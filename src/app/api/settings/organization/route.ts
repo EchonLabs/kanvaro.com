@@ -4,7 +4,7 @@ import { Organization } from '@/models/Organization'
 import { authenticateUser } from '@/lib/auth-utils'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
-import { ensureDirectoryExists, getUploadDirectory } from '@/lib/file-utils'
+import { ensureDirectoryExists, getUploadDirectory, getUploadUrl } from '@/lib/file-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -138,6 +138,6 @@ async function saveLogoFile(file: File, organizationId: string, type: 'light' | 
   // Save file
   await writeFile(filepath, buffer)
   
-  // Return public URL
-  return `/uploads/logos/${filename}`
+  // Return public URL (uses API route if files are stored outside public directory)
+  return getUploadUrl('logos', filename)
 }
