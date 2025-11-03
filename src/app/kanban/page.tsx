@@ -361,9 +361,9 @@ export default function KanbanPage() {
     const matchesSearch = !searchQuery || 
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.project.name.toLowerCase().includes(searchQuery.toLowerCase())
+      (task.project?.name && task.project.name.toLowerCase().includes(searchQuery.toLowerCase()))
     
-    const matchesProject = projectFilter === 'all' || task.project._id === projectFilter
+    const matchesProject = projectFilter === 'all' || (task.project?._id && task.project._id === projectFilter)
     const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
     const matchesType = typeFilter === 'all' || task.type === typeFilter
 
@@ -787,17 +787,17 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
           
           <div className="flex items-center space-x-2">
             <Badge className={getPriorityColor(task.priority)}>
-              {task.priority}
+              {task?.priority}
             </Badge>
             <Badge className={getTypeColor(task.type)}>
-              {task.type}
+              {task?.type}
             </Badge>
           </div>
           
           <div className="text-xs text-muted-foreground">
             <div className="flex items-center space-x-1 mb-1">
               <Target className="h-3 w-3" />
-              <span>{task.project.name}</span>
+              <span>{task?.project?.name}</span>
             </div>
             {task.dueDate && (
               <div className="flex items-center space-x-1 mb-1">
@@ -808,13 +808,13 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
             {task.storyPoints && (
               <div className="flex items-center space-x-1 mb-1">
                 <BarChart3 className="h-3 w-3" />
-                <span>{task.storyPoints} points</span>
+                <span>{task?.storyPoints} points</span>
               </div>
             )}
             {task.estimatedHours && (
               <div className="flex items-center space-x-1">
                 <Clock className="h-3 w-3" />
-                <span>{task.estimatedHours}h</span>
+                <span>{task?.estimatedHours}h</span>
               </div>
             )}
           </div>
@@ -822,24 +822,24 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
           {task.assignedTo && (
             <div className="flex items-center space-x-2">
               <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
-                {task.assignedTo.firstName[0]}{task.assignedTo.lastName[0]}
+                {task?.assignedTo?.firstName[0]}{task?.assignedTo?.lastName[0]}
               </div>
               <span className="text-xs text-muted-foreground">
-                {task.assignedTo.firstName} {task.assignedTo.lastName}
+                {task?.assignedTo?.firstName} {task?.assignedTo?.lastName}
               </span>
             </div>
           )}
           
-          {task.labels.length > 0 && (
+          {task?.labels?.length > 0 && (
             <div className="flex flex-wrap gap-1">
-              {task.labels.slice(0, 2).map((label, index) => (
+              {task?.labels?.slice(0, 2).map((label, index) => (
                 <Badge key={index} variant="outline" className="text-xs">
                   {label}
                 </Badge>
               ))}
-              {task.labels.length > 2 && (
+              {task?.labels?.length > 2 && (
                 <Badge variant="outline" className="text-xs">
-                  +{task.labels.length - 2}
+                  +{task?.labels?.length - 2}
                 </Badge>
               )}
             </div>

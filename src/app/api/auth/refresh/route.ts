@@ -107,6 +107,7 @@ export async function POST() {
       organization: user.organization,
       isActive: user.isActive,
       emailVerified: user.emailVerified,
+      avatar: user.avatar,
       timezone: user.timezone,
       language: user.language,
       currency: user.currency,

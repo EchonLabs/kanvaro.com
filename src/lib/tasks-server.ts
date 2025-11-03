@@ -128,7 +128,7 @@ export async function getTasksServer(filters: TaskFilters = {}): Promise<TasksRe
       const fields = 'title status priority type project position labels createdAt updatedAt assignedTo createdBy storyPoints dueDate estimatedHours actualHours'
 
       let query = Task.find(dbFilters, fields)
-        .populate('project', 'name')
+        .populate('project', '_id name')
         .populate('assignedTo', 'firstName lastName email')
         .populate('createdBy', 'firstName lastName email')
         .sort(sort)
@@ -137,8 +137,9 @@ export async function getTasksServer(filters: TaskFilters = {}): Promise<TasksRe
       if (useCursorPagination) {
         // Cursor pagination: fetch one extra to determine if there are more
         const items = await query.limit(PAGE_SIZE + 1)
-        const hasMore = items.length > PAGE_SIZE
-        const data = hasMore ? items.slice(0, PAGE_SIZE) : items
+        const itemsWithProject = items.filter((t: any) => !!t.project)
+        const hasMore = itemsWithProject.length > PAGE_SIZE
+        const data = hasMore ? itemsWithProject.slice(0, PAGE_SIZE) : itemsWithProject
         const nextCursor = hasMore ? data[data.length - 1].createdAt.toISOString() : null
         
         return {
@@ -152,10 +153,11 @@ export async function getTasksServer(filters: TaskFilters = {}): Promise<TasksRe
       } else {
         // Legacy skip/limit pagination
         const items = await query.limit(PAGE_SIZE)
+        const data = items.filter((t: any) => !!t.project)
         const total = await Task.countDocuments(dbFilters)
         
         return {
-          data: items,
+          data,
           pagination: {
             page: 1,
             limit: PAGE_SIZE,

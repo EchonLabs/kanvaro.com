@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
     const taskQueryFilters: any = { ...filters };
 
     const items = await Task.find(taskQueryFilters)
-      .populate('project', 'name')
+      .populate('project', '_id name')
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
       .sort(sort)
@@ -91,11 +91,14 @@ export async function GET(request: NextRequest) {
       .limit(PAGE_SIZE)
       .lean();
 
+    // Exclude tasks whose project no longer exists (or is outside scope)
+    const filteredItems = items.filter((t: any) => !!t.project)
+
     const total = await Task.countDocuments(taskQueryFilters);
 
     return NextResponse.json({
       success: true,
-      data: items,
+      data: filteredItems,
       pagination: {
         page,
         limit: PAGE_SIZE,
@@ -215,7 +218,7 @@ export async function POST(request: NextRequest) {
 
     // Populate the created task
     const populatedTask = await Task.findById(task._id)
-      .populate('project', 'name')
+      .populate('project', '_id name')
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
       .populate('story', 'title status')
