@@ -7,7 +7,7 @@ import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
-import { ensureDirectoryExists, getUploadDirectory } from '@/lib/file-utils'
+import { ensureDirectoryExists, getUploadDirectory, getUploadUrl } from '@/lib/file-utils'
 
 // Helper function to save logo files
 async function saveLogoFile(file: File | any, organizationId: string, type: 'light' | 'dark'): Promise<string> {
@@ -43,8 +43,8 @@ async function saveLogoFile(file: File | any, organizationId: string, type: 'lig
   // Save file
   await writeFile(filepath, buffer)
   
-  // Return public URL
-  return `/uploads/logos/${filename}`
+  // Return public URL (uses API route if files are stored outside public directory)
+  return getUploadUrl('logos', filename)
 }
 
 export async function GET() {
