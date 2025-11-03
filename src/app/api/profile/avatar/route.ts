@@ -4,7 +4,7 @@ import { User } from '@/models/User'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
 import { authenticateUser } from '@/lib/auth-utils'
-import { ensureDirectoryExists, getUploadDirectory } from '@/lib/file-utils'
+import { ensureDirectoryExists, getUploadDirectory, getUploadUrl } from '@/lib/file-utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -76,8 +76,8 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes)
     await writeFile(filePath, buffer)
 
-    // Update user avatar
-    const avatarUrl = `/uploads/avatars/${fileName}`
+    // Update user avatar (uses API route if files are stored outside public directory)
+    const avatarUrl = getUploadUrl('avatars', fileName)
     user.avatar = avatarUrl
     await user.save()
 

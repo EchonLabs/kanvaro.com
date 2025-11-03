@@ -47,6 +47,49 @@ export async function ensureDirectoryExists(dirPath: string): Promise<void> {
  * @returns The full path to the upload directory
  */
 export function getUploadDirectory(type: string): string {
+  // Check for environment variable first (for containerized environments)
+  const baseUploadDir = process.env.UPLOADS_DIR || process.env.UPLOAD_DIR || process.env.UPLOAD_PATH
+  
+  if (baseUploadDir) {
+    // If UPLOADS_DIR is set, use it as the base directory
+    // It should be an absolute path or relative to process.cwd()
+    const basePath = baseUploadDir.startsWith('/') 
+      ? baseUploadDir 
+      : join(process.cwd(), baseUploadDir)
+    return join(basePath, type)
+  }
+  
+  // Default: use public/uploads (for local development)
+  // For containerized environments, set UPLOADS_DIR environment variable
+  // to a writable path like /tmp/uploads or /app/uploads
   return join(process.cwd(), 'public', 'uploads', type)
+}
+
+/**
+ * Gets the public URL path for an uploaded file
+ * If files are stored outside public directory, returns API route path
+ * @param type - The type of upload (e.g., 'logos', 'avatars')
+ * @param filename - The filename
+ * @returns The public URL path for the file
+ */
+export function getUploadUrl(type: string, filename: string): string {
+  const baseUploadDir = process.env.UPLOADS_DIR || process.env.UPLOAD_DIR || process.env.UPLOAD_PATH
+  const publicDir = join(process.cwd(), 'public')
+  
+  // If UPLOADS_DIR is set and it's outside the public directory, use API route
+  if (baseUploadDir) {
+    const basePath = baseUploadDir.startsWith('/') 
+      ? baseUploadDir 
+      : join(process.cwd(), baseUploadDir)
+    
+    // Check if the upload directory is outside public directory
+    if (!basePath.startsWith(publicDir)) {
+      // Use API route to serve files
+      return `/api/uploads/${type}/${filename}`
+    }
+  }
+  
+  // Default: use direct public path
+  return `/uploads/${type}/${filename}`
 }
 
