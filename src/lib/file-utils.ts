@@ -74,16 +74,21 @@ export function getUploadDirectory(type: string): string {
  */
 export function getUploadUrl(type: string, filename: string): string {
   const baseUploadDir = process.env.UPLOADS_DIR || process.env.UPLOAD_DIR || process.env.UPLOAD_PATH
-  const publicDir = join(process.cwd(), 'public')
   
-  // If UPLOADS_DIR is set and it's outside the public directory, use API route
+  // If UPLOADS_DIR is set, assume files are stored outside public directory
+  // and use API route to serve them
   if (baseUploadDir) {
+    // Normalize paths for comparison
     const basePath = baseUploadDir.startsWith('/') 
       ? baseUploadDir 
       : join(process.cwd(), baseUploadDir)
+    const publicDir = join(process.cwd(), 'public')
+    const normalizedBasePath = basePath.replace(/\/+$/, '') // Remove trailing slashes
+    const normalizedPublicDir = publicDir.replace(/\/+$/, '')
     
     // Check if the upload directory is outside public directory
-    if (!basePath.startsWith(publicDir)) {
+    // Also check if it's an absolute path (likely containerized environment)
+    if (basePath.startsWith('/') && (normalizedBasePath !== normalizedPublicDir && !normalizedBasePath.startsWith(normalizedPublicDir + '/'))) {
       // Use API route to serve files
       return `/api/uploads/${type}/${filename}`
     }
@@ -91,5 +96,36 @@ export function getUploadUrl(type: string, filename: string): string {
   
   // Default: use direct public path
   return `/uploads/${type}/${filename}`
+}
+
+/**
+ * Converts a legacy /uploads/... URL to the correct API route if needed
+ * This is useful for handling existing URLs in the database
+ * @param url - The URL path (e.g., '/uploads/logos/file.jpg')
+ * @returns The corrected URL path (either unchanged or converted to /api/uploads/...)
+ */
+export function normalizeUploadUrl(url: string): string {
+  // Only process URLs that start with /uploads/
+  if (!url || !url.startsWith('/uploads/')) {
+    return url
+  }
+  
+  // Check if UPLOADS_DIR is set (files stored outside public)
+  const baseUploadDir = process.env.UPLOADS_DIR || process.env.UPLOAD_DIR || process.env.UPLOAD_PATH
+  if (baseUploadDir) {
+    const basePath = baseUploadDir.startsWith('/') 
+      ? baseUploadDir 
+      : join(process.cwd(), baseUploadDir)
+    const publicDir = join(process.cwd(), 'public')
+    const normalizedBasePath = basePath.replace(/\/+$/, '')
+    const normalizedPublicDir = publicDir.replace(/\/+$/, '')
+    
+    // If files are stored outside public, convert /uploads/ to /api/uploads/
+    if (basePath.startsWith('/') && (normalizedBasePath !== normalizedPublicDir && !normalizedBasePath.startsWith(normalizedPublicDir + '/'))) {
+      return url.replace(/^\/uploads\//, '/api/uploads/')
+    }
+  }
+  
+  return url
 }
 
