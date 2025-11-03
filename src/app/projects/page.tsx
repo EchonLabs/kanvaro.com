@@ -83,6 +83,7 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -190,6 +191,8 @@ export default function ProjectsPage() {
         setDeleteModalOpen(false)
         setProjectToDelete(null)
         setError('')
+        setSuccess('Project deleted successfully.')
+        setTimeout(() => setSuccess(''), 3000)
       } else {
         setError(data.error || 'Failed to delete project')
       }
@@ -355,6 +358,13 @@ export default function ProjectsPage() {
               <TabsTrigger value="grid">Grid View</TabsTrigger>
               <TabsTrigger value="list">List View</TabsTrigger>
             </TabsList>
+
+            {success && (
+              <Alert className="mt-4">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription>{success}</AlertDescription>
+              </Alert>
+            )}
 
             <TabsContent value="grid" className="space-y-4">
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

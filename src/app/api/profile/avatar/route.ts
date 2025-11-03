@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { User } from '@/models/User'
-import { writeFile, mkdir } from 'fs/promises'
+import { writeFile } from 'fs/promises'
 import { join } from 'path'
-import { existsSync } from 'fs'
 import { authenticateUser } from '@/lib/auth-utils'
+import { ensureDirectoryExists, getUploadDirectory } from '@/lib/file-utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -62,11 +62,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create uploads directory under public so files are served statically
-    const uploadsDir = join(process.cwd(), 'public', 'uploads', 'avatars')
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true })
-    }
+    // Ensure uploads directory exists with proper permissions
+    const uploadsDir = getUploadDirectory('avatars')
+    await ensureDirectoryExists(uploadsDir)
 
     // Generate unique filename
     const fileExtension = file.name.split('.').pop()

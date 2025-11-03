@@ -1,3 +1,10 @@
+## [1.0.16](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.15...v1.0.16) (2025-11-03)
+
+
+### Bug Fixes
+
+* fix images not saving issue ([5b09460](https://github.com/EchonLabs/kanvaro.com/commit/5b0946038681daedbdf99d7f5893af36f6b1d864))
+
 ## [1.0.15](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.14...v1.0.15) (2025-11-03)
 
 

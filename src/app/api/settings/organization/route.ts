@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Organization } from '@/models/Organization'
 import { authenticateUser } from '@/lib/auth-utils'
-import { writeFile, mkdir } from 'fs/promises'
+import { writeFile } from 'fs/promises'
 import { join } from 'path'
-import { existsSync } from 'fs'
+import { ensureDirectoryExists, getUploadDirectory } from '@/lib/file-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -125,11 +125,9 @@ async function saveLogoFile(file: File, organizationId: string, type: 'light' | 
   const bytes = await file.arrayBuffer()
   const buffer = Buffer.from(bytes)
   
-  // Create uploads directory if it doesn't exist
-  const uploadsDir = join(process.cwd(), 'public', 'uploads', 'logos')
-  if (!existsSync(uploadsDir)) {
-    await mkdir(uploadsDir, { recursive: true })
-  }
+  // Ensure uploads directory exists with proper permissions
+  const uploadsDir = getUploadDirectory('logos')
+  await ensureDirectoryExists(uploadsDir)
   
   // Generate unique filename
   const timestamp = Date.now()
