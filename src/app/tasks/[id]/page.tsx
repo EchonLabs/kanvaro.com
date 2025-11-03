@@ -356,7 +356,7 @@ export default function TaskDetailPage() {
                 
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Project</span>
-                  <span className="font-medium">{task.project.name}</span>
+                  <span className="font-medium">{task.project?.name || '—'}</span>
                 </div>
                 
                 {task.assignedTo && (

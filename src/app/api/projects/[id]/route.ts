@@ -187,6 +187,7 @@ export async function DELETE(
     const projectId = params.id
 
     // Check if user can delete this project
+ 
     const canDeleteProject = await PermissionService.hasPermission(userId, Permission.PROJECT_DELETE, projectId)
     if (!canDeleteProject) {
       return NextResponse.json(

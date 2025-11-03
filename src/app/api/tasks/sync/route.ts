@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     // Get tasks that have been updated since the last sync
     const tasks = await Task.find(filters)
-      .populate('project', 'name')
+      .populate('project', '_id name')
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
       .populate('story', 'title')
@@ -53,13 +53,16 @@ export async function GET(request: NextRequest) {
       .sort({ updatedAt: -1 })
       .limit(100) // Limit to prevent large responses
 
+    // Drop orphan tasks with missing project
+    const validTasks = tasks.filter((t: any) => !!t.project)
+
     // Get the most recent update timestamp
-    const latestUpdate = tasks.length > 0 
-      ? Math.max(...tasks.map(task => new Date(task.updatedAt).getTime()))
+    const latestUpdate = validTasks.length > 0 
+      ? Math.max(...validTasks.map(task => new Date(task.updatedAt).getTime()))
       : null
 
     // Format the response
-    const updates = tasks.map(task => ({
+    const updates = validTasks.map(task => ({
       type: 'update',
       data: {
         taskId: task._id,

@@ -475,24 +475,24 @@ export default function TasksClient({
                                     <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                                       <div className="flex items-center space-x-1">
                                         <Target className="h-4 w-4" />
-                                        <span>{task.project.name}</span>
+                                        <span>{task?.project?.name}</span>
                                       </div>
-                                      {task.dueDate && (
+                                      {task?.dueDate && (
                                         <div className="flex items-center space-x-1">
                                           <Calendar className="h-4 w-4" />
-                                          <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>
+                                          <span>Due {new Date(task?.dueDate).toLocaleDateString()}</span>
                                         </div>
                                       )}
-                                      {task.storyPoints && (
+                                      {task?.storyPoints && (
                                         <div className="flex items-center space-x-1">
                                           <BarChart3 className="h-4 w-4" />
-                                          <span>{task.storyPoints} points</span>
+                                          <span>{task?.storyPoints} points</span>
                                         </div>
                                       )}
-                                      {task.estimatedHours && (
+                                      {task?.estimatedHours && (
                                         <div className="flex items-center space-x-1">
                                           <Clock className="h-4 w-4" />
-                                          <span>{task.estimatedHours}h estimated</span>
+                                          <span>{task?.estimatedHours}h estimated</span>
                                         </div>
                                       )}
                                     </div>
@@ -500,9 +500,9 @@ export default function TasksClient({
                                 </div>
                                 <div className="flex items-center space-x-2">
                                   <div className="text-right">
-                                    {task.assignedTo && (
+                                    {task?.assignedTo && (
                                       <div className="text-sm text-muted-foreground">
-                                        {task.assignedTo.firstName} {task.assignedTo.lastName}
+                                        {task?.assignedTo?.firstName} {task?.assignedTo?.lastName}
                                       </div>
                                     )}
                                   </div>
@@ -520,29 +520,32 @@ export default function TasksClient({
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Task
                               </DropdownMenuItem>
-                              <PermissionGate permission={Permission.TASK_UPDATE} projectId={task.project._id}>
-                                
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/tasks/${task._id}/edit`)
-                                }}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit Task
-                                </DropdownMenuItem>
-                              </PermissionGate>
-                              <PermissionGate permission={Permission.TASK_DELETE} projectId={task.project._id}>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleDeleteClick(task)
-                                  }}
-                                  className="text-destructive focus:text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete Task
-                                </DropdownMenuItem>
-                              </PermissionGate>
+                              {task.project?._id && (
+                                <>
+                                  <PermissionGate permission={Permission.TASK_UPDATE} projectId={task?.project?._id}>
+                                    <DropdownMenuItem onClick={(e) => {
+                                      e.stopPropagation()
+                                      router.push(`/tasks/${task._id}/edit`)
+                                    }}>
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Edit Task
+                                    </DropdownMenuItem>
+                                  </PermissionGate>
+                                  <PermissionGate permission={Permission.TASK_DELETE} projectId={task.project._id}>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem 
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleDeleteClick(task)
+                                      }}
+                                      className="text-destructive focus:text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete Task
+                                    </DropdownMenuItem>
+                                  </PermissionGate>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                                 </div>

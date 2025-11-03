@@ -54,6 +54,7 @@ import TestCaseList from '@/components/test-management/TestCaseList'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { TestSuiteForm } from '@/components/test-management/TestSuiteForm'
 import { TestCaseForm } from '@/components/test-management/TestCaseForm'
+import { ProjectTeamTab } from '@/components/projects/ProjectTeamTab'
 
 interface Project {
   _id: string
@@ -386,8 +387,9 @@ export default function ProjectDetailPage() {
           newSearchParams.set('tab', value)
           router.push(`/projects/${projectId}?${newSearchParams.toString()}`)
         }} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1 overflow-x-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-1 overflow-x-auto">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+            <TabsTrigger value="team" className="text-xs sm:text-sm">Team</TabsTrigger>
             <TabsTrigger value="tasks" className="text-xs sm:text-sm">Tasks</TabsTrigger>
             <TabsTrigger value="kanban" className="text-xs sm:text-sm">Kanban</TabsTrigger>
             <TabsTrigger value="calendar" className="text-xs sm:text-sm">Calendar</TabsTrigger>
@@ -553,6 +555,10 @@ export default function ProjectDetailPage() {
                 </Card>
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="team" className="space-y-6">
+            <ProjectTeamTab projectId={projectId} project={project} onUpdate={fetchProject} />
           </TabsContent>
 
           <TabsContent value="tasks" className="space-y-4">

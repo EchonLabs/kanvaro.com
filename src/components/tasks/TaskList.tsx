@@ -64,6 +64,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
@@ -98,6 +99,13 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (success) {
+      const t = setTimeout(() => setSuccess(''), 3000)
+      return () => clearTimeout(t)
+    }
+  }, [success])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -172,6 +180,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         setTasks(tasks.map(task => 
           task._id === taskId ? { ...task, status: newStatus as any } : task
         ))
+        setSuccess('Task updated successfully.')
       }
     } catch (error) {
       console.error('Failed to update task status:', error)
@@ -208,6 +217,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         setTasks(tasks.filter(task => task._id !== selectedTask._id))
         setShowDeleteModal(false)
         setSelectedTask(null)
+        setSuccess('Task deleted successfully.')
       }
     } catch (error) {
       console.error('Failed to delete task:', error)
@@ -220,11 +230,13 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
     fetchTasks()
     setShowEditModal(false)
     setSelectedTask(null)
+    setSuccess('Task updated successfully.')
   }
 
   const handleTaskCreated = () => {
     fetchTasks() // Refresh the task list
     setShowCreateModal(false)
+    setSuccess('Task created successfully.')
   }
 
   const handleCreateTaskClick = () => {
@@ -315,6 +327,11 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
             </SelectContent>
           </Select>
         </div>
+        {success && (
+          <Alert>
+            <AlertDescription>{success}</AlertDescription>
+          </Alert>
+        )}
       </div>
 
       <div className="space-y-4">

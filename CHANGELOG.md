@@ -1,3 +1,10 @@
+## [1.0.15](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.14...v1.0.15) (2025-11-03)
+
+
+### Bug Fixes
+
+* add chnges for task ([e909412](https://github.com/EchonLabs/kanvaro.com/commit/e9094126e0c6ac4acb2e78a111e243565f785815))
+
 ## [1.0.14](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.13...v1.0.14) (2025-10-31)
 
 
