@@ -5,6 +5,7 @@ import { User } from '@/models/User'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { normalizeUploadUrl } from '@/lib/file-utils'
 
 // GET /api/projects/[id]/team - Get project team members
 export async function GET(
@@ -63,14 +64,28 @@ export async function GET(
       .select('firstName lastName email avatar role')
       .lean()
 
+    // Normalize avatar URLs for all members
+    const normalizeUserAvatar = (user: any) => {
+      if (!user) return user
+      return {
+        ...user,
+        avatar: normalizeUploadUrl(user.avatar || '')
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
-        teamMembers: project.teamMembers,
-        projectRoles: project.projectRoles || [],
-        createdBy: project.createdBy,
-        client: project.client,
-        availableMembers: organizationMembers
+        teamMembers: Array.isArray(project.teamMembers) 
+          ? project.teamMembers.map(normalizeUserAvatar)
+          : project.teamMembers ? [normalizeUserAvatar(project.teamMembers)] : [],
+        projectRoles: (project.projectRoles || []).map((pr: any) => ({
+          ...pr,
+          user: pr.user ? normalizeUserAvatar(pr.user) : pr.user
+        })),
+        createdBy: normalizeUserAvatar(project.createdBy),
+        client: normalizeUserAvatar(project.client),
+        availableMembers: organizationMembers.map(normalizeUserAvatar)
       }
     })
 

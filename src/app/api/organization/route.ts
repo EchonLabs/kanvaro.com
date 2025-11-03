@@ -7,7 +7,7 @@ import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
-import { ensureDirectoryExists, getUploadDirectory, getUploadUrl } from '@/lib/file-utils'
+import { ensureDirectoryExists, getUploadDirectory, getUploadUrl, normalizeUploadUrl } from '@/lib/file-utils'
 
 // Helper function to save logo files
 async function saveLogoFile(file: File | any, organizationId: string, type: 'light' | 'dark'): Promise<string> {
@@ -142,8 +142,8 @@ export async function GET() {
       id: organization._id,
       name: organization.name,
       domain: organization.domain,
-      logo: organization.logo,
-      darkLogo: organization.darkLogo,
+      logo: normalizeUploadUrl(organization.logo || ''),
+      darkLogo: normalizeUploadUrl(organization.darkLogo || ''),
       logoMode: organization.logoMode,
       timezone: organization.timezone,
       currency: organization.currency,
@@ -457,8 +457,8 @@ export async function PUT(request: NextRequest) {
         id: organization._id,
         name: organization.name,
         domain: organization.domain,
-        logo: organization.logo,
-        darkLogo: organization.darkLogo,
+        logo: normalizeUploadUrl(organization.logo || ''),
+        darkLogo: normalizeUploadUrl(organization.darkLogo || ''),
         logoMode: organization.logoMode,
         timezone: organization.timezone,
         currency: organization.currency,

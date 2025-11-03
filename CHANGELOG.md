@@ -1,3 +1,10 @@
+## [1.0.18](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.17...v1.0.18) (2025-11-03)
+
+
+### Bug Fixes
+
+* :bug: add changes for profile upload issue ([e12f749](https://github.com/EchonLabs/kanvaro.com/commit/e12f749d9a1180d3af2e9d58cac18a887c8c2aeb))
+
 ## [1.0.17](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.16...v1.0.17) (2025-11-03)
 
 

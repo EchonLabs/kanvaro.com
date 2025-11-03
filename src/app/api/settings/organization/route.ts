@@ -4,7 +4,7 @@ import { Organization } from '@/models/Organization'
 import { authenticateUser } from '@/lib/auth-utils'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
-import { ensureDirectoryExists, getUploadDirectory, getUploadUrl } from '@/lib/file-utils'
+import { ensureDirectoryExists, getUploadDirectory, getUploadUrl, normalizeUploadUrl } from '@/lib/file-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,9 +29,16 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Normalize logo URLs before returning
+    const responseData = {
+      ...organization.toObject(),
+      logo: normalizeUploadUrl(organization.logo || ''),
+      darkLogo: normalizeUploadUrl(organization.darkLogo || '')
+    }
+
     return NextResponse.json({
       success: true,
-      data: organization
+      data: responseData
     })
 
   } catch (error) {
@@ -106,10 +113,17 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    // Normalize logo URLs before returning
+    const responseData = {
+      ...organization.toObject(),
+      logo: normalizeUploadUrl(organization.logo || ''),
+      darkLogo: normalizeUploadUrl(organization.darkLogo || '')
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Organization updated successfully',
-      data: organization
+      data: responseData
     })
 
   } catch (error) {

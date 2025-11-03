@@ -5,6 +5,7 @@ import { Organization } from '@/models/Organization'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { normalizeUploadUrl } from '@/lib/file-utils'
 
 export async function GET() {
   try {
@@ -65,8 +66,8 @@ export async function GET() {
     const settings = {
       id: organization._id,
       name: organization.name,
-      logo: organization.logo,
-      darkLogo: organization.darkLogo,
+      logo: normalizeUploadUrl(organization.logo || ''),
+      darkLogo: normalizeUploadUrl(organization.darkLogo || ''),
       logoMode: organization.logoMode,
       contactInfo: organization.contactInfo || null,
       isConfigured: !!organization.contactInfo
@@ -143,8 +144,8 @@ export async function PUT(request: NextRequest) {
       data: {
         id: organization._id,
         name: organization.name,
-        logo: organization.logo,
-        darkLogo: organization.darkLogo,
+        logo: normalizeUploadUrl(organization.logo || ''),
+        darkLogo: normalizeUploadUrl(organization.darkLogo || ''),
         logoMode: organization.logoMode,
         contactInfo: organization.contactInfo,
         isConfigured: !!organization.contactInfo
