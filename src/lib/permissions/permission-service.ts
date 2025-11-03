@@ -84,6 +84,20 @@ export class PermissionService {
           // For project-scoped permissions, we need a project context
           return false;
         }
+        
+        // First check if user has the permission globally (e.g., ADMIN role)
+        if (userPermissions.globalPermissions.includes(permission)) {
+          // If they have it globally, verify the project belongs to their organization
+          const user = await User.findById(userId);
+          if (user) {
+            const project = await Project.findById(projectId);
+            if (project && user.organization.toString() === project.organization.toString()) {
+              return true;
+            }
+          }
+        }
+        
+        // Check project-specific permissions
         const projectPermissions = userPermissions.projectPermissions.get(projectId);
         return projectPermissions ? projectPermissions.includes(permission) : false;
         

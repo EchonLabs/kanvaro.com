@@ -75,13 +75,11 @@ export default function DashboardPage() {
       
       if (response.ok) {
         const userData = await response.json()
-        console.log('Dashboard: User data received:', userData)
         setUser(userData)
         setAuthError('')
         // Load dashboard data after successful auth
         await loadDashboardData()
       } else if (response.status === 401) {
-        console.log('Dashboard: 401 response, trying refresh token')
         // Try to refresh token
         const refreshResponse = await fetch('/api/auth/refresh', {
           method: 'POST'

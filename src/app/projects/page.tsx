@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PermissionGate, PermissionButton } from '@/lib/permissions/permission-components'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PageContent } from '@/components/ui/PageContent'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { 
   Plus, 
   Search, 
@@ -87,6 +88,9 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Seed filters from URL search params on mount
   useEffect(() => {
@@ -166,21 +170,39 @@ export default function ProjectsPage() {
     }
   }
 
-  const handleDeleteProject = async (projectId: string) => {
+  const handleDeleteClick = (projectId: string) => {
+    setProjectToDelete(projectId)
+    setDeleteModalOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!projectToDelete) return
+
     try {
-      const response = await fetch(`/api/projects/${projectId}`, {
+      setIsDeleting(true)
+      const response = await fetch(`/api/projects/${projectToDelete}`, {
         method: 'DELETE'
       })
       const data = await response.json()
 
       if (data.success) {
-        setProjects(projects.filter(p => p._id !== projectId))
+        setProjects(projects.filter(p => p._id !== projectToDelete))
+        setDeleteModalOpen(false)
+        setProjectToDelete(null)
+        setError('')
       } else {
         setError(data.error || 'Failed to delete project')
       }
     } catch (err) {
       setError('Failed to delete project')
+    } finally {
+      setIsDeleting(false)
     }
+  }
+
+  const handleDeleteCancel = () => {
+    setDeleteModalOpen(false)
+    setProjectToDelete(null)
   }
 
   const getStatusColor = (status: string) => {
@@ -395,10 +417,7 @@ export default function ProjectsPage() {
                               <DropdownMenuItem 
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  // Handle delete with confirmation
-                                  if (confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
-                                    handleDeleteProject(project._id)
-                                  }
+                                  handleDeleteClick(project._id)
                                 }}
                                 className="text-destructive focus:text-destructive"
                               >
@@ -560,10 +579,7 @@ export default function ProjectsPage() {
                                 <DropdownMenuItem 
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    // Handle delete with confirmation
-                                    if (confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
-                                      handleDeleteProject(project._id)
-                                    }
+                                    handleDeleteClick(project._id)
                                   }}
                                   className="text-destructive focus:text-destructive"
                                 >
@@ -584,6 +600,18 @@ export default function ProjectsPage() {
         </CardContent>
         </Card>
         </div>
+
+        <ConfirmationModal
+          isOpen={deleteModalOpen}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Project"
+          description={`Are you sure you want to delete "${projects.find(p => p._id === projectToDelete)?.name || 'this project'}"? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          variant="destructive"
+          isLoading={isDeleting}
+        />
       </PageContent>
     </MainLayout>
   )
