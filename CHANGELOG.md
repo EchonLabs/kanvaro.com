@@ -1,3 +1,10 @@
+## [1.0.17](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.16...v1.0.17) (2025-11-03)
+
+
+### Bug Fixes
+
+* add changes ([c3f7ba6](https://github.com/EchonLabs/kanvaro.com/commit/c3f7ba6fc75c8fcec8a9803855f39d84fcc0455c))
+
 ## [1.0.16](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.15...v1.0.16) (2025-11-03)
 
 
