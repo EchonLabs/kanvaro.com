@@ -4,7 +4,7 @@ import { User } from '@/models/User'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
 import { authenticateUser } from '@/lib/auth-utils'
-import { ensureDirectoryExists, getUploadDirectory, getUploadUrl } from '@/lib/file-utils'
+import { ensureDirectoryExists, getUploadDirectory, getUploadUrl, normalizeUploadUrl } from '@/lib/file-utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Avatar uploaded successfully',
       data: {
-        avatar: avatarUrl
+        avatar: normalizeUploadUrl(avatarUrl)
       }
     })
 
