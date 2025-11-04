@@ -51,17 +51,18 @@ CustomRoleSchema.index({ organization: 1, name: 1 }, { unique: true })
 CustomRoleSchema.index({ organization: 1, isActive: 1 })
 CustomRoleSchema.index({ createdBy: 1 })
 
-// Ensure unique role names per organization
+// Ensure unique role names per organization (only for active roles)
 CustomRoleSchema.pre('save', async function(next) {
   if (this.isModified('name') || this.isNew) {
-    const existingRole = await (this.constructor as any).findOne({
+    // Only check for active roles - inactive (deleted) roles can be reused
+    const existingActiveRole = await (this.constructor as any).findOne({
       name: this.name,
       organization: this.organization,
       isActive: true,
       _id: { $ne: this._id }
     })
     
-    if (existingRole) {
+    if (existingActiveRole) {
       const error = new Error('Role name already exists in this organization')
       return next(error)
     }

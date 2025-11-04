@@ -389,14 +389,29 @@ export default function CreateProjectPage() {
 
   // Add team member
   const addTeamMember = (member: any) => {
-    if (!formData.teamMembers.find(m => m === member._id)) {
-      setFormData(prev => ({
-        ...prev,
-        teamMembers: [...prev.teamMembers, member._id]
-      }))
+    const memberId = member._id || member
+    const memberIdString = typeof memberId === 'string' ? memberId : memberId.toString()
+    
+    // Check if member already exists (comparing as strings)
+    const alreadyExists = formData.teamMembers.some((m: string) => {
+      const existingId = typeof m === 'string' ? m : String(m)
+      return existingId === memberIdString
+    })
+    
+    if (alreadyExists) {
+      setError('This team member is already added to the project')
+      setTimeout(() => setError(''), 3000)
+      return
     }
+    
+    setFormData(prev => ({
+      ...prev,
+      teamMembers: [...prev.teamMembers, memberIdString]
+    }))
     setShowMemberSearch(false)
     setMemberSearchQuery('')
+    setSuccess('Team member added successfully')
+    setTimeout(() => setSuccess(''), 2000)
   }
 
   // Remove team member
@@ -409,12 +424,23 @@ export default function CreateProjectPage() {
 
   // Add client
   const addClient = (member: any) => {
+    const memberId = member._id || member
+    const memberIdString = typeof memberId === 'string' ? memberId : memberId.toString()
+    
+    // Check if this client is already a team member
+    const isTeamMember = formData.teamMembers.some((m: string) => {
+      const existingId = typeof m === 'string' ? m : String(m)
+      return existingId === memberIdString
+    })
+    
     setFormData(prev => ({
       ...prev,
-      clients: [member._id] // For now, only support one client
+      clients: [memberIdString] // For now, only support one client
     }))
     setShowClientSearch(false)
     setClientSearchQuery('')
+    setSuccess('Client assigned successfully')
+    setTimeout(() => setSuccess(''), 2000)
   }
 
   // Remove client
@@ -425,24 +451,45 @@ export default function CreateProjectPage() {
     }))
   }
 
-  // Filter members based on search
+  // Filter members based on search and exclude already added members
   const filteredMembers = availableMembers.filter(member => {
     const searchTerm = memberSearchQuery.toLowerCase()
-    return (
+    const matchesSearch = (
       member.firstName.toLowerCase().includes(searchTerm) ||
       member.lastName.toLowerCase().includes(searchTerm) ||
       member.email.toLowerCase().includes(searchTerm)
     )
+    
+    // Exclude members that are already in the team
+    const memberId = member._id || (member as any)._id
+    const memberIdString = memberId ? (typeof memberId === 'string' ? memberId : String(memberId)) : ''
+    const isAlreadyAdded = formData.teamMembers.some((m: string) => {
+      const existingId = typeof m === 'string' ? m : String(m)
+      return existingId === memberIdString
+    })
+    
+    return matchesSearch && !isAlreadyAdded
   })
 
+  // Filter clients based on search and exclude already selected client
   const filteredClients = availableMembers.filter(member => {
     const searchTerm = clientSearchQuery.toLowerCase()
-    return (
+    const matchesSearch = (
       member.firstName.toLowerCase().includes(searchTerm) ||
       member.lastName.toLowerCase().includes(searchTerm) ||
       member.email.toLowerCase().includes(searchTerm)
     )
-  }).filter(member => !formData.clients.find(c => c === member._id))
+    
+    // Exclude already selected client
+    const memberId = member._id || (member as any)._id
+    const memberIdString = memberId ? (typeof memberId === 'string' ? memberId : String(memberId)) : ''
+    const isAlreadySelected = formData.clients.some((c: string) => {
+      const clientId = typeof c === 'string' ? c : String(c)
+      return clientId === memberIdString
+    })
+    
+    return matchesSearch && !isAlreadySelected
+  })
 
   // Load members when component mounts
   useEffect(() => {
@@ -464,6 +511,20 @@ export default function CreateProjectPage() {
       
       if (data.success && data.data) {
         const project = data.data
+        
+        // Extract team member IDs from populated objects or use array of IDs
+        const teamMemberIds = Array.isArray(project.teamMembers) 
+          ? project.teamMembers.map((member: any) => {
+              // Handle both populated objects and plain IDs
+              return typeof member === 'object' && member._id ? member._id : member
+            })
+          : []
+        
+        // Extract client ID from populated object or use plain ID
+        const clientId = project.client 
+          ? (typeof project.client === 'object' && project.client._id ? project.client._id : project.client)
+          : null
+        
         setFormData({
           name: project.name || '',
           description: project.description || '',
@@ -481,8 +542,8 @@ export default function CreateProjectPage() {
               overhead: 0
             }
           },
-          teamMembers: project.teamMembers || [],
-          clients: project.client ? [project.client] : [],
+          teamMembers: teamMemberIds,
+          clients: clientId ? [clientId] : [],
           settings: project.settings || {
             allowTimeTracking: true,
             allowManualTimeSubmission: true,
@@ -929,12 +990,10 @@ export default function CreateProjectPage() {
                     <div className="max-h-48 overflow-y-auto border rounded-lg">
                       {filteredMembers.length > 0 ? (
                         <div className="space-y-1 p-2">
-                          {filteredMembers
-                            .filter(member => !formData.teamMembers.find(m => m === member._id))
-                            .map((member) => (
+                          {filteredMembers.map((member) => (
                             <div
                               key={member._id}
-                              className="flex items-center justify-between p-2 hover:bg-muted rounded cursor-pointer"
+                              className="flex items-center justify-between p-2 hover:bg-muted rounded cursor-pointer transition-colors"
                               onClick={() => addTeamMember(member)}
                             >
                               <div className="flex items-center space-x-3">
@@ -957,7 +1016,9 @@ export default function CreateProjectPage() {
                         </div>
                       ) : (
                         <div className="p-4 text-center text-muted-foreground">
-                          <p className="text-sm">No members found</p>
+                          <p className="text-sm">
+                            {memberSearchQuery ? 'No matching members found' : 'All available members are already added'}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -1042,7 +1103,7 @@ export default function CreateProjectPage() {
                           {filteredClients.map((member) => (
                             <div
                               key={member._id}
-                              className="flex items-center justify-between p-2 hover:bg-muted rounded cursor-pointer"
+                              className="flex items-center justify-between p-2 hover:bg-muted rounded cursor-pointer transition-colors"
                               onClick={() => addClient(member)}
                             >
                               <div className="flex items-center space-x-3">
@@ -1065,7 +1126,9 @@ export default function CreateProjectPage() {
                         </div>
                       ) : (
                         <div className="p-4 text-center text-muted-foreground">
-                          <p className="text-sm">No members found</p>
+                          <p className="text-sm">
+                            {clientSearchQuery ? 'No matching members found' : 'Client already assigned'}
+                          </p>
                         </div>
                       )}
                     </div>

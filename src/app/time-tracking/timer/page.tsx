@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Timer } from '@/components/time-tracking/Timer'
 import { TimeLogs } from '@/components/time-tracking/TimeLogs'
@@ -58,6 +58,7 @@ interface User {
 
 export default function TimerPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [authError, setAuthError] = useState('')
@@ -118,6 +119,24 @@ console.log('user',user);
 
     checkAuth()
   }, [router])
+
+  // Preselect project from query params when projects are loaded
+  useEffect(() => {
+    if (!projects || projects.length === 0) return
+    if (selectedProject) return
+    let pid = searchParams?.get('project') || searchParams?.get('projectId') || ''
+    const pnameRaw = searchParams?.get('projectName') || ''
+    const pname = pnameRaw && pnameRaw !== 'undefined' && pnameRaw !== 'null' ? pnameRaw : ''
+    if (pid === 'undefined' || pid === 'null') pid = ''
+    let projectIdToSelect = pid || ''
+    if (!projectIdToSelect && pname) {
+      const match = projects.find(p => p.name.toLowerCase() === pname.toLowerCase())
+      if (match) projectIdToSelect = match._id
+    }
+    if (projectIdToSelect) {
+      handleProjectChange(projectIdToSelect)
+    }
+  }, [projects, searchParams, selectedProject])
 
   const fetchProjects = async () => {
     try {

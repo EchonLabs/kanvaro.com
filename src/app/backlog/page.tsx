@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -10,6 +10,10 @@ import { Badge } from '@/components/ui/Badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from '@radix-ui/react-dropdown-menu'
+import { DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
+import { Eye, Edit, Trash2 } from 'lucide-react'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { 
   Plus, 
   Search, 
@@ -41,10 +45,10 @@ interface BacklogItem {
   type: 'epic' | 'story' | 'task'
   priority: 'low' | 'medium' | 'high' | 'critical'
   status: 'backlog' | 'sprint' | 'in_progress' | 'done'
-  project: {
+  project?: {
     _id: string
     name: string
-  }
+  } | null
   assignedTo?: {
     firstName: string
     lastName: string
@@ -73,9 +77,15 @@ interface BacklogItem {
 
 export default function BacklogPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [backlogItems, setBacklogItems] = useState<BacklogItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [deleteError, setDeleteError] = useState('')
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [selectedForDelete, setSelectedForDelete] = useState<{ id: string; type: BacklogItem['type']; title: string } | null>(null)
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -121,6 +131,15 @@ export default function BacklogPage() {
     checkAuth()
   }, [checkAuth])
 
+  useEffect(() => {
+    const successParam = searchParams?.get('success')
+    if (successParam === 'story-created') {
+      setSuccess('User story created successfully.')
+      const timeout = setTimeout(() => setSuccess(''), 3000)
+      return () => clearTimeout(timeout)
+    }
+  }, [searchParams])
+
   const fetchBacklogItems = async () => {
     try {
       setLoading(true)
@@ -136,6 +155,41 @@ export default function BacklogPage() {
       setError('Failed to fetch backlog items')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDeleteClick = (item: BacklogItem) => {
+    setSelectedForDelete({ id: item._id, type: item.type, title: item.title })
+    setShowDeleteConfirmModal(true)
+  }
+
+  const handleDeleteItem = async () => {
+    if (!selectedForDelete) return
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      let endpoint = ''
+      if (selectedForDelete.type === 'task') endpoint = `/api/tasks/${selectedForDelete.id}`
+      else if (selectedForDelete.type === 'story') endpoint = `/api/stories/${selectedForDelete.id}`
+      else if (selectedForDelete.type === 'epic') endpoint = `/api/epics/${selectedForDelete.id}`
+
+      const res = await fetch(endpoint, { method: 'DELETE' })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setBacklogItems(prev => prev.filter(x => x._id !== selectedForDelete.id))
+        setSuccess(`${selectedForDelete.type.charAt(0).toUpperCase() + selectedForDelete.type.slice(1)} deleted successfully.`)
+        setTimeout(() => setSuccess(''), 3000)
+        setShowDeleteConfirmModal(false)
+        setSelectedForDelete(null)
+      } else {
+        setDeleteError(data.error || 'Failed to delete item')
+        setShowDeleteConfirmModal(false)
+      }
+    } catch (e) {
+      setDeleteError('Failed to delete item')
+      setShowDeleteConfirmModal(false)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -173,7 +227,7 @@ export default function BacklogPage() {
       const matchesSearch = !searchQuery || 
         item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.project.name.toLowerCase().includes(searchQuery.toLowerCase())
+        (item.project?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
       
       const matchesType = typeFilter === 'all' || item.type === typeFilter
       const matchesPriority = priorityFilter === 'all' || item.priority === priorityFilter
@@ -258,6 +312,12 @@ export default function BacklogPage() {
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {success && (
+          <Alert>
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription>{success}</AlertDescription>
           </Alert>
         )}
 
@@ -381,7 +441,11 @@ export default function BacklogPage() {
                         <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                           <div className="flex items-center space-x-1">
                             <Target className="h-3 w-3 sm:h-4 sm:w-4" />
-                            <span className="truncate">{item.project.name}</span>
+                            {item.project?.name ? (
+                              <span className="truncate">{item.project.name}</span>
+                            ) : (
+                              <span className="truncate italic text-muted-foreground">Project deleted or unavailable</span>
+                            )}
                           </div>
                           {item.dueDate && (
                             <div className="flex items-center space-x-1">
@@ -410,9 +474,54 @@ export default function BacklogPage() {
                         </div>
                       </div>
                       <div className="flex items-center space-x-2 flex-shrink-0">
-                        <Button variant="ghost" size="sm" className="flex-shrink-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="flex-shrink-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-[172px] py-2 rounded-md shadow-lg border border-border bg-background z-[10000]">
+                            {/* View */}
+                            {item.type === 'task' && (
+                              <DropdownMenuItem onClick={() => router.push(`/tasks/${item._id}`)} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
+                                <Eye className="h-4 w-4 mr-2" />
+                                <span>View Task</span>
+                              </DropdownMenuItem>
+                            )}
+                            {item.type === 'story' && (
+                              <DropdownMenuItem onClick={() => router.push(`/stories/${item._id}`)} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
+                                <Eye className="h-4 w-4 mr-2" />
+                                <span>View Story</span>
+                              </DropdownMenuItem>
+                            )}
+                            {item.type === 'epic' && (
+                              <DropdownMenuItem onClick={() => router.push(`/epics/${item._id}`)} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
+                                <Eye className="h-4 w-4 mr-2" />
+                                <span>View Epic</span>
+                              </DropdownMenuItem>
+                            )}
+
+                            {/* Edit */}
+                            {item.type === 'task' && (
+                              <DropdownMenuItem onClick={() => router.push(`/tasks/${item._id}/edit`)} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
+                                <Edit className="h-4 w-4 mr-2" />
+                                <span>Edit Task</span>
+                              </DropdownMenuItem>
+                            )}
+                            {item.type === 'story' && (
+                              <DropdownMenuItem onClick={() => router.push(`/stories/${item._id}/edit`)} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
+                                <Edit className="h-4 w-4 mr-2" />
+                                <span>Edit Story</span>
+                              </DropdownMenuItem>
+                            )}
+
+                            {/* Delete */}
+                            <DropdownMenuItem onClick={() => handleDeleteClick(item)} className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer">
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              <span>Delete {item.type.charAt(0).toUpperCase() + item.type.slice(1)}</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   </CardContent>
@@ -421,6 +530,16 @@ export default function BacklogPage() {
             </div>
           </CardContent>
         </Card>
+
+        <ConfirmationModal
+          isOpen={showDeleteConfirmModal}
+          onClose={() => { setShowDeleteConfirmModal(false); setSelectedForDelete(null); }}
+          onConfirm={handleDeleteItem}
+          title={`Delete ${selectedForDelete?.type ? selectedForDelete.type.charAt(0).toUpperCase() + selectedForDelete.type.slice(1) : 'Item'}`}
+          description={`Are you sure you want to delete "${selectedForDelete?.title}"? This action cannot be undone.`}
+          confirmText={deleting ? 'Deleting...' : 'Delete'}
+          cancelText="Cancel"
+        />
       </div>
     </MainLayout>
   )

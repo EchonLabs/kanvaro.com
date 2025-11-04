@@ -46,9 +46,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/Popover'
-import { getAppVersion } from '@/lib/version'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { usePermissions } from '@/lib/permissions/permission-context'
+import packageJson from '../../../package.json'
 
 interface SidebarProps {
   collapsed: boolean
@@ -423,7 +423,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {!collapsed && (
           <div className="px-1 pb-2 text-xs text-muted-foreground flex items-center justify-between">
             <span>Version</span>
-            <span className="font-mono">{getAppVersion()}</span>
+            <span className="font-mono">{packageJson.version}</span>
           </div>
         )}
         <Button
