@@ -1,3 +1,10 @@
+## [1.0.20](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.19...v1.0.20) (2025-11-04)
+
+
+### Bug Fixes
+
+* add changes for timer change ([ee4d1c0](https://github.com/EchonLabs/kanvaro.com/commit/ee4d1c09b9bc3e115847d7953634fc377426e934))
+
 ## [1.0.19](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.18...v1.0.19) (2025-11-04)
 
 
