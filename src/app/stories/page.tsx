@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -45,10 +45,10 @@ interface Story {
   description: string
   status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
-  project: {
+  project?: {
     _id: string
     name: string
-  }
+  } | null
   epic?: {
     _id: string
     name: string
@@ -78,6 +78,7 @@ interface Story {
 
 export default function StoriesPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [stories, setStories] = useState<Story[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -128,6 +129,15 @@ export default function StoriesPage() {
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
+
+  useEffect(() => {
+    const successParam = searchParams?.get('success')
+    if (successParam === 'story-created') {
+      setSuccess('User story created successfully.')
+      const timeout = setTimeout(() => setSuccess(''), 3000)
+      return () => clearTimeout(timeout)
+    }
+  }, [searchParams])
 
   const fetchStories = async () => {
     try {
@@ -212,7 +222,7 @@ export default function StoriesPage() {
     const matchesSearch = !searchQuery || 
       story.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       story.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      story.project.name.toLowerCase().includes(searchQuery.toLowerCase())
+      (story.project?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
     
     const matchesStatus = statusFilter === 'all' || story.status === statusFilter
     const matchesPriority = priorityFilter === 'all' || story.priority === priorityFilter
@@ -278,6 +288,12 @@ export default function StoriesPage() {
                   </CardDescription>
                 </div>
               </div>
+              {success && (
+                <Alert>
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>{success}</AlertDescription>
+                </Alert>
+              )}
               <div className="flex flex-col gap-2 sm:gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -331,8 +347,8 @@ export default function StoriesPage() {
                   {filteredStories.map((story) => (
                     <Card 
                       key={story._id} 
-                      className="hover:shadow-md transition-shadow cursor-default"
-                      onClick={() => router.push(`/stories/${story._id}`)}
+                      className={`hover:shadow-md transition-shadow ${story.project ? 'cursor-pointer' : 'cursor-default'}`}
+                      onClick={() => { if (story.project) router.push(`/stories/${story._id}`); }}
                     >
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
@@ -355,7 +371,7 @@ export default function StoriesPage() {
                               <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                                 <div className="flex items-center space-x-1">
                                   <Target className="h-4 w-4" />
-                                  <span>{story.project.name}</span>
+                                  <span>{story.project?.name || 'Project deleted or unavailable'}</span>
                                 </div>
                                 {story.epic && (
                                   <div className="flex items-center space-x-1">
@@ -406,17 +422,19 @@ export default function StoriesPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="min-w-[172px] py-2 rounded-md shadow-lg border border-border bg-background z-[10000]">
-                                <DropdownMenuItem onClick={e => { e.stopPropagation(); router.push(`/stories/${story._id}`); }} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  <span>View Story</span>
-                                </DropdownMenuItem>
-                                <PermissionGate permission={Permission.STORY_UPDATE} projectId={story.project._id}>
+                               
+                                  <DropdownMenuItem onClick={e => { e.stopPropagation(); router.push(`/stories/${story._id}`); }} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    <span>View Story</span>
+                                  </DropdownMenuItem>
+                              
+                                <PermissionGate permission={Permission.STORY_UPDATE} projectId={story.project?._id}>
                                   <DropdownMenuItem onClick={e => { e.stopPropagation(); router.push(`/stories/${story._id}/edit`); }} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
                                     <Edit className="h-4 w-4 mr-2" />
                                     <span>Edit Story</span>
                                   </DropdownMenuItem>
                                 </PermissionGate>
-                                <PermissionGate permission={Permission.STORY_DELETE} projectId={story.project._id}>
+                                <PermissionGate permission={Permission.STORY_DELETE} projectId={story.project?._id}>
                                   <DropdownMenuSeparator className="my-1" />
                                   <DropdownMenuItem onClick={e => { e.stopPropagation(); handleDeleteClick(story); }} className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer">
                                     <Trash2 className="h-4 w-4 mr-2" />

@@ -5,6 +5,7 @@ import { TimeTrackingSettings } from '@/models/TimeTrackingSettings'
 import { Project } from '@/models/Project'
 import { User } from '@/models/User'
 import { Organization } from '@/models/Organization'
+import { Task } from '@/models/Task'
 
 export async function GET(request: NextRequest) {
   try {
@@ -49,11 +50,35 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
     const timeEntries = await TimeEntry.find(query)
       .populate('project', 'name')
-      .populate('task', 'title')
+      .populate({ path: 'task', model: Task, select: 'title' })
       .populate('approvedBy', 'firstName lastName')
       .sort({ startTime: -1 })
       .skip(skip)
       .limit(limit)
+      .lean()
+    
+    // Normalize the response - ensure project and task are properly formatted
+    // Handle cases where project/task might be deleted (populate returns null)
+    const normalizedEntries = timeEntries.map((entry: any) => {
+      // Check if project exists (populate returns null if document deleted)
+      const project = entry.project && typeof entry.project === 'object' && entry.project.name
+        ? { _id: entry.project._id || entry.project, name: entry.project.name }
+        : null
+      
+      // Check if task exists (populate returns null if document deleted)
+      // Only set task if task field exists in original entry (not null)
+      const task = entry.task && typeof entry.task === 'object' && entry.task.title
+        ? { _id: entry.task._id || entry.task, title: entry.task.title }
+        : entry.task !== null && entry.task !== undefined
+        ? { _id: entry.task._id || entry.task, title: null } // Task reference exists but document deleted
+        : null
+      
+      return {
+        ...entry,
+        project,
+        task
+      }
+    })
 
     const total = await TimeEntry.countDocuments(query)
 
@@ -70,7 +95,7 @@ export async function GET(request: NextRequest) {
     }, 0)
 
     return NextResponse.json({
-      timeEntries,
+      timeEntries: normalizedEntries,
       pagination: {
         page,
         limit,

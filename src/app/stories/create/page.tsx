@@ -51,6 +51,7 @@ export default function CreateStoryPage() {
   const [epics, setEpics] = useState<Epic[]>([])
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [projectQuery, setProjectQuery] = useState("");
+  const [assigneeQuery, setAssigneeQuery] = useState('')
 
   const [formData, setFormData] = useState({
     title: '',
@@ -127,7 +128,11 @@ export default function CreateStoryPage() {
       const response = await fetch('/api/members')
       const data = await response.json()
 
-      if (data.success && Array.isArray(data.data)) {
+      // Align with members API shape used elsewhere (e.g., tasks create page)
+      if (data.success && data.data && Array.isArray(data.data.members)) {
+        setUsers(data.data.members)
+      } else if (Array.isArray(data.data)) {
+        // Fallback in case API returns raw array
         setUsers(data.data)
       } else {
         setUsers([])
@@ -205,7 +210,7 @@ export default function CreateStoryPage() {
       const data = await response.json()
 
       if (data.success) {
-        router.push('/stories')
+        router.push('/stories?success=story-created')
       } else {
         setError(data.error || 'Failed to create story')
       }
@@ -226,6 +231,10 @@ export default function CreateStoryPage() {
     if (field === 'project') {
       fetchEpics(value)
       fetchSprints(value)
+      if (!value) {
+        setFormData(prev => ({ ...prev, assignedTo: '' }))
+        setAssigneeQuery('')
+      }
     }
   }
 
@@ -344,6 +353,75 @@ export default function CreateStoryPage() {
                     </Select>
                   </div>
 
+                {formData.project && (
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Assigned To</label>
+                    <div className="mt-1 border rounded-md p-2">
+                      <Input
+                        value={assigneeQuery}
+                        onChange={e => setAssigneeQuery(e.target.value)}
+                        placeholder={'Type to search team members'}
+                        className="mb-2"
+                      />
+                      <div className="max-h-40 overflow-y-auto space-y-1">
+                        {assigneeQuery.trim() === '' ? null : (
+                          (() => {
+                            const q = assigneeQuery.toLowerCase();
+                            const filtered = users.filter(u =>
+                              `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
+                              u.email.toLowerCase().includes(q)
+                            );
+                            if (filtered.length === 0) {
+                              return (
+                                <div className="text-sm text-muted-foreground p-2">No matching members</div>
+                              )
+                            }
+                            return filtered.map(user => (
+                              <button
+                                type="button"
+                                key={user._id}
+                                className="w-full text-left p-1 rounded hover:bg-accent"
+                                onClick={() => {
+                                  setFormData(prev => ({ ...prev, assignedTo: user._id }))
+                                  setAssigneeQuery('')
+                                }}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm">{user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span></span>
+                                  {formData.assignedTo === user._id && (
+                                    <span className="text-xs text-muted-foreground">Selected</span>
+                                  )}
+                                </div>
+                              </button>
+                            ));
+                          })()
+                        )}
+                      </div>
+                      {formData.assignedTo && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {(() => {
+                            const u = users.find(x => x._id === formData.assignedTo);
+                            if (!u) return null;
+                            return (
+                              <span className="inline-flex items-center text-xs bg-muted px-2 py-1 rounded">
+                                <span className="mr-2">{u.firstName} {u.lastName}</span>
+                                <button
+                                  type="button"
+                                  aria-label="Remove assignee"
+                                  className="text-muted-foreground hover:text-foreground"
+                                  onClick={() => setFormData(prev => ({ ...prev, assignedTo: '' }))}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                   <div>
                     <label className="text-sm font-medium text-foreground">Epic</label>
                     <Select value={formData.epic} onValueChange={(value) => handleChange('epic', value)}>
@@ -395,22 +473,6 @@ export default function CreateStoryPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-foreground">Assigned To</label>
-                    <Select value={formData.assignedTo} onValueChange={(value) => handleChange('assignedTo', value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select assignee" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">Unassigned</SelectItem>
-                        {Array.isArray(users) && users.map((user) => (
-                          <SelectItem key={user._id} value={user._id}>
-                            {user.firstName} {user.lastName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
 
                   <div>
                     <label className="text-sm font-medium text-foreground">Due Date *</label>
@@ -472,7 +534,7 @@ export default function CreateStoryPage() {
                       placeholder="Enter acceptance criteria"
                       onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCriteria())}
                     />
-                    <Button type="button" onClick={addCriteria} size="sm">
+                    <Button type="button" onClick={addCriteria} size="sm" disabled={newCriteria.trim() === ''}>
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>

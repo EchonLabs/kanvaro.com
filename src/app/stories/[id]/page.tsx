@@ -35,10 +35,10 @@ interface Story {
   description: string
   status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
-  project: {
+  project?: {
     _id: string
     name: string
-  }
+  } | null
   epic?: {
     _id: string
     name: string
@@ -345,7 +345,9 @@ export default function StoryDetailPage() {
                 
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Project</span>
-                  <span className="font-medium">{story.project.name}</span>
+                  <span className="font-medium">
+                    {story.project?.name || <span className="italic text-muted-foreground">Project deleted or unavailable</span>}
+                  </span>
                 </div>
                 
                 {story.assignedTo && (
