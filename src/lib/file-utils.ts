@@ -68,33 +68,39 @@ export function getUploadDirectory(type: string): string {
 /**
  * Gets the public URL path for an uploaded file
  * If files are stored outside public directory, returns API route path
+ * In standalone/production mode, always uses API route for reliability
  * @param type - The type of upload (e.g., 'logos', 'avatars')
  * @param filename - The filename
  * @returns The public URL path for the file
  */
 export function getUploadUrl(type: string, filename: string): string {
+  // In production or when UPLOADS_DIR is set, always use API route
+  // This ensures files are served correctly in standalone mode
+  const isProduction = process.env.NODE_ENV === 'production'
   const baseUploadDir = process.env.UPLOADS_DIR || process.env.UPLOAD_DIR || process.env.UPLOAD_PATH
   
-  // If UPLOADS_DIR is set, assume files are stored outside public directory
-  // and use API route to serve them
-  if (baseUploadDir) {
-    // Normalize paths for comparison
-    const basePath = baseUploadDir.startsWith('/') 
-      ? baseUploadDir 
-      : join(process.cwd(), baseUploadDir)
+  if (isProduction || baseUploadDir) {
+    // Get the actual upload directory path
+    const uploadDir = getUploadDirectory(type)
     const publicDir = join(process.cwd(), 'public')
-    const normalizedBasePath = basePath.replace(/\/+$/, '') // Remove trailing slashes
+    
+    // Normalize paths for comparison (resolve relative paths and remove trailing slashes)
+    const normalizedUploadDir = uploadDir.replace(/\/+$/, '')
     const normalizedPublicDir = publicDir.replace(/\/+$/, '')
     
-    // Check if the upload directory is outside public directory
-    // Also check if it's an absolute path (likely containerized environment)
-    if (basePath.startsWith('/') && (normalizedBasePath !== normalizedPublicDir && !normalizedBasePath.startsWith(normalizedPublicDir + '/'))) {
-      // Use API route to serve files
+    // If files are stored outside public directory, use API route
+    if (!normalizedUploadDir.startsWith(normalizedPublicDir + '/') && normalizedUploadDir !== normalizedPublicDir) {
+      return `/api/uploads/${type}/${filename}`
+    }
+    
+    // In production/standalone mode, even if files are in public, use API route for reliability
+    // as the public directory might not be accessible in standalone builds
+    if (isProduction) {
       return `/api/uploads/${type}/${filename}`
     }
   }
   
-  // Default: use direct public path
+  // Development mode with files in public directory, use direct path
   return `/uploads/${type}/${filename}`
 }
 
@@ -110,19 +116,36 @@ export function normalizeUploadUrl(url: string): string {
     return url
   }
   
-  // Check if UPLOADS_DIR is set (files stored outside public)
+  // Extract type and filename from URL
+  // Format: /uploads/{type}/{filename}
+  const parts = url.replace(/^\/uploads\//, '').split('/')
+  if (parts.length < 2) {
+    return url
+  }
+  
+  const type = parts[0]
+  const filename = parts.slice(1).join('/')
+  
+  // In production or when UPLOADS_DIR is set, always use API route
+  const isProduction = process.env.NODE_ENV === 'production'
   const baseUploadDir = process.env.UPLOADS_DIR || process.env.UPLOAD_DIR || process.env.UPLOAD_PATH
-  if (baseUploadDir) {
-    const basePath = baseUploadDir.startsWith('/') 
-      ? baseUploadDir 
-      : join(process.cwd(), baseUploadDir)
+  
+  if (isProduction || baseUploadDir) {
+    // Check if files are actually stored outside public directory
+    const uploadDir = getUploadDirectory(type)
     const publicDir = join(process.cwd(), 'public')
-    const normalizedBasePath = basePath.replace(/\/+$/, '')
+    
+    const normalizedUploadDir = uploadDir.replace(/\/+$/, '')
     const normalizedPublicDir = publicDir.replace(/\/+$/, '')
     
     // If files are stored outside public, convert /uploads/ to /api/uploads/
-    if (basePath.startsWith('/') && (normalizedBasePath !== normalizedPublicDir && !normalizedBasePath.startsWith(normalizedPublicDir + '/'))) {
-      return url.replace(/^\/uploads\//, '/api/uploads/')
+    if (!normalizedUploadDir.startsWith(normalizedPublicDir + '/') && normalizedUploadDir !== normalizedPublicDir) {
+      return `/api/uploads/${type}/${filename}`
+    }
+    
+    // In production/standalone mode, always use API route for reliability
+    if (isProduction) {
+      return `/api/uploads/${type}/${filename}`
     }
   }
   
