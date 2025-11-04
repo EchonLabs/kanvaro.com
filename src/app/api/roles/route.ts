@@ -157,6 +157,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // Hoisted context variables for use in catch block
+  let normalizedNameScoped = ''
+  let orgIdScoped = ''
+  let descriptionScoped = ''
+  let permissionsScoped: string[] = []
+  let createdByScoped = ''
+
   try {
     await connectDB()
     
@@ -192,6 +199,12 @@ export async function POST(req: NextRequest) {
     // Check if role name already exists in predefined roles
     const predefinedRoleNames = getPredefinedRoleNames()
     const normalizedName = name.trim()
+    // capture for catch scope
+    normalizedNameScoped = normalizedName
+    orgIdScoped = authResult.user.organization
+    descriptionScoped = description
+    permissionsScoped = permissions
+    createdByScoped = authResult.user.id
     const isPredefinedRole = predefinedRoleNames.some(
       predefinedName => predefinedName.toLowerCase() === normalizedName.toLowerCase()
     )
@@ -258,44 +271,46 @@ export async function POST(req: NextRequest) {
     // Handle MongoDB duplicate key error
     if (error.code === 11000 || error.code === '11000') {
       // Check if it's due to a deleted role that wasn't cleaned up
-      const existingInactiveRole = await CustomRole.findOne({
-        name: name.trim(),
-        organization: authResult.user.organization,
-        isActive: false
-      })
+      if (normalizedNameScoped && orgIdScoped) {
+        const existingInactiveRole = await CustomRole.findOne({
+          name: normalizedNameScoped,
+          organization: orgIdScoped,
+          isActive: false
+        })
 
-      if (existingInactiveRole) {
-        // Try to permanently delete the inactive role and create again
-        try {
-          await CustomRole.deleteOne({ _id: existingInactiveRole._id })
-          
-          // Retry creating the role
-          const customRole = new CustomRole({
-            name: name.trim(),
-            description,
-            permissions,
-            organization: authResult.user.organization,
-            createdBy: authResult.user.id,
-            isActive: true
-          })
-
-          await customRole.save()
-
-          return NextResponse.json({
-            success: true,
-            data: {
-              ...customRole.toObject(),
-              isSystem: false,
-              userCount: 0
-            },
-            message: 'Custom role created successfully'
-          }, { status: 201 })
-        } catch (retryError: any) {
-          console.error('Error retrying role creation:', retryError)
-          return NextResponse.json({
-            success: false,
-            error: 'Failed to create role. Please try again.'
-          }, { status: 500 })
+        if (existingInactiveRole) {
+          // Try to permanently delete the inactive role and create again
+          try {
+            await CustomRole.deleteOne({ _id: existingInactiveRole._id })
+            
+            // Retry creating the role
+            const customRole = new CustomRole({
+              name: normalizedNameScoped,
+              description: descriptionScoped,
+              permissions: permissionsScoped,
+              organization: orgIdScoped,
+              createdBy: createdByScoped,
+              isActive: true
+            })
+            
+            await customRole.save()
+            
+            return NextResponse.json({
+              success: true,
+              data: {
+                ...customRole.toObject(),
+                isSystem: false,
+                userCount: 0
+              },
+              message: 'Custom role created successfully'
+            }, { status: 201 })
+          } catch (retryError: any) {
+            console.error('Error retrying role creation:', retryError)
+            return NextResponse.json({
+              success: false,
+              error: 'Failed to create role. Please try again.'
+            }, { status: 500 })
+          }
         }
       }
 
