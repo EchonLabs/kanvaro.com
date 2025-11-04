@@ -1,3 +1,10 @@
+## [1.0.19](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.18...v1.0.19) (2025-11-04)
+
+
+### Bug Fixes
+
+* :bug: fix images not retriving issue ([003d8b6](https://github.com/EchonLabs/kanvaro.com/commit/003d8b6e4e5b98d91482e150fa95929055700c11))
+
 ## [1.0.18](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.17...v1.0.18) (2025-11-03)
 
 
