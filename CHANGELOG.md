@@ -1,3 +1,10 @@
+## [1.0.21](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.20...v1.0.21) (2025-11-04)
+
+
+### Bug Fixes
+
+* add fixes for build fail ([bcf00bb](https://github.com/EchonLabs/kanvaro.com/commit/bcf00bb42f6e65476629a7034621bac12992d017))
+
 ## [1.0.20](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.19...v1.0.20) (2025-11-04)
 
 
