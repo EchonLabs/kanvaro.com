@@ -15,6 +15,7 @@ import {
   Loader2,
   AlertTriangle,
   Target,
+  Plus,
   X
 } from 'lucide-react'
 
@@ -80,6 +81,7 @@ export default function CreateTaskPage() {
   const [projectQuery, setProjectQuery] = useState("");
   const [assignedToIds, setAssignedToIds] = useState<string[]>([]);
   const [assigneeQuery, setAssigneeQuery] = useState('');
+  const [newLabel, setNewLabel] = useState('')
 
   const [formData, setFormData] = useState({
     title: '',
@@ -95,7 +97,7 @@ export default function CreateTaskPage() {
     dueDate: '',
     estimatedHours: '',
     storyPoints: '',
-    labels: ''
+    labels: [] as string[]
   })
 
   const checkAuth = useCallback(async () => {
@@ -211,14 +213,21 @@ export default function CreateTaskPage() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          ...formData,
+          title: formData.title,
+          description: formData.description,
+          displayId: formData.displayId,
+          project: formData.project,
+          story: formData.story === 'none' ? undefined : formData.story || undefined,
+          parentTask: formData.parentTask || undefined,
           assignedTo: assignedToIds.length === 1 ? assignedToIds[0] : undefined,
           assignees: assignedToIds.length > 1 ? assignedToIds : undefined,
+          priority: formData.priority,
+          type: formData.type,
+          status: formData.status,
+          dueDate: formData.dueDate,
           estimatedHours: formData.estimatedHours ? parseInt(formData.estimatedHours) : undefined,
           storyPoints: formData.storyPoints ? parseInt(formData.storyPoints) : undefined,
-          labels: formData.labels ? formData.labels.split(',').map(label => label.trim()) : [],
-          story: formData.story === 'none' ? undefined : formData.story || undefined,
-          parentTask: formData.parentTask || undefined
+          labels: Array.isArray(formData.labels) ? formData.labels : []
         })
       })
 
@@ -245,17 +254,36 @@ export default function CreateTaskPage() {
     // Fetch stories when project changes
     if (field === 'project') {
       fetchStories(value)
+      // Clear assignees when project is cleared
+      if (!value) {
+        setAssignedToIds([])
+        setAssigneeQuery('')
+      }
     }
   }
 
-  // Required field validation
+  const addLabel = () => {
+    if (newLabel.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        labels: [...prev.labels, newLabel.trim()]
+      }))
+      setNewLabel('')
+    }
+  }
+
+  const removeLabel = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      labels: prev.labels.filter((_, i) => i !== index)
+    }))
+  }
+
+  // Required field validation (only fields marked with *)
   const isFormValid = () => {
     return (
       !!formData.title.trim() &&
       !!formData.project &&
-      !!formData.status &&
-      !!formData.type &&
-      !!formData.priority &&
       !!formData.dueDate
     );
   };
@@ -358,6 +386,80 @@ export default function CreateTaskPage() {
                     </Select>
                   </div>
 
+                  {formData.project && (
+                    <div>
+                      <label className="text-sm font-medium text-foreground">Assigned To</label>
+                      <div className="mt-1 border rounded-md p-2">
+                        <Input
+                          value={assigneeQuery}
+                          onChange={e => setAssigneeQuery(e.target.value)}
+                          placeholder={loadingUsers ? 'Loading members...' : 'Type to search team members'}
+                          className="mb-2"
+                        />
+                        <div className="max-h-40 overflow-y-auto space-y-1">
+                          {loadingUsers ? (
+                            <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Loading members...</span>
+                            </div>
+                          ) : assigneeQuery.trim() === '' ? null : (
+                            (() => {
+                              const q = assigneeQuery.toLowerCase();
+                              const filtered = users.filter(u =>
+                                `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
+                                u.email.toLowerCase().includes(q)
+                              );
+                              if (filtered.length === 0) {
+                                return (
+                                  <div className="text-sm text-muted-foreground p-2">No matching members</div>
+                                )
+                              }
+                              return filtered.map(user => (
+                                <button
+                                  type="button"
+                                  key={user._id}
+                                  className="w-full text-left p-1 rounded hover:bg-accent"
+                                  onClick={() => {
+                                    setAssignedToIds(prev => prev.includes(user._id) ? prev : [...prev, user._id])
+                                    setAssigneeQuery('') // Clear search after selection
+                                  }}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm">{user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span></span>
+                                    {assignedToIds.includes(user._id) && (
+                                      <span className="text-xs text-muted-foreground">Added</span>
+                                    )}
+                                  </div>
+                                </button>
+                              ));
+                            })()
+                          )}
+                        </div>
+                        {assignedToIds.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {assignedToIds.map(id => {
+                              const u = users.find(x => x._id === id);
+                              if (!u) return null;
+                              return (
+                                <span key={id} className="inline-flex items-center text-xs bg-muted px-2 py-1 rounded">
+                                  <span className="mr-2">{u.firstName} {u.lastName}</span>
+                                  <button
+                                    type="button"
+                                    aria-label="Remove assignee"
+                                    className="text-muted-foreground hover:text-foreground"
+                                    onClick={() => setAssignedToIds(prev => prev.filter(x => x !== id))}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="text-sm font-medium text-foreground">Type</label>
                     <Select value={formData.type} onValueChange={(value) => handleChange('type', value)}>
@@ -408,78 +510,6 @@ export default function CreateTaskPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-foreground">Assigned To</label>
-                    <div className="mt-1 border rounded-md p-2">
-                      <Input
-                        value={assigneeQuery}
-                        onChange={e => setAssigneeQuery(e.target.value)}
-                        placeholder={loadingUsers ? 'Loading members...' : 'Type to search team members'}
-                        className="mb-2"
-                      />
-                      <div className="max-h-40 overflow-y-auto space-y-1">
-                        {loadingUsers ? (
-                          <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span>Loading members...</span>
-                          </div>
-                        ) : assigneeQuery.trim() === '' ? null : (
-                          (() => {
-                            const q = assigneeQuery.toLowerCase();
-                            const filtered = users.filter(u =>
-                              `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
-                              u.email.toLowerCase().includes(q)
-                            );
-                            if (filtered.length === 0) {
-                              return (
-                                <div className="text-sm text-muted-foreground p-2">No matching members</div>
-                              )
-                            }
-                            return filtered.map(user => (
-                              <button
-                                type="button"
-                                key={user._id}
-                                className="w-full text-left p-1 rounded hover:bg-accent"
-                                onClick={() => {
-                                  setAssignedToIds(prev => prev.includes(user._id) ? prev : [...prev, user._id])
-                                  setAssigneeQuery('') // Clear search after selection
-                                }}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm">{user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span></span>
-                                  {assignedToIds.includes(user._id) && (
-                                    <span className="text-xs text-muted-foreground">Added</span>
-                                  )}
-                                </div>
-                              </button>
-                            ));
-                          })()
-                        )}
-                      </div>
-                      {assignedToIds.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {assignedToIds.map(id => {
-                            const u = users.find(x => x._id === id);
-                            if (!u) return null;
-                            return (
-                              <span key={id} className="inline-flex items-center text-xs bg-muted px-2 py-1 rounded">
-                                <span className="mr-2">{u.firstName} {u.lastName}</span>
-                                <button
-                                  type="button"
-                                  aria-label="Remove assignee"
-                                  className="text-muted-foreground hover:text-foreground"
-                                  onClick={() => setAssignedToIds(prev => prev.filter(x => x !== id))}
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
                   <div>
                     <label className="text-sm font-medium text-foreground">User Story</label>
                     <Select value={formData.story} onValueChange={(value) => handleChange('story', value)}>
@@ -541,11 +571,34 @@ export default function CreateTaskPage() {
 
               <div>
                 <label className="text-sm font-medium text-foreground">Labels</label>
-                <Input
-                  value={formData.labels}
-                  onChange={(e) => handleChange('labels', e.target.value)}
-                  placeholder="Enter labels separated by commas"
-                />
+                <div className="space-y-2">
+                  <div className="flex space-x-2">
+                    <Input
+                      value={newLabel}
+                      onChange={(e) => setNewLabel(e.target.value)}
+                      placeholder="Enter label"
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLabel())}
+                    />
+                    <Button type="button" onClick={addLabel} size="sm" disabled={newLabel.trim() === ''}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="space-y-1">
+                    {formData.labels.map((label, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <span className="text-sm">{label}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeLabel(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-4">

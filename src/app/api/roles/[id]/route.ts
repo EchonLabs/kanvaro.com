@@ -5,6 +5,20 @@ import { CustomRole } from '@/models/CustomRole'
 import { User } from '@/models/User'
 import { Permission } from '@/lib/permissions/permission-definitions'
 
+/**
+ * Get predefined system role names
+ * This function returns the names of all predefined roles that cannot be duplicated
+ */
+function getPredefinedRoleNames(): string[] {
+  return [
+    'Administrator',
+    'Project Manager',
+    'Team Member',
+    'Client',
+    'Viewer'
+  ]
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -106,9 +120,23 @@ export async function PUT(
       }, { status: 404 })
     }
 
-    // Check if name already exists (excluding current role)
+    // Check if role name already exists in predefined roles
+    const predefinedRoleNames = getPredefinedRoleNames()
+    const normalizedName = name.trim()
+    const isPredefinedRole = predefinedRoleNames.some(
+      predefinedName => predefinedName.toLowerCase() === normalizedName.toLowerCase()
+    )
+
+    if (isPredefinedRole) {
+      return NextResponse.json({
+        success: false,
+        error: 'Role name already exists'
+      }, { status: 409 })
+    }
+
+    // Check if name already exists in custom roles (excluding current role)
     const existingRole = await CustomRole.findOne({
-      name,
+      name: normalizedName,
       organization: authResult.user.organization,
       isActive: true,
       _id: { $ne: params.id }
@@ -122,7 +150,7 @@ export async function PUT(
     }
 
     // Update the role
-    role.name = name
+    role.name = normalizedName
     role.description = description
     role.permissions = permissions
     await role.save()

@@ -133,6 +133,31 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
     }
   }
 
+  const updateTimerAction = async (action: 'pause' | 'resume' | 'stop') => {
+    try {
+      setIsLoading(true)
+      const response = await fetch('/api/time-tracking/timer', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, organizationId, action })
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        setError(data.error || 'Failed to update timer')
+        return
+      }
+      if (action === 'stop') {
+        handleTimerUpdate(null)
+      } else {
+        setActiveTimer(data.activeTimer)
+      }
+    } catch (e) {
+      setError('Failed to update timer')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   if (activeTimer) {
     return (
       <Card>
@@ -177,15 +202,49 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <Button
               size="sm"
               variant="outline"
-              onClick={() => router.push('/time-tracking')}
-              className="flex-1 text-xs sm:text-sm"
+              disabled={isLoading}
+              onClick={() => updateTimerAction(activeTimer.isPaused ? 'resume' : 'pause')}
+              className="w-full text-xs sm:text-sm whitespace-nowrap"
+            >
+              {activeTimer.isPaused ? (
+                <>
+                  <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                  Resume
+                </>
+              ) : (
+                <>
+                  <Pause className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                  Pause
+                </>
+              )}
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={isLoading}
+              onClick={() => updateTimerAction('stop')}
+              className="w-full text-xs sm:text-sm whitespace-nowrap"
+            >
+              <Square className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+              Stop
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const pid = activeTimer.project && activeTimer.project._id ? `projectId=${encodeURIComponent(activeTimer.project._id)}` : ''
+                const pname = activeTimer.project && activeTimer.project.name ? `projectName=${encodeURIComponent(activeTimer.project.name)}` : ''
+                const qs = [pid, pname].filter(Boolean).join('&')
+                router.push(qs ? `/time-tracking/timer?${qs}` : '/time-tracking/timer')
+              }}
+              className="w-full text-xs sm:text-sm whitespace-nowrap"
             >
               <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-              Manage Timer
+              Manage<span className="hidden sm:inline"> Timer</span>
             </Button>
           </div>
         </CardContent>
@@ -266,7 +325,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
           <Button
             size="sm"
             variant="outline"
-            onClick={() => router.push('/time-tracking?tab=logs')}
+            onClick={() => router.push('/time-tracking/logs')}
             className="flex-1 sm:flex-initial text-xs sm:text-sm"
           >
             <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />

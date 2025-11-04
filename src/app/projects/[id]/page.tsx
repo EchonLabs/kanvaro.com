@@ -537,7 +537,7 @@ export default function ProjectDetailPage() {
                       variant="outline" 
                       size="sm" 
                       className="w-full justify-start"
-                      onClick={() => router.push(`/projects/${projectId}?tab=settings`)}
+                      onClick={() => router.push(`/projects/${projectId}?tab=team`)}
                     >
                       <Users className="mr-2 h-4 w-4" />
                       Manage Team
@@ -816,37 +816,6 @@ export default function ProjectDetailPage() {
                     <Button variant="outline" className="w-full">
                       <Edit className="h-4 w-4 mr-2" />
                       Edit Project Details
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Team Management</CardTitle>
-                    <CardDescription>Manage project team members and roles</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-3">
-                      {project?.teamMembers?.map((member: any, index: number) => (
-                        <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
-                              {member.firstName?.[0]}{member.lastName?.[0]}
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium">
-                                {member.firstName} {member.lastName}
-                              </p>
-                              <p className="text-xs text-muted-foreground">{member.email}</p>
-                            </div>
-                          </div>
-                          <Badge variant="secondary">{member.role}</Badge>
-                        </div>
-                      ))}
-                    </div>
-                    <Button variant="outline" className="w-full">
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Add Team Member
                     </Button>
                   </CardContent>
                 </Card>

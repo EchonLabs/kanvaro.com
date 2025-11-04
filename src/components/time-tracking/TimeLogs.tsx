@@ -33,8 +33,8 @@ interface TimeEntry {
   notes?: string
   isApproved: boolean
   approvedBy?: { firstName: string; lastName: string }
-  project: { _id: string; name: string }
-  task?: { _id: string; title: string }
+  project?: { _id: string; name: string } | null
+  task?: { _id: string; title: string } | null
 }
 
 export function TimeLogs({ userId, organizationId, projectId, taskId, onTimeEntryUpdate }: TimeLogsProps) {
@@ -101,7 +101,7 @@ export function TimeLogs({ userId, organizationId, projectId, taskId, onTimeEntr
         limit: pagination.limit.toString()
       })
 
-      if (projectId) params.append('projectId', projectId)
+      if (projectId && projectId !== 'undefined' && projectId !== 'null') params.append('projectId', projectId)
       if (taskId) params.append('taskId', taskId)
       if (filters.startDate) params.append('startDate', filters.startDate)
       if (filters.endDate) params.append('endDate', filters.endDate)
@@ -389,8 +389,18 @@ export function TimeLogs({ userId, organizationId, projectId, taskId, onTimeEntr
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm truncate" title={entry.description}>{entry.description}</div>
                           <div className="text-xs text-muted-foreground truncate mt-1">
-                            {entry.project.name}
-                            {entry.task && ` • ${entry.task.title}`}
+                            {entry?.project?.name ? (
+                              <>
+                                <span className="text-foreground">{entry.project.name}</span>
+                                {entry?.task?.title ? (
+                                  <span className="text-muted-foreground"> • {entry.task.title}</span>
+                                ) : entry.task ? (
+                                  <span className="text-muted-foreground italic"> • Task deleted</span>
+                                ) : null}
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground italic">Project deleted or unavailable</span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -446,9 +456,19 @@ export function TimeLogs({ userId, organizationId, projectId, taskId, onTimeEntr
                       <div className="font-medium text-xs sm:text-sm truncate" title={entry.description}>{entry.description}</div>
                     </div>
                     <div className="col-span-2 text-xs sm:text-sm truncate">
-                      <span title={entry.project.name}>{entry.project.name}</span>
-                      {entry.task && (
-                        <span className="text-muted-foreground"> ({entry.task.title})</span>
+                      {entry?.project?.name ? (
+                        <>
+                          <span title={entry.project.name} className="text-foreground">{entry.project.name}</span>
+                          {entry?.task?.title ? (
+                            <span className="text-muted-foreground"> ({entry.task.title})</span>
+                          ) : entry.task ? (
+                            <span className="text-muted-foreground italic"> (Task deleted)</span>
+                          ) : null}
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground italic" title="Project deleted or unavailable">
+                          Project deleted or unavailable
+                        </span>
                       )}
                     </div>
                     <div className="col-span-1 text-xs sm:text-sm leading-tight">

@@ -231,6 +231,11 @@ export function CreateRoleModal({ isOpen, onClose, onRoleCreated }: CreateRoleMo
     }
   }
 
+  // Check if form is valid - all required fields must be filled
+  const isFormValid = !!formData.name.trim() && 
+                      !!formData.description.trim() && 
+                      formData.permissions.length > 0
+
   if (!isOpen) return null
 
   return (
@@ -258,7 +263,7 @@ export function CreateRoleModal({ isOpen, onClose, onRoleCreated }: CreateRoleMo
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Role Name</Label>
+                <Label htmlFor="name">Role Name *</Label>
                 <Input
                   id="name"
                   value={formData.name}
@@ -269,7 +274,7 @@ export function CreateRoleModal({ isOpen, onClose, onRoleCreated }: CreateRoleMo
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description">Description *</Label>
                 <Textarea
                   id="description"
                   value={formData.description}
@@ -367,7 +372,7 @@ export function CreateRoleModal({ isOpen, onClose, onRoleCreated }: CreateRoleMo
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" form="create-role-form" disabled={loading}>
+            <Button type="submit" form="create-role-form" disabled={loading || !isFormValid}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

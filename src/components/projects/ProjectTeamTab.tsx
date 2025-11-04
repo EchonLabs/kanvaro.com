@@ -11,7 +11,6 @@ import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { 
   Users, 
   UserPlus, 
-  Search, 
   Trash2, 
   Loader2,
   AlertTriangle,
@@ -64,7 +63,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [memberSearchQuery, setMemberSearchQuery] = useState('')
   const [showAddMember, setShowAddMember] = useState(false)
   const [selectedMemberId, setSelectedMemberId] = useState<string>('')
   const [selectedRole, setSelectedRole] = useState<string>('project_member')
@@ -85,6 +84,8 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
       const data = await response.json()
 
       if (data.success) {
+        console.log('Team data received:', data.data)
+        console.log('Team members:', data.data.teamMembers)
         setTeamMembers(data.data.teamMembers || [])
         setProjectRoles(data.data.projectRoles || [])
         setAvailableMembers(data.data.availableMembers || [])
@@ -170,7 +171,11 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
   }
 
   const getMemberRole = (memberId: string) => {
-    const role = projectRoles.find(r => r.user._id === memberId)
+    const role = projectRoles.find(r => {
+      const user = r.user as any
+      const userId = user._doc?._id || user._id
+      return userId === memberId || userId?.toString() === memberId?.toString()
+    })
     return role?.role || 'project_member'
   }
 
@@ -200,11 +205,14 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
     return colorMap[role] || 'bg-gray-100 text-gray-800'
   }
 
-  const filteredAvailableMembers = availableMembers.filter(member =>
-    member.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    member.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    member.email.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredAvailableMembers = memberSearchQuery.trim() === '' 
+    ? [] 
+    : availableMembers.filter(member =>
+        `${member.firstName} ${member.lastName}`.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+        member.email.toLowerCase().includes(memberSearchQuery.toLowerCase())
+      )
+  
+  const selectedMember = availableMembers.find(m => m._id === selectedMemberId)
 
   if (loading) {
     return (
@@ -305,59 +313,68 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
             </div>
           ) : (
             <div className="space-y-3">
-              {teamMembers.map((member) => {
-                const memberRole = getMemberRole(member._id)
-                const isCreator = project && project.createdBy.email === member.email
+              {teamMembers.map((member: any) => {
+                // Handle Mongoose document structure - data might be in _doc or directly on member
+                const memberData = member._doc || member
+                const memberId = memberData._id || member._id
+                const firstName = memberData.firstName || member.firstName || ''
+                const lastName = memberData.lastName || member.lastName || ''
+                const email = memberData.email || member.email || ''
+                const avatar = memberData.avatar || member.avatar
+                
+                console.log('Rendering team member:', member)
+                console.log('Member data:', memberData)
+                console.log('Member firstName:', firstName)
+                console.log('Member lastName:', lastName)
+                console.log('Member email:', email)
+                
+                const memberRole = getMemberRole(memberId)
                 
                 return (
                   <div
-                    key={member._id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    key={memberId}
+                    className="flex items-center space-x-4 p-4 border rounded-lg"
                   >
-                    <div className="flex items-center space-x-4 flex-1 min-w-0">
-                      <GravatarAvatar
-                        user={{
-                          avatar: member.avatar,
-                          firstName: member.firstName,
-                          lastName: member.lastName,
-                          email: member.email
-                        }}
-                        size={40}
-                        className="h-10 w-10 flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground truncate">
-                          {member.firstName} {member.lastName}
-                        </p>
-                        <p className="text-sm text-muted-foreground truncate">{member.email}</p>
-                      </div>
-                      <Badge className={getRoleColor(memberRole) + ' flex-shrink-0'}>
-                        {getRoleDisplayName(memberRole)}
-                      </Badge>
+                    <GravatarAvatar
+                      user={{
+                        avatar: avatar,
+                        firstName: firstName,
+                        lastName: lastName,
+                        email: email
+                      }}
+                      size={48}
+                      className="h-12 w-12"
+                    />
+                    <div className="flex-1">
+                      <p className="font-medium text-foreground">
+                        {firstName} {lastName}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{email}</p>
                     </div>
-                    {!isCreator && (
-                      <PermissionGate permission={Permission.PROJECT_MANAGE_TEAM} projectId={projectId}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setMemberToRemove(member._id)
-                                setShowRemoveConfirm(true)
-                              }}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Remove from Team
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </PermissionGate>
-                    )}
+                    <Badge className={getRoleColor(memberRole)}>
+                      {getRoleDisplayName(memberRole)}
+                    </Badge>
+                    <PermissionGate permission={Permission.PROJECT_MANAGE_TEAM} projectId={projectId}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setMemberToRemove(memberId)
+                              setShowRemoveConfirm(true)
+                            }}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Remove from Team
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </PermissionGate>
                   </div>
                 )
               })}
@@ -379,7 +396,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                   setShowAddMember(false)
                   setSelectedMemberId('')
                   setSelectedRole('project_member')
-                  setSearchQuery('')
+                  setMemberSearchQuery('')
                   setError('')
                 }}
               >
@@ -390,38 +407,62 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Search Members</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name or email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
               <label className="text-sm font-medium">Select Member</label>
-              <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a member..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredAvailableMembers.length === 0 ? (
-                    <SelectItem value="none" disabled>
-                      {searchQuery ? 'No members found' : 'No available members'}
-                    </SelectItem>
-                  ) : (
-                    filteredAvailableMembers.map((member) => (
-                      <SelectItem key={member._id} value={member._id}>
-                        {member.firstName} {member.lastName} ({member.email})
-                      </SelectItem>
-                    ))
+              <div className="mt-1 border rounded-md p-2">
+                <Input
+                  value={memberSearchQuery}
+                  onChange={e => setMemberSearchQuery(e.target.value)}
+                  placeholder={selectedMember ? `${selectedMember.firstName} ${selectedMember.lastName}` : 'Type to search team members'}
+                  className="mb-2"
+                />
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {memberSearchQuery.trim() === '' ? null : (
+                    filteredAvailableMembers.length === 0 ? (
+                      <div className="text-sm text-muted-foreground p-2">No matching members</div>
+                    ) : (
+                      filteredAvailableMembers.map(member => (
+                        <button
+                          type="button"
+                          key={member._id}
+                          className="w-full text-left p-1 rounded hover:bg-accent"
+                          onClick={() => {
+                            setSelectedMemberId(member._id)
+                            setMemberSearchQuery('') // Clear search after selection
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm">
+                              {member.firstName} {member.lastName} 
+                              <span className="text-muted-foreground"> ({member.email})</span>
+                            </span>
+                            {selectedMemberId === member._id && (
+                              <span className="text-xs text-muted-foreground">Selected</span>
+                            )}
+                          </div>
+                        </button>
+                      ))
+                    )
                   )}
-                </SelectContent>
-              </Select>
+                </div>
+                {selectedMember && (
+                  <div className="mt-2">
+                    <span className="inline-flex items-center text-xs bg-muted px-2 py-1 rounded">
+                      <span className="mr-2">{selectedMember.firstName} {selectedMember.lastName}</span>
+                      <button
+                        type="button"
+                        aria-label="Clear selection"
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          setSelectedMemberId('')
+                          setMemberSearchQuery('')
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -448,7 +489,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                   setShowAddMember(false)
                   setSelectedMemberId('')
                   setSelectedRole('project_member')
-                  setSearchQuery('')
+                  setMemberSearchQuery('')
                   setError('')
                 }}
               >
