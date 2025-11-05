@@ -165,6 +165,17 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   })
 
   const handleStatusChange = async (taskId: string, newStatus: string) => {
+    // Store previous state for potential revert
+    const previousTask = tasks.find(t => t._id === taskId)
+    const previousStatus = previousTask?.status
+
+    // Optimistic update - update UI immediately
+    setTasks(prevTasks => 
+      prevTasks.map(task => 
+        task._id === taskId ? { ...task, status: newStatus as any } : task
+      )
+    )
+
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
@@ -174,16 +185,72 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         body: JSON.stringify({ status: newStatus })
       })
 
+      const contentType = response.headers.get('content-type') || ''
+      
+      if (!response.ok) {
+        // Check if response is JSON or HTML
+        if (contentType.includes('application/json')) {
+          try {
+            const errorData = await response.json()
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+          } catch (parseError) {
+            throw new Error(`HTTP error! status: ${response.status}`)
+          }
+        } else {
+          // For non-JSON responses (like HTML 404 pages), don't try to parse
+          throw new Error(`HTTP error! status: ${response.status}. The API endpoint may not be available in this environment.`)
+        }
+      }
+
+      if (!contentType.includes('application/json')) {
+        throw new Error('Invalid response format. Expected JSON but received HTML. The API endpoint may not be properly deployed.')
+      }
+
       const data = await response.json()
       
-      if (data.success) {
-        setTasks(tasks.map(task => 
-          task._id === taskId ? { ...task, status: newStatus as any } : task
-        ))
+      if (data.success && data.data) {
+        // Update with server response to ensure consistency
+        setTasks(prevTasks => 
+          prevTasks.map(task => 
+            task._id === taskId ? { ...task, ...data.data, status: newStatus as any } : task
+          )
+        )
         setSuccess('Task updated successfully.')
+        setError('')
+      } else if (data.success) {
+        // If success but no data, just update status
+        setTasks(prevTasks => 
+          prevTasks.map(task => 
+            task._id === taskId ? { ...task, status: newStatus as any } : task
+          )
+        )
+        setSuccess('Task updated successfully.')
+        setError('')
+      } else {
+        // Revert on error
+        if (previousStatus) {
+          setTasks(prevTasks => 
+            prevTasks.map(task => 
+              task._id === taskId ? { ...task, status: previousStatus } : task
+            )
+          )
+        }
+        setError(data.error || 'Failed to update task status')
       }
     } catch (error) {
       console.error('Failed to update task status:', error)
+      // Revert on error
+      if (previousStatus) {
+        setTasks(prevTasks => 
+          prevTasks.map(task => 
+            task._id === taskId ? { ...task, status: previousStatus } : task
+          )
+        )
+      }
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to update task status. The API endpoint may not be available in this environment.'
+      setError(errorMessage)
     }
   }
 
