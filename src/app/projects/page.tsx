@@ -376,19 +376,36 @@ export default function ProjectsPage() {
                   >
                     <CardHeader>
                       <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <div className="flex items-center space-x-2">
-                            <CardTitle className="text-lg">{project.name}</CardTitle>
-                            {typeof project.projectNumber !== 'undefined' && (
-                              <Badge variant="outline">#{project.projectNumber}</Badge>
-                            )}
-                            {project.isDraft && (
-                              <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                                Draft
-                              </Badge>
-                            )}
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center min-w-0">
+                            <div className="flex-1 min-w-0">
+                              <CardTitle className="text-lg min-w-0">
+                                <span
+                                  className="sm:hidden block truncate"
+                                  title={project.name && project.name.length > 10 ? project.name : undefined}
+                                >
+                                  {project.name && project.name.length > 10 ? `${project.name.slice(0, 10)}…` : project.name}
+                                </span>
+                                <span
+                                  className="hidden sm:inline truncate"
+                                  title={project.name && project.name.length > 10 ? project.name : undefined}
+                                >
+                                  {project.name && project.name.length > 10 ? `${project.name.slice(0, 10)}…` : project.name}
+                                </span>
+                              </CardTitle>
+                            </div>
+                            <div className="flex flex-shrink-0 items-center space-x-2 ml-2">
+                              {typeof project.projectNumber !== 'undefined' && (
+                                <Badge variant="outline">#{project.projectNumber}</Badge>
+                              )}
+                              {project.isDraft && (
+                                <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                  Draft
+                                </Badge>
+                              )}
+                            </div>
                           </div>
-                          <CardDescription className="line-clamp-2">
+                          <CardDescription className="line-clamp-2" title={project.description}>
                             {project.description || 'No description'}
                           </CardDescription>
                         </div>
@@ -503,10 +520,26 @@ export default function ProjectsPage() {
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <h3 className="font-medium">{project.name}</h3>
+                        <div className="flex items-center space-x-4 min-w-0">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center mb-2 min-w-0">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-medium min-w-0">
+                                  <span
+                                    className="sm:hidden block truncate"
+                                    title={project.name && project.name.length > 10 ? project.name : undefined}
+                                  >
+                                    {project.name && project.name.length > 10 ? `${project.name.slice(0, 10)}…` : project.name}
+                                  </span>
+                                <span
+                                  className="hidden sm:inline truncate"
+                                  title={project.name && project.name.length > 10 ? project.name : undefined}
+                                >
+                                  {project.name && project.name.length > 10 ? `${project.name.slice(0, 10)}…` : project.name}
+                                </span>
+                                </h3>
+                              </div>
+                              <div className="flex flex-shrink-0 items-center space-x-2 ml-2">
                               {typeof project.projectNumber !== 'undefined' && (
                                 <Badge variant="outline">#{project.projectNumber}</Badge>
                               )}
@@ -522,8 +555,9 @@ export default function ProjectsPage() {
                               <Badge className={getPriorityColor(project.priority)}>
                                 {project.priority}
                               </Badge>
+                              </div>
                             </div>
-                            <p className="text-sm text-gray-600 mb-2">
+                            <p className="text-sm text-gray-600 mb-2 line-clamp-2" title={project.description}>
                               {project.description || 'No description'}
                             </p>
                             <div className="flex items-center space-x-4 text-sm text-gray-500">

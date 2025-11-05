@@ -442,7 +442,12 @@ export default function BacklogPage() {
                           <div className="flex items-center space-x-1">
                             <Target className="h-3 w-3 sm:h-4 sm:w-4" />
                             {item.project?.name ? (
-                              <span className="truncate">{item.project.name}</span>
+                              <span
+                                className="truncate"
+                                title={item.project.name && item.project.name.length > 10 ? item.project.name : undefined}
+                              >
+                                {item.project.name && item.project.name.length > 10 ? `${item.project.name.slice(0, 10)}…` : item.project.name}
+                              </span>
                             ) : (
                               <span className="truncate italic text-muted-foreground">Project deleted or unavailable</span>
                             )}

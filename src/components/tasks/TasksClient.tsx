@@ -451,31 +451,45 @@ export default function TasksClient({
                           <Card className="hover:shadow-md transition-shadow m-2">
                             <CardContent className="p-4">
                               <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-4">
-                                  <div className="flex-1">
-                                    <div className="flex items-center space-x-2 mb-2">
-                                      <h3 className="font-medium text-foreground">{task.title}</h3>
-                                      {task.displayId && (
-                                        <Badge variant="outline">{task.displayId}</Badge>
-                                      )}
-                                      <Badge className={getStatusColor(task.status)}>
-                                        {getStatusIcon(task.status)}
-                                        <span className="ml-1">{task.status.replace('_', ' ')}</span>
-                                      </Badge>
-                                      <Badge className={getPriorityColor(task.priority)}>
-                                        {task.priority}
-                                      </Badge>
-                                      <Badge className={getTypeColor(task.type)}>
-                                        {task.type}
-                                      </Badge>
+                                <div className="flex items-center space-x-4 min-w-0">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center mb-2 min-w-0">
+                                      <div className="flex-1 min-w-0">
+                                        <h3
+                                          className="font-medium text-foreground truncate"
+                                          title={task.title}
+                                        >
+                                          {task.title}
+                                        </h3>
+                                      </div>
+                                      <div className="flex flex-shrink-0 items-center space-x-2 ml-2">
+                                        {task.displayId && (
+                                          <Badge variant="outline">{task.displayId}</Badge>
+                                        )}
+                                        <Badge className={getStatusColor(task.status)}>
+                                          {getStatusIcon(task.status)}
+                                          <span className="ml-1">{task.status.replace('_', ' ')}</span>
+                                        </Badge>
+                                        <Badge className={getPriorityColor(task.priority)}>
+                                          {task.priority}
+                                        </Badge>
+                                        <Badge className={getTypeColor(task.type)}>
+                                          {task.type}
+                                        </Badge>
+                                      </div>
                                     </div>
                                     <p className="text-sm text-muted-foreground mb-2">
                                       {task.description || 'No description'}
                                     </p>
                                     <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                                      <div className="flex items-center space-x-1">
-                                        <Target className="h-4 w-4" />
-                                        <span>{task?.project?.name}</span>
+                                      <div className="flex items-center space-x-1 min-w-0">
+                                        <Target className="h-4 w-4 flex-shrink-0" />
+                                        <span
+                                          className="truncate max-w-[50vw] sm:max-w-[25vw]"
+                                          title={task?.project?.name}
+                                        >
+                                          {task?.project?.name}
+                                        </span>
                                       </div>
                                       {task?.dueDate && (
                                         <div className="flex items-center space-x-1">

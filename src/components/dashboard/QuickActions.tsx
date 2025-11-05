@@ -60,12 +60,13 @@ const quickActions: QuickAction[] = [
 ]
 
 export function QuickActions() {
-  const { hasAnyPermission } = usePermissions()
+  const { hasAnyPermission, loading } = usePermissions()
 
-  // Filter actions based on user permissions
-  const availableActions = quickActions.filter(action => 
-    hasAnyPermission(action.permissions)
-  )
+  // While permissions are loading, avoid showing a partial list (e.g., only read actions).
+  // Either show skeletons or wait and then render the fully filtered list once.
+  const availableActions = loading
+    ? []
+    : quickActions.filter(action => hasAnyPermission(action.permissions))
 
   return (
     <Card>
@@ -74,7 +75,14 @@ export function QuickActions() {
       </CardHeader>
       <CardContent className="p-4 sm:p-6 pt-0">
         <div className="grid grid-cols-1 gap-2 sm:gap-3">
-          {availableActions.map((action, index) => {
+          {loading && (
+            <>
+              {[0,1,2,3,4].map((i) => (
+                <div key={i} className="h-12 sm:h-14 w-full animate-pulse rounded-md bg-muted/40" />
+              ))}
+            </>
+          )}
+          {!loading && availableActions.map((action, index) => {
             const Icon = action.icon
             
             return (

@@ -68,7 +68,6 @@ export default function TimerPage() {
   const [selectedTask, setSelectedTask] = useState<string>('')
   const [description, setDescription] = useState('')
   const [error, setError] = useState('')
-console.log('user',user);
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -76,13 +75,11 @@ console.log('user',user);
         
         if (response.ok) {
           const userData = await response.json()
-          console.log('userData from /api/auth/me:', userData)
-          console.log('userData.id:', userData.id)
-          console.log('userData.organization:', userData.organization)
+       
           
           setUser(userData)
           setAuthError('')
-          await fetchProjects()
+          await fetchProjects(userData)
         } else if (response.status === 401) {
           const refreshResponse = await fetch('/api/auth/refresh', {
             method: 'POST'
@@ -90,13 +87,11 @@ console.log('user',user);
           
           if (refreshResponse.ok) {
             const refreshData = await refreshResponse.json()
-            console.log('refreshData from /api/auth/refresh:', refreshData)
-            console.log('refreshData.user:', refreshData.user)
-            console.log('refreshData.user.id:', refreshData.user?.id)
+         
             
             setUser(refreshData.user)
             setAuthError('')
-            await fetchProjects()
+            await fetchProjects(refreshData.user)
           } else {
             setAuthError('Session expired')
             setTimeout(() => {
@@ -138,13 +133,28 @@ console.log('user',user);
     }
   }, [projects, searchParams, selectedProject])
 
-  const fetchProjects = async () => {
+  const fetchProjects = async (currentUser?: User | null) => {
     try {
       const response = await fetch('/api/projects')
       const data = await response.json()
-
       if (data.success && Array.isArray(data.data)) {
-        setProjects(data.data.filter((project: Project) => project.settings.allowTimeTracking))
+        const effectiveUser = currentUser ?? user
+        const filtered = data.data.filter((project: any) => {
+          const u = effectiveUser
+          if (!u) return false
+          const allow = project?.settings?.allowTimeTracking
+          if (!allow) return false
+          const createdByMatch = project?.createdBy === u.id || project?.createdBy?.id === u.id
+          const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
+          const teamMatch = teamMembers.some((memberId: any) => {
+            if (typeof memberId === 'string') return memberId === u.id
+            return memberId?._id === u.id || memberId?.id === u.id
+          })
+          const members = Array.isArray(project?.members) ? project.members : []
+          const membersMatch = members.some((m: any) => (typeof m === 'string' ? m === u.id : m?.id === u.id || m?._id === u.id))
+          return createdByMatch || teamMatch || membersMatch
+        })
+        setProjects(filtered)
       } else {
         setProjects([])
       }
@@ -165,7 +175,13 @@ console.log('user',user);
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
-        setTasks(data.data)
+        const assignedOnly = data.data.filter((t: any) => {
+          const at = t?.assignedTo
+          if (!at) return false
+          if (typeof at === 'string') return at === user.id
+          return at?._id === user.id || at?.id === user.id
+        })
+        setTasks(assignedOnly)
       } else {
         setTasks([])
       }
@@ -176,7 +192,6 @@ console.log('user',user);
   }
 
   const handleProjectChange = (projectId: string) => {
-    console.log('Project changed to:', projectId)
     setSelectedProject(projectId)
     setSelectedTask('')
     setTasks([])
@@ -195,16 +210,9 @@ console.log('user',user);
 
   // Debug Timer component rendering
   useEffect(() => {
-    console.log('Timer render check:', { 
-      selectedProject, 
-      user: !!user, 
-      userId: user?.id, 
-      organizationId: user?.organization,
-      shouldRenderTimer: !!(selectedProject && user)
-    })
+  
     
     if (selectedProject && user) {
-      console.log('Timer component should render now!')
     }
   }, [selectedProject, user])
 
@@ -297,13 +305,12 @@ console.log('user',user);
 
               {selectedProject && (
                 <div className="space-y-2">
-                  <Label htmlFor="task">Task (Optional)</Label>
+                  <Label htmlFor="task">Task *</Label>
                   <Select value={selectedTask} onValueChange={handleTaskChange}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select a task" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">No specific task</SelectItem>
                       {Array.isArray(tasks) && tasks.map((task) => (
                         <SelectItem key={task._id} value={task._id}>
                           <div className="flex items-center space-x-2">
@@ -319,6 +326,9 @@ console.log('user',user);
                       ))}
                     </SelectContent>
                   </Select>
+                  {Array.isArray(tasks) && tasks.length === 0 && (
+                    <p className="text-xs text-muted-foreground">No tasks available in this project. Please create or assign a task to start tracking.</p>
+                  )}
                 </div>
               )}
             </div>
@@ -338,15 +348,23 @@ console.log('user',user);
               </div>
             )}
 
-            {selectedProject && user && (
-              <Timer
-                userId={user.id}
-                organizationId={user.organization}
-                projectId={selectedProject}
-                taskId={selectedTask || undefined}
-                description={description}
-                onTimerUpdate={() => {}}
-              />
+            {selectedProject && user && selectedTask && (
+              <div className="my-4">
+                <Timer
+                  userId={user.id}
+                  organizationId={user.organization}
+                  projectId={selectedProject}
+                  taskId={selectedTask || undefined}
+                  description={description}
+                  onTimerUpdate={() => {}}
+                />
+              </div>
+            )}
+
+            {selectedProject && user && !selectedTask && (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground">Select a task to start the timer.</p>
+              </div>
             )}
 
             {user && (

@@ -258,7 +258,7 @@ export default function StoriesPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">User Stories</h1>
@@ -352,37 +352,60 @@ export default function StoriesPage() {
                     >
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-2">
-                                <BookOpen className="h-5 w-5 text-blue-600" />
-                                <h3 className="font-medium text-foreground">{story.title}</h3>
-                                <Badge className={getStatusColor(story.status) + ' cursor-default'}>
-                                  {getStatusIcon(story.status)}
-                                  <span className="ml-1">{story.status.replace('_', ' ')}</span>
-                                </Badge>
-                                <Badge className={getPriorityColor(story.priority) + ' cursor-default'}>
-                                  {story.priority}
-                                </Badge>
+                          <div className="flex items-center space-x-4 min-w-0">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center mb-2 min-w-0">
+                                <BookOpen className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                                <div className="flex-1 min-w-0 ml-2">
+                                  <h3 className="font-medium text-foreground text-sm sm:text-base truncate min-w-0">{story.title}</h3>
+                                </div>
+                                <div className="flex flex-shrink-0 items-center space-x-2 ml-2">
+                                  <Badge className={getStatusColor(story.status) + ' cursor-default'}>
+                                    {getStatusIcon(story.status)}
+                                    <span className="ml-1">{story.status.replace('_', ' ')}</span>
+                                  </Badge>
+                                  <Badge className={getPriorityColor(story.priority) + ' cursor-default'}>
+                                    {story.priority}
+                                  </Badge>
+                                </div>
                               </div>
-                              <p className="text-sm text-muted-foreground mb-2">
+                              <p className="text-sm text-muted-foreground mb-2 line-clamp-2" title={story.description}>
                                 {story.description || 'No description'}
                               </p>
-                              <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                              <div className="flex items-center space-x-4 text-sm text-muted-foreground min-w-0 flex-wrap">
                                 <div className="flex items-center space-x-1">
                                   <Target className="h-4 w-4" />
-                                  <span>{story.project?.name || 'Project deleted or unavailable'}</span>
+                                  {story.project?.name ? (
+                                    <span
+                                      className="truncate"
+                                      title={story.project.name && story.project.name.length > 10 ? story.project.name : undefined}
+                                    >
+                                      {story.project.name && story.project.name.length > 10 ? `${story.project.name.slice(0, 10)}…` : story.project.name}
+                                    </span>
+                                  ) : (
+                                    <span className="truncate italic text-muted-foreground">Project deleted or unavailable</span>
+                                  )}
                                 </div>
                                 {story.epic && (
-                                  <div className="flex items-center space-x-1">
-                                    <Zap className="h-4 w-4" />
-                                    <span>{story.epic.name}</span>
+                                  <div className="flex items-center space-x-1 min-w-0">
+                                    <Zap className="h-4 w-4 flex-shrink-0" />
+                                    <span
+                                      className="truncate"
+                                      title={story.epic.name && story.epic.name.length > 10 ? story.epic.name : undefined}
+                                    >
+                                      {story.epic.name && story.epic.name.length > 10 ? `${story.epic.name.slice(0, 10)}…` : story.epic.name}
+                                    </span>
                                   </div>
                                 )}
                                 {story.sprint && (
-                                  <div className="flex items-center space-x-1">
-                                    <Calendar className="h-4 w-4" />
-                                    <span>{story.sprint.name}</span>
+                                  <div className="flex items-center space-x-1 min-w-0">
+                                    <Calendar className="h-4 w-4 flex-shrink-0" />
+                                    <span
+                                      className="truncate"
+                                      title={story.sprint.name && story.sprint.name.length > 10 ? story.sprint.name : undefined}
+                                    >
+                                      {story.sprint.name && story.sprint.name.length > 10 ? `${story.sprint.name.slice(0, 10)}…` : story.sprint.name}
+                                    </span>
                                   </div>
                                 )}
                                 {story.dueDate && (
