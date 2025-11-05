@@ -271,8 +271,13 @@ export default function ProjectDetailPage() {
               Back
             </Button>
             <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <h1 className="text-2xl sm:text-3xl font-bold text-foreground truncate">{project.name}</h1>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
+                <h1
+                  className="text-2xl sm:text-3xl font-bold text-foreground truncate max-w-full"
+                  title={project.name}
+                >
+                  {project.name}
+                </h1>
                 {typeof project.projectNumber !== 'undefined' && (
                   <Badge variant="outline" className="flex-shrink-0">#{project.projectNumber}</Badge>
                 )}
@@ -286,7 +291,7 @@ export default function ProjectDetailPage() {
                   <span className="ml-1">{project.status.replace('_', ' ')}</span>
                 </Badge>
               </div>
-              <p className="text-sm sm:text-base text-muted-foreground mt-1 break-words overflow-wrap-anywhere">
+              <p className="text-sm sm:text-base text-muted-foreground mt-1 break-words whitespace-normal" title={project.description || 'No description'}>
                 <span className="sm:hidden">
                   {project.description && project.description.length > 25 
                     ? `${project.description.substring(0, 25)}...` 

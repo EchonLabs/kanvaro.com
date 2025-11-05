@@ -797,7 +797,7 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
           <div className="text-xs text-muted-foreground">
             <div className="flex items-center space-x-1 mb-1">
               <Target className="h-3 w-3" />
-              <span>{task?.project?.name}</span>
+                <span className="text-foreground text-sm line-clamp-2">{task?.project?.name}</span>
             </div>
             {task.dueDate && (
               <div className="flex items-center space-x-1 mb-1">

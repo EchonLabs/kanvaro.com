@@ -279,18 +279,18 @@ export default function CreateStoryPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" onClick={() => router.push('/stories')}>
+      <div className="space-y-6 overflow-x-hidden">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <Button variant="ghost" onClick={() => router.push('/stories')} className="w-full sm:w-auto">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center space-x-2">
-              <BookOpen className="h-8 w-8 text-blue-600" />
-              <span>Create New Story</span>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center space-x-2">
+              <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 flex-shrink-0" />
+              <span className="truncate">Create New Story</span>
             </h1>
-            <p className="text-muted-foreground">Create a new user story for your project</p>
+            <p className="text-sm sm:text-base text-muted-foreground">Create a new user story for your project</p>
           </div>
         </div>
 
@@ -380,16 +380,18 @@ export default function CreateStoryPage() {
                               <button
                                 type="button"
                                 key={user._id}
-                                className="w-full text-left p-1 rounded hover:bg-accent"
+                                className="w-full text-left p-1 rounded hover:bg-accent min-w-0"
                                 onClick={() => {
                                   setFormData(prev => ({ ...prev, assignedTo: user._id }))
                                   setAssigneeQuery('')
                                 }}
                               >
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm">{user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span></span>
+                                <div className="flex items-center justify-between min-w-0">
+                                  <span className="text-sm truncate min-w-0">
+                                    {user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span>
+                                  </span>
                                   {formData.assignedTo === user._id && (
-                                    <span className="text-xs text-muted-foreground">Selected</span>
+                                    <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">Selected</span>
                                   )}
                                 </div>
                               </button>
@@ -403,12 +405,12 @@ export default function CreateStoryPage() {
                             const u = users.find(x => x._id === formData.assignedTo);
                             if (!u) return null;
                             return (
-                              <span className="inline-flex items-center text-xs bg-muted px-2 py-1 rounded">
-                                <span className="mr-2">{u.firstName} {u.lastName}</span>
+                              <span className="inline-flex items-center text-xs bg-muted px-2 py-1 rounded max-w-full">
+                                <span className="mr-2 truncate">{u.firstName} {u.lastName}</span>
                                 <button
                                   type="button"
                                   aria-label="Remove assignee"
-                                  className="text-muted-foreground hover:text-foreground"
+                                  className="text-muted-foreground hover:text-foreground flex-shrink-0"
                                   onClick={() => setFormData(prev => ({ ...prev, assignedTo: '' }))}
                                 >
                                   <X className="h-3 w-3" />
@@ -527,26 +529,28 @@ export default function CreateStoryPage() {
               <div>
                 <label className="text-sm font-medium text-foreground">Acceptance Criteria</label>
                 <div className="space-y-2">
-                  <div className="flex space-x-2">
+                  <div className="flex gap-2 min-w-0">
                     <Input
                       value={newCriteria}
                       onChange={(e) => setNewCriteria(e.target.value)}
                       placeholder="Enter acceptance criteria"
                       onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCriteria())}
+                      className="flex-1 min-w-0"
                     />
-                    <Button type="button" onClick={addCriteria} size="sm" disabled={newCriteria.trim() === ''}>
+                    <Button type="button" onClick={addCriteria} size="sm" disabled={newCriteria.trim() === ''} className="flex-shrink-0">
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
                   <div className="space-y-1">
                     {formData.acceptanceCriteria.map((criteria, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <span className="text-sm">{criteria}</span>
+                      <div key={index} className="flex items-center space-x-2 min-w-0">
+                        <span className="text-sm truncate flex-1 min-w-0" title={criteria}>{criteria}</span>
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           onClick={() => removeCriteria(index)}
+                          className="flex-shrink-0"
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -556,11 +560,11 @@ export default function CreateStoryPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-4">
-                <Button type="button" variant="outline" onClick={() => router.push('/stories')}>
+              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4">
+                <Button type="button" variant="outline" onClick={() => router.push('/stories')} className="w-full sm:w-auto">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={loading || !isFormValid()}>
+                <Button type="submit" disabled={loading || !isFormValid()} className="w-full sm:w-auto">
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
