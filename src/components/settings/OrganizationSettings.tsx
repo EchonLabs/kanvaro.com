@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useOrganization } from '@/hooks/useOrganization'
-import { Building2, Upload, Save, AlertCircle, X, Users, UserCheck, Building, Crown } from 'lucide-react'
+import { Building2, Upload, Save, AlertCircle, CheckCircle, X, Users, UserCheck, Building, Crown } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useCurrencies } from '@/hooks/useCurrencies'
 
@@ -17,7 +17,11 @@ export function OrganizationSettings() {
   const { organization, loading, refetch } = useOrganization()
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay } = useCurrencies(true)
   const [saving, setSaving] = useState(false)
+  const [savingRegistration, setSavingRegistration] = useState(false)
+  const [savingTimeTracking, setSavingTimeTracking] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [registrationMessage, setRegistrationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [timeTrackingMessage, setTimeTrackingMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   
   const [formData, setFormData] = useState({
     name: '',
@@ -268,6 +272,66 @@ export function OrganizationSettings() {
       setMessage({ type: 'error', text: 'Failed to update organization settings' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleSaveRegistrationSettings = async () => {
+    setSavingRegistration(true)
+    setRegistrationMessage(null)
+
+    try {
+      const formDataToSend = new FormData()
+      formDataToSend.append('data', JSON.stringify({
+        allowSelfRegistration: formData.allowSelfRegistration,
+        requireEmailVerification: formData.requireEmailVerification,
+        defaultUserRole: formData.defaultUserRole
+      }))
+
+      const response = await fetch('/api/organization', {
+        method: 'PUT',
+        body: formDataToSend,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to update registration settings')
+      }
+
+      refetch()
+      setRegistrationMessage({ type: 'success', text: 'Registration settings updated successfully' })
+    } catch (error) {
+      setRegistrationMessage({ type: 'error', text: 'Failed to update registration settings' })
+    } finally {
+      setSavingRegistration(false)
+    }
+  }
+
+  const handleSaveTimeTrackingSettings = async () => {
+    setSavingTimeTracking(true)
+    setTimeTrackingMessage(null)
+
+    try {
+      const formDataToSend = new FormData()
+      formDataToSend.append('data', JSON.stringify({
+        timeTracking: formData.timeTracking
+      }))
+
+      const response = await fetch('/api/organization', {
+        method: 'PUT',
+        body: formDataToSend,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to update time tracking settings')
+      }
+
+      refetch()
+      setTimeTrackingMessage({ type: 'success', text: 'Time tracking settings updated successfully' })
+    } catch (error) {
+      setTimeTrackingMessage({ type: 'error', text: 'Failed to update time tracking settings' })
+    } finally {
+      setSavingTimeTracking(false)
     }
   }
 
@@ -675,14 +739,14 @@ export function OrganizationSettings() {
             </Alert>
           )}
 
-          <div className="flex justify-end">
+          <div className="flex justify-end mt-4 sm:mt-6">
             <Button onClick={handleSave} disabled={saving || !isFormValid} className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm">
               {saving ? (
                 <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
               ) : (
                 <Save className="h-3 w-3 sm:h-4 sm:w-4" />
               )}
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? 'Saving...' : 'Save Organization Information'}
             </Button>
           </div>
         </CardContent>
@@ -736,6 +800,32 @@ export function OrganizationSettings() {
                 <SelectItem value="admin" className="text-xs sm:text-sm">Administrator</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {registrationMessage && (
+            <Alert variant={registrationMessage.type === 'error' ? 'destructive' : 'default'}>
+              {registrationMessage.type === 'error' ? (
+                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              ) : (
+                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              )}
+              <AlertDescription className="text-xs sm:text-sm break-words">{registrationMessage.text}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="flex justify-end mt-4 sm:mt-6">
+            <Button 
+              onClick={handleSaveRegistrationSettings} 
+              disabled={savingRegistration} 
+              className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm"
+            >
+              {savingRegistration ? (
+                <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
+              ) : (
+                <Save className="h-3 w-3 sm:h-4 sm:w-4" />
+              )}
+              {savingRegistration ? 'Saving...' : 'Save Registration Settings'}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -1159,6 +1249,32 @@ export function OrganizationSettings() {
               </div>
             </div>
           )}
+
+          {timeTrackingMessage && (
+            <Alert variant={timeTrackingMessage.type === 'error' ? 'destructive' : 'default'}>
+              {timeTrackingMessage.type === 'error' ? (
+                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              ) : (
+                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              )}
+              <AlertDescription className="text-xs sm:text-sm break-words">{timeTrackingMessage.text}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="flex justify-end mt-4 sm:mt-6">
+            <Button 
+              onClick={handleSaveTimeTrackingSettings} 
+              disabled={savingTimeTracking} 
+              className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm"
+            >
+              {savingTimeTracking ? (
+                <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
+              ) : (
+                <Save className="h-3 w-3 sm:h-4 sm:w-4" />
+              )}
+              {savingTimeTracking ? 'Saving...' : 'Save Time Tracking Information'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
