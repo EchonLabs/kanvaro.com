@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -45,7 +45,7 @@ import {
 
 interface Epic {
   _id: string
-  name: string
+  title: string
   description: string
   status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
@@ -66,7 +66,7 @@ interface Epic {
   storyPoints?: number
   dueDate?: string
   estimatedHours?: number
-  labels: string[]
+  tags: string[]
   progress: {
     completionPercentage: number
     storiesCompleted: number
@@ -80,6 +80,7 @@ interface Epic {
 
 export default function EpicsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [epics, setEpics] = useState<Epic[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -138,9 +139,11 @@ export default function EpicsPage() {
       if (data.success) {
         setEpics(data.data)
       } else {
+        console.error('Failed to fetch epics:', data)
         setError(data.error || 'Failed to fetch epics')
       }
     } catch (err) {
+      console.error('Fetch epics error:', err)
       setError('Failed to fetch epics')
     } finally {
       setLoading(false)
@@ -211,7 +214,7 @@ export default function EpicsPage() {
 
   const filteredEpics = epics.filter(epic => {
     const matchesSearch = !searchQuery || 
-      epic?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      epic?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       epic?.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       epic?.project?.name?.toLowerCase().includes(searchQuery.toLowerCase())
     
@@ -326,6 +329,7 @@ export default function EpicsPage() {
                 <TabsTrigger value="grid">Grid View</TabsTrigger>
                 <TabsTrigger value="list">List View</TabsTrigger>
               </TabsList>
+             
 
               <TabsContent value="grid" className="space-y-4">
                 <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
@@ -338,9 +342,9 @@ export default function EpicsPage() {
                       <CardHeader className="p-3 sm:p-6">
                         <div className="flex items-start justify-between gap-2">
                           <div className="space-y-1 flex-1 min-w-0">
-                            <CardTitle className="text-base sm:text-lg flex items-center space-x-2 min-w-0" title={epic?.name}>
+                            <CardTitle className="text-base sm:text-lg flex items-center space-x-2 min-w-0" title={epic?.title}>
                               <Layers className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0" />
-                              <span className="truncate">{epic?.name}</span>
+                              <span className="truncate">{epic?.title}</span>
                             </CardTitle>
                             <CardDescription className="line-clamp-2 text-xs sm:text-sm" title={epic?.description || 'No description'}>
                               {epic?.description || 'No description'}
@@ -438,16 +442,16 @@ export default function EpicsPage() {
                           )}
                         </div>
 
-                        {epic?.labels?.length > 0 && (
+                        {epic?.tags?.length > 0 && (
                           <div className="flex flex-wrap gap-1">
-                            {epic?.labels?.slice(0, 3).map((label, index) => (
+                            {epic?.tags?.slice(0, 3).map((label, index) => (
                               <Badge key={index} variant="outline" className="text-xs">
                                 {label}
                               </Badge>
                             ))}
-                            {epic?.labels?.length > 3 && (
+                            {epic?.tags?.length > 3 && (
                               <Badge variant="outline" className="text-xs">
-                                +{epic?.labels?.length - 3} more
+                                +{epic?.tags?.length - 3} more
                               </Badge>
                             )}
                           </div>
@@ -480,8 +484,8 @@ export default function EpicsPage() {
                             </div>
                             <div className="flex items-start gap-2 mb-2">
                               <Layers className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0 mt-0.5" />
-                              <h3 className="font-medium text-sm sm:text-base text-foreground truncate flex-1 min-w-0" title={epic?.name}>
-                                {epic?.name}
+                              <h3 className="font-medium text-sm sm:text-base text-foreground truncate flex-1 min-w-0" title={epic?.title}>
+                                {epic?.title}
                               </h3>
                             </div>
                             <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2" title={epic?.description || 'No description'}>
@@ -515,11 +519,11 @@ export default function EpicsPage() {
                                   <span>{epic?.estimatedHours}h</span>
                                 </div>
                               )}
-                              {epic?.labels?.length > 0 && (
+                              {epic?.tags?.length > 0 && (
                                 <div className="flex items-center space-x-1 min-w-0">
                                   <Star className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                  <span className="truncate">{epic?.labels?.slice(0, 2).join(', ')}</span>
-                                  {epic?.labels?.length > 2 && <span className="flex-shrink-0">+{epic?.labels?.length - 2} more</span>}
+                                  <span className="truncate">{epic?.tags?.slice(0, 2).join(', ')}</span>
+                                  {epic?.tags?.length > 2 && <span className="flex-shrink-0">+{epic?.tags?.length - 2} more</span>}
                                 </div>
                               )}
                             </div>
@@ -591,7 +595,7 @@ export default function EpicsPage() {
         onClose={() => { setShowDeleteConfirmModal(false); setSelectedEpic(null); }}
         onConfirm={handleDeleteConfirm}
         title="Delete Epic"
-        description={`Are you sure you want to delete "${selectedEpic?.name}"? This action cannot be undone.`}
+        description={`Are you sure you want to delete "${selectedEpic?.title}"? This action cannot be undone.`}
         confirmText={deleting ? 'Deleting...' : 'Delete'}
         cancelText="Cancel"
       />

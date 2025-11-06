@@ -347,7 +347,7 @@ export default function StoriesPage() {
                   {filteredStories.map((story) => (
                     <Card 
                       key={story._id} 
-                      className={`hover:shadow-md transition-shadow ${story.project ? 'cursor-pointer' : 'cursor-default'}`}
+                      className={`hover:shadow-md transition-shadow ${story.project ? 'cursor-pointer' : 'cursor-pointer'}`}
                       onClick={() => { if (story.project) router.push(`/stories/${story._id}`); }}
                     >
                       <CardContent className="p-4">
@@ -360,11 +360,11 @@ export default function StoriesPage() {
                                   <h3 className="font-medium text-foreground text-sm sm:text-base truncate min-w-0">{story.title}</h3>
                                 </div>
                                 <div className="flex flex-shrink-0 items-center space-x-2 ml-2">
-                                  <Badge className={getStatusColor(story.status) + ' cursor-default'}>
+                                  <Badge className={getStatusColor(story.status) }>
                                     {getStatusIcon(story.status)}
                                     <span className="ml-1">{story.status.replace('_', ' ')}</span>
                                   </Badge>
-                                  <Badge className={getPriorityColor(story.priority) + ' cursor-default'}>
+                                  <Badge className={getPriorityColor(story.priority)}>
                                     {story.priority}
                                   </Badge>
                                 </div>
