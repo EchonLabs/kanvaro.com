@@ -100,7 +100,7 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
   }
 
   return (
-    <Card>
+    <Card className="overflow-x-hidden">
       <CardHeader className="p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
           <CardTitle className="text-base sm:text-lg truncate">Recent Projects</CardTitle>
@@ -120,13 +120,16 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
           {projects.map((project) => (
             <div 
               key={project._id} 
-              className="border rounded-lg p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+              className="border rounded-lg p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer overflow-x-hidden"
               onClick={() => router.push(`/projects/${project._id}`)}
             >
               <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3 sm:gap-0 mb-3">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate">
-                    {project.name}
+                  <h3 
+                    className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate"
+                    title={project.name && project.name.length > 10 ? project.name : undefined}
+                  >
+                    {project.name && project.name.length > 10 ? `${project.name.slice(0, 10)}…` : project.name}
                   </h3>
                   <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1 break-words line-clamp-2">
                     {project.description || 'No description available'}

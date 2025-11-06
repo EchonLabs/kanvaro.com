@@ -160,7 +160,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
 
   if (activeTimer) {
     return (
-      <Card>
+      <Card className="overflow-x-hidden">
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Clock className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
@@ -182,7 +182,13 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
 
           <div className="space-y-2">
             <div className="text-xs sm:text-sm break-words">
-              <span className="font-medium">Project:</span> <span className="truncate">{activeTimer.project.name}</span>
+              <span className="font-medium">Project:</span>{' '}
+              <span 
+                className={activeTimer.project.name.length > 20 ? 'truncate' : ''}
+                title={activeTimer.project.name.length > 20 ? activeTimer.project.name : undefined}
+              >
+                {activeTimer.project.name.length > 20 ? `${activeTimer.project.name.slice(0, 20)}…` : activeTimer.project.name}
+              </span>
             </div>
             {activeTimer.task && (
               <div className="text-xs sm:text-sm break-words">
@@ -238,7 +244,9 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
               onClick={() => {
                 const pid = activeTimer.project && activeTimer.project._id ? `projectId=${encodeURIComponent(activeTimer.project._id)}` : ''
                 const pname = activeTimer.project && activeTimer.project.name ? `projectName=${encodeURIComponent(activeTimer.project.name)}` : ''
-                const qs = [pid, pname].filter(Boolean).join('&')
+                const tid = activeTimer.task && activeTimer.task._id ? `taskId=${encodeURIComponent(activeTimer.task._id)}` : ''
+                const tname = activeTimer.task && activeTimer.task.title ? `taskName=${encodeURIComponent(activeTimer.task.title)}` : ''
+                const qs = [pid, pname, tid, tname].filter(Boolean).join('&')
                 router.push(qs ? `/time-tracking/timer?${qs}` : '/time-tracking/timer')
               }}
               className="w-full text-xs sm:text-sm whitespace-nowrap"
@@ -253,7 +261,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
   }
 
   return (
-    <Card>
+    <Card className="overflow-x-hidden">
       <CardHeader className="p-4 sm:p-6">
         <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
           <Clock className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />

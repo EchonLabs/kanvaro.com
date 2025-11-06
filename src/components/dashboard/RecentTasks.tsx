@@ -117,7 +117,7 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
   }
 
   return (
-    <Card>
+    <Card className="overflow-x-hidden">
       <CardHeader className="p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
           <CardTitle className="text-base sm:text-lg truncate">Recent Tasks</CardTitle>
@@ -141,7 +141,7 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
           {tasks.map((task) => (
             <div 
               key={task._id} 
-              className="flex items-start sm:items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+              className="flex items-start sm:items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer overflow-x-hidden"
               onClick={() => router.push(`/tasks/${task._id}`)}
             >
               <Checkbox 
@@ -152,8 +152,11 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
               
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <h4 className={`text-xs sm:text-sm font-medium truncate flex-1 min-w-0 ${task.status === 'done' ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}>
-                    {task.title}
+                  <h4 
+                    className={`text-xs sm:text-sm font-medium truncate flex-1 min-w-0 ${task.status === 'done' ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}
+                    title={task.title && task.title.length > 10 ? task.title : undefined}
+                  >
+                    {task.title && task.title.length > 10 ? `${task.title.slice(0, 10)}…` : task.title}
                   </h4>
                   <Badge className={`${getStatusColor(task.status)} text-xs flex-shrink-0`}>
                     {task.status}
@@ -164,7 +167,12 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-gray-600 dark:text-gray-400">
-                  <span className="font-medium truncate">{task.project?.name || 'No Project'}</span>
+                  <span 
+                    className="font-medium truncate"
+                    title={task.project?.name && task.project.name.length > 10 ? task.project.name : undefined}
+                  >
+                    {task.project?.name && task.project.name.length > 10 ? `${task.project.name.slice(0, 10)}…` : (task.project?.name || 'No Project')}
+                  </span>
                   {task.assignedTo && (
                     <div className="flex items-center whitespace-nowrap">
                       <User className="h-3 w-3 mr-1 flex-shrink-0" />

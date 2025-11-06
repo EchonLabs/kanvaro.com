@@ -115,7 +115,7 @@ export function StatsCards({ stats, changes, isLoading }: StatsCardsProps) {
                          TrendingUp
         
         return (
-          <Card key={index}>
+          <Card key={index} className="overflow-x-hidden">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
               <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground truncate flex-1 min-w-0">
                 {stat.title}
