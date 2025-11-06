@@ -26,6 +26,7 @@ export default function CreateEpicPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [authError, setAuthError] = useState('')
   const [projects, setProjects] = useState<Project[]>([])
   const [projectQuery, setProjectQuery] = useState("");
@@ -99,6 +100,7 @@ export default function CreateEpicPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setSuccess('')
 
     try {
       const response = await fetch('/api/epics', {
@@ -108,6 +110,7 @@ export default function CreateEpicPage() {
         },
         body: JSON.stringify({
           ...formData,
+          title: formData.name?.trim() || undefined,
           estimatedHours: formData.estimatedHours ? parseInt(formData.estimatedHours) : undefined,
           storyPoints: formData.storyPoints ? parseInt(formData.storyPoints) : undefined,
           labels: formData.labels ? formData.labels.split(',').map(label => label.trim()) : []
@@ -117,7 +120,10 @@ export default function CreateEpicPage() {
       const data = await response.json()
 
       if (data.success) {
-        router.push('/epics')
+        setSuccess('Epic created successfully')
+        setTimeout(() => {
+          router.push('/epics?created=1')
+        }, 1000)
       } else {
         setError(data.error || 'Failed to create epic')
       }
@@ -159,20 +165,26 @@ export default function CreateEpicPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" onClick={() => router.push('/epics')}>
+      <div className="space-y-6 overflow-x-hidden">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <Button variant="ghost" onClick={() => router.push('/epics')} className="w-full sm:w-auto">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center space-x-2">
-              <Layers className="h-8 w-8 text-purple-600" />
-              <span>Create New Epic</span>
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0">
+              <Layers className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600 flex-shrink-0" />
+              <span className="truncate">Create New Epic</span>
             </h1>
-            <p className="text-muted-foreground">Create a new epic for your project</p>
+            <p className="text-sm sm:text-base text-muted-foreground">Create a new epic for your project</p>
           </div>
         </div>
+
+        {success && (
+          <Alert>
+            <AlertDescription>{success}</AlertDescription>
+          </Alert>
+        )}
 
         {error && (
           <Alert variant="destructive">
@@ -181,7 +193,7 @@ export default function CreateEpicPage() {
           </Alert>
         )}
 
-        <Card>
+        <Card className="overflow-x-hidden">
           <CardHeader>
             <CardTitle>Epic Details</CardTitle>
             <CardDescription>Fill in the details for your new epic</CardDescription>
@@ -207,7 +219,7 @@ export default function CreateEpicPage() {
                       onValueChange={(value) => handleChange('project', value)}
                       onOpenChange={open => { if (open) setProjectQuery(""); }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a project" />
                       </SelectTrigger>
                       <SelectContent className="z-[10050] p-0">
@@ -301,11 +313,11 @@ export default function CreateEpicPage() {
                 />
               </div>
 
-              <div className="flex justify-end space-x-4">
-                <Button type="button" variant="outline" onClick={() => router.push('/epics')}>
+              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4">
+                <Button type="button" variant="outline" onClick={() => router.push('/epics')} className="w-full sm:w-auto">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={loading || !isFormValid()}>
+                <Button type="submit" disabled={loading || !isFormValid()} className="w-full sm:w-auto">
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -323,6 +335,7 @@ export default function CreateEpicPage() {
           </CardContent>
         </Card>
       </div>
+      
     </MainLayout>
   )
 }

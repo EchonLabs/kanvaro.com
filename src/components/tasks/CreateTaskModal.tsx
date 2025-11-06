@@ -423,69 +423,93 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
 
               <div className="md:col-span-2">
                 <label className="text-sm font-medium text-foreground">Assigned To</label>
-                <div className="mt-1 border rounded-md p-2">
-                  <Input
-                    value={assigneeQuery}
-                    onChange={(e) => setAssigneeQuery(e.target.value)}
-                    placeholder={loadingUsers ? 'Loading members...' : 'Type to search team members'}
-                    className="mb-2"
-                  />
-                  <div className="max-h-40 overflow-y-auto space-y-1">
-                    {loadingUsers ? (
-                      <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Loading members...</span>
-                      </div>
-                    ) : assigneeQuery.trim() === '' ? null : (
-                      (() => {
-                        const q = assigneeQuery.toLowerCase()
-                        const filtered = users.filter(u =>
-                          `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
-                          u.email.toLowerCase().includes(q)
-                        )
-                        if (filtered.length === 0) {
-                          return (
-                            <div className="text-sm text-muted-foreground p-2">No matching members</div>
-                          )
-                        }
-                        return filtered.map(user => (
-                          <button
-                            type="button"
-                            key={user._id}
-                            className="w-full text-left p-1 rounded hover:bg-accent"
-                            onClick={() => {
-                              setAssignedToIds(prev => prev.includes(user._id) ? prev : [...prev, user._id])
-                            }}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm">{user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span></span>
-                              {assignedToIds.includes(user._id) && (
-                                <span className="text-xs text-muted-foreground">Added</span>
-                              )}
+                <div className="space-y-2 mt-1">
+                  <Select
+                    value=""
+                    onValueChange={(value) => {
+                      if (!assignedToIds.includes(value)) {
+                        setAssignedToIds(prev => [...prev, value])
+                      }
+                    }}
+                    onOpenChange={(open) => { if (open) setAssigneeQuery(""); }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select team members" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div className="p-2">
+                        <Input
+                          value={assigneeQuery}
+                          onChange={e => setAssigneeQuery(e.target.value)}
+                          placeholder={loadingUsers ? 'Loading members...' : 'Type to search team members'}
+                          className="mb-2"
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          {loadingUsers ? (
+                            <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Loading members...</span>
                             </div>
-                          </button>
-                        ))
-                      })()
-                    )}
-                  </div>
+                          ) : (
+                            (() => {
+                              const q = assigneeQuery.toLowerCase().trim();
+                              const filtered = users.filter(u =>
+                                !q || 
+                                `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
+                                u.email.toLowerCase().includes(q)
+                              );
+                              
+                              if (filtered.length === 0) {
+                                return (
+                                  <div className="px-2 py-1 text-sm text-muted-foreground">No matching members</div>
+                                );
+                              }
+                              
+                              return filtered.map(user => {
+                                const isSelected = assignedToIds.includes(user._id);
+                                return (
+                                  <SelectItem 
+                                    key={user._id} 
+                                    value={user._id}
+                                    disabled={isSelected}
+                                    className={isSelected ? 'opacity-50 cursor-not-allowed' : ''}
+                                  >
+                                    <div className="flex items-center justify-between w-full">
+                                      <span>{user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span></span>
+                                      {isSelected && (
+                                        <span className="text-xs text-muted-foreground ml-2">Selected</span>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                );
+                              });
+                            })()
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
                   {assignedToIds.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {assignedToIds.map(id => {
-                        const u = users.find(x => x._id === id)
-                        if (!u) return null
+                        const u = users.find(x => x._id === id);
+                        if (!u) return null;
                         return (
-                          <span key={id} className="inline-flex items-center text-xs bg-muted px-2 py-1 rounded">
-                            <span className="mr-2">{u.firstName} {u.lastName}</span>
+                          <span 
+                            key={id} 
+                            className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
+                          >
+                            <span>{u.firstName} {u.lastName}</span>
                             <button
                               type="button"
                               aria-label="Remove assignee"
-                              className="text-muted-foreground hover:text-foreground"
+                              className="text-muted-foreground hover:text-foreground focus:outline-none"
                               onClick={() => setAssignedToIds(prev => prev.filter(x => x !== id))}
                             >
                               <X className="h-3 w-3" />
                             </button>
                           </span>
-                        )
+                        );
                       })}
                     </div>
                   )}

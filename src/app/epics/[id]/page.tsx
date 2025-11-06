@@ -31,7 +31,7 @@ import {
 
 interface Epic {
   _id: string
-  name: string
+  title: string
   description: string
   status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
@@ -52,7 +52,7 @@ interface Epic {
   storyPoints?: number
   dueDate?: string
   estimatedHours?: number
-  labels: string[]
+  tags: string[]
   progress: {
     completionPercentage: number
     storiesCompleted: number
@@ -241,9 +241,12 @@ export default function EpicDetailPage() {
               Back
             </Button>
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0">
+              <h1
+                className="text-2xl sm:text-3xl font-bold text-foreground truncate max-w-full flex items-center space-x-2 min-w-0"
+                title={epic?.title}
+              >
                 <Layers className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-purple-600 flex-shrink-0" />
-                <span className="truncate" title={epic?.name}>{epic?.name}</span>
+                <span>{epic?.title}</span>
               </h1>
               <p className="text-xs sm:text-sm text-muted-foreground">Epic Details</p>
             </div>
@@ -393,14 +396,14 @@ export default function EpicDetailPage() {
               </CardContent>
             </Card>
 
-            {epic?.labels?.length > 0 && (
+            {epic?.tags?.length > 0 && (
               <Card className="overflow-x-hidden">
                 <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="text-base sm:text-lg">Labels</CardTitle>
+                  <CardTitle className="text-base sm:text-lg">Tags</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-6 pt-0">
                   <div className="flex flex-wrap gap-2">
-                    {epic?.labels?.map((label, index) => (
+                    {epic?.tags?.map((label, index) => (
                       <Badge key={index} variant="outline" className="text-xs">
                         <Star className="h-3 w-3 mr-1" />
                         {label}
@@ -435,7 +438,7 @@ export default function EpicDetailPage() {
         onClose={() => setShowDeleteConfirmModal(false)}
         onConfirm={handleDeleteConfirm}
         title="Delete Epic"
-        description={`Are you sure you want to delete "${epic?.name}"? This action cannot be undone.`}
+        description={`Are you sure you want to delete "${epic?.title}"? This action cannot be undone.`}
         confirmText={deleting ? 'Deleting...' : 'Delete'}
         cancelText="Cancel"
       />
