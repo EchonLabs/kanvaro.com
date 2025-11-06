@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -100,6 +100,42 @@ export default function CreateTaskPage() {
     labels: [] as string[]
   })
 
+  const fetchProjects = useCallback(async () => {
+    try {
+      const response = await fetch('/api/projects')
+      const data = await response.json()
+
+      if (data.success && Array.isArray(data.data)) {
+        setProjects(data.data)
+      } else {
+        setProjects([])
+      }
+    } catch (err) {
+      console.error('Failed to fetch projects:', err)
+      setProjects([])
+    }
+  }, [])
+
+  const fetchUsers = useCallback(async () => {
+    setLoadingUsers(true)
+    try {
+      const response = await fetch('/api/members')
+      const data = await response.json()
+      
+      if (data.success && data.data && Array.isArray(data.data.members)) {
+        setUsers(data.data.members)
+      } else {
+        console.error('Invalid users data:', data)
+        setUsers([])
+      }
+    } catch (err) {
+      console.error('Failed to fetch users:', err)
+      setUsers([])
+    } finally {
+      setLoadingUsers(false)
+    }
+  }, [])
+
   const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me')
@@ -131,51 +167,13 @@ export default function CreateTaskPage() {
         router.push('/login')
       }, 2000)
     }
-  }, [router])
+  }, [router, fetchProjects, fetchUsers])
 
   useEffect(() => {
     checkAuth()
-    setAssigneeQuery('')
-
   }, [checkAuth])
 
-  const fetchProjects = async () => {
-    try {
-      const response = await fetch('/api/projects')
-      const data = await response.json()
-
-      if (data.success && Array.isArray(data.data)) {
-        setProjects(data.data)
-      } else {
-        setProjects([])
-      }
-    } catch (err) {
-      console.error('Failed to fetch projects:', err)
-      setProjects([])
-    }
-  }
-
-  const fetchUsers = async () => {
-    setLoadingUsers(true)
-    try {
-      const response = await fetch('/api/members')
-      const data = await response.json()
-      
-      if (data.success && data.data && Array.isArray(data.data.members)) {
-        setUsers(data.data.members)
-      } else {
-        console.error('Invalid users data:', data)
-        setUsers([])
-      }
-    } catch (err) {
-      console.error('Failed to fetch users:', err)
-      setUsers([])
-    } finally {
-      setLoadingUsers(false)
-    }
-  }
-
-  const fetchStories = async (projectId: string) => {
+  const fetchStories = useCallback(async (projectId: string) => {
     if (!projectId) {
       setStories([])
       return
@@ -194,7 +192,7 @@ export default function CreateTaskPage() {
       console.error('Failed to fetch stories:', err)
       setStories([])
     }
-  }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -205,22 +203,30 @@ export default function CreateTaskPage() {
       // Prevent past due dates
       if (formData.dueDate && formData.dueDate < today) {
         setError('Due date cannot be in the past')
+        setLoading(false)
         return
       }
+
+      // Validate required fields before submitting
+      if (!formData.title.trim() || !formData.project || !formData.dueDate) {
+        setError('Please fill in all required fields')
+        setLoading(false)
+        return
+      }
+
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          title: formData.title,
-          description: formData.description,
-          displayId: formData.displayId,
+          title: formData.title.trim(),
+          description: formData.description?.trim() || undefined,
+          displayId: formData.displayId?.trim() || undefined,
           project: formData.project,
           story: formData.story === 'none' ? undefined : formData.story || undefined,
           parentTask: formData.parentTask || undefined,
-          assignedTo: assignedToIds.length === 1 ? assignedToIds[0] : undefined,
-          assignees: assignedToIds.length > 1 ? assignedToIds : undefined,
+          assignedTo: assignedToIds.length === 1 ? assignedToIds[0] : assignedToIds.length > 0 ? assignedToIds[0] : undefined,
           priority: formData.priority,
           type: formData.type,
           status: formData.status,
@@ -231,21 +237,29 @@ export default function CreateTaskPage() {
         })
       })
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to create task' }))
+        setError(errorData.error || 'Failed to create task')
+        setLoading(false)
+        return
+      }
+
       const data = await response.json()
 
       if (data.success) {
         router.push('/tasks')
       } else {
         setError(data.error || 'Failed to create task')
+        setLoading(false)
       }
     } catch (err) {
-      setError('Failed to create task')
-    } finally {
+      console.error('Task creation error:', err)
+      setError('Failed to create task. Please try again.')
       setLoading(false)
     }
   }
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = useCallback((field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -260,7 +274,7 @@ export default function CreateTaskPage() {
         setAssigneeQuery('')
       }
     }
-  }
+  }, [fetchStories])
 
   const addLabel = () => {
     if (newLabel.trim()) {
@@ -279,14 +293,31 @@ export default function CreateTaskPage() {
     }))
   }
 
+  // Memoize filtered projects to avoid recalculating on every render
+  const filteredProjects = useMemo(() => {
+    if (!projectQuery.trim()) return projects
+    const q = projectQuery.toLowerCase()
+    return projects.filter(p => p.name.toLowerCase().includes(q))
+  }, [projects, projectQuery])
+
+  // Memoize filtered users to avoid recalculating on every render
+  const filteredUsers = useMemo(() => {
+    if (!assigneeQuery.trim()) return users
+    const q = assigneeQuery.toLowerCase().trim()
+    return users.filter(u =>
+      `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q)
+    )
+  }, [users, assigneeQuery])
+
   // Required field validation (only fields marked with *)
-  const isFormValid = () => {
+  const isFormValid = useMemo(() => {
     return (
       !!formData.title.trim() &&
       !!formData.project &&
       !!formData.dueDate
-    );
-  };
+    )
+  }, [formData.title, formData.project, formData.dueDate])
 
   if (authError) {
     return (
@@ -372,12 +403,13 @@ export default function CreateTaskPage() {
                             className="mb-2"
                           />
                           <div className="max-h-56 overflow-y-auto">
-                            {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).map((project) => (
-                              <SelectItem key={project._id} value={project._id}>
-                                {project.name}
-                              </SelectItem>
-                            ))}
-                            {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).length === 0 && (
+                            {filteredProjects.length > 0 ? (
+                              filteredProjects.map((project) => (
+                                <SelectItem key={project._id} value={project._id}>
+                                  {project.name}
+                                </SelectItem>
+                              ))
+                            ) : (
                               <div className="px-2 py-1 text-sm text-muted-foreground">No matching projects</div>
                             )}
                           </div>
@@ -389,64 +421,74 @@ export default function CreateTaskPage() {
                   {formData.project && (
                     <div>
                       <label className="text-sm font-medium text-foreground">Assigned To</label>
-                      <div className="mt-1 border rounded-md p-2">
-                        <Input
-                          value={assigneeQuery}
-                          onChange={e => setAssigneeQuery(e.target.value)}
-                          placeholder={loadingUsers ? 'Loading members...' : 'Type to search team members'}
-                          className="mb-2"
-                        />
-                        <div className="max-h-40 overflow-y-auto space-y-1">
-                          {loadingUsers ? (
-                            <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span>Loading members...</span>
-                            </div>
-                          ) : assigneeQuery.trim() === '' ? null : (
-                            (() => {
-                              const q = assigneeQuery.toLowerCase();
-                              const filtered = users.filter(u =>
-                                `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
-                                u.email.toLowerCase().includes(q)
-                              );
-                              if (filtered.length === 0) {
-                                return (
-                                  <div className="text-sm text-muted-foreground p-2">No matching members</div>
-                                )
-                              }
-                              return filtered.map(user => (
-                                <button
-                                  type="button"
-                                  key={user._id}
-                                  className="w-full text-left p-1 rounded hover:bg-accent"
-                                  onClick={() => {
-                                    setAssignedToIds(prev => prev.includes(user._id) ? prev : [...prev, user._id])
-                                    setAssigneeQuery('') // Clear search after selection
-                                  }}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-sm">{user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span></span>
-                                    {assignedToIds.includes(user._id) && (
-                                      <span className="text-xs text-muted-foreground">Added</span>
-                                    )}
+                      <div className="space-y-2">
+                        <Select
+                          value=""
+                          onValueChange={(value) => {
+                            if (!assignedToIds.includes(value)) {
+                              setAssignedToIds(prev => [...prev, value])
+                            }
+                          }}
+                          onOpenChange={(open) => { if (open) setAssigneeQuery(""); }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select team members" />
+                          </SelectTrigger>
+                          <SelectContent className="z-[10050] p-0">
+                            <div className="p-2">
+                              <Input
+                                value={assigneeQuery}
+                                onChange={e => setAssigneeQuery(e.target.value)}
+                                placeholder={loadingUsers ? 'Loading members...' : 'Type to search team members'}
+                                className="mb-2"
+                              />
+                              <div className="max-h-56 overflow-y-auto">
+                                {loadingUsers ? (
+                                  <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span>Loading members...</span>
                                   </div>
-                                </button>
-                              ));
-                            })()
-                          )}
-                        </div>
+                                ) : filteredUsers.length > 0 ? (
+                                  filteredUsers.map(user => {
+                                    const isSelected = assignedToIds.includes(user._id);
+                                    return (
+                                      <SelectItem 
+                                        key={user._id} 
+                                        value={user._id}
+                                        disabled={isSelected}
+                                        className={isSelected ? 'opacity-50 cursor-not-allowed' : ''}
+                                      >
+                                        <div className="flex items-center justify-between w-full">
+                                          <span>{user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span></span>
+                                          {isSelected && (
+                                            <span className="text-xs text-muted-foreground ml-2">Selected</span>
+                                          )}
+                                        </div>
+                                      </SelectItem>
+                                    );
+                                  })
+                                ) : (
+                                  <div className="px-2 py-1 text-sm text-muted-foreground">No matching members</div>
+                                )}
+                              </div>
+                            </div>
+                          </SelectContent>
+                        </Select>
                         {assignedToIds.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-2">
+                          <div className="flex flex-wrap gap-2">
                             {assignedToIds.map(id => {
                               const u = users.find(x => x._id === id);
                               if (!u) return null;
                               return (
-                                <span key={id} className="inline-flex items-center text-xs bg-muted px-2 py-1 rounded">
-                                  <span className="mr-2">{u.firstName} {u.lastName}</span>
+                                <span 
+                                  key={id} 
+                                  className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
+                                >
+                                  <span>{u.firstName} {u.lastName}</span>
                                   <button
                                     type="button"
                                     aria-label="Remove assignee"
-                                    className="text-muted-foreground hover:text-foreground"
+                                    className="text-muted-foreground hover:text-foreground focus:outline-none"
                                     onClick={() => setAssignedToIds(prev => prev.filter(x => x !== id))}
                                   >
                                     <X className="h-3 w-3" />
@@ -605,7 +647,7 @@ export default function CreateTaskPage() {
                 <Button type="button" variant="outline" onClick={() => router.back()}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={loading || !isFormValid()}>
+                <Button type="submit" disabled={loading || !isFormValid}>
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
