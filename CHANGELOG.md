@@ -1,3 +1,10 @@
+## [1.0.23](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.22...v1.0.23) (2025-11-06)
+
+
+### Bug Fixes
+
+* fix bugs ([8415e24](https://github.com/EchonLabs/kanvaro.com/commit/8415e24751d3ba71af357374d12b48063e694cc9))
+
 ## [1.0.22](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.21...v1.0.22) (2025-11-05)
 
 
