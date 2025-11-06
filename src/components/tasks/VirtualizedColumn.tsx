@@ -10,7 +10,11 @@ import { Target, Plus } from 'lucide-react'
 import SortableTask from './SortableTask'
 import { ITask } from '@/models/Task'
 
-interface PopulatedTask extends Omit<ITask, 'assignedTo'> {
+interface PopulatedTask extends Omit<ITask, 'assignedTo' | 'project'> {
+  project?: {
+    _id: string
+    name: string
+  }
   assignedTo?: {
     firstName: string
     lastName: string
