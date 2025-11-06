@@ -62,14 +62,14 @@ const quickActions: QuickAction[] = [
 export function QuickActions() {
   const { hasAnyPermission, loading } = usePermissions()
 
-  // While permissions are loading, avoid showing a partial list (e.g., only read actions).
-  // Either show skeletons or wait and then render the fully filtered list once.
+  // While permissions are loading, show all actions (they'll be filtered once loaded)
+  // This prevents empty state when cache is cleared and permissions are being fetched
   const availableActions = loading
-    ? []
+    ? quickActions
     : quickActions.filter(action => hasAnyPermission(action.permissions))
 
   return (
-    <Card>
+    <Card className="overflow-x-hidden">
       <CardHeader className="p-4 sm:p-6">
         <CardTitle className="text-base sm:text-lg truncate">Quick Actions</CardTitle>
       </CardHeader>

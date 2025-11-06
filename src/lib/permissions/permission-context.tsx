@@ -161,7 +161,8 @@ export function PermissionProvider({ children, initialPermissions }: PermissionP
 
   const hasPermission = (permission: Permission, projectId?: string): boolean => {
     // If permissions are still loading, return true to prevent blocking navigation
-    if (!permissions) return true;
+    // This allows UI to show while permissions are being fetched
+    if (!permissions || loading) return true;
     
     // If permissions are empty (user has no permissions), return false
     if (permissions.globalPermissions.length === 0 && Object.keys(permissions.projectPermissions).length === 0) {

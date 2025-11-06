@@ -115,7 +115,7 @@ export function TeamActivity({ activities, isLoading }: TeamActivityProps) {
   }
 
   return (
-    <Card>
+    <Card className="overflow-x-hidden">
       <CardHeader className="p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
           <CardTitle className="text-base sm:text-lg truncate">Team Activity</CardTitle>
@@ -138,7 +138,7 @@ export function TeamActivity({ activities, isLoading }: TeamActivityProps) {
             return (
               <div 
                 key={activity.id} 
-                className="flex items-start sm:items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="flex items-start sm:items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors overflow-x-hidden"
               >
                 <div className="relative flex-shrink-0">
                   <GravatarAvatar 

@@ -292,13 +292,13 @@ export default function TasksClient({
     }
   }
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Tasks</h1>
-          <p className="text-muted-foreground">Manage and track your assigned tasks</p>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground truncate">My Tasks</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage and track your assigned tasks</p>
         </div>
-        <Button onClick={() => setShowCreateTaskModal(true)} className="w-full sm:w-auto">
+        <Button onClick={() => setShowCreateTaskModal(true)} className="w-full sm:w-auto flex-shrink-0">
           <Plus className="h-4 w-4 mr-2" />
           New Task
         </Button>
@@ -311,7 +311,7 @@ export default function TasksClient({
         </Alert>
       )}
 
-      <Card>
+      <Card className="overflow-x-hidden">
         <CardHeader>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -424,7 +424,7 @@ export default function TasksClient({
             <TabsContent value="list" className="space-y-4">
               <div 
                 ref={parentRef}
-                className="h-[600px] overflow-auto"
+                className="h-[400px] sm:h-[500px] md:h-[600px] overflow-auto overflow-x-hidden"
               >
                 <div
                   style={{
@@ -449,78 +449,74 @@ export default function TasksClient({
                           }}
                         >
                           <Card className="hover:shadow-md transition-shadow m-2">
-                            <CardContent className="p-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-4 min-w-0">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center mb-2 min-w-0">
-                                      <div className="flex-1 min-w-0">
-                                        <h3
-                                          className="font-medium text-foreground truncate"
-                                          title={task.title}
-                                        >
-                                          {task.title}
-                                        </h3>
-                                      </div>
-                                      <div className="flex flex-shrink-0 items-center space-x-2 ml-2">
-                                        {task.displayId && (
-                                          <Badge variant="outline">{task.displayId}</Badge>
-                                        )}
-                                        <Badge className={getStatusColor(task.status)}>
-                                          {getStatusIcon(task.status)}
-                                          <span className="ml-1">{task.status.replace('_', ' ')}</span>
-                                        </Badge>
-                                        <Badge className={getPriorityColor(task.priority)}>
-                                          {task.priority}
-                                        </Badge>
-                                        <Badge className={getTypeColor(task.type)}>
-                                          {task.type}
-                                        </Badge>
-                                      </div>
+                            <CardContent className="p-3 sm:p-4">
+                              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
+                                <div className="flex-1 min-w-0 w-full">
+                                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2 min-w-0">
+                                    <div className="flex-1 min-w-0">
+                                      <h3
+                                        className="font-medium text-sm sm:text-base text-foreground truncate"
+                                        title={task.title}
+                                      >
+                                        {task.title}
+                                      </h3>
                                     </div>
-                                    <p className="text-sm text-muted-foreground mb-2">
-                                      {task.description || 'No description'}
-                                    </p>
-                                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                                      <div className="flex items-center space-x-1 min-w-0">
-                                        <Target className="h-4 w-4 flex-shrink-0" />
-                                        <span
-                                          className="truncate max-w-[50vw] sm:max-w-[25vw]"
-                                          title={task?.project?.name}
-                                        >
-                                          {task?.project?.name}
-                                        </span>
-                                      </div>
-                                      {task?.dueDate && (
-                                        <div className="flex items-center space-x-1">
-                                          <Calendar className="h-4 w-4" />
-                                          <span>Due {new Date(task?.dueDate).toLocaleDateString()}</span>
-                                        </div>
+                                    <div className="flex flex-wrap items-center gap-1 sm:gap-2 flex-shrink-0">
+                                      {task.displayId && (
+                                        <Badge variant="outline" className="text-xs">{task.displayId}</Badge>
                                       )}
-                                      {task?.storyPoints && (
-                                        <div className="flex items-center space-x-1">
-                                          <BarChart3 className="h-4 w-4" />
-                                          <span>{task?.storyPoints} points</span>
-                                        </div>
-                                      )}
-                                      {task?.estimatedHours && (
-                                        <div className="flex items-center space-x-1">
-                                          <Clock className="h-4 w-4" />
-                                          <span>{task?.estimatedHours}h estimated</span>
-                                        </div>
-                                      )}
+                                      <Badge className={`${getStatusColor(task.status)} text-xs`}>
+                                        {getStatusIcon(task.status)}
+                                        <span className="ml-1 hidden sm:inline">{task.status.replace('_', ' ')}</span>
+                                      </Badge>
+                                      <Badge className={`${getPriorityColor(task.priority)} text-xs`}>
+                                        {task.priority}
+                                      </Badge>
+                                      <Badge className={`${getTypeColor(task.type)} text-xs`}>
+                                        {task.type}
+                                      </Badge>
                                     </div>
                                   </div>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <div className="text-right">
-                                    {task?.assignedTo && (
-                                      <div className="text-sm text-muted-foreground">
-                                        {task?.assignedTo?.firstName} {task?.assignedTo?.lastName}
+                                  <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2" title={task.description}>
+                                    {task.description || 'No description'}
+                                  </p>
+                                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                                    <div className="flex items-center space-x-1 min-w-0">
+                                      <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                      <span
+                                        className="truncate max-w-[120px] sm:max-w-none"
+                                        title={task?.project?.name && task.project.name.length > 10 ? task.project.name : undefined}
+                                      >
+                                        {task?.project?.name && task.project.name.length > 10 ? `${task.project.name.slice(0, 10)}…` : task?.project?.name}
+                                      </span>
+                                    </div>
+                                    {task?.dueDate && (
+                                      <div className="flex items-center space-x-1 flex-shrink-0">
+                                        <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                        <span className="whitespace-nowrap">Due {new Date(task?.dueDate).toLocaleDateString()}</span>
+                                      </div>
+                                    )}
+                                    {task?.storyPoints && (
+                                      <div className="flex items-center space-x-1 flex-shrink-0">
+                                        <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                        <span>{task?.storyPoints} pts</span>
+                                      </div>
+                                    )}
+                                    {task?.estimatedHours && (
+                                      <div className="flex items-center space-x-1 flex-shrink-0">
+                                        <Clock className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                        <span>{task?.estimatedHours}h</span>
                                       </div>
                                     )}
                                   </div>
-                                   <DropdownMenu>
+                                </div>
+                                <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-2">
+                                  {task?.assignedTo && (
+                                    <div className="text-xs sm:text-sm text-muted-foreground truncate">
+                                      {task?.assignedTo?.firstName} {task?.assignedTo?.lastName}
+                                    </div>
+                                  )}
+                                  <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
                                 <MoreHorizontal className="h-4 w-4" />
