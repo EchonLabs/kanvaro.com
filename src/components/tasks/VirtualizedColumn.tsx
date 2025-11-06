@@ -10,7 +10,11 @@ import { Target, Plus } from 'lucide-react'
 import SortableTask from './SortableTask'
 import { ITask } from '@/models/Task'
 
-interface PopulatedTask extends Omit<ITask, 'assignedTo'> {
+interface PopulatedTask extends Omit<ITask, 'assignedTo' | 'project'> {
+  project?: {
+    _id: string
+    name: string
+  }
   assignedTo?: {
     firstName: string
     lastName: string
@@ -60,13 +64,13 @@ export default function VirtualizedColumn({
   })
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2 sm:space-y-4 min-w-[280px] sm:min-w-0 w-full sm:w-auto">
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Badge className={column.color}>
+        <div className="flex items-center space-x-2 min-w-0">
+          <Badge className={`${column.color} text-xs sm:text-sm truncate`}>
             {column.title}
           </Badge>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs sm:text-sm text-muted-foreground flex-shrink-0">
             {tasks.length}
           </span>
         </div>
@@ -74,6 +78,7 @@ export default function VirtualizedColumn({
           variant="outline" 
           size="sm"
           onClick={() => onCreateTask(column.key)}
+          className="flex-shrink-0"
         >
           +
         </Button>
@@ -85,7 +90,7 @@ export default function VirtualizedColumn({
         >
         <div 
           ref={setNodeRef}
-          className={`h-[500px] overflow-auto border-2 border-dashed rounded-lg transition-colors ${
+          className={`h-[300px] sm:h-[400px] md:h-[500px] overflow-auto overflow-x-hidden border-2 border-dashed rounded-lg transition-colors ${
             isOver 
               ? 'border-primary bg-primary/5' 
               : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700'

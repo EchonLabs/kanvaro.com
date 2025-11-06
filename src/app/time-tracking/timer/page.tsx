@@ -133,6 +133,28 @@ export default function TimerPage() {
     }
   }, [projects, searchParams, selectedProject])
 
+  // Preselect task from query params when tasks are loaded
+  useEffect(() => {
+    if (!tasks || tasks.length === 0) return
+    if (selectedTask) return
+    if (!selectedProject) return
+    
+    let tid = searchParams?.get('taskId') || ''
+    const tnameRaw = searchParams?.get('taskName') || ''
+    const tname = tnameRaw && tnameRaw !== 'undefined' && tnameRaw !== 'null' ? tnameRaw : ''
+    if (tid === 'undefined' || tid === 'null') tid = ''
+    
+    let taskIdToSelect = tid || ''
+    if (!taskIdToSelect && tname) {
+      const match = tasks.find(t => t.title.toLowerCase() === tname.toLowerCase())
+      if (match) taskIdToSelect = match._id
+    }
+    
+    if (taskIdToSelect && tasks.some(t => t._id === taskIdToSelect)) {
+      handleTaskChange(taskIdToSelect)
+    }
+  }, [tasks, searchParams, selectedTask, selectedProject])
+
   const fetchProjects = async (currentUser?: User | null) => {
     try {
       const response = await fetch('/api/projects')

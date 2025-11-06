@@ -356,7 +356,16 @@ export default function TaskDetailPage() {
                 
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Project</span>
-                  <span className="font-medium">{task.project?.name || '—'}</span>
+                  {task.project?.name ? (
+                    <span
+                      className="font-medium truncate max-w-[200px]"
+                      title={task.project.name && task.project.name.length > 10 ? task.project.name : undefined}
+                    >
+                      {task.project.name && task.project.name.length > 10 ? `${task.project.name.slice(0, 10)}…` : task.project.name}
+                    </span>
+                  ) : (
+                    <span className="font-medium">—</span>
+                  )}
                 </div>
                 
                 {task.assignedTo && (

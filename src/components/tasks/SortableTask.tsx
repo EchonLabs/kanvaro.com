@@ -17,7 +17,11 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { ITask } from '@/models/Task'
 
-interface PopulatedTask extends Omit<ITask, 'assignedTo'> {
+interface PopulatedTask extends Omit<ITask, 'assignedTo' | 'project'> {
+  project?: {
+    _id: string
+    name: string
+  }
   assignedTo?: {
     firstName: string
     lastName: string
@@ -68,18 +72,20 @@ export default function SortableTask({
       } ${isDragOverlay ? 'rotate-3 shadow-lg' : ''}`}
       onClick={onClick}
     >
-      <CardContent className="p-4">
-      <div className="space-y-3">
+      <CardContent className="p-2 sm:p-3">
+      <div className="space-y-2 sm:space-y-3 min-w-0">
 
-      <div className="flex items-start justify-between">
-            <h4 className="font-medium text-foreground text-sm line-clamp-2">
-              {task.title}
-            </h4>
-            <div className="flex items-center space-x-1">
+      <div className="flex items-start justify-between gap-2 min-w-0">
+            <div className="flex-1 min-w-0">
+              <h4 className="font-medium text-foreground text-xs sm:text-sm line-clamp-2 truncate" title={task.title}>
+                {task.title}
+              </h4>
+            </div>
+            <div className="flex items-center space-x-1 flex-shrink-0">
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-6 w-6 p-0 cursor-grab active:cursor-grabbing"
+                className="h-5 w-5 sm:h-6 sm:w-6 p-0 cursor-grab active:cursor-grabbing"
                 {...attributes}
                 {...listeners}
                 onClick={(e) => e.stopPropagation()}
@@ -91,10 +97,10 @@ export default function SortableTask({
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    className="h-6 w-6 p-0"
+                    className="h-5 w-5 sm:h-6 sm:w-6 p-0"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <MoreHorizontal className="h-4 w-4" />
+                    <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -131,52 +137,59 @@ export default function SortableTask({
             </div>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <Badge className={getPriorityColor(task.priority)}>
+          <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+            <Badge className={`${getPriorityColor(task.priority)} text-xs`}>
               {task.priority}
             </Badge>
-            <Badge className={getTypeColor(task.type)}>
+            <Badge className={`${getTypeColor(task.type)} text-xs`}>
               {task.type}
             </Badge>
           </div>
           
-          <div className="text-xs text-muted-foreground">
-            <div className="flex items-center space-x-1 mb-1">
-              <Target className="h-3 w-3" />
-              <span>Project</span>
-            </div>
+          <div className="text-xs text-muted-foreground space-y-1 min-w-0">
+            {task.project && (
+              <div className="flex items-center space-x-1 min-w-0">
+                <Target className="h-3 w-3 flex-shrink-0" />
+                <span 
+                  className="truncate"
+                  title={task.project.name && task.project.name.length > 10 ? task.project.name : undefined}
+                >
+                  {task.project.name && task.project.name.length > 10 ? `${task.project.name.slice(0, 10)}…` : task.project.name}
+                </span>
+              </div>
+            )}
             {task.dueDate && (
-              <div className="flex items-center space-x-1 mb-1">
-                <Calendar className="h-3 w-3" />
-                <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>
+              <div className="flex items-center space-x-1">
+                <Calendar className="h-3 w-3 flex-shrink-0" />
+                <span className="whitespace-nowrap">Due {new Date(task.dueDate).toLocaleDateString()}</span>
               </div>
             )}
             {task.storyPoints && (
-              <div className="flex items-center space-x-1 mb-1">
-                <BarChart3 className="h-3 w-3" />
-                <span>{task.storyPoints} points</span>
+              <div className="flex items-center space-x-1">
+                <BarChart3 className="h-3 w-3 flex-shrink-0" />
+                <span>{task.storyPoints} pts</span>
               </div>
             )}
             {task.estimatedHours && (
               <div className="flex items-center space-x-1">
-                <Clock className="h-3 w-3" />
+                <Clock className="h-3 w-3 flex-shrink-0" />
                 <span>{task.estimatedHours}h</span>
               </div>
             )}
           </div>
           
           {task.assignedTo && (
-            <div className="flex items-center space-x-2">
-              <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
+            <div className="flex items-center space-x-2 min-w-0">
+              <div className="w-5 h-5 sm:w-6 sm:h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium flex-shrink-0">
                 {task.assignedTo.firstName[0]}{task.assignedTo.lastName[0]}
               </div>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground truncate">
                 {task.assignedTo.firstName} {task.assignedTo.lastName}
               </span>
             </div>
           )}
 
-{task.labels.length > 0 && (
+          {task.labels && task.labels.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {task.labels.slice(0, 2).map((label, index) => (
                 <Badge key={index} variant="outline" className="text-xs">

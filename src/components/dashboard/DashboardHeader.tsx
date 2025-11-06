@@ -22,7 +22,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
   })
 
   return (
-    <Card className="border-0">
+    <Card className="border-0 overflow-x-hidden">
       <CardContent className="p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex-1 min-w-0">
