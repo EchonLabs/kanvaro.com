@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.25...v1.1.0) (2025-11-07)
+
+
+### Features
+
+* add changes in time tracking ([e565d08](https://github.com/EchonLabs/kanvaro.com/commit/e565d087e0f8c19c2d97bff9621d46e997ab4149))
+
 ## [1.0.25](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.24...v1.0.25) (2025-11-07)
 
 

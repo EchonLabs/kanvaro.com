@@ -378,7 +378,14 @@ export default function TimerPage() {
                   projectId={selectedProject}
                   taskId={selectedTask || undefined}
                   description={description}
-                  onTimerUpdate={() => {}}
+                  onTimerUpdate={(timer) => {
+                    if (!timer) {
+                      setDescription('')
+                      setSelectedTask('')
+                      setSelectedProject('')
+                      setTasks([])
+                    }
+                  }}
                 />
               </div>
             )}
