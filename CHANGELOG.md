@@ -1,3 +1,10 @@
+## [1.0.25](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.24...v1.0.25) (2025-11-07)
+
+
+### Bug Fixes
+
+* add git ignore chnges ([4af2dac](https://github.com/EchonLabs/kanvaro.com/commit/4af2dacc310e37ba79dbf1c14c075eddf75263fa))
+
 ## [1.0.24](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.23...v1.0.24) (2025-11-06)
 
 
