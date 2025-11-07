@@ -181,7 +181,7 @@ export default function CreateEpicPage() {
         </div>
 
         {success && (
-          <Alert>
+          <Alert variant="success">
             <AlertDescription>{success}</AlertDescription>
           </Alert>
         )}

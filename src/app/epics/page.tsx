@@ -598,6 +598,7 @@ export default function EpicsPage() {
         description={`Are you sure you want to delete "${selectedEpic?.title}"? This action cannot be undone.`}
         confirmText={deleting ? 'Deleting...' : 'Delete'}
         cancelText="Cancel"
+        variant="destructive"
       />
     </MainLayout>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -50,8 +50,8 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [users, setUsers] = useState<User[]>([])
-  const [loadingUsers, setLoadingUsers] = useState(false)
+  const [projectMembers, setProjectMembers] = useState<User[]>([])
+  const [loadingProjectMembers, setLoadingProjectMembers] = useState(false)
   const [projects, setProjects] = useState<Array<{ _id: string; name: string }>>([])
   const [loadingProjects, setLoadingProjects] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
@@ -72,25 +72,30 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
     labels: ''
   })
 
-  const fetchUsers = async () => {
-    setLoadingUsers(true)
+  const fetchProjectMembers = useCallback(async (projectIdParam: string | undefined) => {
+    if (!projectIdParam) {
+      setProjectMembers([])
+      return
+    }
+
+    setLoadingProjectMembers(true)
     try {
-      const response = await fetch('/api/members')
+      const response = await fetch(`/api/projects/${projectIdParam}`)
       const data = await response.json()
-      
-      if (data.success && data.data && Array.isArray(data.data.members)) {
-        setUsers(data.data.members)
+
+      if (response.ok && data.success && data.data) {
+        const members = Array.isArray(data.data.teamMembers) ? data.data.teamMembers : []
+        setProjectMembers(members)
       } else {
-        console.error('Invalid users data:', data)
-        setUsers([])
+        setProjectMembers([])
       }
     } catch (error) {
-      console.error('Failed to fetch users:', error)
-      setUsers([])
+      console.error('Failed to fetch project members:', error)
+      setProjectMembers([])
     } finally {
-      setLoadingUsers(false)
+      setLoadingProjectMembers(false)
     }
-  }
+  }, [])
 
   const fetchProjects = async () => {
     setLoadingProjects(true)
@@ -109,15 +114,22 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
     }
   }
 
-  // Fetch users when modal opens
+  // Fetch project members when modal opens or project selection changes
   useEffect(() => {
-    if (isOpen) {
-      fetchUsers()
-      if (!projectId) {
-        fetchProjects()
-      }
+    if (!isOpen) return
+
+    if (projectId) {
+      fetchProjectMembers(projectId)
+    } else if (selectedProjectId) {
+      fetchProjectMembers(selectedProjectId)
+    } else {
+      setProjectMembers([])
     }
-  }, [isOpen])
+
+    if (!projectId) {
+      fetchProjects()
+    }
+  }, [isOpen, projectId, selectedProjectId, fetchProjectMembers])
 
   // Reset form state whenever modal closes so it opens clean next time
   useEffect(() => {
@@ -139,6 +151,8 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
       setSubtasks([])
       setAssignedToIds([])
       setAssigneeQuery('')
+      setProjectMembers([])
+      setLoadingProjectMembers(false)
       if (!projectId) setSelectedProjectId('')
     }
   }, [isOpen, projectId, defaultStatus])
@@ -287,7 +301,7 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
         <CardContent className="flex-1 overflow-y-auto">
           <form onSubmit={handleSubmit} className="space-y-6" autoComplete="on" id="create-task-form">
             {success && (
-              <Alert>
+              <Alert variant="success">
                 <AlertDescription>{success}</AlertDescription>
               </Alert>
             )}
@@ -301,7 +315,17 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
             {!projectId && (
               <div>
                 <label className="text-sm font-medium text-foreground">Project *</label>
-                <Select value={selectedProjectId} onValueChange={(v) => { setSelectedProjectId(v); }} onOpenChange={(open) => { if (open) setProjectQuery('') }}>
+                <Select
+                  value={selectedProjectId}
+                  onValueChange={(v) => {
+                    setSelectedProjectId(v)
+                    setAssignedToIds([])
+                    setAssigneeQuery('')
+                    setProjectMembers([])
+                    fetchProjectMembers(v)
+                  }}
+                  onOpenChange={(open) => { if (open) setProjectQuery('') }}
+                >
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder={loadingProjects ? 'Loading projects...' : 'Select project'} />
                   </SelectTrigger>
@@ -427,6 +451,10 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
                   <Select
                     value=""
                     onValueChange={(value) => {
+                      if (value === '__unassigned') {
+                        setAssignedToIds([])
+                        return
+                      }
                       if (!assignedToIds.includes(value)) {
                         setAssignedToIds(prev => [...prev, value])
                       }
@@ -434,42 +462,47 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
                     onOpenChange={(open) => { if (open) setAssigneeQuery(""); }}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select team members" />
+                      <SelectValue placeholder={loadingProjectMembers ? 'Loading members...' : 'Select team members'} />
                     </SelectTrigger>
                     <SelectContent className="z-[10050] p-0">
                       <div className="p-2">
                         <Input
                           value={assigneeQuery}
                           onChange={e => setAssigneeQuery(e.target.value)}
-                          placeholder={loadingUsers ? 'Loading members...' : 'Type to search team members'}
+                          placeholder={loadingProjectMembers ? 'Loading members...' : 'Type to search team members'}
                           className="mb-2"
                         />
                         <div className="max-h-56 overflow-y-auto">
-                          {loadingUsers ? (
+                          {loadingProjectMembers ? (
                             <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
                               <Loader2 className="h-4 w-4 animate-spin" />
                               <span>Loading members...</span>
                             </div>
+                          ) : projectMembers.length === 0 ? (
+                            <>
+                              <SelectItem value="__unassigned">Unassigned</SelectItem>
+                              <div className="px-2 py-1 text-sm text-muted-foreground">No team members found for this project</div>
+                            </>
                           ) : (
                             (() => {
-                              const q = assigneeQuery.toLowerCase().trim();
-                              const filtered = users.filter(u =>
-                                !q || 
+                              const q = assigneeQuery.toLowerCase().trim()
+                              const filtered = projectMembers.filter(u =>
+                                !q ||
                                 `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
                                 u.email.toLowerCase().includes(q)
-                              );
-                              
+                              )
+
                               if (filtered.length === 0) {
                                 return (
                                   <div className="px-2 py-1 text-sm text-muted-foreground">No matching members</div>
-                                );
+                                )
                               }
-                              
+
                               return filtered.map(user => {
-                                const isSelected = assignedToIds.includes(user._id);
+                                const isSelected = assignedToIds.includes(user._id)
                                 return (
-                                  <SelectItem 
-                                    key={user._id} 
+                                  <SelectItem
+                                    key={user._id}
                                     value={user._id}
                                     disabled={isSelected}
                                     className={isSelected ? 'opacity-50 cursor-not-allowed' : ''}
@@ -481,8 +514,8 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
                                       )}
                                     </div>
                                   </SelectItem>
-                                );
-                              });
+                                )
+                              })
                             })()
                           )}
                         </div>
@@ -492,7 +525,7 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
                   {assignedToIds.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {assignedToIds.map(id => {
-                        const u = users.find(x => x._id === id);
+                        const u = projectMembers.find(x => x._id === id);
                         if (!u) return null;
                         return (
                           <span 
