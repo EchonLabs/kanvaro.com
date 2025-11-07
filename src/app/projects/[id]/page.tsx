@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Progress } from '@/components/ui/Progress'
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { 
   ArrowLeft, 
   Calendar, 
@@ -153,6 +154,23 @@ export default function ProjectDetailPage() {
   const [editingTestCase, setEditingTestCase] = useState<any | null>(null)
   const [createCaseSuiteId, setCreateCaseSuiteId] = useState<string | undefined>(undefined)
   const [testCasesRefreshCounter, setTestCasesRefreshCounter] = useState(0)
+  const [settingsForm, setSettingsForm] = useState({
+    allowTimeTracking: false,
+    allowManualTimeSubmission: false,
+    allowExpenseTracking: false,
+    requireApproval: false,
+    notifications: {
+      taskUpdates: false,
+      budgetAlerts: false,
+      deadlineReminders: false,
+    },
+  })
+  const [statusForm, setStatusForm] = useState<Project['status']>('planning')
+  const [priorityForm, setPriorityForm] = useState<Project['priority']>('medium')
+  const [settingsSuccess, setSettingsSuccess] = useState('')
+  const [settingsError, setSettingsError] = useState('')
+  const [savingSettings, setSavingSettings] = useState(false)
+  const settingsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (projectId) {
@@ -160,6 +178,81 @@ export default function ProjectDetailPage() {
       fetchTasks()
     }
   }, [projectId])
+
+  useEffect(() => {
+    if (project) {
+      setStatusForm(project.status)
+      setPriorityForm(project.priority)
+      setSettingsForm({
+        allowTimeTracking: project.settings?.allowTimeTracking ?? false,
+        allowManualTimeSubmission: project.settings?.allowManualTimeSubmission ?? false,
+        allowExpenseTracking: project.settings?.allowExpenseTracking ?? false,
+        requireApproval: project.settings?.requireApproval ?? false,
+        notifications: {
+          taskUpdates: project.settings?.notifications?.taskUpdates ?? false,
+          budgetAlerts: project.settings?.notifications?.budgetAlerts ?? false,
+          deadlineReminders: project.settings?.notifications?.deadlineReminders ?? false,
+        },
+      })
+    }
+  }, [project])
+
+  useEffect(() => {
+    return () => {
+      if (settingsTimeoutRef.current) {
+        clearTimeout(settingsTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const showSettingsSuccess = (message: string) => {
+    setSettingsSuccess(message)
+    if (settingsTimeoutRef.current) {
+      clearTimeout(settingsTimeoutRef.current)
+    }
+    settingsTimeoutRef.current = setTimeout(() => {
+      setSettingsSuccess('')
+      settingsTimeoutRef.current = null
+    }, 3000)
+  }
+
+  const handleSaveSettings = async () => {
+    if (!projectId) return
+    setSavingSettings(true)
+    setSettingsError('')
+    setSettingsSuccess('')
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          settings: {
+            ...settingsForm,
+            notifications: { ...settingsForm.notifications },
+          },
+          status: statusForm,
+          priority: priorityForm,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setProject(data.data)
+        showSettingsSuccess('Project settings updated successfully.')
+      } else {
+        setSettingsError(data.error || 'Failed to update project settings')
+      }
+    } catch (error) {
+      console.error('Failed to update project settings:', error)
+      setSettingsError('Failed to update project settings')
+    } finally {
+      setSavingSettings(false)
+    }
+  }
 
   const fetchProject = async () => {
     try {
@@ -770,11 +863,25 @@ export default function ProjectDetailPage() {
                 </p>
               </div>
 
+              {settingsError && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>{settingsError}</AlertDescription>
+                </Alert>
+              )}
+
+              {settingsSuccess && (
+                <Alert variant="success">
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>{settingsSuccess}</AlertDescription>
+                </Alert>
+              )}
+
               <div className="grid gap-6 lg:grid-cols-2">
                 <Card>
                   <CardHeader>
-                    <CardTitle>General Settings</CardTitle>
-                    <CardDescription>Basic project information and settings</CardDescription>
+                    <CardTitle>General Information</CardTitle>
+                    <CardDescription>Basic project information</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
@@ -818,7 +925,11 @@ export default function ProjectDetailPage() {
                         />
                       </div>
                     </div>
-                    <Button variant="outline" className="w-full">
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => router.push(`/projects/create?edit=${projectId}`)}
+                    >
                       <Edit className="h-4 w-4 mr-2" />
                       Edit Project Details
                     </Button>
@@ -828,18 +939,19 @@ export default function ProjectDetailPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>Project Status</CardTitle>
-                    <CardDescription>Current project status and workflow settings</CardDescription>
+                    <CardDescription>Update the current status and priority</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="status">Status</Label>
-                      <Select value={project?.status || 'active'}>
+                      <Select value={statusForm} onValueChange={(value) => setStatusForm(value as Project['status'])}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="planning">Planning</SelectItem>
                           <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="on-hold">On Hold</SelectItem>
+                          <SelectItem value="on_hold">On Hold</SelectItem>
                           <SelectItem value="completed">Completed</SelectItem>
                           <SelectItem value="cancelled">Cancelled</SelectItem>
                         </SelectContent>
@@ -847,7 +959,7 @@ export default function ProjectDetailPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="priority">Priority</Label>
-                      <Select value={project?.priority || 'medium'}>
+                      <Select value={priorityForm} onValueChange={(value) => setPriorityForm(value as Project['priority'])}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -859,14 +971,202 @@ export default function ProjectDetailPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <Button variant="outline" className="w-full">
+                    <Button onClick={handleSaveSettings} disabled={savingSettings} className="w-full">
+                      {savingSettings ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
                       <Save className="h-4 w-4 mr-2" />
                       Save Settings
+                        </>
+                      )}
                     </Button>
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Tracking & Approvals</CardTitle>
+                    <CardDescription>Control how work is tracked and approved</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <Label htmlFor="allow-time-tracking">Allow Time Tracking</Label>
+                        <p className="text-sm text-muted-foreground">Enable time tracking for this project</p>
+                      </div>
+                      <Switch
+                        id="allow-time-tracking"
+                        checked={settingsForm.allowTimeTracking}
+                        onCheckedChange={(checked) =>
+                          setSettingsForm((prev) => ({
+                            ...prev,
+                            allowTimeTracking: checked,
+                            allowManualTimeSubmission: checked ? prev.allowManualTimeSubmission : false,
+                          }))
+                        }
+                      />
+                    </div>
+
+                    {settingsForm.allowTimeTracking && (
+                      <div className="ml-0 pl-4 border-l-2 border-muted">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <Label htmlFor="allow-manual-time-submission">Allow Manual Time Submission</Label>
+                            <p className="text-sm text-muted-foreground">Allow team members to submit time entries manually</p>
+                          </div>
+                          <Switch
+                            id="allow-manual-time-submission"
+                            checked={settingsForm.allowManualTimeSubmission}
+                            onCheckedChange={(checked) =>
+                              setSettingsForm((prev) => ({
+                                ...prev,
+                                allowManualTimeSubmission: checked,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <Label htmlFor="allow-expense-tracking">Allow Expense Tracking</Label>
+                        <p className="text-sm text-muted-foreground">Enable expense tracking for this project</p>
+                      </div>
+                      <Switch
+                        id="allow-expense-tracking"
+                        checked={settingsForm.allowExpenseTracking}
+                        onCheckedChange={(checked) =>
+                          setSettingsForm((prev) => ({
+                            ...prev,
+                            allowExpenseTracking: checked,
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <Label htmlFor="require-approval">Require Approval</Label>
+                        <p className="text-sm text-muted-foreground">Require approval for time entries and expenses</p>
+                      </div>
+                      <Switch
+                        id="require-approval"
+                        checked={settingsForm.requireApproval}
+                        onCheckedChange={(checked) =>
+                          setSettingsForm((prev) => ({
+                            ...prev,
+                            requireApproval: checked,
+                          }))
+                        }
+                      />
+                    </div>
+                  </CardContent>
+                  <CardFooter className="justify-end">
+                    <Button onClick={handleSaveSettings} disabled={savingSettings}>
+                      {savingSettings ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Update Tracking Settings
+                        </>
+                      )}
+                    </Button>
+                  </CardFooter>
+                </Card>
+
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Notification Preferences</CardTitle>
+                    <CardDescription>Choose which notifications to send for this project</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <Label htmlFor="notify-task-updates">Task Updates</Label>
+                        <p className="text-sm text-muted-foreground">Notify the team about task status changes</p>
+                      </div>
+                      <Switch
+                        id="notify-task-updates"
+                        checked={settingsForm.notifications.taskUpdates}
+                        onCheckedChange={(checked) =>
+                          setSettingsForm((prev) => ({
+                            ...prev,
+                            notifications: {
+                              ...prev.notifications,
+                              taskUpdates: checked,
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <Label htmlFor="notify-budget-alerts">Budget Alerts</Label>
+                        <p className="text-sm text-muted-foreground">Receive alerts when budget thresholds are met</p>
+                      </div>
+                      <Switch
+                        id="notify-budget-alerts"
+                        checked={settingsForm.notifications.budgetAlerts}
+                        onCheckedChange={(checked) =>
+                          setSettingsForm((prev) => ({
+                            ...prev,
+                            notifications: {
+                              ...prev.notifications,
+                              budgetAlerts: checked,
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <Label htmlFor="notify-deadline-reminders">Deadline Reminders</Label>
+                        <p className="text-sm text-muted-foreground">Send reminders as deadlines approach</p>
+                      </div>
+                      <Switch
+                        id="notify-deadline-reminders"
+                        checked={settingsForm.notifications.deadlineReminders}
+                        onCheckedChange={(checked) =>
+                          setSettingsForm((prev) => ({
+                            ...prev,
+                            notifications: {
+                              ...prev.notifications,
+                              deadlineReminders: checked,
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+                  </CardContent>
+                  <CardFooter className="justify-end">
+                    <Button onClick={handleSaveSettings} disabled={savingSettings}>
+                      {savingSettings ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Update Notification Settings
+                        </>
+                      )}
+                    </Button>
+                  </CardFooter>
+                </Card>
+
+                <Card className="lg:col-span-2">
                   <CardHeader>
                     <CardTitle>Danger Zone</CardTitle>
                     <CardDescription>Irreversible actions for this project</CardDescription>
@@ -878,7 +1178,7 @@ export default function ProjectDetailPage() {
                         <p className="text-xs text-muted-foreground">
                           Permanently delete this project and all its data. This action cannot be undone.
                         </p>
-                        <Button variant="destructive" size="sm">
+                        <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirmModal(true)}>
                           <Trash2 className="h-4 w-4 mr-2" />
                           Delete Project
                         </Button>
