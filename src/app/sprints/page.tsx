@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -77,6 +77,7 @@ interface Sprint {
 
 export default function SprintsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -84,6 +85,20 @@ export default function SprintsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [success, setSuccess] = useState('')
+
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const showSuccess = useCallback((message: string) => {
+    setSuccess(message)
+    if (successTimeoutRef.current) {
+      clearTimeout(successTimeoutRef.current)
+    }
+    successTimeoutRef.current = setTimeout(() => {
+      setSuccess('')
+      successTimeoutRef.current = null
+    }, 3000)
+  }, [])
 
   const checkAuth = useCallback(async () => {
     try {
@@ -122,6 +137,22 @@ export default function SprintsPage() {
     checkAuth()
   }, [checkAuth])
 
+  useEffect(() => {
+    const successParam = searchParams?.get('success')
+    if (successParam === 'sprint-created') {
+      showSuccess('Sprint created successfully.')
+      router.replace('/sprints', { scroll: false })
+    }
+  }, [searchParams, showSuccess, router])
+
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const fetchSprints = async () => {
     try {
       setLoading(true)
@@ -146,6 +177,7 @@ export default function SprintsPage() {
       const data = await res.json()
       if (res.ok && data.success) {
         setSprints(prev => prev.filter(s => s._id !== sprintId))
+        showSuccess('Sprint deleted successfully.')
       } else {
         setError(data.error || 'Failed to delete sprint')
       }
@@ -229,6 +261,13 @@ export default function SprintsPage() {
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {success && (
+          <Alert variant="success">
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription>{success}</AlertDescription>
           </Alert>
         )}
 

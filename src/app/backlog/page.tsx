@@ -315,7 +315,7 @@ export default function BacklogPage() {
           </Alert>
         )}
         {success && (
-          <Alert>
+          <Alert variant="success">
             <CheckCircle className="h-4 w-4" />
             <AlertDescription>{success}</AlertDescription>
           </Alert>
@@ -544,6 +544,7 @@ export default function BacklogPage() {
           description={`Are you sure you want to delete "${selectedForDelete?.title}"? This action cannot be undone.`}
           confirmText={deleting ? 'Deleting...' : 'Delete'}
           cancelText="Cancel"
+          variant="destructive"
         />
       </div>
     </MainLayout>

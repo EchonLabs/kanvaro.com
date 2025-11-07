@@ -412,9 +412,9 @@ export default function TasksClient({
 
             {success && (
               <div className="mt-3">
-                <Alert>
+                <Alert variant="success">
                   <div className="flex items-center">
-                    <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                    <CheckCircle className="h-4 w-4 mr-2" />
                     <AlertDescription>{success}</AlertDescription>
                   </div>
                 </Alert>
@@ -636,6 +636,7 @@ export default function TasksClient({
         description={`Are you sure you want to delete "${selectedTask?.title}"? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
+        variant="destructive"
       />
     </div>
   )

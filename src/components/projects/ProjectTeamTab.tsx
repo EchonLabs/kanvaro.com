@@ -235,7 +235,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
       )}
 
       {success && (
-        <Alert variant="default">
+        <Alert variant="success">
           <AlertDescription>{success}</AlertDescription>
         </Alert>
       )}

@@ -360,8 +360,8 @@ export default function ProjectsPage() {
             </TabsList>
 
             {success && (
-              <Alert className="mt-4">
-                <CheckCircle className="h-4 w-4 text-green-600" />
+              <Alert variant="success" className="mt-4">
+                <CheckCircle className="h-4 w-4" />
                 <AlertDescription>{success}</AlertDescription>
               </Alert>
             )}
