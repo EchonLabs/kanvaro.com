@@ -74,8 +74,8 @@ export default function CreateTaskPage() {
   const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
   const [projects, setProjects] = useState<Project[]>([])
-  const [users, setUsers] = useState<User[]>([])
-  const [loadingUsers, setLoadingUsers] = useState(false)
+  const [projectMembers, setProjectMembers] = useState<User[]>([])
+  const [loadingProjectMembers, setLoadingProjectMembers] = useState(false)
   const [stories, setStories] = useState<Story[]>([])
   const today = new Date().toISOString().split('T')[0]
   const [projectQuery, setProjectQuery] = useState("");
@@ -116,33 +116,13 @@ export default function CreateTaskPage() {
     }
   }, [])
 
-  const fetchUsers = useCallback(async () => {
-    setLoadingUsers(true)
-    try {
-      const response = await fetch('/api/members')
-      const data = await response.json()
-      
-      if (data.success && data.data && Array.isArray(data.data.members)) {
-        setUsers(data.data.members)
-      } else {
-        console.error('Invalid users data:', data)
-        setUsers([])
-      }
-    } catch (err) {
-      console.error('Failed to fetch users:', err)
-      setUsers([])
-    } finally {
-      setLoadingUsers(false)
-    }
-  }, [])
-
   const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me')
       
       if (response.ok) {
         setAuthError('')
-        await Promise.all([fetchProjects(), fetchUsers()])
+        await fetchProjects()
       } else if (response.status === 401) {
         const refreshResponse = await fetch('/api/auth/refresh', {
           method: 'POST'
@@ -150,7 +130,7 @@ export default function CreateTaskPage() {
         
         if (refreshResponse.ok) {
           setAuthError('')
-          await Promise.all([fetchProjects(), fetchUsers()])
+          await fetchProjects()
         } else {
           setAuthError('Session expired')
           setTimeout(() => {
@@ -167,7 +147,7 @@ export default function CreateTaskPage() {
         router.push('/login')
       }, 2000)
     }
-  }, [router, fetchProjects, fetchUsers])
+  }, [router, fetchProjects])
 
   useEffect(() => {
     checkAuth()
@@ -191,6 +171,31 @@ export default function CreateTaskPage() {
     } catch (err) {
       console.error('Failed to fetch stories:', err)
       setStories([])
+    }
+  }, [])
+
+  const fetchProjectMembers = useCallback(async (projectId: string) => {
+    if (!projectId) {
+      setProjectMembers([])
+      return
+    }
+
+    setLoadingProjectMembers(true)
+    try {
+      const response = await fetch(`/api/projects/${projectId}`)
+      const data = await response.json()
+
+      if (response.ok && data.success && data.data) {
+        const members = Array.isArray(data.data.teamMembers) ? data.data.teamMembers : []
+        setProjectMembers(members)
+      } else {
+        setProjectMembers([])
+      }
+    } catch (error) {
+      console.error('Failed to fetch project members:', error)
+      setProjectMembers([])
+    } finally {
+      setLoadingProjectMembers(false)
     }
   }, [])
 
@@ -265,16 +270,14 @@ export default function CreateTaskPage() {
       [field]: value
     }))
 
-    // Fetch stories when project changes
     if (field === 'project') {
+      setAssignedToIds([])
+      setAssigneeQuery('')
+      setProjectMembers([])
       fetchStories(value)
-      // Clear assignees when project is cleared
-      if (!value) {
-        setAssignedToIds([])
-        setAssigneeQuery('')
-      }
+      fetchProjectMembers(value)
     }
-  }, [fetchStories])
+  }, [fetchStories, fetchProjectMembers])
 
   const addLabel = () => {
     if (newLabel.trim()) {
@@ -300,15 +303,15 @@ export default function CreateTaskPage() {
     return projects.filter(p => p.name.toLowerCase().includes(q))
   }, [projects, projectQuery])
 
-  // Memoize filtered users to avoid recalculating on every render
-  const filteredUsers = useMemo(() => {
-    if (!assigneeQuery.trim()) return users
+  // Memoize filtered project members to avoid recalculating on every render
+  const filteredProjectMembers = useMemo(() => {
+    if (!assigneeQuery.trim()) return projectMembers
     const q = assigneeQuery.toLowerCase().trim()
-    return users.filter(u =>
+    return projectMembers.filter(u =>
       `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
       u.email.toLowerCase().includes(q)
     )
-  }, [users, assigneeQuery])
+  }, [projectMembers, assigneeQuery])
 
   // Required field validation (only fields marked with *)
   const isFormValid = useMemo(() => {
@@ -425,6 +428,10 @@ export default function CreateTaskPage() {
                         <Select
                           value=""
                           onValueChange={(value) => {
+                            if (value === '__unassigned') {
+                              setAssignedToIds([])
+                              return
+                            }
                             if (!assignedToIds.includes(value)) {
                               setAssignedToIds(prev => [...prev, value])
                             }
@@ -432,24 +439,31 @@ export default function CreateTaskPage() {
                           onOpenChange={(open) => { if (open) setAssigneeQuery(""); }}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select team members" />
+                            <SelectValue placeholder={loadingProjectMembers ? 'Loading members...' : 'Select team members'} />
                           </SelectTrigger>
                           <SelectContent className="z-[10050] p-0">
                             <div className="p-2">
                               <Input
                                 value={assigneeQuery}
                                 onChange={e => setAssigneeQuery(e.target.value)}
-                                placeholder={loadingUsers ? 'Loading members...' : 'Type to search team members'}
+                                placeholder={loadingProjectMembers ? 'Loading members...' : 'Type to search team members'}
                                 className="mb-2"
                               />
                               <div className="max-h-56 overflow-y-auto">
-                                {loadingUsers ? (
+                                {loadingProjectMembers ? (
                                   <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                     <span>Loading members...</span>
                                   </div>
-                                ) : filteredUsers.length > 0 ? (
-                                  filteredUsers.map(user => {
+                                ) : projectMembers.length === 0 ? (
+                                  <>
+                                    <SelectItem value="__unassigned">
+                                      Unassigned
+                                    </SelectItem>
+                                    <div className="px-2 py-1 text-sm text-muted-foreground">No team members found for this project</div>
+                                  </>
+                                ) : filteredProjectMembers.length > 0 ? (
+                                  filteredProjectMembers.map(user => {
                                     const isSelected = assignedToIds.includes(user._id);
                                     return (
                                       <SelectItem 
@@ -477,7 +491,7 @@ export default function CreateTaskPage() {
                         {assignedToIds.length > 0 && (
                           <div className="flex flex-wrap gap-2">
                             {assignedToIds.map(id => {
-                              const u = users.find(x => x._id === id);
+                              const u = projectMembers.find(x => x._id === id);
                               if (!u) return null;
                               return (
                                 <span 

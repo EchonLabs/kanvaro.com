@@ -684,6 +684,7 @@ export default function KanbanPage() {
         description={`Are you sure you want to delete "${selectedTask?.title}"? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
+        variant="destructive"
       />
     </MainLayout>
   )

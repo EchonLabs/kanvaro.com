@@ -395,7 +395,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
           </Select>
         </div>
         {success && (
-          <Alert>
+          <Alert variant="success">
             <AlertDescription>{success}</AlertDescription>
           </Alert>
         )}

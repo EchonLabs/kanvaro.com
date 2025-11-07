@@ -456,6 +456,7 @@ export default function TaskDetailPage() {
         description={`Are you sure you want to delete "${task?.title}"? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
+        variant="destructive"
       />
     </MainLayout>
   )

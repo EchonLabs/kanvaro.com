@@ -441,6 +441,7 @@ export default function EpicDetailPage() {
         description={`Are you sure you want to delete "${epic?.title}"? This action cannot be undone.`}
         confirmText={deleting ? 'Deleting...' : 'Delete'}
         cancelText="Cancel"
+        variant="destructive"
       />
     </MainLayout>
   )

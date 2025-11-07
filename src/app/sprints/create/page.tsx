@@ -164,7 +164,7 @@ export default function CreateSprintPage() {
       const data = await response.json()
 
       if (data.success) {
-        router.push('/sprints')
+        router.push('/sprints?success=sprint-created')
       } else {
         setError(data.error || 'Failed to create sprint')
       }
