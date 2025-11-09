@@ -1,12 +1,12 @@
-name: Kanvaro CI CD pipeline
+name: Kanvaro CI CD pipeline Prod Environment
 
 on:
   push:
     branches:
-      - main
+      - prod
   pull_request:
     branches:
-      - main
+      - prod
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
@@ -22,10 +22,9 @@ jobs:
       - name: Starting action
         run: echo "starting pipeline"
 
-  build_main:
+  build_prod:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    environment: main
+    environment: prod
     needs: release
     outputs:
       version: ${{ steps.image-version.outputs.version }}
@@ -65,7 +64,6 @@ jobs:
         run: echo "CI_ENVIRONMENT_NAME=${GITHUB_REF##*/}" >> $GITHUB_ENV
 
       - name: Build and push Docker image
-        if: github.ref == 'refs/heads/main'
         run: |
           IMAGE_OWNER="$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f1 | tr '[:upper:]' '[:lower:]')"
           IMAGE_REPO="$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')"
@@ -83,7 +81,7 @@ jobs:
 
           IMAGE_TAG=${GITHUB_SHA::7}
 
-          echo "Building image $IMAGE_NAME:${{ needs.build_main.outputs.version }}"
+          echo "Building image $IMAGE_NAME:${{ needs.build_prod.outputs.version }}"
           docker build -t $IMAGE_NAME:${VERSION} .
 
           echo "Pushing image to GHCR"
@@ -93,10 +91,10 @@ jobs:
           docker tag $IMAGE_NAME:${VERSION} $IMAGE_NAME:latest
           docker push $IMAGE_NAME:latest
 
-  deploy-main:
+  deploy_prod:
     runs-on: ubuntu-latest
-    environment: develop
-    needs: build_main
+    environment: prod
+    needs: build_prod
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -109,25 +107,24 @@ jobs:
       - name: Set Environment Name
         run: echo "CI_ENVIRONMENT_NAME=${GITHUB_REF##*/}" >> $GITHUB_ENV
 
-      - name: Deploy to Server (Dev Environment)
-        if: github.ref == 'refs/heads/main'
+      - name: Deploy to Server (prod Environment)
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "Received version: ${{ needs.build_main.outputs.version }}"
+            echo "Received version: ${{ needs.build_prod.outputs.version }}"
             cd /var/www/
             ./${{ vars.DEPLOY_SCRIPT }} \
-              -v "${{ needs.build_dev.outputs.version }}" \
+              -v "${{ needs.build_prod.outputs.version }}" \
               -w "${{ vars.CONTAINER_TAG }}-web-${{ env.CI_ENVIRONMENT_NAME }}" \
               -u "${{ github.actor }}" \
               -p "${{ secrets.Kanvaro_Deploy_Key }}" \
               -l "/var/www/${{ vars.DEPLOY_PATH }}" \
               -r "${{ vars.REGISTRY_PATH }}" \
               -e "${{ env.CI_ENVIRONMENT_NAME }}" \
-              -x "ghcr.io/${{ github.repository }}-${{ env.CI_ENVIRONMENT_NAME }}:${{ needs.build_dev.outputs.version }}" \
+              -x "ghcr.io/${{ github.repository }}-${{ env.CI_ENVIRONMENT_NAME }}:${{ needs.build_prod.outputs.version }}" \
               -y "$IMAGE"
         env:
           CONTAINER_TAG: ${{ vars.CONTAINER_TAG }}
