@@ -68,6 +68,8 @@ export default function TimerPage() {
   const [selectedTask, setSelectedTask] = useState<string>('')
   const [description, setDescription] = useState('')
   const [error, setError] = useState('')
+  const [timeLogsRefreshKey, setTimeLogsRefreshKey] = useState(0)
+  const [liveActiveTimer, setLiveActiveTimer] = useState<any | null | undefined>(undefined)
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -385,6 +387,8 @@ export default function TimerPage() {
                       setSelectedProject('')
                       setTasks([])
                     }
+                    setLiveActiveTimer(timer ?? null)
+                    setTimeLogsRefreshKey((prev) => prev + 1)
                   }}
                 />
               </div>
@@ -402,6 +406,8 @@ export default function TimerPage() {
                 organizationId={user.organization}
                 projectId={selectedProject || undefined}
                 taskId={selectedTask || undefined}
+                refreshKey={timeLogsRefreshKey}
+                liveActiveTimer={liveActiveTimer}
               />
             )}
 

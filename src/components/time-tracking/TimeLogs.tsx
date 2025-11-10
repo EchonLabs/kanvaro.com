@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useMemo } from 'react'
 import { Clock, Edit, Trash2, Check, X, Filter, Download } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -18,13 +18,15 @@ interface TimeLogsProps {
   projectId?: string
   taskId?: string
   onTimeEntryUpdate?: () => void
+  refreshKey?: number
+  liveActiveTimer?: ActiveTimerPayload | null
 }
 
 interface TimeEntry {
   _id: string
   description: string
   startTime: string
-  endTime?: string
+  endTime?: string | null
   duration: number
   isBillable: boolean
   hourlyRate?: number
@@ -36,9 +38,31 @@ interface TimeEntry {
   approvedBy?: { firstName: string; lastName: string }
   project?: { _id: string; name: string } | null
   task?: { _id: string; title: string } | null
+  __isActive?: boolean
 }
 
-export function TimeLogs({ userId, organizationId, projectId, taskId, onTimeEntryUpdate }: TimeLogsProps) {
+interface ActiveTimerPayload {
+  _id: string
+  description: string
+  startTime: string
+  currentDuration?: number
+  isPaused?: boolean
+  project?: { _id: string; name: string }
+  task?: { _id: string; title: string }
+  isBillable?: boolean
+  hourlyRate?: number
+  tags?: string[]
+}
+
+export function TimeLogs({
+  userId,
+  organizationId,
+  projectId,
+  taskId,
+  onTimeEntryUpdate,
+  refreshKey = 0,
+  liveActiveTimer
+}: TimeLogsProps) {
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -59,6 +83,11 @@ export function TimeLogs({ userId, organizationId, projectId, taskId, onTimeEntr
     total: 0,
     pages: 0
   })
+  const [activeTimerEntry, setActiveTimerEntry] = useState<ActiveTimerPayload | null>(null)
+  const activeDurationBaseRef = useRef<number>(0)
+  const activeTickStartRef = useRef<number | null>(null)
+  const activeIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const [activeTimerDisplayDuration, setActiveTimerDisplayDuration] = useState<number>(0)
 
   // Resolve auth if props are missing
   useEffect(() => {
@@ -89,6 +118,125 @@ export function TimeLogs({ userId, organizationId, projectId, taskId, onTimeEntr
   }, [resolvedUserId, resolvedOrgId])
 
   // Load time entries
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60)
+    const mins = Math.floor(minutes % 60)
+    const secs = Math.floor((minutes % 1) * 60)
+    return `${hours}h ${mins}m${secs > 0 ? ` ${secs}s` : ''}`
+  }
+
+  const passesDateFilters = useCallback(
+    (dateString: string) => {
+      const entryDate = new Date(dateString)
+      if (Number.isNaN(entryDate.getTime())) return true
+
+      if (filters.startDate) {
+        const start = new Date(filters.startDate)
+        start.setHours(0, 0, 0, 0)
+        if (entryDate < start) return false
+      }
+
+      if (filters.endDate) {
+        const end = new Date(filters.endDate)
+        end.setHours(23, 59, 59, 999)
+        if (entryDate > end) return false
+      }
+
+      return true
+    },
+    [filters.startDate, filters.endDate]
+  )
+
+  const passesStatusFilter = useCallback(
+    (status: string) => {
+      const normalized = status.toLowerCase()
+      if (!filters.status || filters.status === 'all') return true
+      return filters.status === normalized
+    },
+    [filters.status]
+  )
+
+  const mapActiveTimerPayload = useCallback((timer: ActiveTimerPayload): ActiveTimerPayload => {
+    return {
+      _id: timer._id,
+      description: timer.description,
+      startTime: timer.startTime,
+      currentDuration: timer.currentDuration ?? 0,
+      isPaused: timer.isPaused ?? false,
+      project: timer.project,
+      task: timer.task,
+      isBillable: timer.isBillable ?? true,
+      hourlyRate: timer.hourlyRate,
+      tags: timer.tags ?? []
+    }
+  }, [])
+
+  const loadActiveTimer = useCallback(async () => {
+    if (!resolvedUserId || !resolvedOrgId) return
+    try {
+      const params = new URLSearchParams({
+        userId: resolvedUserId,
+        organizationId: resolvedOrgId
+      })
+      const response = await fetch(`/api/time-tracking/timer?${params}`)
+      const data = await response.json()
+
+      if (response.ok && data.activeTimer) {
+        setActiveTimerEntry(mapActiveTimerPayload(data.activeTimer))
+      } else {
+        setActiveTimerEntry(null)
+      }
+    } catch (error) {
+      console.error('Failed to load active timer', error)
+    }
+  }, [resolvedUserId, resolvedOrgId, mapActiveTimerPayload])
+
+  useEffect(() => {
+    if (liveActiveTimer === undefined) return
+    if (liveActiveTimer === null) {
+      setActiveTimerEntry(null)
+      setActiveTimerDisplayDuration(0)
+      return
+    }
+    setActiveTimerEntry(mapActiveTimerPayload(liveActiveTimer))
+  }, [liveActiveTimer, mapActiveTimerPayload])
+
+  useEffect(() => {
+    if (activeIntervalRef.current) {
+      clearInterval(activeIntervalRef.current)
+      activeIntervalRef.current = null
+    }
+
+    if (!activeTimerEntry) {
+      setActiveTimerDisplayDuration(0)
+      activeDurationBaseRef.current = 0
+      activeTickStartRef.current = null
+      return
+    }
+
+    activeDurationBaseRef.current = activeTimerEntry.currentDuration ?? 0
+    setActiveTimerDisplayDuration(activeDurationBaseRef.current)
+
+    if (activeTimerEntry.isPaused) {
+      activeTickStartRef.current = null
+      return
+    }
+
+    activeTickStartRef.current = Date.now()
+    activeIntervalRef.current = setInterval(() => {
+      if (activeTickStartRef.current === null) return
+      const elapsed = (Date.now() - activeTickStartRef.current) / 60000
+      setActiveTimerDisplayDuration(Math.max(0, activeDurationBaseRef.current + elapsed))
+    }, 1000)
+
+    return () => {
+      if (activeIntervalRef.current) {
+        clearInterval(activeIntervalRef.current)
+        activeIntervalRef.current = null
+      }
+    }
+  }, [activeTimerEntry])
+
   const loadTimeEntries = useCallback(async () => {
     if (!resolvedUserId || !resolvedOrgId) return
     setIsLoading(true)
@@ -129,14 +277,9 @@ export function TimeLogs({ userId, organizationId, projectId, taskId, onTimeEntr
   useEffect(() => {
     if (!authResolving) {
       loadTimeEntries()
+      loadActiveTimer()
     }
-  }, [authResolving, loadTimeEntries])
-
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60)
-    const mins = Math.floor(minutes % 60)
-    return `${hours}h ${mins}m`
-  }
+  }, [authResolving, loadTimeEntries, loadActiveTimer, refreshKey])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -205,22 +348,6 @@ export function TimeLogs({ userId, organizationId, projectId, taskId, onTimeEntr
     }
   }
 
-  const handleSelectEntry = (entryId: string, selected: boolean) => {
-    if (selected) {
-      setSelectedEntries([...selectedEntries, entryId])
-    } else {
-      setSelectedEntries(selectedEntries.filter(id => id !== entryId))
-    }
-  }
-
-  const handleSelectAll = (selected: boolean) => {
-    if (selected) {
-      setSelectedEntries(timeEntries.map(entry => entry._id))
-    } else {
-      setSelectedEntries([])
-    }
-  }
-
   const handleFilterChange = (key: string, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }))
     setPagination(prev => ({ ...prev, page: 1 }))
@@ -229,6 +356,86 @@ export function TimeLogs({ userId, organizationId, projectId, taskId, onTimeEntr
   const handlePageChange = (page: number) => {
     setPagination(prev => ({ ...prev, page }))
   }
+
+  const activeTimerDisplay = useMemo(() => {
+    if (!activeTimerEntry) return null
+
+    const matchesProject = !projectId || activeTimerEntry.project?._id === projectId
+    const matchesTask = !taskId || activeTimerEntry.task?._id === taskId
+    const status = activeTimerEntry.isPaused ? 'paused' : 'running'
+
+    if (!matchesProject || !matchesTask) return null
+    if (!passesStatusFilter(status)) return null
+    if (!passesDateFilters(activeTimerEntry.startTime)) return null
+
+    return {
+      _id: activeTimerEntry._id,
+      description: activeTimerEntry.description,
+      startTime: activeTimerEntry.startTime,
+      endTime: null,
+      duration: activeTimerDisplayDuration,
+      isBillable: activeTimerEntry.isBillable ?? true,
+      hourlyRate: activeTimerEntry.hourlyRate,
+      status,
+      category: undefined,
+      tags: activeTimerEntry.tags || [],
+      notes: undefined,
+      isApproved: false,
+      project: activeTimerEntry.project ?? null,
+      task: activeTimerEntry.task ?? null,
+      __isActive: true
+    } as TimeEntry
+  }, [activeTimerEntry, activeTimerDisplayDuration, projectId, taskId, passesStatusFilter, passesDateFilters])
+
+  const displayedEntries = useMemo(() => {
+    const entries = timeEntries.filter(entry => passesDateFilters(entry.startTime))
+    if (activeTimerDisplay) {
+      return [activeTimerDisplay, ...entries]
+    }
+    return entries
+  }, [timeEntries, activeTimerDisplay, passesDateFilters])
+
+  const selectableEntries = useMemo(
+    () => displayedEntries.filter(entry => !entry.__isActive),
+    [displayedEntries]
+  )
+
+  const selectableIds = useMemo(
+    () => selectableEntries.map(entry => entry._id),
+    [selectableEntries]
+  )
+
+  const handleSelectEntry = useCallback(
+    (entryId: string, selected: boolean) => {
+      if (!selectableIds.includes(entryId)) return
+      if (selected) {
+        setSelectedEntries(prev => Array.from(new Set([...prev, entryId])))
+      } else {
+        setSelectedEntries(prev => prev.filter(id => id !== entryId))
+      }
+    },
+    [selectableIds]
+  )
+
+  const allSelected = useMemo(
+    () => selectableIds.length > 0 && selectableIds.every(id => selectedEntries.includes(id)),
+    [selectableIds, selectedEntries]
+  )
+
+  useEffect(() => {
+    setSelectedEntries(prev => prev.filter(id => selectableIds.includes(id)))
+  }, [selectableIds])
+
+  const handleSelectAll = useCallback(
+    (selected: boolean) => {
+      if (selected) {
+        setSelectedEntries(selectableIds)
+      } else {
+        setSelectedEntries([])
+      }
+    },
+    [selectableIds]
+  )
 
   return (
     <Card>
@@ -351,7 +558,7 @@ export function TimeLogs({ userId, organizationId, projectId, taskId, onTimeEntr
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
               <p className="text-muted-foreground mt-2">Loading time entries...</p>
             </div>
-          ) : timeEntries.length === 0 ? (
+          ) : displayedEntries.length === 0 ? (
             <div className="text-center py-8">
               <Clock className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-sm sm:text-base text-muted-foreground">No time entries found</p>
@@ -362,8 +569,8 @@ export function TimeLogs({ userId, organizationId, projectId, taskId, onTimeEntr
               <div className="hidden md:grid grid-cols-12 gap-4 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium">
                 <div className="col-span-1">
                   <Checkbox
-                    checked={selectedEntries.length === timeEntries.length && timeEntries.length > 0}
-                    onCheckedChange={handleSelectAll}
+                    checked={allSelected}
+                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
                   />
                 </div>
                 <div className="col-span-4">Description</div>
@@ -376,17 +583,19 @@ export function TimeLogs({ userId, organizationId, projectId, taskId, onTimeEntr
               </div>
 
               {/* Table Rows */}
-              {timeEntries.map((entry) => (
+              {displayedEntries.map((entry) => (
                 <div key={entry._id} className="border rounded-lg overflow-hidden">
                   {/* Mobile Card View */}
                   <div className="md:hidden p-3 space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <Checkbox
-                          checked={selectedEntries.includes(entry._id)}
-                          onCheckedChange={(checked) => handleSelectEntry(entry._id, checked as boolean)}
-                          className="flex-shrink-0"
-                        />
+                        {!entry.__isActive && (
+                          <Checkbox
+                            checked={selectedEntries.includes(entry._id)}
+                            onCheckedChange={(checked) => handleSelectEntry(entry._id, checked as boolean)}
+                            className="flex-shrink-0"
+                          />
+                        )}
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm truncate" title={entry.description}>{entry.description}</div>
                           <div className="text-xs text-muted-foreground truncate mt-1">
@@ -448,10 +657,12 @@ export function TimeLogs({ userId, organizationId, projectId, taskId, onTimeEntr
                   {/* Desktop Table View */}
                   <div className="hidden md:grid grid-cols-12 gap-4 p-3">
                     <div className="col-span-1 flex items-center">
-                      <Checkbox
-                        checked={selectedEntries.includes(entry._id)}
-                        onCheckedChange={(checked) => handleSelectEntry(entry._id, checked as boolean)}
-                      />
+                      {!entry.__isActive ? (
+                        <Checkbox
+                          checked={selectedEntries.includes(entry._id)}
+                          onCheckedChange={(checked) => handleSelectEntry(entry._id, checked as boolean)}
+                        />
+                      ) : null}
                     </div>
                     <div className="col-span-4 truncate">
                       <div className="font-medium text-xs sm:text-sm truncate" title={entry.description}>{entry.description}</div>
@@ -488,7 +699,16 @@ export function TimeLogs({ userId, organizationId, projectId, taskId, onTimeEntr
                       {formatDuration(entry.duration)}
                     </div>
                     <div className="col-span-1">
-                      <Badge variant={entry.status === 'completed' ? 'default' : 'secondary'} className="text-xs">
+                      <Badge
+                        variant={
+                          entry.status === 'completed'
+                            ? 'default'
+                            : entry.status === 'running'
+                            ? 'default'
+                            : 'secondary'
+                        }
+                        className="text-xs capitalize"
+                      >
                         {entry.status}
                       </Badge>
                     </div>

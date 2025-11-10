@@ -42,8 +42,32 @@ export async function GET(request: NextRequest) {
 
     if (startDate || endDate) {
       query.startTime = {}
-      if (startDate) query.startTime.$gte = new Date(startDate)
-      if (endDate) query.startTime.$lte = new Date(endDate)
+
+      if (startDate) {
+        const start = new Date(startDate)
+        if (!Number.isNaN(start.getTime())) {
+          start.setHours(0, 0, 0, 0)
+          query.startTime.$gte = start
+        }
+      }
+
+      if (endDate) {
+        const end = new Date(endDate)
+        if (!Number.isNaN(end.getTime())) {
+          end.setHours(23, 59, 59, 999)
+          query.startTime.$lte = end
+        }
+      }
+
+      if (query.startTime && query.startTime.$gte && query.startTime.$lte && query.startTime.$gte > query.startTime.$lte) {
+        const tmp = query.startTime.$gte
+        query.startTime.$gte = query.startTime.$lte
+        query.startTime.$lte = tmp
+      }
+
+      if (query.startTime && Object.keys(query.startTime).length === 0) {
+        delete query.startTime
+      }
     }
 
     // Get time entries with pagination
