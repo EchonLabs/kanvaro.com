@@ -205,7 +205,8 @@ export default function BacklogPage() {
 
           return {
             ...item,
-            status
+            status,
+            labels: Array.isArray(item.labels) ? item.labels : []
           }
         }) as BacklogItem[]
         setBacklogItems(normalized)
