@@ -1,3 +1,13 @@
+## [1.1.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.3...v1.1.4) (2025-11-10)
+
+
+### Bug Fixes
+
+* :bug: add backlog  fixes ([34671b9](https://github.com/EchonLabs/kanvaro.com/commit/34671b975a28d7c9c8f4895a25c86fa9c5c8f9fe))
+* add changes in filters in backlog ([3d5ef17](https://github.com/EchonLabs/kanvaro.com/commit/3d5ef170386092a170231f572e5ef76689e6d07c))
+* add mobile responsive in set up ([685b2a9](https://github.com/EchonLabs/kanvaro.com/commit/685b2a93a8fdf28af7af1713e24d223e951c3ef1))
+* add time log issues ([9e14a90](https://github.com/EchonLabs/kanvaro.com/commit/9e14a906cff3c5e35247cb8d92cb7107cff8f3b7))
+
 ## [1.1.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.2...v1.1.3) (2025-11-10)
 
 
