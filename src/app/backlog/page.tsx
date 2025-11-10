@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -8,28 +8,28 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from '@radix-ui/react-dropdown-menu'
 import { DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
-import { Eye, Edit, Trash2 } from 'lucide-react'
+import { Checkbox } from '@/components/ui/Checkbox'
+import { Label } from '@/components/ui/label'
+import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreHorizontal, 
-  Calendar, 
+import { cn } from '@/lib/utils'
+import {
+  Eye,
+  Edit,
+  Trash2,
+  Plus,
+  Search,
+  MoreHorizontal,
+  Calendar,
   Clock,
   CheckCircle,
   AlertTriangle,
-  Pause,
   XCircle,
-  Play,
   Loader2,
-  User,
   Target,
-  Zap,
   BarChart3,
   List,
   Kanban,
@@ -66,6 +66,7 @@ interface BacklogItem {
   sprint?: {
     _id: string
     name: string
+    status?: string
   }
   epic?: {
     _id: string
@@ -73,6 +74,41 @@ interface BacklogItem {
   }
   createdAt: string
   updatedAt: string
+}
+
+interface SprintOption {
+  _id: string
+  name: string
+  status: 'planning' | 'active' | 'completed' | 'cancelled' | string
+  startDate?: string
+  endDate?: string
+  project?: {
+    _id: string
+    name: string
+  } | null
+}
+
+const ALLOWED_BACKLOG_STATUSES: BacklogItem['status'][] = ['backlog', 'sprint', 'in_progress', 'done']
+
+function normalizeBacklogStatus(status: string | undefined): BacklogItem['status'] {
+  if (typeof status !== 'string') {
+    return 'backlog'
+  }
+  return ALLOWED_BACKLOG_STATUSES.includes(status as BacklogItem['status'])
+    ? (status as BacklogItem['status'])
+    : 'backlog'
+}
+
+function truncateText(value: string, maxLength = 20): string {
+  if (!value) {
+    return ''
+  }
+
+  if (value.length <= maxLength || maxLength < 3) {
+    return value
+  }
+
+  return `${value.slice(0, maxLength - 1)}…`
 }
 
 export default function BacklogPage() {
@@ -93,6 +129,19 @@ export default function BacklogPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('priority')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
+  const [taskIdsForSprint, setTaskIdsForSprint] = useState<string[]>([])
+  const [showSprintModal, setShowSprintModal] = useState(false)
+  const [sprints, setSprints] = useState<SprintOption[]>([])
+  const [selectedSprintId, setSelectedSprintId] = useState('')
+  const [sprintQuery, setSprintQuery] = useState('')
+  const [sprintsLoading, setSprintsLoading] = useState(false)
+  const [sprintsError, setSprintsError] = useState('')
+  const [assigningSprint, setAssigningSprint] = useState(false)
+  const [removingSprint, setRemovingSprint] = useState(false)
+  const [sprintModalMode, setSprintModalMode] = useState<'assign' | 'manage'>('assign')
+  const [currentSprintInfo, setCurrentSprintInfo] = useState<{ _id: string; name: string } | null>(null)
 
   const checkAuth = useCallback(async () => {
     try {
@@ -147,7 +196,19 @@ export default function BacklogPage() {
       const data = await response.json()
 
       if (data.success) {
-        setBacklogItems(data.data)
+        const rawItems = Array.isArray(data.data) ? data.data : []
+        const normalized = rawItems.map((item: any) => {
+          const status =
+            item.type === 'task' && item.sprint
+              ? 'sprint'
+              : normalizeBacklogStatus(item.status)
+
+          return {
+            ...item,
+            status
+          }
+        }) as BacklogItem[]
+        setBacklogItems(normalized)
       } else {
         setError(data.error || 'Failed to fetch backlog items')
       }
@@ -155,6 +216,323 @@ export default function BacklogPage() {
       setError('Failed to fetch backlog items')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSelectModeToggle = () => {
+    setSelectMode((prev) => {
+      if (prev) {
+        setSelectedTaskIds([])
+      }
+      return !prev
+    })
+  }
+
+  const setTaskSelected = (taskId: string, shouldSelect: boolean) => {
+    setSelectedTaskIds((prev) => {
+      if (shouldSelect) {
+        if (prev.includes(taskId)) {
+          return prev
+        }
+        return [...prev, taskId]
+      }
+      return prev.filter((id) => id !== taskId)
+    })
+  }
+
+  const clearSelection = () => {
+    setSelectedTaskIds([])
+  }
+
+  const clearSprintSelection = () => {
+    setSelectedSprintId('')
+    setSprintQuery('')
+    setSprintsError('')
+  }
+
+  const resetSprintModalState = () => {
+    clearSprintSelection()
+    setTaskIdsForSprint([])
+    setSprintModalMode('assign')
+    setCurrentSprintInfo(null)
+  }
+
+  const handleCloseSprintModal = () => {
+    if (assigningSprint || removingSprint) return
+    setShowSprintModal(false)
+    resetSprintModalState()
+  }
+
+  const handleOpenSprintModal = (
+    taskIds: string[],
+    options?: {
+      mode?: 'assign' | 'manage'
+      existingSprint?: { _id: string; name: string }
+    }
+  ) => {
+    const uniqueTaskIds = Array.from(new Set(taskIds.filter(Boolean)))
+    if (uniqueTaskIds.length === 0) return
+
+    setTaskIdsForSprint(uniqueTaskIds)
+    clearSprintSelection()
+    setSprintModalMode(options?.mode ?? 'assign')
+    setCurrentSprintInfo(options?.existingSprint ?? null)
+    setShowSprintModal(true)
+  }
+
+  const fetchAvailableSprints = useCallback(async () => {
+    setSprintsLoading(true)
+    setSprintsError('')
+    try {
+      const response = await fetch('/api/sprints?limit=200')
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to load sprints')
+      }
+
+      const sprintList: SprintOption[] = Array.isArray(data.data)
+        ? data.data
+        : Array.isArray(data.sprints)
+          ? data.sprints
+          : []
+
+      const filtered = sprintList.filter(
+        (sprint) => sprint && ['planning', 'active'].includes(sprint.status)
+      )
+
+      setSprints(filtered)
+    } catch (fetchError) {
+      console.error('Failed to load sprints:', fetchError)
+      setSprintsError('Failed to load sprints. Please try again.')
+      setSprints([])
+    } finally {
+      setSprintsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (showSprintModal) {
+      fetchAvailableSprints()
+    }
+  }, [showSprintModal, fetchAvailableSprints])
+
+  useEffect(() => {
+    setSelectedTaskIds((prev) => {
+      const validIds = prev.filter((id) =>
+        backlogItems.some((item) => item._id === id && item.type === 'task')
+      )
+      return validIds.length === prev.length ? prev : validIds
+    })
+  }, [backlogItems])
+
+  const selectedTaskCount = selectedTaskIds.length
+
+  const tasksForSprint = useMemo(
+    () =>
+      backlogItems.filter(
+        (item) => item.type === 'task' && taskIdsForSprint.includes(item._id)
+      ),
+    [backlogItems, taskIdsForSprint]
+  )
+
+  const filteredSprints = useMemo(() => {
+    const query = sprintQuery.trim().toLowerCase()
+    if (!query) {
+      return sprints
+    }
+    return sprints.filter((sprint) => {
+      const nameMatch = sprint.name.toLowerCase().includes(query)
+      const projectMatch = sprint.project?.name
+        ? sprint.project.name.toLowerCase().includes(query)
+        : false
+      return nameMatch || projectMatch
+    })
+  }, [sprints, sprintQuery])
+
+  const sprintModalTitle =
+    sprintModalMode === 'manage'
+      ? taskIdsForSprint.length > 1
+        ? `Manage Sprint for ${taskIdsForSprint.length} Tasks`
+        : 'Manage Sprint Assignment'
+      : taskIdsForSprint.length > 1
+        ? `Add ${taskIdsForSprint.length} Tasks to Sprint`
+        : 'Add Task to Sprint'
+
+  const sprintModalDescription =
+    sprintModalMode === 'manage'
+      ? 'Change the sprint or remove it from this task.'
+      : 'Select a sprint to move the selected task(s) into. Only planning and active sprints are available.'
+
+  const handleSprintAssignment = async () => {
+    if (!selectedSprintId) {
+      setSprintsError('Please select a sprint.')
+      return
+    }
+
+    if (
+      sprintModalMode === 'manage' &&
+      currentSprintInfo &&
+      selectedSprintId === currentSprintInfo._id
+    ) {
+      setSprintsError('Task is already assigned to this sprint. Choose a different sprint.')
+      return
+    }
+
+    const sprint = sprints.find((item) => item._id === selectedSprintId)
+    if (!sprint) {
+      setSprintsError('Selected sprint is no longer available.')
+      return
+    }
+
+    setAssigningSprint(true)
+    setSprintsError('')
+
+    try {
+      const results = await Promise.all(
+        taskIdsForSprint.map(async (taskId) => {
+          const response = await fetch(`/api/tasks/${taskId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              sprint: selectedSprintId,
+              status: 'todo'
+            })
+          })
+
+          let body: any = null
+          try {
+            body = await response.json()
+          } catch {
+            // Ignore JSON parse errors (non-JSON response)
+          }
+
+          return {
+            taskId,
+            ok: response.ok && body?.success,
+            body
+          }
+        })
+      )
+
+      const failed = results.filter((result) => !result.ok)
+      if (failed.length > 0) {
+        console.error('Failed to assign some tasks to sprint:', failed)
+        setSprintsError('Failed to add one or more tasks to the sprint. Please try again.')
+        return
+      }
+
+      setBacklogItems((prev) =>
+        prev.map((item) => {
+          if (item.type === 'task' && taskIdsForSprint.includes(item._id)) {
+            return {
+              ...item,
+              sprint: {
+                _id: sprint._id,
+                name: sprint.name,
+                status: sprint.status
+              },
+              status: 'sprint'
+            }
+          }
+          return item
+        })
+      )
+
+      setSuccess(
+        taskIdsForSprint.length > 1
+          ? `${taskIdsForSprint.length} tasks assigned to ${sprint.name} successfully.`
+          : `Task assigned to ${sprint.name} successfully.`
+      )
+      setTimeout(() => setSuccess(''), 3000)
+
+      setShowSprintModal(false)
+      resetSprintModalState()
+      setSelectedTaskIds([])
+      setSelectMode(false)
+    } catch (error) {
+      console.error('Failed to assign tasks to sprint:', error)
+      setSprintsError('Failed to add tasks to sprint. Please try again.')
+    } finally {
+      setAssigningSprint(false)
+    }
+  }
+
+  const handleRemoveFromSprint = async () => {
+    if (!currentSprintInfo) {
+      return
+    }
+
+    setRemovingSprint(true)
+    setSprintsError('')
+
+    try {
+      const results = await Promise.all(
+        taskIdsForSprint.map(async (taskId) => {
+          const response = await fetch(`/api/tasks/${taskId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              sprint: null,
+              status: 'backlog'
+            })
+          })
+
+          let body: any = null
+          try {
+            body = await response.json()
+          } catch {
+            // Ignore JSON parse errors
+          }
+
+          return {
+            taskId,
+            ok: response.ok && body?.success,
+            body
+          }
+        })
+      )
+
+      const failed = results.filter((result) => !result.ok)
+      if (failed.length > 0) {
+        console.error('Failed to remove sprint from some tasks:', failed)
+        setSprintsError('Failed to remove sprint from the task. Please try again.')
+        return
+      }
+
+      setBacklogItems((prev) =>
+        prev.map((item) => {
+          if (item.type === 'task' && taskIdsForSprint.includes(item._id)) {
+            return {
+              ...item,
+              sprint: undefined,
+              status: 'backlog'
+            }
+          }
+          return item
+        })
+      )
+
+      setSuccess(
+        taskIdsForSprint.length > 1
+          ? `${taskIdsForSprint.length} tasks removed from sprint successfully.`
+          : 'Task removed from sprint successfully.'
+      )
+      setTimeout(() => setSuccess(''), 3000)
+
+      setShowSprintModal(false)
+      resetSprintModalState()
+      setSelectedTaskIds([])
+      setSelectMode(false)
+    } catch (error) {
+      console.error('Failed to remove task from sprint:', error)
+      setSprintsError('Failed to remove sprint from the task. Please try again.')
+    } finally {
+      setRemovingSprint(false)
     }
   }
 
@@ -398,140 +776,280 @@ export default function BacklogPage() {
                     {sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
                   </Button>
                 </div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                    <Button
+                      variant={selectMode ? 'secondary' : 'outline'}
+                      size="sm"
+                      onClick={handleSelectModeToggle}
+                      className="w-full sm:w-auto"
+                    >
+                      <List className="h-4 w-4 mr-2" />
+                      {selectMode ? 'Cancel Selection' : 'Add to Sprint'}
+                    </Button>
+                    {selectMode && (
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={() => handleOpenSprintModal(selectedTaskIds)}
+                          disabled={selectedTaskCount === 0 || assigningSprint}
+                          className="w-full sm:w-auto"
+                        >
+                          {assigningSprint ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Kanban className="h-4 w-4 mr-2" />
+                          )}
+                          {assigningSprint ? 'Processing...' : 'Add Selected to Sprint'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={clearSelection}
+                          disabled={selectedTaskCount === 0}
+                          className="w-full sm:w-auto"
+                        >
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Clear
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                  {selectMode && (
+                    <div className="text-sm text-muted-foreground w-full sm:w-auto text-left sm:text-right">
+                      {selectedTaskCount > 0
+                        ? `${selectedTaskCount} task${selectedTaskCount !== 1 ? 's' : ''} selected`
+                        : 'No tasks selected'}
+                    </div>
+                  )}
+                </div>
+                {selectMode && (
+                  <p className="text-xs text-muted-foreground">
+                    Only task items can be added to sprints. Use the checkboxes to choose the tasks you want to move.
+                  </p>
+                )}
               </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {filteredAndSortedItems.map((item) => (
-                <Card key={item._id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0 w-full">
-                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <h3 className="font-medium text-foreground text-sm sm:text-base truncate flex-1 min-w-0">{item.title}</h3>
-                          <Badge className={getTypeColor(item.type)}>
-                            {item.type}
-                          </Badge>
-                          <Badge className={getPriorityColor(item.priority)}>
-                            {item.priority}
-                          </Badge>
-                          <Badge className={getStatusColor(item.status)}>
-                            {item.status.replace('_', ' ')}
-                          </Badge>
-                          {item.epic && (
-                            <Badge variant="outline" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                              {item.epic.name}
-                            </Badge>
-                          )}
-                          {item.sprint && (
-                            <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                              {item.sprint.name}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">
-                          {item.description || 'No description'}
-                        </p>
-                        {item.assignedTo && (
-                          <p className="text-xs sm:text-sm text-muted-foreground mb-2">
-                            {item.assignedTo.firstName} {item.assignedTo.lastName}
-                          </p>
+              {filteredAndSortedItems.map((item) => {
+                const isTask = item.type === 'task'
+                const isSelected = selectedTaskIds.includes(item._id)
+                const showCheckbox = selectMode && isTask
+
+                return (
+                  <Card
+                    key={item._id}
+                    className={cn(
+                      'hover:shadow-md transition-shadow',
+                      showCheckbox && isSelected && 'border-primary/60 bg-primary/5'
+                    )}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        {showCheckbox && (
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) =>
+                              setTaskSelected(item._id, Boolean(checked))
+                            }
+                            aria-label={`Select ${item.title}`}
+                            className="mt-1"
+                          />
                         )}
-                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                          <div className="flex items-center space-x-1">
-                            <Target className="h-3 w-3 sm:h-4 sm:w-4" />
-                            {item.project?.name ? (
-                              <span
-                                className="truncate"
-                                title={item.project.name && item.project.name.length > 10 ? item.project.name : undefined}
-                              >
-                                {item.project.name && item.project.name.length > 10 ? `${item.project.name.slice(0, 10)}…` : item.project.name}
-                              </span>
-                            ) : (
-                              <span className="truncate italic text-muted-foreground">Project deleted or unavailable</span>
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
+                          <div className="flex-1 min-w-0 w-full">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <h3 className="font-medium text-foreground text-sm sm:text-base truncate flex-1 min-w-0">
+                                {item.title}
+                              </h3>
+                              <Badge className={getTypeColor(item.type)}>
+                                {item.type}
+                              </Badge>
+                              <Badge className={getPriorityColor(item.priority)}>
+                                {item.priority}
+                              </Badge>
+                              <Badge className={getStatusColor(item.status)}>
+                                {item.status.replace('_', ' ')}
+                              </Badge>
+                              {item.epic && (
+                                <Badge
+                                  variant="outline"
+                                  className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                                >
+                                  {item.epic.name}
+                                </Badge>
+                              )}
+                              {item.sprint && (
+                                <Badge
+                                  variant="outline"
+                                  className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                                  title={item.sprint.name}
+                                >
+                                  {truncateText(item.sprint.name, 18)}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">
+                              {item.description || 'No description'}
+                            </p>
+                            {item.assignedTo && (
+                              <p className="text-xs sm:text-sm text-muted-foreground mb-2">
+                                {item.assignedTo.firstName} {item.assignedTo.lastName}
+                              </p>
                             )}
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                              <div className="flex items-center space-x-1">
+                                <Target className="h-3 w-3 sm:h-4 sm:w-4" />
+                                {item.project?.name ? (
+                                  <span
+                                    className="truncate"
+                                    title={
+                                      item.project.name && item.project.name.length > 10
+                                        ? item.project.name
+                                        : undefined
+                                    }
+                                  >
+                                    {item.project.name && item.project.name.length > 10
+                                      ? `${item.project.name.slice(0, 10)}…`
+                                      : item.project.name}
+                                  </span>
+                                ) : (
+                                  <span className="truncate italic text-muted-foreground">
+                                    Project deleted or unavailable
+                                  </span>
+                                )}
+                              </div>
+                              {item.dueDate && (
+                                <div className="flex items-center space-x-1">
+                                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  <span>Due {new Date(item.dueDate).toLocaleDateString()}</span>
+                                </div>
+                              )}
+                              {item.storyPoints && (
+                                <div className="flex items-center space-x-1">
+                                  <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  <span>{item.storyPoints} points</span>
+                                </div>
+                              )}
+                              {item.estimatedHours && (
+                                <div className="flex items-center space-x-1">
+                                  <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  <span>{item.estimatedHours}h estimated</span>
+                                </div>
+                              )}
+                              {item.labels.length > 0 && (
+                                <div className="flex items-center space-x-1">
+                                  <Star className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  <span className="truncate">{item.labels.join(', ')}</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          {item.dueDate && (
-                            <div className="flex items-center space-x-1">
-                              <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span>Due {new Date(item.dueDate).toLocaleDateString()}</span>
-                            </div>
-                          )}
-                          {item.storyPoints && (
-                            <div className="flex items-center space-x-1">
-                              <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span>{item.storyPoints} points</span>
-                            </div>
-                          )}
-                          {item.estimatedHours && (
-                            <div className="flex items-center space-x-1">
-                              <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span>{item.estimatedHours}h estimated</span>
-                            </div>
-                          )}
-                          {item.labels.length > 0 && (
-                            <div className="flex items-center space-x-1">
-                              <Star className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span className="truncate">{item.labels.join(', ')}</span>
-                            </div>
-                          )}
+                          <div className="flex items-center space-x-2 flex-shrink-0">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="flex-shrink-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="end"
+                                className="min-w-[172px] py-2 rounded-md shadow-lg border border-border bg-background z-[10000]"
+                              >
+                                {/* View */}
+                                {item.type === 'task' && (
+                                  <DropdownMenuItem
+                                    onClick={() => router.push(`/tasks/${item._id}`)}
+                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                  >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    <span>View Task</span>
+                                  </DropdownMenuItem>
+                                )}
+                                {item.type === 'story' && (
+                                  <DropdownMenuItem
+                                    onClick={() => router.push(`/stories/${item._id}`)}
+                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                  >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    <span>View Story</span>
+                                  </DropdownMenuItem>
+                                )}
+                                {item.type === 'epic' && (
+                                  <DropdownMenuItem
+                                    onClick={() => router.push(`/epics/${item._id}`)}
+                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                  >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    <span>View Epic</span>
+                                  </DropdownMenuItem>
+                                )}
+
+                                {/* Edit */}
+                                {item.type === 'task' && (
+                                  <DropdownMenuItem
+                                    onClick={() => router.push(`/tasks/${item._id}/edit`)}
+                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    <span>Edit Task</span>
+                                  </DropdownMenuItem>
+                                )}
+                                {item.type === 'story' && (
+                                  <DropdownMenuItem
+                                    onClick={() => router.push(`/stories/${item._id}/edit`)}
+                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    <span>Edit Story</span>
+                                  </DropdownMenuItem>
+                                )}
+
+                                {item.type === 'task' && !item.sprint && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleOpenSprintModal([item._id], { mode: 'assign' })}
+                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                  >
+                                    <Kanban className="h-4 w-4 mr-2" />
+                                    <span>Add to Sprint</span>
+                                  </DropdownMenuItem>
+                                )}
+                                {item.type === 'task' && item.sprint && (
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      handleOpenSprintModal([item._id], {
+                                        mode: 'manage',
+                                        existingSprint: { _id: item.sprint!._id, name: item.sprint!.name }
+                                      })
+                                    }
+                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                  >
+                                    <Kanban className="h-4 w-4 mr-2" />
+                                    <span>Manage Sprint</span>
+                                  </DropdownMenuItem>
+                                )}
+
+                                {/* Delete */}
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteClick(item)}
+                                  className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  <span>
+                                    Delete {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                                  </span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2 flex-shrink-0">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="flex-shrink-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="min-w-[172px] py-2 rounded-md shadow-lg border border-border bg-background z-[10000]">
-                            {/* View */}
-                            {item.type === 'task' && (
-                              <DropdownMenuItem onClick={() => router.push(`/tasks/${item._id}`)} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
-                                <Eye className="h-4 w-4 mr-2" />
-                                <span>View Task</span>
-                              </DropdownMenuItem>
-                            )}
-                            {item.type === 'story' && (
-                              <DropdownMenuItem onClick={() => router.push(`/stories/${item._id}`)} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
-                                <Eye className="h-4 w-4 mr-2" />
-                                <span>View Story</span>
-                              </DropdownMenuItem>
-                            )}
-                            {item.type === 'epic' && (
-                              <DropdownMenuItem onClick={() => router.push(`/epics/${item._id}`)} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
-                                <Eye className="h-4 w-4 mr-2" />
-                                <span>View Epic</span>
-                              </DropdownMenuItem>
-                            )}
-
-                            {/* Edit */}
-                            {item.type === 'task' && (
-                              <DropdownMenuItem onClick={() => router.push(`/tasks/${item._id}/edit`)} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
-                                <Edit className="h-4 w-4 mr-2" />
-                                <span>Edit Task</span>
-                              </DropdownMenuItem>
-                            )}
-                            {item.type === 'story' && (
-                              <DropdownMenuItem onClick={() => router.push(`/stories/${item._id}/edit`)} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
-                                <Edit className="h-4 w-4 mr-2" />
-                                <span>Edit Story</span>
-                              </DropdownMenuItem>
-                            )}
-
-                            {/* Delete */}
-                            <DropdownMenuItem onClick={() => handleDeleteClick(item)} className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer">
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              <span>Delete {item.type.charAt(0).toUpperCase() + item.type.slice(1)}</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  </CardContent>
+                    </CardContent>
                 </Card>
-              ))}
+                )
+              })}
             </div>
           </CardContent>
         </Card>
@@ -546,6 +1064,188 @@ export default function BacklogPage() {
           cancelText="Cancel"
           variant="destructive"
         />
+
+        <ResponsiveDialog
+          open={showSprintModal}
+          onOpenChange={(open) => {
+            if (open) {
+              setShowSprintModal(true)
+              return
+            }
+            handleCloseSprintModal()
+          }}
+          title={sprintModalTitle}
+          description={sprintModalDescription}
+          footer={
+            <div className="flex flex-col sm:flex-row sm:justify-end gap-2 w-full">
+              {sprintModalMode === 'manage' && (
+                <Button
+                  variant="destructive"
+                  onClick={handleRemoveFromSprint}
+                  disabled={assigningSprint || removingSprint}
+                >
+                  {removingSprint ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Removing...
+                    </>
+                  ) : (
+                    'Remove from Sprint'
+                  )}
+                </Button>
+              )}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleCloseSprintModal}
+                  disabled={assigningSprint || removingSprint}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSprintAssignment}
+                  disabled={
+                    assigningSprint ||
+                    removingSprint ||
+                    taskIdsForSprint.length === 0 ||
+                    !selectedSprintId
+                  }
+                >
+                  {assigningSprint ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {sprintModalMode === 'manage' ? 'Updating...' : 'Adding...'}
+                    </>
+                  ) : (
+                    <>
+                      <Kanban className="h-4 w-4 mr-2" />
+                      {sprintModalMode === 'manage' ? 'Update Sprint' : 'Add to Sprint'}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            {sprintsError && (
+              <Alert variant="destructive">
+                <AlertDescription>{sprintsError}</AlertDescription>
+              </Alert>
+            )}
+
+            {currentSprintInfo && (
+              <div className="rounded-md border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Current sprint:</span>{' '}
+                <Badge variant="outline" className="ml-1" title={currentSprintInfo.name}>
+                  {truncateText(currentSprintInfo.name, 24)}
+                </Badge>
+              </div>
+            )}
+
+            <div>
+              <Label className="text-sm font-medium text-foreground">
+                Sprint
+              </Label>
+              <Select
+                value={selectedSprintId}
+                onValueChange={(value) => setSelectedSprintId(value)}
+                disabled={sprintsLoading || sprints.length === 0}
+              >
+                <SelectTrigger className="mt-1 w-full text-left items-start min-h-[4.75rem] py-3">
+                  <SelectValue
+                    placeholder={
+                      sprintsLoading
+                        ? 'Loading sprints...'
+                        : sprintModalMode === 'manage'
+                          ? 'Select new sprint'
+                          : 'Select sprint'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent className="z-[10050] p-0 max-w-[26rem]">
+                  <div className="p-2 space-y-2">
+                    <Input
+                      value={sprintQuery}
+                      onChange={(e) => setSprintQuery(e.target.value)}
+                      placeholder="Search sprints"
+                      className="h-9"
+                    />
+                    <div className="max-h-56 overflow-y-auto">
+                      {sprintsLoading ? (
+                        <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Loading sprints...</span>
+                        </div>
+                      ) : filteredSprints.length === 0 ? (
+                        <div className="px-2 py-1 text-sm text-muted-foreground">
+                          {sprints.length === 0
+                            ? 'No planning or active sprints available.'
+                            : 'No sprints match your search.'}
+                        </div>
+                      ) : (
+                        filteredSprints.map((sprint) => (
+                          <SelectItem key={sprint._id} value={sprint._id} className="leading-normal">
+                            <div className="flex flex-col space-y-1 max-w-full">
+                              <span className="font-medium break-words" title={sprint.name}>
+                                {truncateText(sprint.name, 48)}
+                              </span>
+                              {sprint.project?.name && (
+                                <span className="text-xs text-muted-foreground break-words" title={sprint.project.name}>
+                                  Project: {truncateText(sprint.project.name, 48)}
+                                </span>
+                              )}
+                              {(sprint.startDate || sprint.endDate) && (
+                                <div className="text-xs text-muted-foreground flex flex-wrap gap-x-1">
+                                  <span>
+                                    {sprint.startDate
+                                      ? new Date(sprint.startDate).toLocaleDateString()
+                                      : 'TBD'}
+                                  </span>
+                                  <span>-</span>
+                                  <span>
+                                    {sprint.endDate
+                                      ? new Date(sprint.endDate).toLocaleDateString()
+                                      : 'TBD'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium text-foreground">
+                Selected tasks
+              </Label>
+              {tasksForSprint.length === 0 ? (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Choose one or more tasks from the backlog to add them to a sprint.
+                </p>
+              ) : (
+                <ul className="mt-2 space-y-2">
+                  {tasksForSprint.map((task) => (
+                    <li
+                      key={task._id}
+                      className="flex items-center justify-between gap-2 text-sm text-muted-foreground"
+                    >
+                      <span className="truncate">{task.title}</span>
+                      <Badge variant="outline" className="flex-shrink-0">
+                        {task.priority}
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </ResponsiveDialog>
       </div>
     </MainLayout>
   )

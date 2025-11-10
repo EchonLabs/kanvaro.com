@@ -1,3 +1,13 @@
+## [1.1.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.0...v1.1.1) (2025-11-10)
+
+
+### Bug Fixes
+
+* add to spritn option in backlog tasks ([2854f5f](https://github.com/EchonLabs/kanvaro.com/commit/2854f5f06dc810b4f6ee48455c1768046133b76b))
+* fix timer filtering issues ([224ebc3](https://github.com/EchonLabs/kanvaro.com/commit/224ebc3406aba2e6f0e06e89c784cdcf6d460038))
+* fix version number issue and sign in ([1a2af46](https://github.com/EchonLabs/kanvaro.com/commit/1a2af460a438d63b420a953a8fe024f9781c0a94))
+* role error msg will lead to scroll the page up ([000ff25](https://github.com/EchonLabs/kanvaro.com/commit/000ff25cefe945ce7b803dc1d5f64be7b800fedb))
+
 # [1.1.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.25...v1.1.0) (2025-11-07)
 
 
