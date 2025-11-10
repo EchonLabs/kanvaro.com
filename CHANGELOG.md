@@ -1,3 +1,10 @@
+## [1.1.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.2...v1.1.3) (2025-11-10)
+
+
+### Bug Fixes
+
+* undo changes ([3251a2f](https://github.com/EchonLabs/kanvaro.com/commit/3251a2f5e01c520fff03305a37275faf05ede4de))
+
 ## [1.1.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.1...v1.1.2) (2025-11-10)
 
 
