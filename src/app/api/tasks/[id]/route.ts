@@ -3,6 +3,7 @@ import connectDB from '@/lib/db-config'
 import { Task } from '@/models/Task'
 import { Project } from '@/models/Project'
 import { User } from '@/models/User'
+import { Sprint } from '@/models/Sprint'
 import { authenticateUser } from '@/lib/auth-utils'
 import { CompletionService } from '@/lib/completion-service'
 import { notificationService } from '@/lib/notification-service'
@@ -142,7 +143,7 @@ export async function PUT(
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
       .populate('story', 'title status')
-      .populate('sprint', 'name status')
+      .populate('sprint', 'name status startDate endDate teamMembers')
       .populate('parentTask', 'title')
 
     if (!task) {
@@ -150,6 +151,52 @@ export async function PUT(
         { error: 'Task not found or unauthorized' },
         { status: 404 }
       )
+    }
+
+    // Synchronize sprint tasks array if sprint changed
+    if (Object.prototype.hasOwnProperty.call(updateData, 'sprint')) {
+      const newSprintId = updateData.sprint
+      const oldSprintId = currentTask.sprint
+
+      const updates: Promise<unknown>[] = []
+
+      if (oldSprintId && (!newSprintId || oldSprintId.toString() !== newSprintId)) {
+        updates.push(
+          Sprint.findByIdAndUpdate(
+            oldSprintId,
+            { $pull: { tasks: task._id } },
+            { new: false }
+          ).exec().catch(error => {
+            console.error('Failed to remove task from previous sprint:', error)
+          })
+        )
+      }
+
+      if (newSprintId) {
+        const sprintDoc = await Sprint.findById(newSprintId).select('_id project')
+        if (sprintDoc) {
+          if (sprintDoc.project.toString() !== task.project.toString()) {
+            console.warn(
+              `Task ${taskId} assigned to different project sprint. Task project: ${task.project}, Sprint project: ${sprintDoc.project}`
+            )
+          }
+          updates.push(
+            Sprint.findByIdAndUpdate(
+              newSprintId,
+              { $addToSet: { tasks: task._id } },
+              { new: false }
+            ).exec().catch(error => {
+              console.error('Failed to add task to sprint:', error)
+            })
+          )
+        } else {
+          console.warn(`Sprint ${newSprintId} not found when updating task ${taskId}`)
+        }
+      }
+
+      if (updates.length > 0) {
+        await Promise.allSettled(updates)
+      }
     }
 
     // Invalidate tasks cache for this organization

@@ -15,6 +15,8 @@ import { Checkbox } from '@/components/ui/Checkbox'
 import { Label } from '@/components/ui/label'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
+import { Calendar as DateRangeCalendar } from '@/components/ui/calendar'
 import { cn } from '@/lib/utils'
 import {
   Eye,
@@ -37,6 +39,20 @@ import {
   ArrowDown,
   Star
 } from 'lucide-react'
+import { format } from 'date-fns'
+import { DateRange } from 'react-day-picker'
+
+interface UserSummary {
+  _id: string
+  firstName: string
+  lastName: string
+  email: string
+}
+
+interface ProjectSummary {
+  _id: string
+  name: string
+}
 
 interface BacklogItem {
   _id: string
@@ -45,20 +61,9 @@ interface BacklogItem {
   type: 'epic' | 'story' | 'task'
   priority: 'low' | 'medium' | 'high' | 'critical'
   status: 'backlog' | 'sprint' | 'in_progress' | 'done'
-  project?: {
-    _id: string
-    name: string
-  } | null
-  assignedTo?: {
-    firstName: string
-    lastName: string
-    email: string
-  }
-  createdBy: {
-    firstName: string
-    lastName: string
-    email: string
-  }
+  project?: ProjectSummary | null
+  assignedTo?: UserSummary | null
+  createdBy: UserSummary
   storyPoints?: number
   dueDate?: string
   estimatedHours?: number
@@ -142,6 +147,28 @@ export default function BacklogPage() {
   const [removingSprint, setRemovingSprint] = useState(false)
   const [sprintModalMode, setSprintModalMode] = useState<'assign' | 'manage'>('assign')
   const [currentSprintInfo, setCurrentSprintInfo] = useState<{ _id: string; name: string } | null>(null)
+  const [projectOptions, setProjectOptions] = useState<ProjectSummary[]>([])
+  const [assignedToOptions, setAssignedToOptions] = useState<UserSummary[]>([])
+  const [assignedByOptions, setAssignedByOptions] = useState<UserSummary[]>([])
+  const [projectFilterValue, setProjectFilterValue] = useState('all')
+  const [assignedToFilter, setAssignedToFilter] = useState('all')
+  const [assignedByFilter, setAssignedByFilter] = useState('all')
+  const [dateRangeFilter, setDateRangeFilter] = useState<DateRange | undefined>()
+  const [projectFilterQuery, setProjectFilterQuery] = useState('')
+  const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
+  const [assignedByFilterQuery, setAssignedByFilterQuery] = useState('')
+  const startDateBoundary = useMemo(() => {
+    if (!dateRangeFilter?.from) return null
+    const boundary = new Date(dateRangeFilter.from)
+    boundary.setHours(0, 0, 0, 0)
+    return boundary
+  }, [dateRangeFilter])
+  const endDateBoundary = useMemo(() => {
+    if (!dateRangeFilter?.to) return null
+    const boundary = new Date(dateRangeFilter.to)
+    boundary.setHours(23, 59, 59, 999)
+    return boundary
+  }, [dateRangeFilter])
 
   const checkAuth = useCallback(async () => {
     try {
@@ -210,6 +237,43 @@ export default function BacklogPage() {
           }
         }) as BacklogItem[]
         setBacklogItems(normalized)
+
+        const projectMap = new Map<string, ProjectSummary>()
+        const assignedToMap = new Map<string, UserSummary>()
+        const createdByMap = new Map<string, UserSummary>()
+
+        normalized.forEach((item) => {
+          if (item.project?._id) {
+            projectMap.set(item.project._id, {
+              _id: item.project._id,
+              name: item.project.name
+            })
+          }
+          if (item.assignedTo?._id) {
+            assignedToMap.set(item.assignedTo._id, {
+              _id: item.assignedTo._id,
+              firstName: item.assignedTo.firstName,
+              lastName: item.assignedTo.lastName,
+              email: item.assignedTo.email
+            })
+          }
+          if (item.createdBy?._id) {
+            createdByMap.set(item.createdBy._id, {
+              _id: item.createdBy._id,
+              firstName: item.createdBy.firstName,
+              lastName: item.createdBy.lastName,
+              email: item.createdBy.email
+            })
+          }
+        })
+
+        setProjectOptions(Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name)))
+        setAssignedToOptions(Array.from(assignedToMap.values()).sort((a, b) =>
+          `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
+        ))
+        setAssignedByOptions(Array.from(createdByMap.values()).sort((a, b) =>
+          `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
+        ))
       } else {
         setError(data.error || 'Failed to fetch backlog items')
       }
@@ -249,6 +313,10 @@ export default function BacklogPage() {
     setSelectedSprintId('')
     setSprintQuery('')
     setSprintsError('')
+  }
+
+  const clearDateFilters = () => {
+    setDateRangeFilter(undefined)
   }
 
   const resetSprintModalState = () => {
@@ -327,6 +395,18 @@ export default function BacklogPage() {
     })
   }, [backlogItems])
 
+  useEffect(() => {
+    if (projectFilterValue !== 'all' && !projectOptions.some((project) => project._id === projectFilterValue)) {
+      setProjectFilterValue('all')
+    }
+    if (assignedToFilter !== 'all' && !assignedToOptions.some((member) => member._id === assignedToFilter)) {
+      setAssignedToFilter('all')
+    }
+    if (assignedByFilter !== 'all' && !assignedByOptions.some((member) => member._id === assignedByFilter)) {
+      setAssignedByFilter('all')
+    }
+  }, [projectOptions, assignedToOptions, assignedByOptions, projectFilterValue, assignedToFilter, assignedByFilter])
+
   const selectedTaskCount = selectedTaskIds.length
 
   const tasksForSprint = useMemo(
@@ -350,6 +430,30 @@ export default function BacklogPage() {
       return nameMatch || projectMatch
     })
   }, [sprints, sprintQuery])
+
+  const filteredProjectOptions = useMemo(() => {
+    const query = projectFilterQuery.trim().toLowerCase()
+    if (!query) return projectOptions
+    return projectOptions.filter((project) => project.name.toLowerCase().includes(query))
+  }, [projectOptions, projectFilterQuery])
+
+  const filteredAssignedToOptions = useMemo(() => {
+    const query = assignedToFilterQuery.trim().toLowerCase()
+    if (!query) return assignedToOptions
+    return assignedToOptions.filter((member) =>
+      `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
+      member.email.toLowerCase().includes(query)
+    )
+  }, [assignedToOptions, assignedToFilterQuery])
+
+  const filteredAssignedByOptions = useMemo(() => {
+    const query = assignedByFilterQuery.trim().toLowerCase()
+    if (!query) return assignedByOptions
+    return assignedByOptions.filter((member) =>
+      `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
+      member.email.toLowerCase().includes(query)
+    )
+  }, [assignedByOptions, assignedByFilterQuery])
 
   const sprintModalTitle =
     sprintModalMode === 'manage'
@@ -611,8 +715,31 @@ export default function BacklogPage() {
       const matchesType = typeFilter === 'all' || item.type === typeFilter
       const matchesPriority = priorityFilter === 'all' || item.priority === priorityFilter
       const matchesStatus = statusFilter === 'all' || item.status === statusFilter
+      const matchesProject =
+        projectFilterValue === 'all' ||
+        (item.project?._id ? item.project._id === projectFilterValue : false)
+      const matchesAssignedTo =
+        assignedToFilter === 'all' ||
+        (item.assignedTo?._id ? item.assignedTo._id === assignedToFilter : false)
+      const matchesAssignedBy =
+        assignedByFilter === 'all' ||
+        (item.createdBy?._id ? item.createdBy._id === assignedByFilter : false)
 
-      return matchesSearch && matchesType && matchesPriority && matchesStatus
+      const createdAtDate = new Date(item.createdAt)
+      const matchesStartDate = !startDateBoundary || createdAtDate >= startDateBoundary
+      const matchesEndDate = !endDateBoundary || createdAtDate <= endDateBoundary
+
+      return (
+        matchesSearch &&
+        matchesType &&
+        matchesPriority &&
+        matchesStatus &&
+        matchesProject &&
+        matchesAssignedTo &&
+        matchesAssignedBy &&
+        matchesStartDate &&
+        matchesEndDate
+      )
     })
     .sort((a, b) => {
       let comparison = 0
@@ -776,6 +903,133 @@ export default function BacklogPage() {
                   >
                     {sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
                   </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
+                  <Select value={projectFilterValue} onValueChange={setProjectFilterValue}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Project" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div className="p-2">
+                        <Input
+                          value={projectFilterQuery}
+                          onChange={(e) => setProjectFilterQuery(e.target.value)}
+                          placeholder="Search projects"
+                          className="mb-2"
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          <SelectItem value="all">All Projects</SelectItem>
+                          {filteredProjectOptions.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                          ) : (
+                            filteredProjectOptions.map((project) => (
+                              <SelectItem key={project._id} value={project._id}>
+                                {project.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                  <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Assigned To" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div className="p-2">
+                        <Input
+                          value={assignedToFilterQuery}
+                          onChange={(e) => setAssignedToFilterQuery(e.target.value)}
+                          placeholder="Search assignees"
+                          className="mb-2"
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          <SelectItem value="all">All Assignees</SelectItem>
+                          {filteredAssignedToOptions.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching assignees</div>
+                          ) : (
+                            filteredAssignedToOptions.map((member) => (
+                              <SelectItem key={member._id} value={member._id}>
+                                {member.firstName} {member.lastName}
+                              </SelectItem>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                  <Select value={assignedByFilter} onValueChange={setAssignedByFilter}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Assigned By" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div className="p-2">
+                        <Input
+                          value={assignedByFilterQuery}
+                          onChange={(e) => setAssignedByFilterQuery(e.target.value)}
+                          placeholder="Search creators"
+                          className="mb-2"
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          <SelectItem value="all">All Creators</SelectItem>
+                          {filteredAssignedByOptions.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching creators</div>
+                          ) : (
+                            filteredAssignedByOptions.map((member) => (
+                              <SelectItem key={member._id} value={member._id}>
+                                {member.firstName} {member.lastName}
+                              </SelectItem>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex flex-col gap-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            'w-full justify-start text-left font-normal',
+                            !dateRangeFilter?.from && !dateRangeFilter?.to && 'text-muted-foreground'
+                          )}
+                        >
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {dateRangeFilter?.from ? (
+                            dateRangeFilter.to ? (
+                              `${format(dateRangeFilter.from, 'LLL dd, y')} - ${format(dateRangeFilter.to, 'LLL dd, y')}`
+                            ) : (
+                              `${format(dateRangeFilter.from, 'LLL dd, y')} - …`
+                            )
+                          ) : (
+                            'Select date range'
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <DateRangeCalendar
+                          initialFocus
+                          mode="range"
+                          defaultMonth={dateRangeFilter?.from}
+                          selected={dateRangeFilter}
+                          onSelect={setDateRangeFilter}
+                          numberOfMonths={2}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <div className="flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearDateFilters}
+                        disabled={!dateRangeFilter?.from && !dateRangeFilter?.to}
+                      >
+                        Clear dates
+                      </Button>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
