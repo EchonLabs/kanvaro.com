@@ -3,6 +3,7 @@ import mongoose, { Schema, Document } from 'mongoose'
 export interface ISprint extends Document {
   name: string
   description?: string
+  organization: mongoose.Types.ObjectId
   project: mongoose.Types.ObjectId
   createdBy: mongoose.Types.ObjectId
   status: 'planning' | 'active' | 'completed' | 'cancelled'
@@ -16,6 +17,7 @@ export interface ISprint extends Document {
   actualVelocity?: number
   capacity: number // Total team capacity in hours
   actualCapacity?: number // Actual capacity used
+  teamMembers: mongoose.Types.ObjectId[]
   stories: mongoose.Types.ObjectId[]
   tasks: mongoose.Types.ObjectId[]
   attachments: {
@@ -41,6 +43,11 @@ const SprintSchema = new Schema<ISprint>({
   description: {
     type: String,
     maxlength: 500
+  },
+  organization: {
+    type: Schema.Types.ObjectId,
+    ref: 'Organization',
+    required: true
   },
   project: {
     type: Schema.Types.ObjectId,
@@ -92,6 +99,10 @@ const SprintSchema = new Schema<ISprint>({
     type: Number,
     min: 0
   },
+  teamMembers: [{
+    type: Schema.Types.ObjectId,
+    ref: 'User'
+  }],
   stories: [{
     type: Schema.Types.ObjectId,
     ref: 'Story'
@@ -114,6 +125,7 @@ const SprintSchema = new Schema<ISprint>({
 })
 
 // Indexes
+SprintSchema.index({ organization: 1 })
 SprintSchema.index({ project: 1 })
 SprintSchema.index({ createdBy: 1 })
 SprintSchema.index({ status: 1 })
@@ -122,5 +134,34 @@ SprintSchema.index({ endDate: 1 })
 SprintSchema.index({ project: 1, status: 1 })
 SprintSchema.index({ archived: 1 })
 SprintSchema.index({ project: 1, archived: 1 })
+
+if (mongoose.models.Sprint) {
+  const existingSchema = (mongoose.models.Sprint as mongoose.Model<ISprint>).schema
+  if (!existingSchema.path('organization')) {
+    existingSchema.add({
+      organization: {
+        type: Schema.Types.ObjectId,
+        ref: 'Organization',
+        required: true
+      }
+    })
+  }
+  if (!existingSchema.path('teamMembers')) {
+    existingSchema.add({
+      teamMembers: [{
+        type: Schema.Types.ObjectId,
+        ref: 'User'
+      }]
+    })
+  }
+  if (!existingSchema.path('tasks')) {
+    existingSchema.add({
+      tasks: [{
+        type: Schema.Types.ObjectId,
+        ref: 'Task'
+      }]
+    })
+  }
+}
 
 export const Sprint = mongoose.models.Sprint || mongoose.model<ISprint>('Sprint', SprintSchema)

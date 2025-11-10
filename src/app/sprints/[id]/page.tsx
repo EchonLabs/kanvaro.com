@@ -27,7 +27,10 @@ import {
   Plus,
   Star,
   Users,
-  TrendingUp
+  TrendingUp,
+  List,
+  PauseCircle,
+  Gauge
 } from 'lucide-react'
 
 interface Sprint {
@@ -45,6 +48,7 @@ interface Sprint {
   capacity: number
   velocity: number
   teamMembers: Array<{
+    _id: string
     firstName: string
     lastName: string
     email: string
@@ -60,7 +64,33 @@ interface Sprint {
     totalTasks: number
     storyPointsCompleted: number
     totalStoryPoints: number
+    estimatedHours: number
+    actualHours: number
   }
+  taskSummary?: {
+    total: number
+    completed: number
+    inProgress: number
+    todo: number
+    blocked: number
+    cancelled: number
+  }
+  tasks?: Array<{
+    _id: string
+    title: string
+    status: string
+    storyPoints: number
+    estimatedHours: number
+    actualHours: number
+    priority: string
+    type: string
+    assignedTo: {
+      _id: string
+      firstName: string
+      lastName: string
+      email: string
+    } | null
+  }>
   createdAt: string
   updatedAt: string
 }
@@ -276,9 +306,13 @@ export default function SprintDetailPage() {
             <Card className="overflow-x-hidden">
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-base sm:text-lg">Progress</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Sprint completion status</CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
+                  {sprint?.progress?.totalTasks
+                    ? `${sprint.progress.tasksCompleted} of ${sprint.progress.totalTasks} tasks completed`
+                    : 'No tasks have been assigned to this sprint yet.'}
+                </CardDescription>
               </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-0 space-y-4">
+              <CardContent className="p-4 sm:p-6 pt-0 space-y-6">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs sm:text-sm">
                     <span className="text-muted-foreground">Overall Progress</span>
@@ -286,44 +320,117 @@ export default function SprintDetailPage() {
                   </div>
                   <Progress value={sprint?.progress?.completionPercentage || 0} className="h-1.5 sm:h-2" />
                 </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs sm:text-sm">
-                      <span className="text-muted-foreground">Tasks</span>
-                      <span className="font-medium">
-                        {sprint?.progress?.tasksCompleted || 0} / {sprint?.progress?.totalTasks || 0}
-                      </span>
+
+                {!sprint?.progress?.totalTasks && (
+                  <Alert variant="default" className="border-dashed border-muted-foreground/40 bg-muted/40">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="text-xs sm:text-sm">
+                      Assign tasks to this sprint to start tracking progress, story points, and burn-down metrics.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {sprint?.progress?.totalTasks ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="rounded-lg border bg-background p-3">
+                        <div className="flex items-center justify-between text-xs uppercase text-muted-foreground tracking-wide">
+                          <span>Tasks Completed</span>
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                        </div>
+                        <p className="mt-2 text-lg font-semibold">
+                          {sprint.progress.tasksCompleted} / {sprint.progress.totalTasks}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border bg-background p-3">
+                        <div className="flex items-center justify-between text-xs uppercase text-muted-foreground tracking-wide">
+                          <span>Story Points Burned</span>
+                          <BarChart3 className="h-4 w-4 text-blue-500" />
+                        </div>
+                        <p className="mt-2 text-lg font-semibold">
+                          {sprint.progress.storyPointsCompleted || 0} / {sprint.progress.totalStoryPoints || 0}
+                        </p>
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
-                      <div 
-                        className="bg-blue-600 h-1.5 sm:h-2 rounded-full"
-                        style={{ 
-                          width: `${sprint?.progress?.totalTasks ? 
-                            ((sprint?.progress?.tasksCompleted / sprint?.progress?.totalTasks) * 100) : 0}%` 
-                        }}
-                      />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="rounded-lg border bg-background p-3">
+                        <div className="flex items-center justify-between text-xs uppercase text-muted-foreground tracking-wide">
+                          <span>Estimated Hours</span>
+                          <Clock className="h-4 w-4 text-primary" />
+                        </div>
+                        <p className="mt-2 text-lg font-semibold">
+                          {sprint.progress.estimatedHours || 0}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {Math.max((sprint.progress.estimatedHours || 0) - (sprint.progress.actualHours || 0), 0)}h remaining
+                        </p>
+                      </div>
+                      <div className="rounded-lg border bg-background p-3">
+                        <div className="flex items-center justify-between text-xs uppercase text-muted-foreground tracking-wide">
+                          <span>Actual Hours</span>
+                          <Gauge className="h-4 w-4 text-orange-500" />
+                        </div>
+                        <p className="mt-2 text-lg font-semibold">
+                          {sprint.progress.actualHours || 0}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {(sprint.progress.actualHours || 0) > (sprint.progress.estimatedHours || 0)
+                            ? 'Over capacity'
+                            : 'On track'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Task Breakdown</p>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        <div className="rounded-md border bg-background px-3 py-2">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Total</span>
+                            <List className="h-3.5 w-3.5" />
+                          </div>
+                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.total ?? 0}</p>
+                        </div>
+                        <div className="rounded-md border bg-background px-3 py-2">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>In Progress</span>
+                            <PauseCircle className="h-3.5 w-3.5 text-blue-500" />
+                          </div>
+                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.inProgress ?? 0}</p>
+                        </div>
+                        <div className="rounded-md border bg-background px-3 py-2">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Backlog</span>
+                            <Target className="h-3.5 w-3.5 text-slate-500" />
+                          </div>
+                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.todo ?? 0}</p>
+                        </div>
+                        <div className="rounded-md border bg-background px-3 py-2">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Completed</span>
+                            <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                          </div>
+                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.completed ?? 0}</p>
+                        </div>
+                        <div className="rounded-md border bg-background px-3 py-2">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Blocked</span>
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                          </div>
+                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.blocked ?? 0}</p>
+                        </div>
+                        <div className="rounded-md border bg-background px-3 py-2">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Cancelled</span>
+                            <XCircle className="h-3.5 w-3.5 text-red-500" />
+                          </div>
+                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.cancelled ?? 0}</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs sm:text-sm">
-                      <span className="text-muted-foreground">Story Points</span>
-                      <span className="font-medium">
-                        {sprint?.progress?.storyPointsCompleted || 0} / {sprint?.progress?.totalStoryPoints || 0}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
-                      <div 
-                        className="bg-green-600 h-1.5 sm:h-2 rounded-full"
-                        style={{ 
-                          width: `${sprint?.progress?.totalStoryPoints ? 
-                            ((sprint?.progress?.storyPointsCompleted / sprint?.progress?.totalStoryPoints) * 100) : 0}%` 
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
+                ) : null}
               </CardContent>
             </Card>
           </div>
