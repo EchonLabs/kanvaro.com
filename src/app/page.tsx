@@ -27,13 +27,11 @@ export default function HomePage() {
       const setupData = await setupResponse.json()
       
       if (!setupData.setupCompleted) {
-        // Setup not complete, redirect to setup
         console.log('Setup not completed, redirecting to setup')
         router.push('/setup')
       } else {
-        // Setup complete but not authenticated, redirect to login
-        console.log('Setup completed, redirecting to login')
-        router.push('/login')
+        console.log('Setup completed, redirecting to sign-in')
+        router.push('/sign-in')
       }
     } catch (error) {
       console.error('Failed to check auth and setup status:', error)
