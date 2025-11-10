@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
     const sprints = await Sprint.find(sprintQueryFilters)
       .populate('project', 'name')
       .populate('createdBy', 'firstName lastName email')
+      .populate('teamMembers', 'firstName lastName email')
       .sort({ createdAt: -1 })
       .skip((page - 1) * PAGE_SIZE)
       .limit(PAGE_SIZE)
@@ -120,7 +121,8 @@ export async function POST(request: NextRequest) {
       startDate,
       endDate,
       goal,
-      capacity
+      capacity,
+      teamMembers = []
     } = await request.json()
 
     // Validate required fields
@@ -143,7 +145,8 @@ export async function POST(request: NextRequest) {
       endDate: new Date(endDate),
       goal: goal || '',
       capacity: capacity || 0,
-      velocity: 0
+      velocity: 0,
+      teamMembers: Array.isArray(teamMembers) ? teamMembers : []
     })
 
     await sprint.save()
@@ -152,6 +155,7 @@ export async function POST(request: NextRequest) {
     const populatedSprint = await Sprint.findById(sprint._id)
       .populate('project', 'name')
       .populate('createdBy', 'firstName lastName email')
+      .populate('teamMembers', 'firstName lastName email')
 
     return NextResponse.json({
       success: true,

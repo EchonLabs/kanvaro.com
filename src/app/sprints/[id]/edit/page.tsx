@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, ArrowLeft } from 'lucide-react'
+import { Loader2, ArrowLeft, Users } from 'lucide-react'
 
 interface SprintForm {
   name: string
@@ -20,6 +20,13 @@ interface SprintForm {
   goal: string
   capacity: number | string
   velocity: number | string
+}
+
+interface TeamMember {
+  _id: string
+  firstName: string
+  lastName: string
+  email: string
 }
 
 export default function EditSprintPage() {
@@ -40,6 +47,37 @@ export default function EditSprintPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [teamMembers, setTeamMembers] = useState<string[]>([])
+  const [availableMembers, setAvailableMembers] = useState<TeamMember[]>([])
+  const [membersLoading, setMembersLoading] = useState(false)
+  const [membersError, setMembersError] = useState('')
+
+  const fetchProjectMembers = useCallback(async (projectId?: string) => {
+    if (!projectId) {
+      setAvailableMembers([])
+      return
+    }
+
+    try {
+      setMembersLoading(true)
+      setMembersError('')
+      const res = await fetch(`/api/projects/${projectId}`)
+      const data = await res.json()
+
+      if (res.ok && data.success && data.data?.teamMembers) {
+        setAvailableMembers(data.data.teamMembers)
+      } else {
+        setAvailableMembers([])
+        setMembersError(data.error || 'Failed to load project team members')
+      }
+    } catch (err) {
+      console.error('Failed to fetch project members:', err)
+      setMembersError('Failed to load project team members')
+      setAvailableMembers([])
+    } finally {
+      setMembersLoading(false)
+    }
+  }, [])
 
   const fetchSprint = useCallback(async () => {
     try {
@@ -58,6 +96,8 @@ export default function EditSprintPage() {
           capacity: s?.capacity ?? '',
           velocity: s?.velocity ?? ''
         })
+        setTeamMembers(Array.isArray(s?.teamMembers) ? s.teamMembers.map((member: TeamMember) => member._id) : [])
+        await fetchProjectMembers(s?.project?._id)
       } else {
         setError(data.error || 'Failed to load sprint')
       }
@@ -66,7 +106,7 @@ export default function EditSprintPage() {
     } finally {
       setLoading(false)
     }
-  }, [sprintId])
+  }, [sprintId, fetchProjectMembers])
 
   useEffect(() => {
     if (sprintId) fetchSprint()
@@ -86,7 +126,8 @@ export default function EditSprintPage() {
           endDate: form.endDate ? new Date(form.endDate) : undefined,
           goal: form.goal,
           capacity: form.capacity === '' ? undefined : Number(form.capacity),
-          velocity: form.velocity === '' ? undefined : Number(form.velocity)
+          velocity: form.velocity === '' ? undefined : Number(form.velocity),
+          teamMembers
         })
       })
       const data = await res.json()
@@ -198,6 +239,63 @@ export default function EditSprintPage() {
                 <label className="text-sm font-medium">Velocity</label>
                 <Input type="number" value={form.velocity} onChange={(e) => setForm({ ...form, velocity: e.target.value })} className="mt-1" />
               </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium flex items-center space-x-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span>Team Members</span>
+                </label>
+                {membersLoading && (
+                  <span className="text-xs text-muted-foreground flex items-center space-x-1">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Loading...</span>
+                  </span>
+                )}
+              </div>
+              {membersError && (
+                <Alert variant="destructive">
+                  <AlertDescription className="text-xs">{membersError}</AlertDescription>
+                </Alert>
+              )}
+              {availableMembers.length === 0 && !membersLoading ? (
+                <p className="text-xs text-muted-foreground italic">
+                  No team members available for this sprint&apos;s project.
+                </p>
+              ) : (
+                <div className="max-h-48 overflow-y-auto border rounded-md divide-y divide-border">
+                  {availableMembers.map((member) => {
+                    const memberId = member._id
+                    const isChecked = teamMembers.includes(memberId)
+                    return (
+                      <label
+                        key={memberId}
+                        className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-muted/60 transition-colors"
+                      >
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-medium text-foreground truncate">
+                            {member.firstName} {member.lastName}
+                          </span>
+                          <span className="text-xs text-muted-foreground truncate">{member.email}</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() =>
+                            setTeamMembers((prev) =>
+                              prev.includes(memberId)
+                                ? prev.filter((id) => id !== memberId)
+                                : [...prev, memberId]
+                            )
+                          }
+                          className="h-4 w-4"
+                        />
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end space-x-2">
