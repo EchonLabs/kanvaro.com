@@ -142,7 +142,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       if (filters.startDate) params.append('startDate', filters.startDate)
       if (filters.endDate) params.append('endDate', filters.endDate)
 
-      const response = await fetch(`/api/time-tracking/reports/export?${params}`)
+      const response = await fetch(`/api/time-tracking/reports?${params}`)
       
       if (response.ok) {
         const blob = await response.blob()

@@ -220,23 +220,23 @@ export default function TeamReportsPage() {
       <PageWrapper>
         <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Team Reports</h1>
-          <p className="text-muted-foreground">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Team Reports</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
             Team performance analytics and productivity insights
           </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <Button type="button" variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="w-full sm:w-auto">
             <Filter className="h-4 w-4 mr-2" />
             Filters
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={fetchTeamReports}>
+          <Button type="button" variant="outline" size="sm" onClick={fetchTeamReports} className="w-full sm:w-auto">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => exportReport('csv')}>
+          <Button type="button" variant="outline" size="sm" onClick={() => exportReport('csv')} className="w-full sm:w-auto">
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -247,13 +247,13 @@ export default function TeamReportsPage() {
       {showFilters && (
         <Card>
           <CardHeader>
-            <CardTitle>Filters</CardTitle>
-            <CardDescription>Filter and sort team reports</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Filters</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Filter and sort team reports</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="search">Search Team Members</Label>
+                <Label htmlFor="search" className="text-xs sm:text-sm">Search Team Members</Label>
                 <div className="relative">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -261,15 +261,15 @@ export default function TeamReportsPage() {
                     placeholder="Search members..."
                     value={filters.search}
                     onChange={(e) => handleFilterChange('search', e.target.value)}
-                    className="pl-8"
+                    className="pl-8 w-full"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="department">Department</Label>
+                <Label htmlFor="department" className="text-xs sm:text-sm">Department</Label>
                 <Select value={filters.department} onValueChange={(value) => handleFilterChange('department', value)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
@@ -284,9 +284,9 @@ export default function TeamReportsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
+                <Label htmlFor="role" className="text-xs sm:text-sm">Role</Label>
                 <Select value={filters.role} onValueChange={(value) => handleFilterChange('role', value)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -301,8 +301,8 @@ export default function TeamReportsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Date Range</Label>
-                <div className="flex space-x-2">
+                <Label className="text-xs sm:text-sm">Date Range</Label>
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !filters.dateRange.from && "text-muted-foreground")}>
@@ -339,14 +339,14 @@ export default function TeamReportsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <Button variant="outline" onClick={clearFilters}>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+              <Button variant="outline" onClick={clearFilters} className="w-full sm:w-auto">
                 Clear Filters
               </Button>
-              <div className="flex items-center space-x-2">
-                <Label htmlFor="sortBy">Sort By</Label>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-2">
+                <Label htmlFor="sortBy" className="text-xs sm:text-sm whitespace-nowrap flex-shrink-0">Sort By</Label>
                 <Select value={filters.sortBy} onValueChange={(value) => handleFilterChange('sortBy', value)}>
-                  <SelectTrigger className="w-40">
+                  <SelectTrigger className="w-full sm:w-40">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -358,7 +358,7 @@ export default function TeamReportsPage() {
                   </SelectContent>
                 </Select>
                 <Select value={filters.sortOrder} onValueChange={(value: 'asc' | 'desc') => handleFilterChange('sortOrder', value)}>
-                  <SelectTrigger className="w-32">
+                  <SelectTrigger className="w-full sm:w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -373,15 +373,15 @@ export default function TeamReportsPage() {
       )}
 
       {/* Key Team Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Team Size</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Team Size</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{reportData.overview.totalMembers}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-xl sm:text-2xl font-bold">{reportData.overview.totalMembers}</div>
+            <p className="text-xs text-muted-foreground mt-1">
               {reportData.overview.activeMembers} active members
             </p>
           </CardContent>
@@ -389,14 +389,14 @@ export default function TeamReportsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Productivity</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Average Productivity</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               {reportData.overview.averageProductivity.toFixed(1)}%
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Team productivity score
             </p>
             <Progress value={reportData.overview.averageProductivity} className="mt-2" />
@@ -405,14 +405,14 @@ export default function TeamReportsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Hours Logged</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Hours Logged</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold break-words">
               {reportData.overview.totalHoursLogged.toFixed(0)}h
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Across all team members
             </p>
           </CardContent>
@@ -420,14 +420,14 @@ export default function TeamReportsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tasks Completed</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Tasks Completed</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               {reportData.overview.totalTasksCompleted}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Total completed tasks
             </p>
           </CardContent>
@@ -436,11 +436,11 @@ export default function TeamReportsPage() {
 
       {/* Report Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="productivity">Productivity</TabsTrigger>
-          <TabsTrigger value="workload">Workload</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 overflow-x-auto">
+          <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+          <TabsTrigger value="performance" className="text-xs sm:text-sm">Performance</TabsTrigger>
+          <TabsTrigger value="productivity" className="text-xs sm:text-sm">Productivity</TabsTrigger>
+          <TabsTrigger value="workload" className="text-xs sm:text-sm">Workload</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">

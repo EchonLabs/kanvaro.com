@@ -27,6 +27,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import EditTaskModal from './EditTaskModal'
 import ViewTaskModal from './ViewTaskModal'
+import CreateTaskModal from './CreateTaskModal'
 
 interface Task {
   _id: string
@@ -63,6 +64,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
@@ -71,6 +73,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   const [showEditModal, setShowEditModal] = useState(false)
   const [showViewModal, setShowViewModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
   useEffect(() => {
@@ -96,6 +99,13 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (success) {
+      const t = setTimeout(() => setSuccess(''), 3000)
+      return () => clearTimeout(t)
+    }
+  }, [success])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -155,6 +165,17 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   })
 
   const handleStatusChange = async (taskId: string, newStatus: string) => {
+    // Store previous state for potential revert
+    const previousTask = tasks.find(t => t._id === taskId)
+    const previousStatus = previousTask?.status
+
+    // Optimistic update - update UI immediately
+    setTasks(prevTasks => 
+      prevTasks.map(task => 
+        task._id === taskId ? { ...task, status: newStatus as any } : task
+      )
+    )
+
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
@@ -164,15 +185,72 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         body: JSON.stringify({ status: newStatus })
       })
 
+      const contentType = response.headers.get('content-type') || ''
+      
+      if (!response.ok) {
+        // Check if response is JSON or HTML
+        if (contentType.includes('application/json')) {
+          try {
+            const errorData = await response.json()
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+          } catch (parseError) {
+            throw new Error(`HTTP error! status: ${response.status}`)
+          }
+        } else {
+          // For non-JSON responses (like HTML 404 pages), don't try to parse
+          throw new Error(`HTTP error! status: ${response.status}. The API endpoint may not be available in this environment.`)
+        }
+      }
+
+      if (!contentType.includes('application/json')) {
+        throw new Error('Invalid response format. Expected JSON but received HTML. The API endpoint may not be properly deployed.')
+      }
+
       const data = await response.json()
       
-      if (data.success) {
-        setTasks(tasks.map(task => 
-          task._id === taskId ? { ...task, status: newStatus as any } : task
-        ))
+      if (data.success && data.data) {
+        // Update with server response to ensure consistency
+        setTasks(prevTasks => 
+          prevTasks.map(task => 
+            task._id === taskId ? { ...task, ...data.data, status: newStatus as any } : task
+          )
+        )
+        setSuccess('Task updated successfully.')
+        setError('')
+      } else if (data.success) {
+        // If success but no data, just update status
+        setTasks(prevTasks => 
+          prevTasks.map(task => 
+            task._id === taskId ? { ...task, status: newStatus as any } : task
+          )
+        )
+        setSuccess('Task updated successfully.')
+        setError('')
+      } else {
+        // Revert on error
+        if (previousStatus) {
+          setTasks(prevTasks => 
+            prevTasks.map(task => 
+              task._id === taskId ? { ...task, status: previousStatus } : task
+            )
+          )
+        }
+        setError(data.error || 'Failed to update task status')
       }
     } catch (error) {
       console.error('Failed to update task status:', error)
+      // Revert on error
+      if (previousStatus) {
+        setTasks(prevTasks => 
+          prevTasks.map(task => 
+            task._id === taskId ? { ...task, status: previousStatus } : task
+          )
+        )
+      }
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to update task status. The API endpoint may not be available in this environment.'
+      setError(errorMessage)
     }
   }
 
@@ -206,6 +284,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         setTasks(tasks.filter(task => task._id !== selectedTask._id))
         setShowDeleteModal(false)
         setSelectedTask(null)
+        setSuccess('Task deleted successfully.')
       }
     } catch (error) {
       console.error('Failed to delete task:', error)
@@ -218,6 +297,17 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
     fetchTasks()
     setShowEditModal(false)
     setSelectedTask(null)
+    setSuccess('Task updated successfully.')
+  }
+
+  const handleTaskCreated = () => {
+    fetchTasks() // Refresh the task list
+    setShowCreateModal(false)
+    setSuccess('Task created successfully.')
+  }
+
+  const handleCreateTaskClick = () => {
+    setShowCreateModal(true)
   }
 
   if (loading) {
@@ -233,14 +323,14 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-foreground">Project Tasks</h3>
-          <p className="text-sm text-muted-foreground">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-xl sm:text-2xl font-semibold text-foreground">Project Tasks</h3>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
             {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} found
           </p>
         </div>
-        <Button onClick={onCreateTask}>
+        <Button onClick={handleCreateTaskClick} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           Add Task
         </Button>
@@ -253,123 +343,128 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         </Alert>
       )}
 
-      <div className="flex items-center space-x-4">
+      <div className="flex flex-col gap-2 sm:gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
             placeholder="Search tasks..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 w-full"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="todo">To Do</SelectItem>
-            <SelectItem value="in_progress">In Progress</SelectItem>
-            <SelectItem value="review">Review</SelectItem>
-            <SelectItem value="testing">Testing</SelectItem>
-            <SelectItem value="done">Done</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Priority" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Priority</SelectItem>
-            <SelectItem value="low">Low</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="critical">Critical</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="bug">Bug</SelectItem>
-            <SelectItem value="feature">Feature</SelectItem>
-            <SelectItem value="improvement">Improvement</SelectItem>
-            <SelectItem value="task">Task</SelectItem>
-            <SelectItem value="subtask">Subtask</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="todo">To Do</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="review">Review</SelectItem>
+              <SelectItem value="testing">Testing</SelectItem>
+              <SelectItem value="done">Done</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder="Priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Priority</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="critical">Critical</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="bug">Bug</SelectItem>
+              <SelectItem value="feature">Feature</SelectItem>
+              <SelectItem value="improvement">Improvement</SelectItem>
+              <SelectItem value="task">Task</SelectItem>
+              <SelectItem value="subtask">Subtask</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {success && (
+          <Alert variant="success">
+            <AlertDescription>{success}</AlertDescription>
+          </Alert>
+        )}
       </div>
 
       <div className="space-y-4">
         {filteredTasks.map((task) => (
           <Card key={task._id} className="hover:shadow-md transition-shadow">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4 flex-1">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <h4 className="font-medium text-foreground">{task.title}</h4>
-                      <Badge className={getStatusColor(task.status)}>
-                        {getStatusIcon(task.status)}
-                        <span className="ml-1">{task.status.replace('_', ' ')}</span>
-                      </Badge>
-                      <Badge className={getPriorityColor(task.priority)}>
-                        {task.priority}
-                      </Badge>
-                      <Badge className={getTypeColor(task.type)}>
-                        {task.type}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      {task.description || 'No description'}
-                    </p>
-                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                      {task.assignedTo && (
-                        <div className="flex items-center space-x-1">
-                          <User className="h-4 w-4" />
-                          <span>{task.assignedTo.firstName} {task.assignedTo.lastName}</span>
-                        </div>
-                      )}
-                      {task.dueDate && (
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="h-4 w-4" />
-                          <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>
-                        </div>
-                      )}
-                      {task.storyPoints && (
-                        <div className="flex items-center space-x-1">
-                          <Target className="h-4 w-4" />
-                          <span>{task.storyPoints} points</span>
-                        </div>
-                      )}
-                      {task.estimatedHours && (
-                        <div className="flex items-center space-x-1">
-                          <Clock className="h-4 w-4" />
-                          <span>{task.estimatedHours}h estimated</span>
-                        </div>
-                      )}
-                    </div>
-                    {task.labels.length > 0 && (
-                      <div className="flex items-center space-x-1 mt-2">
-                        {task.labels.map((label, index) => (
-                          <Badge key={index} variant="outline" className="text-xs">
-                            {label}
-                          </Badge>
-                        ))}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex-1 min-w-0 w-full">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <h4 className="font-medium text-foreground text-sm sm:text-base truncate flex-1 min-w-0">{task.title}</h4>
+                    <Badge className={getStatusColor(task.status) + ' flex-shrink-0'}>
+                      {getStatusIcon(task.status)}
+                      <span className="ml-1">{task.status.replace('_', ' ')}</span>
+                    </Badge>
+                    <Badge className={getPriorityColor(task.priority) + ' flex-shrink-0'}>
+                      {task.priority}
+                    </Badge>
+                    <Badge className={getTypeColor(task.type) + ' flex-shrink-0'}>
+                      {task.type}
+                    </Badge>
+                  </div>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">
+                    {task.description || 'No description'}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                    {task.assignedTo && (
+                      <div className="flex items-center space-x-1">
+                        <User className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="truncate">{task.assignedTo.firstName} {task.assignedTo.lastName}</span>
+                      </div>
+                    )}
+                    {task.dueDate && (
+                      <div className="flex items-center space-x-1">
+                        <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    {task.storyPoints && (
+                      <div className="flex items-center space-x-1">
+                        <Target className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span>{task.storyPoints} points</span>
+                      </div>
+                    )}
+                    {task.estimatedHours && (
+                      <div className="flex items-center space-x-1">
+                        <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span>{task.estimatedHours}h estimated</span>
                       </div>
                     )}
                   </div>
+                  {task.labels.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1 mt-2">
+                      {task.labels.map((label, index) => (
+                        <Badge key={index} variant="outline" className="text-xs flex-shrink-0">
+                          {label}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 flex-shrink-0 w-full sm:w-auto">
                   <Select 
                     value={task.status} 
                     onValueChange={(value) => handleStatusChange(task._id, value)}
                   >
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-full sm:w-32">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -383,7 +478,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                   </Select>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" className="flex-shrink-0">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -414,7 +509,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         <div className="text-center py-8">
           <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">No tasks found</p>
-          <Button onClick={onCreateTask} className="mt-4">
+          <Button onClick={handleCreateTaskClick} className="mt-4">
             <Plus className="h-4 w-4 mr-2" />
             Create First Task
           </Button>
@@ -422,6 +517,13 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
       )}
 
       {/* Modals */}
+      <CreateTaskModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        projectId={projectId}
+        onTaskCreated={handleTaskCreated}
+      />
+
       {selectedTask && (
         <>
           <EditTaskModal

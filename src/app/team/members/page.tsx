@@ -275,18 +275,18 @@ export default function MembersPage() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" onClick={() => router.back()}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center space-x-4 flex-1 min-w-0">
+            <Button variant="outline" size="sm" onClick={() => router.back()} className="flex-shrink-0">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Team Members</h1>
-              <p className="text-muted-foreground">Manage your team members and invitations</p>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground truncate">Team Members</h1>
+              <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage your team members and invitations</p>
             </div>
           </div>
-          <Button onClick={() => setShowInviteModal(true)}>
+          <Button onClick={() => setShowInviteModal(true)} className="w-full sm:w-auto flex-shrink-0">
             <UserPlus className="h-4 w-4 mr-2" />
             Invite Member
           </Button>
@@ -320,86 +320,92 @@ export default function MembersPage() {
         <TabsContent value="members" className="space-y-4">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Team Members</CardTitle>
-                  <CardDescription>
-                    Manage your team members and their roles
-                  </CardDescription>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Team Members</CardTitle>
+                    <CardDescription>
+                      Manage your team members and their roles
+                    </CardDescription>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <div className="relative">
+                <div className="flex flex-col gap-2 sm:gap-4">
+                  <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       placeholder="Search members..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 w-64"
+                      className="pl-10 w-full"
                     />
                   </div>
-                  <Select value={roleFilter} onValueChange={setRoleFilter}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Filter by role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Roles</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="project_manager">Project Manager</SelectItem>
-                      <SelectItem value="team_member">Team Member</SelectItem>
-                      <SelectItem value="client">Client</SelectItem>
-                      <SelectItem value="viewer">Viewer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+                    <Select value={roleFilter} onValueChange={setRoleFilter}>
+                      <SelectTrigger className="w-full sm:w-40">
+                        <SelectValue placeholder="Filter by role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Roles</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="project_manager">Project Manager</SelectItem>
+                        <SelectItem value="team_member">Team Member</SelectItem>
+                        <SelectItem value="client">Client</SelectItem>
+                        <SelectItem value="viewer">Viewer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-full sm:w-40">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {filteredMembers.map((member) => (
-                  <div key={member._id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
+                  <div key={member._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+                    <div className="flex items-center space-x-4 flex-1 min-w-0 w-full sm:w-auto">
                       <GravatarAvatar 
                         user={{
                           firstName: member.firstName,
                           lastName: member.lastName,
                           email: member.email
                         }}
+                        className="flex-shrink-0"
                       />
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h3 className="font-medium">{member.firstName} {member.lastName}</h3>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 flex-wrap">
+                          <h3 className="font-medium text-sm sm:text-base truncate">{member.firstName} {member.lastName}</h3>
                           {member.isActive ? (
-                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
                           ) : (
-                            <XCircle className="h-4 w-4 text-red-500" />
+                            <XCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground">{member.email}</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Badge className={getRoleColor(member.role)}>
+                        <p className="text-xs sm:text-sm text-muted-foreground truncate">{member.email}</p>
+                        <div className="flex items-center space-x-2 mt-1 flex-wrap gap-2">
+                          <Badge className={getRoleColor(member.role) + ' flex-shrink-0'}>
                             {member.role.replace('_', ' ')}
                           </Badge>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
                             Joined {new Date(member.createdAt).toLocaleDateString()}
                           </span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 w-full sm:w-auto flex-shrink-0">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setEditingMember(member)}
+                        className="flex-1 sm:flex-initial"
                       >
                         Edit
                       </Button>
@@ -408,6 +414,7 @@ export default function MembersPage() {
                         size="sm"
                         onClick={() => handleRemoveMember(member._id)}
                         disabled={member.role === 'admin'}
+                        className="flex-1 sm:flex-initial"
                       >
                         Remove
                       </Button>
@@ -430,34 +437,34 @@ export default function MembersPage() {
             <CardContent>
               <div className="space-y-4">
                 {pendingInvitations.map((invitation) => (
-                  <div key={invitation._id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                  <div key={invitation._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+                    <div className="flex items-center space-x-4 flex-1 min-w-0 w-full sm:w-auto">
+                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
                         <Mail className="h-5 w-5 text-muted-foreground" />
                       </div>
-                      <div>
-                        <h3 className="font-medium">{invitation.email}</h3>
-                        <p className="text-sm text-muted-foreground">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm sm:text-base truncate">{invitation.email}</h3>
+                        <p className="text-xs sm:text-sm text-muted-foreground truncate">
                           Invited by {invitation.invitedBy.firstName} {invitation.invitedBy.lastName}
                         </p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Badge className={getRoleColor(invitation.role)}>
+                        <div className="flex items-center space-x-2 mt-1 flex-wrap gap-2">
+                          <Badge className={getRoleColor(invitation.role) + ' flex-shrink-0'}>
                             {invitation.role.replace('_', ' ')}
                           </Badge>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
                             Expires {new Date(invitation.expiresAt).toLocaleDateString()}
                           </span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Clock className="h-4 w-4 text-yellow-500" />
-                      <span className="text-sm text-muted-foreground">Pending</span>
+                    <div className="flex items-center space-x-2 w-full sm:w-auto flex-shrink-0">
+                      <Clock className="h-4 w-4 text-yellow-500 flex-shrink-0" />
+                      <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">Pending</span>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleCancelInvitation(invitation._id)}
-                        className="ml-2 text-destructive hover:text-destructive"
+                        className="text-destructive hover:text-destructive flex-1 sm:flex-initial sm:ml-2"
                       >
                         <XCircle className="h-4 w-4 mr-1" />
                         Cancel

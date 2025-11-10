@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, ArrowLeft } from 'lucide-react'
 
 interface EpicForm {
-  name: string
+  title: string
   description: string
   status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
@@ -28,7 +28,7 @@ export default function EditEpicPage() {
   const epicId = params.id as string
 
   const [form, setForm] = useState<EpicForm>({
-    name: '',
+    title: '',
     description: '',
     status: 'todo',
     priority: 'medium',
@@ -49,14 +49,14 @@ export default function EditEpicPage() {
       if (res.ok && data.success) {
         const e = data.data
         setForm({
-          name: e?.name || '',
+          title: e?.title || '',
           description: e?.description || '',
           status: (e?.status || 'todo'),
           priority: (e?.priority || 'medium'),
           dueDate: e?.dueDate ? new Date(e.dueDate).toISOString().slice(0, 10) : '',
           estimatedHours: e?.estimatedHours ?? '',
           storyPoints: e?.storyPoints ?? '',
-          labels: Array.isArray(e?.labels) ? e.labels.join(', ') : ''
+          labels: Array.isArray(e?.tags) ? e.tags.join(', ') : ''
         })
         setError('')
       } else {
@@ -77,7 +77,7 @@ export default function EditEpicPage() {
     try {
       setSaving(true)
       const payload: any = {
-        name: form.name,
+        title: form.title,
         description: form.description,
         status: form.status,
         priority: form.priority,
@@ -86,7 +86,7 @@ export default function EditEpicPage() {
       if (form.dueDate) payload.dueDate = new Date(form.dueDate)
       if (form.estimatedHours !== '') payload.estimatedHours = Number(form.estimatedHours)
       if (form.storyPoints !== '') payload.storyPoints = Number(form.storyPoints)
-      if (form.labels.trim()) payload.labels = form.labels.split(',').map((s) => s.trim()).filter(Boolean)
+      if (form.labels.trim()) payload.tags = form.labels.split(',').map((s) => s.trim()).filter(Boolean)
 
       const res = await fetch(`/api/epics/${epicId}`, {
         method: 'PUT',
@@ -148,8 +148,8 @@ export default function EditEpicPage() {
             <div>
               <label className="text-sm font-medium">Name</label>
               <Input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
                 className="mt-1"
               />
             </div>

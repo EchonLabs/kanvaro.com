@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PermissionGate, PermissionButton } from '@/lib/permissions/permission-components'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PageContent } from '@/components/ui/PageContent'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { 
   Plus, 
   Search, 
@@ -82,11 +83,15 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Seed filters from URL search params on mount
   useEffect(() => {
@@ -136,6 +141,13 @@ export default function ProjectsPage() {
     checkAuth()
   }, [checkAuth])
 
+  // Refetch projects when filters change
+  useEffect(() => {
+    if (!loading && !authError) {
+      fetchProjects()
+    }
+  }, [searchQuery, statusFilter, priorityFilter])
+
   const fetchProjects = async () => {
     try {
       setLoading(true)
@@ -159,21 +171,41 @@ export default function ProjectsPage() {
     }
   }
 
-  const handleDeleteProject = async (projectId: string) => {
+  const handleDeleteClick = (projectId: string) => {
+    setProjectToDelete(projectId)
+    setDeleteModalOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!projectToDelete) return
+
     try {
-      const response = await fetch(`/api/projects/${projectId}`, {
+      setIsDeleting(true)
+      const response = await fetch(`/api/projects/${projectToDelete}`, {
         method: 'DELETE'
       })
       const data = await response.json()
 
       if (data.success) {
-        setProjects(projects.filter(p => p._id !== projectId))
+        setProjects(projects.filter(p => p._id !== projectToDelete))
+        setDeleteModalOpen(false)
+        setProjectToDelete(null)
+        setError('')
+        setSuccess('Project deleted successfully.')
+        setTimeout(() => setSuccess(''), 3000)
       } else {
         setError(data.error || 'Failed to delete project')
       }
     } catch (err) {
       setError('Failed to delete project')
+    } finally {
+      setIsDeleting(false)
     }
+  }
+
+  const handleDeleteCancel = () => {
+    setDeleteModalOpen(false)
+    setProjectToDelete(null)
   }
 
   const getStatusColor = (status: string) => {
@@ -208,16 +240,7 @@ export default function ProjectsPage() {
     }
   }
 
-  const filteredProjects = projects.filter(project => {
-    const matchesSearch = !searchQuery || 
-      project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.description.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    const matchesStatus = statusFilter === 'all' || project.status === statusFilter
-    const matchesPriority = priorityFilter === 'all' || project.priority === priorityFilter
-
-    return matchesSearch && matchesStatus && matchesPriority
-  })
+  const filteredProjects = projects
 
   if (loading) {
     return (
@@ -260,14 +283,15 @@ export default function ProjectsPage() {
             <p className="text-muted-foreground">Manage and track your projects</p>
           </div>
         </div>
-        <PermissionButton 
-          permission={Permission.PROJECT_CREATE}
-          onClick={() => router.push('/projects/create')}
-          className="w-full sm:w-auto hover:bg-primary/90 hover:shadow-md transition-all duration-200"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Create New Project
-        </PermissionButton>
+        <PermissionGate permission={Permission.PROJECT_CREATE}>
+          <Button 
+            onClick={() => router.push('/projects/create')}
+            className="flex items-center justify-center gap-2 w-full sm:w-auto hover:bg-primary/90 hover:shadow-lg hover:scale-105 transition-all duration-200"
+          >
+            <Plus className="h-4 w-4" />
+            Create New Project
+          </Button>
+        </PermissionGate>
       </div>
 
       {error && (
@@ -288,7 +312,7 @@ export default function ProjectsPage() {
                 </CardDescription>
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+            <div className="flex flex-col gap-2 sm:gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <Input
@@ -298,7 +322,7 @@ export default function ProjectsPage() {
                   className="pl-10 w-full"
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-full sm:w-40">
                     <SelectValue placeholder="Status" />
@@ -335,6 +359,13 @@ export default function ProjectsPage() {
               <TabsTrigger value="list">List View</TabsTrigger>
             </TabsList>
 
+            {success && (
+              <Alert variant="success" className="mt-4">
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>{success}</AlertDescription>
+              </Alert>
+            )}
+
             <TabsContent value="grid" className="space-y-4">
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {filteredProjects.map((project) => (
@@ -345,19 +376,36 @@ export default function ProjectsPage() {
                   >
                     <CardHeader>
                       <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <div className="flex items-center space-x-2">
-                            <CardTitle className="text-lg">{project.name}</CardTitle>
-                            {typeof project.projectNumber !== 'undefined' && (
-                              <Badge variant="outline">#{project.projectNumber}</Badge>
-                            )}
-                            {project.isDraft && (
-                              <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                                Draft
-                              </Badge>
-                            )}
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center min-w-0">
+                            <div className="flex-1 min-w-0">
+                              <CardTitle className="text-lg min-w-0">
+                                <span
+                                  className="sm:hidden block truncate"
+                                  title={project.name && project.name.length > 10 ? project.name : undefined}
+                                >
+                                  {project.name && project.name.length > 10 ? `${project.name.slice(0, 10)}…` : project.name}
+                                </span>
+                                <span
+                                  className="hidden sm:inline truncate"
+                                  title={project.name && project.name.length > 10 ? project.name : undefined}
+                                >
+                                  {project.name && project.name.length > 10 ? `${project.name.slice(0, 10)}…` : project.name}
+                                </span>
+                              </CardTitle>
+                            </div>
+                            <div className="flex flex-shrink-0 items-center space-x-2 ml-2">
+                              {typeof project.projectNumber !== 'undefined' && (
+                                <Badge variant="outline">#{project.projectNumber}</Badge>
+                              )}
+                              {project.isDraft && (
+                                <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                  Draft
+                                </Badge>
+                              )}
+                            </div>
                           </div>
-                          <CardDescription className="line-clamp-2">
+                          <CardDescription className="line-clamp-2" title={project.description}>
                             {project.description || 'No description'}
                           </CardDescription>
                         </div>
@@ -385,7 +433,7 @@ export default function ProjectsPage() {
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={(e) => {
                                 e.stopPropagation()
-                                router.push(`/projects/${project._id}?tab=edit`)
+                                router.push(`/projects/create?edit=${project._id}`)
                               }}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit Project
@@ -396,10 +444,7 @@ export default function ProjectsPage() {
                               <DropdownMenuItem 
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  // Handle delete with confirmation
-                                  if (confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
-                                    handleDeleteProject(project._id)
-                                  }
+                                  handleDeleteClick(project._id)
                                 }}
                                 className="text-destructive focus:text-destructive"
                               >
@@ -475,10 +520,26 @@ export default function ProjectsPage() {
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <h3 className="font-medium">{project.name}</h3>
+                        <div className="flex items-center space-x-4 min-w-0">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center mb-2 min-w-0">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-medium min-w-0">
+                                  <span
+                                    className="sm:hidden block truncate"
+                                    title={project.name && project.name.length > 10 ? project.name : undefined}
+                                  >
+                                    {project.name && project.name.length > 10 ? `${project.name.slice(0, 10)}…` : project.name}
+                                  </span>
+                                <span
+                                  className="hidden sm:inline truncate"
+                                  title={project.name && project.name.length > 10 ? project.name : undefined}
+                                >
+                                  {project.name && project.name.length > 10 ? `${project.name.slice(0, 10)}…` : project.name}
+                                </span>
+                                </h3>
+                              </div>
+                              <div className="flex flex-shrink-0 items-center space-x-2 ml-2">
                               {typeof project.projectNumber !== 'undefined' && (
                                 <Badge variant="outline">#{project.projectNumber}</Badge>
                               )}
@@ -494,8 +555,9 @@ export default function ProjectsPage() {
                               <Badge className={getPriorityColor(project.priority)}>
                                 {project.priority}
                               </Badge>
+                              </div>
                             </div>
-                            <p className="text-sm text-gray-600 mb-2">
+                            <p className="text-sm text-gray-600 mb-2 line-clamp-2" title={project.description}>
                               {project.description || 'No description'}
                             </p>
                             <div className="flex items-center space-x-4 text-sm text-gray-500">
@@ -550,7 +612,7 @@ export default function ProjectsPage() {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={(e) => {
                                   e.stopPropagation()
-                                  router.push(`/projects/${project._id}?tab=edit`)
+                                  router.push(`/projects/create?edit=${project._id}`)
                                 }}>
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit Project
@@ -561,10 +623,7 @@ export default function ProjectsPage() {
                                 <DropdownMenuItem 
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    // Handle delete with confirmation
-                                    if (confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
-                                      handleDeleteProject(project._id)
-                                    }
+                                    handleDeleteClick(project._id)
                                   }}
                                   className="text-destructive focus:text-destructive"
                                 >
@@ -585,6 +644,18 @@ export default function ProjectsPage() {
         </CardContent>
         </Card>
         </div>
+
+        <ConfirmationModal
+          isOpen={deleteModalOpen}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Project"
+          description={`Are you sure you want to delete "${projects.find(p => p._id === projectToDelete)?.name || 'this project'}"? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          variant="destructive"
+          isLoading={isDeleting}
+        />
       </PageContent>
     </MainLayout>
   )

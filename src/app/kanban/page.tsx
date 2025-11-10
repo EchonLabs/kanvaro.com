@@ -20,6 +20,7 @@ import {
   useSensor,
   useSensors,
   closestCorners,
+  useDroppable,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -59,6 +60,11 @@ import {
   Edit,
   Trash2
 } from 'lucide-react'
+import CreateTaskModal from '@/components/tasks/CreateTaskModal'
+import EditTaskModal from '@/components/tasks/EditTaskModal'
+import ViewTaskModal from '@/components/tasks/ViewTaskModal'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 
 interface Task {
   _id: string
@@ -90,6 +96,11 @@ interface Task {
   updatedAt: string
 }
 
+interface Project {
+  _id: string
+  name: string
+}
+
 const columns = [
   { id: 'todo', title: 'To Do', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' },
   { id: 'in_progress', title: 'In Progress', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
@@ -97,6 +108,105 @@ const columns = [
   { id: 'testing', title: 'Testing', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
   { id: 'done', title: 'Done', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' }
 ]
+
+// Column Drop Zone Component
+function ColumnDropZone({ 
+  column, 
+  tasks, 
+  onCreateTask,
+  onEditTask, 
+  onDeleteTask 
+}: { 
+  column: any, 
+  tasks: Task[], 
+  onCreateTask?: (status?: string) => void,
+  onEditTask?: (task: Task) => void,
+  onDeleteTask?: (taskId: string) => void
+}) {
+  const router = useRouter()
+  const { setNodeRef, isOver } = useDroppable({
+    id: column.id,
+  })
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+    }
+  }
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'bug': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+      case 'feature': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+      case 'improvement': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+      case 'task': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'subtask': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <Badge className={column.color}>
+            {column.title}
+          </Badge>
+          <span className="text-sm text-muted-foreground">
+            {tasks.length}
+          </span>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={() => onCreateTask?.(column.id)}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+      
+      <SortableContext 
+        items={tasks.map(task => task._id)}
+        strategy={verticalListSortingStrategy}
+      >
+        <div 
+          ref={setNodeRef}
+          className={`space-y-3 min-h-[400px] max-h-[600px] overflow-y-auto overflow-x-hidden border-2 border-dashed rounded-lg transition-colors p-2 ${
+            isOver 
+              ? 'border-primary bg-primary/5' 
+              : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700'
+          }`}
+        >
+          {tasks.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-muted-foreground">
+             <div className="text-center">
+                <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Drop tasks here</p>
+              </div>
+            </div>
+          ) : (
+            tasks.map((task) => (
+              <SortableTask 
+              
+                key={task._id} 
+                task={task}
+                onClick={() => router.push(`/tasks/${task._id}`)}
+                getPriorityColor={getPriorityColor}
+                getTypeColor={getTypeColor}
+                onEdit={onEditTask}
+                onDelete={onDeleteTask}
+              />
+            ))
+          )}
+        </div>
+      </SortableContext>
+    </div>
+  )
+}
 
 export default function KanbanPage() {
   const router = useRouter()
@@ -108,6 +218,13 @@ export default function KanbanPage() {
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
   const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
+  const [showEditTaskModal, setShowEditTaskModal] = useState(false)
+  const [showViewTaskModal, setShowViewTaskModal] = useState(false)
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [createTaskStatus, setCreateTaskStatus] = useState<string | undefined>(undefined)
 
   // Use the task state management hook
   const {
@@ -147,7 +264,7 @@ export default function KanbanPage() {
       
       if (response.ok) {
         setAuthError('')
-        await fetchTasks()
+        await Promise.all([fetchTasks(), fetchProjects()])
         // Start real-time synchronization after successful auth
         startPolling()
       } else if (response.status === 401) {
@@ -157,7 +274,7 @@ export default function KanbanPage() {
         
         if (refreshResponse.ok) {
           setAuthError('')
-          await fetchTasks()
+          await Promise.all([fetchTasks(), fetchProjects()])
           // Start real-time synchronization after successful refresh
           startPolling()
         } else {
@@ -203,6 +320,22 @@ export default function KanbanPage() {
     }
   }
 
+  const fetchProjects = async () => {
+    try {
+      const response = await fetch('/api/projects')
+      const data = await response.json()
+
+      if (data.success && Array.isArray(data.data)) {
+        setProjects(data.data)
+      } else {
+        setProjects([])
+      }
+    } catch (err) {
+      console.error('Failed to fetch projects:', err)
+      setProjects([])
+    }
+  }
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
@@ -228,9 +361,9 @@ export default function KanbanPage() {
     const matchesSearch = !searchQuery || 
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.project.name.toLowerCase().includes(searchQuery.toLowerCase())
+      (task.project?.name && task.project.name.toLowerCase().includes(searchQuery.toLowerCase()))
     
-    const matchesProject = projectFilter === 'all' || task.project._id === projectFilter
+    const matchesProject = projectFilter === 'all' || (task.project?._id && task.project._id === projectFilter)
     const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
     const matchesType = typeFilter === 'all' || task.type === typeFilter
 
@@ -287,6 +420,43 @@ export default function KanbanPage() {
     }
   }
 
+  // Modal handlers
+  const handleCreateTask = (status?: string) => {
+    setCreateTaskStatus(status)
+    setShowCreateTaskModal(true)
+  }
+
+  const handleEditTask = (task: Task) => {
+    setSelectedTask(task)
+    setShowEditTaskModal(true)
+  }
+
+  const handleViewTask = (task: Task) => {
+    setSelectedTask(task)
+    setShowViewTaskModal(true)
+  }
+
+  const handleDeleteTask = (taskId: string) => {
+    const task = tasks.find(t => t._id === taskId)
+    if (task) {
+      setSelectedTask(task)
+      setShowDeleteConfirmModal(true)
+    }
+  }
+
+  const confirmDeleteTask = async () => {
+    if (selectedTask) {
+      try {
+        await handleTaskDelete(selectedTask._id)
+        setShowDeleteConfirmModal(false)
+        setSelectedTask(null)
+      } catch (error) {
+        console.error('Failed to delete task:', error)
+        setError('Failed to delete task. Please try again.')
+      }
+    }
+  }
+
   if (loading || taskLoading) {
     return (
       <MainLayout>
@@ -316,12 +486,12 @@ export default function KanbanPage() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Kanban Board</h1>
-            <p className="text-muted-foreground">Visual task management with drag and drop</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Kanban Board</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">Visual task management with drag and drop</p>
           </div>
-          <Button onClick={() => router.push('/tasks/create')}>
+          <Button onClick={() => router.push('/tasks/create')} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             New Task
           </Button>
@@ -346,34 +516,42 @@ export default function KanbanPage() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Task Board</CardTitle>
-                <CardDescription>
-                  {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} found
-                </CardDescription>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <Input
-                    placeholder="Search tasks..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 w-64"
-                  />
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Task Board</CardTitle>
+                  <CardDescription>
+                    {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} found
+                  </CardDescription>
                 </div>
+              </div>
+              {/* Search bar - full width on its own line */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Input
+                  placeholder="Search tasks..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 w-full"
+                />
+              </div>
+              {/* Filter options - on the next line */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2 flex-wrap">
                 <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger className="w-40">
+                  <SelectTrigger className="w-full sm:w-40">
                     <SelectValue placeholder="Project" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Projects</SelectItem>
-                    {/* This would be populated with actual projects */}
+                    {projects.map((project) => (
+                      <SelectItem key={project._id} value={project._id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                  <SelectTrigger className="w-40">
+                  <SelectTrigger className="w-full sm:w-40">
                     <SelectValue placeholder="Priority" />
                   </SelectTrigger>
                   <SelectContent>
@@ -385,7 +563,7 @@ export default function KanbanPage() {
                   </SelectContent>
                 </Select>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-40">
+                  <SelectTrigger className="w-full sm:w-40">
                     <SelectValue placeholder="Type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -412,38 +590,14 @@ export default function KanbanPage() {
                   const columnTasks = getTasksByStatus(column.id)
                   
                   return (
-                    <div key={column.id} className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Badge className={column.color}>
-                            {column.title}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">
-                            {columnTasks.length}
-                          </span>
-                        </div>
-                        <Button variant="ghost" size="sm">
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      
-                      <SortableContext 
-                        items={columnTasks.map(task => task._id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        <div className="space-y-3 min-h-[400px]">
-                          {columnTasks.map((task) => (
-                            <SortableTask 
-                              key={task._id} 
-                              task={task}
-                              onClick={() => router.push(`/tasks/${task._id}`)}
-                              getPriorityColor={getPriorityColor}
-                              getTypeColor={getTypeColor}
-                            />
-                          ))}
-                        </div>
-                      </SortableContext>
-                    </div>
+                    <ColumnDropZone 
+                      key={column.id} 
+                      column={column} 
+                      tasks={columnTasks}
+                      onCreateTask={handleCreateTask}
+                      onEditTask={handleEditTask}
+                      onDeleteTask={handleDeleteTask}
+                    />
                   )
                 })}
               </div>
@@ -456,6 +610,8 @@ export default function KanbanPage() {
                     isDragOverlay
                     getPriorityColor={getPriorityColor}
                     getTypeColor={getTypeColor}
+                    onEdit={handleEditTask}
+                    onDelete={handleDeleteTask}
                   />
                 ) : null}
               </DragOverlay>
@@ -463,6 +619,73 @@ export default function KanbanPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modals */}
+      <CreateTaskModal
+        isOpen={showCreateTaskModal}
+        onClose={() => {
+          setShowCreateTaskModal(false)
+          setCreateTaskStatus(undefined)
+        }}
+        projectId={projectFilter === 'all' ? '' : projectFilter}
+        defaultStatus={createTaskStatus}
+        onTaskCreated={() => {
+          setShowCreateTaskModal(false)
+          setCreateTaskStatus(undefined)
+          // Refresh tasks after creation
+          fetchTasks()
+        }}
+      />
+
+      {selectedTask && (
+        <EditTaskModal
+          isOpen={showEditTaskModal}
+          onClose={() => {
+            setShowEditTaskModal(false)
+            setSelectedTask(null)
+          }}
+          task={selectedTask}
+          onTaskUpdated={() => {
+            setShowEditTaskModal(false)
+            setSelectedTask(null)
+            // Refresh tasks after update
+            fetchTasks()
+          }}
+        />
+      )}
+
+      {selectedTask && (
+        <ViewTaskModal
+          isOpen={showViewTaskModal}
+          onClose={() => {
+            setShowViewTaskModal(false)
+            setSelectedTask(null)
+          }}
+          task={selectedTask}
+          onEdit={() => {
+            setShowViewTaskModal(false)
+            setShowEditTaskModal(true)
+          }}
+          onDelete={() => {
+            setShowViewTaskModal(false)
+            handleDeleteTask(selectedTask._id)
+          }}
+        />
+      )}
+
+      <ConfirmationModal
+        isOpen={showDeleteConfirmModal}
+        onClose={() => {
+          setShowDeleteConfirmModal(false)
+          setSelectedTask(null)
+        }}
+        onConfirm={confirmDeleteTask}
+        title="Delete Task"
+        description={`Are you sure you want to delete "${selectedTask?.title}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </MainLayout>
   )
 }
@@ -473,9 +696,11 @@ interface SortableTaskProps {
   getPriorityColor: (priority: string) => string
   getTypeColor: (type: string) => string
   isDragOverlay?: boolean
+  onEdit?: (task: Task) => void
+  onDelete?: (taskId: string) => void
 }
 
-function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOverlay = false }: SortableTaskProps) {
+function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOverlay = false, onEdit, onDelete }: SortableTaskProps) {
   const {
     attributes,
     listeners,
@@ -516,32 +741,64 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
               >
                 <GripVertical className="h-3 w-3" />
               </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={(e) => {
-                  e.stopPropagation()
-                  // Handle menu actions
-                }}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={(e) => {
+                    e.stopPropagation()
+                    onClick()
+                  }}>
+                    View Details
+                  </DropdownMenuItem>
+                  {onEdit && (
+                    <DropdownMenuItem onClick={(e) => {
+                      e.stopPropagation()
+                      onEdit(task)
+                    }}>
+                      Edit Task
+                    </DropdownMenuItem>
+                  )}
+                  {onDelete && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onDelete(task._id)
+                        }}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        Delete Task
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
           
           <div className="flex items-center space-x-2">
             <Badge className={getPriorityColor(task.priority)}>
-              {task.priority}
+              {task?.priority}
             </Badge>
             <Badge className={getTypeColor(task.type)}>
-              {task.type}
+              {task?.type}
             </Badge>
           </div>
           
           <div className="text-xs text-muted-foreground">
             <div className="flex items-center space-x-1 mb-1">
               <Target className="h-3 w-3" />
-              <span>{task.project.name}</span>
+                <span className="text-foreground text-sm line-clamp-2">{task?.project?.name}</span>
             </div>
             {task.dueDate && (
               <div className="flex items-center space-x-1 mb-1">
@@ -552,13 +809,13 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
             {task.storyPoints && (
               <div className="flex items-center space-x-1 mb-1">
                 <BarChart3 className="h-3 w-3" />
-                <span>{task.storyPoints} points</span>
+                <span>{task?.storyPoints} points</span>
               </div>
             )}
             {task.estimatedHours && (
               <div className="flex items-center space-x-1">
                 <Clock className="h-3 w-3" />
-                <span>{task.estimatedHours}h</span>
+                <span>{task?.estimatedHours}h</span>
               </div>
             )}
           </div>
@@ -566,24 +823,24 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
           {task.assignedTo && (
             <div className="flex items-center space-x-2">
               <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
-                {task.assignedTo.firstName[0]}{task.assignedTo.lastName[0]}
+                {task?.assignedTo?.firstName[0]}{task?.assignedTo?.lastName[0]}
               </div>
               <span className="text-xs text-muted-foreground">
-                {task.assignedTo.firstName} {task.assignedTo.lastName}
+                {task?.assignedTo?.firstName} {task?.assignedTo?.lastName}
               </span>
             </div>
           )}
           
-          {task.labels.length > 0 && (
+          {task?.labels?.length > 0 && (
             <div className="flex flex-wrap gap-1">
-              {task.labels.slice(0, 2).map((label, index) => (
+              {task?.labels?.slice(0, 2).map((label, index) => (
                 <Badge key={index} variant="outline" className="text-xs">
                   {label}
                 </Badge>
               ))}
-              {task.labels.length > 2 && (
+              {task?.labels?.length > 2 && (
                 <Badge variant="outline" className="text-xs">
-                  +{task.labels.length - 2}
+                  +{task?.labels?.length - 2}
                 </Badge>
               )}
             </div>

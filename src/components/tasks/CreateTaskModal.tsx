@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -50,12 +50,15 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [users, setUsers] = useState<User[]>([])
-  const [loadingUsers, setLoadingUsers] = useState(false)
+  const [projectMembers, setProjectMembers] = useState<User[]>([])
+  const [loadingProjectMembers, setLoadingProjectMembers] = useState(false)
   const [projects, setProjects] = useState<Array<{ _id: string; name: string }>>([])
   const [loadingProjects, setLoadingProjects] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+  const [projectQuery, setProjectQuery] = useState('')
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
+  const [assignedToIds, setAssignedToIds] = useState<string[]>([])
+  const [assigneeQuery, setAssigneeQuery] = useState('')
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -69,25 +72,30 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
     labels: ''
   })
 
-  const fetchUsers = async () => {
-    setLoadingUsers(true)
+  const fetchProjectMembers = useCallback(async (projectIdParam: string | undefined) => {
+    if (!projectIdParam) {
+      setProjectMembers([])
+      return
+    }
+
+    setLoadingProjectMembers(true)
     try {
-      const response = await fetch('/api/members')
+      const response = await fetch(`/api/projects/${projectIdParam}`)
       const data = await response.json()
-      
-      if (data.success && data.data && Array.isArray(data.data.members)) {
-        setUsers(data.data.members)
+
+      if (response.ok && data.success && data.data) {
+        const members = Array.isArray(data.data.teamMembers) ? data.data.teamMembers : []
+        setProjectMembers(members)
       } else {
-        console.error('Invalid users data:', data)
-        setUsers([])
+        setProjectMembers([])
       }
     } catch (error) {
-      console.error('Failed to fetch users:', error)
-      setUsers([])
+      console.error('Failed to fetch project members:', error)
+      setProjectMembers([])
     } finally {
-      setLoadingUsers(false)
+      setLoadingProjectMembers(false)
     }
-  }
+  }, [])
 
   const fetchProjects = async () => {
     setLoadingProjects(true)
@@ -96,10 +104,6 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
       const data = await res.json()
       if (data.success && Array.isArray(data.data)) {
         setProjects(data.data)
-        // If no projectId provided, preselect first project if available
-        if (!projectId && data.data.length > 0) {
-          setSelectedProjectId(data.data[0]._id)
-        }
       } else {
         setProjects([])
       }
@@ -110,15 +114,60 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
     }
   }
 
-  // Fetch users when modal opens
+  // Fetch project members when modal opens or project selection changes
   useEffect(() => {
-    if (isOpen) {
-      fetchUsers()
-      if (!projectId) {
-        fetchProjects()
-      }
+    if (!isOpen) return
+
+    if (projectId) {
+      fetchProjectMembers(projectId)
+    } else if (selectedProjectId) {
+      fetchProjectMembers(selectedProjectId)
+    } else {
+      setProjectMembers([])
     }
-  }, [isOpen])
+
+    if (!projectId) {
+      fetchProjects()
+    }
+  }, [isOpen, projectId, selectedProjectId, fetchProjectMembers])
+
+  // Reset form state whenever modal closes so it opens clean next time
+  useEffect(() => {
+    if (!isOpen) {
+      setError('')
+      setSuccess('')
+      setFormData({
+        title: '',
+        description: '',
+        status: defaultStatus || 'todo',
+        priority: 'medium',
+        type: 'task',
+        assignedTo: '',
+        storyPoints: '',
+        dueDate: '',
+        estimatedHours: '',
+        labels: ''
+      })
+      setSubtasks([])
+      setAssignedToIds([])
+      setAssigneeQuery('')
+      setProjectMembers([])
+      setLoadingProjectMembers(false)
+      if (!projectId) setSelectedProjectId('')
+    }
+  }, [isOpen, projectId, defaultStatus])
+
+  // Ensure status is auto-selected based on incoming defaults when opening
+  useEffect(() => {
+    if (!isOpen) return
+    if (defaultStatus) {
+      setFormData(prev => ({ ...prev, status: defaultStatus }))
+      return
+    }
+    if (Array.isArray(availableStatuses) && availableStatuses.length === 1) {
+      setFormData(prev => ({ ...prev, status: availableStatuses[0].key }))
+    }
+  }, [isOpen, defaultStatus, availableStatuses])
 
   const addSubtask = () => {
     setSubtasks([...subtasks, {
@@ -144,6 +193,20 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
     setLoading(true)
     setError('')
     setSuccess('')
+    // Validate required fields including subtasks titles
+    const missingSubtaskTitle = subtasks.some(st => !(st.title && st.title.trim().length > 0))
+    const missingDueDate = !(formData.dueDate && formData.dueDate.trim().length > 0)
+    if (!formData.title || !(projectId || selectedProjectId) || !formData.status || missingDueDate || missingSubtaskTitle) {
+      setLoading(false)
+      if (missingSubtaskTitle) {
+        setError('Please fill in all required subtask titles')
+      } else if (missingDueDate) {
+        setError('Due date is required')
+      } else {
+        setError('Please fill in all required fields')
+      }
+      return
+    }
     try {
       const response = await fetch('/api/tasks', {
         method: 'POST',
@@ -153,7 +216,8 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
         body: JSON.stringify({
           ...formData,
           project: projectId || selectedProjectId,
-          assignedTo: formData.assignedTo === 'unassigned' ? undefined : formData.assignedTo || undefined,
+          assignedTo: assignedToIds.length === 1 ? assignedToIds[0] : undefined,
+          assignees: assignedToIds.length > 1 ? assignedToIds : undefined,
           storyPoints: formData.storyPoints ? parseInt(formData.storyPoints) : undefined,
           estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined,
           dueDate: formData.dueDate || undefined,
@@ -187,6 +251,8 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
           labels: ''
         })
         setSubtasks([])
+        setAssignedToIds([])
+        setAssigneeQuery('')
         if (!projectId) setSelectedProjectId('')
       } else {
         onClose()
@@ -220,8 +286,8 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
         onClose()
       }
     }}>
-      <Card className="w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto bg-background" onClick={(e) => e.stopPropagation()}>
-        <CardHeader>
+      <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col bg-background m-4 sm:m-6" onClick={(e) => e.stopPropagation()}>
+        <CardHeader className="flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Create New Task</CardTitle>
@@ -232,10 +298,10 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <CardContent className="flex-1 overflow-y-auto">
+          <form onSubmit={handleSubmit} className="space-y-6" autoComplete="on" id="create-task-form">
             {success && (
-              <Alert>
+              <Alert variant="success">
                 <AlertDescription>{success}</AlertDescription>
               </Alert>
             )}
@@ -249,11 +315,21 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
             {!projectId && (
               <div>
                 <label className="text-sm font-medium text-foreground">Project *</label>
-                <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <Select
+                  value={selectedProjectId}
+                  onValueChange={(v) => {
+                    setSelectedProjectId(v)
+                    setAssignedToIds([])
+                    setAssigneeQuery('')
+                    setProjectMembers([])
+                    fetchProjectMembers(v)
+                  }}
+                  onOpenChange={(open) => { if (open) setProjectQuery('') }}
+                >
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder={loadingProjects ? 'Loading projects...' : 'Select project'} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[10050] p-0">
                     {loadingProjects ? (
                       <SelectItem value="loading" disabled>
                         <div className="flex items-center space-x-2">
@@ -261,14 +337,25 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
                           <span>Loading projects...</span>
                         </div>
                       </SelectItem>
+                    ) : projects.length > 0 ? (
+                      <div className="p-2">
+                        <Input
+                          value={projectQuery}
+                          onChange={(e) => setProjectQuery(e.target.value)}
+                          placeholder="Type to search projects"
+                          className="mb-2"
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          {(projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase()))).map((p) => (
+                            <SelectItem key={p._id} value={p._id}>{p.name}</SelectItem>
+                          ))}
+                          {(projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase()))).length === 0 && (
+                            <div className="px-2 py-1 text-sm text-muted-foreground">No matching projects</div>
+                          )}
+                        </div>
+                      </div>
                     ) : (
-                      projects.length > 0 ? (
-                        projects.map((p) => (
-                          <SelectItem key={p._id} value={p._id}>{p.name}</SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="no-projects" disabled>No projects found</SelectItem>
-                      )
+                      <SelectItem value="no-projects" disabled>No projects found</SelectItem>
                     )}
                   </SelectContent>
                 </Select>
@@ -299,17 +386,19 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
               </div>
 
               <div>
-                <label className="text-sm font-medium text-foreground">Status</label>
-                <Select value={formData.status} onValueChange={(value) => setFormData({...formData, status: value})}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
+                <label className="text-sm font-medium text-foreground">Status *</label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => setFormData({...formData, status: value})}
+                  disabled={!!availableStatuses && availableStatuses.length === 1}
+                >
+                  <SelectTrigger className="mt-1 w-full">
+                    <SelectValue placeholder="Status" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {availableStatuses ? (
-                      availableStatuses.map((status) => (
-                        <SelectItem key={status.key} value={status.key}>
-                          {status.title}
-                        </SelectItem>
+                  <SelectContent className="z-[10050]">
+                    {Array.isArray(availableStatuses) && availableStatuses.length > 0 ? (
+                      availableStatuses.map(s => (
+                        <SelectItem key={s.key} value={s.key}>{s.title}</SelectItem>
                       ))
                     ) : (
                       <>
@@ -318,6 +407,7 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
                         <SelectItem value="review">Review</SelectItem>
                         <SelectItem value="testing">Testing</SelectItem>
                         <SelectItem value="done">Done</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
                       </>
                     )}
                   </SelectContent>
@@ -327,10 +417,10 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
               <div>
                 <label className="text-sm font-medium text-foreground">Priority</label>
                 <Select value={formData.priority} onValueChange={(value) => setFormData({...formData, priority: value})}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
+                  <SelectTrigger className="mt-1 w-full">
+                    <SelectValue placeholder="Priority" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[10050]">
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="medium">Medium</SelectItem>
                     <SelectItem value="high">High</SelectItem>
@@ -342,10 +432,10 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
               <div>
                 <label className="text-sm font-medium text-foreground">Type</label>
                 <Select value={formData.type} onValueChange={(value) => setFormData({...formData, type: value})}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
+                  <SelectTrigger className="mt-1 w-full">
+                    <SelectValue placeholder="Type" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[10050]">
                     <SelectItem value="task">Task</SelectItem>
                     <SelectItem value="bug">Bug</SelectItem>
                     <SelectItem value="feature">Feature</SelectItem>
@@ -355,36 +445,108 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
                 </Select>
               </div>
 
-              <div>
+              <div className="md:col-span-2">
                 <label className="text-sm font-medium text-foreground">Assigned To</label>
-                <Select value={formData.assignedTo} onValueChange={(value) => setFormData({...formData, assignedTo: value})}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder={loadingUsers ? "Loading members..." : "Select assignee"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {loadingUsers ? (
-                      <SelectItem value="loading" disabled>
-                        <div className="flex items-center space-x-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span>Loading members...</span>
+                <div className="space-y-2 mt-1">
+                  <Select
+                    value=""
+                    onValueChange={(value) => {
+                      if (value === '__unassigned') {
+                        setAssignedToIds([])
+                        return
+                      }
+                      if (!assignedToIds.includes(value)) {
+                        setAssignedToIds(prev => [...prev, value])
+                      }
+                    }}
+                    onOpenChange={(open) => { if (open) setAssigneeQuery(""); }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={loadingProjectMembers ? 'Loading members...' : 'Select team members'} />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div className="p-2">
+                        <Input
+                          value={assigneeQuery}
+                          onChange={e => setAssigneeQuery(e.target.value)}
+                          placeholder={loadingProjectMembers ? 'Loading members...' : 'Type to search team members'}
+                          className="mb-2"
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          {loadingProjectMembers ? (
+                            <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Loading members...</span>
+                            </div>
+                          ) : projectMembers.length === 0 ? (
+                            <>
+                              <SelectItem value="__unassigned">Unassigned</SelectItem>
+                              <div className="px-2 py-1 text-sm text-muted-foreground">No team members found for this project</div>
+                            </>
+                          ) : (
+                            (() => {
+                              const q = assigneeQuery.toLowerCase().trim()
+                              const filtered = projectMembers.filter(u =>
+                                !q ||
+                                `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
+                                u.email.toLowerCase().includes(q)
+                              )
+
+                              if (filtered.length === 0) {
+                                return (
+                                  <div className="px-2 py-1 text-sm text-muted-foreground">No matching members</div>
+                                )
+                              }
+
+                              return filtered.map(user => {
+                                const isSelected = assignedToIds.includes(user._id)
+                                return (
+                                  <SelectItem
+                                    key={user._id}
+                                    value={user._id}
+                                    disabled={isSelected}
+                                    className={isSelected ? 'opacity-50 cursor-not-allowed' : ''}
+                                  >
+                                    <div className="flex items-center justify-between w-full">
+                                      <span>{user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span></span>
+                                      {isSelected && (
+                                        <span className="text-xs text-muted-foreground ml-2">Selected</span>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                )
+                              })
+                            })()
+                          )}
                         </div>
-                      </SelectItem>
-                    ) : (
-                      Array.isArray(users) && users.length > 0 ? (
-                        users.map((user) => (
-                          <SelectItem key={user._id} value={user._id}>
-                            {user.firstName} {user.lastName}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="no-users" disabled>
-                          No team members found
-                        </SelectItem>
-                      )
-                    )}
-                  </SelectContent>
-                </Select>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                  {assignedToIds.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {assignedToIds.map(id => {
+                        const u = projectMembers.find(x => x._id === id);
+                        if (!u) return null;
+                        return (
+                          <span 
+                            key={id} 
+                            className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
+                          >
+                            <span>{u.firstName} {u.lastName}</span>
+                            <button
+                              type="button"
+                              aria-label="Remove assignee"
+                              className="text-muted-foreground hover:text-foreground focus:outline-none"
+                              onClick={() => setAssignedToIds(prev => prev.filter(x => x !== id))}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -411,12 +573,13 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
               </div>
 
               <div>
-                <label className="text-sm font-medium text-foreground">Due Date</label>
+                <label className="text-sm font-medium text-foreground">Due Date *</label>
                 <Input
                   type="date"
                   value={formData.dueDate}
                   onChange={(e) => setFormData({...formData, dueDate: e.target.value})}
                   className="mt-1"
+                  required
                 />
               </div>
 
@@ -477,7 +640,7 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-[10050]">
                           <SelectItem value="todo">To Do</SelectItem>
                           <SelectItem value="in_progress">In Progress</SelectItem>
                           <SelectItem value="done">Done</SelectItem>
@@ -507,26 +670,35 @@ export default function CreateTaskModal({ isOpen, onClose, projectId, onTaskCrea
               )}
             </div>
 
-            <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading || !formData.title}>
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Task
-                  </>
-                )}
-              </Button>
-            </div>
           </form>
         </CardContent>
+        <div className="flex-shrink-0 px-4 sm:px-6 pb-4 sm:pb-6 pt-3 sm:pt-4 border-t">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-0 sm:space-x-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" form="create-task-form" disabled={
+              loading ||
+              !(formData.title && formData.title.trim().length > 0) ||
+              !(projectId || (selectedProjectId && selectedProjectId.trim().length > 0)) ||
+              !(formData.status && formData.status.trim().length > 0) ||
+              !(formData.dueDate && formData.dueDate.trim().length > 0) ||
+              subtasks.some(st => !(st.title && st.title.trim().length > 0))
+            }>
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Task
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
       </Card>
       {(success || error) && (
         <div className="fixed bottom-6 right-6 z-[10000]">

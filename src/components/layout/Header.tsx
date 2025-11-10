@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { Bell, User, Sun, Moon, Monitor, LogOut, UserCircle, X, Check, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Badge } from '@/components/ui/Badge'
 import { OrganizationLogo } from '@/components/ui/OrganizationLogo'
 import { GlobalSearch } from '@/components/search/GlobalSearch'
@@ -29,6 +30,7 @@ interface HeaderProps {
 
 export function Header({ onMobileMenuToggle }: HeaderProps) {
   const [user, setUser] = useState<any>(null)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
   const { theme, setTheme } = useTheme()
@@ -59,11 +61,6 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
   }, [])
 
   const handleLogout = async () => {
-    // Show confirmation dialog
-    if (!confirm('Are you sure you want to logout?')) {
-      return
-    }
-
     try {
       const response = await fetch('/api/auth/logout', { method: 'POST' })
       if (response.ok) {
@@ -82,6 +79,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
   }
 
   return (
+    <>
     <header className="flex h-14 lg:h-16 items-center border-b bg-background px-3 sm:px-4">
       {/* Mobile Menu Button */}
       <Button
@@ -106,7 +104,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
       <div className="flex items-center space-x-1 sm:space-x-2 ml-2 sm:ml-4">
         {/* Theme Toggle Buttons - Hidden on mobile */}
         {mounted && (
-          <div className="hidden sm:flex items-center border rounded-md">
+              <div className="hidden md:flex items-center border rounded-md">
             <Button
               variant={theme === 'light' ? 'default' : 'ghost'}
               size="sm"
@@ -149,13 +147,13 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-80 sm:w-80" align="end">
+          <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80" align="end">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium">Notifications</h4>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+                <h4 className="font-medium text-sm sm:text-base">Notifications</h4>
                 {unreadCount > 0 && (
-                  <Button variant="ghost" size="sm" onClick={markAllAsRead}>
-                    <Check className="h-4 w-4 mr-1" />
+                  <Button variant="ghost" size="sm" onClick={markAllAsRead} className="w-full sm:w-auto text-xs sm:text-sm">
+                    <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                     Mark All as Read
                   </Button>
                 )}
@@ -166,32 +164,33 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                   </div>
                 ) : notifications.length === 0 ? (
-                  <div className="text-center py-4 text-muted-foreground">
+                  <div className="text-center py-4 text-xs sm:text-sm text-muted-foreground">
                     No notifications
                   </div>
                 ) : (
                   notifications.map((notification) => (
                     <div
                       key={(notification._id as any).toString()}
-                      className={`flex items-start space-x-3 rounded-lg p-2 hover:bg-accent ${
+                      className={`flex items-start space-x-2 sm:space-x-3 rounded-lg p-2 sm:p-3 hover:bg-accent ${
                         !notification.isRead ? 'bg-primary/5 border-l-2 border-primary' : ''
                       }`}
                     >
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <span className="text-xs font-medium">
                           {notification.type.charAt(0).toUpperCase()}
                         </span>
                       </div>
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-start justify-between">
-                          <p className="text-sm font-medium">{notification.title}</p>
-                          <div className="flex items-center space-x-1">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-xs sm:text-sm font-medium break-words flex-1 min-w-0">{notification.title}</p>
+                          <div className="flex items-center space-x-1 flex-shrink-0">
                             {!notification.isRead && (
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className="h-6 w-6 p-0"
                                 onClick={() => markAsRead((notification._id as any).toString())}
+                                title="Mark as read"
                               >
                                 <Check className="h-3 w-3" />
                               </Button>
@@ -201,12 +200,13 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                               size="sm"
                               className="h-6 w-6 p-0"
                               onClick={() => deleteNotification((notification._id as any).toString())}
+                              title="Delete notification"
                             >
                               <X className="h-3 w-3" />
                             </Button>
                           </div>
                         </div>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-muted-foreground break-words">
                           {notification.message}
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -241,7 +241,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
               Profile
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>
+          <DropdownMenuItem onClick={() => setShowLogoutConfirm(true)}>
               <LogOut className="mr-2 h-4 w-4" />
               Logout
             </DropdownMenuItem>
@@ -249,5 +249,15 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
         </DropdownMenu>
       </div>
     </header>
+    <ConfirmationModal
+      isOpen={showLogoutConfirm}
+      onClose={() => setShowLogoutConfirm(false)}
+      onConfirm={handleLogout}
+      title="Logout"
+      description="Are you sure you want to log out?"
+      confirmText="Logout"
+      cancelText="Cancel"
+    />
+    </>
   )
 }

@@ -248,8 +248,8 @@ export function EditRoleModal({ isOpen, onClose, onRoleUpdated, role }: EditRole
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+      <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden m-4 sm:m-6">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 pb-3 sm:pb-4 px-4 sm:px-6 pt-4 sm:pt-6 flex-shrink-0">
           <div>
             <CardTitle className="text-xl font-semibold">Edit Role</CardTitle>
             <CardDescription>
@@ -261,8 +261,8 @@ export function EditRoleModal({ isOpen, onClose, onRoleUpdated, role }: EditRole
           </Button>
         </CardHeader>
 
-        <CardContent className="overflow-y-auto max-h-[calc(90vh-120px)]">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <CardContent className="flex-1 overflow-y-auto px-4 sm:px-6 py-3 sm:py-4">
+          <form onSubmit={handleSubmit} className="space-y-6" id="edit-role-form">
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
@@ -373,23 +373,25 @@ export function EditRoleModal({ isOpen, onClose, onRoleUpdated, role }: EditRole
               </div>
             </div>
 
-            <div className="flex justify-end space-x-2 pt-4 border-t">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  'Update Role'
-                )}
-              </Button>
-            </div>
           </form>
         </CardContent>
+        <div className="flex-shrink-0 px-4 sm:px-6 pb-4 sm:pb-6 pt-3 sm:pt-4 border-t">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-0 sm:space-x-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" form="edit-role-form" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Update Role'
+              )}
+            </Button>
+          </div>
+        </div>
       </Card>
     </div>
   )

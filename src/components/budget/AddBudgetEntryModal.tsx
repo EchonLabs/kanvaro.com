@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogBody } from '@/components/ui/Dialog'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { CalendarIcon } from 'lucide-react'
@@ -89,7 +89,8 @@ export function AddBudgetEntryModal({ projectId, onClose, onSuccess }: AddBudget
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <DialogBody>
+          <form onSubmit={handleSubmit} className="space-y-4" id="add-budget-entry-form">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="amount">Amount *</Label>
@@ -193,15 +194,16 @@ export function AddBudgetEntryModal({ projectId, onClose, onSuccess }: AddBudget
             />
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Adding...' : 'Add Budget Entry'}
-            </Button>
-          </DialogFooter>
-        </form>
+          </form>
+        </DialogBody>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="add-budget-entry-form" disabled={loading}>
+            {loading ? 'Adding...' : 'Add Budget Entry'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

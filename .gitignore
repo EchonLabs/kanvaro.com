@@ -3,9 +3,9 @@
 config.json
 
 # dependencies
-/node_modules
-/.pnp
-.pnp.js
+# /node_modules
+# /.pnp
+# .pnp.js
 .yarn/install-state.gz
 
 # testing
@@ -48,8 +48,8 @@ next-env.d.ts
 Thumbs.db
 
 # Logs
-logs
-*.log
+# logs
+# *.log
 
 # Runtime data
 pids
@@ -160,4 +160,4 @@ dist
 .dockerignore
 
 # Uploads
-uploads/
+# uploads/

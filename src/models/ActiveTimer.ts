@@ -98,7 +98,7 @@ ActiveTimerSchema.index({ lastActivity: 1 })
 // Virtual for current duration
 ActiveTimerSchema.virtual('currentDuration').get(function() {
   const now = new Date()
-  const baseDuration = Math.round((now.getTime() - this.startTime.getTime()) / (1000 * 60))
+  const baseDuration = (now.getTime() - this.startTime.getTime()) / (1000 * 60)
   return Math.max(0, baseDuration - this.totalPausedDuration)
 })
 
@@ -106,7 +106,7 @@ ActiveTimerSchema.virtual('currentDuration').get(function() {
 ActiveTimerSchema.virtual('currentCost').get(function() {
   if (this.hourlyRate) {
     const now = new Date()
-    const baseDuration = Math.round((now.getTime() - this.startTime.getTime()) / (1000 * 60))
+    const baseDuration = (now.getTime() - this.startTime.getTime()) / (1000 * 60)
     const currentDuration = Math.max(0, baseDuration - this.totalPausedDuration)
     return (this.hourlyRate * currentDuration) / 60
   }

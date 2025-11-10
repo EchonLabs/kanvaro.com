@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import connectDB from '@/lib/db-config'
 import { User } from '@/models/User'
 import jwt from 'jsonwebtoken'
+import { normalizeUploadUrl } from '@/lib/file-utils'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
@@ -47,6 +48,7 @@ export async function GET() {
             organization: user.organization,
             isActive: user.isActive,
             emailVerified: user.emailVerified,
+            avatar: normalizeUploadUrl(user.avatar || ''),
             timezone: user.timezone,
             language: user.language,
             currency: user.currency,
@@ -93,6 +95,7 @@ export async function GET() {
                 organization: user.organization,
                 isActive: user.isActive,
                 emailVerified: user.emailVerified,
+                avatar: normalizeUploadUrl(user.avatar || ''),
                 timezone: user.timezone,
                 language: user.language,
                 currency: user.currency,
@@ -151,6 +154,7 @@ export async function GET() {
             organization: user.organization,
             isActive: user.isActive,
             emailVerified: user.emailVerified,
+            avatar: normalizeUploadUrl(user.avatar || ''),
             timezone: user.timezone,
             language: user.language,
             currency: user.currency,

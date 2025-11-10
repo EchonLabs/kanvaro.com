@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken'
 import connectDB from '@/lib/db-config'
 import { hasDatabaseConfig } from '@/lib/db-config'
 import { User } from '@/models/User'
+import { normalizeUploadUrl } from '@/lib/file-utils'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
@@ -107,6 +108,7 @@ export async function POST() {
       organization: user.organization,
       isActive: user.isActive,
       emailVerified: user.emailVerified,
+      avatar: normalizeUploadUrl(user.avatar || ''),
       timezone: user.timezone,
       language: user.language,
       currency: user.currency,

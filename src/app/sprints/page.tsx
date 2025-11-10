@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -77,6 +77,7 @@ interface Sprint {
 
 export default function SprintsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -84,6 +85,20 @@ export default function SprintsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [success, setSuccess] = useState('')
+
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const showSuccess = useCallback((message: string) => {
+    setSuccess(message)
+    if (successTimeoutRef.current) {
+      clearTimeout(successTimeoutRef.current)
+    }
+    successTimeoutRef.current = setTimeout(() => {
+      setSuccess('')
+      successTimeoutRef.current = null
+    }, 3000)
+  }, [])
 
   const checkAuth = useCallback(async () => {
     try {
@@ -122,6 +137,22 @@ export default function SprintsPage() {
     checkAuth()
   }, [checkAuth])
 
+  useEffect(() => {
+    const successParam = searchParams?.get('success')
+    if (successParam === 'sprint-created') {
+      showSuccess('Sprint created successfully.')
+      router.replace('/sprints', { scroll: false })
+    }
+  }, [searchParams, showSuccess, router])
+
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const fetchSprints = async () => {
     try {
       setLoading(true)
@@ -146,6 +177,7 @@ export default function SprintsPage() {
       const data = await res.json()
       if (res.ok && data.success) {
         setSprints(prev => prev.filter(s => s._id !== sprintId))
+        showSuccess('Sprint deleted successfully.')
       } else {
         setError(data.error || 'Failed to delete sprint')
       }
@@ -213,13 +245,13 @@ export default function SprintsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-6 overflow-x-hidden">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Sprints</h1>
-            <p className="text-muted-foreground">Manage your agile sprints and iterations</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Sprints</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">Manage your agile sprints and iterations</p>
           </div>
-          <Button onClick={() => router.push('/sprints/create')}>
+          <Button onClick={() => router.push('/sprints/create')} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             New Sprint
           </Button>
@@ -232,37 +264,48 @@ export default function SprintsPage() {
           </Alert>
         )}
 
-        <Card>
+        {success && (
+          <Alert variant="success">
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription>{success}</AlertDescription>
+          </Alert>
+        )}
+
+        <Card className="overflow-x-hidden">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>All Sprints</CardTitle>
-                <CardDescription>
-                  {filteredSprints.length} sprint{filteredSprints.length !== 1 ? 's' : ''} found
-                </CardDescription>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>All Sprints</CardTitle>
+                  <CardDescription>
+                    {filteredSprints.length} sprint{filteredSprints.length !== 1 ? 's' : ''} found
+                  </CardDescription>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <div className="relative">
+              <div className="flex flex-col gap-2 sm:gap-4">
+                <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   <Input
                     placeholder="Search sprints..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 w-64"
+                    className="pl-10 w-full"
                   />
                 </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="planning">Planning</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full sm:w-40">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="planning">Planning</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -274,24 +317,26 @@ export default function SprintsPage() {
               </TabsList>
 
               <TabsContent value="grid" className="space-y-4">
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                   {filteredSprints.map((sprint) => (
                     <Card 
                       key={sprint._id} 
-                      className="hover:shadow-md transition-shadow cursor-pointer"
+                      className="hover:shadow-md transition-shadow cursor-pointer overflow-x-hidden"
                       onClick={() => router.push(`/sprints/${sprint._id}`)}
                     >
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div className="space-y-1">
-                            <CardTitle className="text-lg">{sprint.name}</CardTitle>
-                            <CardDescription className="line-clamp-2">
+                      <CardHeader className="p-3 sm:p-6">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-1 flex-1 min-w-0">
+                            <CardTitle className="text-base sm:text-lg truncate" title={sprint.name}>
+                              {sprint.name}
+                            </CardTitle>
+                            <CardDescription className="line-clamp-2 text-xs sm:text-sm" title={sprint.description || 'No description'}>
                               {sprint.description || 'No description'}
                             </CardDescription>
                           </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -334,54 +379,54 @@ export default function SprintsPage() {
                           </DropdownMenu>
                         </div>
                       </CardHeader>
-                      <CardContent className="space-y-4">
+                      <CardContent className="p-3 sm:p-6 pt-0 space-y-3 sm:space-y-4">
                         <div className="flex items-center space-x-2">
-                          <Badge className={getStatusColor(sprint?.status)}>
+                          <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
                             {getStatusIcon(sprint?.status)}
-                            <span className="ml-1">{sprint?.status}</span>
+                            <span className="ml-1 hidden sm:inline">{sprint?.status}</span>
                           </Badge>
                         </div>
 
                         <div className="space-y-2">
-                          <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center justify-between text-xs sm:text-sm">
                             <span className="text-muted-foreground">Progress</span>
                             <span className="font-medium">{sprint?.progress?.completionPercentage || 0}%</span>
                           </div>
-                          <Progress value={sprint?.progress?.completionPercentage || 0} className="h-2" />
+                          <Progress value={sprint?.progress?.completionPercentage || 0} className="h-1.5 sm:h-2" />
                           <div className="text-xs text-muted-foreground">
                             {sprint?.progress?.tasksCompleted || 0} of {sprint?.progress?.totalTasks || 0} tasks completed
                           </div>
                         </div>
 
                         <div className="space-y-2">
-                          <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center justify-between text-xs sm:text-sm">
                             <span className="text-muted-foreground">Story Points</span>
                             <span className="font-medium">
                               {sprint?.progress?.storyPointsCompleted || 0} / {sprint?.progress?.totalStoryPoints || 0}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center justify-between text-xs sm:text-sm">
                             <span className="text-muted-foreground">Velocity</span>
                             <span className="font-medium">{sprint?.velocity || 0}</span>
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground">
                           <div className="flex items-center space-x-1">
-                            <Users className="h-4 w-4" />
-                            <span>{sprint?.teamMembers?.length} members</span>
+                            <Users className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <span className="truncate">{sprint?.teamMembers?.length} members</span>
                           </div>
-                          <div className="flex items-center space-x-1">
-                            <Calendar className="h-4 w-4" />
-                            <span>{new Date(sprint?.startDate).toLocaleDateString()}</span>
+                          <div className="flex items-center space-x-1 flex-shrink-0">
+                            <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="whitespace-nowrap">{new Date(sprint?.startDate).toLocaleDateString()}</span>
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="text-muted-foreground">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 text-xs sm:text-sm">
+                          <div className="text-muted-foreground truncate">
                             {new Date(sprint?.startDate).toLocaleDateString()} - {new Date(sprint?.endDate).toLocaleDateString()}
                           </div>
-                          <div className="text-muted-foreground">
+                          <div className="text-muted-foreground whitespace-nowrap flex-shrink-0">
                             {Math.ceil((new Date(sprint?.endDate).getTime() - new Date(sprint?.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
                           </div>
                         </div>
@@ -396,56 +441,65 @@ export default function SprintsPage() {
                   {filteredSprints.map((sprint) => (
                     <Card 
                       key={sprint?._id} 
-                      className="hover:shadow-md transition-shadow cursor-pointer"
+                      className="hover:shadow-md transition-shadow cursor-pointer overflow-x-hidden"
                       onClick={() => router.push(`/sprints/${sprint?._id}`)}
                     >
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-2">
-                                <h3 className="font-medium text-foreground">{sprint?.name}</h3>
-                                <Badge className={getStatusColor(sprint?.status)}>
-                                  {getStatusIcon(sprint?.status)}
-                                  <span className="ml-1">{sprint?.status}</span>
-                                </Badge>
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
+                          <div className="flex-1 min-w-0 w-full">
+                            <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2 mb-2">
+                              <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
+                                {getStatusIcon(sprint?.status)}
+                                <span className="ml-1 hidden sm:inline">{sprint?.status}</span>
+                              </Badge>
+                            </div>
+                            <div className="flex items-start gap-2 mb-2">
+                              <h3 className="font-medium text-sm sm:text-base text-foreground truncate flex-1 min-w-0" title={sprint?.name}>
+                                {sprint?.name}
+                              </h3>
+                            </div>
+                            <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2" title={sprint?.description || 'No description'}>
+                              {sprint?.description || 'No description'}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                              <div className="flex items-center space-x-1 min-w-0">
+                                <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                <span 
+                                  className="truncate"
+                                  title={sprint?.project?.name && sprint?.project?.name.length > 10 ? sprint?.project?.name : undefined}
+                                >
+                                  {sprint?.project?.name && sprint?.project?.name.length > 10 ? `${sprint?.project?.name.slice(0, 10)}…` : sprint?.project?.name}
+                                </span>
                               </div>
-                              <p className="text-sm text-muted-foreground mb-2">
-                                {sprint?.description || 'No description'}
-                              </p>
-                              <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                                <div className="flex items-center space-x-1">
-                                  <Target className="h-4 w-4" />
-                                  <span>{sprint?.project?.name}</span>
-                                </div>
-                                <div className="flex items-center space-x-1">
-                                  <Users className="h-4 w-4" />
-                                  <span>{sprint?.teamMembers?.length} members</span>
-                                </div>
-                                <div className="flex items-center space-x-1">
-                                  <Calendar className="h-4 w-4" />
-                                  <span>{new Date(sprint?.startDate).toLocaleDateString()} - {new Date(sprint?.endDate).toLocaleDateString()}</span>
-                                </div>
-                                <div className="flex items-center space-x-1">
-                                  <TrendingUp className="h-4 w-4" />
-                                  <span>Velocity: {sprint?.velocity || 0}</span>
-                                </div>
+                              <div className="flex items-center space-x-1 flex-shrink-0">
+                                <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+                                <span className="whitespace-nowrap">{sprint?.teamMembers?.length} members</span>
+                              </div>
+                              <div className="flex items-center space-x-1 min-w-0">
+                                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                <span className="truncate">
+                                  {new Date(sprint?.startDate).toLocaleDateString()} - {new Date(sprint?.endDate).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-1 flex-shrink-0 whitespace-nowrap">
+                                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
+                                <span>Velocity: {sprint?.velocity || 0}</span>
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <div className="text-right">
-                              <div className="text-sm font-medium text-foreground">{sprint?.progress?.completionPercentage || 0}%</div>
-                              <div className="w-20 bg-gray-200 rounded-full h-2">
+                          <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                            <div className="text-right sm:text-left">
+                              <div className="text-xs sm:text-sm font-medium text-foreground">{sprint?.progress?.completionPercentage || 0}%</div>
+                              <div className="w-16 sm:w-20 bg-gray-200 rounded-full h-1.5 sm:h-2">
                                 <div 
-                                  className="bg-blue-600 h-2 rounded-full"
+                                  className="bg-blue-600 h-1.5 sm:h-2 rounded-full"
                                   style={{ width: `${sprint?.progress?.completionPercentage || 0}%` }}
                                 />
                               </div>
                             </div>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                                <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>

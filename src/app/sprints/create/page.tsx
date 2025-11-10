@@ -36,6 +36,8 @@ export default function CreateSprintPage() {
   const [authError, setAuthError] = useState('')
   const [projects, setProjects] = useState<Project[]>([])
   const [users, setUsers] = useState<User[]>([])
+  const [selectedProject, setSelectedProject] = useState<any>(null)
+  const [projectQuery, setProjectQuery] = useState("");
 
   const [formData, setFormData] = useState({
     name: '',
@@ -107,12 +109,36 @@ export default function CreateSprintPage() {
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
-        setUsers(data.data)
+        setUsers(data.data) // Initially show all users
       } else {
         setUsers([])
       }
     } catch (err) {
       console.error('Failed to fetch users:', err)
+      setUsers([])
+    }
+  }
+
+  const fetchProjectDetails = async (projectId: string) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}`)
+      const data = await response.json()
+
+      if (data.success && data.data) {
+        setSelectedProject(data.data)
+        // Use team members directly from project data (already populated with user details)
+        if (data.data.teamMembers && data.data.teamMembers.length > 0) {
+          setUsers(data.data.teamMembers)
+        } else {
+          setUsers([])
+        }
+      } else {
+        setSelectedProject(null)
+        setUsers([])
+      }
+    } catch (err) {
+      console.error('Failed to fetch project details:', err)
+      setSelectedProject(null)
       setUsers([])
     }
   }
@@ -138,7 +164,7 @@ export default function CreateSprintPage() {
       const data = await response.json()
 
       if (data.success) {
-        router.push('/sprints')
+        router.push('/sprints?success=sprint-created')
       } else {
         setError(data.error || 'Failed to create sprint')
       }
@@ -150,10 +176,26 @@ export default function CreateSprintPage() {
   }
 
   const handleChange = (field: string, value: string | string[]) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [field]: value
+      }
+      
+      // If project is changed, fetch project details and filter team members
+      if (field === 'project' && typeof value === 'string') {
+        if (value) {
+          fetchProjectDetails(value)
+        } else {
+          setSelectedProject(null)
+          setUsers([]) // Clear users when no project selected
+        }
+        // Clear team members selection when project changes
+        newData.teamMembers = []
+      }
+      
+      return newData
+    })
   }
 
   const handleTeamMemberToggle = (userId: string) => {
@@ -163,6 +205,14 @@ export default function CreateSprintPage() {
         ? prev.teamMembers.filter(id => id !== userId)
         : [...prev.teamMembers, userId]
     }))
+  }
+
+  // Check if all required fields are filled
+  const isFormValid = () => {
+    return formData.name.trim() !== '' && 
+           formData.project !== '' && 
+           formData.startDate !== '' && 
+           formData.endDate !== ''
   }
 
   if (authError) {
@@ -181,17 +231,17 @@ export default function CreateSprintPage() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" onClick={() => router.push('/sprints')}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <Button variant="ghost" onClick={() => router.push('/sprints')} className="w-full sm:w-auto">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center space-x-2">
-              <Target className="h-8 w-8 text-blue-600" />
-              <span>Create New Sprint</span>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground flex items-center space-x-2">
+              <Target className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-blue-600 flex-shrink-0" />
+              <span className="truncate">Create New Sprint</span>
             </h1>
-            <p className="text-muted-foreground">Create a new sprint for your project</p>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">Create a new sprint for your project</p>
           </div>
         </div>
 
@@ -218,21 +268,39 @@ export default function CreateSprintPage() {
                       onChange={(e) => handleChange('name', e.target.value)}
                       placeholder="Enter sprint name"
                       required
+                      className="w-full"
                     />
                   </div>
 
                   <div>
                     <label className="text-sm font-medium text-foreground">Project *</label>
-                    <Select value={formData.project} onValueChange={(value) => handleChange('project', value)}>
-                      <SelectTrigger>
+                    <Select
+                      value={formData.project}
+                      onValueChange={(value) => handleChange('project', value)}
+                      onOpenChange={open => { if(open) setProjectQuery(""); }}
+                    >
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a project" />
                       </SelectTrigger>
-                      <SelectContent>
-                        {Array.isArray(projects) && projects.map((project) => (
-                          <SelectItem key={project._id} value={project._id}>
-                            {project.name}
-                          </SelectItem>
-                        ))}
+                      <SelectContent className="z-[10050] p-0">
+                        <div className="p-2">
+                          <Input
+                            value={projectQuery}
+                            onChange={e => setProjectQuery(e.target.value)}
+                            placeholder="Type to search projects"
+                            className="mb-2 w-full"
+                          />
+                          <div className="max-h-56 overflow-y-auto">
+                            {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).map((project) => (
+                              <SelectItem key={project._id} value={project._id}>
+                                {project.name}
+                              </SelectItem>
+                            ))}
+                            {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).length === 0 && (
+                              <div className="px-2 py-1 text-sm text-muted-foreground">No matching projects</div>
+                            )}
+                          </div>
+                        </div>
                       </SelectContent>
                     </Select>
                   </div>
@@ -243,7 +311,9 @@ export default function CreateSprintPage() {
                       type="date"
                       value={formData.startDate}
                       onChange={(e) => handleChange('startDate', e.target.value)}
+                      max={formData.endDate || undefined}
                       required
+                      className="w-full"
                     />
                   </div>
 
@@ -253,7 +323,9 @@ export default function CreateSprintPage() {
                       type="date"
                       value={formData.endDate}
                       onChange={(e) => handleChange('endDate', e.target.value)}
+                      min={formData.startDate || undefined}
                       required
+                      className="w-full"
                     />
                   </div>
                 </div>
@@ -266,6 +338,7 @@ export default function CreateSprintPage() {
                       value={formData.capacity}
                       onChange={(e) => handleChange('capacity', e.target.value)}
                       placeholder="Enter sprint capacity"
+                      className="w-full"
                     />
                   </div>
 
@@ -275,6 +348,7 @@ export default function CreateSprintPage() {
                       value={formData.goal}
                       onChange={(e) => handleChange('goal', e.target.value)}
                       placeholder="Enter sprint goal"
+                      className="w-full"
                     />
                   </div>
                 </div>
@@ -287,34 +361,45 @@ export default function CreateSprintPage() {
                   onChange={(e) => handleChange('description', e.target.value)}
                   placeholder="Enter sprint description"
                   rows={4}
+                  className="w-full"
                 />
               </div>
 
               <div>
                 <label className="text-sm font-medium text-foreground">Team Members</label>
                 <div className="grid gap-2 mt-2 max-h-40 overflow-y-auto">
-                  {Array.isArray(users) && users.map((user) => (
-                    <div key={user._id} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={user._id}
-                        checked={formData.teamMembers.includes(user._id)}
-                        onChange={() => handleTeamMemberToggle(user._id)}
-                        className="rounded"
-                      />
-                      <label htmlFor={user._id} className="text-sm">
-                        {user.firstName} {user.lastName} ({user.email})
-                      </label>
-                    </div>
-                  ))}
+                  {!formData.project ? (
+                    <p className="text-xs sm:text-sm text-muted-foreground italic">
+                      Please select a project to see available team members
+                    </p>
+                  ) : Array.isArray(users) && users.length > 0 ? (
+                    users.map((user) => (
+                      <div key={user._id} className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id={user._id}
+                          checked={formData.teamMembers.includes(user._id)}
+                          onChange={() => handleTeamMemberToggle(user._id)}
+                          className="rounded flex-shrink-0"
+                        />
+                        <label htmlFor={user._id} className="text-xs sm:text-sm break-words flex-1 min-w-0">
+                          {user.firstName} {user.lastName} ({user.email})
+                        </label>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs sm:text-sm text-muted-foreground italic">
+                      No team members found for the selected project
+                    </p>
+                  )}
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-4">
-                <Button type="button" variant="outline" onClick={() => router.push('/sprints')}>
+              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4">
+                <Button type="button" variant="outline" onClick={() => router.push('/sprints')} className="w-full sm:w-auto">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={loading}>
+                <Button type="submit" disabled={loading || !isFormValid()} className="w-full sm:w-auto">
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />

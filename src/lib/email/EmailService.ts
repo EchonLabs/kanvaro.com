@@ -45,33 +45,63 @@ export class EmailService {
 
   private createTransporter(config: any) {
     if (config.provider === 'smtp') {
-      return nodemailer.createTransport({
+      const port = config.smtp.port || 587
+      
+      // Port 465 uses direct SSL/TLS (secure: true)
+      // Port 587 uses STARTTLS (secure: false, requireTLS: true)
+      // Port 25 usually doesn't use encryption (secure: false)
+      // Force correct setting based on port to prevent SSL version mismatch
+      let useSecure: boolean
+      if (port === 465) {
+        // Port 465 uses direct SSL/TLS connection
+        useSecure = true
+      } else {
+        // Ports 587, 25, etc. use STARTTLS (upgrade plain connection to TLS)
+        useSecure = false
+      }
+      
+      const useStartTLS = !useSecure && port !== 465
+      
+      const transportConfig: any = {
         host: config.smtp.host,
-        port: config.smtp.port,
-        secure: config.smtp.secure,
+        port: port,
+        secure: useSecure, // false for STARTTLS (port 587), true for direct SSL (port 465)
         auth: {
           user: config.smtp.username,
           pass: config.smtp.password,
         },
         tls: {
           rejectUnauthorized: false,
+          // Don't specify ciphers - let Node.js negotiate with server
+          // This allows the system to find compatible ciphers automatically
+          minVersion: 'TLSv1.2' // Minimum TLS version
         },
         connectionTimeout: 60000,
         greetingTimeout: 30000,
         socketTimeout: 60000,
-      })
+        // STARTTLS configuration (for port 587)
+        requireTLS: useStartTLS, // Require TLS upgrade for STARTTLS
+        ignoreTLS: false // Don't ignore TLS - upgrade to TLS when available
+      }
+      
+      
+      
+      return nodemailer.createTransport(transportConfig)
     }
     
     throw new Error(`Unsupported email provider: ${config.provider}`)
   }
 
   async sendEmail(options: EmailOptions): Promise<boolean> {
+
     try {
       const config = await this.getEmailConfig()
+
       const transporter = this.createTransporter(config)
 
       const fromEmail = config.smtp?.fromEmail || config.azure?.fromEmail
       const fromName = config.smtp?.fromName || config.azure?.fromName
+
 
       if (!fromEmail || !fromName) {
         throw new Error('From email and name not configured')
@@ -86,10 +116,10 @@ export class EmailService {
       }
 
       const result = await transporter.sendMail(mailOptions)
-      console.log('Email sent successfully:', result.messageId)
+
       return true
-    } catch (error) {
-      console.error('Email sending failed:', error)
+    } catch (error: any) {
+      
       return false
     }
   }

@@ -119,7 +119,7 @@ export default function SetupPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open('/docs/public', '_blank')}
+              onClick={() => router.push('/docs/public')}
               className="flex items-center space-x-2 w-full sm:w-auto"
             >
               <BookOpen className="h-4 w-4" />
@@ -145,7 +145,7 @@ export default function SetupPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => window.open('/docs/public', '_blank')}
+                      onClick={() => router.push('/docs/public')}
                       className="flex items-center space-x-2"
                     >
                       <BookOpen className="h-4 w-4" />

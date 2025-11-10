@@ -26,16 +26,21 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'Test plan not found' }, { status: 404 })
     }
 
-    // Check if user has access to the project
+    // Check if user has access to the project (safe ObjectId comparisons)
     const project = await Project.findById(testPlan.project)
-    const hasAccess = project && (
-      project.teamMembers.includes(authResult.user.id) || 
-      project.createdBy.toString() === authResult.user.id ||
-      project.projectRoles.some((role: any) => 
-        role.user.toString() === authResult.user.id && 
-        ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)
-      )
-    )
+    const userIdStr_GET = (authResult as any)?.user?.id?.toString?.() || String((authResult as any)?.user?.id)
+    const roleStr_GET = (authResult as any)?.user?.role ?? (authResult as any)?.role
+    const isAdmin_GET = typeof roleStr_GET === 'string' && ['admin', 'super_admin', 'superadmin'].includes(roleStr_GET.toLowerCase())
+    const createdByStr_GET = project?.createdBy?.toString?.()
+    const teamHasUser_GET = Array.isArray(project?.teamMembers)
+      ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr_GET)
+      : false
+    const roleHasUser_GET = Array.isArray(project?.projectRoles)
+      ? project.projectRoles.some(
+          (role: any) => role?.user?.toString?.() === userIdStr_GET && ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)
+        )
+      : false
+    const hasAccess = !!project && (isAdmin_GET || createdByStr_GET === userIdStr_GET || teamHasUser_GET || roleHasUser_GET)
 
     if (!hasAccess) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 })
@@ -85,16 +90,21 @@ export async function PUT(
       return NextResponse.json({ success: false, error: 'Test plan not found' }, { status: 404 })
     }
 
-    // Check if user has access to the project
+    // Check if user has access to the project (safe ObjectId comparisons)
     const project = await Project.findById(testPlan.project)
-    const hasAccess = project && (
-      project.teamMembers.includes(authResult.user.id) || 
-      project.createdBy.toString() === authResult.user.id ||
-      project.projectRoles.some((role: any) => 
-        role.user.toString() === authResult.user.id && 
-        ['project_manager', 'project_qa_lead'].includes(role.role)
-      )
-    )
+    const userIdStr_PUT = (authResult as any)?.user?.id?.toString?.() || String((authResult as any)?.user?.id)
+    const roleStr_PUT = (authResult as any)?.user?.role ?? (authResult as any)?.role
+    const isAdmin_PUT = typeof roleStr_PUT === 'string' && ['admin', 'super_admin', 'superadmin'].includes(roleStr_PUT.toLowerCase())
+    const createdByStr_PUT = project?.createdBy?.toString?.()
+    const teamHasUser_PUT = Array.isArray(project?.teamMembers)
+      ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr_PUT)
+      : false
+    const roleHasUser_PUT = Array.isArray(project?.projectRoles)
+      ? project.projectRoles.some(
+          (role: any) => role?.user?.toString?.() === userIdStr_PUT && ['project_manager', 'project_qa_lead'].includes(role.role)
+        )
+      : false
+    const hasAccess = !!project && (isAdmin_PUT || createdByStr_PUT === userIdStr_PUT || teamHasUser_PUT || roleHasUser_PUT)
 
     if (!hasAccess) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 })
@@ -149,16 +159,21 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: 'Test plan not found' }, { status: 404 })
     }
 
-    // Check if user has access to the project
+    // Check if user has access to the project (safe ObjectId comparisons + admin override)
     const project = await Project.findById(testPlan.project)
-    const hasAccess = project && (
-      project.teamMembers.includes(authResult.user.id) || 
-      project.createdBy.toString() === authResult.user.id ||
-      project.projectRoles.some((role: any) => 
-        role.user.toString() === authResult.user.id && 
-        ['project_manager', 'project_qa_lead'].includes(role.role)
-      )
-    )
+    const userIdStr_DEL = (authResult as any)?.user?.id?.toString?.() || String((authResult as any)?.user?.id)
+    const roleStr_DEL = (authResult as any)?.user?.role ?? (authResult as any)?.role
+    const isAdmin_DEL = typeof roleStr_DEL === 'string' && ['admin', 'super_admin', 'superadmin'].includes(roleStr_DEL.toLowerCase())
+    const createdByStr_DEL = project?.createdBy?.toString?.()
+    const teamHasUser_DEL = Array.isArray(project?.teamMembers)
+      ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr_DEL)
+      : false
+    const roleHasUser_DEL = Array.isArray(project?.projectRoles)
+      ? project.projectRoles.some(
+          (role: any) => role?.user?.toString?.() === userIdStr_DEL && ['project_manager', 'project_qa_lead'].includes(role.role)
+        )
+      : false
+    const hasAccess = !!project && (isAdmin_DEL || createdByStr_DEL === userIdStr_DEL || teamHasUser_DEL || roleHasUser_DEL)
 
     if (!hasAccess) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 })

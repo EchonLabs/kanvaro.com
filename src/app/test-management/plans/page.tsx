@@ -32,36 +32,58 @@ export default function TestPlansPage() {
   const [deleteItem, setDeleteItem] = useState<{ id: string; name: string } | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [testPlans, setTestPlans] = useState<TestPlan[]>([])
+  const [plansLoading, setPlansLoading] = useState(false)
+  const [refreshCounter, setRefreshCounter] = useState(0)
 
-  // Mock data - in real implementation, this would come from API
-  const testPlans: TestPlan[] = [
-    {
-      _id: '1',
-      name: 'Sprint 1 Test Plan',
-      description: 'Test plan for Sprint 1 features',
-      project: 'Project Alpha',
-      version: 'v1.0.0',
-      assignedTo: 'John Doe',
-      startDate: new Date('2024-01-15'),
-      endDate: new Date('2024-01-30'),
-      testCases: ['tc1', 'tc2', 'tc3'],
-      tags: ['sprint1', 'feature'],
-      customFields: {}
-    },
-    {
-      _id: '2',
-      name: 'Regression Test Plan',
-      description: 'Comprehensive regression testing',
-      project: 'Project Beta',
-      version: 'v2.1.0',
-      assignedTo: 'Jane Smith',
-      startDate: new Date('2024-01-20'),
-      endDate: new Date('2024-02-05'),
-      testCases: ['tc4', 'tc5', 'tc6'],
-      tags: ['regression', 'comprehensive'],
-      customFields: {}
+  // Helper to fetch the first available project id when none is selected
+  const getFirstProjectId = async (): Promise<string | null> => {
+    try {
+      const res = await fetch('/api/projects')
+      const data = await res.json()
+      if (res.ok && data?.success && Array.isArray(data.data) && data.data.length > 0) {
+        return data.data[0]._id as string
+      }
+    } catch (e) {
+      console.error('Error fetching projects:', e)
     }
-  ]
+    return null
+  }
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        setPlansLoading(true)
+        const qs = selectedProject ? `?projectId=${selectedProject}` : ''
+        const res = await fetch(`/api/test-plans${qs}`)
+        const data = await res.json()
+        if (res.ok && data?.success && Array.isArray(data.data)) {
+          const mapped: TestPlan[] = data.data.map((p: any) => ({
+            _id: p._id,
+            name: p.name,
+            description: p.description,
+            project: typeof p.project === 'object' && p.project?._id ? p.project._id : p.project,
+            version: p.version,
+            assignedTo: p.assignedTo ? `${p.assignedTo.firstName ?? ''} ${p.assignedTo.lastName ?? ''}`.trim() : undefined,
+            startDate: p.startDate ? new Date(p.startDate) : undefined,
+            endDate: p.endDate ? new Date(p.endDate) : undefined,
+            testCases: Array.isArray(p.testCases) ? p.testCases.map((tc: any) => (typeof tc === 'string' ? tc : tc._id)) : [],
+            tags: p.tags || [],
+            customFields: p.customFields || {}
+          }))
+          setTestPlans(mapped)
+        } else {
+          setTestPlans([])
+        }
+      } catch (e) {
+        console.error('Error fetching test plans:', e)
+        setTestPlans([])
+      } finally {
+        setPlansLoading(false)
+      }
+    }
+    fetchPlans()
+  }, [selectedProject, refreshCounter])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -73,7 +95,12 @@ export default function TestPlansPage() {
     }
   }
 
-  const handleCreateTestPlan = () => {
+  const handleCreateTestPlan = async () => {
+    console.log('inside create project')
+    if (!selectedProject) {
+      const first = await getFirstProjectId()
+      if (first) setSelectedProject(first)
+    }
     setSelectedTestPlan(null)
     setTestPlanDialogOpen(true)
   }
@@ -89,10 +116,24 @@ export default function TestPlansPage() {
   }
 
   const handleSaveTestPlan = async (testPlanData: any) => {
+    console.log('testPlanData', testPlanData)
     setSaving(true)
     try {
+      let effectiveProjectId = selectedProject || testPlanData.project
+      if (!effectiveProjectId) {
+        const first = await getFirstProjectId()
+        if (first) {
+          setSelectedProject(first)
+          effectiveProjectId = first
+        }
+      }
+      if (!effectiveProjectId) {
+        console.error('Cannot save test plan: projectId is missing')
+        setSaving(false)
+        return
+      }
       const url = selectedTestPlan?._id 
-        ? `/api/test-plans/${selectedTestPlan._id}`
+        ? `/api/test-plans/${selectedTestPlan._id}` 
         : '/api/test-plans'
       
       const method = selectedTestPlan?._id ? 'PUT' : 'POST'
@@ -102,14 +143,14 @@ export default function TestPlansPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...testPlanData,
-          projectId: selectedProject
+          projectId: effectiveProjectId
         })
       })
 
       if (response.ok) {
         setTestPlanDialogOpen(false)
         setSelectedTestPlan(null)
-        // Refresh the list or show success message
+        setRefreshCounter(c => c + 1)
       } else {
         console.error('Failed to save test plan')
       }
@@ -132,7 +173,7 @@ export default function TestPlansPage() {
       if (response.ok) {
         setDeleteDialogOpen(false)
         setDeleteItem(null)
-        // Refresh the list or show success message
+        setRefreshCounter(c => c + 1)
       } else {
         console.error('Failed to delete test plan')
       }

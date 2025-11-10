@@ -74,6 +74,8 @@ export default function FinancialReportsPage() {
   const [reportData, setReportData] = useState<FinancialReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
+  const [projects, setProjects] = useState<Array<{ _id: string; name: string }>>([])
+  const [projectsLoading, setProjectsLoading] = useState(false)
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     category: 'all',
@@ -90,6 +92,26 @@ export default function FinancialReportsPage() {
   useEffect(() => {
     fetchFinancialReports()
   }, [filters])
+
+  // Load projects for the Project filter dropdown
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        setProjectsLoading(true)
+        const res = await fetch('/api/projects?limit=1000&page=1')
+        if (res.ok) {
+          const data = await res.json()
+          const items = (data?.data || []).map((p: any) => ({ _id: p._id, name: p.name }))
+          setProjects(items)
+        }
+      } catch (e) {
+        console.error('Failed to load projects for financial filter:', e)
+      } finally {
+        setProjectsLoading(false)
+      }
+    }
+    loadProjects()
+  }, [])
 
   const fetchFinancialReports = async () => {
     try {
@@ -201,23 +223,23 @@ export default function FinancialReportsPage() {
       <PageWrapper>
         <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Financial Reports</h1>
-          <p className="text-muted-foreground">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Financial Reports</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
             Comprehensive financial analytics and budget insights
           </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="w-full sm:w-auto">
             <Filter className="h-4 w-4 mr-2" />
             Filters
           </Button>
-          <Button variant="outline" size="sm" onClick={fetchFinancialReports}>
+          <Button variant="outline" size="sm" onClick={fetchFinancialReports} className="w-full sm:w-auto">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={() => exportReport('csv')}>
+          <Button variant="outline" size="sm" onClick={() => exportReport('csv')} className="w-full sm:w-auto">
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -228,13 +250,13 @@ export default function FinancialReportsPage() {
       {showFilters && (
         <Card>
           <CardHeader>
-            <CardTitle>Filters</CardTitle>
-            <CardDescription>Filter and sort financial reports</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Filters</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Filter and sort financial reports</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="search">Search</Label>
+                <Label htmlFor="search" className="text-xs sm:text-sm">Search</Label>
                 <div className="relative">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -242,15 +264,15 @@ export default function FinancialReportsPage() {
                     placeholder="Search transactions..."
                     value={filters.search}
                     onChange={(e) => handleFilterChange('search', e.target.value)}
-                    className="pl-8"
+                    className="pl-8 w-full"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
+                <Label htmlFor="category" className="text-xs sm:text-sm">Category</Label>
                 <Select value={filters.category} onValueChange={(value) => handleFilterChange('category', value)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -265,24 +287,32 @@ export default function FinancialReportsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="project">Project</Label>
+                <Label htmlFor="project" className="text-xs sm:text-sm">Project</Label>
                 <Select value={filters.project} onValueChange={(value) => handleFilterChange('project', value)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select project" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Projects</SelectItem>
-                    {/* Project options would be populated from API */}
+                    {projectsLoading ? (
+                      <SelectItem value="loading" disabled>Loading projects...</SelectItem>
+                    ) : projects.length === 0 ? (
+                      <SelectItem value="none" disabled>No projects found</SelectItem>
+                    ) : (
+                      projects.map((p) => (
+                        <SelectItem key={p._id} value={p._id}>{p.name}</SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label>Date Range</Label>
-                <div className="flex space-x-2">
+                <Label className="text-xs sm:text-sm">Date Range</Label>
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !filters.dateRange.from && "text-muted-foreground")}>
+                      <Button variant="outline" className={cn("w-full sm:w-auto justify-start text-left font-normal", !filters.dateRange.from && "text-muted-foreground")}>
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {filters.dateRange.from ? format(filters.dateRange.from, "PPP") : "From"}
                       </Button>
@@ -298,7 +328,7 @@ export default function FinancialReportsPage() {
                   </Popover>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !filters.dateRange.to && "text-muted-foreground")}>
+                      <Button variant="outline" className={cn("w-full sm:w-auto justify-start text-left font-normal", !filters.dateRange.to && "text-muted-foreground")}>
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {filters.dateRange.to ? format(filters.dateRange.to, "PPP") : "To"}
                       </Button>
@@ -316,14 +346,14 @@ export default function FinancialReportsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <Button variant="outline" onClick={clearFilters}>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+              <Button variant="outline" onClick={clearFilters} className="w-full sm:w-auto">
                 Clear Filters
               </Button>
-              <div className="flex items-center space-x-2">
-                <Label htmlFor="sortBy">Sort By</Label>
+              <div className="flex items-center space-x-2 w-full sm:w-auto">
+                <Label htmlFor="sortBy" className="text-xs sm:text-sm whitespace-nowrap flex-shrink-0">Sort By</Label>
                 <Select value={filters.sortBy} onValueChange={(value) => handleFilterChange('sortBy', value)}>
-                  <SelectTrigger className="w-40">
+                  <SelectTrigger className="w-full sm:w-40">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -334,7 +364,7 @@ export default function FinancialReportsPage() {
                   </SelectContent>
                 </Select>
                 <Select value={filters.sortOrder} onValueChange={(value: 'asc' | 'desc') => handleFilterChange('sortOrder', value)}>
-                  <SelectTrigger className="w-32">
+                  <SelectTrigger className="w-full sm:w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -349,17 +379,17 @@ export default function FinancialReportsPage() {
       )}
 
       {/* Key Financial Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Budget</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Budget</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               ${reportData.overview.totalBudget.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Across all projects
             </p>
           </CardContent>
@@ -367,14 +397,14 @@ export default function FinancialReportsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Spent</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Spent</CardTitle>
+            <TrendingDown className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               ${reportData.overview.totalSpent.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               {reportData.overview.budgetUtilization.toFixed(1)}% of budget
             </p>
             <Progress value={reportData.overview.budgetUtilization} className="mt-2" />
@@ -383,14 +413,14 @@ export default function FinancialReportsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Revenue</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-600 flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-xl sm:text-2xl font-bold text-green-600">
               ${reportData.overview.totalRevenue.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Generated revenue
             </p>
           </CardContent>
@@ -398,16 +428,16 @@ export default function FinancialReportsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-            <Badge variant={reportData.overview.netProfit >= 0 ? 'default' : 'destructive'}>
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Net Profit</CardTitle>
+            <Badge variant={reportData.overview.netProfit >= 0 ? 'default' : 'destructive'} className="flex-shrink-0 ml-2 text-xs">
               {reportData.overview.netProfit >= 0 ? '+' : ''}${reportData.overview.netProfit.toLocaleString()}
             </Badge>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${reportData.overview.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <div className={`text-xl sm:text-2xl font-bold ${reportData.overview.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               ${reportData.overview.netProfit.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               {reportData.overview.profitMargin.toFixed(1)}% profit margin
             </p>
           </CardContent>
@@ -416,11 +446,11 @@ export default function FinancialReportsPage() {
 
       {/* Report Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="budget">Budget Analysis</TabsTrigger>
-          <TabsTrigger value="expenses">Expenses</TabsTrigger>
-          <TabsTrigger value="revenue">Revenue</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 overflow-x-auto">
+          <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+          <TabsTrigger value="budget" className="text-xs sm:text-sm">Budget Analysis</TabsTrigger>
+          <TabsTrigger value="expenses" className="text-xs sm:text-sm">Expenses</TabsTrigger>
+          <TabsTrigger value="revenue" className="text-xs sm:text-sm">Revenue</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">

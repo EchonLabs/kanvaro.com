@@ -117,10 +117,10 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Recent Tasks</CardTitle>
+    <Card className="overflow-x-hidden">
+      <CardHeader className="p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+          <CardTitle className="text-base sm:text-lg truncate">Recent Tasks</CardTitle>
           <Button 
             variant="outline" 
             size="sm"
@@ -129,57 +129,66 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
               e.stopPropagation()
               router.push('/tasks')
             }}
+            className="w-full sm:w-auto flex-shrink-0"
           >
             View All
-            <ArrowRight className="h-4 w-4 ml-1" />
+            <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1" />
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
+      <CardContent className="p-4 sm:p-6 pt-0">
+        <div className="space-y-2 sm:space-y-3">
           {tasks.map((task) => (
             <div 
               key={task._id} 
-              className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+              className="flex items-start sm:items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer overflow-x-hidden"
               onClick={() => router.push(`/tasks/${task._id}`)}
             >
               <Checkbox 
                 checked={task.status === 'done'}
-                className="flex-shrink-0"
+                className="flex-shrink-0 mt-1 sm:mt-0"
                 readOnly
               />
               
               <div className="flex-1 min-w-0">
-                <div className="flex items-center space-x-2 mb-1">
-                  <h4 className={`text-sm font-medium ${task.status === 'done' ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}>
-                    {task.title}
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <h4 
+                    className={`text-xs sm:text-sm font-medium truncate flex-1 min-w-0 ${task.status === 'done' ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}
+                    title={task.title && task.title.length > 10 ? task.title : undefined}
+                  >
+                    {task.title && task.title.length > 10 ? `${task.title.slice(0, 10)}…` : task.title}
                   </h4>
-                  <Badge className={getStatusColor(task.status)}>
+                  <Badge className={`${getStatusColor(task.status)} text-xs flex-shrink-0`}>
                     {task.status}
                   </Badge>
-                  <Badge className={getPriorityColor(task.priority)}>
+                  <Badge className={`${getPriorityColor(task.priority)} text-xs flex-shrink-0`}>
                     {task.priority}
                   </Badge>
                 </div>
                 
-                <div className="flex items-center space-x-4 text-xs text-gray-600 dark:text-gray-400">
-                  <span className="font-medium">{task.project?.name || 'No Project'}</span>
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-gray-600 dark:text-gray-400">
+                  <span 
+                    className="font-medium truncate"
+                    title={task.project?.name && task.project.name.length > 10 ? task.project.name : undefined}
+                  >
+                    {task.project?.name && task.project.name.length > 10 ? `${task.project.name.slice(0, 10)}…` : (task.project?.name || 'No Project')}
+                  </span>
                   {task.assignedTo && (
-                    <div className="flex items-center">
-                      <User className="h-3 w-3 mr-1" />
-                      {task.assignedTo.firstName} {task.assignedTo.lastName}
+                    <div className="flex items-center whitespace-nowrap">
+                      <User className="h-3 w-3 mr-1 flex-shrink-0" />
+                      <span className="truncate">{task.assignedTo.firstName} {task.assignedTo.lastName}</span>
                     </div>
                   )}
                   {task.dueDate && (
-                    <div className="flex items-center">
-                      <Calendar className="h-3 w-3 mr-1" />
-                      {new Date(task.dueDate).toLocaleDateString()}
+                    <div className="flex items-center whitespace-nowrap">
+                      <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
+                      <span className="truncate">{new Date(task.dueDate).toLocaleDateString()}</span>
                     </div>
                   )}
                 </div>
               </div>
               
-              <Button variant="ghost" size="sm" className="flex-shrink-0">
+              <Button variant="ghost" size="sm" className="flex-shrink-0 hidden sm:inline-flex">
                 View
               </Button>
             </div>

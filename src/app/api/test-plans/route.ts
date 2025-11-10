@@ -74,6 +74,16 @@ export async function POST(req: NextRequest) {
   try {
     await connectDB()
     const authResult = await authenticateUser()
+    console.log('authResult', authResult);
+    // Normalize user id to string regardless of shape
+    const userIdStr = (authResult as any)?.user?.id
+      ? (authResult as any).user.id.toString()
+      : (authResult as any)?.id?.toString?.()
+    const orgIdStr = (authResult as any)?.user?.organization
+      ? (authResult as any).user.organization.toString()
+      : (authResult as any)?.organization?.toString?.()
+    const roleStr = (authResult as any)?.user?.role ?? (authResult as any)?.role
+    const isAdmin = typeof roleStr === 'string' && ['admin', 'super_admin', 'superadmin'].includes(roleStr.toLowerCase())
     
     if ('error' in authResult) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
@@ -92,6 +102,16 @@ export async function POST(req: NextRequest) {
       customFields
     } = await req.json()
 
+    console.log('name', name);
+    console.log('projectId', projectId);
+    console.log('version', version);
+    console.log('assignedTo', assignedTo);
+    console.log('startDate', startDate);
+    console.log('endDate', endDate);
+    console.log('testCases', testCases);
+    console.log('tags', tags);
+    console.log('customFields', customFields);
+    
     if (!name || !projectId) {
       return NextResponse.json(
         { success: false, error: 'Name and projectId are required' },
@@ -104,26 +124,31 @@ export async function POST(req: NextRequest) {
     if (!project) {
       return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
     }
-
-    const hasAccess = project.teamMembers.includes(authResult.user.id) || 
-                     project.createdBy.toString() === authResult.user.id ||
-                     project.projectRoles.some((role: any) => 
-                       role.user.toString() === authResult.user.id && 
-                       ['project_manager', 'project_qa_lead'].includes(role.role)
-                     )
+    const createdByStr = project.createdBy?.toString?.()
+    const teamHasUser = Array.isArray(project.teamMembers)
+      ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr)
+      : false
+    const roleHasUser = Array.isArray(project.projectRoles)
+      ? project.projectRoles.some(
+          (role: any) => role?.user?.toString?.() === userIdStr && ['project_manager', 'project_qa_lead'].includes(role.role)
+        )
+      : false
+    const hasAccess = !!userIdStr && (isAdmin || createdByStr === userIdStr || teamHasUser || roleHasUser)
+    console.log('createdByStr', createdByStr, 'userIdStr', userIdStr, { isAdmin, teamHasUser, roleHasUser, hasAccess })
 
     if (!hasAccess) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 })
     }
 
+    const assignedToId = typeof assignedTo === 'string' && assignedTo.trim().length > 0 ? assignedTo : undefined
     const testPlan = new TestPlan({
       name,
       description,
-      organization: authResult.user.organization,
+      organization: orgIdStr,
       project: projectId,
       version,
-      createdBy: authResult.user.id,
-      assignedTo,
+      createdBy: userIdStr,
+      assignedTo: assignedToId,
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
       testCases: testCases || [],

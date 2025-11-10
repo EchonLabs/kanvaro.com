@@ -168,8 +168,8 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <Card className="w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
-        <CardHeader>
+      <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col m-4 sm:m-6">
+        <CardHeader className="flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Edit Task</CardTitle>
@@ -180,8 +180,8 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <CardContent className="flex-1 overflow-y-auto">
+          <form onSubmit={handleSubmit} className="space-y-6" id="edit-task-form">
             {error && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
@@ -411,26 +411,28 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
               )}
             </div>
 
-            <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading || !formData.title}>
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Update Task
-                  </>
-                )}
-              </Button>
-            </div>
           </form>
         </CardContent>
+        <div className="flex-shrink-0 px-4 sm:px-6 pb-4 sm:pb-6 pt-3 sm:pt-4 border-t">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-0 sm:space-x-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" form="edit-task-form" disabled={loading || !formData.title}>
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Update Task
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
       </Card>
     </div>
   )

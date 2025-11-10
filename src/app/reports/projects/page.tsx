@@ -212,23 +212,23 @@ export default function ProjectReportsPage() {
       <PageWrapper>
         <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Project Reports</h1>
-          <p className="text-muted-foreground">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Project Reports</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
             Comprehensive analytics and insights for all projects
           </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="w-full sm:w-auto">
             <Filter className="h-4 w-4 mr-2" />
             Filters
           </Button>
-          <Button variant="outline" size="sm" onClick={fetchProjectReports}>
+          <Button variant="outline" size="sm" onClick={fetchProjectReports} className="w-full sm:w-auto">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={() => exportReport('pdf')}>
+          <Button variant="outline" size="sm" onClick={() => exportReport('pdf')} className="w-full sm:w-auto">
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -276,10 +276,10 @@ export default function ProjectReportsPage() {
 
               <div className="space-y-2">
                 <Label>Date Range</Label>
-                <div className="flex space-x-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !filters.dateRange.from && "text-muted-foreground")}>
+                      <Button variant="outline" className={cn("w-full sm:w-auto justify-start text-left font-normal", !filters.dateRange.from && "text-muted-foreground")}>
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {filters.dateRange.from ? format(filters.dateRange.from, "PPP") : "From"}
                       </Button>
@@ -295,7 +295,7 @@ export default function ProjectReportsPage() {
                   </Popover>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !filters.dateRange.to && "text-muted-foreground")}>
+                      <Button variant="outline" className={cn("w-full sm:w-auto justify-start text-left font-normal", !filters.dateRange.to && "text-muted-foreground")}>
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {filters.dateRange.to ? format(filters.dateRange.to, "PPP") : "To"}
                       </Button>
@@ -329,14 +329,14 @@ export default function ProjectReportsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <Button variant="outline" onClick={clearFilters}>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+              <Button variant="outline" onClick={clearFilters} className="w-full sm:w-auto">
                 Clear Filters
               </Button>
-              <div className="flex items-center space-x-2">
-                <Label htmlFor="sortOrder">Order</Label>
+              <div className="flex items-center space-x-2 w-full sm:w-auto">
+                <Label htmlFor="sortOrder" className="text-xs sm:text-sm whitespace-nowrap flex-shrink-0">Order</Label>
                 <Select value={filters.sortOrder} onValueChange={(value: 'asc' | 'desc') => handleFilterChange('sortOrder', value)}>
-                  <SelectTrigger className="w-32">
+                  <SelectTrigger className="w-full sm:w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -351,15 +351,15 @@ export default function ProjectReportsPage() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
-            <Badge variant="outline">{reportData.summary.totalProjects}</Badge>
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Projects</CardTitle>
+            <Badge variant="outline" className="flex-shrink-0 ml-2 text-xs">{reportData.summary.totalProjects}</Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{reportData.summary.totalProjects}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-xl sm:text-2xl font-bold">{reportData.summary.totalProjects}</div>
+            <p className="text-xs text-muted-foreground mt-1">
               {reportData.summary.activeProjects} active, {reportData.summary.completedProjects} completed
             </p>
           </CardContent>
@@ -367,8 +367,8 @@ export default function ProjectReportsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Budget Utilization</CardTitle>
-            <Badge variant="outline">
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Budget Utilization</CardTitle>
+            <Badge variant="outline" className="flex-shrink-0 ml-2 text-xs">
               {reportData.summary.totalBudget > 0 
                 ? `${((reportData.summary.totalSpent / reportData.summary.totalBudget) * 100).toFixed(1)}%`
                 : '0%'
@@ -376,10 +376,10 @@ export default function ProjectReportsPage() {
             </Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               ${reportData.summary.totalSpent.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1 break-words">
               of ${reportData.summary.totalBudget.toLocaleString()} total budget
             </p>
             <Progress 
@@ -391,14 +391,14 @@ export default function ProjectReportsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Completion</CardTitle>
-            <Badge variant="outline">{reportData.summary.averageCompletionRate.toFixed(1)}%</Badge>
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Average Completion</CardTitle>
+            <Badge variant="outline" className="flex-shrink-0 ml-2 text-xs">{reportData.summary.averageCompletionRate.toFixed(1)}%</Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               {reportData.summary.averageCompletionRate.toFixed(1)}%
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Across all projects
             </p>
             <Progress 
@@ -410,14 +410,14 @@ export default function ProjectReportsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Project Velocity</CardTitle>
-            <Badge variant="outline">{reportData.trends.projectVelocity.toFixed(1)}</Badge>
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Project Velocity</CardTitle>
+            <Badge variant="outline" className="flex-shrink-0 ml-2 text-xs">{reportData.trends.projectVelocity.toFixed(1)}</Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               {reportData.trends.projectVelocity.toFixed(1)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Projects per month
             </p>
           </CardContent>
@@ -426,11 +426,11 @@ export default function ProjectReportsPage() {
 
       {/* Report Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="progress">Progress</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
-          <TabsTrigger value="resources">Resources</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 overflow-x-auto">
+          <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+          <TabsTrigger value="progress" className="text-xs sm:text-sm">Progress</TabsTrigger>
+          <TabsTrigger value="timeline" className="text-xs sm:text-sm">Timeline</TabsTrigger>
+          <TabsTrigger value="resources" className="text-xs sm:text-sm">Resources</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">

@@ -3,6 +3,8 @@ import connectDB from '@/lib/db-config'
 import { Story } from '@/models/Story'
 import { Project } from '@/models/Project'
 import { Epic } from '@/models/Epic'
+import { User } from '@/models/User'
+import { Sprint } from '@/models/Sprint'
 import { authenticateUser } from '@/lib/auth-utils'
 
 export async function GET(request: NextRequest) {
@@ -65,7 +67,10 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Get stories error:', error)
+    console.error('Get stories error:', error);
+    if (error instanceof Error && error.stack) {
+      console.error('Stack:', error.stack);
+    }
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

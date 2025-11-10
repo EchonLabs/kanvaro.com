@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Progress } from '@/components/ui/Progress'
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { 
   ArrowLeft, 
   Calendar, 
@@ -33,9 +34,17 @@ import {
   User,
   Calendar as CalendarIcon,
   Target,
-  Zap
+  Zap,
+  Download,
+  Edit,
+  UserPlus,
+  Save,
+  Trash2
 } from 'lucide-react'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
+import EditTaskModal from '@/components/tasks/EditTaskModal'
+import ViewTaskModal from '@/components/tasks/ViewTaskModal'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import TaskList from '@/components/tasks/TaskList'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
 import CalendarView from '@/components/tasks/CalendarView'
@@ -43,6 +52,10 @@ import BacklogView from '@/components/tasks/BacklogView'
 import ReportsView from '@/components/tasks/ReportsView'
 import TestSuiteTree from '@/components/test-management/TestSuiteTree'
 import TestCaseList from '@/components/test-management/TestCaseList'
+import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
+import { TestSuiteForm } from '@/components/test-management/TestSuiteForm'
+import { TestCaseForm } from '@/components/test-management/TestCaseForm'
+import { ProjectTeamTab } from '@/components/projects/ProjectTeamTab'
 
 interface Project {
   _id: string
@@ -95,6 +108,22 @@ interface Project {
       deadlineReminders: boolean
     }
   }
+  stats?: {
+    tasks?: {
+      completionRate: number
+      completed: number
+      total: number
+    }
+    budget?: {
+      utilizationRate: number
+      spent: number
+      total: number
+    }
+    timeTracking?: {
+      totalHours: number
+      entries: number
+    }
+  }
   tags: string[]
   createdAt: string
   updatedAt: string
@@ -111,12 +140,119 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
+  const [showEditTaskModal, setShowEditTaskModal] = useState(false)
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
+  const [selectedTask, setSelectedTask] = useState<any | null>(null)
+  const [tasks, setTasks] = useState<any[]>([])
+  const [suiteDialogOpen, setSuiteDialogOpen] = useState(false)
+  const [suiteSaving, setSuiteSaving] = useState(false)
+  const [editingSuite, setEditingSuite] = useState<any | null>(null)
+  const [parentSuiteIdForCreate, setParentSuiteIdForCreate] = useState<string | undefined>(undefined)
+  const [suitesRefreshCounter, setSuitesRefreshCounter] = useState(0)
+  const [testCaseDialogOpen, setTestCaseDialogOpen] = useState(false)
+  const [testCaseSaving, setTestCaseSaving] = useState(false)
+  const [editingTestCase, setEditingTestCase] = useState<any | null>(null)
+  const [createCaseSuiteId, setCreateCaseSuiteId] = useState<string | undefined>(undefined)
+  const [testCasesRefreshCounter, setTestCasesRefreshCounter] = useState(0)
+  const [settingsForm, setSettingsForm] = useState({
+    allowTimeTracking: false,
+    allowManualTimeSubmission: false,
+    allowExpenseTracking: false,
+    requireApproval: false,
+    notifications: {
+      taskUpdates: false,
+      budgetAlerts: false,
+      deadlineReminders: false,
+    },
+  })
+  const [statusForm, setStatusForm] = useState<Project['status']>('planning')
+  const [priorityForm, setPriorityForm] = useState<Project['priority']>('medium')
+  const [settingsSuccess, setSettingsSuccess] = useState('')
+  const [settingsError, setSettingsError] = useState('')
+  const [savingSettings, setSavingSettings] = useState(false)
+  const settingsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (projectId) {
       fetchProject()
+      fetchTasks()
     }
   }, [projectId])
+
+  useEffect(() => {
+    if (project) {
+      setStatusForm(project.status)
+      setPriorityForm(project.priority)
+      setSettingsForm({
+        allowTimeTracking: project.settings?.allowTimeTracking ?? false,
+        allowManualTimeSubmission: project.settings?.allowManualTimeSubmission ?? false,
+        allowExpenseTracking: project.settings?.allowExpenseTracking ?? false,
+        requireApproval: project.settings?.requireApproval ?? false,
+        notifications: {
+          taskUpdates: project.settings?.notifications?.taskUpdates ?? false,
+          budgetAlerts: project.settings?.notifications?.budgetAlerts ?? false,
+          deadlineReminders: project.settings?.notifications?.deadlineReminders ?? false,
+        },
+      })
+    }
+  }, [project])
+
+  useEffect(() => {
+    return () => {
+      if (settingsTimeoutRef.current) {
+        clearTimeout(settingsTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const showSettingsSuccess = (message: string) => {
+    setSettingsSuccess(message)
+    if (settingsTimeoutRef.current) {
+      clearTimeout(settingsTimeoutRef.current)
+    }
+    settingsTimeoutRef.current = setTimeout(() => {
+      setSettingsSuccess('')
+      settingsTimeoutRef.current = null
+    }, 3000)
+  }
+
+  const handleSaveSettings = async () => {
+    if (!projectId) return
+    setSavingSettings(true)
+    setSettingsError('')
+    setSettingsSuccess('')
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          settings: {
+            ...settingsForm,
+            notifications: { ...settingsForm.notifications },
+          },
+          status: statusForm,
+          priority: priorityForm,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setProject(data.data)
+        showSettingsSuccess('Project settings updated successfully.')
+      } else {
+        setSettingsError(data.error || 'Failed to update project settings')
+      }
+    } catch (error) {
+      console.error('Failed to update project settings:', error)
+      setSettingsError('Failed to update project settings')
+    } finally {
+      setSavingSettings(false)
+    }
+  }
 
   const fetchProject = async () => {
     try {
@@ -133,6 +269,19 @@ export default function ProjectDetailPage() {
       setError('Failed to fetch project')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchTasks = async () => {
+    try {
+      const response = await fetch(`/api/tasks?project=${projectId}`)
+      const data = await response.json()
+      
+      if (data.success) {
+        setTasks(data.data)
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error)
     }
   }
 
@@ -208,33 +357,49 @@ export default function ProjectDetailPage() {
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" onClick={() => router.back()}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-1 min-w-0">
+            <Button variant="outline" size="sm" onClick={() => router.back()} className="w-full sm:w-auto">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div>
-              <div className="flex items-center space-x-3">
-                <h1 className="text-3xl font-bold text-foreground">{project.name}</h1>
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
+                <h1
+                  className="text-2xl sm:text-3xl font-bold text-foreground truncate max-w-full"
+                  title={project.name}
+                >
+                  {project.name}
+                </h1>
                 {typeof project.projectNumber !== 'undefined' && (
-                  <Badge variant="outline">#{project.projectNumber}</Badge>
+                  <Badge variant="outline" className="flex-shrink-0">#{project.projectNumber}</Badge>
                 )}
                 {project.isDraft && (
-                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 flex-shrink-0">
                     Draft
                   </Badge>
                 )}
-                <Badge className={getStatusColor(project.status)}>
+                <Badge className={getStatusColor(project.status) + ' flex-shrink-0'}>
                   {getStatusIcon(project.status)}
                   <span className="ml-1">{project.status.replace('_', ' ')}</span>
                 </Badge>
               </div>
-              <p className="text-muted-foreground mt-1">{project.description || 'No description'}</p>
+              <p className="text-sm sm:text-base text-muted-foreground mt-1 break-words whitespace-normal" title={project.description || 'No description'}>
+                <span className="sm:hidden">
+                  {project.description && project.description.length > 25 
+                    ? `${project.description.substring(0, 25)}...` 
+                    : (project.description || 'No description')}
+                </span>
+                <span className="hidden sm:inline">
+                  {project.description && project.description.length > 100 
+                    ? `${project.description.substring(0, 100)}...` 
+                    : (project.description || 'No description')}
+                </span>
+              </p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button size="sm" onClick={() => setShowCreateTaskModal(true)}>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button size="sm" onClick={() => setShowCreateTaskModal(true)} className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               Add Task
             </Button>
@@ -242,7 +407,7 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* Project Stats */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center space-x-2">
@@ -320,15 +485,16 @@ export default function ProjectDetailPage() {
           newSearchParams.set('tab', value)
           router.push(`/projects/${projectId}?${newSearchParams.toString()}`)
         }} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-8">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="tasks">Tasks</TabsTrigger>
-            <TabsTrigger value="kanban">Kanban</TabsTrigger>
-            <TabsTrigger value="calendar">Calendar</TabsTrigger>
-            <TabsTrigger value="backlog">Backlog</TabsTrigger>
-            <TabsTrigger value="testing">Testing</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-1 overflow-x-auto">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+            <TabsTrigger value="team" className="text-xs sm:text-sm">Team</TabsTrigger>
+            <TabsTrigger value="tasks" className="text-xs sm:text-sm">Tasks</TabsTrigger>
+            <TabsTrigger value="kanban" className="text-xs sm:text-sm">Kanban</TabsTrigger>
+            <TabsTrigger value="calendar" className="text-xs sm:text-sm">Calendar</TabsTrigger>
+            <TabsTrigger value="backlog" className="text-xs sm:text-sm">Backlog</TabsTrigger>
+            <TabsTrigger value="testing" className="text-xs sm:text-sm">Testing</TabsTrigger>
+            <TabsTrigger value="reports" className="text-xs sm:text-sm">Reports</TabsTrigger>
+            <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -469,7 +635,7 @@ export default function ProjectDetailPage() {
                       variant="outline" 
                       size="sm" 
                       className="w-full justify-start"
-                      onClick={() => router.push(`/projects/${projectId}?tab=settings`)}
+                      onClick={() => router.push(`/projects/${projectId}?tab=team`)}
                     >
                       <Users className="mr-2 h-4 w-4" />
                       Manage Team
@@ -489,6 +655,10 @@ export default function ProjectDetailPage() {
             </div>
           </TabsContent>
 
+          <TabsContent value="team" className="space-y-6">
+            <ProjectTeamTab projectId={projectId} project={project} onUpdate={fetchProject} />
+          </TabsContent>
+
           <TabsContent value="tasks" className="space-y-4">
             <TaskList 
               projectId={projectId} 
@@ -500,6 +670,17 @@ export default function ProjectDetailPage() {
             <KanbanBoard 
               projectId={projectId} 
               onCreateTask={() => setShowCreateTaskModal(true)}
+              onEditTask={(task) => {
+                setSelectedTask(task)
+                setShowEditTaskModal(true)
+              }}
+              onDeleteTask={(taskId) => {
+                const task = tasks.find(t => t._id === taskId)
+                if (task) {
+                  setSelectedTask(task)
+                  setShowDeleteConfirmModal(true)
+                }
+              }}
             />
           </TabsContent>
 
@@ -521,18 +702,32 @@ export default function ProjectDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-1">
                 <TestSuiteTree
+                  key={`${projectId}-${suitesRefreshCounter}`}
                   projectId={projectId}
                   onSuiteSelect={(suite) => console.log('Selected suite:', suite)}
-                  onSuiteCreate={(parentSuiteId) => console.log('Create suite:', parentSuiteId)}
-                  onSuiteEdit={(suite) => console.log('Edit suite:', suite)}
+                  onSuiteCreate={(parentSuiteId) => {
+                    setEditingSuite(null)
+                    setParentSuiteIdForCreate(parentSuiteId)
+                    setSuiteDialogOpen(true)
+                  }}
+                  onSuiteEdit={(suite) => {
+                    setEditingSuite(suite)
+                    setParentSuiteIdForCreate(undefined)
+                    setSuiteDialogOpen(true)
+                  }}
                   onSuiteDelete={(suiteId) => console.log('Delete suite:', suiteId)}
                 />
               </div>
               <div className="lg:col-span-2">
                 <TestCaseList
                   projectId={projectId}
+                  key={`${projectId}-${testCasesRefreshCounter}`}
                   onTestCaseSelect={(testCase) => console.log('Selected test case:', testCase)}
-                  onTestCaseCreate={(testSuiteId) => console.log('Create test case:', testSuiteId)}
+                  onTestCaseCreate={(testSuiteId) => {
+                    setEditingTestCase(null)
+                    setCreateCaseSuiteId(testSuiteId)
+                    setTestCaseDialogOpen(true)
+                  }}
                   onTestCaseEdit={(testCase) => console.log('Edit test case:', testCase)}
                   onTestCaseDelete={(testCaseId) => console.log('Delete test case:', testCaseId)}
                   onTestCaseExecute={(testCase) => console.log('Execute test case:', testCase)}
@@ -541,75 +736,216 @@ export default function ProjectDetailPage() {
             </div>
           </TabsContent>
 
-          <TabsContent value="reports" className="space-y-4">
-            <ReportsView projectId={projectId} />
+          <TabsContent value="reports" className="space-y-6">
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-xl sm:text-2xl font-semibold text-foreground">Project Reports</h3>
+                  <p className="text-sm sm:text-base text-muted-foreground mt-1">
+                    View detailed reports and analytics for this project
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                    <Download className="h-4 w-4 mr-2" />
+                    Export
+                  </Button>
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Schedule Report
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Project Progress</CardTitle>
+                    <Target className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{project?.stats?.tasks?.completionRate || 0}%</div>
+                    <p className="text-xs text-muted-foreground">
+                      {project?.stats?.tasks?.completed || 0} of {project?.stats?.tasks?.total || 0} tasks completed
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Budget Utilization</CardTitle>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{project?.stats?.budget?.utilizationRate || 0}%</div>
+                    <p className="text-xs text-muted-foreground">
+                      ${project?.stats?.budget?.spent || 0} of ${project?.stats?.budget?.total || 0} spent
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Time Tracking</CardTitle>
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{project?.stats?.timeTracking?.totalHours || 0}h</div>
+                    <p className="text-xs text-muted-foreground">
+                      {project?.stats?.timeTracking?.entries || 0} time entries
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Recent Activity</CardTitle>
+                    <CardDescription>Latest project activities and updates</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <div className="flex-1 space-y-1">
+                          <p className="text-sm font-medium">Project created</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(project?.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <div className="flex-1 space-y-1">
+                          <p className="text-sm font-medium">First task completed</p>
+                          <p className="text-xs text-muted-foreground">2 days ago</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Team Performance</CardTitle>
+                    <CardDescription>Team member productivity and workload</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {project?.teamMembers?.slice(0, 3).map((member: any, index: number) => (
+                        <div key={index} className="flex items-center space-x-4">
+                          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
+                            {member.firstName?.[0]}{member.lastName?.[0]}
+                          </div>
+                          <div className="flex-1 space-y-1">
+                            <p className="text-sm font-medium">
+                              {member.firstName} {member.lastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{member.role}</p>
+                          </div>
+                          <Badge variant="secondary">Active</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Project Settings</CardTitle>
-                <CardDescription>Configure project settings and preferences</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="project-name" className="text-sm font-medium text-foreground">Project Name</Label>
-                      <Input 
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Project Settings</h3>
+                <p className="text-sm text-muted-foreground">
+                  Manage project configuration and preferences
+                </p>
+              </div>
+
+              {settingsError && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>{settingsError}</AlertDescription>
+                </Alert>
+              )}
+
+              {settingsSuccess && (
+                <Alert variant="success">
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>{settingsSuccess}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>General Information</CardTitle>
+                    <CardDescription>Basic project information</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="project-name">Project Name</Label>
+                      <Input
                         id="project-name"
-                        value={project?.name || ''} 
+                        value={project?.name || ''}
                         readOnly
-                        className="mt-1 bg-muted"
+                        className="bg-muted"
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="description" className="text-sm font-medium text-foreground">Description</Label>
-                      <Textarea 
-                        id="description"
-                        value={project?.description || ''} 
+                    <div className="space-y-2">
+                      <Label htmlFor="project-description">Description</Label>
+                      <Textarea
+                        id="project-description"
+                        value={project?.description || ''}
                         readOnly
-                        className="mt-1 resize-none bg-muted"
+                        className="bg-muted"
                         rows={3}
-                        placeholder="Enter project description..."
                       />
                     </div>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <Label htmlFor="start-date" className="text-sm font-medium text-foreground">Start Date</Label>
-                        <Input 
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="start-date">Start Date</Label>
+                        <Input
                           id="start-date"
                           type="date"
-                          value={project?.startDate ? new Date(project.startDate).toISOString().split('T')[0] : ''} 
+                          value={project?.startDate ? new Date(project.startDate).toISOString().split('T')[0] : ''}
                           readOnly
-                          className="mt-1 bg-muted"
+                          className="bg-muted"
                         />
                       </div>
-                      <div>
-                        <Label htmlFor="end-date" className="text-sm font-medium text-foreground">End Date</Label>
-                        <Input 
+                      <div className="space-y-2">
+                        <Label htmlFor="end-date">End Date</Label>
+                        <Input
                           id="end-date"
                           type="date"
-                          value={project?.endDate ? new Date(project.endDate).toISOString().split('T')[0] : ''} 
+                          value={project?.endDate ? new Date(project.endDate).toISOString().split('T')[0] : ''}
                           readOnly
-                          className="mt-1 bg-muted"
+                          className="bg-muted"
                         />
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium text-foreground">Status</label>
-                      <Select 
-                        value={project?.status || 'planning'} 
-                        onValueChange={(value) => {
-                          if (project) {
-                            setProject({...project, status: value as any})
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="mt-1">
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => router.push(`/projects/create?edit=${projectId}`)}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Project Details
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Project Status</CardTitle>
+                    <CardDescription>Update the current status and priority</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Status</Label>
+                      <Select value={statusForm} onValueChange={(value) => setStatusForm(value as Project['status'])}>
+                        <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -621,18 +957,10 @@ export default function ProjectDetailPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    
-                    <div>
-                      <label className="text-sm font-medium text-foreground">Priority</label>
-                      <Select 
-                        value={project?.priority || 'medium'} 
-                        onValueChange={(value) => {
-                          if (project) {
-                            setProject({...project, priority: value as any})
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="mt-1">
+                    <div className="space-y-2">
+                      <Label htmlFor="priority">Priority</Label>
+                      <Select value={priorityForm} onValueChange={(value) => setPriorityForm(value as Project['priority'])}>
+                        <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -643,140 +971,428 @@ export default function ProjectDetailPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    <Button onClick={handleSaveSettings} disabled={savingSettings} className="w-full">
+                      {savingSettings ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Settings
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
 
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium text-foreground">Time Tracking Settings</h4>
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Tracking & Approvals</CardTitle>
+                    <CardDescription>Control how work is tracked and approved</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <Label htmlFor="allow-time-tracking">Allow Time Tracking</Label>
+                        <p className="text-sm text-muted-foreground">Enable time tracking for this project</p>
+                      </div>
+                      <Switch
+                        id="allow-time-tracking"
+                        checked={settingsForm.allowTimeTracking}
+                        onCheckedChange={(checked) =>
+                          setSettingsForm((prev) => ({
+                            ...prev,
+                            allowTimeTracking: checked,
+                            allowManualTimeSubmission: checked ? prev.allowManualTimeSubmission : false,
+                          }))
+                        }
+                      />
+                    </div>
+
+                    {settingsForm.allowTimeTracking && (
+                      <div className="ml-0 pl-4 border-l-2 border-muted">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <Label htmlFor="allow-manual-time-submission">Allow Manual Time Submission</Label>
+                            <p className="text-sm text-muted-foreground">Allow team members to submit time entries manually</p>
+                          </div>
+                          <Switch
+                            id="allow-manual-time-submission"
+                            checked={settingsForm.allowManualTimeSubmission}
+                            onCheckedChange={(checked) =>
+                              setSettingsForm((prev) => ({
+                                ...prev,
+                                allowManualTimeSubmission: checked,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <Label htmlFor="allow-expense-tracking">Allow Expense Tracking</Label>
+                        <p className="text-sm text-muted-foreground">Enable expense tracking for this project</p>
+                      </div>
+                      <Switch
+                        id="allow-expense-tracking"
+                        checked={settingsForm.allowExpenseTracking}
+                        onCheckedChange={(checked) =>
+                          setSettingsForm((prev) => ({
+                            ...prev,
+                            allowExpenseTracking: checked,
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <Label htmlFor="require-approval">Require Approval</Label>
+                        <p className="text-sm text-muted-foreground">Require approval for time entries and expenses</p>
+                      </div>
+                      <Switch
+                        id="require-approval"
+                        checked={settingsForm.requireApproval}
+                        onCheckedChange={(checked) =>
+                          setSettingsForm((prev) => ({
+                            ...prev,
+                            requireApproval: checked,
+                          }))
+                        }
+                      />
+                    </div>
+                  </CardContent>
+                  <CardFooter className="justify-end">
+                    <Button onClick={handleSaveSettings} disabled={savingSettings}>
+                      {savingSettings ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Update Tracking Settings
+                        </>
+                      )}
+                    </Button>
+                  </CardFooter>
+                </Card>
+
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Notification Preferences</CardTitle>
+                    <CardDescription>Choose which notifications to send for this project</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <Label htmlFor="notify-task-updates">Task Updates</Label>
+                        <p className="text-sm text-muted-foreground">Notify the team about task status changes</p>
+                      </div>
+                      <Switch
+                        id="notify-task-updates"
+                        checked={settingsForm.notifications.taskUpdates}
+                        onCheckedChange={(checked) =>
+                          setSettingsForm((prev) => ({
+                            ...prev,
+                            notifications: {
+                              ...prev.notifications,
+                              taskUpdates: checked,
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <Label htmlFor="notify-budget-alerts">Budget Alerts</Label>
+                        <p className="text-sm text-muted-foreground">Receive alerts when budget thresholds are met</p>
+                      </div>
+                      <Switch
+                        id="notify-budget-alerts"
+                        checked={settingsForm.notifications.budgetAlerts}
+                        onCheckedChange={(checked) =>
+                          setSettingsForm((prev) => ({
+                            ...prev,
+                            notifications: {
+                              ...prev.notifications,
+                              budgetAlerts: checked,
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <Label htmlFor="notify-deadline-reminders">Deadline Reminders</Label>
+                        <p className="text-sm text-muted-foreground">Send reminders as deadlines approach</p>
+                      </div>
+                      <Switch
+                        id="notify-deadline-reminders"
+                        checked={settingsForm.notifications.deadlineReminders}
+                        onCheckedChange={(checked) =>
+                          setSettingsForm((prev) => ({
+                            ...prev,
+                            notifications: {
+                              ...prev.notifications,
+                              deadlineReminders: checked,
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+                  </CardContent>
+                  <CardFooter className="justify-end">
+                    <Button onClick={handleSaveSettings} disabled={savingSettings}>
+                      {savingSettings ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Update Notification Settings
+                        </>
+                      )}
+                    </Button>
+                  </CardFooter>
+                </Card>
+
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Danger Zone</CardTitle>
+                    <CardDescription>Irreversible actions for this project</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="p-4 border border-destructive rounded-lg">
                       <div className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <input 
-                            type="checkbox" 
-                            checked={project?.settings?.allowTimeTracking ?? true}
-                            onChange={(e) => {
-                              if (project) {
-                                setProject({
-                                  ...project, 
-                                  settings: {
-                                    ...project.settings,
-                                    allowTimeTracking: e.target.checked
-                                  }
-                                })
-                              }
-                            }}
-                            className="rounded"
-                          />
-                          <label className="text-sm text-foreground">Allow time tracking</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <input 
-                            type="checkbox" 
-                            checked={project?.settings?.allowManualTimeSubmission ?? true}
-                            onChange={(e) => {
-                              if (project) {
-                                setProject({
-                                  ...project, 
-                                  settings: {
-                                    ...project.settings,
-                                    allowManualTimeSubmission: e.target.checked
-                                  }
-                                })
-                              }
-                            }}
-                            className="rounded"
-                          />
-                          <label className="text-sm text-foreground">Allow manual time submission</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <input 
-                            type="checkbox" 
-                            checked={project?.settings?.allowExpenseTracking ?? true}
-                            onChange={(e) => {
-                              if (project) {
-                                setProject({
-                                  ...project, 
-                                  settings: {
-                                    ...project.settings,
-                                    allowExpenseTracking: e.target.checked
-                                  }
-                                })
-                              }
-                            }}
-                            className="rounded"
-                          />
-                          <label className="text-sm text-foreground">Allow expense tracking</label>
-                        </div>
+                        <h4 className="text-sm font-medium text-destructive">Delete Project</h4>
+                        <p className="text-xs text-muted-foreground">
+                          Permanently delete this project and all its data. This action cannot be undone.
+                        </p>
+                        <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirmModal(true)}>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete Project
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                </div>
-
-                {/* Team Member Hourly Rates */}
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="text-lg font-medium text-foreground">Team Member Hourly Rates</h4>
-                    <p className="text-sm text-muted-foreground">Configure hourly rates for team members on this project</p>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <div className="text-sm text-muted-foreground">
-                      Hourly rates will be automatically applied when team members track time on this project.
-                    </div>
-                    
-                    <div className="p-4 border border-dashed border-muted-foreground/25 rounded-lg">
-                      <div className="text-center text-muted-foreground">
-                        <User className="h-8 w-8 mx-auto mb-2" />
-                        <p className="text-sm">Team member hourly rates will be configured here</p>
-                        <p className="text-xs mt-1">This feature will be available when team management is implemented</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => {
-                    // Reset to original project data
-                    fetchProject()
-                  }}>
-                    Cancel
-                  </Button>
-                  <Button onClick={async () => {
-                    try {
-                      const response = await fetch(`/api/projects/${projectId}`, {
-                        method: 'PUT',
-                        headers: {
-                          'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(project)
-                      })
-                      const data = await response.json()
-                      
-                      if (data.success) {
-                        // Show success message
-                        alert('Project settings updated successfully!')
-                      } else {
-                        alert('Failed to update project settings')
-                      }
-                    } catch (error) {
-                      alert('Failed to update project settings')
-                    }
-                  }}>
-                    Save Changes
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
-      </div>
 
-      <CreateTaskModal
-        isOpen={showCreateTaskModal}
-        onClose={() => setShowCreateTaskModal(false)}
-        projectId={projectId}
-        onTaskCreated={() => {
-          // Refresh project data to update task counts
-          fetchProject()
-        }}
-      />
+        <ResponsiveDialog
+          open={suiteDialogOpen}
+          onOpenChange={setSuiteDialogOpen}
+          title={editingSuite ? 'Edit Test Suite' : 'Create Test Suite'}
+          footer={
+            <>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setSuiteDialogOpen(false)
+                  setEditingSuite(null)
+                  setParentSuiteIdForCreate(undefined)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={suiteSaving}
+                form="test-suite-form"
+              >
+                {suiteSaving ? 'Saving...' : (editingSuite?._id ? 'Update Test Suite' : 'Create Test Suite')}
+              </Button>
+            </>
+          }
+        >
+          <TestSuiteForm
+            testSuite={editingSuite || (parentSuiteIdForCreate ? { name: '', description: '', parentSuite: parentSuiteIdForCreate, project: projectId } as any : undefined)}
+            projectId={projectId}
+            onSave={async (suiteData) => {
+              setSuiteSaving(true)
+              try {
+                const isEdit = !!editingSuite?._id
+                const res = await fetch('/api/test-suites', {
+                  method: isEdit ? 'PUT' : 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    ...(isEdit ? { suiteId: editingSuite._id } : {}),
+                    name: suiteData.name,
+                    description: suiteData.description,
+                    projectId: projectId,
+                    parentSuiteId: suiteData.parentSuite || parentSuiteIdForCreate,
+                  })
+                })
+                if (res.ok) {
+                  setSuiteDialogOpen(false)
+                  setEditingSuite(null)
+                  setParentSuiteIdForCreate(undefined)
+                  setSuitesRefreshCounter(c => c + 1)
+                } else {
+                  const data = await res.json().catch(() => ({}))
+                  console.error('Failed to save test suite', data)
+                }
+              } catch (e) {
+                console.error('Error saving test suite:', e)
+              } finally {
+                setSuiteSaving(false)
+              }
+            }}
+            onCancel={() => {
+              setSuiteDialogOpen(false)
+              setEditingSuite(null)
+              setParentSuiteIdForCreate(undefined)
+            }}
+            loading={suiteSaving}
+          />
+        </ResponsiveDialog>
+
+        <ResponsiveDialog
+          open={testCaseDialogOpen}
+          onOpenChange={setTestCaseDialogOpen}
+          title={editingTestCase ? 'Edit Test Case' : 'Create Test Case'}
+        >
+          <TestCaseForm
+            testCase={editingTestCase || (createCaseSuiteId ? { testSuite: createCaseSuiteId } as any : undefined)}
+            projectId={projectId}
+            onSave={async (testCaseData: any) => {
+              setTestCaseSaving(true)
+              try {
+                const isEdit = !!editingTestCase?._id
+                const res = await fetch('/api/test-cases', {
+                  method: isEdit ? 'PUT' : 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    ...(isEdit ? { testCaseId: editingTestCase._id } : {}),
+                    ...testCaseData,
+                    projectId,
+                  })
+                })
+                if (res.ok) {
+                  setTestCaseDialogOpen(false)
+                  setEditingTestCase(null)
+                  setCreateCaseSuiteId(undefined)
+                  setTestCasesRefreshCounter(c => c + 1)
+                } else {
+                  const data = await res.json().catch(() => ({}))
+                  console.error('Failed to save test case', data)
+                }
+              } catch (e) {
+                console.error('Error saving test case:', e)
+              } finally {
+                setTestCaseSaving(false)
+              }
+            }}
+            onCancel={() => {
+              setTestCaseDialogOpen(false)
+              setEditingTestCase(null)
+              setCreateCaseSuiteId(undefined)
+            }}
+            loading={testCaseSaving}
+          />
+        </ResponsiveDialog>
+
+        {/* Create Task Modal */}
+        <CreateTaskModal
+          isOpen={showCreateTaskModal}
+          onClose={() => setShowCreateTaskModal(false)}
+          projectId={projectId}
+          onTaskCreated={() => {
+            setShowCreateTaskModal(false)
+            // Refresh project data to update task counts
+            fetchProject()
+            // Refresh tasks list
+            fetchTasks()
+          }}
+        />
+
+        {/* Edit Task Modal */}
+        {selectedTask && (
+          <EditTaskModal
+            isOpen={showEditTaskModal}
+            onClose={() => {
+              setShowEditTaskModal(false)
+              setSelectedTask(null)
+            }}
+            task={selectedTask}
+            onTaskUpdated={() => {
+              setShowEditTaskModal(false)
+              setSelectedTask(null)
+              // Refresh project data to update task counts
+              fetchProject()
+              // Refresh tasks list
+              fetchTasks()
+            }}
+          />
+        )}
+
+        {/* View Task Modal */}
+        {selectedTask && (
+          <ViewTaskModal
+            isOpen={false} // We'll handle this separately if needed
+            onClose={() => {
+              setSelectedTask(null)
+            }}
+            task={selectedTask}
+            onEdit={() => {
+              setShowEditTaskModal(true)
+            }}
+            onDelete={() => {
+              setShowDeleteConfirmModal(true)
+            }}
+          />
+        )}
+
+        {/* Delete Confirmation Modal */}
+        <ConfirmationModal
+          isOpen={showDeleteConfirmModal}
+          onClose={() => {
+            setShowDeleteConfirmModal(false)
+            setSelectedTask(null)
+          }}
+          onConfirm={async () => {
+            if (selectedTask) {
+              try {
+                const response = await fetch(`/api/tasks/${selectedTask._id}`, {
+                  method: 'DELETE'
+                })
+                
+                if (response.ok) {
+                  setShowDeleteConfirmModal(false)
+                  setSelectedTask(null)
+                  // Refresh project data to update task counts
+                  fetchProject()
+                  // Refresh tasks list
+                  fetchTasks()
+                } else {
+                  console.error('Failed to delete task')
+                }
+              } catch (error) {
+                console.error('Error deleting task:', error)
+              }
+            }
+          }}
+          title="Delete Task"
+          description={`Are you sure you want to delete "${selectedTask?.title}"? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          variant="destructive"
+        />
+
+      </div>
     </MainLayout>
   )
 }

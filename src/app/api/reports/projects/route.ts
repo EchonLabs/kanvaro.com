@@ -59,8 +59,8 @@ export async function GET(req: NextRequest) {
 
     // Get projects with populated data
     const projects = await Project.find(query)
-      .populate('team', 'firstName lastName email')
-      .populate('owner', 'firstName lastName email')
+      .populate('teamMembers', 'firstName lastName email')
+      .populate('createdBy', 'firstName lastName email')
       .sort(sort)
       .lean()
 
@@ -170,10 +170,10 @@ function calculateProjectVelocity(projects: any[]): number {
 
 function calculateTeamUtilization(projects: any[]): number {
   // Calculate average team utilization across all projects
-  const totalTeamMembers = projects.reduce((sum, p) => sum + (p.team?.length || 0), 0)
+  const totalTeamMembers = projects.reduce((sum, p) => sum + (p.teamMembers?.length || 0), 0)
   const activeTeamMembers = projects
     .filter(p => p.status === 'active')
-    .reduce((sum, p) => sum + (p.team?.length || 0), 0)
+    .reduce((sum, p) => sum + (p.teamMembers?.length || 0), 0)
   
   return totalTeamMembers > 0 ? (activeTeamMembers / totalTeamMembers) * 100 : 0
 }

@@ -127,15 +127,15 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
   return (
     <div className="space-y-6">
       {/* Resource Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Team Members</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Team Members</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalTeamMembers}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-xl sm:text-2xl font-bold">{totalTeamMembers}</div>
+            <p className="text-xs text-muted-foreground mt-1">
               Across all projects
             </p>
           </CardContent>
@@ -143,14 +143,14 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Hours Logged</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Hours Logged</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               {totalHoursLogged.toFixed(0)}h
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Time investment
             </p>
           </CardContent>
@@ -158,14 +158,14 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Budget</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Budget</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               ${totalBudget.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1 break-words">
               Allocated budget
             </p>
           </CardContent>
@@ -173,14 +173,14 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Budget Utilization</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Budget Utilization</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               {totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(1) : 0}%
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1 break-words">
               ${totalSpent.toLocaleString()} spent
             </p>
             <Progress 
@@ -192,15 +192,15 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Team Size Distribution */}
         <Card>
           <CardHeader>
-            <CardTitle>Team Size Distribution</CardTitle>
-            <CardDescription>Distribution of team sizes across projects</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Team Size Distribution</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Distribution of team sizes across projects</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie
                   data={teamSizeData}
@@ -225,16 +225,16 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
         {/* Resource Allocation by Project */}
         <Card>
           <CardHeader>
-            <CardTitle>Resource Allocation</CardTitle>
-            <CardDescription>Team size and hours logged by project</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Resource Allocation</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Team size and hours logged by project</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <BarChart data={resourceData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis yAxisId="left" />
-                <YAxis yAxisId="right" orientation="right" />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
                 <Tooltip />
                 <Bar yAxisId="left" dataKey="teamSize" fill="#8884d8" name="Team Size" />
                 <Bar yAxisId="right" dataKey="hoursLogged" fill="#82ca9d" name="Hours Logged" />
@@ -246,15 +246,15 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
         {/* Budget vs Spent */}
         <Card>
           <CardHeader>
-            <CardTitle>Budget vs Spent by Project</CardTitle>
-            <CardDescription>Budget allocation vs actual spending</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Budget vs Spent by Project</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Budget allocation vs actual spending</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <BarChart data={budgetData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']} />
                 <Bar dataKey="budget" fill="#8884d8" name="Budget" />
                 <Bar dataKey="spent" fill="#82ca9d" name="Spent" />
@@ -266,15 +266,15 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
         {/* Time Tracking Efficiency */}
         <Card>
           <CardHeader>
-            <CardTitle>Time Tracking Efficiency</CardTitle>
-            <CardDescription>Hours logged vs time entries by project</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Time Tracking Efficiency</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Hours logged vs time entries by project</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <LineChart data={timeData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip />
                 <Line 
                   type="monotone" 
@@ -299,41 +299,41 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
       {/* Project Resource Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Project Resource Details</CardTitle>
-          <CardDescription>Detailed resource allocation for each project</CardDescription>
+          <CardTitle className="text-base sm:text-lg">Project Resource Details</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Detailed resource allocation for each project</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {projects.map((project) => (
-              <div key={project._id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3">
-                    <h3 className="font-semibold">{project.name}</h3>
-                    <Badge variant={project.status === 'active' ? 'default' : 'secondary'}>
+              <div key={project._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+                <div className="flex-1 min-w-0 w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
+                    <h3 className="font-semibold text-sm sm:text-base truncate">{project.name}</h3>
+                    <Badge variant={project.status === 'active' ? 'default' : 'secondary'} className="flex-shrink-0">
                       {project.status}
                     </Badge>
                     {project.stats.budget.utilizationRate > 80 && (
-                      <Badge variant="destructive" className="flex items-center space-x-1">
+                      <Badge variant="destructive" className="flex items-center space-x-1 flex-shrink-0">
                         <AlertTriangle className="h-3 w-3" />
-                        <span>Over Budget</span>
+                        <span className="text-xs sm:text-sm">Over Budget</span>
                       </Badge>
                     )}
                   </div>
                   
                   {/* Resource Metrics */}
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <div className="flex items-center space-x-2 mb-2">
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">Team</span>
+                        <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-xs sm:text-sm font-medium">Team</span>
                       </div>
-                      <div className="text-lg font-bold">
+                      <div className="text-base sm:text-lg font-bold">
                         {project.team?.length || 0} members
                       </div>
                       {project.team && project.team.length > 0 && (
                         <div className="flex -space-x-2 mt-2">
                           {project.team.slice(0, 3).map((member, index) => (
-                            <Avatar key={index} className="h-6 w-6 border-2 border-background">
+                            <Avatar key={index} className="h-5 w-5 sm:h-6 sm:w-6 border-2 border-background">
                               <AvatarImage src={member.avatar} />
                               <AvatarFallback className="text-xs">
                                 {member.firstName?.charAt(0)}{member.lastName?.charAt(0)}
@@ -341,7 +341,7 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
                             </Avatar>
                           ))}
                           {project.team.length > 3 && (
-                            <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background">
+                            <div className="h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background">
                               +{project.team.length - 3}
                             </div>
                           )}
@@ -351,10 +351,10 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
                     
                     <div>
                       <div className="flex items-center space-x-2 mb-2">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">Time</span>
+                        <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-xs sm:text-sm font-medium">Time</span>
                       </div>
-                      <div className="text-lg font-bold">
+                      <div className="text-base sm:text-lg font-bold">
                         {project.stats.timeTracking.totalHours.toFixed(1)}h
                       </div>
                       <div className="text-xs text-muted-foreground">
@@ -364,13 +364,13 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
                     
                     <div>
                       <div className="flex items-center space-x-2 mb-2">
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">Budget</span>
+                        <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-xs sm:text-sm font-medium">Budget</span>
                       </div>
-                      <div className="text-lg font-bold">
+                      <div className="text-base sm:text-lg font-bold break-words">
                         ${project.stats.budget.spent.toLocaleString()}
                       </div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground break-words">
                         of ${project.stats.budget.total.toLocaleString()}
                       </div>
                       <Progress 
@@ -381,20 +381,20 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
                   </div>
                 </div>
                 
-                <div className="flex items-center space-x-4 ml-6">
-                  <div className="text-center">
-                    <div className="text-sm font-medium">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full sm:w-auto sm:ml-6">
+                  <div className="flex sm:flex-col items-center sm:items-center text-center gap-2 sm:gap-0">
+                    <div className="text-xs sm:text-sm font-medium">
                       {project.stats.sprints.active}
                     </div>
                     <div className="text-xs text-muted-foreground">Active Sprints</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-sm font-medium">
+                  <div className="flex sm:flex-col items-center sm:items-center text-center gap-2 sm:gap-0">
+                    <div className="text-xs sm:text-sm font-medium">
                       {project.stats.tasks.completionRate.toFixed(1)}%
                     </div>
                     <div className="text-xs text-muted-foreground">Complete</div>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto flex-shrink-0">
                     View Details
                   </Button>
                 </div>

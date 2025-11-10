@@ -26,26 +26,60 @@ export async function POST(request: NextRequest) {
         fromName: trimmedSmtp.fromName
       })
 
-      // Test SMTP connection
+      // Determine secure setting based on port
+      // Port 465 uses direct SSL/TLS (secure: true)
+      // Port 587 uses STARTTLS (secure: false, requireTLS: true)
+      // Port 25 usually doesn't use encryption (secure: false)
+      const port = trimmedSmtp.port || 587
+      
+      // Force correct secure setting based on port to prevent SSL version mismatch
+      // For port 587, always use STARTTLS (not direct SSL)
+      let useSecure: boolean
+      if (port === 465) {
+        // Port 465 uses direct SSL/TLS connection
+        useSecure = true
+        if (trimmedSmtp.secure === false) {
+          console.warn('⚠️ Port 465 requires secure: true (direct SSL/TLS), overriding user setting')
+        }
+      } else {
+        // Ports 587, 25, etc. use STARTTLS (upgrade plain connection to TLS)
+        useSecure = false
+        if (trimmedSmtp.secure === true) {
+          console.warn(`⚠️ Port ${port} uses STARTTLS (not direct SSL), overriding secure: true to secure: false`)
+        }
+      }
+
+      const useStartTLS = !useSecure && port !== 465
+
+      console.log('Creating transporter with:', {
+        host: trimmedSmtp.host,
+        port: port,
+        secure: useSecure,
+        connectionType: useSecure ? 'SSL/TLS (Direct)' : 'STARTTLS (Upgrade)',
+        requireTLS: useStartTLS,
+        userSetting: trimmedSmtp.secure,
+        corrected: trimmedSmtp.secure !== undefined && trimmedSmtp.secure !== useSecure
+      })
+
+      
       const transporter = nodemailer.createTransport({
         host: trimmedSmtp.host,
-        port: trimmedSmtp.port,
-        secure: trimmedSmtp.secure, // true for 465, false for other ports
+        port: port,
+        secure: useSecure, 
         auth: {
           user: trimmedSmtp.username,
           pass: trimmedSmtp.password,
         },
-        // Add additional options for better compatibility
         tls: {
           rejectUnauthorized: false,
-          ciphers: 'SSLv3'
+          minVersion: 'TLSv1.2' // Minimum TLS version
         },
         connectionTimeout: 60000, // 60 seconds
         greetingTimeout: 30000,   // 30 seconds
         socketTimeout: 60000,     // 60 seconds
-        // Additional options for IONOS and other providers
-        requireTLS: true,
-        ignoreTLS: false,
+        // STARTTLS configuration (for port 587)
+        requireTLS: useStartTLS, // Require TLS upgrade for STARTTLS
+        ignoreTLS: false, // Don't ignore TLS - upgrade to TLS when available
         debug: true,
         logger: true
       })
@@ -93,12 +127,7 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // In a real implementation, you would:
-      // 1. Get an access token using client credentials flow
-      // 2. Use Microsoft Graph API to send email
-      // 3. Handle authentication and permissions
-
-      // For now, we'll simulate a successful test
+      
       return NextResponse.json({ 
         success: true,
         message: 'Azure configuration validated successfully! (Note: Full implementation requires Microsoft Graph SDK)'

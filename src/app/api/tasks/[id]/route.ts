@@ -13,7 +13,6 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    console.log('GET task')
     await connectDB()
 
     const authResult = await authenticateUser()
@@ -38,7 +37,7 @@ export async function GET(
         { createdBy: userId }
       ]
     })
-      .populate('project', 'name')
+      .populate('project', '_id name')
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
       .populate('story', 'title status')
@@ -139,7 +138,7 @@ export async function PUT(
       { ...updateData, updatedAt: new Date() },
       { new: true }
     )
-      .populate('project', 'name')
+      .populate('project', '_id name')
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
       .populate('story', 'title status')

@@ -77,39 +77,24 @@ export function useOrganization() {
   const [organization, setOrganization] = useState<Organization | null>(organizationCache)
   const [loading, setLoading] = useState(!organizationCache)
 
-  useEffect(() => {
-    // Use cached data if available and not expired
-    if (organizationCache && Date.now() - cacheTimestamp < CACHE_DURATION) {
+  const fetchOrganization = async (force = false) => {
+    // Use cached data if available and not expired, unless force refresh
+    if (!force && organizationCache && Date.now() - cacheTimestamp < CACHE_DURATION) {
       setOrganization(organizationCache)
       setLoading(false)
       return
     }
 
-    const fetchOrganization = async () => {
-      try {
-        const response = await fetch('/api/organization')
-        if (response.ok) {
-          const data = await response.json()
-          setOrganization(data)
-          // Cache the data
-          organizationCache = data
-          cacheTimestamp = Date.now()
-        } else {
-          // Fallback to mock data if API fails
-          const mockOrganization: Organization = {
-            id: '1',
-            name: 'Kanvaro',
-            logo: undefined,
-            darkLogo: undefined,
-            logoMode: 'auto'
-          }
-          setOrganization(mockOrganization)
-          organizationCache = mockOrganization
-          cacheTimestamp = Date.now()
-        }
-      } catch (error) {
-        console.error('Failed to fetch organization:', error)
-        // Fallback to mock data on error
+    try {
+      const response = await fetch('/api/organization')
+      if (response.ok) {
+        const data = await response.json()
+        setOrganization(data)
+        // Cache the data
+        organizationCache = data
+        cacheTimestamp = Date.now()
+      } else {
+        // Fallback to mock data if API fails
         const mockOrganization: Organization = {
           id: '1',
           name: 'Kanvaro',
@@ -120,16 +105,32 @@ export function useOrganization() {
         setOrganization(mockOrganization)
         organizationCache = mockOrganization
         cacheTimestamp = Date.now()
-      } finally {
-        setLoading(false)
       }
+    } catch (error) {
+      console.error('Failed to fetch organization:', error)
+      // Fallback to mock data on error
+      const mockOrganization: Organization = {
+        id: '1',
+        name: 'Kanvaro',
+        logo: undefined,
+        darkLogo: undefined,
+        logoMode: 'auto'
+      }
+      setOrganization(mockOrganization)
+      organizationCache = mockOrganization
+      cacheTimestamp = Date.now()
+    } finally {
+      setLoading(false)
     }
+  }
 
+  useEffect(() => {
     fetchOrganization()
   }, [])
 
   return {
     organization,
-    loading
+    loading,
+    refetch: () => fetchOrganization(true)
   }
 }

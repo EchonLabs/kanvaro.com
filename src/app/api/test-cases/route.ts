@@ -107,11 +107,18 @@ export async function POST(req: NextRequest) {
       estimatedExecutionTime,
       projectId,
       testSuiteId,
+      testSuite,
       tags,
       customFields
     } = await req.json()
 
-    if (!title || !description || !projectId || !testSuiteId) {
+    const suiteId = testSuiteId || testSuite
+console.log("title",title);
+console.log("description",description);
+console.log("projectId",projectId);
+console.log("suiteId",suiteId);
+
+    if (!title || !description || !projectId || !suiteId) {
       return NextResponse.json(
         { success: false, error: 'Title, description, projectId, and testSuiteId are required' },
         { status: 400 }
@@ -124,20 +131,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
     }
 
-    const hasAccess = project.teamMembers.includes(authResult.user.id) || 
-                     project.createdBy.toString() === authResult.user.id ||
-                     project.projectRoles.some((role: any) => 
-                       role.user.toString() === authResult.user.id && 
-                       ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)
-                     )
+    const userIdStr = authResult.user.id?.toString?.() || String(authResult.user.id)
+    const createdByStr = project?.createdBy?.toString?.()
+    const teamHasUser = Array.isArray(project?.teamMembers)
+      ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr)
+      : false
+    const roleHasUser = Array.isArray(project?.projectRoles)
+      ? project.projectRoles.some(
+          (role: any) => role?.user?.toString?.() === userIdStr && ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)
+        )
+      : false
+    const hasAccess = !!project && (createdByStr === userIdStr || teamHasUser || roleHasUser)
 
     if (!hasAccess) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 })
     }
 
     // Check if test suite exists and belongs to the same project
-    const testSuite = await TestSuite.findById(testSuiteId)
-    if (!testSuite || testSuite.project.toString() !== projectId) {
+    const testSuiteDoc = await TestSuite.findById(suiteId)
+    if (!testSuiteDoc || testSuiteDoc.project.toString() !== projectId) {
       return NextResponse.json(
         { success: false, error: 'Invalid test suite' },
         { status: 400 }
@@ -158,7 +170,7 @@ export async function POST(req: NextRequest) {
       estimatedExecutionTime: estimatedExecutionTime || 15,
       organization: authResult.user.organization,
       project: projectId,
-      testSuite: testSuiteId,
+      testSuite: suiteId,
       createdBy: authResult.user.id,
       tags: tags || [],
       customFields: customFields || {}

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogBody } from '@/components/ui/Dialog'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { CalendarIcon } from 'lucide-react'
@@ -135,7 +135,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Create Sprint Event</DialogTitle>
           <DialogDescription>
@@ -143,7 +143,8 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <DialogBody>
+          <form onSubmit={handleSubmit} className="space-y-4" id="create-sprint-event-form">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="sprintId">Sprint *</Label>
@@ -273,15 +274,16 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
             />
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Creating...' : 'Create Event'}
-            </Button>
-          </DialogFooter>
-        </form>
+          </form>
+        </DialogBody>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="create-sprint-event-form" disabled={loading}>
+            {loading ? 'Creating...' : 'Create Event'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

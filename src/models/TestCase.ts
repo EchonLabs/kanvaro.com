@@ -137,4 +137,9 @@ TestCaseSchema.index({ priority: 1, category: 1 })
 TestCaseSchema.index({ automationStatus: 1 })
 TestCaseSchema.index({ title: 'text', description: 'text' })
 
-export const TestCase = mongoose.models.TestCase || mongoose.model<ITestCase>('TestCase', TestCaseSchema)
+// In dev with HMR, ensure we don't keep stale schema versions (e.g., old fields like testSuiteId)
+// Delete existing model so we can safely recompile with the current schema shape.
+if (mongoose.models.TestCase) {
+  delete mongoose.models.TestCase
+}
+export const TestCase = mongoose.model<ITestCase>('TestCase', TestCaseSchema)

@@ -113,13 +113,86 @@ export async function POST(request: NextRequest) {
     const logoMode = organization?.logoMode || 'both'
 
     // Send invitation email
-    // Dynamically construct the invitation URL using the request origin
-    const origin = request.headers.get('origin') || request.headers.get('host')
-    const protocol = request.headers.get('x-forwarded-proto') || (origin?.includes('localhost') ? 'http' : 'https')
-    const host = origin || process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, '') || 'localhost:3000'
-    const baseUrl = `${protocol}://${host}`
-    const invitationLink = `${baseUrl}/accept-invitation?token=${token}`
+    // Dynamically construct the invitation URL based on environment
+    // Priority: 1. NEXT_PUBLIC_APP_URL env var, 2. Request headers (x-forwarded-*), 3. Origin/Referer headers, 4. Request host
+    let baseUrl: string
     
+    // First, check if NEXT_PUBLIC_APP_URL is explicitly set (recommended for all environments)
+    if (process.env.NEXT_PUBLIC_APP_URL) {
+      baseUrl = process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '') // Remove trailing slash
+    } else {
+      // Fall back to detecting from request headers
+      // When behind a proxy/load balancer, check x-forwarded-* headers first
+      const forwardedHost = request.headers.get('x-forwarded-host')
+      const forwardedProto = request.headers.get('x-forwarded-proto')
+      
+      // Get the host from various sources, prioritizing origin/referer headers for external URLs
+      const originHeader = request.headers.get('origin')
+      const refererHeader = request.headers.get('referer')
+      const hostHeader = request.headers.get('host')
+      
+      // Extract host from origin or referer (these usually have the correct external domain)
+      let extractedHost: string | null = null
+      let extractedProtocol: string | null = null
+      
+      if (originHeader) {
+        try {
+          const originUrl = new URL(originHeader)
+          extractedHost = originUrl.host
+          extractedProtocol = originUrl.protocol.replace(':', '')
+        } catch (e) {
+          // Invalid origin, continue
+        }
+      }
+      
+      if (!extractedHost && refererHeader) {
+        try {
+          const refererUrl = new URL(refererHeader)
+          extractedHost = refererUrl.host
+          extractedProtocol = refererUrl.protocol.replace(':', '')
+        } catch (e) {
+          // Invalid referer, continue
+        }
+      }
+      
+      // Determine protocol
+      let protocol: string
+      if (extractedProtocol) {
+        protocol = extractedProtocol
+      } else if (forwardedProto) {
+        protocol = forwardedProto.split(',')[0].trim() // Use first proto if multiple
+      } else if (hostHeader?.includes('localhost') || hostHeader?.includes('127.0.0.1')) {
+        protocol = 'http'
+      } else {
+        protocol = 'https' // Default to https for production domains
+      }
+      
+      // Determine host - prefer extracted host from origin/referer, then forwarded host, then host header
+      let host: string
+      if (extractedHost && !extractedHost.includes('localhost') && !extractedHost.includes('127.0.0.1')) {
+        // Use extracted host if it's a valid external domain
+        host = extractedHost
+      } else if (forwardedHost) {
+        host = forwardedHost.split(',')[0].trim() // Use first host if multiple
+      } else if (hostHeader) {
+        host = hostHeader.replace(/^https?:\/\//, '') // Remove protocol if present
+      } else {
+        host = 'localhost:3000' // Fallback
+        protocol = 'http'
+      }
+      
+      // Clean up host (remove any protocol prefix, remove trailing slash, remove port if default)
+      host = host.replace(/^https?:\/\//, '').replace(/\/$/, '')
+      // Remove default ports
+      host = host.replace(/^(.+):80$/, '$1')
+      host = host.replace(/^(.+):443$/, '$1')
+      
+      baseUrl = `${protocol}://${host}`
+    }
+    
+    const invitationLink = `${baseUrl}/accept-invitation?token=${token}`
+    console.log('invitationLink', invitationLink);
+   
     const emailHtml = `
     <!DOCTYPE html>
     <html lang="en">
@@ -229,15 +302,24 @@ export async function POST(request: NextRequest) {
     </html>
     `
 
-    const emailSent = await emailService.sendEmail({
-      to: email,
-      subject: `You're invited to join ${organizationName}`,
-      html: emailHtml
-    })
+    try {
+      const emailSent = await emailService.sendEmail({
+        to: email,
+        subject: `You're invited to join ${organizationName}`,
+        html: emailHtml
+      })
 
-    if (!emailSent) {
+      if (!emailSent) {
+        console.error('Email service returned false for invitation email')
+        return NextResponse.json(
+          { error: 'Failed to send invitation email. Please check email configuration.' },
+          { status: 500 }
+        )
+      }
+    } catch (emailError) {
+      console.error('Email sending error:', emailError)
       return NextResponse.json(
-        { error: 'Failed to send invitation email' },
+        { error: 'Failed to send invitation email. Please check email configuration.' },
         { status: 500 }
       )
     }

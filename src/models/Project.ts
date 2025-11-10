@@ -4,6 +4,7 @@ export interface IProject extends Document {
   name: string
   description: string
   status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled'
+  priority: 'low' | 'medium' | 'high' | 'critical'
   isDraft: boolean
   organization: mongoose.Types.ObjectId
   createdBy: mongoose.Types.ObjectId
@@ -83,6 +84,11 @@ const ProjectSchema = new Schema<IProject>({
     enum: ['planning', 'active', 'on_hold', 'completed', 'cancelled'],
     default: 'planning'
   },
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high', 'critical'],
+    default: 'medium'
+  },
   isDraft: { type: Boolean, default: false },
   organization: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
   createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -160,6 +166,7 @@ const ProjectSchema = new Schema<IProject>({
 
 // Indexes
 ProjectSchema.index({ organization: 1, status: 1 })
+ProjectSchema.index({ organization: 1, priority: 1 })
 ProjectSchema.index({ createdBy: 1 })
 ProjectSchema.index({ teamMembers: 1 })
 ProjectSchema.index({ startDate: 1, endDate: 1 })

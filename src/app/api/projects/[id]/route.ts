@@ -35,10 +35,11 @@ export async function GET(
       )
     }
 
-    // Find project
+    // Find project (only non-deleted projects)
     const project = await Project.findOne({
       _id: projectId,
-      organization: organizationId
+      organization: organizationId,
+      is_deleted: { $ne: true } // Only return non-deleted projects
     })
       .populate('createdBy', 'firstName lastName email')
       .populate('teamMembers', 'firstName lastName email')
@@ -111,11 +112,30 @@ export async function PUT(
 
     const updateData = await request.json()
 
-    // Find and update project
+    // Check for duplicate project name if name is being updated (excluding deleted projects and current project)
+    if (updateData.name && updateData.name.trim()) {
+      const existingProject = await Project.findOne({
+        name: updateData.name.trim(),
+        createdBy: userId,
+        organization: organizationId,
+        is_deleted: { $ne: true }, // Exclude deleted projects
+        _id: { $ne: projectId } // Exclude current project
+      })
+
+      if (existingProject) {
+        return NextResponse.json(
+          { error: 'A project with this name already exists' },
+          { status: 409 }
+        )
+      }
+    }
+
+    // Find and update project (only update non-deleted projects)
     const project = await Project.findOneAndUpdate(
       {
         _id: projectId,
-        organization: organizationId
+        organization: organizationId,
+        is_deleted: { $ne: true } // Only update non-deleted projects
       },
       updateData,
       { new: true }
@@ -167,6 +187,7 @@ export async function DELETE(
     const projectId = params.id
 
     // Check if user can delete this project
+ 
     const canDeleteProject = await PermissionService.hasPermission(userId, Permission.PROJECT_DELETE, projectId)
     if (!canDeleteProject) {
       return NextResponse.json(
@@ -175,10 +196,11 @@ export async function DELETE(
       )
     }
 
-    // Find and delete project
+    // Find and delete project (only non-deleted projects)
     const project = await Project.findOneAndDelete({
       _id: projectId,
-      organization: organizationId
+      organization: organizationId,
+      is_deleted: { $ne: true } // Only delete non-deleted projects
     })
 
     if (!project) {

@@ -41,70 +41,49 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from '@dnd-kit/sortable'
-import {
-  useSortable,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import dynamic from 'next/dynamic'
 import VirtualizedColumn from './VirtualizedColumn'
+import SortableTask from './SortableTask'
+import { ITask } from '@/models/Task'
+import { useRouter } from 'next/navigation'
 
-// Dynamically import heavy modals
-const CreateTaskModal = dynamic(() => import('./CreateTaskModal'), { ssr: false })
-const ColumnSettingsModal = dynamic(() => import('./ColumnSettingsModal'), { ssr: false })
-
-interface Task {
-  _id: string
-  title: string
-  description: string
-  status: string
-  priority: 'low' | 'medium' | 'high' | 'critical'
-  type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
-  position: number
+interface PopulatedTask extends Omit<ITask, 'assignedTo' | 'project'> {
+  project?: {
+    _id: string
+    name: string
+  }
   assignedTo?: {
     firstName: string
     lastName: string
     email: string
   }
-  createdBy: {
-    firstName: string
-    lastName: string
-    email: string
-  }
-  story?: {
-    _id: string
-    title: string
-    status: string
-  }
-  sprint?: {
-    _id: string
-    name: string
-    status: string
-  }
-  storyPoints?: number
-  dueDate?: string
-  estimatedHours?: number
-  actualHours?: number
-  labels: string[]
-  createdAt: string
-  updatedAt: string
 }
+
+// Dynamically import heavy modals
+const CreateTaskModal = dynamic(() => import('./CreateTaskModal'), { ssr: false })
+const ColumnSettingsModal = dynamic(() => import('./ColumnSettingsModal'), { ssr: false })
 
 interface Project {
   _id: string
   name: string
-  settings?: {
-    kanbanStatuses?: Array<{
-      key: string
-      title: string
-      color?: string
-      order: number
-    }>
-  }
+  description: string
+  status: string
+  startDate?: string
+  endDate?: string
+  budget?: number
+  teamMembers: any[]
+  createdBy: any
+  client?: any
+  isDraft: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 interface KanbanBoardProps {
   projectId: string
   onCreateTask: () => void
+  onEditTask?: (task: PopulatedTask) => void
+  onDeleteTask?: (taskId: string) => void
 }
 
 const defaultColumns = [
@@ -115,17 +94,19 @@ const defaultColumns = [
   { key: 'done', title: 'Done', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' }
 ]
 
-export default function KanbanBoard({ projectId, onCreateTask }: KanbanBoardProps) {
+export default function KanbanBoard({ projectId, onCreateTask, onEditTask, onDeleteTask }: KanbanBoardProps) {
   const [project, setProject] = useState<Project | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState(projectId)
-  const [tasks, setTasks] = useState<Task[]>([])
+  const [tasks, setTasks] = useState<PopulatedTask[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [activeTask, setActiveTask] = useState<PopulatedTask | null>(null)
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
-  const [createTaskStatus, setCreateTaskStatus] = useState<string | undefined>(undefined)
   const [showColumnSettings, setShowColumnSettings] = useState(false)
+  const [createTaskStatus, setCreateTaskStatus] = useState<string | undefined>(undefined)
+
+  const router = useRouter()
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -135,117 +116,115 @@ export default function KanbanBoard({ projectId, onCreateTask }: KanbanBoardProp
     })
   )
 
-  const fetchProjects = async () => {
-    try {
-      const response = await fetch('/api/projects')
-      const data = await response.json()
-
-      if (data.success) {
-        setProjects(data.data)
-      } else {
-        setError(data.error || 'Failed to fetch projects')
-      }
-    } catch (err) {
-      setError('Failed to fetch projects')
+  const fetchProject = useCallback(async () => {
+    // Don't fetch a specific project if "All Projects" is selected
+    if (selectedProjectId === 'all') {
+      setProject(null)
+      return
     }
-  }
-
-  const fetchProject = async (id: string) => {
+    
     try {
-      // Handle "all" case by not fetching a specific project
-      if (id === 'all') {
-        setProject(null) // No specific project for "all" view
-        return
-      }
-      
-      const response = await fetch(`/api/projects/${id}`)
+      const response = await fetch(`/api/projects/${selectedProjectId}`)
       const data = await response.json()
-
+      
       if (data.success) {
         setProject(data.data)
       } else {
         setError(data.error || 'Failed to fetch project')
       }
-    } catch (err) {
+    } catch (error) {
+      console.error('Error fetching project:', error)
       setError('Failed to fetch project')
     }
-  }
+  }, [selectedProjectId])
 
-  const fetchTasks = async (id: string) => {
+  const fetchProjects = useCallback(async () => {
+    try {
+      const response = await fetch('/api/projects')
+      const data = await response.json()
+      
+      if (data.success) {
+        setProjects(data.data)
+      }
+    } catch (error) {
+      console.error('Error fetching projects:', error)
+    }
+  }, [])
+
+  const fetchTasks = useCallback(async () => {
     try {
       setLoading(true)
-      // Handle "all" case by not passing project parameter
-      const url = id === 'all' ? '/api/tasks' : `/api/tasks?project=${id}`
-      const response = await fetch(url)
+      
+      // Build the API URL based on selected project
+      let apiUrl = '/api/tasks'
+      if (selectedProjectId && selectedProjectId !== 'all') {
+        apiUrl += `?project=${selectedProjectId}`
+      }
+      
+      const response = await fetch(apiUrl)
       const data = await response.json()
-
+      
       if (data.success) {
         setTasks(data.data)
       } else {
         setError(data.error || 'Failed to fetch tasks')
       }
-    } catch (err) {
+    } catch (error) {
+      console.error('Error fetching tasks:', error)
       setError('Failed to fetch tasks')
     } finally {
       setLoading(false)
+    }
+  }, [selectedProjectId])
+
+  useEffect(() => {
+    fetchProject()
+    fetchProjects()
+  }, [fetchProject, fetchProjects])
+
+  useEffect(() => {
+    fetchTasks()
+  }, [selectedProjectId, fetchTasks])
+
+  const getColumns = () => {
+    return defaultColumns
+  }
+
+  const getTasksByStatus = (status: string) => {
+    return tasks.filter(task => task.status === status)
+  }
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority.toLowerCase()) {
+      case 'high':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+      case 'low':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+    }
+  }
+
+  const getTypeColor = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'bug':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+      case 'feature':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+      case 'task':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+      case 'story':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
     }
   }
 
   const handleProjectChange = (newProjectId: string) => {
     setSelectedProjectId(newProjectId)
-    fetchProject(newProjectId)
-    fetchTasks(newProjectId)
-  }
-
-  useEffect(() => {
-    fetchProjects()
-    fetchProject(selectedProjectId)
-    fetchTasks(selectedProjectId)
-  }, [])
-
-  const getColumns = () => {
-    // For "all" projects view, use default columns
-    if (selectedProjectId === 'all' || !project) {
-      return defaultColumns
-    }
-    
-    if (project?.settings?.kanbanStatuses && project.settings.kanbanStatuses.length > 0) {
-      return project.settings.kanbanStatuses
-        .sort((a, b) => a.order - b.order)
-        .map(status => ({
-          key: status.key,
-          title: status.title,
-          color: status.color || defaultColumns.find(col => col.key === status.key)?.color || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-        }))
-    }
-    return defaultColumns
-  }
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-    }
-  }
-
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'bug': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      case 'feature': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'improvement': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'task': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'subtask': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-    }
-  }
-
-  const getTasksByStatus = (status: string) => {
-    return tasks
-      .filter(task => task.status === status)
-      .sort((a, b) => a.position - b.position)
+    setError(null)
   }
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -273,13 +252,21 @@ export default function KanbanBoard({ projectId, onCreateTask }: KanbanBoardProp
     let newStatus = activeTask.status
     const columns = getColumns()
     
+    // Check if dropped directly on a column (empty column drop)
     if (typeof overId === 'string' && columns.some(col => col.key === overId)) {
-      newStatus = overId
+      newStatus = overId as any
     } else {
       // If dropped on another task, get the status of that task
       const overTask = tasks.find(task => task._id === overId)
       if (overTask) {
         newStatus = overTask.status
+      } else {
+        // If we can't find the task, check if overId is a column key
+        // This handles cases where the drop target might be the column container
+        const columnMatch = columns.find(col => col.key === overId)
+        if (columnMatch) {
+          newStatus = columnMatch.key as any
+        }
       }
     }
 
@@ -289,7 +276,7 @@ export default function KanbanBoard({ projectId, onCreateTask }: KanbanBoardProp
       const oldIndex = columnTasks.findIndex(task => task._id === activeId)
       const newIndex = columnTasks.findIndex(task => task._id === overId)
       
-      if (oldIndex !== -1 && newIndex !== -1) {
+      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
         const reorderedTasks = arrayMove(columnTasks, oldIndex, newIndex)
         const orderedTaskIds = reorderedTasks.map(task => task._id)
         
@@ -314,7 +301,7 @@ export default function KanbanBoard({ projectId, onCreateTask }: KanbanBoardProp
               reorderedTasks.forEach((task, index) => {
                 const taskIndex = updatedTasks.findIndex(t => t._id === task._id)
                 if (taskIndex !== -1) {
-                  updatedTasks[taskIndex] = { ...updatedTasks[taskIndex], position: index }
+                  updatedTasks[taskIndex] = { ...updatedTasks[taskIndex], position: index } as PopulatedTask
                 }
               })
               return updatedTasks
@@ -339,7 +326,7 @@ export default function KanbanBoard({ projectId, onCreateTask }: KanbanBoardProp
         
         if (data.success) {
           setTasks(tasks.map(task => 
-            task._id === activeId ? { ...task, status: newStatus } : task
+            task._id === activeId ? { ...task, status: newStatus } as PopulatedTask : task
           ))
         }
       } catch (error) {
@@ -354,37 +341,39 @@ export default function KanbanBoard({ projectId, onCreateTask }: KanbanBoardProp
   }
 
   const handleTaskCreated = () => {
-    fetchTasks(selectedProjectId)
-    onCreateTask()
+    fetchTasks()
+    setShowCreateTaskModal(false)
+    setCreateTaskStatus(undefined)
   }
 
   const handleColumnsUpdated = () => {
-    fetchProject(selectedProjectId)
+    fetchTasks()
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Loading kanban board...</p>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-foreground">Kanban Board</h3>
-          <p className="text-sm text-muted-foreground">
-            Drag and drop tasks between columns to update their status. Stories, sprints, and epics will auto-complete when all their tasks are done.
-          </p>
+    <div className="space-y-6 overflow-x-hidden">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-base sm:text-lg font-semibold text-foreground truncate">
+              Kanban Board {selectedProjectId === 'all' ? '- All Projects' : project ? `- ${project.name}` : ''}
+            </h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Drag and drop tasks between columns to update their status. Stories, sprints, and epics will auto-complete when all their tasks are done.
+            </p>
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2 flex-wrap">
           <Select value={selectedProjectId} onValueChange={handleProjectChange}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-full sm:w-[200px]">
               <SelectValue placeholder="Select project" />
             </SelectTrigger>
             <SelectContent>
@@ -396,18 +385,27 @@ export default function KanbanBoard({ projectId, onCreateTask }: KanbanBoardProp
               ))}
             </SelectContent>
           </Select>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => setShowColumnSettings(true)}
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            Manage Columns
-          </Button>
-          <Button onClick={() => handleCreateTask()}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Task
-          </Button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:ml-auto">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowColumnSettings(true)}
+              className="w-full sm:w-auto"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Manage Columns</span>
+              <span className="sm:hidden">Columns</span>
+            </Button>
+            <Button 
+              onClick={() => handleCreateTask()}
+              disabled={selectedProjectId === 'all'}
+              title={selectedProjectId === 'all' ? 'Please select a specific project to create tasks' : 'Add a new task'}
+              className="w-full sm:w-auto"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Task
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -424,7 +422,8 @@ export default function KanbanBoard({ projectId, onCreateTask }: KanbanBoardProp
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="overflow-x-auto overflow-y-hidden -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6 min-w-max sm:min-w-0">
           {getColumns().map((column) => {
             const columnTasks = getTasksByStatus(column.key)
             
@@ -436,18 +435,28 @@ export default function KanbanBoard({ projectId, onCreateTask }: KanbanBoardProp
                 onCreateTask={handleCreateTask}
                 getPriorityColor={getPriorityColor}
                 getTypeColor={getTypeColor}
+                onTaskClick={(task) => {
+                  // Navigate to task detail page
+                  router.push(`/tasks/${task._id}`)
+                }}
+                onEditTask={onEditTask}
+                onDeleteTask={onDeleteTask}
               />
             )
           })}
+          </div>
         </div>
         
         <DragOverlay>
           {activeTask ? (
             <SortableTask 
               task={activeTask}
-              isDragOverlay
+              onClick={() => {}}
               getPriorityColor={getPriorityColor}
               getTypeColor={getTypeColor}
+              isDragOverlay
+              onEdit={onEditTask}
+              onDelete={onDeleteTask}
             />
           ) : null}
         </DragOverlay>
@@ -459,7 +468,7 @@ export default function KanbanBoard({ projectId, onCreateTask }: KanbanBoardProp
           setShowCreateTaskModal(false)
           setCreateTaskStatus(undefined)
         }}
-        projectId={projectId}
+        projectId={selectedProjectId === 'all' ? '' : selectedProjectId}
         onTaskCreated={handleTaskCreated}
         defaultStatus={createTaskStatus}
         availableStatuses={getColumns().map(col => ({ key: col.key, title: col.title }))}
@@ -468,7 +477,7 @@ export default function KanbanBoard({ projectId, onCreateTask }: KanbanBoardProp
       <ColumnSettingsModal
         isOpen={showColumnSettings}
         onClose={() => setShowColumnSettings(false)}
-        projectId={projectId}
+        projectId={selectedProjectId === 'all' ? '' : selectedProjectId}
         currentColumns={getColumns().map(col => ({
           key: col.key,
           title: col.title,
@@ -478,125 +487,5 @@ export default function KanbanBoard({ projectId, onCreateTask }: KanbanBoardProp
         onColumnsUpdated={handleColumnsUpdated}
       />
     </div>
-  )
-}
-
-interface SortableTaskProps {
-  task: Task
-  getPriorityColor: (priority: string) => string
-  getTypeColor: (type: string) => string
-  isDragOverlay?: boolean
-}
-
-function SortableTask({ task, getPriorityColor, getTypeColor, isDragOverlay = false }: SortableTaskProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: task._id })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  }
-
-  return (
-    <Card 
-      ref={setNodeRef}
-      style={style}
-      className={`hover:shadow-md transition-shadow cursor-pointer ${
-        isDragging ? 'opacity-50' : ''
-      } ${isDragOverlay ? 'rotate-3 shadow-lg' : ''}`}
-    >
-      <CardContent className="p-4">
-        <div className="space-y-3">
-          <div className="flex items-start justify-between">
-            <h4 className="font-medium text-foreground text-sm line-clamp-2">
-              {task.title}
-            </h4>
-            <div className="flex items-center space-x-1">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-6 w-6 p-0 cursor-grab active:cursor-grabbing"
-                {...attributes}
-                {...listeners}
-              >
-                <GripVertical className="h-3 w-3" />
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm"
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Badge className={getPriorityColor(task.priority)}>
-              {task.priority}
-            </Badge>
-            <Badge className={getTypeColor(task.type)}>
-              {task.type}
-            </Badge>
-          </div>
-          
-          <div className="text-xs text-muted-foreground">
-            <div className="flex items-center space-x-1 mb-1">
-              <Target className="h-3 w-3" />
-              <span>Project</span>
-            </div>
-            {task.dueDate && (
-              <div className="flex items-center space-x-1 mb-1">
-                <Calendar className="h-3 w-3" />
-                <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>
-              </div>
-            )}
-            {task.storyPoints && (
-              <div className="flex items-center space-x-1 mb-1">
-                <BarChart3 className="h-3 w-3" />
-                <span>{task.storyPoints} points</span>
-              </div>
-            )}
-            {task.estimatedHours && (
-              <div className="flex items-center space-x-1">
-                <Clock className="h-3 w-3" />
-                <span>{task.estimatedHours}h</span>
-              </div>
-            )}
-          </div>
-          
-          {task.assignedTo && (
-            <div className="flex items-center space-x-2">
-              <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
-                {task.assignedTo.firstName[0]}{task.assignedTo.lastName[0]}
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {task.assignedTo.firstName} {task.assignedTo.lastName}
-              </span>
-            </div>
-          )}
-          
-          {task.labels.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {task.labels.slice(0, 2).map((label, index) => (
-                <Badge key={index} variant="outline" className="text-xs">
-                  {label}
-                </Badge>
-              ))}
-              {task.labels.length > 2 && (
-                <Badge variant="outline" className="text-xs">
-                  +{task.labels.length - 2}
-                </Badge>
-              )}
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
   )
 }

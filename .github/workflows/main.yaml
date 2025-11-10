@@ -1,4 +1,4 @@
-name: Kanvaro CI CD pipeline
+name: Kanvaro CI CD pipeline Main(Develop) Environment
 
 on:
   push:
@@ -22,11 +22,49 @@ jobs:
       - name: Starting action
         run: echo "starting pipeline"
 
+  semantic-release:
+    runs-on: ubuntu-latest
+    needs: release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      version: ${{ steps.set-version.outputs.version }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22.14.0
+          cache: "npm"
+
+      - name: Install dependencies
+        run: |
+          npm ci --legacy-peer-deps
+
+      - name: Run Semantic Release
+        id: set-version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_ACESS_TOKEN }}
+        run: |
+          git remote set-url origin https://x-access-token:${{ secrets.GH_ACESS_TOKEN }}@github.com/EchonLabs/kanvaro.com.git
+          RELEASE_OUTPUT=$(npx semantic-release || true)
+          echo "$RELEASE_OUTPUT"
+          VERSION=$(echo "$RELEASE_OUTPUT" | grep -oP 'Published release \K[0-9]+\.[0-9]+\.[0-9]+' || true)
+          if [ -n "$VERSION" ]; then
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "Version detected: $VERSION"
+          else
+            echo "version=" >> $GITHUB_OUTPUT
+            echo "No new release was created."
+          fi
+
   build_main:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
     environment: main
-    needs: release
+    needs: semantic-release
     outputs:
       version: ${{ steps.image-version.outputs.version }}
     steps:
@@ -93,9 +131,9 @@ jobs:
           docker tag $IMAGE_NAME:${VERSION} $IMAGE_NAME:latest
           docker push $IMAGE_NAME:latest
 
-  deploy-main:
+  deploy_main:
     runs-on: ubuntu-latest
-    environment: develop
+    environment: main
     needs: build_main
     steps:
       - name: Checkout code
@@ -109,7 +147,7 @@ jobs:
       - name: Set Environment Name
         run: echo "CI_ENVIRONMENT_NAME=${GITHUB_REF##*/}" >> $GITHUB_ENV
 
-      - name: Deploy to Server (Dev Environment)
+      - name: Deploy to Server (Main Environment)
         if: github.ref == 'refs/heads/main'
         uses: appleboy/ssh-action@master
         with:
@@ -120,7 +158,7 @@ jobs:
             echo "Received version: ${{ needs.build_main.outputs.version }}"
             cd /var/www/
             ./${{ vars.DEPLOY_SCRIPT }} \
-              -v "${{ needs.build_dev.outputs.version }}" \
+              -v "${{ needs.build_main.outputs.version }}" \
               -w "${{ vars.CONTAINER_TAG }}-web-${{ env.CI_ENVIRONMENT_NAME }}" \
               -u "${{ github.actor }}" \
               -p "${{ secrets.Kanvaro_Deploy_Key }}" \

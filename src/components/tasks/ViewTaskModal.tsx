@@ -56,8 +56,8 @@ console.log('task', task);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <Card className="w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-        <CardHeader>
+      <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col m-4 sm:m-6">
+        <CardHeader className="flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center space-x-2">
@@ -81,7 +81,7 @@ console.log('task', task);
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="flex-1 overflow-y-auto space-y-6">
           {/* Basic Information */}
           <div className="grid gap-4 md:grid-cols-2">
             <div>

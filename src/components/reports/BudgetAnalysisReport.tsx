@@ -81,17 +81,17 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
   return (
     <div className="space-y-6">
       {/* Budget Analysis Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Budgeted</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Budgeted</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold break-words">
               ${totalBudgeted.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Across all categories
             </p>
           </CardContent>
@@ -99,30 +99,30 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Spent</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Spent</CardTitle>
+            <TrendingDown className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold break-words">
               ${totalSpent.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {((totalSpent / totalBudgeted) * 100).toFixed(1)}% of budget
+            <p className="text-xs text-muted-foreground mt-1">
+              {totalBudgeted > 0 ? ((totalSpent / totalBudgeted) * 100).toFixed(1) : 0}% of budget
             </p>
-            <Progress value={(totalSpent / totalBudgeted) * 100} className="mt-2" />
+            <Progress value={totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0} className="mt-2" />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Remaining Budget</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Remaining Budget</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold break-words">
               ${totalRemaining.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Available to spend
             </p>
           </CardContent>
@@ -130,14 +130,14 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Utilization</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Average Utilization</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               {averageUtilization.toFixed(1)}%
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Across categories
             </p>
             <Progress value={averageUtilization} className="mt-2" />
@@ -146,19 +146,19 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Budget vs Spent by Category */}
         <Card>
           <CardHeader>
-            <CardTitle>Budget vs Spent by Category</CardTitle>
-            <CardDescription>Budget allocation vs actual spending</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Budget vs Spent by Category</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Budget allocation vs actual spending</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <BarChart data={categoryData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']} />
                 <Bar dataKey="budgeted" fill="#8884d8" name="Budgeted" />
                 <Bar dataKey="spent" fill="#82ca9d" name="Spent" />
@@ -170,15 +170,15 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
         {/* Budget Utilization by Category */}
         <Card>
           <CardHeader>
-            <CardTitle>Budget Utilization by Category</CardTitle>
-            <CardDescription>Percentage of budget used by category</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Budget Utilization by Category</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Percentage of budget used by category</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <BarChart data={utilizationData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="category" />
-                <YAxis />
+                <XAxis dataKey="category" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip formatter={(value) => [`${value}%`, 'Utilization']} />
                 <Bar dataKey="utilization" fill="#FFBB28" />
               </BarChart>
@@ -189,15 +189,15 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
         {/* Monthly Budget Trends */}
         <Card>
           <CardHeader>
-            <CardTitle>Monthly Budget Trends</CardTitle>
-            <CardDescription>Budget and spending over time</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Monthly Budget Trends</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Budget and spending over time</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <AreaChart data={monthlyBudgetData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']} />
                 <Area 
                   type="monotone" 
@@ -225,15 +225,15 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
         {/* Budget Variance Analysis */}
         <Card>
           <CardHeader>
-            <CardTitle>Budget Variance Analysis</CardTitle>
-            <CardDescription>Monthly budget vs actual spending variance</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Budget Variance Analysis</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Monthly budget vs actual spending variance</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <LineChart data={monthlyBudgetData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Variance']} />
                 <Line 
                   type="monotone" 
@@ -258,53 +258,55 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
       {/* Budget Category Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Budget Category Analysis</CardTitle>
-          <CardDescription>Detailed breakdown of budget performance by category</CardDescription>
+          <CardTitle className="text-base sm:text-lg">Budget Category Analysis</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Detailed breakdown of budget performance by category</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {budgetBreakdown.map((category, index) => (
-              <div key={category.category} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3">
-                    <div 
-                      className="w-4 h-4 rounded-full" 
-                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                    />
-                    <h3 className="font-semibold">{category.category}</h3>
+              <div key={category.category} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+                <div className="flex-1 min-w-0 w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
+                    <div className="flex items-center space-x-2">
+                      <div 
+                        className="w-3 h-3 sm:w-4 sm:h-4 rounded-full flex-shrink-0" 
+                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                      />
+                      <h3 className="font-semibold text-sm sm:text-base truncate">{category.category}</h3>
+                    </div>
                     <Badge variant={category.utilizationRate > 80 ? 'destructive' : 
-                                   category.utilizationRate > 60 ? 'default' : 'secondary'}>
+                                   category.utilizationRate > 60 ? 'default' : 'secondary'} className="flex-shrink-0">
                       {category.utilizationRate.toFixed(1)}% used
                     </Badge>
                     {category.utilizationRate > 100 && (
-                      <Badge variant="destructive" className="flex items-center space-x-1">
+                      <Badge variant="destructive" className="flex items-center space-x-1 flex-shrink-0">
                         <AlertCircle className="h-3 w-3" />
-                        <span>Over Budget</span>
+                        <span className="text-xs sm:text-sm">Over Budget</span>
                       </Badge>
                     )}
                   </div>
                   
                   <div className="mt-3 space-y-2">
                     <div>
-                      <div className="flex items-center justify-between text-sm mb-1">
+                      <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
                         <span>Budget Utilization</span>
-                        <span>{category.utilizationRate.toFixed(1)}%</span>
+                        <span className="flex-shrink-0 ml-2">{category.utilizationRate.toFixed(1)}%</span>
                       </div>
                       <Progress value={Math.min(100, category.utilizationRate)} className="h-2" />
                     </div>
                     
-                    <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-xs sm:text-sm">
                       <div>
                         <div className="text-muted-foreground">Budgeted</div>
-                        <div className="font-medium">${category.budgeted.toLocaleString()}</div>
+                        <div className="font-medium break-words">${category.budgeted.toLocaleString()}</div>
                       </div>
                       <div>
                         <div className="text-muted-foreground">Spent</div>
-                        <div className="font-medium">${category.spent.toLocaleString()}</div>
+                        <div className="font-medium break-words">${category.spent.toLocaleString()}</div>
                       </div>
                       <div>
                         <div className="text-muted-foreground">Remaining</div>
-                        <div className={`font-medium ${category.remaining < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        <div className={`font-medium break-words ${category.remaining < 0 ? 'text-red-600' : 'text-green-600'}`}>
                           ${category.remaining.toLocaleString()}
                         </div>
                       </div>

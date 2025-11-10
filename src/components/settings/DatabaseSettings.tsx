@@ -104,9 +104,9 @@ export function DatabaseSettings() {
   if (loading) {
     return (
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-primary"></div>
           </div>
         </CardContent>
       </Card>
@@ -114,118 +114,129 @@ export function DatabaseSettings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Database className="h-5 w-5" />
-            Database Configuration
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-2xl">
+            <Database className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+            <span className="truncate">Database Configuration</span>
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs sm:text-sm">
             Configure your MongoDB database connection settings.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-2">
-              <Label htmlFor="db-host">Host</Label>
+              <Label htmlFor="db-host" className="text-xs sm:text-sm">Host</Label>
               <Input
                 id="db-host"
                 value={formData.host}
                 onChange={(e) => setFormData({ ...formData, host: e.target.value })}
                 placeholder="localhost"
+                className="text-xs sm:text-sm"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="db-port">Port</Label>
+              <Label htmlFor="db-port" className="text-xs sm:text-sm">Port</Label>
               <Input
                 id="db-port"
                 type="number"
                 value={formData.port}
                 onChange={(e) => setFormData({ ...formData, port: parseInt(e.target.value) || 27017 })}
                 placeholder="27017"
+                className="text-xs sm:text-sm"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="db-database">Database Name</Label>
+              <Label htmlFor="db-database" className="text-xs sm:text-sm">Database Name</Label>
               <Input
                 id="db-database"
                 value={formData.database}
                 onChange={(e) => setFormData({ ...formData, database: e.target.value })}
                 placeholder="kanvaro"
+                className="text-xs sm:text-sm"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="db-auth-source">Authentication Database</Label>
+              <Label htmlFor="db-auth-source" className="text-xs sm:text-sm">Authentication Database</Label>
               <Input
                 id="db-auth-source"
                 value={formData.authSource}
                 onChange={(e) => setFormData({ ...formData, authSource: e.target.value })}
                 placeholder="admin"
+                className="text-xs sm:text-sm"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="db-username">Username</Label>
+              <Label htmlFor="db-username" className="text-xs sm:text-sm">Username</Label>
               <Input
                 id="db-username"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 placeholder="mongodb_user"
+                className="text-xs sm:text-sm"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="db-password">Password</Label>
+              <Label htmlFor="db-password" className="text-xs sm:text-sm">Password</Label>
               <Input
                 id="db-password"
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 placeholder="••••••••"
+                className="text-xs sm:text-sm"
               />
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             <Switch
               id="db-ssl"
               checked={formData.ssl}
               onCheckedChange={(checked) => setFormData({ ...formData, ssl: checked })}
+              className="flex-shrink-0"
             />
-            <Label htmlFor="db-ssl">Use SSL/TLS</Label>
+            <Label htmlFor="db-ssl" className="text-xs sm:text-sm">Use SSL/TLS</Label>
           </div>
 
           {message && (
             <Alert variant={message.type === 'error' ? 'destructive' : 'default'}>
-              {message.type === 'error' ? <AlertCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-              <AlertDescription>{message.text}</AlertDescription>
+              {message.type === 'error' ? (
+                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              ) : (
+                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              )}
+              <AlertDescription className="text-xs sm:text-sm break-words">{message.text}</AlertDescription>
             </Alert>
           )}
 
-          <div className="flex justify-between">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-0">
             <Button 
               onClick={handleTest} 
               disabled={testing}
               variant="outline"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm"
             >
               {testing ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-current"></div>
               ) : (
-                <TestTube className="h-4 w-4" />
+                <TestTube className="h-3 w-3 sm:h-4 sm:w-4" />
               )}
               {testing ? 'Testing...' : 'Test Connection'}
             </Button>
 
-            <Button onClick={handleSave} disabled={testing} className="flex items-center gap-2">
+            <Button onClick={handleSave} disabled={testing} className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm">
               {testing ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
               ) : (
-                <Database className="h-4 w-4" />
+                <Database className="h-3 w-3 sm:h-4 sm:w-4" />
               )}
               {testing ? 'Saving...' : 'Save Configuration'}
             </Button>

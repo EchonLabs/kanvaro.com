@@ -26,6 +26,27 @@ export async function GET(req: NextRequest) {
     let query: any = { organization: authResult.user.organization }
 
     if (projectId) {
+      // Validate access to the requested project first (safe ObjectId comparisons + admin override)
+      const project = await Project.findById(projectId)
+      if (!project) {
+        return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
+      }
+      const userIdStr = (authResult as any)?.user?.id?.toString?.() || String((authResult as any)?.user?.id)
+      const roleStr = (authResult as any)?.user?.role ?? (authResult as any)?.role
+      const isAdmin = typeof roleStr === 'string' && ['admin', 'super_admin', 'superadmin'].includes(roleStr.toLowerCase())
+      const createdByStr = project?.createdBy?.toString?.()
+      const teamHasUser = Array.isArray(project?.teamMembers)
+        ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr)
+        : false
+      const roleHasUser = Array.isArray(project?.projectRoles)
+        ? project.projectRoles.some(
+            (role: any) => role?.user?.toString?.() === userIdStr && ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)
+          )
+        : false
+      const hasAccess = !!project && (isAdmin || createdByStr === userIdStr || teamHasUser || roleHasUser)
+      if (!hasAccess) {
+        return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 })
+      }
       query.project = projectId
     }
 
@@ -53,8 +74,12 @@ export async function GET(req: NextRequest) {
 
     const testExecutions = await TestExecution.find(query)
       .populate('executedBy', 'firstName lastName email')
-      .populate('testCase', 'title priority category')
-      .populate('testPlan', 'name')
+      .populate({
+        path: 'testCase',
+        select: 'title priority category estimatedExecutionTime testSuite',
+        populate: { path: 'testSuite', select: 'name' }
+      })
+      .populate('testPlan', 'name version')
       .populate('project', 'name')
       .sort({ executedAt: -1 })
       .skip(skip)
@@ -116,14 +141,19 @@ export async function POST(req: NextRequest) {
     }
 
     const project = await Project.findById(testCase.project)
-    const hasAccess = project && (
-      project.teamMembers.includes(authResult.user.id) || 
-      project.createdBy.toString() === authResult.user.id ||
-      project.projectRoles.some((role: any) => 
-        role.user.toString() === authResult.user.id && 
-        ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)
-      )
-    )
+    const userIdStr = (authResult as any)?.user?.id?.toString?.() || String((authResult as any)?.user?.id)
+    const roleStr = (authResult as any)?.user?.role ?? (authResult as any)?.role
+    const isAdmin = typeof roleStr === 'string' && ['admin', 'super_admin', 'superadmin'].includes(roleStr.toLowerCase())
+    const createdByStr = project?.createdBy?.toString?.()
+    const teamHasUser = Array.isArray(project?.teamMembers)
+      ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr)
+      : false
+    const roleHasUser = Array.isArray(project?.projectRoles)
+      ? project.projectRoles.some(
+          (role: any) => role?.user?.toString?.() === userIdStr && ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)
+        )
+      : false
+    const hasAccess = !!project && (isAdmin || createdByStr === userIdStr || teamHasUser || roleHasUser)
 
     if (!hasAccess) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 })

@@ -174,9 +174,9 @@ export function EmailSettings() {
   if (loading) {
     return (
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-primary"></div>
           </div>
         </CardContent>
       </Card>
@@ -184,24 +184,24 @@ export function EmailSettings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" />
-            Email Configuration
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Mail className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+            <span className="truncate">Email Configuration</span>
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs sm:text-sm">
             Configure your email provider settings for sending notifications and invitations.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
           {/* Email Provider Selection */}
-          <div className="space-y-4">
-            <Label>Email Provider</Label>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-3 sm:space-y-4">
+            <Label className="text-xs sm:text-sm">Email Provider</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <div
-                className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                className={`p-3 sm:p-4 border-2 rounded-lg cursor-pointer transition-all ${
                   formData.provider === 'smtp'
                     ? 'border-primary bg-primary/5'
                     : 'border-muted hover:border-muted-foreground/50'
@@ -209,16 +209,16 @@ export function EmailSettings() {
                 onClick={() => setFormData({ ...formData, provider: 'smtp' })}
               >
                 <div className="text-center">
-                  <Mail className="h-8 w-8 text-primary mx-auto mb-2" />
-                  <h3 className="font-semibold">SMTP Server</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <Mail className="h-6 w-6 sm:h-8 sm:w-8 text-primary mx-auto mb-2 flex-shrink-0" />
+                  <h3 className="text-sm sm:text-base font-semibold">SMTP Server</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
                     Use your own SMTP server
                   </p>
                 </div>
               </div>
 
               <div
-                className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                className={`p-3 sm:p-4 border-2 rounded-lg cursor-pointer transition-all ${
                   formData.provider === 'azure'
                     ? 'border-primary bg-primary/5'
                     : 'border-muted hover:border-muted-foreground/50'
@@ -226,16 +226,16 @@ export function EmailSettings() {
                 onClick={() => setFormData({ ...formData, provider: 'azure' })}
               >
                 <div className="text-center">
-                  <Mail className="h-8 w-8 text-primary mx-auto mb-2" />
-                  <h3 className="font-semibold">Azure App</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <Mail className="h-6 w-6 sm:h-8 sm:w-8 text-primary mx-auto mb-2 flex-shrink-0" />
+                  <h3 className="text-sm sm:text-base font-semibold">Azure App</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
                     Use Azure App with Exchange Online
                   </p>
                 </div>
               </div>
 
               <div
-                className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                className={`p-3 sm:p-4 border-2 rounded-lg cursor-pointer transition-all ${
                   formData.provider === 'skip'
                     ? 'border-primary bg-primary/5'
                     : 'border-muted hover:border-muted-foreground/50'
@@ -243,9 +243,9 @@ export function EmailSettings() {
                 onClick={() => setFormData({ ...formData, provider: 'skip' })}
               >
                 <div className="text-center">
-                  <Mail className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                  <h3 className="font-semibold">Skip Email</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <Mail className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground mx-auto mb-2 flex-shrink-0" />
+                  <h3 className="text-sm sm:text-base font-semibold">Skip Email</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
                     Disable email notifications
                   </p>
                 </div>
@@ -254,17 +254,17 @@ export function EmailSettings() {
           </div>
 
           {formData.provider === 'smtp' && (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <Alert>
-                <Mail className="h-4 w-4" />
-                <AlertTitle>SMTP Configuration</AlertTitle>
-                <AlertDescription>
+                <Mail className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <AlertTitle className="text-xs sm:text-sm">SMTP Configuration</AlertTitle>
+                <AlertDescription className="text-xs sm:text-sm break-words">
                   Configure your SMTP server settings. Common providers: Gmail (smtp.gmail.com:587), Outlook (smtp-mail.outlook.com:587), or your custom SMTP server.
                 </AlertDescription>
               </Alert>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="smtp-host">SMTP Host *</Label>
+                  <Label htmlFor="smtp-host" className="text-xs sm:text-sm">SMTP Host *</Label>
                   <Input
                     id="smtp-host"
                     type="text"
@@ -274,15 +274,15 @@ export function EmailSettings() {
                       smtp: { ...formData.smtp, host: e.target.value.trim() }
                     })}
                     placeholder="smtp.gmail.com"
-                    className={errors.host ? 'border-red-500' : ''}
+                    className={`text-xs sm:text-sm ${errors.host ? 'border-red-500' : ''}`}
                   />
                   {errors.host && (
-                    <p className="text-sm text-red-600">{errors.host}</p>
+                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.host}</p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="smtp-port">Port *</Label>
+                  <Label htmlFor="smtp-port" className="text-xs sm:text-sm">Port *</Label>
                   <Input
                     id="smtp-port"
                     type="number"
@@ -292,11 +292,12 @@ export function EmailSettings() {
                       smtp: { ...formData.smtp, port: parseInt(e.target.value) || 587 }
                     })}
                     placeholder="587"
+                    className="text-xs sm:text-sm"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-2">
                 <Switch
                   id="smtp-secure"
                   checked={formData.smtp.secure}
@@ -304,13 +305,14 @@ export function EmailSettings() {
                     ...formData,
                     smtp: { ...formData.smtp, secure: checked }
                   })}
+                  className="flex-shrink-0"
                 />
-                <Label htmlFor="smtp-secure">Use SSL/TLS</Label>
+                <Label htmlFor="smtp-secure" className="text-xs sm:text-sm">Use SSL/TLS</Label>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="smtp-username">Username *</Label>
+                  <Label htmlFor="smtp-username" className="text-xs sm:text-sm">Username *</Label>
                   <Input
                     id="smtp-username"
                     type="text"
@@ -320,15 +322,15 @@ export function EmailSettings() {
                       smtp: { ...formData.smtp, username: e.target.value.trim() }
                     })}
                     placeholder="your-email@gmail.com"
-                    className={errors.username ? 'border-red-500' : ''}
+                    className={`text-xs sm:text-sm ${errors.username ? 'border-red-500' : ''}`}
                   />
                   {errors.username && (
-                    <p className="text-sm text-red-600">{errors.username}</p>
+                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.username}</p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="smtp-password">Password *</Label>
+                  <Label htmlFor="smtp-password" className="text-xs sm:text-sm">Password *</Label>
                   <Input
                     id="smtp-password"
                     type="password"
@@ -338,17 +340,17 @@ export function EmailSettings() {
                       smtp: { ...formData.smtp, password: e.target.value }
                     })}
                     placeholder="Email account password"
-                    className={errors.password ? 'border-red-500' : ''}
+                    className={`text-xs sm:text-sm ${errors.password ? 'border-red-500' : ''}`}
                   />
                   {errors.password && (
-                    <p className="text-sm text-red-600">{errors.password}</p>
+                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.password}</p>
                   )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="smtp-from-email">From Email *</Label>
+                  <Label htmlFor="smtp-from-email" className="text-xs sm:text-sm">From Email *</Label>
                   <Input
                     id="smtp-from-email"
                     type="email"
@@ -358,15 +360,15 @@ export function EmailSettings() {
                       smtp: { ...formData.smtp, fromEmail: e.target.value.trim() }
                     })}
                     placeholder="noreply@yourcompany.com"
-                    className={errors.fromEmail ? 'border-red-500' : ''}
+                    className={`text-xs sm:text-sm ${errors.fromEmail ? 'border-red-500' : ''}`}
                   />
                   {errors.fromEmail && (
-                    <p className="text-sm text-red-600">{errors.fromEmail}</p>
+                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.fromEmail}</p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="smtp-from-name">From Name *</Label>
+                  <Label htmlFor="smtp-from-name" className="text-xs sm:text-sm">From Name *</Label>
                   <Input
                     id="smtp-from-name"
                     type="text"
@@ -376,10 +378,10 @@ export function EmailSettings() {
                       smtp: { ...formData.smtp, fromName: e.target.value.trim() }
                     })}
                     placeholder="Your Company"
-                    className={errors.fromName ? 'border-red-500' : ''}
+                    className={`text-xs sm:text-sm ${errors.fromName ? 'border-red-500' : ''}`}
                   />
                   {errors.fromName && (
-                    <p className="text-sm text-red-600">{errors.fromName}</p>
+                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.fromName}</p>
                   )}
                 </div>
               </div>
@@ -387,17 +389,17 @@ export function EmailSettings() {
           )}
 
           {formData.provider === 'azure' && (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <Alert>
-                <Mail className="h-4 w-4" />
-                <AlertTitle>Azure App Configuration</AlertTitle>
-                <AlertDescription>
+                <Mail className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <AlertTitle className="text-xs sm:text-sm">Azure App Configuration</AlertTitle>
+                <AlertDescription className="text-xs sm:text-sm break-words">
                   Configure your Azure App registration for Exchange Online. You'll need to create an app in Azure Portal and grant it Mail.Send permissions.
                 </AlertDescription>
               </Alert>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="azure-client-id">Client ID *</Label>
+                  <Label htmlFor="azure-client-id" className="text-xs sm:text-sm">Client ID *</Label>
                   <Input
                     id="azure-client-id"
                     type="text"
@@ -407,15 +409,15 @@ export function EmailSettings() {
                       azure: { ...formData.azure, clientId: e.target.value }
                     })}
                     placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    className={errors.clientId ? 'border-red-500' : ''}
+                    className={`text-xs sm:text-sm ${errors.clientId ? 'border-red-500' : ''}`}
                   />
                   {errors.clientId && (
-                    <p className="text-sm text-red-600">{errors.clientId}</p>
+                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.clientId}</p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="azure-tenant-id">Tenant ID *</Label>
+                  <Label htmlFor="azure-tenant-id" className="text-xs sm:text-sm">Tenant ID *</Label>
                   <Input
                     id="azure-tenant-id"
                     type="text"
@@ -425,16 +427,16 @@ export function EmailSettings() {
                       azure: { ...formData.azure, tenantId: e.target.value }
                     })}
                     placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    className={errors.tenantId ? 'border-red-500' : ''}
+                    className={`text-xs sm:text-sm ${errors.tenantId ? 'border-red-500' : ''}`}
                   />
                   {errors.tenantId && (
-                    <p className="text-sm text-red-600">{errors.tenantId}</p>
+                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.tenantId}</p>
                   )}
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="azure-client-secret">Client Secret *</Label>
+                <Label htmlFor="azure-client-secret" className="text-xs sm:text-sm">Client Secret *</Label>
                 <Input
                   id="azure-client-secret"
                   type="password"
@@ -444,16 +446,16 @@ export function EmailSettings() {
                     azure: { ...formData.azure, clientSecret: e.target.value }
                   })}
                   placeholder="Enter your Azure app client secret"
-                  className={errors.clientSecret ? 'border-red-500' : ''}
+                  className={`text-xs sm:text-sm ${errors.clientSecret ? 'border-red-500' : ''}`}
                 />
                 {errors.clientSecret && (
-                  <p className="text-sm text-red-600">{errors.clientSecret}</p>
+                  <p className="text-xs sm:text-sm text-red-600 break-words">{errors.clientSecret}</p>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="azure-from-email">From Email *</Label>
+                  <Label htmlFor="azure-from-email" className="text-xs sm:text-sm">From Email *</Label>
                   <Input
                     id="azure-from-email"
                     type="email"
@@ -463,15 +465,15 @@ export function EmailSettings() {
                       azure: { ...formData.azure, fromEmail: e.target.value.trim() }
                     })}
                     placeholder="noreply@yourcompany.com"
-                    className={errors.fromEmail ? 'border-red-500' : ''}
+                    className={`text-xs sm:text-sm ${errors.fromEmail ? 'border-red-500' : ''}`}
                   />
                   {errors.fromEmail && (
-                    <p className="text-sm text-red-600">{errors.fromEmail}</p>
+                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.fromEmail}</p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="azure-from-name">From Name *</Label>
+                  <Label htmlFor="azure-from-name" className="text-xs sm:text-sm">From Name *</Label>
                   <Input
                     id="azure-from-name"
                     type="text"
@@ -481,10 +483,10 @@ export function EmailSettings() {
                       azure: { ...formData.azure, fromName: e.target.value.trim() }
                     })}
                     placeholder="Your Company"
-                    className={errors.fromName ? 'border-red-500' : ''}
+                    className={`text-xs sm:text-sm ${errors.fromName ? 'border-red-500' : ''}`}
                   />
                   {errors.fromName && (
-                    <p className="text-sm text-red-600">{errors.fromName}</p>
+                    <p className="text-xs sm:text-sm text-red-600 break-words">{errors.fromName}</p>
                   )}
                 </div>
               </div>
@@ -493,38 +495,38 @@ export function EmailSettings() {
 
           {formData.provider === 'skip' && (
             <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
+              <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <AlertDescription className="text-xs sm:text-sm">
                 <p className="font-medium">Email notifications disabled</p>
-                <p>Email functionality will be disabled for this organization.</p>
+                <p className="break-words">Email functionality will be disabled for this organization.</p>
               </AlertDescription>
             </Alert>
           )}
 
           {formData.provider !== 'skip' && (
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-0">
               <Button 
                 onClick={handleTest} 
                 disabled={testing || saving}
                 variant="outline"
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm"
               >
                 {testing ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                  <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-current"></div>
                 ) : (
-                  <TestTube className="h-4 w-4" />
+                  <TestTube className="h-3 w-3 sm:h-4 sm:w-4" />
                 )}
                 {testing ? 'Testing...' : 'Test Email'}
               </Button>
 
               {testResult && (
-                <Alert variant={testResult === 'success' ? 'default' : 'destructive'}>
+                <Alert variant={testResult === 'success' ? 'default' : 'destructive'} className="flex-1 min-w-0">
                   {testResult === 'success' ? (
-                    <CheckCircle className="h-4 w-4" />
+                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                   ) : (
-                    <XCircle className="h-4 w-4" />
+                    <XCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                   )}
-                  <AlertDescription>
+                  <AlertDescription className="text-xs sm:text-sm break-words">
                     {testMessage}
                   </AlertDescription>
                 </Alert>
@@ -534,17 +536,21 @@ export function EmailSettings() {
 
           {message && (
             <Alert variant={message.type === 'error' ? 'destructive' : 'default'}>
-              {message.type === 'error' ? <AlertCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-              <AlertDescription>{message.text}</AlertDescription>
+              {message.type === 'error' ? (
+                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              ) : (
+                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              )}
+              <AlertDescription className="text-xs sm:text-sm break-words">{message.text}</AlertDescription>
             </Alert>
           )}
 
           <div className="flex justify-end">
-            <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2">
+            <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm">
               {saving ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
               ) : (
-                <Mail className="h-4 w-4" />
+                <Mail className="h-3 w-3 sm:h-4 sm:w-4" />
               )}
               {saving ? 'Saving...' : 'Save Configuration'}
             </Button>

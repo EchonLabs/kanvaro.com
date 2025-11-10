@@ -1,0 +1,133 @@
+name: Kanvaro CI CD pipeline QA Environment
+
+on:
+  push:
+    branches:
+      - qa
+  pull_request:
+    branches:
+      - qa
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: write # Needed to create releases, update tags, etc.
+  packages: write # Needed for publishing to GitHub Packages (docker/npm)
+  id-token: write # Needed for OIDC deployments (e.g., cloud auth)
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Starting action
+        run: echo "starting pipeline"
+
+  build_qa:
+    runs-on: ubuntu-latest
+    environment: qa
+    needs: release
+    outputs:
+      version: ${{ steps.image-version.outputs.version }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Set VERSION from release or package.json
+        id: image-version
+        run: |
+          VERSION="${{ needs.release.outputs.version }}"
+          if [ -z "$VERSION" ]; then
+            echo "No semantic-release version found, using version from package.json"
+            VERSION=$(jq -r .version package.json)
+          fi
+          echo "Using version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+      - name: Sanitize Branch Name
+        id: sanitize-branch
+        run: |
+          SAFE_BRANCH=$(echo "${{ github.ref_name }}" | tr '/' '-')
+          echo "safe_branch=$SAFE_BRANCH" >> $GITHUB_OUTPUT
+          echo "BRANCH_TAG=$SAFE_BRANCH" >> $GITHUB_ENV
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set Environment Name
+        run: echo "CI_ENVIRONMENT_NAME=${GITHUB_REF##*/}" >> $GITHUB_ENV
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_OWNER="$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f1 | tr '[:upper:]' '[:lower:]')"
+          IMAGE_REPO="$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')"
+          ENV_NAME="$(echo "$CI_ENVIRONMENT_NAME" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-')"
+
+          IMAGE_NAME="ghcr.io/${IMAGE_OWNER}/${IMAGE_REPO}"
+
+          if [ -n "$ENV_NAME" ]; then
+            IMAGE_NAME="${IMAGE_NAME}-${ENV_NAME}"
+          fi
+
+          IMAGE_NAME="${IMAGE_NAME%-}"
+
+          echo "Final IMAGE_NAME: $IMAGE_NAME"
+
+          IMAGE_TAG=${GITHUB_SHA::7}
+
+          echo "Building image $IMAGE_NAME:${{ needs.build_qa.outputs.version }}"
+          docker build -t $IMAGE_NAME:${VERSION} .
+
+          echo "Pushing image to GHCR"
+          docker push $IMAGE_NAME:${VERSION}
+
+          # Optionally, push 'latest' tag
+          docker tag $IMAGE_NAME:${VERSION} $IMAGE_NAME:latest
+          docker push $IMAGE_NAME:latest
+
+  deploy_qa:
+    runs-on: ubuntu-latest
+    environment: qa
+    needs: build_qa
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Add SSH host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+      
+      - name: Set Environment Name
+        run: echo "CI_ENVIRONMENT_NAME=${GITHUB_REF##*/}" >> $GITHUB_ENV
+
+      - name: Deploy to Server (qa Environment)
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "Received version: ${{ needs.build_qa.outputs.version }}"
+            cd /var/www/
+            ./${{ vars.DEPLOY_SCRIPT }} \
+              -v "${{ needs.build_qa.outputs.version }}" \
+              -w "${{ vars.CONTAINER_TAG }}-web-${{ env.CI_ENVIRONMENT_NAME }}" \
+              -u "${{ github.actor }}" \
+              -p "${{ secrets.Kanvaro_Deploy_Key }}" \
+              -l "/var/www/${{ vars.DEPLOY_PATH }}" \
+              -r "${{ vars.REGISTRY_PATH }}" \
+              -e "${{ env.CI_ENVIRONMENT_NAME }}" \
+              -x "ghcr.io/${{ github.repository }}-${{ env.CI_ENVIRONMENT_NAME }}:${{ needs.build_qa.outputs.version }}" \
+              -y "$IMAGE"
+        env:
+          CONTAINER_TAG: ${{ vars.CONTAINER_TAG }}
+          REGISTRY_PATH: ${{ vars.REGISTRY_PATH }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          DEPLOY_SCRIPT: ${{ vars.DEPLOY_SCRIPT }}

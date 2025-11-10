@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -33,7 +33,7 @@ interface User {
 
 interface Epic {
   _id: string
-  name: string
+  title: string
 }
 
 interface Sprint {
@@ -47,9 +47,12 @@ export default function CreateStoryPage() {
   const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
   const [projects, setProjects] = useState<Project[]>([])
-  const [users, setUsers] = useState<User[]>([])
+  const [projectMembers, setProjectMembers] = useState<User[]>([])
+  const [loadingProjectMembers, setLoadingProjectMembers] = useState(false)
   const [epics, setEpics] = useState<Epic[]>([])
   const [sprints, setSprints] = useState<Sprint[]>([])
+  const [projectQuery, setProjectQuery] = useState("");
+  const [assigneeQuery, setAssigneeQuery] = useState('')
 
   const [formData, setFormData] = useState({
     title: '',
@@ -74,7 +77,7 @@ export default function CreateStoryPage() {
       
       if (response.ok) {
         setAuthError('')
-        await Promise.all([fetchProjects(), fetchUsers()])
+        await fetchProjects()
       } else if (response.status === 401) {
         const refreshResponse = await fetch('/api/auth/refresh', {
           method: 'POST'
@@ -82,7 +85,7 @@ export default function CreateStoryPage() {
         
         if (refreshResponse.ok) {
           setAuthError('')
-          await Promise.all([fetchProjects(), fetchUsers()])
+          await fetchProjects()
         } else {
           setAuthError('Session expired')
           setTimeout(() => {
@@ -121,21 +124,38 @@ export default function CreateStoryPage() {
     }
   }
 
-  const fetchUsers = async () => {
+  const fetchProjectMembers = useCallback(async (projectId: string) => {
+    if (!projectId) {
+      setProjectMembers([])
+      return
+    }
+
+    setLoadingProjectMembers(true)
     try {
-      const response = await fetch('/api/members')
+      const response = await fetch(`/api/projects/${projectId}`)
       const data = await response.json()
 
-      if (data.success && Array.isArray(data.data)) {
-        setUsers(data.data)
+      if (response.ok && data.success && data.data) {
+        const members = Array.isArray(data.data.teamMembers) ? data.data.teamMembers : []
+        setProjectMembers(members)
       } else {
-        setUsers([])
+        setProjectMembers([])
       }
-    } catch (err) {
-      console.error('Failed to fetch users:', err)
-      setUsers([])
+    } catch (error) {
+      console.error('Failed to fetch project members:', error)
+      setProjectMembers([])
+    } finally {
+      setLoadingProjectMembers(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (formData.project) {
+      fetchProjectMembers(formData.project)
+    } else {
+      setProjectMembers([])
+    }
+  }, [formData.project, fetchProjectMembers])
 
   const fetchEpics = async (projectId: string) => {
     if (!projectId) {
@@ -149,6 +169,7 @@ export default function CreateStoryPage() {
 
       if (data.success && Array.isArray(data.data)) {
         setEpics(data.data)
+        
       } else {
         setEpics([])
       }
@@ -167,7 +188,6 @@ export default function CreateStoryPage() {
     try {
       const response = await fetch(`/api/sprints?project=${projectId}`)
       const data = await response.json()
-
       if (data.success && Array.isArray(data.data)) {
         setSprints(data.data)
       } else {
@@ -204,7 +224,7 @@ export default function CreateStoryPage() {
       const data = await response.json()
 
       if (data.success) {
-        router.push('/stories')
+        router.push('/stories?success=story-created')
       } else {
         setError(data.error || 'Failed to create story')
       }
@@ -216,16 +236,23 @@ export default function CreateStoryPage() {
   }
 
   const handleChange = (field: string, value: string) => {
+    if (field === 'project') {
+      fetchEpics(value)
+      fetchSprints(value)
+      setFormData(prev => ({
+        ...prev,
+        project: value,
+        assignedTo: ''
+      }))
+      setAssigneeQuery('')
+      setProjectMembers([])
+      return
+    }
+
     setFormData(prev => ({
       ...prev,
       [field]: value
     }))
-
-    // Fetch related data when project changes
-    if (field === 'project') {
-      fetchEpics(value)
-      fetchSprints(value)
-    }
   }
 
   const addCriteria = () => {
@@ -245,6 +272,24 @@ export default function CreateStoryPage() {
     }))
   }
 
+  const filteredProjectMembers = useMemo(() => {
+    if (!assigneeQuery.trim()) return projectMembers
+    const q = assigneeQuery.toLowerCase().trim()
+    return projectMembers.filter(u =>
+      `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q)
+    )
+  }, [projectMembers, assigneeQuery])
+
+  // Add required field validation
+  const isFormValid = () => {
+    return (
+      !!formData.title.trim() &&
+      !!formData.project &&
+      !!formData.dueDate
+    );
+  };
+
   if (authError) {
     return (
       <MainLayout>
@@ -260,18 +305,18 @@ export default function CreateStoryPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" onClick={() => router.push('/stories')}>
+      <div className="space-y-6 overflow-x-hidden">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <Button variant="ghost" onClick={() => router.push('/stories')} className="w-full sm:w-auto">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center space-x-2">
-              <BookOpen className="h-8 w-8 text-blue-600" />
-              <span>Create New Story</span>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center space-x-2">
+              <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 flex-shrink-0" />
+              <span className="truncate">Create New Story</span>
             </h1>
-            <p className="text-muted-foreground">Create a new user story for your project</p>
+            <p className="text-sm sm:text-base text-muted-foreground">Create a new user story for your project</p>
           </div>
         </div>
 
@@ -303,19 +348,119 @@ export default function CreateStoryPage() {
 
                   <div>
                     <label className="text-sm font-medium text-foreground">Project *</label>
-                    <Select value={formData.project} onValueChange={(value) => handleChange('project', value)}>
+                    <Select
+                      value={formData.project}
+                      onValueChange={(value) => handleChange('project', value)}
+                      onOpenChange={open => { if (open) setProjectQuery(""); }}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select a project" />
                       </SelectTrigger>
-                      <SelectContent>
-                        {Array.isArray(projects) && projects.map((project) => (
-                          <SelectItem key={project._id} value={project._id}>
-                            {project.name}
-                          </SelectItem>
-                        ))}
+                      <SelectContent className="z-[10050] p-0">
+                        <div className="p-2">
+                          <Input
+                            value={projectQuery}
+                            onChange={e => setProjectQuery(e.target.value)}
+                            placeholder="Type to search projects"
+                            className="mb-2"
+                          />
+                          <div className="max-h-56 overflow-y-auto">
+                            {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).map((project) => (
+                              <SelectItem key={project._id} value={project._id}>
+                                {project.name}
+                              </SelectItem>
+                            ))}
+                            {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).length === 0 && (
+                              <div className="px-2 py-1 text-sm text-muted-foreground">No matching projects</div>
+                            )}
+                          </div>
+                        </div>
                       </SelectContent>
                     </Select>
                   </div>
+
+                {formData.project && (
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Assigned To</label>
+                    <div className="space-y-2 mt-1">
+                      <Select
+                        value={formData.assignedTo || ''}
+                        onValueChange={(value) => {
+                          if (value === '__unassigned') {
+                            setFormData(prev => ({ ...prev, assignedTo: '' }))
+                            return
+                          }
+                          setFormData(prev => ({ ...prev, assignedTo: value }))
+                        }}
+                        onOpenChange={(open) => { if (open) setAssigneeQuery('') }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={loadingProjectMembers ? 'Loading members...' : 'Select a team member'} />
+                        </SelectTrigger>
+                        <SelectContent className="z-[10050] p-0">
+                          <div className="p-2">
+                            <Input
+                              value={assigneeQuery}
+                              onChange={e => setAssigneeQuery(e.target.value)}
+                              placeholder={loadingProjectMembers ? 'Loading members...' : 'Type to search team members'}
+                              className="mb-2"
+                            />
+                            <div className="max-h-56 overflow-y-auto">
+                              {loadingProjectMembers ? (
+                                <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <span>Loading members...</span>
+                                </div>
+                              ) : projectMembers.length === 0 ? (
+                                <>
+                                  <SelectItem value="__unassigned">Unassigned</SelectItem>
+                                  <div className="px-2 py-1 text-sm text-muted-foreground">No team members found for this project</div>
+                                </>
+                              ) : filteredProjectMembers.length > 0 ? (
+                                filteredProjectMembers.map(user => (
+                                  <SelectItem
+                                    key={user._id}
+                                    value={user._id}
+                                  >
+                                    <div className="flex items-center justify-between w-full">
+                                      <span>{user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span></span>
+                                      {formData.assignedTo === user._id && (
+                                        <span className="text-xs text-muted-foreground ml-2">Selected</span>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <div className="px-2 py-1 text-sm text-muted-foreground">No matching members</div>
+                              )}
+                            </div>
+                          </div>
+                        </SelectContent>
+                      </Select>
+                      {formData.assignedTo && (
+                        <div className="flex flex-wrap gap-2">
+                          {(() => {
+                            const u = projectMembers.find(x => x._id === formData.assignedTo)
+                            if (!u) return null
+                            return (
+                              <span className="inline-flex items-center text-xs bg-muted px-2 py-1 rounded">
+                                <span>{u.firstName} {u.lastName}</span>
+                                <button
+                                  type="button"
+                                  aria-label="Remove assignee"
+                                  className="text-muted-foreground hover:text-foreground focus:outline-none ml-2"
+                                  onClick={() => setFormData(prev => ({ ...prev, assignedTo: '' }))}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            )
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                   <div>
                     <label className="text-sm font-medium text-foreground">Epic</label>
@@ -327,7 +472,7 @@ export default function CreateStoryPage() {
                         <SelectItem value="none">No Epic</SelectItem>
                         {Array.isArray(epics) && epics.map((epic) => (
                           <SelectItem key={epic._id} value={epic._id}>
-                            {epic.name}
+                            {epic.title}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -368,25 +513,9 @@ export default function CreateStoryPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-foreground">Assigned To</label>
-                    <Select value={formData.assignedTo} onValueChange={(value) => handleChange('assignedTo', value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select assignee" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">Unassigned</SelectItem>
-                        {Array.isArray(users) && users.map((user) => (
-                          <SelectItem key={user._id} value={user._id}>
-                            {user.firstName} {user.lastName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
 
                   <div>
-                    <label className="text-sm font-medium text-foreground">Due Date</label>
+                    <label className="text-sm font-medium text-foreground">Due Date *</label>
                     <Input
                       type="date"
                       value={formData.dueDate}
@@ -438,26 +567,28 @@ export default function CreateStoryPage() {
               <div>
                 <label className="text-sm font-medium text-foreground">Acceptance Criteria</label>
                 <div className="space-y-2">
-                  <div className="flex space-x-2">
+                  <div className="flex gap-2 min-w-0">
                     <Input
                       value={newCriteria}
                       onChange={(e) => setNewCriteria(e.target.value)}
                       placeholder="Enter acceptance criteria"
                       onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCriteria())}
+                      className="flex-1 min-w-0"
                     />
-                    <Button type="button" onClick={addCriteria} size="sm">
+                    <Button type="button" onClick={addCriteria} size="sm" disabled={newCriteria.trim() === ''} className="flex-shrink-0">
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
                   <div className="space-y-1">
                     {formData.acceptanceCriteria.map((criteria, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <span className="text-sm">{criteria}</span>
+                      <div key={index} className="flex items-center space-x-2 min-w-0">
+                        <span className="text-sm truncate flex-1 min-w-0" title={criteria}>{criteria}</span>
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           onClick={() => removeCriteria(index)}
+                          className="flex-shrink-0"
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -467,11 +598,11 @@ export default function CreateStoryPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-4">
-                <Button type="button" variant="outline" onClick={() => router.push('/stories')}>
+              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4">
+                <Button type="button" variant="outline" onClick={() => router.push('/stories')} className="w-full sm:w-auto">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={loading}>
+                <Button type="submit" disabled={loading || !isFormValid()} className="w-full sm:w-auto">
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />

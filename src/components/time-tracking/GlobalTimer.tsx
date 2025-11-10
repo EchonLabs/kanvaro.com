@@ -13,6 +13,7 @@ import {
   CheckCircle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
 
 interface TimerData {
   id: string
@@ -33,6 +34,7 @@ export function GlobalTimer({ className }: GlobalTimerProps) {
   const [timer, setTimer] = useState<TimerData | null>(null)
   const [elapsed, setElapsed] = useState(0)
   const [loading, setLoading] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
     loadCurrentTimer()
@@ -256,7 +258,7 @@ export function GlobalTimer({ className }: GlobalTimerProps) {
             <Button
               variant="link"
               size="sm"
-              onClick={() => window.open(`/tasks/${timer.taskId}`, '_blank')}
+              onClick={() => router.push(`/tasks/${timer.taskId}`)}
               className="text-xs"
             >
               View Task

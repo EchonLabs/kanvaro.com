@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Progress } from '@/components/ui/Progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { 
   ArrowLeft,
   Calendar,
@@ -74,6 +75,7 @@ export default function SprintDetailPage() {
   const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const checkAuth = useCallback(async () => {
     try {
@@ -132,7 +134,6 @@ export default function SprintDetailPage() {
 
   const handleDelete = async () => {
     try {
-      if (!confirm('Are you sure you want to delete this sprint? This action cannot be undone.')) return
       setDeleting(true)
       const res = await fetch(`/api/sprints/${sprintId}`, { method: 'DELETE' })
       const data = await res.json()
@@ -145,6 +146,7 @@ export default function SprintDetailPage() {
       setError('Failed to delete sprint')
     } finally {
       setDeleting(false)
+      setShowDeleteConfirm(false)
     }
   }
 
@@ -220,82 +222,82 @@ export default function SprintDetailPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={() => router.push('/sprints')}>
+      <div className="space-y-6 overflow-x-hidden">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+            <Button variant="ghost" onClick={() => router.push('/sprints')} className="w-full sm:w-auto">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground flex items-center space-x-2">
-                <Target className="h-8 w-8 text-blue-600" />
-                <span>{sprint?.name}</span>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0">
+                <Target className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-blue-600 flex-shrink-0" />
+                <span className="truncate" title={sprint?.name}>{sprint?.name}</span>
               </h1>
-              <p className="text-muted-foreground">Sprint Details</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Sprint Details</p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" onClick={() => router.push(`/sprints/${sprintId}/edit`)}>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={() => router.push(`/sprints/${sprintId}/edit`)} className="w-full sm:w-auto">
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+            <Button variant="destructive" onClick={() => setShowDeleteConfirm(true)} disabled={deleting} className="w-full sm:w-auto">
               <Trash2 className="h-4 w-4 mr-2" />
               {deleting ? 'Deleting...' : 'Delete'}
             </Button>
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="md:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Description</CardTitle>
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-3">
+          <div className="md:col-span-2 space-y-4 sm:space-y-6">
+            <Card className="overflow-x-hidden">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg">Description</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
+              <CardContent className="p-4 sm:p-6 pt-0">
+                <p className="text-sm sm:text-base text-muted-foreground break-words">
                   {sprint?.description || 'No description provided'}
                 </p>
               </CardContent>
             </Card>
 
             {sprint?.goal && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Sprint Goal</CardTitle>
+              <Card className="overflow-x-hidden">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-base sm:text-lg">Sprint Goal</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">{sprint?.goal}</p>
+                <CardContent className="p-4 sm:p-6 pt-0">
+                  <p className="text-sm sm:text-base text-muted-foreground break-words">{sprint?.goal}</p>
                 </CardContent>
               </Card>
             )}
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Progress</CardTitle>
-                <CardDescription>Sprint completion status</CardDescription>
+            <Card className="overflow-x-hidden">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg">Progress</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Sprint completion status</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="p-4 sm:p-6 pt-0 space-y-4">
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center justify-between text-xs sm:text-sm">
                     <span className="text-muted-foreground">Overall Progress</span>
                     <span className="font-medium">{sprint?.progress?.completionPercentage || 0}%</span>
                   </div>
-                  <Progress value={sprint?.progress?.completionPercentage || 0} className="h-2" />
+                  <Progress value={sprint?.progress?.completionPercentage || 0} className="h-1.5 sm:h-2" />
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center justify-between text-xs sm:text-sm">
                       <span className="text-muted-foreground">Tasks</span>
                       <span className="font-medium">
                         {sprint?.progress?.tasksCompleted || 0} / {sprint?.progress?.totalTasks || 0}
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
                       <div 
-                        className="bg-blue-600 h-2 rounded-full"
+                        className="bg-blue-600 h-1.5 sm:h-2 rounded-full"
                         style={{ 
                           width: `${sprint?.progress?.totalTasks ? 
                             ((sprint?.progress?.tasksCompleted / sprint?.progress?.totalTasks) * 100) : 0}%` 
@@ -305,15 +307,15 @@ export default function SprintDetailPage() {
                   </div>
                   
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center justify-between text-xs sm:text-sm">
                       <span className="text-muted-foreground">Story Points</span>
                       <span className="font-medium">
                         {sprint?.progress?.storyPointsCompleted || 0} / {sprint?.progress?.totalStoryPoints || 0}
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
                       <div 
-                        className="bg-green-600 h-2 rounded-full"
+                        className="bg-green-600 h-1.5 sm:h-2 rounded-full"
                         style={{ 
                           width: `${sprint?.progress?.totalStoryPoints ? 
                             ((sprint?.progress?.storyPointsCompleted / sprint?.progress?.totalStoryPoints) * 100) : 0}%` 
@@ -326,76 +328,81 @@ export default function SprintDetailPage() {
             </Card>
           </div>
 
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Details</CardTitle>
+          <div className="space-y-4 sm:space-y-6">
+            <Card className="overflow-x-hidden">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg">Details</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Status</span>
-                  <Badge className={getStatusColor(sprint?.status)}>
+              <CardContent className="p-4 sm:p-6 pt-0 space-y-3 sm:space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Status</span>
+                  <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
                     {getStatusIcon(sprint?.status)}
                     <span className="ml-1">{sprint?.status}</span>
                   </Badge>
                 </div>
                 
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Project</span>
-                  <span className="font-medium">{sprint?.project?.name}</span>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Project</span>
+                  <span 
+                    className="text-xs sm:text-sm font-medium truncate max-w-[200px] sm:max-w-none text-right sm:text-left"
+                    title={sprint?.project?.name && sprint?.project?.name.length > 10 ? sprint?.project?.name : undefined}
+                  >
+                    {sprint?.project?.name && sprint?.project?.name.length > 10 ? `${sprint?.project?.name.slice(0, 10)}…` : sprint?.project?.name}
+                  </span>
                 </div>
                 
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Duration</span>
-                  <span className="font-medium">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Duration</span>
+                  <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
                     {Math.ceil((new Date(sprint?.endDate).getTime() - new Date(sprint?.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
                   </span>
                 </div>
                 
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Start Date</span>
-                  <span className="font-medium">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Start Date</span>
+                  <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
                     {new Date(sprint?.startDate).toLocaleDateString()}
                   </span>
                 </div>
                 
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">End Date</span>
-                  <span className="font-medium">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">End Date</span>
+                  <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
                     {new Date(sprint?.endDate).toLocaleDateString()}
                   </span>
                 </div>
                 
                 {getDaysRemaining() > 0 && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Days Remaining</span>
-                    <span className="font-medium text-orange-600">{getDaysRemaining()}</span>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <span className="text-xs sm:text-sm text-muted-foreground">Days Remaining</span>
+                    <span className="text-xs sm:text-sm font-medium text-orange-600 whitespace-nowrap">{getDaysRemaining()}</span>
                   </div>
                 )}
                 
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Capacity</span>
-                  <span className="font-medium">{sprint?.capacity}h</span>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Capacity</span>
+                  <span className="text-xs sm:text-sm font-medium whitespace-nowrap">{sprint?.capacity}h</span>
                 </div>
                 
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Velocity</span>
-                  <span className="font-medium">{sprint?.velocity}</span>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Velocity</span>
+                  <span className="text-xs sm:text-sm font-medium whitespace-nowrap">{sprint?.velocity}</span>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Team Members</CardTitle>
-                <CardDescription>{sprint?.teamMembers?.length} members</CardDescription>
+            <Card className="overflow-x-hidden">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg">Team Members</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">{sprint?.teamMembers?.length} members</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 sm:p-6 pt-0">
                 <div className="space-y-2">
                   {sprint?.teamMembers?.map((member, index) => (
                     <div key={index} className="flex items-center space-x-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">
+                      <User className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="text-xs sm:text-sm truncate">
                         {member.firstName} {member.lastName}
                       </span>
                     </div>
@@ -404,14 +411,14 @@ export default function SprintDetailPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Created By</CardTitle>
+            <Card className="overflow-x-hidden">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg">Created By</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 sm:p-6 pt-0">
                 <div className="flex items-center space-x-2">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">
+                  <User className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                  <span className="text-xs sm:text-sm truncate">
                     {sprint?.createdBy?.firstName} {sprint?.createdBy?.lastName}
                   </span>
                 </div>
@@ -422,6 +429,19 @@ export default function SprintDetailPage() {
             </Card>
           </div>
         </div>
+
+        {/* Delete Confirmation Modal */}
+        <ConfirmationModal
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={handleDelete}
+          title="Delete Sprint"
+          description="Are you sure you want to delete this sprint? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          variant="destructive"
+          isLoading={deleting}
+        />
       </div>
     </MainLayout>
   )

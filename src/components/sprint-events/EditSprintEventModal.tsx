@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogBody } from '@/components/ui/Dialog'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { CalendarIcon } from 'lucide-react'
@@ -245,7 +245,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Edit Sprint Event</DialogTitle>
           <DialogDescription>
@@ -253,7 +253,8 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <DialogBody>
+          <form onSubmit={handleSubmit} className="space-y-4" id="edit-sprint-event-form">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="title">Event Title *</Label>
@@ -504,15 +505,16 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
             </div>
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Updating...' : 'Update Event'}
-            </Button>
-          </DialogFooter>
-        </form>
+          </form>
+        </DialogBody>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="edit-sprint-event-form" disabled={loading}>
+            {loading ? 'Updating...' : 'Update Event'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

@@ -26,8 +26,10 @@ export default function CreateEpicPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [authError, setAuthError] = useState('')
   const [projects, setProjects] = useState<Project[]>([])
+  const [projectQuery, setProjectQuery] = useState("");
 
   const [formData, setFormData] = useState({
     name: '',
@@ -98,6 +100,7 @@ export default function CreateEpicPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setSuccess('')
 
     try {
       const response = await fetch('/api/epics', {
@@ -107,6 +110,7 @@ export default function CreateEpicPage() {
         },
         body: JSON.stringify({
           ...formData,
+          title: formData.name?.trim() || undefined,
           estimatedHours: formData.estimatedHours ? parseInt(formData.estimatedHours) : undefined,
           storyPoints: formData.storyPoints ? parseInt(formData.storyPoints) : undefined,
           labels: formData.labels ? formData.labels.split(',').map(label => label.trim()) : []
@@ -116,7 +120,10 @@ export default function CreateEpicPage() {
       const data = await response.json()
 
       if (data.success) {
-        router.push('/epics')
+        setSuccess('Epic created successfully')
+        setTimeout(() => {
+          router.push('/epics?created=1')
+        }, 1000)
       } else {
         setError(data.error || 'Failed to create epic')
       }
@@ -134,6 +141,15 @@ export default function CreateEpicPage() {
     }))
   }
 
+  // Required field validation for Epic
+  const isFormValid = () => {
+    return (
+      !!formData.name.trim() &&
+      !!formData.project &&
+      !!formData.dueDate
+    );
+  };
+
   if (authError) {
     return (
       <MainLayout>
@@ -149,20 +165,26 @@ export default function CreateEpicPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" onClick={() => router.push('/epics')}>
+      <div className="space-y-6 overflow-x-hidden">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <Button variant="ghost" onClick={() => router.push('/epics')} className="w-full sm:w-auto">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center space-x-2">
-              <Layers className="h-8 w-8 text-purple-600" />
-              <span>Create New Epic</span>
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0">
+              <Layers className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600 flex-shrink-0" />
+              <span className="truncate">Create New Epic</span>
             </h1>
-            <p className="text-muted-foreground">Create a new epic for your project</p>
+            <p className="text-sm sm:text-base text-muted-foreground">Create a new epic for your project</p>
           </div>
         </div>
+
+        {success && (
+          <Alert variant="success">
+            <AlertDescription>{success}</AlertDescription>
+          </Alert>
+        )}
 
         {error && (
           <Alert variant="destructive">
@@ -171,7 +193,7 @@ export default function CreateEpicPage() {
           </Alert>
         )}
 
-        <Card>
+        <Card className="overflow-x-hidden">
           <CardHeader>
             <CardTitle>Epic Details</CardTitle>
             <CardDescription>Fill in the details for your new epic</CardDescription>
@@ -192,16 +214,33 @@ export default function CreateEpicPage() {
 
                   <div>
                     <label className="text-sm font-medium text-foreground">Project *</label>
-                    <Select value={formData.project} onValueChange={(value) => handleChange('project', value)}>
-                      <SelectTrigger>
+                    <Select
+                      value={formData.project}
+                      onValueChange={(value) => handleChange('project', value)}
+                      onOpenChange={open => { if (open) setProjectQuery(""); }}
+                    >
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a project" />
                       </SelectTrigger>
-                      <SelectContent>
-                        {Array.isArray(projects) && projects.map((project) => (
-                          <SelectItem key={project._id} value={project._id}>
-                            {project.name}
-                          </SelectItem>
-                        ))}
+                      <SelectContent className="z-[10050] p-0">
+                        <div className="p-2">
+                          <Input
+                            value={projectQuery}
+                            onChange={e => setProjectQuery(e.target.value)}
+                            placeholder="Type to search projects"
+                            className="mb-2"
+                          />
+                          <div className="max-h-56 overflow-y-auto">
+                            {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).map((project) => (
+                              <SelectItem key={project._id} value={project._id}>
+                                {project.name}
+                              </SelectItem>
+                            ))}
+                            {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).length === 0 && (
+                              <div className="px-2 py-1 text-sm text-muted-foreground">No matching projects</div>
+                            )}
+                          </div>
+                        </div>
                       </SelectContent>
                     </Select>
                   </div>
@@ -222,11 +261,12 @@ export default function CreateEpicPage() {
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-foreground">Due Date</label>
+                    <label className="text-sm font-medium text-foreground">Due Date *</label>
                     <Input
                       type="date"
                       value={formData.dueDate}
                       onChange={(e) => handleChange('dueDate', e.target.value)}
+                      required
                     />
                   </div>
                 </div>
@@ -273,11 +313,11 @@ export default function CreateEpicPage() {
                 />
               </div>
 
-              <div className="flex justify-end space-x-4">
-                <Button type="button" variant="outline" onClick={() => router.push('/epics')}>
+              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4">
+                <Button type="button" variant="outline" onClick={() => router.push('/epics')} className="w-full sm:w-auto">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={loading}>
+                <Button type="submit" disabled={loading || !isFormValid()} className="w-full sm:w-auto">
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -295,6 +335,7 @@ export default function CreateEpicPage() {
           </CardContent>
         </Card>
       </div>
+      
     </MainLayout>
   )
 }

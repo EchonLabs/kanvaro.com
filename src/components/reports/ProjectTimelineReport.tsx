@@ -100,15 +100,15 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
   return (
     <div className="space-y-6">
       {/* Timeline Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Projects</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{projects.length}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-xl sm:text-2xl font-bold">{projects.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">
               In timeline view
             </p>
           </CardContent>
@@ -116,14 +116,14 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">On Track</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">On Track</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-xl sm:text-2xl font-bold text-green-600">
               {onTrackProjects.length}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Projects on schedule
             </p>
           </CardContent>
@@ -131,14 +131,14 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overdue</CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-600" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Overdue</CardTitle>
+            <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
+            <div className="text-xl sm:text-2xl font-bold text-red-600">
               {overdueProjects.length}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Projects behind schedule
             </p>
           </CardContent>
@@ -146,14 +146,14 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Completed</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               {completedProjects.length}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Successfully finished
             </p>
           </CardContent>
@@ -161,19 +161,19 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Project Timeline Gantt-like View */}
         <Card>
           <CardHeader>
-            <CardTitle>Project Timeline</CardTitle>
-            <CardDescription>Project duration and progress over time</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Project Timeline</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Project duration and progress over time</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <BarChart data={timelineData} layout="horizontal">
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={100} />
+                <XAxis type="number" tick={{ fontSize: 10 }} />
+                <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 10 }} />
                 <Tooltip formatter={(value) => [`${value} days`, 'Duration']} />
                 <Bar dataKey="duration" fill="#8884d8" name="Planned Duration" />
                 <Bar dataKey="daysElapsed" fill="#82ca9d" name="Days Elapsed" />
@@ -185,15 +185,15 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
         {/* Monthly Project Activity */}
         <Card>
           <CardHeader>
-            <CardTitle>Monthly Project Activity</CardTitle>
-            <CardDescription>Project starts and completions by month</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Monthly Project Activity</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Project starts and completions by month</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <AreaChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip />
                 <Area 
                   type="monotone" 
@@ -221,15 +221,15 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
         {/* Progress vs Time */}
         <Card>
           <CardHeader>
-            <CardTitle>Progress vs Time</CardTitle>
-            <CardDescription>Task completion vs timeline progress</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Progress vs Time</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Task completion vs timeline progress</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <LineChart data={timelineData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip formatter={(value) => [`${value}%`, 'Percentage']} />
                 <Line 
                   type="monotone" 
@@ -253,15 +253,15 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
         {/* Project Status Over Time */}
         <Card>
           <CardHeader>
-            <CardTitle>Project Status Trends</CardTitle>
-            <CardDescription>Status distribution over time</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Project Status Trends</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Status distribution over time</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <BarChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip />
                 <Bar dataKey="active" fill="#00C49F" name="Active" />
                 <Bar dataKey="completed" fill="#0088FE" name="Completed" />
@@ -275,23 +275,23 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
       {/* Project Timeline Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Project Timeline Details</CardTitle>
-          <CardDescription>Detailed timeline view for each project</CardDescription>
+          <CardTitle className="text-base sm:text-lg">Project Timeline Details</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Detailed timeline view for each project</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {timelineData.map((project) => (
-              <div key={project.name} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3">
-                    <h3 className="font-semibold">{project.name}</h3>
-                    <Badge variant={project.isOverdue ? 'destructive' : 'default'}>
+              <div key={project.name} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+                <div className="flex-1 min-w-0 w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
+                    <h3 className="font-semibold text-sm sm:text-base truncate">{project.name}</h3>
+                    <Badge variant={project.isOverdue ? 'destructive' : 'default'} className="flex-shrink-0">
                       {project.status}
                     </Badge>
                     {project.isOverdue && (
-                      <Badge variant="destructive" className="flex items-center space-x-1">
+                      <Badge variant="destructive" className="flex items-center space-x-1 flex-shrink-0">
                         <AlertCircle className="h-3 w-3" />
-                        <span>Overdue</span>
+                        <span className="text-xs sm:text-sm">Overdue</span>
                       </Badge>
                     )}
                   </div>
@@ -299,52 +299,52 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
                   {/* Timeline Progress */}
                   <div className="mt-4 space-y-3">
                     <div>
-                      <div className="flex items-center justify-between text-sm mb-1">
+                      <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
                         <span className="flex items-center space-x-1">
-                          <Clock className="h-4 w-4" />
+                          <Clock className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                           <span>Timeline Progress</span>
                         </span>
-                        <span>{project.progress.toFixed(1)}%</span>
+                        <span className="flex-shrink-0 ml-2">{project.progress.toFixed(1)}%</span>
                       </div>
                       <Progress value={project.progress} className="h-2" />
-                      <div className="text-xs text-muted-foreground mt-1">
+                      <div className="text-xs text-muted-foreground mt-1 break-words">
                         {project.daysElapsed} of {project.duration} days elapsed
                       </div>
                     </div>
                     
                     <div>
-                      <div className="flex items-center justify-between text-sm mb-1">
+                      <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
                         <span className="flex items-center space-x-1">
-                          <Target className="h-4 w-4" />
+                          <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                           <span>Task Completion</span>
                         </span>
-                        <span>{project.completion.toFixed(1)}%</span>
+                        <span className="flex-shrink-0 ml-2">{project.completion.toFixed(1)}%</span>
                       </div>
                       <Progress value={project.completion} className="h-2" />
                     </div>
                   </div>
                 </div>
                 
-                <div className="flex items-center space-x-4 ml-6">
-                  <div className="text-center">
-                    <div className="text-sm font-medium">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full sm:w-auto sm:ml-6">
+                  <div className="flex sm:flex-col items-center sm:items-center text-center gap-2 sm:gap-0">
+                    <div className="text-xs sm:text-sm font-medium truncate">
                       {project.startDate}
                     </div>
                     <div className="text-xs text-muted-foreground">Start Date</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-sm font-medium">
+                  <div className="flex sm:flex-col items-center sm:items-center text-center gap-2 sm:gap-0">
+                    <div className="text-xs sm:text-sm font-medium truncate">
                       {project.endDate}
                     </div>
                     <div className="text-xs text-muted-foreground">End Date</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-sm font-medium">
+                  <div className="flex sm:flex-col items-center sm:items-center text-center gap-2 sm:gap-0">
+                    <div className="text-xs sm:text-sm font-medium">
                       {project.duration}
                     </div>
                     <div className="text-xs text-muted-foreground">Days</div>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto flex-shrink-0">
                     View Details
                   </Button>
                 </div>

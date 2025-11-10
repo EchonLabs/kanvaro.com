@@ -5,6 +5,20 @@ import { CustomRole } from '@/models/CustomRole'
 import { User } from '@/models/User'
 import { Permission } from '@/lib/permissions/permission-definitions'
 
+/**
+ * Get predefined system role names
+ * This function returns the names of all predefined roles that cannot be duplicated
+ */
+function getPredefinedRoleNames(): string[] {
+  return [
+    'Administrator',
+    'Project Manager',
+    'Team Member',
+    'Client',
+    'Viewer'
+  ]
+}
+
 export async function GET(req: NextRequest) {
   try {
     await connectDB()
@@ -143,6 +157,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // Hoisted context variables for use in catch block
+  let normalizedNameScoped = ''
+  let orgIdScoped = ''
+  let descriptionScoped = ''
+  let permissionsScoped: string[] = []
+  let createdByScoped = ''
+
   try {
     await connectDB()
     
@@ -175,23 +196,56 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    // Check if role name already exists
-    const existingRole = await CustomRole.findOne({
-      name,
-      organization: authResult.user.organization,
-      isActive: true
-    })
+    // Check if role name already exists in predefined roles
+    const predefinedRoleNames = getPredefinedRoleNames()
+    const normalizedName = name.trim()
+    // capture for catch scope
+    normalizedNameScoped = normalizedName
+    orgIdScoped = authResult.user.organization
+    descriptionScoped = description
+    permissionsScoped = permissions
+    createdByScoped = authResult.user.id
+    const isPredefinedRole = predefinedRoleNames.some(
+      predefinedName => predefinedName.toLowerCase() === normalizedName.toLowerCase()
+    )
 
-    if (existingRole) {
+    if (isPredefinedRole) {
       return NextResponse.json({
         success: false,
         error: 'Role name already exists'
       }, { status: 409 })
     }
 
+    // Check if role name already exists in active custom roles
+    const existingActiveRole = await CustomRole.findOne({
+      name: normalizedName,
+      organization: authResult.user.organization,
+      isActive: true
+    })
+
+    if (existingActiveRole) {
+      return NextResponse.json({
+        success: false,
+        error: 'Role name already exists'
+      }, { status: 409 })
+    }
+
+    // Check if there's an inactive (deleted) role with the same name
+    // If so, permanently delete it to allow reuse of the name
+    const existingInactiveRole = await CustomRole.findOne({
+      name: normalizedName,
+      organization: authResult.user.organization,
+      isActive: false
+    })
+
+    if (existingInactiveRole) {
+      // Permanently delete the inactive role to allow reuse of the name
+      await CustomRole.deleteOne({ _id: existingInactiveRole._id })
+    }
+
     // Create new custom role
     const customRole = new CustomRole({
-      name,
+      name: normalizedName,
       description,
       permissions,
       organization: authResult.user.organization,
@@ -211,8 +265,61 @@ export async function POST(req: NextRequest) {
       message: 'Custom role created successfully'
     }, { status: 201 })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating role:', error)
+    
+    // Handle MongoDB duplicate key error
+    if (error.code === 11000 || error.code === '11000') {
+      // Check if it's due to a deleted role that wasn't cleaned up
+      if (normalizedNameScoped && orgIdScoped) {
+        const existingInactiveRole = await CustomRole.findOne({
+          name: normalizedNameScoped,
+          organization: orgIdScoped,
+          isActive: false
+        })
+
+        if (existingInactiveRole) {
+          // Try to permanently delete the inactive role and create again
+          try {
+            await CustomRole.deleteOne({ _id: existingInactiveRole._id })
+            
+            // Retry creating the role
+            const customRole = new CustomRole({
+              name: normalizedNameScoped,
+              description: descriptionScoped,
+              permissions: permissionsScoped,
+              organization: orgIdScoped,
+              createdBy: createdByScoped,
+              isActive: true
+            })
+            
+            await customRole.save()
+            
+            return NextResponse.json({
+              success: true,
+              data: {
+                ...customRole.toObject(),
+                isSystem: false,
+                userCount: 0
+              },
+              message: 'Custom role created successfully'
+            }, { status: 201 })
+          } catch (retryError: any) {
+            console.error('Error retrying role creation:', retryError)
+            return NextResponse.json({
+              success: false,
+              error: 'Failed to create role. Please try again.'
+            }, { status: 500 })
+          }
+        }
+      }
+
+      return NextResponse.json({
+        success: false,
+        error: 'Role name already exists'
+      }, { status: 409 })
+    }
+
     return NextResponse.json({
       success: false,
       error: 'Internal server error'

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, ArrowLeft } from 'lucide-react'
+import { Loader2, ArrowLeft, CheckCircle } from 'lucide-react'
 
 interface Task {
   _id: string
@@ -26,9 +26,11 @@ export default function EditTaskPage() {
   const taskId = params.id as string
 
   const [task, setTask] = useState<Task | null>(null)
+  const [originalTask, setOriginalTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   const fetchTask = useCallback(async () => {
     try {
@@ -37,6 +39,7 @@ export default function EditTaskPage() {
       const data = await res.json()
       if (data.success) {
         setTask(data.data)
+        setOriginalTask(data.data)
       } else {
         setError(data.error || 'Failed to load task')
       }
@@ -68,7 +71,10 @@ export default function EditTaskPage() {
       })
       const data = await res.json()
       if (data.success) {
-        router.push(`/tasks/${taskId}`)
+        setSuccess('Task updated successfully')
+        setTimeout(() => setSuccess(''), 4000)
+        // Reset originalTask to current to mark as not-dirty after save
+        setOriginalTask(task)
       } else {
         setError(data.error || 'Failed to save task')
       }
@@ -177,9 +183,25 @@ export default function EditTaskPage() {
               </div>
             </div>
 
+            {success && (
+              <div className="w-full">
+                <Alert className="w-full">
+                  <div className="flex items-center">
+                    <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                    <AlertDescription>{success}</AlertDescription>
+                  </div>
+                </Alert>
+              </div>
+            )}
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => router.push(`/tasks/${taskId}`)}>Cancel</Button>
-              <Button onClick={handleSave} disabled={saving}>
+              <Button variant="outline" onClick={() => router.push(`/tasks`)}>Cancel</Button>
+              <Button onClick={handleSave} disabled={saving || !(task && originalTask && (
+                task.title !== originalTask.title ||
+                (task.description || '') !== (originalTask.description || '') ||
+                task.status !== originalTask.status ||
+                task.priority !== originalTask.priority ||
+                task.type !== originalTask.type
+              ))}>
                 {saving ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>) : 'Save Changes'}
               </Button>
             </div>

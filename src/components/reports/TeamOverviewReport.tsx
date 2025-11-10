@@ -91,19 +91,19 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
   return (
     <div className="space-y-6">
       {/* Team Health Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Team Size</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Team Size</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{overview.totalMembers}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-xl sm:text-2xl font-bold">{overview.totalMembers}</div>
+            <p className="text-xs text-muted-foreground mt-1">
               {overview.activeMembers} active members
             </p>
             <Progress 
-              value={(overview.activeMembers / overview.totalMembers) * 100} 
+              value={overview.totalMembers > 0 ? (overview.activeMembers / overview.totalMembers) * 100 : 0} 
               className="mt-2"
             />
           </CardContent>
@@ -111,14 +111,14 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Productivity</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Average Productivity</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               {overview.averageProductivity.toFixed(1)}%
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Team productivity score
             </p>
             <Progress value={overview.averageProductivity} className="mt-2" />
@@ -127,14 +127,14 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Hours</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold break-words">
               {overview.totalHoursLogged.toFixed(0)}h
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Logged across team
             </p>
           </CardContent>
@@ -142,14 +142,14 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tasks Completed</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Tasks Completed</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               {overview.totalTasksCompleted}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Total completed tasks
             </p>
           </CardContent>
@@ -157,15 +157,15 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Department Distribution */}
         <Card>
           <CardHeader>
-            <CardTitle>Team by Department</CardTitle>
-            <CardDescription>Distribution of team members across departments</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Team by Department</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Distribution of team members across departments</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie
                   data={departmentPieData}
@@ -173,7 +173,7 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
                   cy="50%"
                   labelLine={false}
                   label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
-                  outerRadius={80}
+                  outerRadius={60}
                   fill="#8884d8"
                   dataKey="value"
                 >
@@ -190,15 +190,15 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
         {/* Department Productivity */}
         <Card>
           <CardHeader>
-            <CardTitle>Productivity by Department</CardTitle>
-            <CardDescription>Average productivity and workload by department</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Productivity by Department</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Average productivity and workload by department</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <BarChart data={productivityData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip formatter={(value) => [`${value}%`, 'Percentage']} />
                 <Bar dataKey="productivity" fill="#00C49F" name="Productivity" />
                 <Bar dataKey="workload" fill="#FFBB28" name="Workload" />
@@ -210,16 +210,16 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
         {/* Department Size vs Productivity */}
         <Card>
           <CardHeader>
-            <CardTitle>Department Size vs Productivity</CardTitle>
-            <CardDescription>Team size and productivity correlation</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Department Size vs Productivity</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Team size and productivity correlation</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <BarChart data={departmentData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis yAxisId="left" />
-                <YAxis yAxisId="right" orientation="right" />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
                 <Tooltip />
                 <Bar yAxisId="left" dataKey="members" fill="#8884d8" name="Members" />
                 <Bar yAxisId="right" dataKey="productivity" fill="#82ca9d" name="Productivity %" />
@@ -231,15 +231,15 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
         {/* Workload Distribution */}
         <Card>
           <CardHeader>
-            <CardTitle>Workload Distribution</CardTitle>
-            <CardDescription>Average workload across departments</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Workload Distribution</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Average workload across departments</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <AreaChart data={productivityData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip formatter={(value) => [`${value}%`, 'Workload']} />
                 <Area 
                   type="monotone" 
@@ -258,58 +258,58 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
       {/* Top Performers */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Award className="h-5 w-5" />
-            <span>Top Performers</span>
+          <CardTitle className="flex items-center space-x-2 text-base sm:text-lg">
+            <Award className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+            <span className="truncate">Top Performers</span>
           </CardTitle>
-          <CardDescription>Team members with highest productivity scores</CardDescription>
+          <CardDescription className="text-xs sm:text-sm">Team members with highest productivity scores</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {topPerformers.map((performer, index) => (
-              <div key={performer._id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
+              <div key={performer._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+                <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
+                  <div className="flex items-center space-x-2 flex-shrink-0">
                     <Badge variant="outline" className="w-6 h-6 rounded-full flex items-center justify-center">
                       {index + 1}
                     </Badge>
-                    <Avatar className="h-10 w-10">
+                    <Avatar className="h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0">
                       <AvatarImage src={performer.avatar} />
-                      <AvatarFallback>
+                      <AvatarFallback className="text-xs sm:text-sm">
                         {performer.firstName.charAt(0)}{performer.lastName.charAt(0)}
                       </AvatarFallback>
                     </Avatar>
                   </div>
-                  <div>
-                    <h3 className="font-semibold">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm sm:text-base truncate">
                       {performer.firstName} {performer.lastName}
                     </h3>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs sm:text-sm text-muted-foreground truncate">
                       {performer.role} • {performer.department}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-6">
+                <div className="grid grid-cols-2 sm:flex sm:items-center sm:space-x-4 sm:space-x-6 gap-3 sm:gap-0 w-full sm:w-auto flex-shrink-0">
                   <div className="text-center">
-                    <div className="text-sm font-medium">
+                    <div className="text-xs sm:text-sm font-medium">
                       {performer.stats.productivityScore.toFixed(1)}%
                     </div>
                     <div className="text-xs text-muted-foreground">Productivity</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-sm font-medium">
+                    <div className="text-xs sm:text-sm font-medium">
                       {performer.stats.tasksCompleted}
                     </div>
                     <div className="text-xs text-muted-foreground">Tasks Done</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-sm font-medium">
+                    <div className="text-xs sm:text-sm font-medium">
                       {performer.stats.hoursLogged.toFixed(1)}h
                     </div>
                     <div className="text-xs text-muted-foreground">Hours Logged</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-sm font-medium">
+                    <div className="text-xs sm:text-sm font-medium">
                       {performer.stats.completionRate.toFixed(1)}%
                     </div>
                     <div className="text-xs text-muted-foreground">Completion</div>
@@ -324,34 +324,36 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
       {/* Department Breakdown */}
       <Card>
         <CardHeader>
-          <CardTitle>Department Performance</CardTitle>
-          <CardDescription>Detailed performance metrics by department</CardDescription>
+          <CardTitle className="text-base sm:text-lg">Department Performance</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Detailed performance metrics by department</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {departmentBreakdown.map((dept, index) => (
-              <div key={dept.department} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3">
-                    <div 
-                      className="w-4 h-4 rounded-full" 
-                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                    />
-                    <h3 className="font-semibold">{dept.department}</h3>
-                    <Badge variant="outline">{dept.members} members</Badge>
+              <div key={dept.department} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+                <div className="flex-1 min-w-0 w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
+                    <div className="flex items-center space-x-2">
+                      <div 
+                        className="w-3 h-3 sm:w-4 sm:h-4 rounded-full flex-shrink-0" 
+                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                      />
+                      <h3 className="font-semibold text-sm sm:text-base truncate">{dept.department}</h3>
+                    </div>
+                    <Badge variant="outline" className="flex-shrink-0">{dept.members} members</Badge>
                   </div>
                   <div className="mt-2 space-y-2">
                     <div>
-                      <div className="flex items-center justify-between text-sm mb-1">
+                      <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
                         <span>Productivity</span>
-                        <span>{dept.averageProductivity.toFixed(1)}%</span>
+                        <span className="flex-shrink-0 ml-2">{dept.averageProductivity.toFixed(1)}%</span>
                       </div>
                       <Progress value={dept.averageProductivity} className="h-2" />
                     </div>
                     <div>
-                      <div className="flex items-center justify-between text-sm mb-1">
+                      <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
                         <span>Workload</span>
-                        <span>{dept.averageWorkload.toFixed(1)}%</span>
+                        <span className="flex-shrink-0 ml-2">{dept.averageWorkload.toFixed(1)}%</span>
                       </div>
                       <Progress value={dept.averageWorkload} className="h-2" />
                     </div>

@@ -14,7 +14,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
     const organizationId = searchParams.get('organizationId')
-
+console.log('userId',userId);
+console.log('organizationId',organizationId);
     if (!userId || !organizationId) {
       return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 })
     }
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     // Calculate current duration
     const now = new Date()
-    const baseDuration = Math.round((now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60))
+    const baseDuration = (now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60)
     const currentDuration = Math.max(0, baseDuration - activeTimer.totalPausedDuration)
 
     return NextResponse.json({
@@ -49,12 +50,24 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('Timer API POST called');
+    
     await connectDB()
     
     const body = await request.json()
+    console.log('Received body:', body)
+    
     const { userId, organizationId, projectId, taskId, description, category, tags, isBillable, hourlyRate } = body
+    
+    console.log('Extracted fields:', { userId, organizationId, projectId, taskId, description })
 
     if (!userId || !organizationId || !projectId || !description) {
+      console.log('Missing required fields:', { 
+        userId: !!userId, 
+        organizationId: !!organizationId, 
+        projectId: !!projectId, 
+        description: !!description 
+      })
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -63,6 +76,7 @@ export async function POST(request: NextRequest) {
       user: userId,
       organization: organizationId
     })
+console.log('existingTimer',existingTimer);
 
     if (existingTimer) {
       return NextResponse.json({ error: 'User already has an active timer' }, { status: 400 })
@@ -82,10 +96,12 @@ export async function POST(request: NextRequest) {
       organization: organizationId,
       project: null
     })
+console.log('setting',settings);
 
     // If no TimeTrackingSettings exist, create default ones based on organization settings
     if (!settings) {
       const organization = await Organization.findById(organizationId)
+      console.log('organization',organization);
       
       if (!organization || !organization.settings.timeTracking.allowTimeTracking) {
         return NextResponse.json({ error: 'Time tracking not enabled' }, { status: 403 })
@@ -138,6 +154,7 @@ export async function POST(request: NextRequest) {
       hourlyRate: finalHourlyRate,
       maxSessionHours: settings.maxSessionHours
     })
+console.log('activeTimer',activeTimer);
 
     await activeTimer.save()
 
@@ -189,14 +206,14 @@ export async function PUT(request: NextRequest) {
         if (!activeTimer.pausedAt) {
           return NextResponse.json({ error: 'Timer is not paused' }, { status: 400 })
         }
-        const pausedDuration = Math.round((now.getTime() - activeTimer.pausedAt.getTime()) / (1000 * 60))
+        const pausedDuration = (now.getTime() - activeTimer.pausedAt.getTime()) / (1000 * 60)
         activeTimer.totalPausedDuration += pausedDuration
         activeTimer.pausedAt = undefined
         break
 
       case 'stop':
         // Create time entry
-        const baseDuration = Math.round((now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60))
+        const baseDuration = (now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60)
         const totalDuration = Math.max(0, baseDuration - activeTimer.totalPausedDuration)
 
         const timeEntry = new TimeEntry({
@@ -238,7 +255,7 @@ export async function PUT(request: NextRequest) {
     await activeTimer.save()
 
     // Calculate current duration
-    const baseDuration = Math.round((now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60))
+    const baseDuration = (now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60)
     const currentDuration = Math.max(0, baseDuration - activeTimer.totalPausedDuration)
 
     return NextResponse.json({

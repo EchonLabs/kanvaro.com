@@ -10,13 +10,15 @@ import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { CreateRoleModal } from '@/components/roles/CreateRoleModal'
 import { EditRoleModal } from '@/components/roles/EditRoleModal'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { 
   Shield, 
   Plus, 
   Edit, 
   Trash2, 
   Users,
-  Loader2
+  Loader2,
+  CheckCircle
 } from 'lucide-react'
 
 interface Role {
@@ -34,10 +36,14 @@ export default function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [authError, setAuthError] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedRole, setSelectedRole] = useState<Role | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const checkAuth = useCallback(async () => {
     try {
@@ -98,6 +104,9 @@ export default function RolesPage() {
   const handleRoleCreated = (newRole: Role) => {
     setRoles(prev => [...prev, newRole])
     setShowCreateModal(false)
+    setSuccess('Role created successfully')
+    setError('')
+    setTimeout(() => setSuccess(''), 3000)
   }
 
   const handleEditRole = (role: Role) => {
@@ -109,9 +118,12 @@ export default function RolesPage() {
     setRoles(prev => prev.map(role => role._id === updatedRole._id ? updatedRole : role))
     setShowEditModal(false)
     setSelectedRole(null)
+    setSuccess('Role updated successfully')
+    setError('')
+    setTimeout(() => setSuccess(''), 3000)
   }
 
-  const handleDeleteRole = async (role: Role) => {
+  const handleDeleteClick = (role: Role) => {
     if (role.isSystem) {
       setError('Cannot delete system roles')
       return
@@ -122,25 +134,37 @@ export default function RolesPage() {
       return
     }
 
-    if (!confirm(`Are you sure you want to delete the role "${role.name}"?`)) {
-      return
-    }
+    setRoleToDelete(role)
+    setShowDeleteConfirm(true)
+  }
+
+  const handleDeleteRole = async () => {
+    if (!roleToDelete) return
 
     try {
-      const response = await fetch(`/api/roles/${role._id}`, {
+      setIsDeleting(true)
+      setError('')
+      
+      const response = await fetch(`/api/roles/${roleToDelete._id}`, {
         method: 'DELETE'
       })
 
       const data = await response.json()
 
       if (data.success) {
-        setRoles(prev => prev.filter(r => r._id !== role._id))
+        setRoles(prev => prev.filter(r => r._id !== roleToDelete._id))
         setError('')
+        setSuccess('Role deleted successfully')
+        setShowDeleteConfirm(false)
+        setRoleToDelete(null)
+        setTimeout(() => setSuccess(''), 3000)
       } else {
         setError(data.error || 'Failed to delete role')
       }
     } catch (err) {
       setError('Failed to delete role')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -190,6 +214,13 @@ export default function RolesPage() {
           </Alert>
         )}
 
+        {success && (
+          <Alert variant="success">
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription>{success}</AlertDescription>
+          </Alert>
+        )}
+
         <div className="grid gap-6">
           {roles.map((role) => (
             <Card key={role._id}>
@@ -223,7 +254,7 @@ export default function RolesPage() {
                           variant="ghost" 
                           size="sm" 
                           className="text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteRole(role)}
+                          onClick={() => handleDeleteClick(role)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -276,6 +307,21 @@ export default function RolesPage() {
           }}
           onRoleUpdated={handleRoleUpdated}
           role={selectedRole}
+        />
+
+        <ConfirmationModal
+          isOpen={showDeleteConfirm}
+          onClose={() => {
+            setShowDeleteConfirm(false)
+            setRoleToDelete(null)
+          }}
+          onConfirm={handleDeleteRole}
+          title="Delete Role"
+          description={`Are you sure you want to delete the role "${roleToDelete?.name}"? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          variant="destructive"
+          isLoading={isDeleting}
         />
       </div>
     </MainLayout>

@@ -72,17 +72,17 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
   return (
     <div className="space-y-6">
       {/* Revenue Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-xl sm:text-2xl font-bold text-green-600 break-words">
               ${totalRevenue.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Generated revenue
             </p>
           </CardContent>
@@ -90,14 +90,14 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Revenue</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Average Revenue</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold break-words">
               ${averageRevenue.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Per source
             </p>
           </CardContent>
@@ -105,14 +105,14 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Top Source</CardTitle>
-            <Award className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Top Source</CardTitle>
+            <Award className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold truncate">
               {topSource ? topSource.source : 'N/A'}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               {topSource ? `${topSource.percentage.toFixed(1)}% of total` : 'No data'}
             </p>
           </CardContent>
@@ -120,14 +120,14 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Revenue Growth</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Revenue Growth</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               {revenueGrowth.toFixed(1)}%
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Month over month
             </p>
           </CardContent>
@@ -135,15 +135,15 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Revenue by Source */}
         <Card>
           <CardHeader>
-            <CardTitle>Revenue by Source</CardTitle>
-            <CardDescription>Distribution of revenue across different sources</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Revenue by Source</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Distribution of revenue across different sources</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie
                   data={sourceData}
@@ -151,7 +151,7 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
                   cy="50%"
                   labelLine={false}
                   label={({ name, amount, percentage }) => `${name}: $${amount.toLocaleString()} (${percentage.toFixed(0)}%)`}
-                  outerRadius={80}
+                  outerRadius={60}
                   fill="#8884d8"
                   dataKey="amount"
                 >
@@ -168,15 +168,15 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
         {/* Monthly Revenue Trends */}
         <Card>
           <CardHeader>
-            <CardTitle>Monthly Revenue Trends</CardTitle>
-            <CardDescription>Revenue and profit over time</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Monthly Revenue Trends</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Revenue and profit over time</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <AreaChart data={monthlyRevenueData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']} />
                 <Area 
                   type="monotone" 
@@ -204,15 +204,15 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
         {/* Revenue Sources Comparison */}
         <Card>
           <CardHeader>
-            <CardTitle>Revenue Sources Comparison</CardTitle>
-            <CardDescription>Revenue amounts by source</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Revenue Sources Comparison</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Revenue amounts by source</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <BarChart data={sourceData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']} />
                 <Bar dataKey="amount" fill="#82ca9d" />
               </BarChart>
@@ -223,15 +223,15 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
         {/* Profit Margin Trends */}
         <Card>
           <CardHeader>
-            <CardTitle>Profit Margin Trends</CardTitle>
-            <CardDescription>Profit margin percentage over time</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Profit Margin Trends</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Profit margin percentage over time</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <LineChart data={monthlyRevenueData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip formatter={(value) => [`${typeof value === 'number' ? value.toFixed(1) : value}%`, 'Margin']} />
                 <Line 
                   type="monotone" 
@@ -249,39 +249,41 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
       {/* Revenue Sources Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Revenue Sources Analysis</CardTitle>
-          <CardDescription>Detailed breakdown of revenue by source</CardDescription>
+          <CardTitle className="text-base sm:text-lg">Revenue Sources Analysis</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Detailed breakdown of revenue by source</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {revenueSources.map((source, index) => (
-              <div key={source.source} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3">
-                    <div 
-                      className="w-4 h-4 rounded-full" 
-                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                    />
-                    <h3 className="font-semibold">{source.source}</h3>
-                    <Badge variant="outline">{source.percentage.toFixed(1)}%</Badge>
+              <div key={source.source} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+                <div className="flex-1 min-w-0 w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
+                    <div className="flex items-center space-x-2">
+                      <div 
+                        className="w-3 h-3 sm:w-4 sm:h-4 rounded-full flex-shrink-0" 
+                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                      />
+                      <h3 className="font-semibold text-sm sm:text-base truncate">{source.source}</h3>
+                    </div>
+                    <Badge variant="outline" className="flex-shrink-0">{source.percentage.toFixed(1)}%</Badge>
                   </div>
                   <div className="mt-2">
-                    <div className="text-2xl font-bold text-green-600">
+                    <div className="text-xl sm:text-2xl font-bold text-green-600 break-words">
                       ${source.amount.toLocaleString()}
                     </div>
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-xs sm:text-sm text-muted-foreground mt-1">
                       Revenue generated
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-4">
-                  <div className="text-center">
-                    <div className="text-sm font-medium">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
+                  <div className="text-left sm:text-center">
+                    <div className="text-xs sm:text-sm font-medium">
                       {source.percentage.toFixed(1)}%
                     </div>
                     <div className="text-xs text-muted-foreground">of Total</div>
                   </div>
-                  <div className="w-32">
+                  <div className="w-full sm:w-32 flex-shrink-0">
                     <Progress value={source.percentage} className="h-2" />
                   </div>
                 </div>
@@ -294,25 +296,25 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
       {/* Monthly Revenue Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Monthly Revenue Breakdown</CardTitle>
-          <CardDescription>Revenue and profit by month</CardDescription>
+          <CardTitle className="text-base sm:text-lg">Monthly Revenue Breakdown</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Revenue and profit by month</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {monthlyRevenueData.map((month, index) => (
-              <div key={month.month} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex-1">
-                  <h3 className="font-semibold">{month.month}</h3>
-                  <div className="mt-2 grid grid-cols-3 gap-4 text-sm">
+              <div key={month.month} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+                <div className="flex-1 min-w-0 w-full sm:w-auto">
+                  <h3 className="font-semibold text-sm sm:text-base truncate">{month.month}</h3>
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-xs sm:text-sm">
                     <div>
                       <div className="text-muted-foreground">Revenue</div>
-                      <div className="font-medium text-green-600">
+                      <div className="font-medium text-green-600 break-words">
                         ${month.revenue.toLocaleString()}
                       </div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Profit</div>
-                      <div className={`font-medium ${month.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <div className={`font-medium break-words ${month.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         ${month.profit.toLocaleString()}
                       </div>
                     </div>
@@ -324,7 +326,7 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
                     </div>
                   </div>
                 </div>
-                <div className="w-32">
+                <div className="w-full sm:w-32 flex-shrink-0">
                   <Progress value={Math.max(0, Math.min(100, month.margin))} className="h-2" />
                 </div>
               </div>

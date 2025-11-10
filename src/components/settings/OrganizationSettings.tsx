@@ -9,15 +9,19 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useOrganization } from '@/hooks/useOrganization'
-import { Building2, Upload, Save, AlertCircle, X, Users, UserCheck, Building, Crown } from 'lucide-react'
+import { Building2, Upload, Save, AlertCircle, CheckCircle, X, Users, UserCheck, Building, Crown } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useCurrencies } from '@/hooks/useCurrencies'
 
 export function OrganizationSettings() {
-  const { organization, loading } = useOrganization()
+  const { organization, loading, refetch } = useOrganization()
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay } = useCurrencies(true)
   const [saving, setSaving] = useState(false)
+  const [savingRegistration, setSavingRegistration] = useState(false)
+  const [savingTimeTracking, setSavingTimeTracking] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [registrationMessage, setRegistrationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [timeTrackingMessage, setTimeTrackingMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   
   const [formData, setFormData] = useState({
     name: '',
@@ -155,6 +159,9 @@ export function OrganizationSettings() {
     return Object.keys(newErrors).length === 0
   }
 
+  // Check if all required fields are filled
+  const isFormValid = formData.name.trim() !== '' && (!formData.domain || /^(https?:\/\/)?([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(\/.*)?$/.test(formData.domain))
+
   useEffect(() => {
     if (organization) {
       setFormData({
@@ -241,11 +248,24 @@ export function OrganizationSettings() {
       const response = await fetch('/api/organization', {
         method: 'PUT',
         body: formDataToSend,
+        // Don't set Content-Type header - let browser set it with boundary for multipart/form-data
       })
 
       if (!response.ok) {
-        throw new Error('Failed to update organization')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to update organization')
       }
+
+      // Clear logo file states after successful upload
+      if (logo) {
+        setLogo(null)
+      }
+      if (darkLogo) {
+        setDarkLogo(null)
+      }
+
+      // Clear cache and refetch organization data to show updated values (including logos)
+      refetch()
 
       setMessage({ type: 'success', text: 'Organization settings updated successfully' })
     } catch (error) {
@@ -255,12 +275,72 @@ export function OrganizationSettings() {
     }
   }
 
+  const handleSaveRegistrationSettings = async () => {
+    setSavingRegistration(true)
+    setRegistrationMessage(null)
+
+    try {
+      const formDataToSend = new FormData()
+      formDataToSend.append('data', JSON.stringify({
+        allowSelfRegistration: formData.allowSelfRegistration,
+        requireEmailVerification: formData.requireEmailVerification,
+        defaultUserRole: formData.defaultUserRole
+      }))
+
+      const response = await fetch('/api/organization', {
+        method: 'PUT',
+        body: formDataToSend,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to update registration settings')
+      }
+
+      refetch()
+      setRegistrationMessage({ type: 'success', text: 'Registration settings updated successfully' })
+    } catch (error) {
+      setRegistrationMessage({ type: 'error', text: 'Failed to update registration settings' })
+    } finally {
+      setSavingRegistration(false)
+    }
+  }
+
+  const handleSaveTimeTrackingSettings = async () => {
+    setSavingTimeTracking(true)
+    setTimeTrackingMessage(null)
+
+    try {
+      const formDataToSend = new FormData()
+      formDataToSend.append('data', JSON.stringify({
+        timeTracking: formData.timeTracking
+      }))
+
+      const response = await fetch('/api/organization', {
+        method: 'PUT',
+        body: formDataToSend,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to update time tracking settings')
+      }
+
+      refetch()
+      setTimeTrackingMessage({ type: 'success', text: 'Time tracking settings updated successfully' })
+    } catch (error) {
+      setTimeTrackingMessage({ type: 'error', text: 'Failed to update time tracking settings' })
+    } finally {
+      setSavingTimeTracking(false)
+    }
+  }
+
   if (loading) {
     return (
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-primary"></div>
           </div>
         </CardContent>
       </Card>
@@ -268,63 +348,63 @@ export function OrganizationSettings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
-            Organization Information
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Building2 className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+            <span className="truncate">Organization Information</span>
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs sm:text-sm">
             Update your organization's basic information and settings.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
           <div className="space-y-2">
-            <Label htmlFor="name">Organization Name *</Label>
+            <Label htmlFor="name" className="text-xs sm:text-sm">Organization Name *</Label>
             <Input
               id="name"
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="Your Company Name"
-              className={errors.name ? 'border-red-500' : ''}
+              className={`text-xs sm:text-sm ${errors.name ? 'border-red-500' : ''}`}
             />
             {errors.name && (
-              <p className="text-sm text-red-600">{errors.name}</p>
+              <p className="text-xs sm:text-sm text-red-600 break-words">{errors.name}</p>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="domain">Website Domain (Optional)</Label>
+            <Label htmlFor="domain" className="text-xs sm:text-sm">Website Domain (Optional)</Label>
             <Input
               id="domain"
               type="text"
               value={formData.domain}
               onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
               placeholder="yourcompany.com or https://yourcompany.com"
-              className={errors.domain ? 'border-red-500' : ''}
+              className={`text-xs sm:text-sm ${errors.domain ? 'border-red-500' : ''}`}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground break-words">
               Enter your website domain or full URL (e.g., example.com or https://example.com)
             </p>
             {errors.domain && (
-              <p className="text-sm text-red-600">{errors.domain}</p>
+              <p className="text-xs sm:text-sm text-red-600 break-words">{errors.domain}</p>
             )}
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <div className="space-y-2">
-              <Label>Organization Logo</Label>
-              <p className="text-sm text-muted-foreground">
+              <Label className="text-xs sm:text-sm">Organization Logo</Label>
+              <p className="text-xs sm:text-sm text-muted-foreground break-words">
                 Configure your organization logo for the best display across all themes
               </p>
             </div>
 
             {/* Logo Mode Selection */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div
-                className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
+                className={`p-4 sm:p-6 border-2 rounded-lg cursor-pointer transition-all ${
                   logoMode === 'single'
                     ? 'border-primary bg-primary/5'
                     : 'border-muted hover:border-muted-foreground/50'
@@ -332,18 +412,18 @@ export function OrganizationSettings() {
                 onClick={() => setLogoMode('single')}
               >
                 <div className="text-center">
-                  <div className="h-12 w-12 mx-auto mb-3 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <Upload className="h-6 w-6 text-primary" />
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3 bg-primary/10 rounded-lg flex items-center justify-center">
+                    <Upload className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                   </div>
-                  <h3 className="font-semibold">Single Logo</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <h3 className="text-sm sm:text-base font-semibold">Single Logo</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
                     Upload one logo that will be used across all themes and interfaces
                   </p>
                 </div>
               </div>
 
               <div
-                className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
+                className={`p-4 sm:p-6 border-2 rounded-lg cursor-pointer transition-all ${
                   logoMode === 'dual'
                     ? 'border-primary bg-primary/5'
                     : 'border-muted hover:border-muted-foreground/50'
@@ -351,14 +431,14 @@ export function OrganizationSettings() {
                 onClick={() => setLogoMode('dual')}
               >
                 <div className="text-center">
-                  <div className="h-12 w-12 mx-auto mb-3 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3 bg-primary/10 rounded-lg flex items-center justify-center">
                     <div className="flex space-x-1">
-                      <div className="h-4 w-4 bg-white border border-gray-300 rounded"></div>
-                      <div className="h-4 w-4 bg-gray-800 border border-gray-600 rounded"></div>
+                      <div className="h-3 w-3 sm:h-4 sm:w-4 bg-white border border-gray-300 rounded"></div>
+                      <div className="h-3 w-3 sm:h-4 sm:w-4 bg-gray-800 border border-gray-600 rounded"></div>
                     </div>
                   </div>
-                  <h3 className="font-semibold">Dual Logos</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <h3 className="text-sm sm:text-base font-semibold">Dual Logos</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
                     Upload separate logos for light and dark themes to ensure optimal visibility
                   </p>
                 </div>
@@ -366,35 +446,35 @@ export function OrganizationSettings() {
             </div>
 
             {logoMode === 'single' ? (
-              <div className="bg-card border rounded-lg p-6">
-                <div className="flex items-center space-x-4">
+              <div className="bg-card border rounded-lg p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                   {logoPreview ? (
-                    <div className="relative">
+                    <div className="relative flex-shrink-0">
                       <img
                         src={logoPreview}
                         alt="Logo preview"
-                        className="h-20 w-20 object-contain rounded-lg border bg-background"
+                        className="h-16 w-16 sm:h-20 sm:w-20 object-contain rounded-lg border bg-background"
                       />
                       <Button
                         type="button"
                         variant="destructive"
                         size="sm"
                         onClick={() => removeLogo('light')}
-                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                        className="absolute -top-2 -right-2 h-5 w-5 sm:h-6 sm:w-6 rounded-full p-0"
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                       </Button>
                     </div>
                   ) : (
-                    <div className="h-20 w-20 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center">
-                      <Upload className="h-8 w-8 text-muted-foreground" />
+                    <div className="h-16 w-16 sm:h-20 sm:w-20 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Upload className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
                     </div>
                   )}
-                  <div className="flex-1">
-                    <Label htmlFor="logo" className="text-sm font-medium text-foreground">
+                  <div className="flex-1 min-w-0 w-full sm:w-auto">
+                    <Label htmlFor="logo" className="text-xs sm:text-sm font-medium text-foreground">
                       Organization Logo
                     </Label>
-                    <p className="text-xs text-muted-foreground mb-3">
+                    <p className="text-xs text-muted-foreground mb-2 sm:mb-3 break-words">
                       Upload a logo that works well in both light and dark themes
                     </p>
                     <input
@@ -406,9 +486,9 @@ export function OrganizationSettings() {
                     />
                     <Label
                       htmlFor="logo"
-                      className="cursor-pointer inline-flex items-center px-4 py-2 border border-border rounded-md text-sm font-medium text-foreground bg-background hover:bg-accent transition-colors"
+                      className="cursor-pointer inline-flex items-center px-3 py-2 sm:px-4 sm:py-2 border border-border rounded-md text-xs sm:text-sm font-medium text-foreground bg-background hover:bg-accent transition-colors"
                     >
-                      <Upload className="h-4 w-4 mr-2" />
+                      <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                       Upload Logo
                     </Label>
                     <p className="text-xs text-muted-foreground mt-2">Max 5MB, PNG/JPG/SVG</p>
@@ -416,38 +496,38 @@ export function OrganizationSettings() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 {/* Light Mode Logo */}
-                <div className="bg-card border rounded-lg p-6">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <div className="w-4 h-4 bg-white border border-gray-300 rounded"></div>
-                    <Label className="text-sm font-medium text-foreground">Light Mode Logo</Label>
+                <div className="bg-card border rounded-lg p-4 sm:p-6">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-white border border-gray-300 rounded flex-shrink-0"></div>
+                    <Label className="text-xs sm:text-sm font-medium text-foreground">Light Mode Logo</Label>
                   </div>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                     {logoPreview ? (
-                      <div className="relative">
+                      <div className="relative flex-shrink-0">
                         <img
                           src={logoPreview}
                           alt="Light logo preview"
-                          className="h-20 w-20 object-contain rounded-lg border bg-white"
+                          className="h-16 w-16 sm:h-20 sm:w-20 object-contain rounded-lg border bg-white"
                         />
                         <Button
                           type="button"
                           variant="destructive"
                           size="sm"
                           onClick={() => removeLogo('light')}
-                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                          className="absolute -top-2 -right-2 h-5 w-5 sm:h-6 sm:w-6 rounded-full p-0"
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                         </Button>
                       </div>
                     ) : (
-                      <div className="h-20 w-20 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center bg-white">
-                        <Upload className="h-8 w-8 text-muted-foreground" />
+                      <div className="h-16 w-16 sm:h-20 sm:w-20 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center bg-white flex-shrink-0">
+                        <Upload className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
                       </div>
                     )}
-                    <div className="flex-1">
-                      <p className="text-xs text-muted-foreground mb-2">
+                    <div className="flex-1 min-w-0 w-full sm:w-auto">
+                      <p className="text-xs text-muted-foreground mb-2 break-words">
                         Optimized for light backgrounds
                       </p>
                       <input
@@ -459,9 +539,9 @@ export function OrganizationSettings() {
                       />
                       <Label
                         htmlFor="light-logo"
-                        className="cursor-pointer inline-flex items-center px-4 py-2 border border-border rounded-md text-sm font-medium text-foreground bg-background hover:bg-accent transition-colors"
+                        className="cursor-pointer inline-flex items-center px-3 py-2 sm:px-4 sm:py-2 border border-border rounded-md text-xs sm:text-sm font-medium text-foreground bg-background hover:bg-accent transition-colors"
                       >
-                        <Upload className="h-4 w-4 mr-2" />
+                        <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                         Upload Logo
                       </Label>
                     </div>
@@ -469,36 +549,36 @@ export function OrganizationSettings() {
                 </div>
 
                 {/* Dark Mode Logo */}
-                <div className="bg-card border rounded-lg p-6">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <div className="w-4 h-4 bg-gray-800 border border-gray-600 rounded"></div>
-                    <Label className="text-sm font-medium text-foreground">Dark Mode Logo</Label>
+                <div className="bg-card border rounded-lg p-4 sm:p-6">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-800 border border-gray-600 rounded flex-shrink-0"></div>
+                    <Label className="text-xs sm:text-sm font-medium text-foreground">Dark Mode Logo</Label>
                   </div>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                     {darkLogoPreview ? (
-                      <div className="relative">
+                      <div className="relative flex-shrink-0">
                         <img
                           src={darkLogoPreview}
                           alt="Dark logo preview"
-                          className="h-20 w-20 object-contain rounded-lg border bg-gray-800"
+                          className="h-16 w-16 sm:h-20 sm:w-20 object-contain rounded-lg border bg-gray-800"
                         />
                         <Button
                           type="button"
                           variant="destructive"
                           size="sm"
                           onClick={() => removeLogo('dark')}
-                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                          className="absolute -top-2 -right-2 h-5 w-5 sm:h-6 sm:w-6 rounded-full p-0"
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                         </Button>
                       </div>
                     ) : (
-                      <div className="h-20 w-20 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center bg-gray-800">
-                        <Upload className="h-8 w-8 text-muted-foreground" />
+                      <div className="h-16 w-16 sm:h-20 sm:w-20 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center bg-gray-800 flex-shrink-0">
+                        <Upload className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
                       </div>
                     )}
-                    <div className="flex-1">
-                      <p className="text-xs text-muted-foreground mb-2">
+                    <div className="flex-1 min-w-0 w-full sm:w-auto">
+                      <p className="text-xs text-muted-foreground mb-2 break-words">
                         Optimized for dark backgrounds
                       </p>
                       <input
@@ -510,9 +590,9 @@ export function OrganizationSettings() {
                       />
                       <Label
                         htmlFor="dark-logo"
-                        className="cursor-pointer inline-flex items-center px-4 py-2 border border-border rounded-md text-sm font-medium text-foreground bg-background hover:bg-accent transition-colors"
+                        className="cursor-pointer inline-flex items-center px-3 py-2 sm:px-4 sm:py-2 border border-border rounded-md text-xs sm:text-sm font-medium text-foreground bg-background hover:bg-accent transition-colors"
                       >
-                        <Upload className="h-4 w-4 mr-2" />
+                        <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                         Upload Logo
                       </Label>
                     </div>
@@ -522,33 +602,33 @@ export function OrganizationSettings() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-2">
-              <Label htmlFor="timezone">Timezone</Label>
+              <Label htmlFor="timezone" className="text-xs sm:text-sm">Timezone</Label>
               <Select value={formData.timezone} onValueChange={(value) => setFormData({ ...formData, timezone: value })}>
-                <SelectTrigger>
+                <SelectTrigger className="text-xs sm:text-sm">
                   <SelectValue placeholder="Select timezone" />
                 </SelectTrigger>
                 <SelectContent>
                   {timezones.map((tz) => (
-                    <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+                    <SelectItem key={tz} value={tz} className="text-xs sm:text-sm">{tz}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="currency">Currency</Label>
+              <Label htmlFor="currency" className="text-xs sm:text-sm">Currency</Label>
               <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
-                <SelectTrigger>
+                <SelectTrigger className="text-xs sm:text-sm">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
                   {currenciesLoading ? (
-                    <SelectItem value="__loading__" disabled>Loading currencies...</SelectItem>
+                    <SelectItem value="__loading__" disabled className="text-xs sm:text-sm">Loading currencies...</SelectItem>
                   ) : (
                     currencies.map((currency) => (
-                      <SelectItem key={currency.code} value={currency.code}>
+                      <SelectItem key={currency.code} value={currency.code} className="text-xs sm:text-sm">
                         {formatCurrencyDisplay(currency)}
                       </SelectItem>
                     ))
@@ -558,43 +638,43 @@ export function OrganizationSettings() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="language">Language</Label>
+              <Label htmlFor="language" className="text-xs sm:text-sm">Language</Label>
               <Select value={formData.language} onValueChange={(value) => setFormData({ ...formData, language: value })}>
-                <SelectTrigger>
+                <SelectTrigger className="text-xs sm:text-sm">
                   <SelectValue placeholder="Select language" />
                 </SelectTrigger>
                 <SelectContent>
                   {languages.map((lang) => (
-                    <SelectItem key={lang.code} value={lang.code}>{lang.name}</SelectItem>
+                    <SelectItem key={lang.code} value={lang.code} className="text-xs sm:text-sm">{lang.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="industry">Industry</Label>
+              <Label htmlFor="industry" className="text-xs sm:text-sm">Industry</Label>
               <Select value={formData.industry} onValueChange={(value) => setFormData({ ...formData, industry: value })}>
-                <SelectTrigger>
+                <SelectTrigger className="text-xs sm:text-sm">
                   <SelectValue placeholder="Select industry" />
                 </SelectTrigger>
                 <SelectContent>
                   {industries.map((industry) => (
-                    <SelectItem key={industry} value={industry}>{industry}</SelectItem>
+                    <SelectItem key={industry} value={industry} className="text-xs sm:text-sm">{industry}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <div className="space-y-2">
-              <Label>Organization Size</Label>
-              <p className="text-sm text-muted-foreground">
+              <Label className="text-xs sm:text-sm">Organization Size</Label>
+              <p className="text-xs sm:text-sm text-muted-foreground break-words">
                 Choose the size category that best represents your organization
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {organizationSizes.map((size) => {
                 const getIcon = () => {
                   switch (size.value) {
@@ -610,35 +690,35 @@ export function OrganizationSettings() {
                 return (
                   <div
                     key={size.value}
-                    className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
+                    className={`p-4 sm:p-6 border-2 rounded-lg cursor-pointer transition-all ${
                       formData.size === size.value
                         ? 'border-primary bg-primary/5'
                         : 'border-muted hover:border-muted-foreground/50'
                     }`}
                      onClick={() => setFormData({ ...formData, size: size.value as 'startup' | 'small' | 'medium' | 'enterprise' })}
                   >
-                    <div className="flex items-start space-x-4">
-                      <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${
+                    <div className="flex items-start gap-3 sm:gap-4">
+                      <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
                         formData.size === size.value
                           ? 'bg-primary/10 text-primary'
                           : 'bg-muted/50 text-muted-foreground'
                       }`}>
-                        <Icon className="h-6 w-6" />
+                        <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                          <div className={`h-3 w-3 sm:h-4 sm:w-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                             formData.size === size.value
                               ? 'border-primary bg-primary'
                               : 'border-muted-foreground/30'
                           }`}>
                             {formData.size === size.value && (
-                              <div className="h-2 w-2 rounded-full bg-white"></div>
+                              <div className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-white"></div>
                             )}
                           </div>
-                          <div className="font-semibold text-foreground">{size.label}</div>
+                          <div className="text-xs sm:text-sm font-semibold text-foreground truncate">{size.label}</div>
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-xs sm:text-sm text-muted-foreground break-words">
                           {size.value === 'startup' && 'Small teams and early-stage companies'}
                           {size.value === 'small' && 'Growing businesses with established teams'}
                           {size.value === 'medium' && 'Established companies with multiple departments'}
@@ -654,86 +734,114 @@ export function OrganizationSettings() {
 
           {message && (
             <Alert variant={message.type === 'error' ? 'destructive' : 'default'}>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{message.text}</AlertDescription>
+              <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <AlertDescription className="text-xs sm:text-sm break-words">{message.text}</AlertDescription>
             </Alert>
           )}
 
-          <div className="flex justify-end">
-            <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2">
+          <div className="flex justify-end mt-4 sm:mt-6">
+            <Button onClick={handleSave} disabled={saving || !isFormValid} className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm">
               {saving ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
               ) : (
-                <Save className="h-4 w-4" />
+                <Save className="h-3 w-3 sm:h-4 sm:w-4" />
               )}
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? 'Saving...' : 'Save Organization Information'}
             </Button>
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>User Registration Settings</CardTitle>
-          <CardDescription>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-base sm:text-lg">User Registration Settings</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
             Configure how new users can join your organization.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Allow Self Registration</Label>
-              <p className="text-sm text-muted-foreground">
+        <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+            <div className="space-y-0.5 flex-1 min-w-0">
+              <Label className="text-xs sm:text-sm">Allow Self Registration</Label>
+              <p className="text-xs sm:text-sm text-muted-foreground break-words">
                 Allow users to register themselves without invitation
               </p>
             </div>
             <Switch
               checked={formData.allowSelfRegistration}
               onCheckedChange={(checked) => setFormData({ ...formData, allowSelfRegistration: checked })}
+              className="flex-shrink-0"
             />
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Require Email Verification</Label>
-              <p className="text-sm text-muted-foreground">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+            <div className="space-y-0.5 flex-1 min-w-0">
+              <Label className="text-xs sm:text-sm">Require Email Verification</Label>
+              <p className="text-xs sm:text-sm text-muted-foreground break-words">
                 Require users to verify their email address before accessing the system
               </p>
             </div>
             <Switch
               checked={formData.requireEmailVerification}
               onCheckedChange={(checked) => setFormData({ ...formData, requireEmailVerification: checked })}
+              className="flex-shrink-0"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="defaultRole">Default User Role</Label>
+            <Label htmlFor="defaultRole" className="text-xs sm:text-sm">Default User Role</Label>
             <Select value={formData.defaultUserRole} onValueChange={(value) => setFormData({ ...formData, defaultUserRole: value })}>
-              <SelectTrigger>
+              <SelectTrigger className="text-xs sm:text-sm">
                 <SelectValue placeholder="Select default role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="team_member">Team Member</SelectItem>
-                <SelectItem value="project_manager">Project Manager</SelectItem>
-                <SelectItem value="admin">Administrator</SelectItem>
+                <SelectItem value="team_member" className="text-xs sm:text-sm">Team Member</SelectItem>
+                <SelectItem value="project_manager" className="text-xs sm:text-sm">Project Manager</SelectItem>
+                <SelectItem value="admin" className="text-xs sm:text-sm">Administrator</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {registrationMessage && (
+            <Alert variant={registrationMessage.type === 'error' ? 'destructive' : 'default'}>
+              {registrationMessage.type === 'error' ? (
+                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              ) : (
+                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              )}
+              <AlertDescription className="text-xs sm:text-sm break-words">{registrationMessage.text}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="flex justify-end mt-4 sm:mt-6">
+            <Button 
+              onClick={handleSaveRegistrationSettings} 
+              disabled={savingRegistration} 
+              className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm"
+            >
+              {savingRegistration ? (
+                <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
+              ) : (
+                <Save className="h-3 w-3 sm:h-4 sm:w-4" />
+              )}
+              {savingRegistration ? 'Saving...' : 'Save Registration Settings'}
+            </Button>
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Time Tracking Settings</CardTitle>
-          <CardDescription>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-base sm:text-lg">Time Tracking Settings</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
             Configure global time tracking settings for your organization.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Allow Time Tracking</Label>
-              <p className="text-sm text-muted-foreground">
+        <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+            <div className="space-y-0.5 flex-1 min-w-0">
+              <Label className="text-xs sm:text-sm">Allow Time Tracking</Label>
+              <p className="text-xs sm:text-sm text-muted-foreground break-words">
                 Enable time tracking across all projects in your organization
               </p>
             </div>
@@ -743,15 +851,16 @@ export function OrganizationSettings() {
                 ...formData, 
                 timeTracking: { ...formData.timeTracking, allowTimeTracking: checked }
               })}
+              className="flex-shrink-0"
             />
           </div>
 
           {formData.timeTracking.allowTimeTracking && (
-            <div className="ml-6 pl-4 border-l-2 border-muted space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Allow Manual Time Submission</Label>
-                  <p className="text-sm text-muted-foreground">
+            <div className="ml-3 sm:ml-6 pl-3 sm:pl-4 border-l-2 border-muted space-y-4 sm:space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                <div className="space-y-0.5 flex-1 min-w-0">
+                  <Label className="text-xs sm:text-sm">Allow Manual Time Submission</Label>
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words">
                     Allow team members to submit time entries manually after completing tasks
                   </p>
                 </div>
@@ -761,13 +870,14 @@ export function OrganizationSettings() {
                     ...formData, 
                     timeTracking: { ...formData.timeTracking, allowManualTimeSubmission: checked }
                   })}
+                  className="flex-shrink-0"
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Require Approval</Label>
-                  <p className="text-sm text-muted-foreground">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                <div className="space-y-0.5 flex-1 min-w-0">
+                  <Label className="text-xs sm:text-sm">Require Approval</Label>
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words">
                     Require manager approval for all time entries
                   </p>
                 </div>
@@ -777,13 +887,14 @@ export function OrganizationSettings() {
                     ...formData, 
                     timeTracking: { ...formData.timeTracking, requireApproval: checked }
                   })}
+                  className="flex-shrink-0"
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Allow Billable Time</Label>
-                  <p className="text-sm text-muted-foreground">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                <div className="space-y-0.5 flex-1 min-w-0">
+                  <Label className="text-xs sm:text-sm">Allow Billable Time</Label>
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words">
                     Enable billing and cost tracking for time entries
                   </p>
                 </div>
@@ -793,12 +904,13 @@ export function OrganizationSettings() {
                     ...formData, 
                     timeTracking: { ...formData.timeTracking, allowBillableTime: checked }
                   })}
+                  className="flex-shrink-0"
                 />
               </div>
 
               {formData.timeTracking.allowBillableTime && (
                 <div>
-                  <Label htmlFor="defaultHourlyRate">Default Hourly Rate ($)</Label>
+                  <Label htmlFor="defaultHourlyRate" className="text-xs sm:text-sm">Default Hourly Rate ($)</Label>
                   <Input
                     id="defaultHourlyRate"
                     type="number"
@@ -810,13 +922,14 @@ export function OrganizationSettings() {
                     placeholder="0.00"
                     step="0.01"
                     min="0"
+                    className="text-xs sm:text-sm"
                   />
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div>
-                  <Label htmlFor="maxDailyHours">Max Daily Hours</Label>
+                  <Label htmlFor="maxDailyHours" className="text-xs sm:text-sm">Max Daily Hours</Label>
                   <Input
                     id="maxDailyHours"
                     type="number"
@@ -827,10 +940,11 @@ export function OrganizationSettings() {
                     })}
                     min="1"
                     max="24"
+                    className="text-xs sm:text-sm"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="maxWeeklyHours">Max Weekly Hours</Label>
+                  <Label htmlFor="maxWeeklyHours" className="text-xs sm:text-sm">Max Weekly Hours</Label>
                   <Input
                     id="maxWeeklyHours"
                     type="number"
@@ -841,10 +955,11 @@ export function OrganizationSettings() {
                     })}
                     min="1"
                     max="168"
+                    className="text-xs sm:text-sm"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="maxSessionHours">Max Session Hours</Label>
+                  <Label htmlFor="maxSessionHours" className="text-xs sm:text-sm">Max Session Hours</Label>
                   <Input
                     id="maxSessionHours"
                     type="number"
@@ -855,14 +970,15 @@ export function OrganizationSettings() {
                     })}
                     min="1"
                     max="24"
+                    className="text-xs sm:text-sm"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Allow Overtime</Label>
-                  <p className="text-sm text-muted-foreground">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                <div className="space-y-0.5 flex-1 min-w-0">
+                  <Label className="text-xs sm:text-sm">Allow Overtime</Label>
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words">
                     Allow time entries beyond daily/weekly limits
                   </p>
                 </div>
@@ -872,13 +988,14 @@ export function OrganizationSettings() {
                     ...formData, 
                     timeTracking: { ...formData.timeTracking, allowOvertime: checked }
                   })}
+                  className="flex-shrink-0"
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Require Description</Label>
-                  <p className="text-sm text-muted-foreground">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                <div className="space-y-0.5 flex-1 min-w-0">
+                  <Label className="text-xs sm:text-sm">Require Description</Label>
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words">
                     Require description for all time entries
                   </p>
                 </div>
@@ -888,13 +1005,14 @@ export function OrganizationSettings() {
                     ...formData, 
                     timeTracking: { ...formData.timeTracking, requireDescription: checked }
                   })}
+                  className="flex-shrink-0"
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Require Category</Label>
-                  <p className="text-sm text-muted-foreground">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                <div className="space-y-0.5 flex-1 min-w-0">
+                  <Label className="text-xs sm:text-sm">Require Category</Label>
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words">
                     Require category selection for time entries
                   </p>
                 </div>
@@ -904,13 +1022,14 @@ export function OrganizationSettings() {
                     ...formData, 
                     timeTracking: { ...formData.timeTracking, requireCategory: checked }
                   })}
+                  className="flex-shrink-0"
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Allow Future Time</Label>
-                  <p className="text-sm text-muted-foreground">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                <div className="space-y-0.5 flex-1 min-w-0">
+                  <Label className="text-xs sm:text-sm">Allow Future Time</Label>
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words">
                     Allow logging time for future dates
                   </p>
                 </div>
@@ -920,13 +1039,14 @@ export function OrganizationSettings() {
                     ...formData, 
                     timeTracking: { ...formData.timeTracking, allowFutureTime: checked }
                   })}
+                  className="flex-shrink-0"
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Allow Past Time</Label>
-                  <p className="text-sm text-muted-foreground">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                <div className="space-y-0.5 flex-1 min-w-0">
+                  <Label className="text-xs sm:text-sm">Allow Past Time</Label>
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words">
                     Allow logging time for past dates
                   </p>
                 </div>
@@ -936,12 +1056,13 @@ export function OrganizationSettings() {
                     ...formData, 
                     timeTracking: { ...formData.timeTracking, allowPastTime: checked }
                   })}
+                  className="flex-shrink-0"
                 />
               </div>
 
               {formData.timeTracking.allowPastTime && (
                 <div>
-                  <Label htmlFor="pastTimeLimitDays">Past Time Limit (Days)</Label>
+                  <Label htmlFor="pastTimeLimitDays" className="text-xs sm:text-sm">Past Time Limit (Days)</Label>
                   <Input
                     id="pastTimeLimitDays"
                     type="number"
@@ -952,16 +1073,17 @@ export function OrganizationSettings() {
                     })}
                     min="1"
                     max="365"
+                    className="text-xs sm:text-sm"
                   />
                 </div>
               )}
 
-              <div className="space-y-4">
-                <h4 className="font-medium">Rounding Rules</h4>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Enable Rounding</Label>
-                    <p className="text-sm text-muted-foreground">
+              <div className="space-y-3 sm:space-y-4">
+                <h4 className="text-sm sm:text-base font-medium">Rounding Rules</h4>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                  <div className="space-y-0.5 flex-1 min-w-0">
+                    <Label className="text-xs sm:text-sm">Enable Rounding</Label>
+                    <p className="text-xs sm:text-sm text-muted-foreground break-words">
                       Round time entries to specified increments
                     </p>
                   </div>
@@ -974,13 +1096,14 @@ export function OrganizationSettings() {
                         roundingRules: { ...formData.timeTracking.roundingRules, enabled: checked }
                       }
                     })}
+                    className="flex-shrink-0"
                   />
                 </div>
 
                 {formData.timeTracking.roundingRules.enabled && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
-                      <Label htmlFor="roundingIncrement">Increment (minutes)</Label>
+                      <Label htmlFor="roundingIncrement" className="text-xs sm:text-sm">Increment (minutes)</Label>
                       <Input
                         id="roundingIncrement"
                         type="number"
@@ -994,12 +1117,13 @@ export function OrganizationSettings() {
                         })}
                         min="1"
                         max="60"
+                        className="text-xs sm:text-sm"
                       />
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Round Up</Label>
-                        <p className="text-sm text-muted-foreground">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                      <div className="space-y-0.5 flex-1 min-w-0">
+                        <Label className="text-xs sm:text-sm">Round Up</Label>
+                        <p className="text-xs sm:text-sm text-muted-foreground break-words">
                           Round up instead of down
                         </p>
                       </div>
@@ -1012,19 +1136,20 @@ export function OrganizationSettings() {
                             roundingRules: { ...formData.timeTracking.roundingRules, roundUp: checked }
                           }
                         })}
+                        className="flex-shrink-0"
                       />
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className="space-y-4">
-                <h4 className="font-medium">Notifications</h4>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Timer Start</Label>
-                      <p className="text-sm text-muted-foreground">
+              <div className="space-y-3 sm:space-y-4">
+                <h4 className="text-sm sm:text-base font-medium">Notifications</h4>
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <Label className="text-xs sm:text-sm">Timer Start</Label>
+                      <p className="text-xs sm:text-sm text-muted-foreground break-words">
                         Notify when timer starts
                       </p>
                     </div>
@@ -1037,13 +1162,14 @@ export function OrganizationSettings() {
                           notifications: { ...formData.timeTracking.notifications, onTimerStart: checked }
                         }
                       })}
+                      className="flex-shrink-0"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Timer Stop</Label>
-                      <p className="text-sm text-muted-foreground">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <Label className="text-xs sm:text-sm">Timer Stop</Label>
+                      <p className="text-xs sm:text-sm text-muted-foreground break-words">
                         Notify when timer stops
                       </p>
                     </div>
@@ -1056,13 +1182,14 @@ export function OrganizationSettings() {
                           notifications: { ...formData.timeTracking.notifications, onTimerStop: checked }
                         }
                       })}
+                      className="flex-shrink-0"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Overtime Alert</Label>
-                      <p className="text-sm text-muted-foreground">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <Label className="text-xs sm:text-sm">Overtime Alert</Label>
+                      <p className="text-xs sm:text-sm text-muted-foreground break-words">
                         Notify when overtime is logged
                       </p>
                     </div>
@@ -1075,13 +1202,14 @@ export function OrganizationSettings() {
                           notifications: { ...formData.timeTracking.notifications, onOvertime: checked }
                         }
                       })}
+                      className="flex-shrink-0"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Approval Needed</Label>
-                      <p className="text-sm text-muted-foreground">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <Label className="text-xs sm:text-sm">Approval Needed</Label>
+                      <p className="text-xs sm:text-sm text-muted-foreground break-words">
                         Notify when approval is needed
                       </p>
                     </div>
@@ -1094,13 +1222,14 @@ export function OrganizationSettings() {
                           notifications: { ...formData.timeTracking.notifications, onApprovalNeeded: checked }
                         }
                       })}
+                      className="flex-shrink-0"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Time Submitted</Label>
-                      <p className="text-sm text-muted-foreground">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <Label className="text-xs sm:text-sm">Time Submitted</Label>
+                      <p className="text-xs sm:text-sm text-muted-foreground break-words">
                         Notify when time is submitted
                       </p>
                     </div>
@@ -1113,12 +1242,39 @@ export function OrganizationSettings() {
                           notifications: { ...formData.timeTracking.notifications, onTimeSubmitted: checked }
                         }
                       })}
+                      className="flex-shrink-0"
                     />
                   </div>
                 </div>
               </div>
             </div>
           )}
+
+          {timeTrackingMessage && (
+            <Alert variant={timeTrackingMessage.type === 'error' ? 'destructive' : 'default'}>
+              {timeTrackingMessage.type === 'error' ? (
+                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              ) : (
+                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              )}
+              <AlertDescription className="text-xs sm:text-sm break-words">{timeTrackingMessage.text}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="flex justify-end mt-4 sm:mt-6">
+            <Button 
+              onClick={handleSaveTimeTrackingSettings} 
+              disabled={savingTimeTracking} 
+              className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm"
+            >
+              {savingTimeTracking ? (
+                <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
+              ) : (
+                <Save className="h-3 w-3 sm:h-4 sm:w-4" />
+              )}
+              {savingTimeTracking ? 'Saving...' : 'Save Time Tracking Information'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

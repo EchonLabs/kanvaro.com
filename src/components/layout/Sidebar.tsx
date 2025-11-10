@@ -46,8 +46,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/Popover'
-import { getAppVersion } from '@/lib/version'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { usePermissions } from '@/lib/permissions/permission-context'
+import packageJson from '../../../package.json'
 
 interface SidebarProps {
   collapsed: boolean
@@ -112,6 +113,13 @@ const navigationItems = [
         icon: List,
         path: '/backlog',
         permission: Permission.BACKLOG_READ
+      },
+      {
+        id: 'tasks-user-stories',
+        label: 'User Stories',
+        icon: BookOpen,
+        path: '/stories',
+        permission: Permission.TASK_READ
       },
       {
         id: 'tasks-sprints',
@@ -295,6 +303,7 @@ const navigationItems = [
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([])
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const { organization, loading } = useOrganization()
@@ -349,6 +358,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   }
 
   return (
+    <>
     <div
       className={cn(
         'flex h-full flex-col border-r bg-background transition-all duration-300 rounded-r-2xl overflow-hidden',
@@ -393,22 +403,17 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Navigation Items */}
       <div className="flex-1 overflow-y-auto px-2 py-4">
         <nav className="space-y-1">
-          {navigationItems
-            .filter((item) => hasPermission(item.permission))
-            .map((item) => ({
-              ...item,
-              children: item.children?.filter((child: any) => hasPermission(child.permission)) || []
-            }))
-            .map((item) => (
-            <NavigationItem
-              key={item.id}
-              item={item}
-              collapsed={collapsed}
-              pathname={pathname}
-              expandedItems={expandedItems}
-              onToggleExpanded={toggleExpanded}
-              router={router}
-            />
+          {navigationItems.map((item) => (
+            <PermissionGate key={item.id} permission={item.permission}>
+              <NavigationItem
+                item={item}
+                collapsed={collapsed}
+                pathname={pathname}
+                expandedItems={expandedItems}
+                onToggleExpanded={toggleExpanded}
+                router={router}
+              />
+            </PermissionGate>
           ))}
         </nav>
       </div>
@@ -418,7 +423,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {!collapsed && (
           <div className="px-1 pb-2 text-xs text-muted-foreground flex items-center justify-between">
             <span>Version</span>
-            <span className="font-mono">{getAppVersion()}</span>
+            <span className="font-mono">{packageJson.version}</span>
           </div>
         )}
         <Button
@@ -427,13 +432,24 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             'w-full justify-start text-muted-foreground hover:text-foreground rounded-lg',
             collapsed ? 'px-2' : 'px-3'
           )}
-          onClick={handleLogout}
+          onClick={() => setShowLogoutConfirm(true)}
         >
           <LogOut className={cn('h-4 w-4', collapsed ? 'mx-auto' : 'mr-2')} />
           {!collapsed && 'Sign Out'}
         </Button>
       </div>
     </div>
+    {/* Logout Confirmation Modal */}
+    <ConfirmationModal
+      isOpen={showLogoutConfirm}
+      onClose={() => setShowLogoutConfirm(false)}
+      onConfirm={handleLogout}
+      title="Sign Out"
+      description="Are you sure you want to sign out?"
+      confirmText="Sign Out"
+      cancelText="Cancel"
+    />
+    </>
   )
 }
 
@@ -499,59 +515,40 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
   return (
     <PermissionGate permission={item.permission}>
       <div className="space-y-1">
-        {hasChildren && !collapsed ? (
-          <Button
-            variant={isActive ? 'secondary' : 'ghost'}
-            className={cn(
-              'w-full justify-start rounded-lg',
-              collapsed ? 'px-2' : 'px-3',
-              isActive && 'bg-secondary text-secondary-foreground'
-            )}
-            onClick={() => onToggleExpanded(item.id)}
-          >
-            <Icon className={cn('h-4 w-4', collapsed ? 'mx-auto' : 'mr-2')} />
-            {!collapsed && (
-              <>
-                <span className="flex-1 text-left">{item.label}</span>
-                {hasChildren && (
-                  <ChevronRight
-                    className={cn(
-                      'h-4 w-4 transition-transform',
-                      isExpanded && 'rotate-90'
-                    )}
-                  />
-                )}
-              </>
-            )}
-          </Button>
-        ) : (
-          <Button
-            variant={isActive ? 'secondary' : 'ghost'}
-            className={cn(
-              'w-full justify-start rounded-lg',
-              collapsed ? 'px-2' : 'px-3',
-              isActive && 'bg-secondary text-secondary-foreground'
-            )}
-            asChild
-          >
-            <Link href={item.path} prefetch onMouseEnter={() => router.prefetch(item.path)} title={item.label}>
-              <Icon className={cn('h-4 w-4', collapsed ? 'mx-auto' : 'mr-2')} />
-              {!collapsed && (
-                <>
-                  <span className="flex-1 text-left">{item.label}</span>
-                  {hasChildren && (
-                    <ChevronRight
-                      className={cn(
-                        'h-4 w-4 transition-transform',
-                        isExpanded && 'rotate-90'
-                      )}
-                    />
+        <Button
+          variant={isActive ? 'secondary' : 'ghost'}
+          className={cn(
+            'w-full justify-start',
+            collapsed ? 'px-2' : 'px-3',
+            isActive && 'bg-secondary text-secondary-foreground'
+          )}
+          title={collapsed ? item.label : undefined}
+          onClick={() => {
+            if (hasChildren && !collapsed) {
+              onToggleExpanded(item.id)
+            } else {
+              // Use startTransition for non-blocking navigation
+              startTransition(() => {
+                router.push(item.path)
+              })
+            }
+          }}
+        >
+          <Icon className={cn('h-4 w-4', collapsed ? 'mx-auto' : 'mr-2')} />
+          {!collapsed && (
+            <>
+              <span className="flex-1 text-left">{item.label}</span>
+              {hasChildren && (
+                <ChevronRight
+                  className={cn(
+                    'h-4 w-4 transition-transform',
+                    isExpanded && 'rotate-90'
                   )}
-                </>
+                />
               )}
-            </Link>
-          </Button>
-        )}
+            </>
+          )}
+        </Button>
 
         {/* Sub-navigation */}
         {hasChildren && isExpanded && !collapsed && (

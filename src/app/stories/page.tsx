@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -29,8 +29,15 @@ import {
   BarChart3,
   List,
   Kanban,
-  BookOpen
+  BookOpen,
+  Trash2,
+  Eye,
+  Edit
 } from 'lucide-react'
+import { Permission, PermissionGate } from '@/lib/permissions'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@radix-ui/react-dropdown-menu'
+import { DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 
 interface Story {
   _id: string
@@ -38,10 +45,10 @@ interface Story {
   description: string
   status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
-  project: {
+  project?: {
     _id: string
     name: string
-  }
+  } | null
   epic?: {
     _id: string
     name: string
@@ -71,14 +78,20 @@ interface Story {
 
 export default function StoriesPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [stories, setStories] = useState<Story[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list')
+  const [selectedStory, setSelectedStory] = useState<Story | null>(null)
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
+  const [deleting, setDeleting] = useState(false);
 
   const checkAuth = useCallback(async () => {
     try {
@@ -117,6 +130,15 @@ export default function StoriesPage() {
     checkAuth()
   }, [checkAuth])
 
+  useEffect(() => {
+    const successParam = searchParams?.get('success')
+    if (successParam === 'story-created') {
+      setSuccess('User story created successfully.')
+      const timeout = setTimeout(() => setSuccess(''), 3000)
+      return () => clearTimeout(timeout)
+    }
+  }, [searchParams])
+
   const fetchStories = async () => {
     try {
       setLoading(true)
@@ -135,6 +157,33 @@ export default function StoriesPage() {
     }
   }
 
+  const handleDeleteClick = (story: Story) => {
+    setSelectedStory(story)
+    setShowDeleteConfirmModal(true)
+  }
+  const handleDeleteStory = async () => {
+    if (!selectedStory) return
+    setDeleting(true)
+    try {
+      const response = await fetch(`/api/stories/${selectedStory._id}`, {
+        method: 'DELETE'
+      })
+      const data = await response.json()
+      if (data.success) {
+        setStories(stories.filter(p => p._id !== selectedStory._id))
+        setShowDeleteConfirmModal(false)
+        setSelectedStory(null)
+        setSuccess('Story deleted successfully.')
+        setTimeout(() => setSuccess(''), 4000)
+      } else {
+        setError(data.error || 'Failed to delete story')
+      }
+    } catch (err) {
+      setError('Failed to delete story')
+    } finally {
+      setDeleting(false)
+    }
+  }
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'todo': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
@@ -173,7 +222,7 @@ export default function StoriesPage() {
     const matchesSearch = !searchQuery || 
       story.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       story.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      story.project.name.toLowerCase().includes(searchQuery.toLowerCase())
+      (story.project?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
     
     const matchesStatus = statusFilter === 'all' || story.status === statusFilter
     const matchesPriority = priorityFilter === 'all' || story.priority === priorityFilter
@@ -209,13 +258,13 @@ export default function StoriesPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-6 overflow-x-hidden">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">User Stories</h1>
-            <p className="text-muted-foreground">Manage your user stories and requirements</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">User Stories</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">Manage your user stories and requirements</p>
           </div>
-          <Button onClick={() => router.push('/stories/create')}>
+          <Button onClick={() => router.push('/stories/create')} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             New Story
           </Button>
@@ -230,49 +279,59 @@ export default function StoriesPage() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>All Stories</CardTitle>
-                <CardDescription>
-                  {filteredStories.length} story{filteredStories.length !== 1 ? 'ies' : ''} found
-                </CardDescription>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>All Stories</CardTitle>
+                  <CardDescription>
+                    {filteredStories.length} story{filteredStories.length !== 1 ? 'ies' : ''} found
+                  </CardDescription>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <div className="relative">
+              {success && (
+                <Alert variant="success">
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>{success}</AlertDescription>
+                </Alert>
+              )}
+              <div className="flex flex-col gap-2 sm:gap-4">
+                <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   <Input
                     placeholder="Search stories..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 w-64"
+                    className="pl-10 w-full"
                   />
                 </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="todo">To Do</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="review">Review</SelectItem>
-                    <SelectItem value="testing">Testing</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Filter by priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Priority</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full sm:w-40">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="todo">To Do</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="review">Review</SelectItem>
+                      <SelectItem value="testing">Testing</SelectItem>
+                      <SelectItem value="done">Done</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                    <SelectTrigger className="w-full sm:w-40">
+                      <SelectValue placeholder="Filter by priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Priority</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -288,42 +347,65 @@ export default function StoriesPage() {
                   {filteredStories.map((story) => (
                     <Card 
                       key={story._id} 
-                      className="hover:shadow-md transition-shadow cursor-pointer"
-                      onClick={() => router.push(`/stories/${story._id}`)}
+                      className={`hover:shadow-md transition-shadow ${story.project ? 'cursor-pointer' : 'cursor-pointer'}`}
+                      onClick={() => { if (story.project) router.push(`/stories/${story._id}`); }}
                     >
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-2">
-                                <BookOpen className="h-5 w-5 text-blue-600" />
-                                <h3 className="font-medium text-foreground">{story.title}</h3>
-                                <Badge className={getStatusColor(story.status)}>
-                                  {getStatusIcon(story.status)}
-                                  <span className="ml-1">{story.status.replace('_', ' ')}</span>
-                                </Badge>
-                                <Badge className={getPriorityColor(story.priority)}>
-                                  {story.priority}
-                                </Badge>
+                          <div className="flex items-center space-x-4 min-w-0">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center mb-2 min-w-0">
+                                <BookOpen className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                                <div className="flex-1 min-w-0 ml-2">
+                                  <h3 className="font-medium text-foreground text-sm sm:text-base truncate min-w-0">{story.title}</h3>
+                                </div>
+                                <div className="flex flex-shrink-0 items-center space-x-2 ml-2">
+                                  <Badge className={getStatusColor(story.status) }>
+                                    {getStatusIcon(story.status)}
+                                    <span className="ml-1">{story.status.replace('_', ' ')}</span>
+                                  </Badge>
+                                  <Badge className={getPriorityColor(story.priority)}>
+                                    {story.priority}
+                                  </Badge>
+                                </div>
                               </div>
-                              <p className="text-sm text-muted-foreground mb-2">
+                              <p className="text-sm text-muted-foreground mb-2 line-clamp-2" title={story.description}>
                                 {story.description || 'No description'}
                               </p>
-                              <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                              <div className="flex items-center space-x-4 text-sm text-muted-foreground min-w-0 flex-wrap">
                                 <div className="flex items-center space-x-1">
                                   <Target className="h-4 w-4" />
-                                  <span>{story.project.name}</span>
+                                  {story.project?.name ? (
+                                    <span
+                                      className="truncate"
+                                      title={story.project.name && story.project.name.length > 10 ? story.project.name : undefined}
+                                    >
+                                      {story.project.name && story.project.name.length > 10 ? `${story.project.name.slice(0, 10)}…` : story.project.name}
+                                    </span>
+                                  ) : (
+                                    <span className="truncate italic text-muted-foreground">Project deleted or unavailable</span>
+                                  )}
                                 </div>
                                 {story.epic && (
-                                  <div className="flex items-center space-x-1">
-                                    <Zap className="h-4 w-4" />
-                                    <span>{story.epic.name}</span>
+                                  <div className="flex items-center space-x-1 min-w-0">
+                                    <Zap className="h-4 w-4 flex-shrink-0" />
+                                    <span
+                                      className="truncate"
+                                      title={story.epic.name && story.epic.name.length > 10 ? story.epic.name : undefined}
+                                    >
+                                      {story.epic.name && story.epic.name.length > 10 ? `${story.epic.name.slice(0, 10)}…` : story.epic.name}
+                                    </span>
                                   </div>
                                 )}
                                 {story.sprint && (
-                                  <div className="flex items-center space-x-1">
-                                    <Calendar className="h-4 w-4" />
-                                    <span>{story.sprint.name}</span>
+                                  <div className="flex items-center space-x-1 min-w-0">
+                                    <Calendar className="h-4 w-4 flex-shrink-0" />
+                                    <span
+                                      className="truncate"
+                                      title={story.sprint.name && story.sprint.name.length > 10 ? story.sprint.name : undefined}
+                                    >
+                                      {story.sprint.name && story.sprint.name.length > 10 ? `${story.sprint.name.slice(0, 10)}…` : story.sprint.name}
+                                    </span>
                                   </div>
                                 )}
                                 {story.dueDate && (
@@ -355,12 +437,36 @@ export default function StoriesPage() {
                                 </div>
                               )}
                             </div>
-                            <Button variant="ghost" size="sm" onClick={(e) => {
-                              e.stopPropagation()
-                              // Handle menu actions
-                            }}>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center space-x-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" onClick={e => e.stopPropagation()}>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="min-w-[172px] py-2 rounded-md shadow-lg border border-border bg-background z-[10000]">
+                               
+                                  <DropdownMenuItem onClick={e => { e.stopPropagation(); router.push(`/stories/${story._id}`); }} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    <span>View Story</span>
+                                  </DropdownMenuItem>
+                              
+                                <PermissionGate permission={Permission.STORY_UPDATE} projectId={story.project?._id}>
+                                  <DropdownMenuItem onClick={e => { e.stopPropagation(); router.push(`/stories/${story._id}/edit`); }} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    <span>Edit Story</span>
+                                  </DropdownMenuItem>
+                                </PermissionGate>
+                                <PermissionGate permission={Permission.STORY_DELETE} projectId={story.project?._id}>
+                                  <DropdownMenuSeparator className="my-1" />
+                                  <DropdownMenuItem onClick={e => { e.stopPropagation(); handleDeleteClick(story); }} className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer">
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    <span>Delete Story</span>
+                                  </DropdownMenuItem>
+                                </PermissionGate>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                            </div>
                           </div>
                         </div>
                       </CardContent>
@@ -379,6 +485,16 @@ export default function StoriesPage() {
           </CardContent>
         </Card>
       </div>
+      <ConfirmationModal
+        isOpen={showDeleteConfirmModal}
+        onClose={() => { setShowDeleteConfirmModal(false); setSelectedStory(null); }}
+        onConfirm={handleDeleteStory}
+        title="Delete Story"
+        description={`Are you sure you want to delete "${selectedStory?.title}"? This action cannot be undone.`}
+        confirmText={deleting ? 'Deleting...' : 'Delete'}
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </MainLayout>
   )
 }

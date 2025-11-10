@@ -3,6 +3,7 @@ import connectDB from '@/lib/db-config'
 import { User } from '@/models/User'
 import { UserInvitation } from '@/models/UserInvitation'
 import { authenticateUser } from '@/lib/auth-utils'
+import { normalizeUploadUrl } from '@/lib/file-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -63,6 +64,13 @@ export async function GET(request: NextRequest) {
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
+      .lean()
+
+    // Normalize avatar URLs
+    const normalizedMembers = members.map((member: any) => ({
+      ...member,
+      avatar: normalizeUploadUrl(member.avatar || '')
+    }))
 
     const total = await User.countDocuments(filters)
 
@@ -76,7 +84,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        members,
+        members: normalizedMembers,
         pendingInvitations,
         pagination: {
           page,

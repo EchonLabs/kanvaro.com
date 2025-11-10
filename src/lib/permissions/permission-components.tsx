@@ -20,7 +20,8 @@ export function PermissionGate({
 }: PermissionGateProps) {
   const { hasPermission, loading } = usePermissions();
   
-  // Show children immediately if permissions are still loading to prevent blocking
+  // Show children while loading to prevent content flicker
+  // Once loaded, check permissions and hide if not granted
   if (loading) {
     return <>{children}</>;
   }

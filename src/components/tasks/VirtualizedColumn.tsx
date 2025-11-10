@@ -2,53 +2,24 @@
 
 import { useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Card, CardContent } from '@/components/ui/Card'
+import { useDroppable } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { 
-  Target, 
-  Calendar, 
-  Clock, 
-  BarChart3, 
-  GripVertical, 
-  MoreHorizontal 
-} from 'lucide-react'
+import { Target, Plus } from 'lucide-react'
+import SortableTask from './SortableTask'
+import { ITask } from '@/models/Task'
 
-interface Task {
-  _id: string
-  title: string
-  description: string
-  status: string
-  priority: 'low' | 'medium' | 'high' | 'critical'
-  type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
-  position: number
+interface PopulatedTask extends Omit<ITask, 'assignedTo' | 'project'> {
+  project?: {
+    _id: string
+    name: string
+  }
   assignedTo?: {
     firstName: string
     lastName: string
     email: string
   }
-  createdBy: {
-    firstName: string
-    lastName: string
-    email: string
-  }
-  story?: {
-    _id: string
-    title: string
-    status: string
-  }
-  sprint?: {
-    _id: string
-    name: string
-    status: string
-  }
-  storyPoints?: number
-  dueDate?: string
-  estimatedHours?: number
-  actualHours?: number
-  labels: string[]
-  createdAt: string
-  updatedAt: string
 }
 
 interface Column {
@@ -59,11 +30,13 @@ interface Column {
 
 interface VirtualizedColumnProps {
   column: Column
-  tasks: Task[]
-  onCreateTask: (status: string) => void
+  tasks: PopulatedTask[]
+  onCreateTask: (status?: string) => void
   getPriorityColor: (priority: string) => string
   getTypeColor: (type: string) => string
-  onTaskClick?: (task: Task) => void
+  onTaskClick?: (task: PopulatedTask) => void
+  onEditTask?: (task: PopulatedTask) => void
+  onDeleteTask?: (taskId: string) => void
 }
 
 export default function VirtualizedColumn({
@@ -72,9 +45,16 @@ export default function VirtualizedColumn({
   onCreateTask,
   getPriorityColor,
   getTypeColor,
-  onTaskClick
+  onTaskClick,
+  onEditTask,
+  onDeleteTask
 }: VirtualizedColumnProps) {
   const parentRef = useRef<HTMLDivElement>(null)
+  
+  // Add droppable functionality for empty columns
+  const { setNodeRef, isOver } = useDroppable({
+    id: column.key,
+  })
   
   const rowVirtualizer = useVirtualizer({
     count: tasks.length,
@@ -84,145 +64,87 @@ export default function VirtualizedColumn({
   })
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2 sm:space-y-4 min-w-[280px] sm:min-w-0 w-full sm:w-auto">
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Badge className={column.color}>
+        <div className="flex items-center space-x-2 min-w-0">
+          <Badge className={`${column.color} text-xs sm:text-sm truncate`}>
             {column.title}
           </Badge>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs sm:text-sm text-muted-foreground flex-shrink-0">
             {tasks.length}
           </span>
         </div>
         <Button 
-          variant="ghost" 
+          variant="outline" 
           size="sm"
           onClick={() => onCreateTask(column.key)}
+          className="flex-shrink-0"
         >
           +
         </Button>
       </div>
       
-      <div 
-        ref={parentRef}
-        className="h-[500px] overflow-auto"
-      >
-        <div
-          style={{
-            height: `${rowVirtualizer.getTotalSize()}px`,
-            width: '100%',
-            position: 'relative',
-          }}
+        <SortableContext
+          items={tasks.map(task => task._id as string)}
+          strategy={verticalListSortingStrategy}
         >
-          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-            const task = tasks[virtualRow.index]
-            return (
+        <div 
+          ref={setNodeRef}
+          className={`h-[300px] sm:h-[400px] md:h-[500px] overflow-auto overflow-x-hidden border-2 border-dashed rounded-lg transition-colors ${
+            isOver 
+              ? 'border-primary bg-primary/5' 
+              : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700'
+          }`}
+        >
+          {tasks.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-muted-foreground">
+              <div className="text-center">
+                <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Drop tasks here</p>
+              </div>
+            </div>
+          ) : (
+            <div
+              ref={parentRef}
+              className="h-full"
+            >
               <div
-                key={virtualRow.key}
                 style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
+                  height: `${rowVirtualizer.getTotalSize()}px`,
                   width: '100%',
-                  height: `${virtualRow.size}px`,
-                  transform: `translateY(${virtualRow.start}px)`,
+                  position: 'relative',
                 }}
               >
-                <Card 
-                  className="hover:shadow-md transition-shadow cursor-pointer m-1"
-                  onClick={() => onTaskClick?.(task)}
-                >
-                  <CardContent className="p-3">
-                    <div className="space-y-2">
-                      <div className="flex items-start justify-between">
-                        <h4 className="font-medium text-foreground text-sm line-clamp-2">
-                          {task.title}
-                        </h4>
-                        <div className="flex items-center space-x-1">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-6 w-6 p-0 cursor-grab active:cursor-grabbing"
-                          >
-                            <GripVertical className="h-3 w-3" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="h-6 w-6 p-0"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Badge className={getPriorityColor(task.priority)}>
-                          {task.priority}
-                        </Badge>
-                        <Badge className={getTypeColor(task.type)}>
-                          {task.type}
-                        </Badge>
-                      </div>
-                      
-                      <div className="text-xs text-muted-foreground">
-                        <div className="flex items-center space-x-1 mb-1">
-                          <Target className="h-3 w-3" />
-                          <span>Project</span>
-                        </div>
-                        {task.dueDate && (
-                          <div className="flex items-center space-x-1 mb-1">
-                            <Calendar className="h-3 w-3" />
-                            <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>
-                          </div>
-                        )}
-                        {task.storyPoints && (
-                          <div className="flex items-center space-x-1 mb-1">
-                            <BarChart3 className="h-3 w-3" />
-                            <span>{task.storyPoints} points</span>
-                          </div>
-                        )}
-                        {task.estimatedHours && (
-                          <div className="flex items-center space-x-1">
-                            <Clock className="h-3 w-3" />
-                            <span>{task.estimatedHours}h</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {task.assignedTo && (
-                        <div className="flex items-center space-x-2">
-                          <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
-                            {task.assignedTo.firstName[0]}{task.assignedTo.lastName[0]}
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {task.assignedTo.firstName} {task.assignedTo.lastName}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {task.labels.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {task.labels.slice(0, 2).map((label, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {label}
-                            </Badge>
-                          ))}
-                          {task.labels.length > 2 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{task.labels.length - 2}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const task = tasks[virtualRow.index]
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: `${virtualRow.size}px`,
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      <SortableTask 
+                        task={task}
+                        onClick={() => onTaskClick?.(task)}
+                        getPriorityColor={getPriorityColor}
+                        getTypeColor={getTypeColor}
+                        onEdit={onEditTask}
+                        onDelete={onDeleteTask}
+                      />
                     </div>
-                  </CardContent>
-                </Card>
+                  )
+                })}
               </div>
-            )
-          })}
+            </div>
+          )}
         </div>
-      </div>
+      </SortableContext>
     </div>
   )
 }

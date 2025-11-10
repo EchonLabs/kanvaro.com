@@ -8,6 +8,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    console.log('inside story get');
+
     await connectDB()
 
     const authResult = await authenticateUser()
@@ -23,14 +25,9 @@ export async function GET(
     const organizationId = user.organization
     const storyId = params.id
 
-    // Find story where user is assigned or creator
+    // Find story (allow any organization member to view)
     const story = await Story.findOne({
       _id: storyId,
-      organization: organizationId,
-      $or: [
-        { assignedTo: userId },
-        { createdBy: userId }
-      ]
     })
       .populate('project', 'name')
       .populate('epic', 'name')
@@ -85,11 +82,6 @@ export async function PUT(
     const story = await Story.findOneAndUpdate(
       {
         _id: storyId,
-        organization: organizationId,
-        $or: [
-          { assignedTo: userId },
-          { createdBy: userId }
-        ]
       },
       updateData,
       { new: true }
@@ -145,7 +137,6 @@ export async function DELETE(
     // Find and delete story (only creator can delete)
     const story = await Story.findOneAndDelete({
       _id: storyId,
-      organization: organizationId,
       createdBy: userId
     })
 

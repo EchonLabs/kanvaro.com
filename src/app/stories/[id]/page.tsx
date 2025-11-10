@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { 
   ArrowLeft,
   Calendar,
@@ -34,10 +35,10 @@ interface Story {
   description: string
   status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
-  project: {
+  project?: {
     _id: string
     name: string
-  }
+  } | null
   epic?: {
     _id: string
     name: string
@@ -74,6 +75,9 @@ export default function StoryDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const checkAuth = useCallback(async () => {
     try {
@@ -129,6 +133,28 @@ export default function StoryDetailPage() {
       setLoading(false)
     }
   }
+
+  const handleDeleteStory = async () => {
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const response = await fetch(`/api/stories/${storyId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        router.push('/stories');
+      } else {
+        const data = await response.json();
+        setDeleteError(data.error || 'Failed to delete story');
+        setShowDeleteConfirmModal(false);
+      }
+    } catch (e) {
+      setDeleteError('Failed to delete story');
+      setShowDeleteConfirmModal(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -208,27 +234,30 @@ export default function StoryDetailPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={() => router.push('/stories')}>
+      <div className="space-y-6 overflow-x-hidden">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+            <Button variant="ghost" onClick={() => router.push('/stories')} className="w-full sm:w-auto">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground flex items-center space-x-2">
-                <BookOpen className="h-8 w-8 text-blue-600" />
+            <div className="min-w-0">
+              <h1
+                className="text-2xl sm:text-3xl font-bold text-foreground truncate max-w-full flex items-center space-x-2 min-w-0"
+                title={story.title}
+              >
+                <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 flex-shrink-0" />
                 <span>{story.title}</span>
               </h1>
-              <p className="text-muted-foreground">User Story Details</p>
+              <p className="text-sm sm:text-base text-muted-foreground">User Story Details</p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={() => router.push(`/stories/${storyId}/edit`)} className="w-full sm:w-auto">
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
-            <Button variant="destructive">
+            <Button variant="destructive" onClick={() => setShowDeleteConfirmModal(true)} className="w-full sm:w-auto">
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
             </Button>
@@ -237,19 +266,19 @@ export default function StoryDetailPage() {
 
         <div className="grid gap-6 md:grid-cols-3">
           <div className="md:col-span-2 space-y-6">
-            <Card>
+            <Card className="overflow-x-hidden">
               <CardHeader>
                 <CardTitle>Description</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">
+                <p className="text-muted-foreground break-words">
                   {story.description || 'No description provided'}
                 </p>
               </CardContent>
             </Card>
 
             {story.acceptanceCriteria && story.acceptanceCriteria.length > 0 && (
-              <Card>
+              <Card className="overflow-x-hidden">
                 <CardHeader>
                   <CardTitle>Acceptance Criteria</CardTitle>
                   <CardDescription>Criteria that must be met for this story to be considered complete</CardDescription>
@@ -259,7 +288,7 @@ export default function StoryDetailPage() {
                     {story.acceptanceCriteria.map((criteria, index) => (
                       <li key={index} className="flex items-start space-x-2">
                         <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                        <span className="text-sm">{criteria}</span>
+                        <span className="text-sm break-words">{criteria}</span>
                       </li>
                     ))}
                   </ul>
@@ -268,28 +297,28 @@ export default function StoryDetailPage() {
             )}
 
             {story.epic && (
-              <Card>
+              <Card className="overflow-x-hidden">
                 <CardHeader>
                   <CardTitle>Epic</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center space-x-2">
-                    <Layers className="h-4 w-4 text-purple-600" />
-                    <span className="text-sm">{story.epic.name}</span>
+                  <div className="flex items-center space-x-2 min-w-0">
+                    <Layers className="h-4 w-4 text-purple-600 flex-shrink-0" />
+                    <span className="text-sm truncate" title={story.epic.name}>{story.epic.name}</span>
                   </div>
                 </CardContent>
               </Card>
             )}
 
             {story.sprint && (
-              <Card>
+              <Card className="overflow-x-hidden">
                 <CardHeader>
                   <CardTitle>Sprint</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center space-x-2">
-                    <Target className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm">{story.sprint.name}</span>
+                  <div className="flex items-center space-x-2 min-w-0">
+                    <Target className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                    <span className="text-sm truncate" title={story.sprint.name}>{story.sprint.name}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -297,67 +326,69 @@ export default function StoryDetailPage() {
           </div>
 
           <div className="space-y-6">
-            <Card>
+            <Card className="overflow-x-hidden">
               <CardHeader>
                 <CardTitle>Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between text-xs sm:text-sm">
                   <span className="text-muted-foreground">Status</span>
-                  <Badge className={getStatusColor(story.status)}>
+                  <Badge className={`${getStatusColor(story.status)} text-xs`}>
                     {getStatusIcon(story.status)}
-                    <span className="ml-1">{story.status.replace('_', ' ')}</span>
+                    <span className="ml-1 hidden sm:inline">{story.status.replace('_', ' ')}</span>
                   </Badge>
                 </div>
                 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between text-xs sm:text-sm">
                   <span className="text-muted-foreground">Priority</span>
-                  <Badge className={getPriorityColor(story.priority)}>
+                  <Badge className={`${getPriorityColor(story.priority)} text-xs`}>
                     {story.priority}
                   </Badge>
                 </div>
                 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2 text-xs sm:text-sm">
                   <span className="text-muted-foreground">Project</span>
-                  <span className="font-medium">{story.project.name}</span>
+                  <span className="font-medium truncate max-w-[200px] sm:max-w-none text-right sm:text-left" title={story.project?.name && story.project?.name.length > 10 ? story.project?.name : undefined}>
+                    {story.project?.name ? (story.project?.name.length > 10 ? `${story.project?.name.slice(0,10)}…` : story.project?.name) : <span className="italic text-muted-foreground">Project deleted or unavailable</span>}
+                  </span>
                 </div>
                 
                 {story.assignedTo && (
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2 text-xs sm:text-sm">
                     <span className="text-muted-foreground">Assigned To</span>
-                    <span className="font-medium">
+                    <span className="font-medium truncate max-w-[200px] sm:max-w-none text-right sm:text-left">
                       {story.assignedTo.firstName} {story.assignedTo.lastName}
                     </span>
                   </div>
                 )}
                 
                 {story.dueDate && (
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between text-xs sm:text-sm">
                     <span className="text-muted-foreground">Due Date</span>
-                    <span className="font-medium">
+                    <span className="font-medium whitespace-nowrap">
                       {new Date(story.dueDate).toLocaleDateString()}
                     </span>
                   </div>
                 )}
                 
                 {story.storyPoints && (
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between text-xs sm:text-sm">
                     <span className="text-muted-foreground">Story Points</span>
-                    <span className="font-medium">{story.storyPoints}</span>
+                    <span className="font-medium whitespace-nowrap">{story.storyPoints}</span>
                   </div>
                 )}
                 
                 {story.estimatedHours && (
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between text-xs sm:text-sm">
                     <span className="text-muted-foreground">Estimated Hours</span>
-                    <span className="font-medium">{story.estimatedHours}h</span>
+                    <span className="font-medium whitespace-nowrap">{story.estimatedHours}h</span>
                   </div>
                 )}
               </CardContent>
             </Card>
 
             {story.tags.length > 0 && (
-              <Card>
+              <Card className="overflow-x-hidden">
                 <CardHeader>
                   <CardTitle>Tags</CardTitle>
                 </CardHeader>
@@ -374,7 +405,7 @@ export default function StoryDetailPage() {
               </Card>
             )}
 
-            <Card>
+            <Card className="overflow-x-hidden">
               <CardHeader>
                 <CardTitle>Created By</CardTitle>
               </CardHeader>
@@ -385,7 +416,7 @@ export default function StoryDetailPage() {
                     {story.createdBy.firstName} {story.createdBy.lastName}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1 whitespace-nowrap">
                   {new Date(story.createdAt).toLocaleDateString()}
                 </p>
               </CardContent>
@@ -393,6 +424,21 @@ export default function StoryDetailPage() {
           </div>
         </div>
       </div>
+      {deleteError && (
+        <Alert variant="destructive" className="my-4">
+          <AlertDescription>{deleteError}</AlertDescription>
+        </Alert>
+      )}
+      <ConfirmationModal
+        isOpen={showDeleteConfirmModal}
+        onClose={() => setShowDeleteConfirmModal(false)}
+        onConfirm={handleDeleteStory}
+        title="Delete Story"
+        description={`Are you sure you want to delete "${story?.title}"? This action cannot be undone.`}
+        confirmText={deleting ? 'Deleting...' : 'Delete'}
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </MainLayout>
   )
 }

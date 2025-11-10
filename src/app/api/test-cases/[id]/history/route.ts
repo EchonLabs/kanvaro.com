@@ -9,6 +9,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    
     await connectDB()
     const authResult = await authenticateUser()
     

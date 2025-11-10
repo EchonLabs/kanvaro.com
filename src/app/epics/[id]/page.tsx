@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Progress } from '@/components/ui/Progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { 
   ArrowLeft,
   Calendar,
@@ -30,7 +31,7 @@ import {
 
 interface Epic {
   _id: string
-  name: string
+  title: string
   description: string
   status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
@@ -51,7 +52,7 @@ interface Epic {
   storyPoints?: number
   dueDate?: string
   estimatedHours?: number
-  labels: string[]
+  tags: string[]
   progress: {
     completionPercentage: number
     storiesCompleted: number
@@ -73,6 +74,7 @@ export default function EpicDetailPage() {
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [authError, setAuthError] = useState('')
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
 
   const checkAuth = useCallback(async () => {
     try {
@@ -129,19 +131,25 @@ export default function EpicDetailPage() {
     }
   }
 
-  const handleDelete = async () => {
+  const handleDeleteClick = () => {
+    setShowDeleteConfirmModal(true)
+  }
+
+  const handleDeleteConfirm = async () => {
     try {
-      if (!confirm('Are you sure you want to delete this epic? This action cannot be undone.')) return
       setDeleting(true)
       const res = await fetch(`/api/epics/${epicId}`, { method: 'DELETE' })
       const data = await res.json()
       if (res.ok && data.success) {
+        setShowDeleteConfirmModal(false)
         router.push('/epics')
       } else {
         setError(data?.error || 'Failed to delete epic')
+        setShowDeleteConfirmModal(false)
       }
     } catch (e) {
       setError('Failed to delete epic')
+      setShowDeleteConfirmModal(false)
     } finally {
       setDeleting(false)
     }
@@ -225,71 +233,74 @@ export default function EpicDetailPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={() => router.push('/epics')}>
+      <div className="space-y-6 overflow-x-hidden">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+            <Button variant="ghost" onClick={() => router.push('/epics')} className="w-full sm:w-auto">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground flex items-center space-x-2">
-                <Layers className="h-8 w-8 text-purple-600" />
-                <span>{epic?.name}</span>
+            <div className="flex-1 min-w-0">
+              <h1
+                className="text-2xl sm:text-3xl font-bold text-foreground truncate max-w-full flex items-center space-x-2 min-w-0"
+                title={epic?.title}
+              >
+                <Layers className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-purple-600 flex-shrink-0" />
+                <span>{epic?.title}</span>
               </h1>
-              <p className="text-muted-foreground">Epic Details</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Epic Details</p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-           <Button variant="outline" onClick={() => router.push(`/epics/${epicId}/edit`)}>
-  <Edit className="h-4 w-4 mr-2" />
-  Edit
-</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+           <Button variant="outline" onClick={() => router.push(`/epics/${epicId}/edit`)} className="w-full sm:w-auto">
+             <Edit className="h-4 w-4 mr-2" />
+             Edit
+           </Button>
+            <Button variant="destructive" onClick={handleDeleteClick} disabled={deleting} className="w-full sm:w-auto">
               <Trash2 className="h-4 w-4 mr-2" />
               {deleting ? 'Deleting...' : 'Delete'}
             </Button>
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="md:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Description</CardTitle>
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-3">
+          <div className="md:col-span-2 space-y-4 sm:space-y-6">
+            <Card className="overflow-x-hidden">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg">Description</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
+              <CardContent className="p-4 sm:p-6 pt-0">
+                <p className="text-sm sm:text-base text-muted-foreground break-words">
                   {epic?.description || 'No description provided'}
                 </p>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Progress</CardTitle>
-                <CardDescription>Epic completion status</CardDescription>
+            <Card className="overflow-x-hidden">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg">Progress</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Epic completion status</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="p-4 sm:p-6 pt-0 space-y-4">
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center justify-between text-xs sm:text-sm">
                     <span className="text-muted-foreground">Overall Progress</span>
                     <span className="font-medium">{epic?.progress?.completionPercentage || 0}%</span>
                   </div>
-                  <Progress value={epic?.progress?.completionPercentage || 0} className="h-2" />
+                  <Progress value={epic?.progress?.completionPercentage || 0} className="h-1.5 sm:h-2" />
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center justify-between text-xs sm:text-sm">
                       <span className="text-muted-foreground">Stories</span>
                       <span className="font-medium">
                         {epic?.progress?.storiesCompleted || 0} / {epic?.progress?.totalStories || 0}
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
                       <div 
-                        className="bg-blue-600 h-2 rounded-full"
+                        className="bg-blue-600 h-1.5 sm:h-2 rounded-full"
                         style={{ 
                           width: `${epic?.progress?.totalStories ? 
                             ((epic?.progress?.storiesCompleted / epic?.progress?.totalStories) * 100) : 0}%` 
@@ -299,15 +310,15 @@ export default function EpicDetailPage() {
                   </div>
                   
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center justify-between text-xs sm:text-sm">
                       <span className="text-muted-foreground">Story Points</span>
                       <span className="font-medium">
                         {epic?.progress?.storyPointsCompleted || 0} / {epic?.progress?.totalStoryPoints || 0}
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
                       <div 
-                        className="bg-green-600 h-2 rounded-full"
+                        className="bg-green-600 h-1.5 sm:h-2 rounded-full"
                         style={{ 
                           width: `${epic?.progress?.totalStoryPoints ? 
                             ((epic?.progress?.storyPointsCompleted / epic?.progress?.totalStoryPoints) * 100) : 0}%` 
@@ -320,75 +331,80 @@ export default function EpicDetailPage() {
             </Card>
           </div>
 
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Details</CardTitle>
+          <div className="space-y-4 sm:space-y-6">
+            <Card className="overflow-x-hidden">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg">Details</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Status</span>
-                  <Badge className={getStatusColor(epic?.status)}>
+              <CardContent className="p-4 sm:p-6 pt-0 space-y-3 sm:space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Status</span>
+                  <Badge className={`${getStatusColor(epic?.status)} text-xs`}>
                     {getStatusIcon(epic?.status)}
                     <span className="ml-1">{epic?.status.replace('_', ' ')}</span>
                   </Badge>
                 </div>
                 
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Priority</span>
-                  <Badge className={getPriorityColor(epic?.priority)}>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Priority</span>
+                  <Badge className={`${getPriorityColor(epic?.priority)} text-xs`}>
                     {epic?.priority}
                   </Badge>
                 </div>
                 
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Project</span>
-                  <span className="font-medium">{epic?.project?.name}</span>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Project</span>
+                  <span 
+                    className="text-xs sm:text-sm font-medium truncate max-w-[200px] sm:max-w-none text-right sm:text-left"
+                    title={epic?.project?.name && epic?.project?.name.length > 10 ? epic?.project?.name : undefined}
+                  >
+                    {epic?.project?.name && epic?.project?.name.length > 10 ? `${epic?.project?.name.slice(0, 10)}…` : epic?.project?.name}
+                  </span>
                 </div>
                 
                 {epic?.assignedTo && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Assigned To</span>
-                    <span className="font-medium">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <span className="text-xs sm:text-sm text-muted-foreground">Assigned To</span>
+                    <span className="text-xs sm:text-sm font-medium truncate max-w-[200px] sm:max-w-none text-right sm:text-left">
                       {epic?.assignedTo?.firstName} {epic?.assignedTo?.lastName}
                     </span>
                   </div>
                 )}
                 
                 {epic?.dueDate && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Due Date</span>
-                    <span className="font-medium">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <span className="text-xs sm:text-sm text-muted-foreground">Due Date</span>
+                    <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
                       {new Date(epic?.dueDate).toLocaleDateString()}
                     </span>
                   </div>
                 )}
                 
                 {epic?.storyPoints && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Story Points</span>
-                    <span className="font-medium">{epic?.storyPoints}</span>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <span className="text-xs sm:text-sm text-muted-foreground">Story Points</span>
+                    <span className="text-xs sm:text-sm font-medium">{epic?.storyPoints}</span>
                   </div>
                 )}
                 
                 {epic?.estimatedHours && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Estimated Hours</span>
-                    <span className="font-medium">{epic?.estimatedHours}h</span>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <span className="text-xs sm:text-sm text-muted-foreground">Estimated Hours</span>
+                    <span className="text-xs sm:text-sm font-medium whitespace-nowrap">{epic?.estimatedHours}h</span>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {epic?.labels?.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Labels</CardTitle>
+            {epic?.tags?.length > 0 && (
+              <Card className="overflow-x-hidden">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-base sm:text-lg">Tags</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 sm:p-6 pt-0">
                   <div className="flex flex-wrap gap-2">
-                    {epic?.labels?.map((label, index) => (
-                      <Badge key={index} variant="outline">
+                    {epic?.tags?.map((label, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">
                         <Star className="h-3 w-3 mr-1" />
                         {label}
                       </Badge>
@@ -398,14 +414,14 @@ export default function EpicDetailPage() {
               </Card>
             )}
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Created By</CardTitle>
+            <Card className="overflow-x-hidden">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg">Created By</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 sm:p-6 pt-0">
                 <div className="flex items-center space-x-2">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">
+                  <User className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                  <span className="text-xs sm:text-sm truncate">
                     {epic?.createdBy?.firstName} {epic?.createdBy?.lastName}
                   </span>
                 </div>
@@ -417,6 +433,16 @@ export default function EpicDetailPage() {
           </div>
         </div>
       </div>
+      <ConfirmationModal
+        isOpen={showDeleteConfirmModal}
+        onClose={() => setShowDeleteConfirmModal(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Epic"
+        description={`Are you sure you want to delete "${epic?.title}"? This action cannot be undone.`}
+        confirmText={deleting ? 'Deleting...' : 'Delete'}
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </MainLayout>
   )
 }

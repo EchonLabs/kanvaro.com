@@ -53,6 +53,7 @@ interface TestCase {
     lastName: string
   }
   isActive: boolean
+  preconditions:string
   createdAt: string
   updatedAt: string
 }
@@ -131,6 +132,7 @@ export default function TestCaseList({
   }
 
   const handleEditTestCase = (testCase: TestCase) => {
+    
     onTestCaseEdit?.(testCase)
   }
 
@@ -217,74 +219,74 @@ export default function TestCaseList({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Test Cases</CardTitle>
-          <Button onClick={handleCreateTestCase}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <CardTitle className="text-xl sm:text-2xl">Test Cases</CardTitle>
+          <Button onClick={handleCreateTestCase} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Add Test Case
           </Button>
         </div>
         
-        <div className="flex flex-wrap gap-4 mt-4">
-          <div className="flex-1 min-w-64">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search test cases..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                className="pl-10"
-              />
-            </div>
+        <div className="flex flex-col gap-2 sm:gap-4 mt-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search test cases..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              className="pl-10 w-full"
+            />
           </div>
           
-          <Select value={priorityFilter || ALL_PRIORITY} onValueChange={(v) => setPriorityFilter(v === ALL_PRIORITY ? '' : v)}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="Priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_PRIORITY}>All Priority</SelectItem>
-              <SelectItem value="critical">Critical</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+            <Select value={priorityFilter || ALL_PRIORITY} onValueChange={(v) => setPriorityFilter(v === ALL_PRIORITY ? '' : v)}>
+              <SelectTrigger className="w-full sm:w-32">
+                <SelectValue placeholder="Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_PRIORITY}>All Priority</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Select value={categoryFilter || ALL_CATEGORIES} onValueChange={(v) => setCategoryFilter(v === ALL_CATEGORIES ? '' : v)}>
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_CATEGORIES}>All Categories</SelectItem>
-              <SelectItem value="functional">Functional</SelectItem>
-              <SelectItem value="integration">Integration</SelectItem>
-              <SelectItem value="regression">Regression</SelectItem>
-              <SelectItem value="performance">Performance</SelectItem>
-              <SelectItem value="security">Security</SelectItem>
-              <SelectItem value="usability">Usability</SelectItem>
-              <SelectItem value="compatibility">Compatibility</SelectItem>
-            </SelectContent>
-          </Select>
+            <Select value={categoryFilter || ALL_CATEGORIES} onValueChange={(v) => setCategoryFilter(v === ALL_CATEGORIES ? '' : v)}>
+              <SelectTrigger className="w-full sm:w-36">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_CATEGORIES}>All Categories</SelectItem>
+                <SelectItem value="functional">Functional</SelectItem>
+                <SelectItem value="integration">Integration</SelectItem>
+                <SelectItem value="regression">Regression</SelectItem>
+                <SelectItem value="performance">Performance</SelectItem>
+                <SelectItem value="security">Security</SelectItem>
+                <SelectItem value="usability">Usability</SelectItem>
+                <SelectItem value="compatibility">Compatibility</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Select value={automationFilter || ALL_STATUS} onValueChange={(v) => setAutomationFilter(v === ALL_STATUS ? '' : v)}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Automation" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_STATUS}>All Status</SelectItem>
-              <SelectItem value="not_automated">Not Automated</SelectItem>
-              <SelectItem value="automated">Automated</SelectItem>
-              <SelectItem value="semi_automated">Semi Automated</SelectItem>
-              <SelectItem value="deprecated">Deprecated</SelectItem>
-            </SelectContent>
-          </Select>
+            <Select value={automationFilter || ALL_STATUS} onValueChange={(v) => setAutomationFilter(v === ALL_STATUS ? '' : v)}>
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue placeholder="Automation" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_STATUS}>All Status</SelectItem>
+                <SelectItem value="not_automated">Not Automated</SelectItem>
+                <SelectItem value="automated">Automated</SelectItem>
+                <SelectItem value="semi_automated">Semi Automated</SelectItem>
+                <SelectItem value="deprecated">Deprecated</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Button variant="outline" onClick={handleSearch}>
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
-          </Button>
+            <Button variant="outline" onClick={handleSearch} className="w-full sm:w-auto">
+              <Filter className="h-4 w-4 mr-2" />
+              Filter
+            </Button>
+          </div>
         </div>
       </CardHeader>
 

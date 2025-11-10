@@ -115,33 +115,29 @@ export function EditMemberModal({ member, onClose, onUpdate }: EditMemberModalPr
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        width: '100vw',
-        height: '100vh'
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose()
+        }
       }}
     >
-      <Card className="w-full max-w-md mx-4">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Edit Team Member</CardTitle>
-              <CardDescription>
+      <Card className="w-full max-w-md max-h-[90vh] flex flex-col m-4 sm:m-0">
+        <CardHeader className="flex-shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-xl sm:text-2xl truncate">Edit Team Member</CardTitle>
+              <CardDescription className="text-sm sm:text-base mt-1">
                 Update member information and permissions
               </CardDescription>
             </div>
-            <Button variant="ghost" size="sm" onClick={onClose}>
+            <Button variant="ghost" size="sm" onClick={onClose} className="flex-shrink-0">
               <X className="h-4 w-4" />
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <CardContent className="flex-1 overflow-y-auto px-4 sm:px-6 py-3 sm:py-4">
+          <form onSubmit={handleSubmit} className="space-y-4" id="edit-member-form">
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
@@ -155,12 +151,12 @@ export function EditMemberModal({ member, onClose, onUpdate }: EditMemberModalPr
                 type="email"
                 value={member.email}
                 disabled
-                className="bg-gray-50"
+                className="bg-gray-50 w-full"
               />
               <p className="text-xs text-gray-500">Email cannot be changed</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First Name</Label>
                 <Input
@@ -169,6 +165,7 @@ export function EditMemberModal({ member, onClose, onUpdate }: EditMemberModalPr
                   value={formData.firstName}
                   onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
                   required
+                  className="w-full"
                 />
               </div>
               <div className="space-y-2">
@@ -179,6 +176,7 @@ export function EditMemberModal({ member, onClose, onUpdate }: EditMemberModalPr
                   value={formData.lastName}
                   onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
                   required
+                  className="w-full"
                 />
               </div>
             </div>
@@ -186,7 +184,7 @@ export function EditMemberModal({ member, onClose, onUpdate }: EditMemberModalPr
             <div className="space-y-2">
               <Label htmlFor="role">System Role</Label>
               <Select value={formData.role} onValueChange={(value) => setFormData(prev => ({ ...prev, role: value }))}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -205,7 +203,7 @@ export function EditMemberModal({ member, onClose, onUpdate }: EditMemberModalPr
                 value={formData.customRoleId || '__NO_CUSTOM_ROLE__'} 
                 onValueChange={(value) => setFormData(prev => ({ ...prev, customRoleId: value === '__NO_CUSTOM_ROLE__' ? '' : value }))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a custom role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -229,10 +227,10 @@ export function EditMemberModal({ member, onClose, onUpdate }: EditMemberModalPr
               </p>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="space-y-0.5 flex-1 min-w-0">
                 <Label htmlFor="isActive">Active Status</Label>
-                <p className="text-sm text-gray-500">
+                <p className="text-xs sm:text-sm text-gray-500">
                   {formData.isActive ? 'Member can access the system' : 'Member cannot access the system'}
                 </p>
               </div>
@@ -240,26 +238,26 @@ export function EditMemberModal({ member, onClose, onUpdate }: EditMemberModalPr
                 id="isActive"
                 checked={formData.isActive}
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: checked }))}
+                className="flex-shrink-0"
               />
-            </div>
-
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  'Update Member'
-                )}
-              </Button>
             </div>
           </form>
         </CardContent>
+        <div className="flex-shrink-0 px-4 sm:px-6 pb-4 sm:pb-6 pt-3 sm:pt-4 border-t flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-0 sm:space-x-2">
+          <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-auto" form="edit-member-form">
+            Cancel
+          </Button>
+          <Button type="submit" disabled={loading} className="w-full sm:w-auto" form="edit-member-form">
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              'Update Member'
+            )}
+          </Button>
+        </div>
       </Card>
     </div>
   )

@@ -91,27 +91,27 @@ export default function TimeReportsPage() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" onClick={() => router.push('/time-tracking')}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <Button variant="ghost" onClick={() => router.push('/time-tracking')} className="flex-shrink-0 w-full sm:w-auto">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center space-x-2">
-              <BarChart3 className="h-8 w-8 text-purple-600" />
-              <span>Time Reports</span>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground flex items-center space-x-2">
+              <BarChart3 className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-purple-600 flex-shrink-0" />
+              <span className="truncate">Time Reports</span>
             </h1>
-            <p className="text-muted-foreground">Analyze your time tracking data and generate insights</p>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">Analyze your time tracking data and generate insights</p>
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="outline">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 sm:flex-initial">
+            <Button variant="outline" className="w-full sm:w-auto">
               <Filter className="h-4 w-4 mr-2" />
               Filter Reports
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" className="w-full sm:w-auto">
               <Download className="h-4 w-4 mr-2" />
               Export Data
             </Button>
