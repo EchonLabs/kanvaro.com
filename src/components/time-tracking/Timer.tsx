@@ -407,7 +407,11 @@ export function Timer({ userId, organizationId, projectId, taskId, description =
         </Alert>
       )}
 
-      <Button onClick={handleStartTimer} disabled={isLoading || !description.trim()} className="w-full">
+      <Button
+        onClick={handleStartTimer}
+        disabled={isLoading || !description.trim() || !projectId || !taskId}
+        className="w-full"
+      >
         <Play className="h-4 w-4 mr-2" />
         Start Timer
       </Button>
