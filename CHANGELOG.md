@@ -1,3 +1,10 @@
+## [1.1.8](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.7...v1.1.8) (2025-11-11)
+
+
+### Bug Fixes
+
+* debug issues in dev ([42de66a](https://github.com/EchonLabs/kanvaro.com/commit/42de66a1b10ac7e3f913912aaf5c9e511fa44944))
+
 ## [1.1.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.6...v1.1.7) (2025-11-11)
 
 
