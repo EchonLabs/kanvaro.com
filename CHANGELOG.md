@@ -1,3 +1,10 @@
+## [1.1.9](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.8...v1.1.9) (2025-11-11)
+
+
+### Reverts
+
+* Revert "fix: debug issues in dev" ([a157140](https://github.com/EchonLabs/kanvaro.com/commit/a15714057a88e271b1a9fbf8af8ddc17c597e9ff))
+
 ## [1.1.8](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.7...v1.1.8) (2025-11-11)
 
 
