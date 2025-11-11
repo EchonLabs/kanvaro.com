@@ -90,7 +90,7 @@ services:
 
 2. **Application Configuration:**
    ```
-   /app/config.json
+   /app/config/config.json
    ```
 
 ## Deployment Steps

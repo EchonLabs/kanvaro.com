@@ -19,19 +19,48 @@ interface AppConfig {
   organizationId?: string
 }
 
-const CONFIG_FILE = path.join(process.cwd(), 'config.json')
+const CONFIG_DIR = path.join(process.cwd(), 'config')
+const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json')
+const LEGACY_CONFIG_FILE = path.join(process.cwd(), 'config.json')
+
+function ensureConfigDirectory() {
+  if (!fs.existsSync(CONFIG_DIR)) {
+    fs.mkdirSync(CONFIG_DIR, { recursive: true })
+  }
+}
+
+function readConfigFromFile(filePath: string): AppConfig | null {
+  try {
+    if (fs.existsSync(filePath)) {
+      const configData = fs.readFileSync(filePath, 'utf8')
+      return JSON.parse(configData)
+    }
+  } catch (error) {
+    console.error(`Failed to read config file at ${filePath}:`, error)
+  }
+  return null
+}
 
 /**
  * Load application configuration from file
  */
 export function loadConfig(): AppConfig {
-  try {
-    if (fs.existsSync(CONFIG_FILE)) {
-      const configData = fs.readFileSync(CONFIG_FILE, 'utf8')
-      return JSON.parse(configData)
+  const currentConfig = readConfigFromFile(CONFIG_FILE)
+  if (currentConfig) {
+    return currentConfig
+  }
+
+  const legacyConfig = readConfigFromFile(LEGACY_CONFIG_FILE)
+  if (legacyConfig) {
+    console.warn('Legacy config.json detected at project root. Migrating to config/config.json.')
+    try {
+      ensureConfigDirectory()
+      fs.writeFileSync(CONFIG_FILE, JSON.stringify(legacyConfig, null, 2))
+      fs.unlinkSync(LEGACY_CONFIG_FILE)
+    } catch (error) {
+      console.error('Failed to migrate legacy config.json:', error)
     }
-  } catch (error) {
-    console.error('Failed to load config file:', error)
+    return legacyConfig
   }
   
   return {
@@ -44,7 +73,15 @@ export function loadConfig(): AppConfig {
  */
 export function saveConfig(config: AppConfig): void {
   try {
+    ensureConfigDirectory()
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2))
+    if (fs.existsSync(LEGACY_CONFIG_FILE)) {
+      try {
+        fs.unlinkSync(LEGACY_CONFIG_FILE)
+      } catch (removeError) {
+        console.warn('Failed to remove legacy config.json:', removeError)
+      }
+    }
     console.log('Configuration saved to file')
   } catch (error) {
     console.error('Failed to save config file:', error)

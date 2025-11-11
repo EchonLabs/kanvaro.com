@@ -5,7 +5,8 @@ import path from 'path'
 
 export async function GET() {
   try {
-    const configFile = path.join(process.cwd(), 'config.json')
+    const configDir = path.join(process.cwd(), 'config')
+    const configFile = path.join(configDir, 'config.json')
     const configFileExists = fs.existsSync(configFile)
     
     const config = loadConfig()
@@ -14,6 +15,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       configFileExists,
+      configDirectoryExists: fs.existsSync(configDir),
       configFile: configFile,
       setupCompleted,
       hasDatabaseConfig: !!config.database,
