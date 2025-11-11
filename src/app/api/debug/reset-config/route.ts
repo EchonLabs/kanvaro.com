@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server'
-import { clearConfig } from '@/lib/config'
+import fs from 'fs'
+import path from 'path'
 
 export async function POST() {
   try {
-    await clearConfig()
+    const configFile = path.join(process.cwd(), 'config.json')
+    
+    // Delete the config file if it exists
+    if (fs.existsSync(configFile)) {
+      fs.unlinkSync(configFile)
+      console.log('Config file deleted')
+    }
     
     return NextResponse.json({
       success: true,
