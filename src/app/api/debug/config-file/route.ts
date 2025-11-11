@@ -8,8 +8,8 @@ export async function GET() {
     const configFile = path.join(process.cwd(), 'config.json')
     const configFileExists = fs.existsSync(configFile)
     
-    const config = loadConfig()
-    const setupCompleted = isSetupCompleted()
+    const config = await loadConfig()
+    const setupCompleted = await isSetupCompleted()
     
     return NextResponse.json({
       success: true,

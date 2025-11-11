@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     
     // Save database configuration first so connectDB can use it
     console.log('Saving database configuration to config file...')
-    saveDatabaseConfig({
+    await saveDatabaseConfig({
       host: config.host,
       port: config.port,
       database: config.database,
