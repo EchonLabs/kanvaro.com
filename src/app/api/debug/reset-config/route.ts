@@ -4,12 +4,21 @@ import path from 'path'
 
 export async function POST() {
   try {
-    const configFile = path.join(process.cwd(), 'config.json')
+    const configDir = path.join(process.cwd(), 'config')
+    const configFile = path.join(configDir, 'config.json')
     
     // Delete the config file if it exists
     if (fs.existsSync(configFile)) {
       fs.unlinkSync(configFile)
       console.log('Config file deleted')
+    }
+
+    // Remove the directory if it's now empty
+    if (fs.existsSync(configDir)) {
+      const remainingFiles = fs.readdirSync(configDir)
+      if (remainingFiles.length === 0) {
+        fs.rmdirSync(configDir)
+      }
     }
     
     return NextResponse.json({
