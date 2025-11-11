@@ -13,7 +13,12 @@ import {
   Trash2,
   CheckCircle,
   Circle,
-  AlertCircle
+  AlertCircle,
+  Play,
+  AlertTriangle,
+  Zap,
+  XCircle,
+  Layers
 } from 'lucide-react'
 
 interface ViewTaskModalProps {
@@ -26,7 +31,6 @@ interface ViewTaskModalProps {
 
 export default function ViewTaskModal({ isOpen, onClose, task, onEdit, onDelete }: ViewTaskModalProps) {
   if (!isOpen || !task) return null
-console.log('task', task);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -40,18 +44,57 @@ console.log('task', task);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'done': return 'default'
-      case 'in_progress': return 'default'
-      case 'review': return 'secondary'
-      case 'testing': return 'secondary'
-      case 'todo': return 'outline'
-      default: return 'outline'
+      case 'backlog':
+      case 'todo':
+        return 'outline'
+      case 'in_progress':
+      case 'review':
+      case 'testing':
+        return 'secondary'
+      case 'done':
+        return 'default'
+      case 'cancelled':
+        return 'destructive'
+      default:
+        return 'outline'
     }
   }
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'Not set'
     return new Date(dateString).toLocaleDateString()
+  }
+
+  const formatDateTime = (dateString?: string) => {
+    if (!dateString) return 'Not set'
+    const date = new Date(dateString)
+    return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+  }
+
+  const getSubtaskBadgeClass = (status: string) => {
+    switch (status) {
+      case 'backlog': return 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200'
+      case 'todo': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+      case 'review': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+      case 'testing': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+      case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+    }
+  }
+
+  const getSubtaskStatusIcon = (status: string) => {
+    switch (status) {
+      case 'backlog': return <Layers className="h-4 w-4" />
+      case 'todo': return <Target className="h-4 w-4" />
+      case 'in_progress': return <Play className="h-4 w-4" />
+      case 'review': return <AlertTriangle className="h-4 w-4" />
+      case 'testing': return <Zap className="h-4 w-4" />
+      case 'done': return <CheckCircle className="h-4 w-4" />
+      case 'cancelled': return <XCircle className="h-4 w-4" />
+      default: return <Target className="h-4 w-4" />
+    }
   }
 
   return (
@@ -184,29 +227,43 @@ console.log('task', task);
               <label className="text-sm font-medium text-muted-foreground">Subtasks</label>
               <div className="mt-1 space-y-2">
                 {task.subtasks.map((subtask: any, index: number) => (
-                  <div key={index} className="p-3 border rounded-lg">
-                    <div className="flex items-start space-x-3">
-                      <div className="mt-1">
-                        {subtask.isCompleted ? (
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <Circle className="h-4 w-4 text-muted-foreground" />
+                  <div key={subtask._id || index} className="p-3 border rounded-lg">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-1">
+                            {subtask.isCompleted ? (
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`font-medium ${subtask.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
+                                {subtask.title}
+                              </span>
+                              <Badge className={`${getSubtaskBadgeClass(subtask.status)} text-xs flex items-center gap-1`}>
+                                {getSubtaskStatusIcon(subtask.status)}
+                                <span>{subtask.status?.replace('_', ' ')}</span>
+                              </Badge>
+                            </div>
+                            {subtask.description && (
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {subtask.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {subtask.isCompleted && (
+                          <Badge variant="outline" className="text-xs text-green-700 border-green-200 bg-green-50">
+                            Completed
+                          </Badge>
                         )}
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2">
-                          <span className={`font-medium ${subtask.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
-                            {subtask.title}
-                          </span>
-                          <Badge variant={getStatusColor(subtask.status)} className="text-xs">
-                            {subtask.status?.replace('_', ' ').toUpperCase()}
-                          </Badge>
-                        </div>
-                        {subtask.description && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {subtask.description}
-                          </p>
-                        )}
+                      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                        <span>Created {formatDateTime(subtask.createdAt)}</span>
+                        <span>Updated {formatDateTime(subtask.updatedAt)}</span>
                       </div>
                     </div>
                   </div>

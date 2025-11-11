@@ -219,6 +219,12 @@ export default function CreateTaskPage() {
         return
       }
 
+      if (assignedToIds.length === 0) {
+        setError('Please assign this task to at least one user')
+        setLoading(false)
+        return
+      }
+
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: {
@@ -318,9 +324,10 @@ export default function CreateTaskPage() {
     return (
       !!formData.title.trim() &&
       !!formData.project &&
-      !!formData.dueDate
+      !!formData.dueDate &&
+      assignedToIds.length > 0
     )
-  }, [formData.title, formData.project, formData.dueDate])
+  }, [formData.title, formData.project, formData.dueDate, assignedToIds.length])
 
   if (authError) {
     return (
@@ -423,7 +430,7 @@ export default function CreateTaskPage() {
 
                   {formData.project && (
                     <div>
-                      <label className="text-sm font-medium text-foreground">Assigned To</label>
+                      <label className="text-sm font-medium text-foreground">Assigned To *</label>
                       <div className="space-y-2">
                         <Select
                           value=""
@@ -439,7 +446,7 @@ export default function CreateTaskPage() {
                           onOpenChange={(open) => { if (open) setAssigneeQuery(""); }}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder={loadingProjectMembers ? 'Loading members...' : 'Select team members'} />
+                            <SelectValue placeholder={loadingProjectMembers ? 'Loading members...' : 'Select a team member'} />
                           </SelectTrigger>
                           <SelectContent className="z-[10050] p-0">
                             <div className="p-2">

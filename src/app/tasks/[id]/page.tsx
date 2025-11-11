@@ -26,7 +26,8 @@ import {
   Star,
   Bug,
   Wrench,
-  Layers
+  Layers,
+  Circle
 } from 'lucide-react'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 
@@ -35,7 +36,7 @@ interface Task {
   title: string
   displayId: string
   description: string
-  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
+  status: 'backlog' | 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
   project: {
@@ -67,6 +68,15 @@ interface Task {
   labels: string[]
   createdAt: string
   updatedAt: string
+  subtasks?: {
+    _id: string
+    title: string
+    description?: string
+    status: 'backlog' | 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
+    isCompleted: boolean
+    createdAt: string
+    updatedAt: string
+  }[]
 }
 
 export default function TaskDetailPage() {
@@ -155,6 +165,7 @@ export default function TaskDetailPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'backlog': return 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200'
       case 'todo': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
       case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
       case 'review': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
@@ -167,6 +178,7 @@ export default function TaskDetailPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
+      case 'backlog': return <Layers className="h-4 w-4" />
       case 'todo': return <Target className="h-4 w-4" />
       case 'in_progress': return <Play className="h-4 w-4" />
       case 'review': return <AlertTriangle className="h-4 w-4" />
@@ -175,6 +187,12 @@ export default function TaskDetailPage() {
       case 'cancelled': return <XCircle className="h-4 w-4" />
       default: return <Target className="h-4 w-4" />
     }
+  }
+
+  const formatDateTime = (value?: string) => {
+    if (!value) return 'Not set'
+    const date = new Date(value)
+    return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
   }
 
   const getPriorityColor = (priority: string) => {
@@ -320,6 +338,59 @@ export default function TaskDetailPage() {
                     <Target className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm">{task.story.title}</span>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {task.subtasks && task.subtasks.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Subtasks</CardTitle>
+                  <CardDescription>{task.subtasks.length} {task.subtasks.length === 1 ? 'subtask' : 'subtasks'}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {task.subtasks.map((subtask, index) => (
+                    <div key={subtask._id || index} className="p-3 border rounded-lg">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <div className="mt-1">
+                              {subtask.isCompleted ? (
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                              ) : (
+                                <Circle className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </div>
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`font-medium ${subtask.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
+                                  {subtask.title}
+                                </span>
+                                <Badge className={`${getStatusColor(subtask.status)} text-xs flex items-center gap-1`}>
+                                  {getStatusIcon(subtask.status)}
+                                  <span>{subtask.status.replace('_', ' ')}</span>
+                                </Badge>
+                              </div>
+                              {subtask.description && (
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  {subtask.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          {subtask.isCompleted && (
+                            <Badge variant="outline" className="text-xs text-green-700 border-green-200 bg-green-50">
+                              Completed
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                          <span>Created {formatDateTime(subtask.createdAt)}</span>
+                          <span>Updated {formatDateTime(subtask.updatedAt)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
             )}
