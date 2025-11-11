@@ -45,6 +45,7 @@ COPY --from=builder --chown=nextjs:nodegroup /app/.next/static ./.next/static
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 RUN chown -R nextjs:nodegroup /app/.next
+RUN chown -R nextjs:nodegroup /app/config
 
 USER nextjs
 
