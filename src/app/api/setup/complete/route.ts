@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Persist the database configuration so the unified connector can read it
-    await saveDatabaseConfig({
+    saveDatabaseConfig({
       host,
       port,
       database: databaseName,
@@ -322,7 +322,7 @@ export async function POST(request: NextRequest) {
     // Database configuration was already saved in the database step
     
     // Mark setup as completed
-    await markSetupCompleted(organization._id.toString())
+    markSetupCompleted(organization._id.toString())
     
     console.log('Setup completed successfully!')
     return NextResponse.json({ 

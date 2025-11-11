@@ -1,5 +1,5 @@
 import mongoose from 'mongoose'
-import { getDatabaseConfig as getStoredDatabaseConfig, getMongoUri, loadConfig } from './config'
+import { getDatabaseConfig as getConfigFromFile, getMongoUri } from './config'
 
 /**
  * Global is used here to maintain a cached connection across hot reloads
@@ -17,7 +17,7 @@ if (!cached) {
  */
 export async function getDatabaseConfig() {
   try {
-    const config = await getStoredDatabaseConfig()
+    const config = getConfigFromFile()
     
     if (!config) {
       throw new Error('Database configuration not found. Please complete the setup process.')
@@ -41,7 +41,7 @@ export async function connectDB() {
       return cached.conn
     }
 
-    const mongoUri = await getMongoUri()
+    const mongoUri = getMongoUri()
     if (!mongoUri) {
       // During build time or when config doesn't exist, return null instead of throwing
       if (process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE === 'phase-production-build') {
@@ -101,8 +101,8 @@ export async function connectWithStoredConfig() {
  */
 export async function hasDatabaseConfig(): Promise<boolean> {
   try {
-    const config = await loadConfig({ skipDb: true })
-    return Boolean(config.database && config.database.uri)
+    const config = getConfigFromFile()
+    return !!(config)
   } catch (error) {
     console.error('Failed to check database configuration:', error)
     return false
