@@ -16,7 +16,7 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
-      - ./config.json:/app/config.json
+      - ./config:/app/config
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
