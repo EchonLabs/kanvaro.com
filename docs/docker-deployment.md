@@ -139,7 +139,7 @@ If the setup wizard fails:
    docker-compose logs kanvaro-app
    ```
 
-2. **Verify config/config.json is writable**:
+2. **Verify config.json is writable**:
    The application needs to write the configuration file to persist setup data.
 
 3. **Check database credentials**:
@@ -152,8 +152,7 @@ kanvaro.com/
 ├── docker-compose.yml          # Development compose file
 ├── docker-compose.prod.yml     # Production compose file
 ├── .env                        # Environment variables (create from env.example)
-├── config/
-│   └── config.json             # Application configuration (created during setup)
+├── config.json                 # Application configuration (created during setup)
 ├── uploads/                    # File uploads directory
 └── logs/                       # Application logs
 ```
@@ -180,5 +179,5 @@ kanvaro.com/
 
 3. **Configuration backup**:
    ```bash
-   cp config/config.json config/config.json.backup
+   cp config.json config.json.backup
    ```
