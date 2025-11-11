@@ -181,7 +181,6 @@ export async function POST(request: NextRequest) {
       throw new Error('Admin user configuration is missing')
     }
     
-    // Database configuration should already be saved from the database step
     // Connect using unified connection system
     await connectDB()
     

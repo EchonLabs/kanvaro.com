@@ -1,3 +1,38 @@
+## [1.1.10](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.9...v1.1.10) (2025-11-11)
+
+
+### Bug Fixes
+
+* :bug: revert signup changes ([ba80157](https://github.com/EchonLabs/kanvaro.com/commit/ba80157ac9545497de38f4afa3c985160b084453))
+
+## [1.1.9](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.8...v1.1.9) (2025-11-11)
+
+
+### Reverts
+
+* Revert "fix: debug issues in dev" ([a157140](https://github.com/EchonLabs/kanvaro.com/commit/a15714057a88e271b1a9fbf8af8ddc17c597e9ff))
+
+## [1.1.8](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.7...v1.1.8) (2025-11-11)
+
+
+### Bug Fixes
+
+* debug issues in dev ([42de66a](https://github.com/EchonLabs/kanvaro.com/commit/42de66a1b10ac7e3f913912aaf5c9e511fa44944))
+
+## [1.1.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.6...v1.1.7) (2025-11-11)
+
+
+### Bug Fixes
+
+* fix bugs in sign up ([2c2977b](https://github.com/EchonLabs/kanvaro.com/commit/2c2977bbf94a62fb4436dd8515f6ca156f16efda))
+
+## [1.1.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.5...v1.1.6) (2025-11-11)
+
+
+### Bug Fixes
+
+* reverting config changes ([c9ef665](https://github.com/EchonLabs/kanvaro.com/commit/c9ef6655093875f395f4a646239228006db0a915))
+
 ## [1.1.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.4...v1.1.5) (2025-11-11)
 
 

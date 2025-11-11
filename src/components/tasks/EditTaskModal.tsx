@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Checkbox } from '@/components/ui/Checkbox'
 import { 
   X, 
   Save, 
@@ -35,12 +36,37 @@ interface User {
   email: string
 }
 
+type SubtaskStatus = 'backlog' | 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
+
 interface Subtask {
   _id?: string
   title: string
   description?: string
-  status: string
+  status: SubtaskStatus
   isCompleted: boolean
+}
+
+const SUBTASK_STATUS_OPTIONS: Array<{ value: SubtaskStatus; label: string }> = [
+  { value: 'backlog', label: 'Backlog' },
+  { value: 'todo', label: 'To Do' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'review', label: 'Review' },
+  { value: 'testing', label: 'Testing' },
+  { value: 'done', label: 'Done' },
+  { value: 'cancelled', label: 'Cancelled' }
+]
+
+interface TaskFormData {
+  title: string
+  description: string
+  status: SubtaskStatus
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  type: 'task' | 'bug' | 'feature' | 'improvement' | 'subtask'
+  assignedTo: string
+  storyPoints: string
+  dueDate: string
+  estimatedHours: string
+  labels: string
 }
 
 export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: EditTaskModalProps) {
@@ -48,10 +74,10 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
   const [error, setError] = useState('')
   const [users, setUsers] = useState<User[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<TaskFormData>({
     title: '',
     description: '',
-    status: 'todo',
+    status: 'backlog',
     priority: 'medium',
     type: 'task',
     assignedTo: '',
@@ -68,7 +94,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
       setFormData({
         title: task.title || '',
         description: task.description || '',
-        status: task.status || 'todo',
+        status: (task.status || 'backlog') as SubtaskStatus,
         priority: task.priority || 'medium',
         type: task.type || 'task',
         assignedTo: task.assignedTo?._id || '',
@@ -80,7 +106,15 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
       
       // Set subtasks if they exist
       if (task.subtasks && Array.isArray(task.subtasks)) {
-        setSubtasks(task.subtasks)
+        setSubtasks(task.subtasks.map((subtask: any) => ({
+          _id: subtask._id,
+          title: subtask.title,
+          description: subtask.description || '',
+          status: (subtask.status || 'todo') as SubtaskStatus,
+          isCompleted: typeof subtask.isCompleted === 'boolean'
+            ? subtask.isCompleted
+            : subtask.status === 'done'
+        })))
       } else {
         setSubtasks([])
       }
@@ -114,6 +148,14 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
     setError('')
 
     try {
+      const preparedSubtasks = subtasks.map(subtask => ({
+        _id: subtask._id,
+        title: subtask.title.trim(),
+        description: subtask.description?.trim() || undefined,
+        status: subtask.status,
+        isCompleted: subtask.status === 'done' ? true : subtask.isCompleted
+      }))
+
       const response = await fetch(`/api/tasks/${task._id}`, {
         method: 'PUT',
         headers: {
@@ -126,7 +168,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
           estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined,
           dueDate: formData.dueDate || undefined,
           labels: formData.labels ? formData.labels.split(',').map(label => label.trim()) : [],
-          subtasks: subtasks
+          subtasks: preparedSubtasks
         })
       })
 
@@ -155,9 +197,33 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
   }
 
   const updateSubtask = (index: number, field: keyof Subtask, value: any) => {
-    const updated = [...subtasks]
-    updated[index] = { ...updated[index], [field]: value }
-    setSubtasks(updated)
+    setSubtasks(prev => {
+      const updated = [...prev]
+      updated[index] = {
+        ...updated[index],
+        [field]: field === 'status' ? (value as SubtaskStatus) : value
+      }
+      if (field === 'status') {
+        updated[index].isCompleted = (value as SubtaskStatus) === 'done'
+      }
+      return updated
+    })
+  }
+
+  const toggleSubtaskCompletion = (index: number, checked: boolean) => {
+    setSubtasks(prev => {
+      const updated = [...prev]
+      const current = updated[index]
+      const nextStatus: SubtaskStatus = checked
+        ? 'done'
+        : (current.status === 'done' ? 'todo' : (current.status || 'todo'))
+      updated[index] = {
+        ...current,
+        status: nextStatus,
+        isCompleted: checked
+      }
+      return updated
+    })
   }
 
   const removeSubtask = (index: number) => {
@@ -214,23 +280,25 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
 
               <div>
                 <label className="text-sm font-medium text-foreground">Status</label>
-                <Select value={formData.status} onValueChange={(value) => setFormData({...formData, status: value})}>
+                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value as SubtaskStatus })}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="backlog">Backlog</SelectItem>
                     <SelectItem value="todo">To Do</SelectItem>
                     <SelectItem value="in_progress">In Progress</SelectItem>
                     <SelectItem value="review">Review</SelectItem>
                     <SelectItem value="testing">Testing</SelectItem>
                     <SelectItem value="done">Done</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div>
                 <label className="text-sm font-medium text-foreground">Priority</label>
-                <Select value={formData.priority} onValueChange={(value) => setFormData({...formData, priority: value})}>
+                <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value as TaskFormData['priority'] })}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
@@ -245,7 +313,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
 
               <div>
                 <label className="text-sm font-medium text-foreground">Type</label>
-                <Select value={formData.type} onValueChange={(value) => setFormData({...formData, type: value})}>
+                <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value as TaskFormData['type'] })}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
@@ -376,15 +444,17 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
                       <label className="text-sm font-medium text-foreground">Status</label>
                       <Select
                         value={subtask.status}
-                        onValueChange={(value) => updateSubtask(index, 'status', value)}
+                        onValueChange={(value) => updateSubtask(index, 'status', value as SubtaskStatus)}
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="todo">To Do</SelectItem>
-                          <SelectItem value="in_progress">In Progress</SelectItem>
-                          <SelectItem value="done">Done</SelectItem>
+                          {SUBTASK_STATUS_OPTIONS.map(option => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -398,6 +468,16 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
                       placeholder="Subtask description"
                       rows={2}
                     />
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      checked={subtask.isCompleted || subtask.status === 'done'}
+                      onCheckedChange={(checked) => toggleSubtaskCompletion(index, !!checked)}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      Mark as completed
+                    </span>
                   </div>
                 </div>
               ))}
