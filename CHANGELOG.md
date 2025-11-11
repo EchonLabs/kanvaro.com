@@ -1,3 +1,10 @@
+## [1.1.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.4...v1.1.5) (2025-11-11)
+
+
+### Bug Fixes
+
+* fix always redirect to setup issue ([578f821](https://github.com/EchonLabs/kanvaro.com/commit/578f82140e5328295c8301ee504a5faa5e1754c0))
+
 ## [1.1.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.3...v1.1.4) (2025-11-10)
 
 
