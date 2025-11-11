@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Database, User, Building, Mail, CheckCircle, BookOpen, Loader2 } from 'lucide-react'
+import { Database, User, Building, Mail, CheckCircle, BookOpen } from 'lucide-react'
 import { ProgressSteps } from '@/components/setup/ProgressSteps'
 import { DatabaseConfig } from '@/components/setup/DatabaseConfig'
 import { AdminUserSetup } from '@/components/setup/AdminUserSetup'
@@ -24,35 +24,6 @@ export default function SetupPage() {
   const [setupData, setSetupData] = useState<any>({})
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const [checkingStatus, setCheckingStatus] = useState(true)
-
-  useEffect(() => {
-    let isMounted = true
-    const verifySetupStatus = async () => {
-      try {
-        const response = await fetch('/api/setup/status')
-        if (!isMounted) return
-        if (response.ok) {
-          const data = await response.json()
-          if (data.setupCompleted) {
-            router.replace('/sign-in')
-            return
-          }
-        }
-      } catch (error) {
-        console.error('Failed to verify setup status:', error)
-      } finally {
-        if (isMounted) {
-          setCheckingStatus(false)
-        }
-      }
-    }
-
-    verifySetupStatus()
-    return () => {
-      isMounted = false
-    }
-  }, [router])
 
   const handleNext = (stepData: any) => {
     // Extract existing data from database step if present
@@ -96,7 +67,8 @@ export default function SetupPage() {
       if (response.ok) {
         const result = await response.json()
         if (result.success) {
-          router.replace('/sign-in?message=setup-completed')
+          // Setup completed successfully, redirect to login page
+          router.push('/login?message=setup-completed')
         } else {
           throw new Error(result.error || 'Setup completion failed')
         }
@@ -116,15 +88,6 @@ export default function SetupPage() {
 
 
   const renderCurrentStep = () => {
-    if (checkingStatus) {
-      return (
-        <div className="flex flex-col items-center justify-center py-16 space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Checking setup status...</p>
-        </div>
-      )
-    }
-
     switch (currentStep) {
       case 'database':
         return <DatabaseConfig onNext={handleNext} initialData={setupData.database} />

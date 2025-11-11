@@ -181,53 +181,6 @@ export async function POST(request: NextRequest) {
       throw new Error('Admin user configuration is missing')
     }
     
-    // Ensure database configuration (including URI) is persisted before connecting
-    const databaseConfig = setupData.database
-    const host = typeof databaseConfig.host === 'string' && databaseConfig.host.trim().length > 0
-      ? databaseConfig.host.trim()
-      : 'localhost'
-    const port = Number(databaseConfig.port) || 27017
-    const databaseName = typeof databaseConfig.database === 'string' ? databaseConfig.database.trim() : ''
-    const username = typeof databaseConfig.username === 'string' ? databaseConfig.username.trim() : ''
-    const password = typeof databaseConfig.password === 'string' ? databaseConfig.password : ''
-    const authSource = typeof databaseConfig.authSource === 'string' && databaseConfig.authSource.trim().length > 0
-      ? databaseConfig.authSource.trim()
-      : 'admin'
-    const ssl = Boolean(databaseConfig.ssl)
-
-    if (!databaseName) {
-      throw new Error('Database name is missing in the configuration.')
-    }
-
-    let mongoUri = typeof databaseConfig.uri === 'string' && databaseConfig.uri.trim().length > 0
-      ? databaseConfig.uri.trim()
-      : ''
-
-    if (!mongoUri) {
-      const hasCredentials = username.length > 0 && password.length > 0
-      const credentials = hasCredentials
-        ? `${encodeURIComponent(username)}:${encodeURIComponent(password)}@`
-        : ''
-      const authParams = hasCredentials
-        ? [`authSource=${encodeURIComponent(authSource)}`]
-        : []
-      const queryString = authParams.length > 0 ? `?${authParams.join('&')}` : ''
-
-      mongoUri = `mongodb://${credentials}${host}:${port}/${databaseName}${queryString}`
-    }
-
-    // Persist the database configuration so the unified connector can read it
-    saveDatabaseConfig({
-      host,
-      port,
-      database: databaseName,
-      username,
-      password,
-      authSource,
-      ssl,
-      uri: mongoUri
-    })
-
     // Connect using unified connection system
     await connectDB()
     
