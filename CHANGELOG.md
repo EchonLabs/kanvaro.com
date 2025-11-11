@@ -1,3 +1,10 @@
+## [1.1.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.5...v1.1.6) (2025-11-11)
+
+
+### Bug Fixes
+
+* reverting config changes ([c9ef665](https://github.com/EchonLabs/kanvaro.com/commit/c9ef6655093875f395f4a646239228006db0a915))
+
 ## [1.1.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.4...v1.1.5) (2025-11-11)
 
 
