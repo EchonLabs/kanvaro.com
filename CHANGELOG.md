@@ -1,3 +1,10 @@
+## [1.1.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.6...v1.1.7) (2025-11-11)
+
+
+### Bug Fixes
+
+* fix bugs in sign up ([2c2977b](https://github.com/EchonLabs/kanvaro.com/commit/2c2977bbf94a62fb4436dd8515f6ca156f16efda))
+
 ## [1.1.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.5...v1.1.6) (2025-11-11)
 
 
