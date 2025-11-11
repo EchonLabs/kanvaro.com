@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
-import { Task } from '@/models/Task'
+import { Task, TASK_STATUS_VALUES, TaskStatus } from '@/models/Task'
 import { Project } from '@/models/Project'
 import { User } from '@/models/User'
 import { authenticateUser } from '@/lib/auth-utils'
@@ -10,6 +10,82 @@ import { notificationService } from '@/lib/notification-service'
 import { cache, invalidateCache } from '@/lib/redis'
 import crypto from 'crypto'
 import { Counter } from '@/models/Counter'
+
+const TASK_STATUS_SET = new Set<TaskStatus>(TASK_STATUS_VALUES)
+
+function sanitizeLabels(input: any): string[] {
+  if (Array.isArray(input)) {
+    return input
+      .filter((value): value is string => typeof value === 'string')
+      .map(label => label.trim())
+      .filter(label => label.length > 0)
+  }
+
+  if (typeof input === 'string') {
+    return input
+      .split(',')
+      .map(part => part.trim())
+      .filter(part => part.length > 0)
+  }
+
+  return []
+}
+
+type IncomingSubtask = {
+  _id?: string
+  title?: unknown
+  description?: unknown
+  status?: unknown
+  isCompleted?: unknown
+}
+
+function sanitizeSubtasks(input: any): Array<{
+  _id?: string
+  title: string
+  description?: string
+  status: TaskStatus
+  isCompleted: boolean
+}> {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  return input
+    .filter((item: IncomingSubtask) => typeof item?.title === 'string' && item.title.trim().length > 0)
+    .map((item: IncomingSubtask) => {
+      const rawStatus = typeof item.status === 'string' ? item.status : undefined
+      const status = rawStatus && TASK_STATUS_SET.has(rawStatus as TaskStatus)
+        ? rawStatus as TaskStatus
+        : 'backlog'
+
+      const sanitized: {
+        _id?: string
+        title: string
+        description?: string
+        status: TaskStatus
+        isCompleted: boolean
+      } = {
+        title: (item.title as string).trim(),
+        status,
+        isCompleted: typeof item.isCompleted === 'boolean'
+          ? item.isCompleted
+          : status === 'done'
+      }
+
+      if (item._id && typeof item._id === 'string') {
+        sanitized._id = item._id
+      }
+
+      if (typeof item.description === 'string') {
+        const trimmed = item.description.trim()
+        if (trimmed.length > 0) {
+          sanitized.description = trimmed
+        }
+      }
+
+      return sanitized
+    })
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -131,6 +207,7 @@ export async function POST(request: NextRequest) {
     const { user } = authResult
     const userId = user.id
 
+    const payload = await request.json()
     const {
       title,
       description,
@@ -144,8 +221,9 @@ export async function POST(request: NextRequest) {
       storyPoints,
       dueDate,
       estimatedHours,
-      labels
-    } = await request.json()
+      labels,
+      subtasks
+    } = payload
 
     // Check if user can create tasks (project-scoped permission)
     const canCreateTask = await PermissionService.hasPermission(userId, Permission.TASK_CREATE, project)
@@ -165,7 +243,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the next position for this project/status combination
-    const taskStatus = status || 'todo'
+    const taskStatus: TaskStatus = typeof status === 'string' && TASK_STATUS_SET.has(status as TaskStatus)
+      ? status as TaskStatus
+      : 'backlog'
     const maxPosition = await Task.findOne(
       { project, status: taskStatus },
       { position: 1 }
@@ -190,6 +270,10 @@ export async function POST(request: NextRequest) {
     const displayId = `${projectDoc.projectNumber}.${taskNumber}`
 
     // Create task
+    const normalizedStory = typeof story === 'string' && story.trim() !== '' ? story.trim() : undefined
+    const normalizedParentTask = typeof parentTask === 'string' && parentTask.trim() !== '' ? parentTask.trim() : undefined
+    const normalizedAssignedTo = typeof assignedTo === 'string' && assignedTo.trim() !== '' ? assignedTo.trim() : undefined
+
     const task = new Task({
       title,
       description,
@@ -200,14 +284,19 @@ export async function POST(request: NextRequest) {
       project,
       taskNumber,
       displayId,
-      story: story || undefined,
-      parentTask: parentTask || undefined,
-      assignedTo: assignedTo || undefined,
+      story: normalizedStory,
+      parentTask: normalizedParentTask,
+      assignedTo: normalizedAssignedTo,
       createdBy: userId,
-      storyPoints: storyPoints || undefined,
+      storyPoints: typeof storyPoints === 'number'
+        ? storyPoints
+        : (typeof storyPoints === 'string' && storyPoints.trim() !== '' ? Number(storyPoints) : undefined),
       dueDate: dueDate ? new Date(dueDate) : undefined,
-      estimatedHours: estimatedHours || undefined,
-      labels: labels || [],
+      estimatedHours: typeof estimatedHours === 'number'
+        ? estimatedHours
+        : (typeof estimatedHours === 'string' && estimatedHours.trim() !== '' ? Number(estimatedHours) : undefined),
+      labels: sanitizeLabels(labels),
+      subtasks: sanitizeSubtasks(subtasks),
       position: nextPosition
     })
 
@@ -226,7 +315,7 @@ export async function POST(request: NextRequest) {
       .populate('parentTask', 'title')
 
     // Send notification if task is assigned to someone
-    if (assignedTo && assignedTo !== userId) {
+    if (normalizedAssignedTo && normalizedAssignedTo !== userId) {
       try {
         const projectDoc = await Project.findById(project).select('name')
         const createdByUser = await User.findById(userId).select('firstName lastName')
@@ -234,7 +323,7 @@ export async function POST(request: NextRequest) {
         await notificationService.notifyTaskUpdate(
           task._id.toString(),
           'assigned',
-          assignedTo,
+          normalizedAssignedTo,
           user.organization,
           title,
           projectDoc?.name
