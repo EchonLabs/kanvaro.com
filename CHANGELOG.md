@@ -1,3 +1,10 @@
+## [1.1.10](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.9...v1.1.10) (2025-11-11)
+
+
+### Bug Fixes
+
+* :bug: revert signup changes ([ba80157](https://github.com/EchonLabs/kanvaro.com/commit/ba80157ac9545497de38f4afa3c985160b084453))
+
 ## [1.1.9](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.8...v1.1.9) (2025-11-11)
 
 
