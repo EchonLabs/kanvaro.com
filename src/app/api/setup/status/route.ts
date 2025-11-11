@@ -5,7 +5,7 @@ import { User } from '@/models/User'
 
 export async function GET() {
   try {
-    const config = loadConfig()
+    const config = await loadConfig()
     
     // Check if there are actually users in the database
     let hasUsers = false
@@ -18,7 +18,7 @@ export async function GET() {
     }
     
     // Setup is only completed if config says so AND there are users in the database
-    const setupCompleted = config.setupCompleted && hasUsers
+    const setupCompleted = Boolean(config.setupCompleted) && hasUsers
     
     return NextResponse.json({
       setupCompleted,

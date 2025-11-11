@@ -18,7 +18,7 @@ export async function GET() {
     }
 
     const config = await getDatabaseConfig()
-    const appConfig = loadConfig()
+    const appConfig = await loadConfig()
     
     console.log('Database config retrieved:', {
       host: config.host,
@@ -30,7 +30,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       hasConfig: true,
-      setupCompleted: appConfig.setupCompleted,
+      setupCompleted: Boolean(appConfig.setupCompleted),
       organizationId: appConfig.organizationId,
       config: {
         host: config.host,
