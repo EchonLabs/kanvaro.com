@@ -1,3 +1,13 @@
+## [1.1.11](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.10...v1.1.11) (2025-11-19)
+
+
+### Bug Fixes
+
+* add changes in kanbarn board ([fb1d208](https://github.com/EchonLabs/kanvaro.com/commit/fb1d2087dd5b09aafc7b964e7bfbf1b1e8a6a0b8))
+* add changes in project setting ([e3640a9](https://github.com/EchonLabs/kanvaro.com/commit/e3640a962255b340c695456f89264846b5118042))
+* add chnges in assigned to section ([35c524a](https://github.com/EchonLabs/kanvaro.com/commit/35c524a3f84b07c9f6fccb8df5995a599618d71f))
+* add project and task changes ([20eef34](https://github.com/EchonLabs/kanvaro.com/commit/20eef34226a333f1e9ccfb0053e48391352e8db5))
+
 ## [1.1.10](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.9...v1.1.10) (2025-11-11)
 
 
