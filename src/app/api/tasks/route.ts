@@ -243,8 +243,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the next position for this project/status combination
-    const taskStatus: TaskStatus = typeof status === 'string' && TASK_STATUS_SET.has(status as TaskStatus)
-      ? status as TaskStatus
+    // Allow any string status to support custom kanban statuses per project
+    // Default to 'backlog' if no status provided
+    const taskStatus: string = typeof status === 'string' && status.trim().length > 0
+      ? status.trim()
       : 'backlog'
     const maxPosition = await Task.findOne(
       { project, status: taskStatus },

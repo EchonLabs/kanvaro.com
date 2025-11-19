@@ -402,6 +402,7 @@ export default function CreateStoryPage() {
                             <Input
                               value={assigneeQuery}
                               onChange={e => setAssigneeQuery(e.target.value)}
+                              onKeyDown={(e) => e.stopPropagation()}
                               placeholder={loadingProjectMembers ? 'Loading members...' : 'Type to search team members'}
                               className="mb-2"
                             />

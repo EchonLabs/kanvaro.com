@@ -147,6 +147,11 @@ export default function BacklogPage() {
   const [removingSprint, setRemovingSprint] = useState(false)
   const [sprintModalMode, setSprintModalMode] = useState<'assign' | 'manage'>('assign')
   const [currentSprintInfo, setCurrentSprintInfo] = useState<{ _id: string; name: string } | null>(null)
+  const [statusChangeModalOpen, setStatusChangeModalOpen] = useState(false)
+  const [statusChangeTaskId, setStatusChangeTaskId] = useState<string | null>(null)
+  const [statusChangeValue, setStatusChangeValue] = useState<BacklogItem['status']>('backlog')
+  const [statusChanging, setStatusChanging] = useState(false)
+  const [statusChangeError, setStatusChangeError] = useState('')
   const [projectOptions, setProjectOptions] = useState<ProjectSummary[]>([])
   const [assignedToOptions, setAssignedToOptions] = useState<UserSummary[]>([])
   const [assignedByOptions, setAssignedByOptions] = useState<UserSummary[]>([])
@@ -673,6 +678,67 @@ export default function BacklogPage() {
       setShowDeleteConfirmModal(false)
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const openStatusChangeModal = (item: BacklogItem) => {
+    if (item.type !== 'task') return
+    setStatusChangeTaskId(item._id)
+    setStatusChangeValue(item.status || 'backlog')
+    setStatusChangeError('')
+    setStatusChangeModalOpen(true)
+  }
+
+  const closeStatusChangeModal = () => {
+    if (statusChanging) return
+    setStatusChangeModalOpen(false)
+    setStatusChangeTaskId(null)
+    setStatusChangeError('')
+  }
+
+  const handleStatusChange = async () => {
+    if (!statusChangeTaskId) return
+
+    setStatusChanging(true)
+    setStatusChangeError('')
+
+    try {
+      const response = await fetch(`/api/tasks/${statusChangeTaskId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: statusChangeValue
+        })
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update task status.')
+      }
+
+      setBacklogItems((prev) =>
+        prev.map((item) =>
+          item._id === statusChangeTaskId
+            ? {
+                ...item,
+                status: statusChangeValue,
+                sprint: statusChangeValue === 'sprint' ? item.sprint : statusChangeValue === 'backlog' ? undefined : item.sprint
+              }
+            : item
+        )
+      )
+
+      setSuccess('Task status updated successfully.')
+      setTimeout(() => setSuccess(''), 3000)
+      closeStatusChangeModal()
+    } catch (error) {
+      console.error('Failed to change task status:', error)
+      setStatusChangeError(error instanceof Error ? error.message : 'Failed to update task status.')
+    } finally {
+      setStatusChanging(false)
     }
   }
 
@@ -1286,6 +1352,16 @@ export default function BacklogPage() {
                                   </DropdownMenuItem>
                                 )}
 
+                                {item.type === 'task' && (
+                                  <DropdownMenuItem
+                                    onClick={() => openStatusChangeModal(item)}
+                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                  >
+                                    <CheckCircle className="h-4 w-4 mr-2" />
+                                    <span>Change Status</span>
+                                  </DropdownMenuItem>
+                                )}
+
                                 {/* Delete */}
                                 <DropdownMenuItem
                                   onClick={() => handleDeleteClick(item)}
@@ -1498,6 +1574,77 @@ export default function BacklogPage() {
                   ))}
                 </ul>
               )}
+            </div>
+          </div>
+        </ResponsiveDialog>
+
+        <ResponsiveDialog
+          open={statusChangeModalOpen}
+          onOpenChange={(open) => {
+            if (open) {
+              setStatusChangeModalOpen(true)
+              return
+            }
+            closeStatusChangeModal()
+          }}
+          title="Change Task Status"
+          description="Select a new status for this task."
+          footer={
+            <div className="flex flex-col sm:flex-row sm:justify-end gap-2 w-full">
+              <Button
+                variant="outline"
+                onClick={closeStatusChangeModal}
+                disabled={statusChanging}
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleStatusChange}
+                disabled={statusChanging || !statusChangeTaskId}
+                className="w-full sm:w-auto"
+              >
+                {statusChanging ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Update Status
+                  </>
+                )}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            {statusChangeError && (
+              <Alert variant="destructive">
+                <AlertDescription>{statusChangeError}</AlertDescription>
+              </Alert>
+            )}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-foreground">Status</Label>
+              <Select
+                value={statusChangeValue}
+                onValueChange={(value) => setStatusChangeValue(value as BacklogItem['status'])}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent className="z-[10050]">
+                  {ALLOWED_BACKLOG_STATUSES.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {status.replace('_', ' ')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                This update takes effect immediately and can be changed again later.
+              </p>
             </div>
           </div>
         </ResponsiveDialog>

@@ -166,8 +166,12 @@ export async function PUT(
     const updateData: Record<string, any> = { ...rawUpdate }
 
     if (Object.prototype.hasOwnProperty.call(updateData, 'status')) {
-      if (typeof updateData.status !== 'string' || !TASK_STATUS_SET.has(updateData.status as TaskStatus)) {
+      // Allow any string status to support custom kanban statuses per project
+      // Validation should be done at the application level based on project settings
+      if (typeof updateData.status !== 'string' || updateData.status.trim().length === 0) {
         delete updateData.status
+      } else {
+        updateData.status = updateData.status.trim()
       }
     }
 
