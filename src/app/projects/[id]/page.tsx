@@ -307,6 +307,10 @@ export default function ProjectDetailPage() {
     }
   }
 
+  const statusPriorityChanged = project
+    ? statusForm !== project.status || priorityForm !== project.priority
+    : false
+
   if (loading) {
     return (
       <MainLayout>
@@ -971,7 +975,11 @@ export default function ProjectDetailPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <Button onClick={handleSaveSettings} disabled={savingSettings} className="w-full">
+                    <Button
+                      onClick={handleSaveSettings}
+                      disabled={savingSettings || !statusPriorityChanged}
+                      className="w-full"
+                    >
                       {savingSettings ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />

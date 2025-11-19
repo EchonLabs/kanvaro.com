@@ -74,8 +74,10 @@ const SubtaskSchema = new Schema<ITaskSubtask>({
   },
   status: {
     type: String,
-    enum: TASK_STATUS_VALUES,
-    default: 'todo'
+    default: 'todo',
+    trim: true
+    // Note: No enum restriction to allow custom kanban statuses per project
+    // Status validation should be done at the application level based on project settings
   },
   isCompleted: {
     type: Boolean,
@@ -96,8 +98,10 @@ const TaskSchema = new Schema<ITask>({
   },
   status: {
     type: String,
-    enum: TASK_STATUS_VALUES,
-    default: 'backlog'
+    default: 'backlog',
+    trim: true
+    // Note: No enum restriction to allow custom kanban statuses per project
+    // Status validation should be done at the application level based on project settings
   },
   priority: {
     type: String,

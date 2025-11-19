@@ -44,6 +44,8 @@ import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 const CreateTaskModal = dynamic(() => import('./CreateTaskModal'), { ssr: false })
 const KanbanBoard = dynamic(() => import('./KanbanBoard'), { ssr: false })
 
+const TASK_STATUS_OPTIONS = ['todo', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const
+
 interface Task {
   _id: string
   title: string
@@ -108,6 +110,7 @@ export default function TasksClient({
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
   useEffect(() => {
     const q = searchParams.get('search') || ''
     const s = searchParams.get('status') || 'all'
@@ -291,6 +294,37 @@ export default function TasksClient({
       handleDeleteClick(task)
     }
   }
+
+  const handleInlineStatusChange = async (task: Task, nextStatus: Task['status']) => {
+    if (nextStatus === task.status) return
+    setStatusUpdatingId(task._id)
+    try {
+      const response = await fetch(`/api/tasks/${task._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: nextStatus })
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update status')
+      }
+
+      setTasks((prev) =>
+        prev.map((item) => (item._id === task._id ? { ...item, status: nextStatus } : item))
+      )
+      setSuccess('Task status updated successfully.')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (error) {
+      console.error('Failed to update task status:', error)
+      setError(error instanceof Error ? error.message : 'Failed to update status')
+      setTimeout(() => setError(''), 4000)
+    } finally {
+      setStatusUpdatingId(null)
+    }
+  }
   return (
     <div className="space-y-6 overflow-x-hidden">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -465,10 +499,27 @@ export default function TasksClient({
                                       {task.displayId && (
                                         <Badge variant="outline" className="text-xs">{task.displayId}</Badge>
                                       )}
-                                      <Badge className={`${getStatusColor(task.status)} text-xs`}>
-                                        {getStatusIcon(task.status)}
-                                        <span className="ml-1 hidden sm:inline">{task.status.replace('_', ' ')}</span>
-                                      </Badge>
+                                      <Select
+                                        value={task.status}
+                                        onValueChange={(value) =>
+                                          handleInlineStatusChange(task, value as Task['status'])
+                                        }
+                                        disabled={statusUpdatingId === task._id}
+                                      >
+                                        <SelectTrigger className="h-7 w-[150px] text-xs">
+                                          <SelectValue placeholder="Status" />
+                                        </SelectTrigger>
+                                        <SelectContent className="z-[10050]">
+                                          {TASK_STATUS_OPTIONS.map((status) => (
+                                            <SelectItem key={status} value={status} className="text-xs">
+                                              <div className="flex items-center gap-2">
+                                                {getStatusIcon(status)}
+                                                <span>{status.replace('_', ' ')}</span>
+                                              </div>
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
                                       <Badge className={`${getPriorityColor(task.priority)} text-xs`}>
                                         {task.priority}
                                       </Badge>

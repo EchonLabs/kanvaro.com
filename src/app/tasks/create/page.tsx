@@ -93,7 +93,6 @@ export default function CreateTaskPage() {
     assignedTo: '',
     priority: 'medium',
     type: 'task',
-    status: 'todo',
     dueDate: '',
     estimatedHours: '',
     storyPoints: '',
@@ -240,7 +239,7 @@ export default function CreateTaskPage() {
           assignedTo: assignedToIds.length === 1 ? assignedToIds[0] : assignedToIds.length > 0 ? assignedToIds[0] : undefined,
           priority: formData.priority,
           type: formData.type,
-          status: formData.status,
+          status: 'backlog',
           dueDate: formData.dueDate,
           estimatedHours: formData.estimatedHours ? parseInt(formData.estimatedHours) : undefined,
           storyPoints: formData.storyPoints ? parseInt(formData.storyPoints) : undefined,
@@ -453,6 +452,7 @@ export default function CreateTaskPage() {
                               <Input
                                 value={assigneeQuery}
                                 onChange={e => setAssigneeQuery(e.target.value)}
+                                onKeyDown={(e) => e.stopPropagation()}
                                 placeholder={loadingProjectMembers ? 'Loading members...' : 'Type to search team members'}
                                 className="mb-2"
                               />
@@ -550,23 +550,6 @@ export default function CreateTaskPage() {
                         <SelectItem value="medium">Medium</SelectItem>
                         <SelectItem value="high">High</SelectItem>
                         <SelectItem value="critical">Critical</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-foreground">Status</label>
-                    <Select value={formData.status} onValueChange={(value) => handleChange('status', value)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todo">To Do</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="review">Review</SelectItem>
-                        <SelectItem value="testing">Testing</SelectItem>
-                        <SelectItem value="done">Done</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
