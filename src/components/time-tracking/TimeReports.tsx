@@ -76,10 +76,15 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [projects, setProjects] = useState<Array<{ _id: string; name: string }>>([])
+  const [users, setUsers] = useState<Array<{ _id: string; firstName: string; lastName: string; email: string }>>([])
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
-    reportType: 'summary'
+    reportType: 'summary',
+    projectId: projectId || 'all',
+    assignedTo: userId || 'all',
+    assignedBy: 'all'
   })
 
   const loadReport = useCallback(async () => {
@@ -92,29 +97,71 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
         reportType: filters.reportType
       })
 
-      if (userId) params.append('userId', userId)
-      if (projectId) params.append('projectId', projectId)
+      if (filters.projectId && filters.projectId !== 'all') params.append('projectId', filters.projectId)
+      if (filters.assignedTo && filters.assignedTo !== 'all') params.append('userId', filters.assignedTo)
+      if (filters.assignedBy && filters.assignedBy !== 'all') params.append('assignedBy', filters.assignedBy)
       if (filters.startDate) params.append('startDate', filters.startDate)
       if (filters.endDate) params.append('endDate', filters.endDate)
 
       const response = await fetch(`/api/time-tracking/reports?${params}`)
       const data = await response.json()
 
-      if (response.ok) {
-        setReportData(data)
+      if (response.ok && data) {
+        // Handle different response structures
+        if (data.summary || data.userReport || data.projectReport || data.taskReport || data.billableReport) {
+          setReportData(data)
+        } else if (data.data) {
+          setReportData(data.data)
+        } else {
+          setReportData(data)
+        }
       } else {
-        setError(data.error || 'Failed to load report')
+        setError(data?.error || 'Failed to load report')
       }
     } catch (error) {
       setError('Failed to load report')
     } finally {
       setIsLoading(false)
     }
-  }, [organizationId, userId, projectId, filters])
+  }, [organizationId, filters])
 
   useEffect(() => {
     loadReport()
   }, [loadReport])
+
+  // Load projects and users for filters
+  useEffect(() => {
+    const loadFilterData = async () => {
+      try {
+        // Load projects
+        const projectsRes = await fetch(`/api/projects?limit=1000&page=1`)
+        if (projectsRes.ok) {
+          const projectsData = await projectsRes.json()
+          if (projectsData.success) {
+            setProjects(projectsData.data.map((p: any) => ({ _id: p._id, name: p.name })))
+          }
+        }
+
+        // Load users (team members from organization)
+        const usersRes = await fetch(`/api/users`)
+        if (usersRes.ok) {
+          const usersData = await usersRes.json()
+          if (Array.isArray(usersData)) {
+            setUsers(usersData.map((u: any) => ({
+              _id: u._id,
+              firstName: u.firstName || '',
+              lastName: u.lastName || '',
+              email: u.email || ''
+            })))
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load filter data:', error)
+      }
+    }
+
+    loadFilterData()
+  }, [organizationId])
 
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60)
@@ -137,8 +184,9 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
         format: 'csv'
       })
 
-      if (userId) params.append('userId', userId)
-      if (projectId) params.append('projectId', projectId)
+      if (filters.projectId && filters.projectId !== 'all') params.append('projectId', filters.projectId)
+      if (filters.assignedTo && filters.assignedTo !== 'all') params.append('userId', filters.assignedTo)
+      if (filters.assignedBy && filters.assignedBy !== 'all') params.append('assignedBy', filters.assignedBy)
       if (filters.startDate) params.append('startDate', filters.startDate)
       if (filters.endDate) params.append('endDate', filters.endDate)
 
@@ -190,7 +238,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
             </Alert>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="startDate">Start Date</Label>
               <Input
@@ -210,6 +258,54 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
               />
             </div>
             <div>
+              <Label htmlFor="projectId">Project</Label>
+              <Select value={filters.projectId} onValueChange={(value) => setFilters(prev => ({ ...prev, projectId: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Projects" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Projects</SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem key={project._id} value={project._id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="assignedTo">Assigned To</Label>
+              <Select value={filters.assignedTo} onValueChange={(value) => setFilters(prev => ({ ...prev, assignedTo: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Users" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  {users.map((user) => (
+                    <SelectItem key={user._id} value={user._id}>
+                      {user.firstName} {user.lastName} ({user.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="assignedBy">Assigned By</Label>
+              <Select value={filters.assignedBy} onValueChange={(value) => setFilters(prev => ({ ...prev, assignedBy: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Approvers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Approvers</SelectItem>
+                  {users.map((user) => (
+                    <SelectItem key={user._id} value={user._id}>
+                      {user.firstName} {user.lastName} ({user.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label htmlFor="reportType">Report Type</Label>
               <Select value={filters.reportType} onValueChange={(value) => setFilters(prev => ({ ...prev, reportType: value }))}>
                 <SelectTrigger>
@@ -224,18 +320,18 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-end">
-              <Button onClick={handleExport} className="w-full">
-                <Download className="h-4 w-4 mr-2" />
-                Export CSV
-              </Button>
-            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={handleExport}>
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Summary Report */}
-      {reportData && filters.reportType === 'summary' && (
+      {reportData && filters.reportType === 'summary' && reportData.summary && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-6">
@@ -243,7 +339,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 <Clock className="h-8 w-8 text-primary" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-muted-foreground">Total Time</p>
-                  <p className="text-2xl font-bold">{formatDuration(reportData.summary.totalDuration)}</p>
+                  <p className="text-2xl font-bold">{formatDuration(reportData.summary.totalDuration || 0)}</p>
                 </div>
               </div>
             </CardContent>
@@ -255,7 +351,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 <DollarSign className="h-8 w-8 text-green-600" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-muted-foreground">Total Cost</p>
-                  <p className="text-2xl font-bold">{formatCurrency(reportData.summary.totalCost)}</p>
+                  <p className="text-2xl font-bold">{formatCurrency(reportData.summary.totalCost || 0)}</p>
                 </div>
               </div>
             </CardContent>
@@ -267,7 +363,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 <TrendingUp className="h-8 w-8 text-blue-600" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-muted-foreground">Billable Time</p>
-                  <p className="text-2xl font-bold">{formatDuration(reportData.summary.billableDuration)}</p>
+                  <p className="text-2xl font-bold">{formatDuration(reportData.summary.billableDuration || 0)}</p>
                 </div>
               </div>
             </CardContent>
@@ -279,7 +375,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 <Users className="h-8 w-8 text-purple-600" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-muted-foreground">Total Entries</p>
-                  <p className="text-2xl font-bold">{reportData.summary.totalEntries}</p>
+                  <p className="text-2xl font-bold">{reportData.summary.totalEntries || 0}</p>
                 </div>
               </div>
             </CardContent>

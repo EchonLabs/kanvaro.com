@@ -6,7 +6,7 @@ import { MainLayout } from '@/components/layout/MainLayout'
 import { TimeReports } from '@/components/time-tracking/TimeReports'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { ArrowLeft, BarChart3, Download, Filter } from 'lucide-react'
+import { ArrowLeft, BarChart3 } from 'lucide-react'
 import { Loader2 } from 'lucide-react'
 
 export default function TimeReportsPage() {
@@ -102,19 +102,6 @@ export default function TimeReportsPage() {
               <span className="truncate">Time Reports</span>
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground mt-1">Analyze your time tracking data and generate insights</p>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-4">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 sm:flex-initial">
-            <Button variant="outline" className="w-full sm:w-auto">
-              <Filter className="h-4 w-4 mr-2" />
-              Filter Reports
-            </Button>
-            <Button variant="outline" className="w-full sm:w-auto">
-              <Download className="h-4 w-4 mr-2" />
-              Export Data
-            </Button>
           </div>
         </div>
 

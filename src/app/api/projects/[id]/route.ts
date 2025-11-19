@@ -130,6 +130,46 @@ export async function PUT(
       }
     }
 
+    // Build update object with proper handling for nested fields
+    const updateObject: any = { $set: {} }
+    
+    // Extract settings if present and handle nested updates
+    if (updateData.settings) {
+      if (updateData.settings.kanbanStatuses !== undefined) {
+        updateObject.$set['settings.kanbanStatuses'] = updateData.settings.kanbanStatuses
+      }
+      // Handle other settings fields
+      if (updateData.settings.allowTimeTracking !== undefined) {
+        updateObject.$set['settings.allowTimeTracking'] = updateData.settings.allowTimeTracking
+      }
+      if (updateData.settings.allowManualTimeSubmission !== undefined) {
+        updateObject.$set['settings.allowManualTimeSubmission'] = updateData.settings.allowManualTimeSubmission
+      }
+      if (updateData.settings.allowExpenseTracking !== undefined) {
+        updateObject.$set['settings.allowExpenseTracking'] = updateData.settings.allowExpenseTracking
+      }
+      if (updateData.settings.requireApproval !== undefined) {
+        updateObject.$set['settings.requireApproval'] = updateData.settings.requireApproval
+      }
+      if (updateData.settings.notifications) {
+        Object.keys(updateData.settings.notifications).forEach(key => {
+          updateObject.$set[`settings.notifications.${key}`] = updateData.settings.notifications[key]
+        })
+      }
+    }
+    
+    // Add other top-level fields to $set
+    Object.keys(updateData).forEach(key => {
+      if (key !== 'settings') {
+        updateObject.$set[key] = updateData[key]
+      }
+    })
+
+    // If no $set fields, fall back to direct update
+    const finalUpdateData = Object.keys(updateObject.$set).length > 0 
+      ? updateObject 
+      : updateData
+
     // Find and update project (only update non-deleted projects)
     const project = await Project.findOneAndUpdate(
       {
@@ -137,7 +177,7 @@ export async function PUT(
         organization: organizationId,
         is_deleted: { $ne: true } // Only update non-deleted projects
       },
-      updateData,
+      finalUpdateData,
       { new: true }
     )
       .populate('createdBy', 'firstName lastName email')
