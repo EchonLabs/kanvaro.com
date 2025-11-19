@@ -42,7 +42,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has permission to update tasks
-    const projectIds = [...new Set(tasks.map(t => t.project?.toString()).filter(Boolean))]
+    const projectIds = Array.from(
+      new Set(tasks.map((t) => t.project?.toString()).filter(Boolean))
+    )
     
     for (const projectId of projectIds) {
       if (projectId) {
