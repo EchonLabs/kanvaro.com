@@ -150,7 +150,7 @@ export default function CreateProjectPage() {
     switch (currentStep) {
       case 1: // Basic Information
         if (!formData.name.trim()) {
-          errors.name = 'Project name is required'
+          errors.name = 'Project Name is required'
         }
         break
       case 2: // Timeline
@@ -232,7 +232,7 @@ export default function CreateProjectPage() {
       
       // Validate Step 1: Basic Information
       if (!formData.name.trim()) {
-        errors.name = 'Project name is required'
+        errors.name = 'Project Name is required'
       }
       
       // Validate Step 2: Timeline
@@ -321,7 +321,7 @@ export default function CreateProjectPage() {
     const errors = { ...validationErrors }
     
     if (fieldName === 'name' && !value.trim()) {
-      errors.name = 'Project name is required'
+      errors.name = 'Project Name is required'
     } else if (fieldName === 'name' && value.trim()) {
       delete errors.name
     }
