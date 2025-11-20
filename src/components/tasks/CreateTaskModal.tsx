@@ -615,6 +615,7 @@ export default function CreateTaskModal({
                   type="date"
                   value={formData.dueDate}
                   onChange={(e) => setFormData({...formData, dueDate: e.target.value})}
+                  min={new Date().toISOString().split('T')[0]}
                   className="mt-1"
                   required
                 />
