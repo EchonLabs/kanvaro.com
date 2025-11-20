@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from '@radix-ui/react-dropdown-menu'
@@ -1192,7 +1193,7 @@ export default function BacklogPage() {
                                 {item.priority}
                               </Badge>
                               <Badge className={getStatusColor(item.status)}>
-                                {item.status.replace('_', ' ')}
+                                {formatToTitleCase(item.status)}
                               </Badge>
                               {item.epic && (
                                 <Badge

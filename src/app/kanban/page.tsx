@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { formatToTitleCase } from '@/lib/utils'
 import { useTaskSync, useTaskState } from '@/hooks/useTaskSync'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -788,10 +789,10 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
           
           <div className="flex items-center space-x-2">
             <Badge className={getPriorityColor(task.priority)}>
-              {task?.priority}
+              {formatToTitleCase(task?.priority)}
             </Badge>
             <Badge className={getTypeColor(task.type)}>
-              {task?.type}
+              {formatToTitleCase(task?.type)}
             </Badge>
           </div>
           

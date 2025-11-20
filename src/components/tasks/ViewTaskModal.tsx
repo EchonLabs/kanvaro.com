@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 import { 
   X, 
   Calendar, 
@@ -131,7 +132,7 @@ export default function ViewTaskModal({ isOpen, onClose, task, onEdit, onDelete 
               <label className="text-sm font-medium text-muted-foreground">Status</label>
               <div className="mt-1">
                 <Badge variant={getStatusColor(task.status)}>
-                  {task.status?.replace('_', ' ').toUpperCase()}
+                  {formatToTitleCase(task.status)}
                 </Badge>
               </div>
             </div>
@@ -140,7 +141,7 @@ export default function ViewTaskModal({ isOpen, onClose, task, onEdit, onDelete 
               <label className="text-sm font-medium text-muted-foreground">Priority</label>
               <div className="mt-1">
                 <Badge variant={getPriorityColor(task.priority)}>
-                  {task.priority?.toUpperCase()}
+                  {formatToTitleCase(task.priority)}
                 </Badge>
               </div>
             </div>
@@ -149,7 +150,7 @@ export default function ViewTaskModal({ isOpen, onClose, task, onEdit, onDelete 
               <label className="text-sm font-medium text-muted-foreground">Type</label>
               <div className="mt-1">
                 <Badge variant="outline">
-                  {task.type?.toUpperCase()}
+                  {formatToTitleCase(task.type)}
                 </Badge>
               </div>
             </div>

@@ -6,6 +6,7 @@ import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 import { Progress } from '@/components/ui/Progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
@@ -445,7 +446,7 @@ export default function SprintDetailPage() {
                   <span className="text-xs sm:text-sm text-muted-foreground">Status</span>
                   <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
                     {getStatusIcon(sprint?.status)}
-                    <span className="ml-1">{sprint?.status}</span>
+                    <span className="ml-1">{formatToTitleCase(sprint?.status)}</span>
                   </Badge>
                 </div>
                 

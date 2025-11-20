@@ -46,3 +46,21 @@ export function slugify(text: string): string {
     .replace(/[^\w ]+/g, '')
     .replace(/ +/g, '-')
 }
+
+/**
+ * Converts text to Title Case
+ * Handles snake_case, kebab-case, and regular lowercase text
+ * Examples:
+ *   "in_progress" -> "In Progress"
+ *   "team_member" -> "Team Member"
+ *   "low" -> "Low"
+ *   "high" -> "High"
+ */
+export function formatToTitleCase(text: string | undefined | null): string {
+  if (!text) return ''
+  
+  return text
+    .split(/[_\-\s]+/) // Split on underscore, hyphen, or whitespace
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+}
