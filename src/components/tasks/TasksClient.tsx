@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -9,6 +9,9 @@ import { Badge } from '@/components/ui/Badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
+import { Calendar as DateRangeCalendar } from '@/components/ui/calendar'
+import { cn } from '@/lib/utils'
 import { 
   Plus, 
   Search, 
@@ -39,18 +42,21 @@ import dynamic from 'next/dynamic'
 import { Permission, PermissionGate } from '@/lib/permissions'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { format } from 'date-fns'
+import { DateRange } from 'react-day-picker'
 
 // Dynamically import heavy modals
 const CreateTaskModal = dynamic(() => import('./CreateTaskModal'), { ssr: false })
 const KanbanBoard = dynamic(() => import('./KanbanBoard'), { ssr: false })
 
-const TASK_STATUS_OPTIONS = ['todo', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const
+const TASK_STATUS_OPTIONS = ['todo', 'in_progress', 'review', 'testing', 'done', 'cancelled', 'backlog'] as const
 
 interface Task {
   _id: string
   title: string
   description: string
-  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
+  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled' | 'backlog'
   priority: 'low' | 'medium' | 'high' | 'critical'
   type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
   displayId?: string
@@ -59,11 +65,13 @@ interface Task {
     name: string
   }
   assignedTo?: {
+    _id: string
     firstName: string
     lastName: string
     email: string
   }
   createdBy: {
+    _id: string
     firstName: string
     lastName: string
     email: string
@@ -77,6 +85,18 @@ interface Task {
   updatedAt: string
 }
 
+interface ProjectSummary {
+  _id: string
+  name: string
+}
+
+interface UserSummary {
+  _id: string
+  firstName: string
+  lastName: string
+  email: string
+}
+
 interface TasksClientProps {
   initialTasks: Task[]
   initialPagination: any
@@ -86,6 +106,12 @@ interface TasksClientProps {
     priority?: string
     type?: string
     project?: string
+    assignedTo?: string
+    createdBy?: string
+    dueDateFrom?: string
+    dueDateTo?: string
+    createdAtFrom?: string
+    createdAtTo?: string
   }
 }
 
@@ -95,7 +121,9 @@ export default function TasksClient({
   initialFilters = {} 
 }: TasksClientProps) {
   const router = useRouter()
-    const searchParams = useSearchParams()
+  const searchParams = useSearchParams()
+  const { hasPermission } = usePermissions()
+  const canViewAllTasks = hasPermission(Permission.PROJECT_VIEW_ALL)
   
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [pagination, setPagination] = useState(initialPagination)
@@ -106,22 +134,189 @@ export default function TasksClient({
   const [statusFilter, setStatusFilter] = useState(initialFilters.status || 'all')
   const [priorityFilter, setPriorityFilter] = useState(initialFilters.priority || 'all')
   const [typeFilter, setTypeFilter] = useState(initialFilters.type || 'all')
+  const [projectFilter, setProjectFilter] = useState(initialFilters.project || 'all')
+  const [assignedToFilter, setAssignedToFilter] = useState(initialFilters.assignedTo || 'all')
+  const [createdByFilter, setCreatedByFilter] = useState(initialFilters.createdBy || 'all')
+  const [dateRangeFilter, setDateRangeFilter] = useState<DateRange | undefined>(
+    initialFilters.createdAtFrom || initialFilters.createdAtTo
+      ? {
+          from: initialFilters.createdAtFrom ? new Date(initialFilters.createdAtFrom) : undefined,
+          to: initialFilters.createdAtTo ? new Date(initialFilters.createdAtTo) : undefined,
+        }
+      : undefined
+  )
+  const [projectOptions, setProjectOptions] = useState<ProjectSummary[]>([])
+  const [assignedToOptions, setAssignedToOptions] = useState<UserSummary[]>([])
+  const [createdByOptions, setCreatedByOptions] = useState<UserSummary[]>([])
+  const [projectFilterQuery, setProjectFilterQuery] = useState('')
+  const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
+  const [createdByFilterQuery, setCreatedByFilterQuery] = useState('')
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list')
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
+
+  const startDateBoundary = useMemo(() => {
+    if (!dateRangeFilter?.from) return null
+    const boundary = new Date(dateRangeFilter.from)
+    boundary.setHours(0, 0, 0, 0)
+    return boundary
+  }, [dateRangeFilter])
+
+  const endDateBoundary = useMemo(() => {
+    if (!dateRangeFilter?.to) return null
+    const boundary = new Date(dateRangeFilter.to)
+    boundary.setHours(23, 59, 59, 999)
+    return boundary
+  }, [dateRangeFilter])
   useEffect(() => {
     const q = searchParams.get('search') || ''
     const s = searchParams.get('status') || 'all'
     const p = searchParams.get('priority') || 'all'
+    const proj = searchParams.get('project') || 'all'
     setSearchQuery(q)
     setStatusFilter(s)
     setPriorityFilter(p)
+    setProjectFilter(proj)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Extract unique projects, assignedTo, and createdBy from tasks
+  useEffect(() => {
+    const projectMap = new Map<string, ProjectSummary>()
+    const assignedToMap = new Map<string, UserSummary>()
+    const createdByMap = new Map<string, UserSummary>()
+
+    tasks.forEach((task) => {
+      if (task.project?._id) {
+        projectMap.set(task.project._id, {
+          _id: task.project._id,
+          name: task.project.name,
+        })
+      }
+      if (task.assignedTo?._id) {
+        assignedToMap.set(task.assignedTo._id, {
+          _id: task.assignedTo._id,
+          firstName: task.assignedTo.firstName,
+          lastName: task.assignedTo.lastName,
+          email: task.assignedTo.email,
+        })
+      }
+      if (task.createdBy?._id) {
+        createdByMap.set(task.createdBy._id, {
+          _id: task.createdBy._id,
+          firstName: task.createdBy.firstName,
+          lastName: task.createdBy.lastName,
+          email: task.createdBy.email,
+        })
+      }
+    })
+
+    setProjectOptions(Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name)))
+    
+    // Only show user filters if user can view all tasks
+    if (canViewAllTasks) {
+      setAssignedToOptions(Array.from(assignedToMap.values()).sort((a, b) =>
+        `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
+      ))
+      setCreatedByOptions(Array.from(createdByMap.values()).sort((a, b) =>
+        `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
+      ))
+    }
+  }, [tasks, canViewAllTasks])
+
+  // Load projects from API for filter dropdown
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        const response = await fetch('/api/projects?limit=1000&page=1')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && Array.isArray(data.data)) {
+            const projects = data.data.map((p: any) => ({ _id: p._id, name: p.name }))
+            setProjectOptions(prev => {
+              const combined = new Map<string, ProjectSummary>()
+              prev.forEach(p => combined.set(p._id, p))
+              projects.forEach((p: ProjectSummary) => combined.set(p._id, p))
+              return Array.from(combined.values()).sort((a, b) => a.name.localeCompare(b.name))
+            })
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load projects:', err)
+      }
+    }
+    loadProjects()
+  }, [])
+
+  // Load users for filter dropdown (only if user can view all tasks)
+  useEffect(() => {
+    if (!canViewAllTasks) return
+
+    const loadUsers = async () => {
+      try {
+        const response = await fetch('/api/members?limit=1000&page=1')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.data?.members && Array.isArray(data.data.members)) {
+            const users = data.data.members.map((u: any) => ({
+              _id: u._id,
+              firstName: u.firstName || '',
+              lastName: u.lastName || '',
+              email: u.email || '',
+            }))
+            setAssignedToOptions(prev => {
+              const combined = new Map<string, UserSummary>()
+              prev.forEach(u => combined.set(u._id, u))
+              users.forEach((u: UserSummary) => combined.set(u._id, u))
+              return Array.from(combined.values()).sort((a, b) =>
+                `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
+              )
+            })
+            setCreatedByOptions(prev => {
+              const combined = new Map<string, UserSummary>()
+              prev.forEach(u => combined.set(u._id, u))
+              users.forEach((u: UserSummary) => combined.set(u._id, u))
+              return Array.from(combined.values()).sort((a, b) =>
+                `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
+              )
+            })
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load users:', err)
+      }
+    }
+    loadUsers()
+  }, [canViewAllTasks])
+
   // Debounce search query
   const debouncedSearch = useDebounce(searchQuery, 300)
+
+  const filteredProjectOptions = useMemo(() => {
+    const query = projectFilterQuery.trim().toLowerCase()
+    if (!query) return projectOptions
+    return projectOptions.filter((project) => project.name.toLowerCase().includes(query))
+  }, [projectOptions, projectFilterQuery])
+
+  const filteredAssignedToOptions = useMemo(() => {
+    const query = assignedToFilterQuery.trim().toLowerCase()
+    if (!query) return assignedToOptions
+    return assignedToOptions.filter((member) =>
+      `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
+      member.email.toLowerCase().includes(query)
+    )
+  }, [assignedToOptions, assignedToFilterQuery])
+
+  const filteredCreatedByOptions = useMemo(() => {
+    const query = createdByFilterQuery.trim().toLowerCase()
+    if (!query) return createdByOptions
+    return createdByOptions.filter((member) =>
+      `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
+      member.email.toLowerCase().includes(query)
+    )
+  }, [createdByOptions, createdByFilterQuery])
 
   // Virtualization refs
   const parentRef = useRef<HTMLDivElement>(null)
@@ -135,16 +330,34 @@ export default function TasksClient({
   // Fetch tasks with current filters
   const fetchTasks = useCallback(async (reset = false) => {
     try {
-      
       setLoading(true)
+      if (reset) {
+        setPagination({ nextCursor: null })
+      }
       const params = new URLSearchParams()
       
       if (debouncedSearch) params.set('search', debouncedSearch)
-              if (searchQuery) params.set('search', searchQuery)
+      if (searchQuery) params.set('search', searchQuery)
 
       if (statusFilter !== 'all') params.set('status', statusFilter)
       if (priorityFilter !== 'all') params.set('priority', priorityFilter)
       if (typeFilter !== 'all') params.set('type', typeFilter)
+      if (projectFilter !== 'all') params.set('project', projectFilter)
+      
+      // Only allow assignedTo and createdBy filters if user can view all tasks
+      if (canViewAllTasks) {
+        if (assignedToFilter !== 'all') params.set('assignedTo', assignedToFilter)
+        if (createdByFilter !== 'all') params.set('createdBy', createdByFilter)
+      }
+      
+      // Date range filters
+      if (dateRangeFilter?.from) {
+        params.set('createdAtFrom', dateRangeFilter.from.toISOString().split('T')[0])
+      }
+      if (dateRangeFilter?.to) {
+        params.set('createdAtTo', dateRangeFilter.to.toISOString().split('T')[0])
+      }
+      
       if (pagination.nextCursor && !reset) params.set('after', pagination.nextCursor)
       params.set('limit', '20')
 
@@ -178,17 +391,57 @@ export default function TasksClient({
     } finally {
       setLoading(false)
     }
-  }, [debouncedSearch, statusFilter, priorityFilter, typeFilter, pagination.nextCursor])
+  }, [
+    debouncedSearch,
+    searchQuery,
+    statusFilter,
+    priorityFilter,
+    typeFilter,
+    projectFilter,
+    assignedToFilter,
+    createdByFilter,
+    dateRangeFilter,
+    pagination.nextCursor,
+    canViewAllTasks,
+    router
+  ])
 
   // Reset and fetch when filters change
   useEffect(() => {
-    if (debouncedSearch !== initialFilters.search || 
-        statusFilter !== initialFilters.status || 
-        priorityFilter !== initialFilters.priority || 
-        typeFilter !== initialFilters.type) {
+    const filtersChanged = 
+      debouncedSearch !== initialFilters.search || 
+      statusFilter !== initialFilters.status || 
+      priorityFilter !== initialFilters.priority || 
+      typeFilter !== initialFilters.type ||
+      projectFilter !== initialFilters.project ||
+      assignedToFilter !== initialFilters.assignedTo ||
+      createdByFilter !== initialFilters.createdBy ||
+      (dateRangeFilter?.from?.toISOString().split('T')[0] !== initialFilters.createdAtFrom) ||
+      (dateRangeFilter?.to?.toISOString().split('T')[0] !== initialFilters.createdAtTo)
+
+    if (filtersChanged) {
       fetchTasks(true)
     }
-  }, [debouncedSearch, statusFilter, priorityFilter, typeFilter, fetchTasks])
+  }, [
+    debouncedSearch,
+    statusFilter,
+    priorityFilter,
+    typeFilter,
+    projectFilter,
+    assignedToFilter,
+    createdByFilter,
+    dateRangeFilter,
+    fetchTasks,
+    initialFilters.search,
+    initialFilters.status,
+    initialFilters.priority,
+    initialFilters.type,
+    initialFilters.project,
+    initialFilters.assignedTo,
+    initialFilters.createdBy,
+    initialFilters.createdAtFrom,
+    initialFilters.createdAtTo
+  ])
 
   // Initial fetch on mount if no initial tasks were provided
   useEffect(() => {
@@ -203,6 +456,7 @@ export default function TasksClient({
       case 'todo': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
       case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
       case 'review': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+      case 'backlog': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
       case 'testing': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
       case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
       case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
@@ -215,6 +469,7 @@ export default function TasksClient({
       case 'todo': return <Target className="h-4 w-4" />
       case 'in_progress': return <Play className="h-4 w-4" />
       case 'review': return <AlertTriangle className="h-4 w-4" />
+      case 'backlog': return <Target className="h-4 w-4" />
       case 'testing': return <Zap className="h-4 w-4" />
       case 'done': return <CheckCircle className="h-4 w-4" />
       case 'cancelled': return <XCircle className="h-4 w-4" />
@@ -389,6 +644,7 @@ export default function TasksClient({
                     <SelectItem value="todo">To Do</SelectItem>
                     <SelectItem value="in_progress">In Progress</SelectItem>
                     <SelectItem value="review">Review</SelectItem>
+                    <SelectItem value="backlog">Backlog</SelectItem>
                     <SelectItem value="testing">Testing</SelectItem>
                     <SelectItem value="done">Done</SelectItem>
                     <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -419,6 +675,138 @@ export default function TasksClient({
                     <SelectItem value="subtask">Subtask</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
+                <Select value={projectFilter} onValueChange={setProjectFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Project" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[10050] p-0">
+                    <div className="p-2">
+                      <Input
+                        value={projectFilterQuery}
+                        onChange={(e) => setProjectFilterQuery(e.target.value)}
+                        placeholder="Search projects"
+                        className="mb-2"
+                      />
+                      <div className="max-h-56 overflow-y-auto">
+                        <SelectItem value="all">All Projects</SelectItem>
+                        {filteredProjectOptions.length === 0 ? (
+                          <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                        ) : (
+                          filteredProjectOptions.map((project) => (
+                            <SelectItem key={project._id} value={project._id}>
+                              {project.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </SelectContent>
+                </Select>
+                {canViewAllTasks && (
+                  <>
+                    <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Assigned To" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[10050] p-0">
+                        <div className="p-2">
+                          <Input
+                            value={assignedToFilterQuery}
+                            onChange={(e) => setAssignedToFilterQuery(e.target.value)}
+                            placeholder="Search assignees"
+                            className="mb-2"
+                          />
+                          <div className="max-h-56 overflow-y-auto">
+                            <SelectItem value="all">All Assignees</SelectItem>
+                            {filteredAssignedToOptions.length === 0 ? (
+                              <div className="px-2 py-1 text-xs text-muted-foreground">No matching assignees</div>
+                            ) : (
+                              filteredAssignedToOptions.map((member) => (
+                                <SelectItem key={member._id} value={member._id}>
+                                  {member.firstName} {member.lastName}
+                                </SelectItem>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </SelectContent>
+                    </Select>
+                    <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Created By" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[10050] p-0">
+                        <div className="p-2">
+                          <Input
+                            value={createdByFilterQuery}
+                            onChange={(e) => setCreatedByFilterQuery(e.target.value)}
+                            placeholder="Search creators"
+                            className="mb-2"
+                          />
+                          <div className="max-h-56 overflow-y-auto">
+                            <SelectItem value="all">All Creators</SelectItem>
+                            {filteredCreatedByOptions.length === 0 ? (
+                              <div className="px-2 py-1 text-xs text-muted-foreground">No matching creators</div>
+                            ) : (
+                              filteredCreatedByOptions.map((member) => (
+                                <SelectItem key={member._id} value={member._id}>
+                                  {member.firstName} {member.lastName}
+                                </SelectItem>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
+                <div className="flex flex-col gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          'w-full justify-start text-left font-normal',
+                          !dateRangeFilter?.from && !dateRangeFilter?.to && 'text-muted-foreground'
+                        )}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {dateRangeFilter?.from ? (
+                          dateRangeFilter.to ? (
+                            `${format(dateRangeFilter.from, 'LLL dd, y')} - ${format(dateRangeFilter.to, 'LLL dd, y')}`
+                          ) : (
+                            `${format(dateRangeFilter.from, 'LLL dd, y')} - …`
+                          )
+                        ) : (
+                          'Select date range'
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <DateRangeCalendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={dateRangeFilter?.from}
+                        selected={dateRangeFilter}
+                        onSelect={setDateRangeFilter}
+                        numberOfMonths={2}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <div className="flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDateRangeFilter(undefined)}
+                      disabled={!dateRangeFilter?.from && !dateRangeFilter?.to}
+                      className="h-8 text-xs"
+                    >
+                      Clear dates
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
