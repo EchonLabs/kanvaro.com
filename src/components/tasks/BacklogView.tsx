@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -468,10 +469,10 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
                     <div className="flex items-center space-x-2 mb-2">
                       <h4 className="font-medium text-foreground">{task.title}</h4>
                       <Badge className={getPriorityColor(task.priority)}>
-                        {task.priority}
+                        {formatToTitleCase(task.priority)}
                       </Badge>
                       <Badge className={getTypeColor(task.type)}>
-                        {task.type}
+                        {formatToTitleCase(task.type)}
                       </Badge>
                       {task.storyPoints && (
                         <Badge variant="outline">

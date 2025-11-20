@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 import { Progress } from '@/components/ui/Progress'
 import { 
   TrendingUp, 
@@ -171,7 +172,7 @@ export function VelocityReport({ projectId }: VelocityReportProps) {
                     <div className="flex items-center space-x-2">
                       <Zap className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm font-medium">{sprint.sprint}</span>
-                      {getStatusBadge(sprint.status)}
+                      <Badge>{formatToTitleCase(sprint.status)}</Badge>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Badge variant="outline" className={velocityStatus.color}>

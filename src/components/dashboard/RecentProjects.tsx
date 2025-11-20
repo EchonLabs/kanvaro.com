@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { Progress } from '@/components/ui/Progress'
 import { Calendar, Users, ArrowRight, Loader2 } from 'lucide-react'
@@ -137,7 +138,7 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
                 </div>
                 <div className="flex flex-shrink-0">
                   <Badge className={`${getStatusColor(project.status)} text-xs`}>
-                    {project.status}
+                    {formatToTitleCase(project.status)}
                   </Badge>
                 </div>
               </div>

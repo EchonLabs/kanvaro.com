@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
+import { formatToTitleCase } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
@@ -414,13 +415,13 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                     <h4 className="font-medium text-foreground text-sm sm:text-base truncate flex-1 min-w-0">{task.title}</h4>
                     <Badge className={getStatusColor(task.status) + ' flex-shrink-0'}>
                       {getStatusIcon(task.status)}
-                      <span className="ml-1">{task.status.replace('_', ' ')}</span>
+                      <span className="ml-1">{formatToTitleCase(task.status)}</span>
                     </Badge>
                     <Badge className={getPriorityColor(task.priority) + ' flex-shrink-0'}>
-                      {task.priority}
+                      {formatToTitleCase(task.priority)}
                     </Badge>
                     <Badge className={getTypeColor(task.type) + ' flex-shrink-0'}>
-                      {task.type}
+                      {formatToTitleCase(task.type)}
                     </Badge>
                   </div>
                   <p className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">

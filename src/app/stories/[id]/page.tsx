@@ -6,6 +6,7 @@ import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { 
@@ -335,14 +336,14 @@ export default function StoryDetailPage() {
                   <span className="text-muted-foreground">Status</span>
                   <Badge className={`${getStatusColor(story.status)} text-xs`}>
                     {getStatusIcon(story.status)}
-                    <span className="ml-1 hidden sm:inline">{story.status.replace('_', ' ')}</span>
+                    <span className="ml-1 hidden sm:inline">{formatToTitleCase(story.status)}</span>
                   </Badge>
                 </div>
                 
                 <div className="flex items-center justify-between text-xs sm:text-sm">
                   <span className="text-muted-foreground">Priority</span>
                   <Badge className={`${getPriorityColor(story.priority)} text-xs`}>
-                    {story.priority}
+                    {formatToTitleCase(story.priority)}
                   </Badge>
                 </div>
                 

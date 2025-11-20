@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -362,10 +363,10 @@ export default function StoriesPage() {
                                 <div className="flex flex-shrink-0 items-center space-x-2 ml-2">
                                   <Badge className={getStatusColor(story.status) }>
                                     {getStatusIcon(story.status)}
-                                    <span className="ml-1">{story.status.replace('_', ' ')}</span>
+                                    <span className="ml-1">{formatToTitleCase(story.status)}</span>
                                   </Badge>
                                   <Badge className={getPriorityColor(story.priority)}>
-                                    {story.priority}
+                                    {formatToTitleCase(story.priority)}
                                   </Badge>
                                 </div>
                               </div>
