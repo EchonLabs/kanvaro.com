@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { formatToTitleCase } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -368,7 +369,7 @@ export default function TaskDetailPage() {
                                 </span>
                                 <Badge className={`${getStatusColor(subtask.status)} text-xs flex items-center gap-1`}>
                                   {getStatusIcon(subtask.status)}
-                                  <span>{subtask.status.replace('_', ' ')}</span>
+                                  <span>{formatToTitleCase(subtask.status)}</span>
                                 </Badge>
                               </div>
                               {subtask.description && (
@@ -406,14 +407,14 @@ export default function TaskDetailPage() {
                   <span className="text-muted-foreground">Status</span>
                   <Badge className={getStatusColor(task.status)}>
                     {getStatusIcon(task.status)}
-                    <span className="ml-1">{task.status.replace('_', ' ')}</span>
+                    <span className="ml-1">{formatToTitleCase(task.status)}</span>
                   </Badge>
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Priority</span>
                   <Badge className={getPriorityColor(task.priority)}>
-                    {task.priority}
+                    {formatToTitleCase(task.priority)}
                   </Badge>
                 </div>
                 
@@ -421,7 +422,7 @@ export default function TaskDetailPage() {
                   <span className="text-muted-foreground">Type</span>
                   <Badge className={getTypeColor(task.type)}>
                     {getTypeIcon(task.type)}
-                    <span className="ml-1">{task.type}</span>
+                    <span className="ml-1">{formatToTitleCase(task.type)}</span>
                   </Badge>
                 </div>
                 

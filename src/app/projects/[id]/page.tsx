@@ -6,6 +6,7 @@ import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 import { Progress } from '@/components/ui/Progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -385,7 +386,7 @@ export default function ProjectDetailPage() {
                 )}
                 <Badge className={getStatusColor(project.status) + ' flex-shrink-0'}>
                   {getStatusIcon(project.status)}
-                  <span className="ml-1">{project.status.replace('_', ' ')}</span>
+                  <span className="ml-1">{formatToTitleCase(project.status)}</span>
                 </Badge>
               </div>
               <p className="text-sm sm:text-base text-muted-foreground mt-1 break-words whitespace-normal" title={project.description || 'No description'}>

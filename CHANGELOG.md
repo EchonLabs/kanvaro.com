@@ -1,3 +1,17 @@
+# [1.2.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.16...v1.2.0) (2025-11-20)
+
+
+### Features
+
+* add title case ([2ce0e67](https://github.com/EchonLabs/kanvaro.com/commit/2ce0e673f0173cd58528aeb90746f1d00b9368d4))
+
+## [1.1.16](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.15...v1.1.16) (2025-11-20)
+
+
+### Bug Fixes
+
+* add title cases ([9bdedef](https://github.com/EchonLabs/kanvaro.com/commit/9bdedeff48f56cc4643d2031c3c274c7efbcd321))
+
 ## [1.1.15](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.14...v1.1.15) (2025-11-20)
 
 

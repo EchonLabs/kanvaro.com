@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Progress } from '@/components/ui/Progress'
+import { formatToTitleCase } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { 
@@ -341,14 +342,14 @@ export default function EpicDetailPage() {
                   <span className="text-xs sm:text-sm text-muted-foreground">Status</span>
                   <Badge className={`${getStatusColor(epic?.status)} text-xs`}>
                     {getStatusIcon(epic?.status)}
-                    <span className="ml-1">{epic?.status.replace('_', ' ')}</span>
+                    <span className="ml-1">{formatToTitleCase(epic?.status)}</span>
                   </Badge>
                 </div>
                 
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <span className="text-xs sm:text-sm text-muted-foreground">Priority</span>
                   <Badge className={`${getPriorityColor(epic?.priority)} text-xs`}>
-                    {epic?.priority}
+                    {formatToTitleCase(epic?.priority)}
                   </Badge>
                 </div>
                 

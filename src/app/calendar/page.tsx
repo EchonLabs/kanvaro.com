@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { formatToTitleCase } from '@/lib/utils'
 import { useTaskSync, useTaskState } from '@/hooks/useTaskSync'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -678,11 +679,11 @@ export default function CalendarPage() {
                                 }`} />
                                 <h4 className="font-medium text-foreground">{event.title}</h4>
                                 <Badge className={getTypeColor(event.type)}>
-                                  {event.type}
+                                  {formatToTitleCase(event.type)}
                                 </Badge>
                               </div>
                               <Badge className={getPriorityColor(event.priority)}>
-                                {event.priority}
+                                {formatToTitleCase(event.priority)}
                               </Badge>
                             </div>
                             {event.description && (

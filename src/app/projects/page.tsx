@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -460,10 +461,10 @@ export default function ProjectsPage() {
                       <div className="flex items-center space-x-2">
                         <Badge className={getStatusColor(project.status)}>
                           {getStatusIcon(project.status)}
-                          <span className="ml-1">{project.status.replace('_', ' ')}</span>
+                          <span className="ml-1">{formatToTitleCase(project.status)}</span>
                         </Badge>
                         <Badge className={getPriorityColor(project.priority)}>
-                          {project.priority}
+                          {formatToTitleCase(project.priority)}
                         </Badge>
                       </div>
 
@@ -550,10 +551,10 @@ export default function ProjectsPage() {
                               )}
                               <Badge className={getStatusColor(project.status)}>
                                 {getStatusIcon(project.status)}
-                                <span className="ml-1">{project.status.replace('_', ' ')}</span>
+                                <span className="ml-1">{formatToTitleCase(project.status)}</span>
                               </Badge>
                               <Badge className={getPriorityColor(project.priority)}>
-                                {project.priority}
+                                {formatToTitleCase(project.priority)}
                               </Badge>
                               </div>
                             </div>
