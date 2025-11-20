@@ -65,6 +65,7 @@ export default function MembersPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [editingMember, setEditingMember] = useState<Member | null>(null)
+  const [activeTab, setActiveTab] = useState('members')
 
   const checkAuth = useCallback(async () => {
     try {
@@ -138,6 +139,8 @@ export default function MembersPage() {
         setShowInviteModal(false)
         setSuccess('Invitation sent successfully!')
         setError('')
+        // Switch to Pending Invitations tab
+        setActiveTab('invitations')
         // Clear success message after 5 seconds
         setTimeout(() => setSuccess(''), 5000)
         // Refresh authentication state and then fetch members
@@ -305,7 +308,7 @@ export default function MembersPage() {
         </Alert>
       )}
 
-      <Tabs defaultValue="members" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="members">
             <Users className="h-4 w-4 mr-2" />
@@ -391,7 +394,7 @@ export default function MembersPage() {
                         </div>
                         <p className="text-xs sm:text-sm text-muted-foreground truncate">{member.email}</p>
                         <div className="flex items-center space-x-2 mt-1 flex-wrap gap-2">
-                          <Badge className={getRoleColor(member.role) + ' flex-shrink-0'}>
+                          <Badge className={getRoleColor(member.role) + ' flex-shrink-0 pointer-events-none hover:opacity-100'}>
                             {member.role.replace('_', ' ')}
                           </Badge>
                           <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -448,7 +451,7 @@ export default function MembersPage() {
                           Invited by {invitation.invitedBy.firstName} {invitation.invitedBy.lastName}
                         </p>
                         <div className="flex items-center space-x-2 mt-1 flex-wrap gap-2">
-                          <Badge className={getRoleColor(invitation.role) + ' flex-shrink-0'}>
+                          <Badge className={getRoleColor(invitation.role) + ' flex-shrink-0 pointer-events-none hover:opacity-100'}>
                             {invitation.role.replace('_', ' ')}
                           </Badge>
                           <span className="text-xs text-muted-foreground whitespace-nowrap">

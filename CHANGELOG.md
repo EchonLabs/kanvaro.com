@@ -1,3 +1,11 @@
+## [1.1.14](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.13...v1.1.14) (2025-11-20)
+
+
+### Bug Fixes
+
+* add time tracking fixes ([c0769d3](https://github.com/EchonLabs/kanvaro.com/commit/c0769d30d32ccc14dbbfc2466b9d9c2590560584))
+* fix task issues ([96b8b1f](https://github.com/EchonLabs/kanvaro.com/commit/96b8b1f3551b38ae0482d0c08ea3d91d8b2d1f6b))
+
 ## [1.1.13](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.12...v1.1.13) (2025-11-20)
 
 
