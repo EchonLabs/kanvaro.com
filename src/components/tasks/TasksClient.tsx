@@ -336,8 +336,8 @@ export default function TasksClient({
       }
       const params = new URLSearchParams()
       
+      // Use debounced search only (searchQuery is for input, debouncedSearch for API)
       if (debouncedSearch) params.set('search', debouncedSearch)
-      if (searchQuery) params.set('search', searchQuery)
 
       if (statusFilter !== 'all') params.set('status', statusFilter)
       if (priorityFilter !== 'all') params.set('priority', priorityFilter)
@@ -393,7 +393,6 @@ export default function TasksClient({
     }
   }, [
     debouncedSearch,
-    searchQuery,
     statusFilter,
     priorityFilter,
     typeFilter,
@@ -406,20 +405,83 @@ export default function TasksClient({
     router
   ])
 
-  // Reset and fetch when filters change
+  // Track if filters have been initialized and previous filter values
+  const filtersInitializedRef = useRef(false)
+  const prevFiltersRef = useRef<{
+    debouncedSearch: string
+    statusFilter: string
+    priorityFilter: string
+    typeFilter: string
+    projectFilter: string
+    assignedToFilter: string
+    createdByFilter: string
+    dateRangeFilter: { from?: string; to?: string } | null
+  } | null>(null)
+
+  // Initial fetch on mount if no initial tasks were provided
   useEffect(() => {
+    if (!initialTasks || initialTasks.length === 0) {
+      filtersInitializedRef.current = true
+      fetchTasks(true)
+    } else {
+      filtersInitializedRef.current = true
+      // Initialize prev filters with current values to prevent immediate fetch
+      prevFiltersRef.current = {
+        debouncedSearch: debouncedSearch || '',
+        statusFilter: statusFilter || 'all',
+        priorityFilter: priorityFilter || 'all',
+        typeFilter: typeFilter || 'all',
+        projectFilter: projectFilter || 'all',
+        assignedToFilter: assignedToFilter || 'all',
+        createdByFilter: createdByFilter || 'all',
+        dateRangeFilter: dateRangeFilter ? {
+          from: dateRangeFilter.from?.toISOString().split('T')[0],
+          to: dateRangeFilter.to?.toISOString().split('T')[0]
+        } : null
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Reset and fetch when filters change (but not on initial mount)
+  useEffect(() => {
+    // Skip if filters haven't been initialized yet (during initial mount)
+    if (!filtersInitializedRef.current) return
+
+    const currentFilters = {
+      debouncedSearch: debouncedSearch || '',
+      statusFilter: statusFilter || 'all',
+      priorityFilter: priorityFilter || 'all',
+      typeFilter: typeFilter || 'all',
+      projectFilter: projectFilter || 'all',
+      assignedToFilter: assignedToFilter || 'all',
+      createdByFilter: createdByFilter || 'all',
+      dateRangeFilter: dateRangeFilter ? {
+        from: dateRangeFilter.from?.toISOString().split('T')[0],
+        to: dateRangeFilter.to?.toISOString().split('T')[0]
+      } : null
+    }
+
+    // Initialize prev filters on first change check after mount
+    if (prevFiltersRef.current === null) {
+      prevFiltersRef.current = currentFilters
+      return
+    }
+
+    // Check if filters have actually changed from previous values
     const filtersChanged = 
-      debouncedSearch !== initialFilters.search || 
-      statusFilter !== initialFilters.status || 
-      priorityFilter !== initialFilters.priority || 
-      typeFilter !== initialFilters.type ||
-      projectFilter !== initialFilters.project ||
-      assignedToFilter !== initialFilters.assignedTo ||
-      createdByFilter !== initialFilters.createdBy ||
-      (dateRangeFilter?.from?.toISOString().split('T')[0] !== initialFilters.createdAtFrom) ||
-      (dateRangeFilter?.to?.toISOString().split('T')[0] !== initialFilters.createdAtTo)
+      currentFilters.debouncedSearch !== prevFiltersRef.current.debouncedSearch ||
+      currentFilters.statusFilter !== prevFiltersRef.current.statusFilter ||
+      currentFilters.priorityFilter !== prevFiltersRef.current.priorityFilter ||
+      currentFilters.typeFilter !== prevFiltersRef.current.typeFilter ||
+      currentFilters.projectFilter !== prevFiltersRef.current.projectFilter ||
+      currentFilters.assignedToFilter !== prevFiltersRef.current.assignedToFilter ||
+      currentFilters.createdByFilter !== prevFiltersRef.current.createdByFilter ||
+      currentFilters.dateRangeFilter?.from !== prevFiltersRef.current.dateRangeFilter?.from ||
+      currentFilters.dateRangeFilter?.to !== prevFiltersRef.current.dateRangeFilter?.to
 
     if (filtersChanged) {
+      prevFiltersRef.current = currentFilters
       fetchTasks(true)
     }
   }, [
@@ -431,25 +493,8 @@ export default function TasksClient({
     assignedToFilter,
     createdByFilter,
     dateRangeFilter,
-    fetchTasks,
-    initialFilters.search,
-    initialFilters.status,
-    initialFilters.priority,
-    initialFilters.type,
-    initialFilters.project,
-    initialFilters.assignedTo,
-    initialFilters.createdBy,
-    initialFilters.createdAtFrom,
-    initialFilters.createdAtTo
+    fetchTasks
   ])
-
-  // Initial fetch on mount if no initial tasks were provided
-  useEffect(() => {
-    if (!initialTasks || initialTasks.length === 0) {
-      fetchTasks(true)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const getStatusColor = (status: string) => {
     switch (status) {
