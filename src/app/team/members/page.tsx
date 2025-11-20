@@ -395,7 +395,7 @@ export default function MembersPage() {
                         <p className="text-xs sm:text-sm text-muted-foreground truncate">{member.email}</p>
                         <div className="flex items-center space-x-2 mt-1 flex-wrap gap-2">
                           <Badge className={getRoleColor(member.role) + ' flex-shrink-0 pointer-events-none hover:opacity-100'}>
-                            {member.role.replace('_', ' ')}
+                            {formatToTitleCase(member.role)}
                           </Badge>
                           <span className="text-xs text-muted-foreground whitespace-nowrap">
                             Joined {new Date(member.createdAt).toLocaleDateString()}

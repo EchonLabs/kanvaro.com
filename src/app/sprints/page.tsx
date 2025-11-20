@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 import { Progress } from '@/components/ui/Progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -383,7 +384,7 @@ export default function SprintsPage() {
                         <div className="flex items-center space-x-2">
                           <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
                             {getStatusIcon(sprint?.status)}
-                            <span className="ml-1 hidden sm:inline">{sprint?.status}</span>
+                            <span className="ml-1 hidden sm:inline">{formatToTitleCase(sprint?.status)}</span>
                           </Badge>
                         </div>
 
@@ -450,7 +451,7 @@ export default function SprintsPage() {
                             <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2 mb-2">
                               <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
                                 {getStatusIcon(sprint?.status)}
-                                <span className="ml-1 hidden sm:inline">{sprint?.status}</span>
+                                <span className="ml-1 hidden sm:inline">{formatToTitleCase(sprint?.status)}</span>
                               </Badge>
                             </div>
                             <div className="flex items-start gap-2 mb-2">

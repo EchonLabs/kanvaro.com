@@ -260,7 +260,7 @@ export function SprintReport({ projectId }: SprintReportProps) {
                   <div className="flex items-center space-x-2">
                     {getStatusIcon(sprint.status)}
                     <span className="text-sm font-medium">{sprint.name}</span>
-                    {getStatusBadge(sprint.status)}
+                    <Badge>{formatToTitleCase(sprint.status)}</Badge>
                   </div>
                   <Button
                     variant="outline"
@@ -315,7 +315,7 @@ export function SprintReport({ projectId }: SprintReportProps) {
                             <div className="flex items-center space-x-2">
                               {getEventTypeIcon(event.eventType)}
                               <span className="text-sm font-medium">{event.title}</span>
-                              {getEventStatusBadge(event.status)}
+                              <Badge>{formatToTitleCase(event.status)}</Badge>
                             </div>
                             <div className="text-xs text-muted-foreground">
                               {event.duration} min

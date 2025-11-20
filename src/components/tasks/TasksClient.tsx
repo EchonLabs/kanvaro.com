@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { Calendar as DateRangeCalendar } from '@/components/ui/calendar'
-import { cn } from '@/lib/utils'
+import { cn, formatToTitleCase } from '@/lib/utils'
 import { 
   Plus, 
   Search, 
@@ -947,17 +947,17 @@ export default function TasksClient({
                                             <SelectItem key={status} value={status} className="text-xs">
                                               <div className="flex items-center gap-2">
                                                 {getStatusIcon(status)}
-                                                <span>{status.replace('_', ' ')}</span>
+                                                <span>{formatToTitleCase(status)}</span>
                                               </div>
                                             </SelectItem>
                                           ))}
                                         </SelectContent>
                                       </Select>
                                       <Badge className={`${getPriorityColor(task.priority)} text-xs`}>
-                                        {task.priority}
+                                        {formatToTitleCase(task.priority)}
                                       </Badge>
                                       <Badge className={`${getTypeColor(task.type)} text-xs`}>
-                                        {task.type}
+                                        {formatToTitleCase(task.type)}
                                       </Badge>
                                     </div>
                                   </div>

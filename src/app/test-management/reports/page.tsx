@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Progress } from '@/components/ui/Progress'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 import { 
   BarChart, 
   Download, 

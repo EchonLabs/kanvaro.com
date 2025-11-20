@@ -3,6 +3,7 @@
 import { Calendar, Clock } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 
 interface DashboardHeaderProps {
   user: any
@@ -48,7 +49,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
             </div>
             <div className="flex sm:justify-end">
               <Badge variant="secondary" className="text-xs">
-                {user?.role || 'Team Member'}
+                {formatToTitleCase(user?.role) || 'Team Member'}
               </Badge>
             </div>
           </div>

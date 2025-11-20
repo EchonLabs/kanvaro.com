@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   ChevronLeft, 
@@ -346,10 +347,10 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                             <div className="font-medium truncate">{task.title}</div>
                             <div className="flex items-center space-x-1">
                               <Badge className={`text-xs ${getPriorityColor(task.priority)}`}>
-                                {task.priority}
+                                {formatToTitleCase(task.priority)}
                               </Badge>
                               <Badge className={`text-xs ${getStatusColor(task.status)}`}>
-                                {task.status.replace('_', ' ')}
+                                {formatToTitleCase(task.status)}
                               </Badge>
                             </div>
                           </div>
@@ -413,10 +414,10 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                         <div className="font-medium truncate">{task.title}</div>
                         <div className="flex items-center space-x-1 mt-1">
                           <Badge className={`text-xs ${getPriorityColor(task.priority)}`}>
-                            {task.priority}
+                            {formatToTitleCase(task.priority)}
                           </Badge>
                           <Badge className={`text-xs ${getStatusColor(task.status)}`}>
-                            {task.status.replace('_', ' ')}
+                            {formatToTitleCase(task.status)}
                           </Badge>
                         </div>
                       </div>
@@ -470,10 +471,10 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                         <div className="text-sm text-muted-foreground mt-1">{task.description}</div>
                         <div className="flex items-center space-x-2 mt-2">
                           <Badge className={`text-xs ${getPriorityColor(task.priority)}`}>
-                            {task.priority}
+                            {formatToTitleCase(task.priority)}
                           </Badge>
                           <Badge className={`text-xs ${getStatusColor(task.status)}`}>
-                            {task.status.replace('_', ' ')}
+                            {formatToTitleCase(task.status)}
                           </Badge>
                           {task.assignedTo && (
                             <div className="flex items-center space-x-1 text-xs text-muted-foreground">
