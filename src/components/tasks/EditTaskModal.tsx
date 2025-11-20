@@ -498,7 +498,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" form="edit-task-form" disabled={loading || !formData.title}>
+            <Button type="submit" form="edit-task-form" disabled={loading || !formData.title || !formData.assignedTo || formData.assignedTo === 'unassigned'}>
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

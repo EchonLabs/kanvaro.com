@@ -1,3 +1,11 @@
+## [1.1.13](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.12...v1.1.13) (2025-11-20)
+
+
+### Bug Fixes
+
+* add task edit new changes ([2b1641a](https://github.com/EchonLabs/kanvaro.com/commit/2b1641aecbd86bb86d40eb6e7859487e768b7f72))
+* stories edit flow ([1fdb6e8](https://github.com/EchonLabs/kanvaro.com/commit/1fdb6e83190b980beaf4b65530748c806e2f4a4f))
+
 ## [1.1.12](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.11...v1.1.12) (2025-11-19)
 
 
