@@ -114,6 +114,12 @@ export async function GET(request: NextRequest) {
     const priority = searchParams.get('priority') || '';
     const type = searchParams.get('type') || '';
     const project = searchParams.get('project') || '';
+    const assignedTo = searchParams.get('assignedTo') || '';
+    const createdBy = searchParams.get('createdBy') || '';
+    const dueDateFrom = searchParams.get('dueDateFrom') || '';
+    const dueDateTo = searchParams.get('dueDateTo') || '';
+    const createdAtFrom = searchParams.get('createdAtFrom') || '';
+    const createdAtTo = searchParams.get('createdAtTo') || '';
 
     const useCursorPagination = !!after;
     const PAGE_SIZE = Math.min(limit, 100);
@@ -128,8 +134,25 @@ export async function GET(request: NextRequest) {
       archived: false,
     };
 
+    // Build the base filter for user permissions
+    // If user can view all tasks, allow additional filters like assignedTo and createdBy
+    // Otherwise, restrict to tasks assigned to or created by the user
     if (!canViewAllTasks) {
-      filters.$or = [{ assignedTo: userId }, { createdBy: userId }];
+      const userFilters: any[] = [{ assignedTo: userId }, { createdBy: userId }];
+      
+      // If assignedTo filter is provided and it's the current user, use it
+      // Otherwise, ignore the filter and use default user restriction
+      if (assignedTo && assignedTo === userId) {
+        filters.assignedTo = userId;
+      } else if (createdBy && createdBy === userId) {
+        filters.createdBy = userId;
+      } else {
+        filters.$or = userFilters;
+      }
+    } else {
+      // User can view all tasks, so apply filters as requested
+      if (assignedTo) filters.assignedTo = assignedTo;
+      if (createdBy) filters.createdBy = createdBy;
     }
 
     if (search) {
@@ -152,7 +175,41 @@ export async function GET(request: NextRequest) {
     if (type) filters.type = type;
     if (project) filters.project = project;
 
+    // Date range filters
+    if (dueDateFrom || dueDateTo) {
+      filters.dueDate = {};
+      if (dueDateFrom) {
+        const fromDate = new Date(dueDateFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        filters.dueDate.$gte = fromDate;
+      }
+      if (dueDateTo) {
+        const toDate = new Date(dueDateTo);
+        toDate.setHours(23, 59, 59, 999);
+        filters.dueDate.$lte = toDate;
+      }
+    }
+
+    // Created date range filters (combine with cursor pagination if needed)
+    const createdAtFilters: any = {};
+    if (createdAtFrom) {
+      const fromDate = new Date(createdAtFrom);
+      fromDate.setHours(0, 0, 0, 0);
+      createdAtFilters.$gte = fromDate;
+    }
+    if (createdAtTo) {
+      const toDate = new Date(createdAtTo);
+      toDate.setHours(23, 59, 59, 999);
+      createdAtFilters.$lte = toDate;
+    }
+    
     if (useCursorPagination && after) {
+      createdAtFilters.$lt = new Date(after);
+    }
+    
+    if (Object.keys(createdAtFilters).length > 0) {
+      filters.createdAt = createdAtFilters;
+    } else if (useCursorPagination && after) {
       filters.createdAt = { $lt: new Date(after) };
     }
 

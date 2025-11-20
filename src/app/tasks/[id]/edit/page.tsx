@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Checkbox } from '@/components/ui/Checkbox'
-import { Loader2, ArrowLeft, CheckCircle, Plus, Trash2 } from 'lucide-react'
+import { Loader2, ArrowLeft, CheckCircle, Plus, Trash2, Target, User, Clock, Calendar } from 'lucide-react'
 
 const STATUS_OPTIONS = [
   { value: 'backlog', label: 'Backlog' },
@@ -38,12 +38,30 @@ interface Subtask {
   updatedAt?: string
 }
 
+interface User {
+  _id: string
+  firstName: string
+  lastName: string
+  email: string
+}
+
+interface Project {
+  _id: string
+  name: string
+}
+
 interface TaskFormState {
   title: string
   description: string
   status: TaskStatus
   priority: TaskPriority
   type: TaskType
+  project?: string
+  assignedTo?: string
+  dueDate?: string
+  labels?: string
+  estimatedHours?: number
+  storyPoints?: number
 }
 
 const mapTaskFormState = (data: any): TaskFormState => ({
@@ -51,7 +69,13 @@ const mapTaskFormState = (data: any): TaskFormState => ({
   description: data?.description ?? '',
   status: (data?.status ?? 'backlog') as TaskStatus,
   priority: (data?.priority ?? 'medium') as TaskPriority,
-  type: (data?.type ?? 'task') as TaskType
+  type: (data?.type ?? 'task') as TaskType,
+  project: data?.project?._id ?? undefined,
+  assignedTo: data?.assignedTo?._id ?? undefined,
+  dueDate: data?.dueDate ? new Date(data.dueDate).toISOString().split('T')[0] : undefined,
+  labels: Array.isArray(data?.labels) ? data.labels.join(', ') : undefined,
+  estimatedHours: typeof data?.estimatedHours === 'number' ? data.estimatedHours : undefined,
+  storyPoints: typeof data?.storyPoints === 'number' ? data.storyPoints : undefined
 })
 
 const mapSubtasksFromResponse = (input: any): Subtask[] => {
@@ -96,11 +120,19 @@ export default function EditTaskPage() {
   const [originalTask, setOriginalTask] = useState<TaskFormState | null>(null)
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
   const [originalSubtasks, setOriginalSubtasks] = useState<Subtask[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loadingProjects, setLoadingProjects] = useState(false)
+  const [projectFilterQuery, setProjectFilterQuery] = useState('')
+  const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
+  const [labelsInput, setLabelsInput] = useState('')
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const messageRef = useRef<HTMLDivElement>(null)
 
   const fetchTask = useCallback(async () => {
     try {
@@ -116,7 +148,22 @@ export default function EditTaskPage() {
         setOriginalTask(mappedTask)
         setSubtasks(mappedSubtasks)
         setOriginalSubtasks(mappedSubtasks)
+        setLabelsInput(Array.isArray(data.data?.labels) ? data.data.labels.join(', ') : '')
         setError('')
+        // Reset filter queries
+        setProjectFilterQuery('')
+        setAssignedToFilterQuery('')
+        fetchProjects()
+        
+        // Fetch team members for the project if one is set
+        // On initial load: fetch team members and preserve existing assignee if valid
+        if (mappedTask.project) {
+          // Fetch team members with current assignee ID to validate it
+          fetchProjectTeamMembers(mappedTask.project, mappedTask.assignedTo)
+        } else {
+          // If no project, clear users
+          setUsers([])
+        }
       } else {
         setError(data.error || 'Failed to load task')
       }
@@ -132,6 +179,129 @@ export default function EditTaskPage() {
       fetchTask()
     }
   }, [taskId, fetchTask])
+
+  const fetchProjects = async () => {
+    setLoadingProjects(true)
+    try {
+      const response = await fetch('/api/projects?limit=1000&page=1')
+      const data = await response.json()
+      
+      if (data.success && Array.isArray(data.data)) {
+        setProjects(data.data.map((p: any) => ({ _id: p._id, name: p.name })))
+      } else {
+        setProjects([])
+      }
+    } catch (error) {
+      console.error('Failed to fetch projects:', error)
+      setProjects([])
+    } finally {
+      setLoadingProjects(false)
+    }
+  }
+
+  const fetchProjectTeamMembers = async (projectId: string, preserveAssigneeId?: string) => {
+    if (!projectId) {
+      setUsers([])
+      if (preserveAssigneeId) {
+        setTask((prev) => prev ? ({ ...prev, assignedTo: undefined }) : prev)
+      }
+      return
+    }
+    
+    setLoadingUsers(true)
+    try {
+      // Fetch project details to get team members (same approach as create page)
+      const response = await fetch(`/api/projects/${projectId}`)
+      const data = await response.json()
+      
+      if (!response.ok || !data.success || !data.data) {
+        setUsers([])
+        if (preserveAssigneeId) {
+          setTask((prev) => prev ? ({ ...prev, assignedTo: undefined }) : prev)
+        }
+        return
+      }
+      
+      // Extract team members from project data (same as create page)
+      const rawMembers = Array.isArray(data.data.teamMembers) 
+        ? data.data.teamMembers 
+        : []
+      
+      // Map team members to User format - handle direct user objects
+      const teamMembers: User[] = rawMembers
+        .map((member: any) => {
+          // Handle both populated and non-populated formats
+          const userObj = member.user || member
+          const userId = userObj?._id || member?._id
+          const firstName = userObj?.firstName || member?.firstName
+          const lastName = userObj?.lastName || member?.lastName
+          const email = userObj?.email || member?.email
+          
+          // Validate required fields
+          if (!userId || !firstName || !lastName) {
+            return null
+          }
+          
+          return {
+            _id: String(userId),
+            firstName: String(firstName),
+            lastName: String(lastName),
+            email: email ? String(email) : ''
+          }
+        })
+        .filter((member: User | null): member is User => member !== null)
+      
+      // Set the team members list
+      setUsers(teamMembers)
+      
+      // Handle assignee preservation/validation
+      if (preserveAssigneeId) {
+        const assigneeIdStr = String(preserveAssigneeId)
+        const assigneeInTeam = teamMembers.some((u: User) => String(u._id) === assigneeIdStr)
+        
+        if (assigneeInTeam) {
+          // Assignee is in the new team, preserve it
+          setTask((prev) => {
+            if (prev && String(prev.assignedTo) !== assigneeIdStr) {
+              return { ...prev, assignedTo: preserveAssigneeId }
+            }
+            return prev
+          })
+        } else {
+          // Assignee is not in the new team, clear it
+          setTask((prev) => {
+            if (prev && String(prev.assignedTo) === assigneeIdStr) {
+              return { ...prev, assignedTo: undefined }
+            }
+            return prev
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch project team members:', error)
+      setUsers([])
+      if (preserveAssigneeId) {
+        setTask((prev) => prev ? ({ ...prev, assignedTo: undefined }) : prev)
+      }
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
+
+  const filteredProjectOptions = useMemo(() => {
+    const query = projectFilterQuery.trim().toLowerCase()
+    if (!query) return projects
+    return projects.filter((project) => project.name.toLowerCase().includes(query))
+  }, [projects, projectFilterQuery])
+
+  const filteredAssignedToOptions = useMemo(() => {
+    const query = assignedToFilterQuery.trim().toLowerCase()
+    if (!query) return users
+    return users.filter((user) =>
+      `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(query) ||
+      (user.email && user.email.toLowerCase().includes(query))
+    )
+  }, [users, assignedToFilterQuery])
 
   const addSubtask = () => {
     setSubtasks((prev) => ([
@@ -182,9 +352,28 @@ export default function EditTaskPage() {
   const handleSave = async () => {
     if (!task) return
 
+    // Validate required fields
+    if (!task.project) {
+      setError('Project is required')
+      setSaving(false)
+      return
+    }
+    
+    if (!task.assignedTo) {
+      setError('Assigned To is required')
+      setSaving(false)
+      return
+    }
+
     try {
       setSaving(true)
+      setError('')
       const preparedSubtasks = sanitizeSubtasksForPayload(subtasks)
+      
+      // Parse labels from comma-separated string
+      const labels = labelsInput
+        ? labelsInput.split(',').map(label => label.trim()).filter(label => label.length > 0)
+        : []
 
       const res = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
@@ -195,6 +384,12 @@ export default function EditTaskPage() {
           status: task.status,
           priority: task.priority,
           type: task.type,
+          project: task.project || undefined,
+          assignedTo: task.assignedTo || undefined,
+          dueDate: task.dueDate || undefined,
+          labels: labels,
+          estimatedHours: task.estimatedHours || undefined,
+          storyPoints: task.storyPoints || undefined,
           subtasks: preparedSubtasks
         })
       })
@@ -209,6 +404,7 @@ export default function EditTaskPage() {
         setOriginalTask(mappedTask)
         setSubtasks(mappedSubtasks)
         setOriginalSubtasks(mappedSubtasks)
+        setLabelsInput(Array.isArray(data.data?.labels) ? data.data.labels.join(', ') : '')
         setSuccess('Task updated successfully')
         setTimeout(() => setSuccess(''), 4000)
         setError('')
@@ -229,8 +425,30 @@ export default function EditTaskPage() {
     if (!task || !originalTask) return false
     const taskChanged = JSON.stringify(task) !== JSON.stringify(originalTask)
     const subtasksChanged = JSON.stringify(comparableCurrentSubtasks) !== JSON.stringify(comparableOriginalSubtasks)
-    return taskChanged || subtasksChanged
-  }, [task, originalTask, comparableCurrentSubtasks, comparableOriginalSubtasks])
+    
+    // Check labels separately since they're stored in a separate state
+    const originalLabelsStr = Array.isArray(originalTask.labels) ? originalTask.labels.join(', ') : (originalTask.labels || '')
+    const labelsChanged = labelsInput.trim() !== originalLabelsStr.trim()
+    
+    return taskChanged || subtasksChanged || labelsChanged
+  }, [task, originalTask, comparableCurrentSubtasks, comparableOriginalSubtasks, labelsInput])
+
+  const isValid = useMemo(() => {
+    if (!task) return false
+    // Check all required fields
+    return !!(task.title?.trim() && task.project && task.assignedTo)
+  }, [task])
+
+  // Auto-scroll to message when error or success appears
+  useEffect(() => {
+    if ((error || success) && messageRef.current) {
+      messageRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start',
+        inline: 'nearest'
+      })
+    }
+  }, [error, success])
 
   if (loading) {
     return (
@@ -267,20 +485,22 @@ export default function EditTaskPage() {
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
 
-        {success && (
-          <Alert>
-            <div className="flex items-center">
-              <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-              <AlertDescription>{success}</AlertDescription>
-            </div>
-          </Alert>
-        )}
+        <div ref={messageRef}>
+          {success && (
+            <Alert>
+              <div className="flex items-center">
+                <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                <AlertDescription>{success}</AlertDescription>
+              </div>
+            </Alert>
+          )}
 
-        {error && !success && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+          {error && !success && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </div>
 
         <Card>
           <CardHeader>
@@ -341,6 +561,229 @@ export default function EditTaskPage() {
                       <SelectItem value="subtask">Subtask</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Target className="h-4 w-4" />
+                    Project *
+                  </label>
+                  <Select 
+                    value={task.project || ''} 
+                    onValueChange={(v) => {
+                      const newProjectId = v || undefined
+                      const currentAssigneeId = task?.assignedTo
+                      
+                      // Update project but DON'T clear assignee yet - will be validated when team members load
+                      setTask((prev) => prev ? ({ ...prev, project: newProjectId }) : prev)
+                      setProjectFilterQuery('')
+                      setAssignedToFilterQuery('')
+                      
+                      // Fetch team members for new project and preserve assignee if they're in the new team
+                      if (newProjectId) {
+                        // Pass current assignee ID to preserve it if valid in new project
+                        fetchProjectTeamMembers(newProjectId, currentAssigneeId)
+                      } else {
+                        setUsers([])
+                        setTask((prev) => prev ? ({ ...prev, assignedTo: undefined }) : prev)
+                      }
+                    }}
+                    disabled={loadingProjects}
+                    required
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder={loadingProjects ? "Loading projects..." : "Select project"} />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div 
+                        className="p-2"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        <Input
+                          value={projectFilterQuery}
+                          onChange={(e) => setProjectFilterQuery(e.target.value)}
+                          placeholder="Search projects"
+                          className="mb-2"
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => {
+                            e.stopPropagation()
+                            // Prevent Select from handling keyboard navigation when typing
+                            if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+                              e.preventDefault()
+                            }
+                          }}
+                          onFocus={(e) => e.stopPropagation()}
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          {loadingProjects ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground flex items-center space-x-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Loading projects...</span>
+                            </div>
+                          ) : filteredProjectOptions.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                          ) : (
+                            filteredProjectOptions.map((project) => (
+                              <SelectItem key={project._id} value={project._id}>
+                                {project.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Assigned To *
+                  </label>
+                  <Select 
+                    value={task.assignedTo || ''} 
+                    onValueChange={(v) => {
+                      setTask((prev) => prev ? ({ ...prev, assignedTo: v || undefined }) : prev)
+                      setAssignedToFilterQuery('')
+                    }}
+                    disabled={loadingUsers || !task.project}
+                    required
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue 
+                        placeholder={
+                          loadingUsers 
+                            ? "Loading team members..." 
+                            : !task.project 
+                              ? "Select project first" 
+                              : users.length === 0
+                                ? "No team members available"
+                                : task.assignedTo && users.some(u => String(u._id) === String(task.assignedTo))
+                                  ? undefined // Will display selected user name automatically
+                                  : "Select team member"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div 
+                        className="p-2"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        <Input
+                          value={assignedToFilterQuery}
+                          onChange={(e) => setAssignedToFilterQuery(e.target.value)}
+                          placeholder="Search assignees"
+                          className="mb-2"
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => {
+                            e.stopPropagation()
+                            // Prevent Select from handling keyboard navigation when typing
+                            if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+                              e.preventDefault()
+                            }
+                          }}
+                          onFocus={(e) => e.stopPropagation()}
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          {loadingUsers ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground flex items-center space-x-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Loading members...</span>
+                            </div>
+                          ) : !task.project ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">Please select a project first</div>
+                          ) : users.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No team members in this project</div>
+                          ) : filteredAssignedToOptions.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching team members</div>
+                          ) : (
+                            filteredAssignedToOptions.map((user) => (
+                              <SelectItem key={user._id} value={user._id}>
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="font-medium">{user.firstName} {user.lastName}</span>
+                                  {user.email && (
+                                    <span className="text-xs text-muted-foreground ml-2 truncate max-w-[180px]">
+                                      {user.email}
+                                    </span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Estimated Hours
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.5"
+                    value={task.estimatedHours || ''}
+                    onChange={(e) => setTask((prev) => prev ? ({ 
+                      ...prev, 
+                      estimatedHours: e.target.value ? parseFloat(e.target.value) : undefined 
+                    }) : prev)}
+                    placeholder="e.g., 8"
+                    className="mt-1"
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Story Points</label>
+                  <Input
+                    type="number"
+                    value={task.storyPoints || ''}
+                    onChange={(e) => setTask((prev) => prev ? ({ 
+                      ...prev, 
+                      storyPoints: e.target.value ? parseInt(e.target.value) : undefined 
+                    }) : prev)}
+                    placeholder="e.g., 5"
+                    className="mt-1"
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Due Date
+                  </label>
+                  <Input
+                    type="date"
+                    value={task.dueDate || ''}
+                    onChange={(e) => setTask((prev) => prev ? ({ ...prev, dueDate: e.target.value || undefined }) : prev)}
+                    className="mt-1"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Labels</label>
+                  <Input
+                    value={labelsInput}
+                    onChange={(e) => setLabelsInput(e.target.value)}
+                    placeholder="e.g., frontend, urgent, design"
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Separate multiple labels with commas</p>
                 </div>
               </div>
             </div>
@@ -432,7 +875,7 @@ export default function EditTaskPage() {
 
             <div className="flex justify-end space-x-2 pt-2">
               <Button variant="outline" onClick={() => router.push('/tasks')}>Cancel</Button>
-              <Button onClick={handleSave} disabled={saving || !isDirty}>
+              <Button onClick={handleSave} disabled={saving || !isDirty || !isValid}>
                 {saving ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...
