@@ -1,3 +1,11 @@
+## [1.1.15](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.14...v1.1.15) (2025-11-20)
+
+
+### Bug Fixes
+
+* add changes in calender view ([c106bba](https://github.com/EchonLabs/kanvaro.com/commit/c106bba7ff6433fe09a7e69ff1947d6d71cd67ca))
+* due data is not older date ([82c26b3](https://github.com/EchonLabs/kanvaro.com/commit/82c26b3ecf645badbfc44704a7c3c3355b19d6a4))
+
 ## [1.1.14](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.13...v1.1.14) (2025-11-20)
 
 
