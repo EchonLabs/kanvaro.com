@@ -13,8 +13,24 @@ import { Loader2, CheckCircle } from 'lucide-react'
 interface InvitationData {
   email: string
   role: string
+  customRole?: string
+  roleDisplayName?: string
   organization: string
   invitedBy: string
+}
+
+interface FieldErrors {
+  firstName?: string
+  lastName?: string
+  password?: string
+  confirmPassword?: string
+}
+
+interface TouchedFields {
+  firstName: boolean
+  lastName: boolean
+  password: boolean
+  confirmPassword: boolean
 }
 
 function AcceptInvitationContent() {
@@ -35,6 +51,15 @@ function AcceptInvitationContent() {
     confirmPassword: ''
   })
 
+  const [touched, setTouched] = useState<TouchedFields>({
+    firstName: false,
+    lastName: false,
+    password: false,
+    confirmPassword: false
+  })
+
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+
   useEffect(() => {
     if (token) {
       validateInvitation()
@@ -43,6 +68,17 @@ function AcceptInvitationContent() {
       setLoading(false)
     }
   }, [token])
+
+  // Re-validate confirmPassword when password changes
+  useEffect(() => {
+    if (touched.confirmPassword && formData.confirmPassword) {
+      const confirmError = validateField('confirmPassword', formData.confirmPassword, formData.password)
+      setFieldErrors(prev => ({
+        ...prev,
+        confirmPassword: confirmError
+      }))
+    }
+  }, [formData.password, formData.confirmPassword, touched.confirmPassword])
 
   const validateInvitation = async () => {
     try {
@@ -66,28 +102,126 @@ function AcceptInvitationContent() {
     }
   }
 
+  const validateField = (name: keyof typeof formData, value: string, currentPassword?: string): string | undefined => {
+    switch (name) {
+      case 'firstName':
+        if (!value.trim()) {
+          return 'First name is required'
+        }
+        if (value.trim().length < 2) {
+          return 'First name must be at least 2 characters'
+        }
+        return undefined
+      
+      case 'lastName':
+        if (!value.trim()) {
+          return 'Last name is required'
+        }
+        if (value.trim().length < 2) {
+          return 'Last name must be at least 2 characters'
+        }
+        return undefined
+      
+      case 'password':
+        if (!value) {
+          return 'Password is required'
+        }
+        if (value.length < 8) {
+          return 'Password must be at least 8 characters long'
+        }
+        const hasLowercase = /[a-z]/.test(value)
+        const hasUppercase = /[A-Z]/.test(value)
+        const hasNumber = /\d/.test(value)
+        const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(value)
+        
+        if (!hasLowercase || !hasUppercase || !hasNumber || !hasSpecialChar) {
+          return 'Password must contain uppercase, lowercase, number, and special character'
+        }
+        return undefined
+      
+      case 'confirmPassword':
+        if (!value) {
+          return 'Please confirm your password'
+        }
+        const passwordToCompare = currentPassword !== undefined ? currentPassword : formData.password
+        if (value !== passwordToCompare) {
+          return 'Passwords do not match'
+        }
+        return undefined
+      
+      default:
+        return undefined
+    }
+  }
+
+  const validateForm = (): boolean => {
+    const errors: FieldErrors = {}
+    
+    errors.firstName = validateField('firstName', formData.firstName)
+    errors.lastName = validateField('lastName', formData.lastName)
+    errors.password = validateField('password', formData.password)
+    errors.confirmPassword = validateField('confirmPassword', formData.confirmPassword)
+    
+    setFieldErrors(errors)
+    
+    return !errors.firstName && !errors.lastName && !errors.password && !errors.confirmPassword
+  }
+
+  const isFormValid = (): boolean => {
+    return (
+      formData.firstName.trim().length >= 2 &&
+      formData.lastName.trim().length >= 2 &&
+      formData.password.length >= 8 &&
+      formData.password === formData.confirmPassword &&
+      /[a-z]/.test(formData.password) &&
+      /[A-Z]/.test(formData.password) &&
+      /\d/.test(formData.password) &&
+      /[!@#$%^&*(),.?":{}|<>]/.test(formData.password)
+    )
+  }
+
+  const handleFieldChange = (name: keyof typeof formData, value: string) => {
+    // Clear general error when user starts typing
+    if (error) {
+      setError('')
+    }
+    
+    // Update form data
+    setFormData(prev => ({ ...prev, [name]: value }))
+    
+    // Validate field if it has been touched
+    if (touched[name]) {
+      const fieldError = validateField(name, value, name === 'password' ? value : formData.password)
+      setFieldErrors(prev => ({
+        ...prev,
+        [name]: fieldError
+      }))
+    }
+  }
+
+  const handleFieldBlur = (name: keyof typeof formData) => {
+    setTouched(prev => ({ ...prev, [name]: true }))
+    const fieldError = validateField(name, formData[name])
+    setFieldErrors(prev => ({
+      ...prev,
+      [name]: fieldError
+    }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match')
-      return
-    }
+    // Mark all fields as touched
+    setTouched({
+      firstName: true,
+      lastName: true,
+      password: true,
+      confirmPassword: true
+    })
 
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long')
-      return
-    }
-
-    // Enhanced password validation
-    const hasLowercase = /[a-z]/.test(formData.password)
-    const hasUppercase = /[A-Z]/.test(formData.password)
-    const hasNumber = /\d/.test(formData.password)
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(formData.password)
-
-    if (!hasLowercase || !hasUppercase || !hasNumber || !hasSpecialChar) {
-      setError('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character')
+    // Validate entire form
+    if (!validateForm()) {
       return
     }
 
@@ -183,85 +317,131 @@ function AcceptInvitationContent() {
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Accept Invitation</h1>
           <p className="text-muted-foreground">
-            You've been invited to join <span className="font-semibold text-foreground">{invitationData?.organization}</span> as a <span className="font-semibold text-primary">{invitationData?.role?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+            You've been invited to join <span className="font-semibold text-foreground">{invitationData?.organization}</span> as a <span className="font-semibold text-primary">{invitationData?.roleDisplayName || invitationData?.role?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
           </p>
         </div>
         
         <Card className="shadow-lg border-0 bg-card/50 backdrop-blur-sm">
-          <CardContent className="pt-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <Alert variant="destructive">
-                {error}
-              </Alert>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName" className="text-sm font-medium">First Name</Label>
-                <Input
-                  id="firstName"
-                  type="text"
-                  value={formData.firstName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
-                  required
-                  className="h-11"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="lastName" className="text-sm font-medium">Last Name</Label>
-                <Input
-                  id="lastName"
-                  type="text"
-                  value={formData.lastName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
-                  required
-                  className="h-11"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                required
-                minLength={8}
-                className="h-11"
-                placeholder="Create a strong password"
-              />
-              <PasswordStrength password={formData.password} />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                required
-                minLength={8}
-                className="h-11"
-                placeholder="Confirm your password"
-              />
-            </div>
-
-            <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Account...
-                </>
-              ) : (
-                'Accept Invitation'
+          <CardContent className="pt-6 pb-6 px-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {error && (
+                <Alert variant="destructive" className="mb-4">
+                  {error}
+                </Alert>
               )}
-            </Button>
-          </form>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName" className="text-sm font-medium">
+                    First Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="firstName"
+                    type="text"
+                    value={formData.firstName}
+                    onChange={(e) => handleFieldChange('firstName', e.target.value)}
+                    onBlur={() => handleFieldBlur('firstName')}
+                    required
+                    className={`h-11 ${touched.firstName && fieldErrors.firstName ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                    aria-invalid={touched.firstName && !!fieldErrors.firstName}
+                    aria-describedby={touched.firstName && fieldErrors.firstName ? 'firstName-error' : undefined}
+                  />
+                  {touched.firstName && fieldErrors.firstName && (
+                    <p id="firstName-error" className="text-sm text-destructive mt-1">
+                      {fieldErrors.firstName}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="lastName" className="text-sm font-medium">
+                    Last Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="lastName"
+                    type="text"
+                    value={formData.lastName}
+                    onChange={(e) => handleFieldChange('lastName', e.target.value)}
+                    onBlur={() => handleFieldBlur('lastName')}
+                    required
+                    className={`h-11 ${touched.lastName && fieldErrors.lastName ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                    aria-invalid={touched.lastName && !!fieldErrors.lastName}
+                    aria-describedby={touched.lastName && fieldErrors.lastName ? 'lastName-error' : undefined}
+                  />
+                  {touched.lastName && fieldErrors.lastName && (
+                    <p id="lastName-error" className="text-sm text-destructive mt-1">
+                      {fieldErrors.lastName}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium">
+                  Password <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => handleFieldChange('password', e.target.value)}
+                  onBlur={() => handleFieldBlur('password')}
+                  required
+                  minLength={8}
+                  className={`h-11 ${touched.password && fieldErrors.password ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                  placeholder="Create a strong password"
+                  aria-invalid={touched.password && !!fieldErrors.password}
+                  aria-describedby={touched.password && fieldErrors.password ? 'password-error' : undefined}
+                />
+                {touched.password && fieldErrors.password && (
+                  <p id="password-error" className="text-sm text-destructive mt-1">
+                    {fieldErrors.password}
+                  </p>
+                )}
+                <PasswordStrength password={formData.password} />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword" className="text-sm font-medium">
+                  Confirm Password <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={formData.confirmPassword}
+                  onChange={(e) => handleFieldChange('confirmPassword', e.target.value)}
+                  onBlur={() => handleFieldBlur('confirmPassword')}
+                  required
+                  minLength={8}
+                  className={`h-11 ${touched.confirmPassword && fieldErrors.confirmPassword ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                  placeholder="Confirm your password"
+                  aria-invalid={touched.confirmPassword && !!fieldErrors.confirmPassword}
+                  aria-describedby={touched.confirmPassword && fieldErrors.confirmPassword ? 'confirmPassword-error' : undefined}
+                />
+                {touched.confirmPassword && fieldErrors.confirmPassword && (
+                  <p id="confirmPassword-error" className="text-sm text-destructive mt-1">
+                    {fieldErrors.confirmPassword}
+                  </p>
+                )}
+              </div>
+
+              <div className="pt-2">
+                <Button 
+                  type="submit" 
+                  className="w-full h-11" 
+                  disabled={submitting || !isFormValid()}
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    'Accept Invitation'
+                  )}
+                </Button>
+              </div>
+            </form>
           </CardContent>
         </Card>
       </div>

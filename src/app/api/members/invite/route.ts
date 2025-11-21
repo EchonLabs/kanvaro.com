@@ -3,10 +3,12 @@ import connectDB from '@/lib/db-config'
 import { User } from '@/models/User'
 import { UserInvitation } from '@/models/UserInvitation'
 import { Organization } from '@/models/Organization'
+import { CustomRole } from '@/models/CustomRole'
 import { emailService } from '@/lib/email/EmailService'
 import { authenticateUser } from '@/lib/auth-utils'
 import { notificationService } from '@/lib/notification-service'
 import crypto from 'crypto'
+import mongoose from 'mongoose'
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,21 +90,71 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Determine if role is a custom role (ObjectId) or system role (enum value)
+    const systemRoles = ['admin', 'project_manager', 'team_member', 'client', 'viewer']
+    let invitationRole: string = 'team_member' // Default role
+    let customRoleId: mongoose.Types.ObjectId | undefined = undefined
+    let roleDisplayName: string = 'Team Member' // For email template
+
+    // Check if role is a valid MongoDB ObjectId (custom role)
+    if (mongoose.Types.ObjectId.isValid(role) && !systemRoles.includes(role)) {
+      // It's a custom role ID
+      const customRole = await CustomRole.findOne({
+        _id: role,
+        organization: organizationId,
+        isActive: true
+      })
+
+      if (!customRole) {
+        return NextResponse.json(
+          { error: 'Invalid custom role or role does not belong to this organization' },
+          { status: 400 }
+        )
+      }
+
+      customRoleId = customRole._id as mongoose.Types.ObjectId
+      invitationRole = 'team_member' // Use default role when custom role is set
+      roleDisplayName = customRole.name
+    } else if (systemRoles.includes(role)) {
+      // It's a system role
+      invitationRole = role
+      // Map system role to display name
+      const roleNameMap: Record<string, string> = {
+        'admin': 'Administrator',
+        'project_manager': 'Project Manager',
+        'team_member': 'Team Member',
+        'client': 'Client',
+        'viewer': 'Viewer'
+      }
+      roleDisplayName = roleNameMap[role] || role
+    } else {
+      return NextResponse.json(
+        { error: 'Invalid role specified' },
+        { status: 400 }
+      )
+    }
+
     // Generate invitation token
     const token = crypto.randomBytes(32).toString('hex')
 
     // Create invitation
-    const invitation = new UserInvitation({
+    const invitationData: any = {
       email: email.toLowerCase(),
       organization: organizationId,
       invitedBy: userId,
-      role,
+      role: invitationRole,
       firstName,
       lastName,
       token,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-    })
+    }
 
+    // Add customRole if it's a custom role
+    if (customRoleId) {
+      invitationData.customRole = customRoleId
+    }
+
+    const invitation = new UserInvitation(invitationData)
     await invitation.save()
 
     // Get organization details
@@ -280,7 +332,7 @@ export async function POST(request: NextRequest) {
                 <h1>You're Invited to Join ${organizationName}</h1>
             </div>
 
-            <p>You've been invited to join <strong>${organizationName}</strong> as a <strong>${role.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</strong>.</p>
+            <p>You've been invited to join <strong>${organizationName}</strong> as a <strong>${roleDisplayName}</strong>.</p>
             
             <p>Click the button below to accept your invitation and set up your account:</p>
 
@@ -337,7 +389,7 @@ export async function POST(request: NextRequest) {
         await notificationService.createBulkNotifications(adminIds, organizationId, {
           type: 'invitation',
           title: 'New Team Member Invitation',
-          message: `${inviterUser.firstName} ${inviterUser.lastName} invited ${firstName || email} to join as ${role.replace(/_/g, ' ')}`,
+          message: `${inviterUser.firstName} ${inviterUser.lastName} invited ${firstName || email} to join as ${roleDisplayName}`,
           data: {
             entityType: 'user',
             action: 'created',
@@ -358,6 +410,8 @@ export async function POST(request: NextRequest) {
       data: {
         email: invitation.email,
         role: invitation.role,
+        customRole: invitation.customRole,
+        roleDisplayName: roleDisplayName,
         expiresAt: invitation.expiresAt
       }
     })

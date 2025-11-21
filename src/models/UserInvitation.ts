@@ -37,7 +37,8 @@ const UserInvitationSchema = new Schema<IUserInvitation>({
   role: {
     type: String,
     enum: ['admin', 'project_manager', 'team_member', 'client', 'viewer'],
-    required: true
+    required: false,
+    default: 'team_member'
   },
   customRole: {
     type: Schema.Types.ObjectId,
