@@ -330,7 +330,12 @@ export async function POST(request: NextRequest) {
       )
     ])
     
-    const nextPosition = maxPosition?.position !== undefined ? maxPosition.position + 1 : 0
+    // TypeScript type narrowing: findOne returns a single document or null
+    // Access position property safely after verifying it exists
+    const maxPositionValue = maxPosition && typeof maxPosition === 'object' && !Array.isArray(maxPosition) && 'position' in maxPosition
+      ? (maxPosition as any).position
+      : undefined
+    const nextPosition = typeof maxPositionValue === 'number' ? maxPositionValue + 1 : 0
     const taskNumber = taskCounter.seq
     const displayId = `${projectDoc.projectNumber}.${taskNumber}`
 
