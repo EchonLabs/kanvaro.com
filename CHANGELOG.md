@@ -1,3 +1,10 @@
+## [1.2.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.2.1...v1.2.2) (2025-11-21)
+
+
+### Bug Fixes
+
+* add changes in invitation and email ([f8a4843](https://github.com/EchonLabs/kanvaro.com/commit/f8a48436c72cba3813887c85c9a336fe4dab1b79))
+
 ## [1.2.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.2.0...v1.2.1) (2025-11-21)
 
 
