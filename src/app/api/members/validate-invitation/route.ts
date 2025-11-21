@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { UserInvitation } from '@/models/UserInvitation'
 import { Organization } from '@/models/Organization'
+import { CustomRole } from '@/models/CustomRole'
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,11 +32,32 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Get role display name
+    let roleDisplayName = invitation.role
+    if (invitation.customRole) {
+      const customRole = await CustomRole.findById(invitation.customRole)
+      if (customRole) {
+        roleDisplayName = customRole.name
+      }
+    } else {
+      // Map system role to display name
+      const roleNameMap: Record<string, string> = {
+        'admin': 'Administrator',
+        'project_manager': 'Project Manager',
+        'team_member': 'Team Member',
+        'client': 'Client',
+        'viewer': 'Viewer'
+      }
+      roleDisplayName = roleNameMap[invitation.role] || invitation.role
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         email: invitation.email,
         role: invitation.role,
+        customRole: invitation.customRole,
+        roleDisplayName: roleDisplayName,
         organization: invitation.organization.name,
         invitedBy: `${invitation.invitedBy.firstName} ${invitation.invitedBy.lastName}`,
         firstName: invitation.firstName,
