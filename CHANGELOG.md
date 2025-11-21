@@ -1,3 +1,15 @@
+# [1.3.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.2.4...v1.3.0) (2025-11-21)
+
+
+### Bug Fixes
+
+* speedup task creation ([fe8bf85](https://github.com/EchonLabs/kanvaro.com/commit/fe8bf854a7e6a9f28675b4ec2b79a170bdbb729d))
+
+
+### Features
+
+* add sprint changes ([c8afe33](https://github.com/EchonLabs/kanvaro.com/commit/c8afe33c4e2f9b194096a498a785dede90474f7f))
+
 ## [1.2.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.2.3...v1.2.4) (2025-11-21)
 
 
