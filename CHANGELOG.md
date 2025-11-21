@@ -1,3 +1,11 @@
+## [1.2.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.2.2...v1.2.3) (2025-11-21)
+
+
+### Bug Fixes
+
+* kanbarn board loading issue ([c8b55e8](https://github.com/EchonLabs/kanvaro.com/commit/c8b55e8346766f70a8534ff93f95e827861a71e9))
+* remove settings part from stories ([f0d0fef](https://github.com/EchonLabs/kanvaro.com/commit/f0d0fefa916f858a295ffe50e645c7c67f31d6df))
+
 ## [1.2.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.2.1...v1.2.2) (2025-11-21)
 
 
