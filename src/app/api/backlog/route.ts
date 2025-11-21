@@ -5,6 +5,7 @@ import { Story } from '@/models/Story'
 import { Epic } from '@/models/Epic'
 import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
+import '@/models/Sprint'
 
 export async function GET(request: NextRequest) {
   try {
@@ -61,17 +62,20 @@ export async function GET(request: NextRequest) {
     const taskFilter: any = {
       ...searchFilter,
       organization: organizationId,
-      project: { $in: projectIds }
+      project: { $in: projectIds },
+      archived: false
     }
 
     const storyFilter: any = {
       ...searchFilter,
-      project: { $in: projectIds }
+      project: { $in: projectIds },
+      archived: false
     }
 
     const epicFilter: any = {
       ...searchFilter,
-      project: { $in: projectIds }
+      project: { $in: projectIds },
+      archived: false
     }
 
     if (priority) {

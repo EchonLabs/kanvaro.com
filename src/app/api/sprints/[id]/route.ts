@@ -41,10 +41,9 @@ export async function GET(
 
     const taskDocs = await Task.find({
       sprint: sprintId,
-      organization: organizationId,
-      archived: { $ne: true }
+      organization: organizationId
     })
-      .select('title status storyPoints estimatedHours actualHours priority type assignedTo')
+      .select('title status storyPoints estimatedHours actualHours priority type assignedTo archived')
       .populate('assignedTo', 'firstName lastName email')
 
     const tasks = taskDocs.map(task => {
@@ -58,6 +57,7 @@ export async function GET(
         actualHours: taskObj.actualHours ?? 0,
         priority: taskObj.priority,
         type: taskObj.type,
+        archived: taskObj.archived ?? false,
         assignedTo: taskObj.assignedTo
           ? {
               _id: taskObj.assignedTo._id,
