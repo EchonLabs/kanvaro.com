@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.3.0...v1.3.1) (2025-11-21)
+
+
+### Bug Fixes
+
+* fix create task ([3f71760](https://github.com/EchonLabs/kanvaro.com/commit/3f71760754cad7ad487963a1af8c9d9d0ff13d49))
+
 # [1.3.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.2.4...v1.3.0) (2025-11-21)
 
 
