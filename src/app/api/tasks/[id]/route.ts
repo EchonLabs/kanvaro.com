@@ -148,6 +148,7 @@ export async function PUT(
 ) {
   try {
     await connectDB()
+    console.log('[Task PUT] Connected to DB', { taskId: params?.id })
 
     const authResult = await authenticateUser()
     if ('error' in authResult) {
@@ -164,6 +165,10 @@ export async function PUT(
 
     const rawUpdate = await request.json()
     const updateData: Record<string, any> = { ...rawUpdate }
+    console.log('[Task PUT] Incoming payload', {
+      taskId,
+      receivedKeys: Object.keys(updateData)
+    })
 
     if (Object.prototype.hasOwnProperty.call(updateData, 'status')) {
       // Allow any string status to support custom kanban statuses per project
@@ -242,6 +247,15 @@ export async function PUT(
         { createdBy: userId }
       ]
     })
+    if (!currentTask) {
+      console.warn('[Task PUT] Task not found or unauthorized', { taskId, userId })
+    } else {
+      console.log('[Task PUT] Current task loaded', {
+        taskId,
+        currentStatus: currentTask.status,
+        currentSprint: currentTask.sprint
+      })
+    }
 
     // If status is changing, set position to end of target column
     if (updateData.status && updateData.status !== currentTask.status) {
@@ -253,6 +267,7 @@ export async function PUT(
     }
 
     if (!currentTask) {
+      console.warn('[Task PUT] Task not found or unauthorized on update', { taskId, userId })
       return NextResponse.json(
         { error: 'Task not found or unauthorized' },
         { status: 404 }
@@ -410,6 +425,12 @@ export async function PUT(
       console.error('Failed to send task update notifications:', notificationError)
       // Don't fail the task update if notification fails
     }
+
+    console.log('[Task PUT] Task updated successfully', {
+      taskId,
+      newStatus: task.status,
+      sprint: task.sprint?._id
+    })
 
     return NextResponse.json({
       success: true,
