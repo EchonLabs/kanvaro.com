@@ -1,3 +1,10 @@
+## [1.2.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.2.3...v1.2.4) (2025-11-21)
+
+
+### Bug Fixes
+
+* add consoles to check errors ([cc19cc4](https://github.com/EchonLabs/kanvaro.com/commit/cc19cc4bb95d307af0aa8dc96af53009e258a194))
+
 ## [1.2.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.2.2...v1.2.3) (2025-11-21)
 
 
