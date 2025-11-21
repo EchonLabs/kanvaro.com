@@ -6,7 +6,6 @@ import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { formatToTitleCase } from '@/lib/utils'
 import { Target, Plus } from 'lucide-react'
 import SortableTask from './SortableTask'
 import { ITask } from '@/models/Task'
@@ -50,7 +49,7 @@ export default function VirtualizedColumn({
   onEditTask,
   onDeleteTask
 }: VirtualizedColumnProps) {
-  const parentRef = useRef<HTMLDivElement>(null)
+  const parentRef = useRef<HTMLDivElement | null>(null)
   
   // Add droppable functionality for empty columns
   const { setNodeRef, isOver } = useDroppable({
@@ -60,29 +59,37 @@ export default function VirtualizedColumn({
   const rowVirtualizer = useVirtualizer({
     count: tasks.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 140,
-    overscan: 5,
+    estimateSize: () => 185,
+    overscan: 6,
   })
 
+  const setDroppableRef = (node: HTMLDivElement | null) => {
+    setNodeRef(node)
+    parentRef.current = node
+  }
+
   return (
-    <div className="space-y-2 sm:space-y-4 min-w-[280px] sm:min-w-0 w-full sm:w-auto">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6 min-w-[280px] sm:min-w-0 w-full sm:w-auto">
+      <div className="flex items-center justify-between rounded-xl bg-muted/40 px-4 py-3 shadow-sm">
         <div className="flex items-center space-x-2 min-w-0">
-          <Badge className={`${column.color} text-xs sm:text-sm truncate`}>
+          <Badge className={`${column.color} text-xs sm:text-sm truncate px-2 py-1`}>
             {column.title}
           </Badge>
           <span className="text-xs sm:text-sm text-muted-foreground flex-shrink-0">
             {tasks.length}
           </span>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => onCreateTask(column.key)}
-          className="flex-shrink-0"
-        >
-          +
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => onCreateTask(column.key)}
+            className="flex items-center gap-1 h-8 px-3 text-xs"
+          >
+            <Plus className="h-3 w-3" />
+            <span className="hidden sm:inline">Add Task</span>
+          </Button>
+        </div>
       </div>
       
         <SortableContext
@@ -90,58 +97,53 @@ export default function VirtualizedColumn({
           strategy={verticalListSortingStrategy}
         >
         <div 
-          ref={setNodeRef}
-          className={`h-[300px] sm:h-[400px] md:h-[500px] overflow-auto overflow-x-hidden border-2 border-dashed rounded-lg transition-colors ${
+          ref={setDroppableRef}
+          className={`h-[360px] sm:h-[460px] md:h-[560px] overflow-auto overflow-x-hidden border border-dashed rounded-2xl transition-colors bg-background/80 px-4 py-4 shadow-sm space-y-3 ${
             isOver 
               ? 'border-primary bg-primary/5' 
-              : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700'
+              : 'border-border/40 hover:border-border/70'
           }`}
         >
           {tasks.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-muted-foreground">
-              <div className="text-center">
-                <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+              <div className="text-center space-y-1">
+                <Target className="h-9 w-9 mx-auto opacity-50" />
                 <p className="text-sm">Drop tasks here</p>
               </div>
             </div>
           ) : (
             <div
-              ref={parentRef}
-              className="h-full"
+              className="h-full relative"
+              style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+              }}
             >
-              <div
-                style={{
-                  height: `${rowVirtualizer.getTotalSize()}px`,
-                  width: '100%',
-                  position: 'relative',
-                }}
-              >
-                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                  const task = tasks[virtualRow.index]
-                  return (
-                    <div
-                      key={virtualRow.key}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: `${virtualRow.size}px`,
-                        transform: `translateY(${virtualRow.start}px)`,
-                      }}
-                    >
-                      <SortableTask 
-                        task={task}
-                        onClick={() => onTaskClick?.(task)}
-                        getPriorityColor={getPriorityColor}
-                        getTypeColor={getTypeColor}
-                        onEdit={onEditTask}
-                        onDelete={onDeleteTask}
-                      />
-                    </div>
-                  )
-                })}
-              </div>
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const task = tasks[virtualRow.index]
+                return (
+                  <div
+                    key={virtualRow.key}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                      padding: '0 0.35rem 1rem 0.35rem',
+                    }}
+                  >
+                    <SortableTask 
+                      task={task}
+                      onClick={() => onTaskClick?.(task)}
+                      getPriorityColor={getPriorityColor}
+                      getTypeColor={getTypeColor}
+                      onEdit={onEditTask}
+                      onDelete={onDeleteTask}
+                    />
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

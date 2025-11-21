@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import connectDB, { hasDatabaseConfig } from '@/lib/db-config'
+import connectDB from '@/lib/db-config'
+import { hasDatabaseConfig } from '@/lib/db-config'
 import { Organization } from '@/models/Organization'
-import { authenticateUser } from '@/lib/auth-utils'
 
 export async function GET() {
   try {
+    // Check if database is configured
     const isConfigured = await hasDatabaseConfig()
-
     if (!isConfigured) {
       return NextResponse.json({
         provider: 'smtp',
@@ -28,19 +28,12 @@ export async function GET() {
         }
       })
     }
-
-    const authResult = await authenticateUser()
-    if ('error' in authResult) {
-      return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status }
-      )
-    }
-
+    
     await connectDB()
-
-    const organization = await Organization.findById(authResult.user.organization)
-
+    
+    // Get the organization's email configuration
+    const organization = await Organization.findOne({})
+    
     if (!organization || !organization.emailConfig) {
       return NextResponse.json({
         provider: 'smtp',
@@ -62,7 +55,7 @@ export async function GET() {
         }
       })
     }
-
+    
     return NextResponse.json(organization.emailConfig)
   } catch (error) {
     console.error('Email settings retrieval failed:', error)
@@ -76,7 +69,8 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const emailConfig = await request.json()
-
+    
+    // Check if database is configured
     const isConfigured = await hasDatabaseConfig()
     if (!isConfigured) {
       return NextResponse.json(
@@ -84,26 +78,12 @@ export async function PUT(request: NextRequest) {
         { status: 200 }
       )
     }
-
-    const authResult = await authenticateUser()
-    if ('error' in authResult) {
-      return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status }
-      )
-    }
-
-    if (!['admin', 'project_manager'].includes(authResult.user.role)) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions' },
-        { status: 403 }
-      )
-    }
-
+    
     await connectDB()
-
+    
+    // Update the organization's email configuration
     const organization = await Organization.findOneAndUpdate(
-      { _id: authResult.user.organization },
+      {},
       {
         emailConfig: {
           provider: emailConfig.provider,
@@ -113,14 +93,14 @@ export async function PUT(request: NextRequest) {
       },
       { new: true, upsert: true }
     )
-
+    
     if (!organization) {
       return NextResponse.json(
         { error: 'Failed to update email settings' },
         { status: 500 }
       )
     }
-
+    
     return NextResponse.json({
       message: 'Email settings updated successfully',
       emailConfig: organization.emailConfig

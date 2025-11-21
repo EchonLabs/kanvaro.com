@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { formatToTitleCase } from '@/lib/utils'
@@ -227,6 +227,7 @@ export default function KanbanPage() {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [createTaskStatus, setCreateTaskStatus] = useState<string | undefined>(undefined)
+  const hasFetchedProjects = useRef(false)
 
   // Use the task state management hook
   const {
@@ -259,6 +260,52 @@ export default function KanbanPage() {
       },
     })
   )
+
+  const fetchTasks = useCallback(async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/tasks')
+      const data = await response.json()
+
+      if (data.success) {
+        setTasks(data.data)
+      } else {
+        setError(data.error || 'Failed to fetch tasks')
+      }
+    } catch (err) {
+      setError('Failed to fetch tasks')
+    } finally {
+      setLoading(false)
+    }
+  }, [setTasks])
+
+  const fetchProjects = useCallback(async (force = false) => {
+    if (hasFetchedProjects.current && !force) {
+      return
+    }
+
+    let fetchSucceeded = false
+    hasFetchedProjects.current = true
+
+    try {
+      const response = await fetch('/api/projects')
+      const data = await response.json()
+
+      if (data.success && Array.isArray(data.data)) {
+        setProjects(data.data)
+      } else {
+        setProjects([])
+      }
+      fetchSucceeded = true
+    } catch (err) {
+      console.error('Failed to fetch projects:', err)
+      setProjects([])
+    } finally {
+      if (!fetchSucceeded) {
+        hasFetchedProjects.current = false
+      }
+    }
+  }, [])
 
   const checkAuth = useCallback(async () => {
     try {
@@ -298,45 +345,11 @@ export default function KanbanPage() {
         router.push('/login')
       }, 2000)
     }
-  }, [router, startPolling, stopPolling])
+  }, [router, startPolling, stopPolling, fetchTasks, fetchProjects])
 
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
-
-  const fetchTasks = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch('/api/tasks')
-      const data = await response.json()
-
-      if (data.success) {
-        setTasks(data.data)
-      } else {
-        setError(data.error || 'Failed to fetch tasks')
-      }
-    } catch (err) {
-      setError('Failed to fetch tasks')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchProjects = async () => {
-    try {
-      const response = await fetch('/api/projects')
-      const data = await response.json()
-
-      if (data.success && Array.isArray(data.data)) {
-        setProjects(data.data)
-      } else {
-        setProjects([])
-      }
-    } catch (err) {
-      console.error('Failed to fetch projects:', err)
-      setProjects([])
-    }
-  }
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
