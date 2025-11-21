@@ -250,6 +250,7 @@ export async function GET(request: NextRequest) {
 
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now()
   try {
     await connectDB()
 
@@ -265,6 +266,7 @@ export async function POST(request: NextRequest) {
     const userId = user.id
 
     const payload = await request.json()
+    console.log('[Task POST] Starting task creation', { userId, project: payload.project })
     const {
       title,
       description,
@@ -299,20 +301,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get the next position for this project/status combination
-    // Allow any string status to support custom kanban statuses per project
-    // Default to 'backlog' if no status provided
-    const taskStatus: string = typeof status === 'string' && status.trim().length > 0
-      ? status.trim()
-      : 'backlog'
-    const maxPosition = await Task.findOne(
-      { project, status: taskStatus },
-      { position: 1 }
-    ).sort({ position: -1 })
-    const nextPosition = maxPosition ? maxPosition.position + 1 : 0
-
-    // Resolve project number and next task number for this project
-    const projectDoc = await Project.findById(project).select('projectNumber organization')
+    // Resolve project number and next task number for this project (do this first as we need it)
+    const projectDoc = await Project.findById(project).select('projectNumber organization name')
     if (!projectDoc) {
       return NextResponse.json(
         { error: 'Project not found' },
@@ -320,11 +310,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const taskCounter = await Counter.findOneAndUpdate(
-      { scope: 'task', project: projectDoc._id },
-      { $inc: { seq: 1 }, $setOnInsert: { updatedAt: new Date() } },
-      { new: true, upsert: true }
-    )
+    // Get the next position for this project/status combination
+    // Allow any string status to support custom kanban statuses per project
+    // Default to 'backlog' if no status provided
+    const taskStatus: string = typeof status === 'string' && status.trim().length > 0
+      ? status.trim()
+      : 'backlog'
+    
+    // Run position query and counter update in parallel for better performance
+    const [maxPosition, taskCounter] = await Promise.all([
+      Task.findOne(
+        { project, status: taskStatus },
+        { position: 1 }
+      ).sort({ position: -1 }).lean(),
+      Counter.findOneAndUpdate(
+        { scope: 'task', project: projectDoc._id },
+        { $inc: { seq: 1 }, $setOnInsert: { updatedAt: new Date() } },
+        { new: true, upsert: true }
+      )
+    ])
+    
+    // TypeScript type narrowing: findOne returns a single document or null
+    // Access position property safely after verifying it exists
+    const maxPositionValue = maxPosition && typeof maxPosition === 'object' && !Array.isArray(maxPosition) && 'position' in maxPosition
+      ? (maxPosition as any).position
+      : undefined
+    const nextPosition = typeof maxPositionValue === 'number' ? maxPositionValue + 1 : 0
     const taskNumber = taskCounter.seq
     const displayId = `${projectDoc.projectNumber}.${taskNumber}`
 
@@ -361,10 +372,7 @@ export async function POST(request: NextRequest) {
 
     await task.save()
 
-    // Invalidate tasks cache for this organization
-    await invalidateCache(`tasks:*:org:${user.organization}:*`)
-
-    // Populate the created task
+    // Populate the created task (do this before cache invalidation to ensure we have the data)
     const populatedTask = await Task.findById(task._id)
       .populate('project', '_id name')
       .populate('assignedTo', 'firstName lastName email')
@@ -373,31 +381,38 @@ export async function POST(request: NextRequest) {
       .populate('sprint', 'name status')
       .populate('parentTask', 'title')
 
-    // Send notification if task is assigned to someone
-    if (normalizedAssignedTo && normalizedAssignedTo !== userId) {
-      try {
-        const projectDoc = await Project.findById(project).select('name')
-        const createdByUser = await User.findById(userId).select('firstName lastName')
-        
-        await notificationService.notifyTaskUpdate(
-          task._id.toString(),
-          'assigned',
-          normalizedAssignedTo,
-          user.organization,
-          title,
-          projectDoc?.name
-        )
-      } catch (notificationError) {
-        console.error('Failed to send task assignment notification:', notificationError)
-        // Don't fail the task creation if notification fails
-      }
-    }
-
-    return NextResponse.json({
+    // Return response immediately to avoid blocking on slow operations
+    const responseData = {
       success: true,
       message: 'Task created successfully',
       data: populatedTask
+    }
+
+    // Invalidate tasks cache for this organization (non-blocking)
+    invalidateCache(`tasks:*:org:${user.organization}:*`).catch(err => {
+      console.error('Failed to invalidate cache:', err)
     })
+
+    // Send notification if task is assigned to someone (non-blocking - fire and forget)
+    if (normalizedAssignedTo && normalizedAssignedTo !== userId) {
+      // Use projectDoc we already fetched earlier instead of querying again
+      notificationService.notifyTaskUpdate(
+        task._id.toString(),
+        'assigned',
+        normalizedAssignedTo,
+        user.organization,
+        title,
+        projectDoc?.name
+      ).catch(notificationError => {
+        console.error('Failed to send task assignment notification:', notificationError)
+        // Don't fail the task creation if notification fails
+      })
+    }
+
+    const duration = Date.now() - startTime
+    console.log('[Task POST] Task created successfully', { taskId: task._id, duration: `${duration}ms` })
+
+    return NextResponse.json(responseData)
 
   } catch (error) {
     console.error('Create task error:', error)
