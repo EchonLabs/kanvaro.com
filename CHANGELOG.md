@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.2.0...v1.2.1) (2025-11-21)
+
+
+### Bug Fixes
+
+* add backlog to kanbarn board ([bb3c561](https://github.com/EchonLabs/kanvaro.com/commit/bb3c561e549aeac102d286bd767ab1b51b71ac82))
+
 # [1.2.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.16...v1.2.0) (2025-11-20)
 
 
