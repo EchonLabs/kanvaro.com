@@ -289,9 +289,17 @@ export default function CreateTaskModal({
         })
       })
 
-      const data = await response.json()
+      // Read response body only once - you can't read it twice!
+      const data = await response.json().catch(() => ({ error: 'Failed to parse response' }))
       
+      if (!response.ok) {
+        setError(data.error || 'Failed to create task')
+        setLoading(false)
+        return
+      }
+
       if (data.success) {
+        setSuccess('Task created successfully')
         onTaskCreated()
         const newId = data?.data?._id
         onClose()
@@ -317,11 +325,12 @@ export default function CreateTaskModal({
         setAssigneeQuery('')
         if (!projectId) setSelectedProjectId('')
       } else {
-        onClose()
+        setError(data.error || 'Failed to create task')
+        setLoading(false)
       }
     } catch (error) {
-      onClose()
-    } finally {
+      console.error('Task creation error:', error)
+      setError('Failed to create task. Please try again.')
       setLoading(false)
     }
   }
