@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
-import { formatToTitleCase } from '@/lib/utils'
+import { formatToTitleCase, cn } from '@/lib/utils'
 import { useTaskSync, useTaskState } from '@/hooks/useTaskSync'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
+import { Calendar as DateRangeCalendar } from '@/components/ui/calendar'
 import {
   DndContext,
   DragEndEvent,
@@ -66,6 +68,8 @@ import EditTaskModal from '@/components/tasks/EditTaskModal'
 import ViewTaskModal from '@/components/tasks/ViewTaskModal'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
+import { DateRange } from 'react-day-picker'
+import { format } from 'date-fns'
 
 interface Task {
   _id: string
@@ -79,15 +83,18 @@ interface Task {
     name: string
   }
   assignedTo?: {
+    _id?: string
     firstName: string
     lastName: string
     email: string
   }
   createdBy: {
+    _id?: string
     firstName: string
     lastName: string
     email: string
   }
+  taskNumber?: string | number
   storyPoints?: number
   dueDate?: string
   estimatedHours?: number
@@ -100,6 +107,17 @@ interface Task {
 interface Project {
   _id: string
   name: string
+}
+
+interface PersonOption {
+  id: string
+  name: string
+  email?: string
+}
+
+interface TaskOption {
+  id: string
+  label: string
 }
 
 const columns = [
@@ -227,6 +245,15 @@ export default function KanbanPage() {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [createTaskStatus, setCreateTaskStatus] = useState<string | undefined>(undefined)
+  const [assignedToFilter, setAssignedToFilter] = useState('all')
+  const [assignedByFilter, setAssignedByFilter] = useState('all')
+  const [assignedToOptions, setAssignedToOptions] = useState<PersonOption[]>([])
+  const [assignedByOptions, setAssignedByOptions] = useState<PersonOption[]>([])
+  const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
+  const [assignedByFilterQuery, setAssignedByFilterQuery] = useState('')
+  const [dateRangeFilter, setDateRangeFilter] = useState<DateRange | undefined>()
+  const [taskNumberFilter, setTaskNumberFilter] = useState('all')
+  const [taskNumberFilterQuery, setTaskNumberFilterQuery] = useState('')
   const hasFetchedProjects = useRef(false)
 
   // Use the task state management hook
@@ -307,6 +334,52 @@ export default function KanbanPage() {
     }
   }, [])
 
+  useEffect(() => {
+    const assignedToMap = new Map<string, PersonOption>()
+    const assignedByMap = new Map<string, PersonOption>()
+
+    tasks.forEach((task) => {
+      if (task.assignedTo) {
+        const id = task.assignedTo._id || task.assignedTo.email || `${task.assignedTo.firstName}-${task.assignedTo.lastName}`
+        if (id) {
+          const name = `${task.assignedTo.firstName} ${task.assignedTo.lastName}`.trim()
+          assignedToMap.set(id, {
+            id,
+            name,
+            email: task.assignedTo.email
+          })
+        }
+      }
+
+      if (task.createdBy) {
+        const id = task.createdBy._id || task.createdBy.email || `${task.createdBy.firstName}-${task.createdBy.lastName}`
+        if (id) {
+          const name = `${task.createdBy.firstName} ${task.createdBy.lastName}`.trim()
+          assignedByMap.set(id, {
+            id,
+            name,
+            email: task.createdBy.email
+          })
+        }
+      }
+    })
+
+    setAssignedToOptions(Array.from(assignedToMap.values()).sort((a, b) => a.name.localeCompare(b.name)))
+    setAssignedByOptions(Array.from(assignedByMap.values()).sort((a, b) => a.name.localeCompare(b.name)))
+  }, [tasks])
+
+  useEffect(() => {
+    if (assignedToFilter !== 'all' && !assignedToOptions.some(option => option.id === assignedToFilter)) {
+      setAssignedToFilter('all')
+    }
+    if (assignedByFilter !== 'all' && !assignedByOptions.some(option => option.id === assignedByFilter)) {
+      setAssignedByFilter('all')
+    }
+    if (taskNumberFilter !== 'all' && !tasks.some(task => task._id === taskNumberFilter || String(task.taskNumber ?? '') === taskNumberFilter)) {
+      setTaskNumberFilter('all')
+    }
+  }, [assignedToOptions, assignedByOptions, assignedToFilter, assignedByFilter, taskNumberFilter, tasks])
+
   const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me')
@@ -372,6 +445,59 @@ export default function KanbanPage() {
     }
   }
 
+  const startDateBoundary = useMemo(() => {
+    if (!dateRangeFilter?.from) return null
+    const date = new Date(dateRangeFilter.from)
+    date.setHours(0, 0, 0, 0)
+    return date
+  }, [dateRangeFilter])
+
+  const endDateBoundary = useMemo(() => {
+    if (!dateRangeFilter?.to) return null
+    const date = new Date(dateRangeFilter.to)
+    date.setHours(23, 59, 59, 999)
+    return date
+  }, [dateRangeFilter])
+
+  const filteredAssignedToOptions = useMemo(() => {
+    if (!assignedToFilterQuery.trim()) return assignedToOptions
+    const query = assignedToFilterQuery.toLowerCase()
+    return assignedToOptions.filter(option =>
+      option.name.toLowerCase().includes(query) ||
+      (option.email?.toLowerCase().includes(query) ?? false)
+    )
+  }, [assignedToOptions, assignedToFilterQuery])
+
+  const filteredAssignedByOptions = useMemo(() => {
+    if (!assignedByFilterQuery.trim()) return assignedByOptions
+    const query = assignedByFilterQuery.toLowerCase()
+    return assignedByOptions.filter(option =>
+      option.name.toLowerCase().includes(query) ||
+      (option.email?.toLowerCase().includes(query) ?? false)
+    )
+  }, [assignedByOptions, assignedByFilterQuery])
+
+  const taskNumberOptions = useMemo<TaskOption[]>(() => {
+    const map = new Map<string, TaskOption>()
+    tasks.forEach(task => {
+      const id = task._id
+      const label = task.taskNumber
+        ? `#${task.taskNumber} - ${task.title}`
+        : task.title
+      map.set(id, { id, label })
+    })
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label))
+  }, [tasks])
+
+  const filteredTaskNumberOptions = useMemo(() => {
+    if (!taskNumberFilterQuery.trim()) return taskNumberOptions
+    const query = taskNumberFilterQuery.toLowerCase()
+    return taskNumberOptions.filter(option =>
+      option.label.toLowerCase().includes(query) ||
+      option.id.toLowerCase().includes(query)
+    )
+  }, [taskNumberOptions, taskNumberFilterQuery])
+
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = !searchQuery || 
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -381,8 +507,28 @@ export default function KanbanPage() {
     const matchesProject = projectFilter === 'all' || (task.project?._id && task.project._id === projectFilter)
     const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
     const matchesType = typeFilter === 'all' || task.type === typeFilter
+    const assignedToId = task.assignedTo?._id || task.assignedTo?.email || `${task.assignedTo?.firstName ?? ''}-${task.assignedTo?.lastName ?? ''}`
+    const createdById = task.createdBy?._id || task.createdBy?.email || `${task.createdBy?.firstName ?? ''}-${task.createdBy?.lastName ?? ''}`
+    const matchesAssignedTo = assignedToFilter === 'all' || (assignedToId && assignedToId === assignedToFilter)
+    const matchesAssignedBy = assignedByFilter === 'all' || (createdById && createdById === assignedByFilter)
+    const taskIdMatches = taskNumberFilter === 'all' ||
+      task._id === taskNumberFilter ||
+      (task.taskNumber && String(task.taskNumber) === taskNumberFilter)
+    const dueDate = task.dueDate ? new Date(task.dueDate) : null
+    const matchesStartDate = !startDateBoundary || (dueDate && dueDate >= startDateBoundary)
+    const matchesEndDate = !endDateBoundary || (dueDate && dueDate <= endDateBoundary)
 
-    return matchesSearch && matchesProject && matchesPriority && matchesType
+    return (
+      matchesSearch &&
+      matchesProject &&
+      matchesPriority &&
+      matchesType &&
+      matchesAssignedTo &&
+      matchesAssignedBy &&
+      taskIdMatches &&
+      matchesStartDate &&
+      matchesEndDate
+    )
   })
 
   const getTasksByStatus = (status: string) => {
@@ -457,6 +603,10 @@ export default function KanbanPage() {
       setSelectedTask(task)
       setShowDeleteConfirmModal(true)
     }
+  }
+
+  const clearDateFilters = () => {
+    setDateRangeFilter(undefined)
   }
 
   const confirmDeleteTask = async () => {
@@ -590,6 +740,136 @@ export default function KanbanPage() {
                     <SelectItem value="subtask">Subtask</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
+                <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Assigned To" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[10050] p-0">
+                    <div className="p-2">
+                      <Input
+                        value={assignedToFilterQuery}
+                        onChange={(e) => setAssignedToFilterQuery(e.target.value)}
+                        placeholder="Search assignees"
+                        className="mb-2"
+                      />
+                      <div className="max-h-56 overflow-y-auto">
+                        <SelectItem value="all">All Assignees</SelectItem>
+                        {filteredAssignedToOptions.length === 0 ? (
+                          <div className="px-2 py-1 text-xs text-muted-foreground">No matching assignees</div>
+                        ) : (
+                          filteredAssignedToOptions.map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {option.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </SelectContent>
+                </Select>
+
+                <Select value={assignedByFilter} onValueChange={setAssignedByFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Assigned By" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[10050] p-0">
+                    <div className="p-2">
+                      <Input
+                        value={assignedByFilterQuery}
+                        onChange={(e) => setAssignedByFilterQuery(e.target.value)}
+                        placeholder="Search creators"
+                        className="mb-2"
+                      />
+                      <div className="max-h-56 overflow-y-auto">
+                        <SelectItem value="all">All Creators</SelectItem>
+                        {filteredAssignedByOptions.length === 0 ? (
+                          <div className="px-2 py-1 text-xs text-muted-foreground">No matching creators</div>
+                        ) : (
+                          filteredAssignedByOptions.map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {option.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </SelectContent>
+                </Select>
+
+                <Select value={taskNumberFilter} onValueChange={setTaskNumberFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Task Number" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[10050] p-0">
+                    <div className="p-2">
+                      <Input
+                        value={taskNumberFilterQuery}
+                        onChange={(e) => setTaskNumberFilterQuery(e.target.value)}
+                        placeholder="Search tasks"
+                        className="mb-2"
+                      />
+                      <div className="max-h-56 overflow-y-auto">
+                        <SelectItem value="all">All Tasks</SelectItem>
+                        {filteredTaskNumberOptions.length === 0 ? (
+                          <div className="px-2 py-1 text-xs text-muted-foreground">No matching tasks</div>
+                        ) : (
+                          filteredTaskNumberOptions.map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {option.label}
+                            </SelectItem>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </SelectContent>
+                </Select>
+
+                <div className="flex flex-col gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          'w-full justify-start text-left font-normal',
+                          !dateRangeFilter?.from && !dateRangeFilter?.to && 'text-muted-foreground'
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dateRangeFilter?.from ? (
+                          dateRangeFilter.to ? (
+                            `${format(dateRangeFilter.from, 'LLL dd, y')} - ${format(dateRangeFilter.to, 'LLL dd, y')}`
+                          ) : (
+                            `${format(dateRangeFilter.from, 'LLL dd, y')} - …`
+                          )
+                        ) : (
+                          'Select due date range'
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <DateRangeCalendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={dateRangeFilter?.from}
+                        selected={dateRangeFilter}
+                        onSelect={setDateRangeFilter}
+                        numberOfMonths={2}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <div className="flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearDateFilters}
+                      disabled={!dateRangeFilter?.from && !dateRangeFilter?.to}
+                    >
+                      Clear dates
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </CardHeader>
