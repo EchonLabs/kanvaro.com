@@ -312,6 +312,19 @@ export default function ProjectDetailPage() {
     ? statusForm !== project.status || priorityForm !== project.priority
     : false
 
+  const trackingSettingsChanged = project ? (
+    settingsForm.allowTimeTracking !== (project.settings?.allowTimeTracking ?? false) ||
+    settingsForm.allowManualTimeSubmission !== (project.settings?.allowManualTimeSubmission ?? false) ||
+    settingsForm.allowExpenseTracking !== (project.settings?.allowExpenseTracking ?? false) ||
+    settingsForm.requireApproval !== (project.settings?.requireApproval ?? false)
+  ) : false
+
+  const notificationSettingsChanged = project ? (
+    settingsForm.notifications.taskUpdates !== (project.settings?.notifications?.taskUpdates ?? false) ||
+    settingsForm.notifications.budgetAlerts !== (project.settings?.notifications?.budgetAlerts ?? false) ||
+    settingsForm.notifications.deadlineReminders !== (project.settings?.notifications?.deadlineReminders ?? false)
+  ) : false
+
   if (loading) {
     return (
       <MainLayout>
@@ -883,119 +896,6 @@ export default function ProjectDetailPage() {
               )}
 
               <div className="grid gap-6 lg:grid-cols-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>General Information</CardTitle>
-                    <CardDescription>Basic project information</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="project-name">Project Name</Label>
-                      <Input
-                        id="project-name"
-                        value={project?.name || ''}
-                        readOnly
-                        className="bg-muted"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="project-description">Description</Label>
-                      <Textarea
-                        id="project-description"
-                        value={project?.description || ''}
-                        readOnly
-                        className="bg-muted"
-                        rows={3}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="start-date">Start Date</Label>
-                        <Input
-                          id="start-date"
-                          type="date"
-                          value={project?.startDate ? new Date(project.startDate).toISOString().split('T')[0] : ''}
-                          readOnly
-                          className="bg-muted"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="end-date">End Date</Label>
-                        <Input
-                          id="end-date"
-                          type="date"
-                          value={project?.endDate ? new Date(project.endDate).toISOString().split('T')[0] : ''}
-                          readOnly
-                          className="bg-muted"
-                        />
-                      </div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => router.push(`/projects/create?edit=${projectId}`)}
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Project Details
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Project Status</CardTitle>
-                    <CardDescription>Update the current status and priority</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="status">Status</Label>
-                      <Select value={statusForm} onValueChange={(value) => setStatusForm(value as Project['status'])}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="planning">Planning</SelectItem>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="on_hold">On Hold</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                          <SelectItem value="cancelled">Cancelled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="priority">Priority</Label>
-                      <Select value={priorityForm} onValueChange={(value) => setPriorityForm(value as Project['priority'])}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                          <SelectItem value="critical">Critical</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button
-                      onClick={handleSaveSettings}
-                      disabled={savingSettings || !statusPriorityChanged}
-                      className="w-full"
-                    >
-                      {savingSettings ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Settings
-                        </>
-                      )}
-                    </Button>
-                  </CardContent>
-                </Card>
-
                 <Card className="lg:col-span-2">
                   <CardHeader>
                     <CardTitle>Tracking & Approvals</CardTitle>
@@ -1076,7 +976,7 @@ export default function ProjectDetailPage() {
                     </div>
                   </CardContent>
                   <CardFooter className="justify-end">
-                    <Button onClick={handleSaveSettings} disabled={savingSettings}>
+                    <Button onClick={handleSaveSettings} disabled={savingSettings || !trackingSettingsChanged}>
                       {savingSettings ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1159,7 +1059,7 @@ export default function ProjectDetailPage() {
                     </div>
                   </CardContent>
                   <CardFooter className="justify-end">
-                    <Button onClick={handleSaveSettings} disabled={savingSettings}>
+                    <Button onClick={handleSaveSettings} disabled={savingSettings || !notificationSettingsChanged}>
                       {savingSettings ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1175,26 +1075,6 @@ export default function ProjectDetailPage() {
                   </CardFooter>
                 </Card>
 
-                <Card className="lg:col-span-2">
-                  <CardHeader>
-                    <CardTitle>Danger Zone</CardTitle>
-                    <CardDescription>Irreversible actions for this project</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="p-4 border border-destructive rounded-lg">
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-medium text-destructive">Delete Project</h4>
-                        <p className="text-xs text-muted-foreground">
-                          Permanently delete this project and all its data. This action cannot be undone.
-                        </p>
-                        <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirmModal(true)}>
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete Project
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
               </div>
             </div>
           </TabsContent>

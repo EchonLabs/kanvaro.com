@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -24,13 +24,6 @@ interface Project {
   name: string
 }
 
-interface User {
-  _id: string
-  firstName: string
-  lastName: string
-  email: string
-}
-
 interface Epic {
   _id: string
   title: string
@@ -47,12 +40,9 @@ export default function CreateStoryPage() {
   const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
   const [projects, setProjects] = useState<Project[]>([])
-  const [projectMembers, setProjectMembers] = useState<User[]>([])
-  const [loadingProjectMembers, setLoadingProjectMembers] = useState(false)
   const [epics, setEpics] = useState<Epic[]>([])
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [projectQuery, setProjectQuery] = useState("");
-  const [assigneeQuery, setAssigneeQuery] = useState('')
 
   const [formData, setFormData] = useState({
     title: '',
@@ -60,7 +50,6 @@ export default function CreateStoryPage() {
     project: '',
     epic: '',
     sprint: '',
-    assignedTo: '',
     priority: 'medium',
     dueDate: '',
     estimatedHours: '',
@@ -124,39 +113,6 @@ export default function CreateStoryPage() {
     }
   }
 
-  const fetchProjectMembers = useCallback(async (projectId: string) => {
-    if (!projectId) {
-      setProjectMembers([])
-      return
-    }
-
-    setLoadingProjectMembers(true)
-    try {
-      const response = await fetch(`/api/projects/${projectId}`)
-      const data = await response.json()
-
-      if (response.ok && data.success && data.data) {
-        const members = Array.isArray(data.data.teamMembers) ? data.data.teamMembers : []
-        setProjectMembers(members)
-      } else {
-        setProjectMembers([])
-      }
-    } catch (error) {
-      console.error('Failed to fetch project members:', error)
-      setProjectMembers([])
-    } finally {
-      setLoadingProjectMembers(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (formData.project) {
-      fetchProjectMembers(formData.project)
-    } else {
-      setProjectMembers([])
-    }
-  }, [formData.project, fetchProjectMembers])
-
   const fetchEpics = async (projectId: string) => {
     if (!projectId) {
       setEpics([])
@@ -216,8 +172,7 @@ export default function CreateStoryPage() {
           storyPoints: formData.storyPoints ? parseInt(formData.storyPoints) : undefined,
           tags: formData.tags ? formData.tags.split(',').map(tag => tag.trim()) : [],
           epic: formData.epic === 'none' ? undefined : formData.epic || undefined,
-          sprint: formData.sprint === 'none' ? undefined : formData.sprint || undefined,
-          assignedTo: formData.assignedTo === 'unassigned' ? undefined : formData.assignedTo || undefined
+          sprint: formData.sprint === 'none' ? undefined : formData.sprint || undefined
         })
       })
 
@@ -242,10 +197,7 @@ export default function CreateStoryPage() {
       setFormData(prev => ({
         ...prev,
         project: value,
-        assignedTo: ''
       }))
-      setAssigneeQuery('')
-      setProjectMembers([])
       return
     }
 
@@ -271,15 +223,6 @@ export default function CreateStoryPage() {
       acceptanceCriteria: prev.acceptanceCriteria.filter((_, i) => i !== index)
     }))
   }
-
-  const filteredProjectMembers = useMemo(() => {
-    if (!assigneeQuery.trim()) return projectMembers
-    const q = assigneeQuery.toLowerCase().trim()
-    return projectMembers.filter(u =>
-      `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q)
-    )
-  }, [projectMembers, assigneeQuery])
 
   // Add required field validation
   const isFormValid = () => {
@@ -378,90 +321,6 @@ export default function CreateStoryPage() {
                       </SelectContent>
                     </Select>
                   </div>
-
-                {formData.project && (
-                  <div>
-                    <label className="text-sm font-medium text-foreground">Assigned To</label>
-                    <div className="space-y-2 mt-1">
-                      <Select
-                        value={formData.assignedTo || ''}
-                        onValueChange={(value) => {
-                          if (value === '__unassigned') {
-                            setFormData(prev => ({ ...prev, assignedTo: '' }))
-                            return
-                          }
-                          setFormData(prev => ({ ...prev, assignedTo: value }))
-                        }}
-                        onOpenChange={(open) => { if (open) setAssigneeQuery('') }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder={loadingProjectMembers ? 'Loading members...' : 'Select a team member'} />
-                        </SelectTrigger>
-                        <SelectContent className="z-[10050] p-0">
-                          <div className="p-2">
-                            <Input
-                              value={assigneeQuery}
-                              onChange={e => setAssigneeQuery(e.target.value)}
-                              onKeyDown={(e) => e.stopPropagation()}
-                              placeholder={loadingProjectMembers ? 'Loading members...' : 'Type to search team members'}
-                              className="mb-2"
-                            />
-                            <div className="max-h-56 overflow-y-auto">
-                              {loadingProjectMembers ? (
-                                <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                  <span>Loading members...</span>
-                                </div>
-                              ) : projectMembers.length === 0 ? (
-                                <>
-                                  <SelectItem value="__unassigned">Unassigned</SelectItem>
-                                  <div className="px-2 py-1 text-sm text-muted-foreground">No team members found for this project</div>
-                                </>
-                              ) : filteredProjectMembers.length > 0 ? (
-                                filteredProjectMembers.map(user => (
-                                  <SelectItem
-                                    key={user._id}
-                                    value={user._id}
-                                  >
-                                    <div className="flex items-center justify-between w-full">
-                                      <span>{user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span></span>
-                                      {formData.assignedTo === user._id && (
-                                        <span className="text-xs text-muted-foreground ml-2">Selected</span>
-                                      )}
-                                    </div>
-                                  </SelectItem>
-                                ))
-                              ) : (
-                                <div className="px-2 py-1 text-sm text-muted-foreground">No matching members</div>
-                              )}
-                            </div>
-                          </div>
-                        </SelectContent>
-                      </Select>
-                      {formData.assignedTo && (
-                        <div className="flex flex-wrap gap-2">
-                          {(() => {
-                            const u = projectMembers.find(x => x._id === formData.assignedTo)
-                            if (!u) return null
-                            return (
-                              <span className="inline-flex items-center text-xs bg-muted px-2 py-1 rounded">
-                                <span>{u.firstName} {u.lastName}</span>
-                                <button
-                                  type="button"
-                                  aria-label="Remove assignee"
-                                  className="text-muted-foreground hover:text-foreground focus:outline-none ml-2"
-                                  onClick={() => setFormData(prev => ({ ...prev, assignedTo: '' }))}
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </span>
-                            )
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
 
                   <div>
                     <label className="text-sm font-medium text-foreground">Epic</label>
