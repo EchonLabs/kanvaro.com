@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.3.1...v1.4.0) (2025-11-22)
+
+
+### Features
+
+* add latest changes in sprint ([0ccc14a](https://github.com/EchonLabs/kanvaro.com/commit/0ccc14a15a3db79226b879c65af537be109c445e))
+
 ## [1.3.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.3.0...v1.3.1) (2025-11-21)
 
 
