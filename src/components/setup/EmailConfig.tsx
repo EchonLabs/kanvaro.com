@@ -78,22 +78,22 @@ export const EmailConfig = ({ onNext, onBack, initialData }: EmailConfigProps) =
     const newErrors: Record<string, string> = {}
 
     if (provider === 'smtp') {
-      if (!smtpConfig.host.trim()) newErrors.host = 'SMTP host is required'
+      if (!smtpConfig.host.trim()) newErrors.host = 'SMTP Host is required'
       if (!smtpConfig.username.trim()) newErrors.username = 'Username is required'
       if (!smtpConfig.password.trim()) newErrors.password = 'Password is required'
-      if (!smtpConfig.fromEmail.trim()) newErrors.fromEmail = 'From email is required'
-      if (!smtpConfig.fromName.trim()) newErrors.fromName = 'From name is required'
+      if (!smtpConfig.fromEmail.trim()) newErrors.fromEmail = 'From Email is required'
+      if (!smtpConfig.fromName.trim()) newErrors.fromName = 'From Name is required'
       if (smtpConfig.fromEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(smtpConfig.fromEmail)) {
-        newErrors.fromEmail = 'Please enter a valid email address'
+        newErrors.fromEmail = 'Please enter a valid Email Address'
       }
     } else if (provider === 'azure') {
       if (!azureConfig.clientId.trim()) newErrors.clientId = 'Client ID is required'
       if (!azureConfig.clientSecret.trim()) newErrors.clientSecret = 'Client Secret is required'
       if (!azureConfig.tenantId.trim()) newErrors.tenantId = 'Tenant ID is required'
-      if (!azureConfig.fromEmail.trim()) newErrors.fromEmail = 'From email is required'
-      if (!azureConfig.fromName.trim()) newErrors.fromName = 'From name is required'
+      if (!azureConfig.fromEmail.trim()) newErrors.fromEmail = 'From Email is required'
+      if (!azureConfig.fromName.trim()) newErrors.fromName = 'From Name is required'
       if (azureConfig.fromEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(azureConfig.fromEmail)) {
-        newErrors.fromEmail = 'Please enter a valid email address'
+        newErrors.fromEmail = 'Please enter a valid Email Address'
       }
     }
 

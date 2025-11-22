@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Timer } from '@/components/time-tracking/Timer'
+import { useOrganization } from '@/hooks/useOrganization'
+import { applyRoundingRules } from '@/lib/utils'
 
 interface TimeTrackingWidgetProps {
   userId: string
@@ -44,6 +46,7 @@ interface TimeStats {
 
 export function TimeTrackingWidget({ userId, organizationId, timeStats: propTimeStats }: TimeTrackingWidgetProps) {
   const router = useRouter()
+  const { organization } = useOrganization()
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null)
   const [timeStats, setTimeStats] = useState<TimeStats | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -112,9 +115,28 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
     }
   }, [loadActiveTimer, loadTimeStats, propTimeStats])
 
-  const formatDuration = (minutes: number) => {
+  // Format duration for active timer - NO rounding (shows actual elapsed time)
+  const formatActiveTimerDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60)
     const mins = Math.floor(minutes % 60)
+    return `${hours}h ${mins}m`
+  }
+
+  // Format duration for saved time entries - WITH rounding
+  const formatDuration = (minutes: number) => {
+    // Apply rounding rules if enabled for saved entries
+    let displayMinutes = minutes
+    const roundingRules = organization?.settings?.timeTracking?.roundingRules
+    if (roundingRules?.enabled) {
+      displayMinutes = applyRoundingRules(minutes, {
+        enabled: roundingRules.enabled,
+        increment: roundingRules.increment || 15,
+        roundUp: roundingRules.roundUp ?? true
+      })
+    }
+    
+    const hours = Math.floor(displayMinutes / 60)
+    const mins = Math.floor(displayMinutes % 60)
     return `${hours}h ${mins}m`
   }
 
@@ -170,7 +192,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
         <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0">
           <div className="text-center">
             <div className="text-2xl sm:text-3xl font-mono font-bold text-primary break-words">
-              {formatDuration(activeTimer.currentDuration)}
+              {formatActiveTimerDuration(activeTimer.currentDuration)}
             </div>
             {activeTimer.hourlyRate && (
               <div className="text-xs sm:text-sm text-muted-foreground mt-1">

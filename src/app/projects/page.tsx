@@ -149,6 +149,30 @@ export default function ProjectsPage() {
     }
   }, [searchQuery, statusFilter, priorityFilter])
 
+  // Refresh projects when page regains focus (user returns from another page)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (!loading && !authError) {
+        fetchProjects()
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !loading && !authError) {
+        fetchProjects()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, authError])
+
   const fetchProjects = async () => {
     try {
       setLoading(true)
@@ -470,15 +494,23 @@ export default function ProjectsPage() {
 
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-500">Progress</span>
+                          <span className="text-muted-foreground">Progress</span>
                           <span className="font-medium">{project.progress?.completionPercentage || 0}%</span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
                           <div 
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${project.progress?.completionPercentage || 0}%` }}
+                            className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full transition-all duration-300 ease-out"
+                            style={{ 
+                              width: `${Math.min(100, Math.max(0, project.progress?.completionPercentage || 0))}%`,
+                              minWidth: (project.progress?.completionPercentage || 0) > 0 ? '2px' : '0px'
+                            }}
                           />
                         </div>
+                        {project.progress && project.progress.totalTasks > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {project.progress.tasksCompleted} of {project.progress.totalTasks} tasks completed
+                          </p>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-between text-sm text-gray-500">
@@ -582,12 +614,20 @@ export default function ProjectsPage() {
                         <div className="flex items-center space-x-2">
                           <div className="text-right">
                             <div className="text-sm font-medium">{project.progress?.completionPercentage || 0}%</div>
-                            <div className="w-20 bg-gray-200 rounded-full h-2">
+                            <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
                               <div 
-                                className="bg-blue-600 h-2 rounded-full"
-                                style={{ width: `${project.progress?.completionPercentage || 0}%` }}
+                                className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full transition-all duration-300 ease-out"
+                                style={{ 
+                                  width: `${Math.min(100, Math.max(0, project.progress?.completionPercentage || 0))}%`,
+                                  minWidth: (project.progress?.completionPercentage || 0) > 0 ? '2px' : '0px'
+                                }}
                               />
                             </div>
+                            {project.progress && project.progress.totalTasks > 0 && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {project.progress.tasksCompleted}/{project.progress.totalTasks}
+                              </p>
+                            )}
                           </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>

@@ -874,9 +874,13 @@ export default function BacklogPage() {
               <Plus className="h-4 w-4 mr-2" />
               New Epic
             </Button>
-            <Button onClick={() => router.push('/stories/create')} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={() => router.push('/stories/create')} className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               New Story
+            </Button>
+            <Button onClick={() => router.push('/tasks/create')} className="w-full sm:w-auto">
+              <Plus className="h-4 w-4 mr-2" />
+              New Task
             </Button>
           </div>
         </div>

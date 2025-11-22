@@ -992,7 +992,7 @@ export default function ProjectDetailPage() {
                   </CardFooter>
                 </Card>
 
-                <Card className="lg:col-span-2">
+                {/* <Card className="lg:col-span-2">
                   <CardHeader>
                     <CardTitle>Notification Preferences</CardTitle>
                     <CardDescription>Choose which notifications to send for this project</CardDescription>
@@ -1073,7 +1073,7 @@ export default function ProjectDetailPage() {
                       )}
                     </Button>
                   </CardFooter>
-                </Card>
+                </Card> */}
 
               </div>
             </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Project } from '@/models/Project'
+import { Task } from '@/models/Task'
 import { User } from '@/models/User'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
@@ -79,9 +80,37 @@ export async function GET(request: NextRequest) {
 
     const total = await Project.countDocuments(projectQuery)
 
+    // Calculate progress for each project
+    const projectsWithProgress = await Promise.all(
+      projects.map(async (project) => {
+        const tasks = await Task.find({ 
+          project: project._id,
+          organization: organizationId
+        })
+        
+        const totalTasks = tasks.length
+        // Consider tasks with status 'done' or 'completed' as completed
+        const tasksCompleted = tasks.filter(
+          task => task.status === 'done' || task.status === 'completed'
+        ).length
+        const completionPercentage = totalTasks > 0 
+          ? Math.round((tasksCompleted / totalTasks) * 100) 
+          : 0
+
+        return {
+          ...project.toObject(),
+          progress: {
+            completionPercentage,
+            tasksCompleted,
+            totalTasks
+          }
+        }
+      })
+    )
+
     return NextResponse.json({
       success: true,
-      data: projects,
+      data: projectsWithProgress,
       pagination: {
         page,
         limit,
