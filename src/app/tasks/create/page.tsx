@@ -117,7 +117,6 @@ export default function CreateTaskPage() {
     type: 'task',
     dueDate: '',
     estimatedHours: '',
-    storyPoints: '',
     labels: [] as string[]
   })
 
@@ -278,7 +277,6 @@ export default function CreateTaskPage() {
           status: 'backlog',
           dueDate: formData.dueDate,
           estimatedHours: formData.estimatedHours ? parseInt(formData.estimatedHours) : undefined,
-          storyPoints: formData.storyPoints ? parseInt(formData.storyPoints) : undefined,
           labels: Array.isArray(formData.labels) ? formData.labels : [],
           subtasks: preparedSubtasks
         })
@@ -674,15 +672,6 @@ export default function CreateTaskPage() {
                     />
                   </div>
 
-                  <div>
-                    <label className="text-sm font-medium text-foreground">Story Points</label>
-                    <Input
-                      type="number"
-                      value={formData.storyPoints}
-                      onChange={(e) => handleChange('storyPoints', e.target.value)}
-                      placeholder="Enter story points"
-                    />
-                  </div>
                 </div>
               </div>
 
@@ -710,21 +699,26 @@ export default function CreateTaskPage() {
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
-                  <div className="space-y-1">
-                    {formData.labels.map((label, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <span className="text-sm">{label}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeLabel(index)}
+                  {formData.labels.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {formData.labels.map((label, index) => (
+                        <div 
+                          key={index} 
+                          className="inline-flex items-center gap-1.5 bg-muted px-3 py-1.5 rounded-md text-sm"
                         >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+                          <span>{label}</span>
+                          <button
+                            type="button"
+                            aria-label="Remove label"
+                            className="text-muted-foreground hover:text-foreground focus:outline-none transition-colors"
+                            onClick={() => removeLabel(index)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 

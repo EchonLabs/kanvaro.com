@@ -18,7 +18,6 @@ interface EpicForm {
   priority: 'low' | 'medium' | 'high' | 'critical'
   dueDate: string
   estimatedHours: number | string
-  storyPoints: number | string
   labels: string
 }
 
@@ -34,7 +33,6 @@ export default function EditEpicPage() {
     priority: 'medium',
     dueDate: '',
     estimatedHours: '',
-    storyPoints: '',
     labels: ''
   })
   const [loading, setLoading] = useState(true)
@@ -55,7 +53,6 @@ export default function EditEpicPage() {
           priority: (e?.priority || 'medium'),
           dueDate: e?.dueDate ? new Date(e.dueDate).toISOString().slice(0, 10) : '',
           estimatedHours: e?.estimatedHours ?? '',
-          storyPoints: e?.storyPoints ?? '',
           labels: Array.isArray(e?.tags) ? e.tags.join(', ') : ''
         })
         setError('')
@@ -85,7 +82,6 @@ export default function EditEpicPage() {
       }
       if (form.dueDate) payload.dueDate = new Date(form.dueDate)
       if (form.estimatedHours !== '') payload.estimatedHours = Number(form.estimatedHours)
-      if (form.storyPoints !== '') payload.storyPoints = Number(form.storyPoints)
       if (form.labels.trim()) payload.tags = form.labels.split(',').map((s) => s.trim()).filter(Boolean)
 
       const res = await fetch(`/api/epics/${epicId}`, {
@@ -201,10 +197,6 @@ export default function EditEpicPage() {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium">Story Points</label>
-                <Input type="number" value={form.storyPoints} onChange={(e) => setForm({ ...form, storyPoints: e.target.value })} className="mt-1" />
-              </div>
               <div>
                 <label className="text-sm font-medium">Labels (comma separated)</label>
                 <Input value={form.labels} onChange={(e) => setForm({ ...form, labels: e.target.value })} className="mt-1" />

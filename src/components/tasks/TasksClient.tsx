@@ -156,6 +156,7 @@ export default function TasksClient({
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
+  const [projectsWithStatuses, setProjectsWithStatuses] = useState<Map<string, Array<{ key: string; title: string; order: number }>>>(new Map())
 
   const startDateBoundary = useMemo(() => {
     if (!dateRangeFilter?.from) return null
@@ -543,6 +544,66 @@ export default function TasksClient({
     }
   }
 
+  // Fetch projects with their kanbanStatuses
+  const fetchProjectsWithStatuses = useCallback(async () => {
+    try {
+      const response = await fetch('/api/projects')
+      const data = await response.json()
+      
+      if (data.success && Array.isArray(data.data)) {
+        const statusMap = new Map<string, Array<{ key: string; title: string; order: number }>>()
+        
+        data.data.forEach((project: any) => {
+          if (project._id && project.settings?.kanbanStatuses && project.settings.kanbanStatuses.length > 0) {
+            statusMap.set(project._id, project.settings.kanbanStatuses)
+          }
+        })
+        
+        setProjectsWithStatuses(statusMap)
+      }
+    } catch (error) {
+      console.error('Failed to fetch projects with statuses:', error)
+    }
+  }, [])
+
+  // Get available statuses for a specific task (from its project)
+  const getStatusesForTask = useCallback((task: Task): string[] => {
+    const projectId = task.project?._id
+    if (projectId && projectsWithStatuses.has(projectId)) {
+      const statuses = projectsWithStatuses.get(projectId)!
+      return statuses.map(s => s.key)
+    }
+    // Fall back to default statuses
+    return Array.from(TASK_STATUS_OPTIONS)
+  }, [projectsWithStatuses])
+
+  // Get all available statuses (for filter dropdowns)
+  const getAllAvailableStatuses = useCallback((): string[] => {
+    if (projectFilter !== 'all') {
+      // If a specific project is selected, use its statuses
+      if (projectsWithStatuses.has(projectFilter)) {
+        const statuses = projectsWithStatuses.get(projectFilter)!
+        return statuses.map(s => s.key)
+      }
+    } else {
+      // If "all" is selected, collect unique statuses from all projects
+      const statusSet = new Set<string>()
+      projectsWithStatuses.forEach((statuses) => {
+        statuses.forEach(s => statusSet.add(s.key))
+      })
+      if (statusSet.size > 0) {
+        return Array.from(statusSet)
+      }
+    }
+    // Fall back to default statuses
+    return Array.from(TASK_STATUS_OPTIONS)
+  }, [projectFilter, projectsWithStatuses])
+
+  // Fetch projects with statuses on mount and when project filter changes
+  useEffect(() => {
+    fetchProjectsWithStatuses()
+  }, [fetchProjectsWithStatuses, projectFilter])
+
   const handleTaskCreated = () => {
     fetchTasks(true)
     setShowCreateTaskModal(false)
@@ -686,13 +747,11 @@ export default function TasksClient({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="todo">To Do</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="review">Review</SelectItem>
-                    <SelectItem value="backlog">Backlog</SelectItem>
-                    <SelectItem value="testing">Testing</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    {getAllAvailableStatuses().map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {formatToTitleCase(status)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
@@ -943,7 +1002,7 @@ export default function TasksClient({
                                           <SelectValue placeholder="Status" />
                                         </SelectTrigger>
                                         <SelectContent className="z-[10050]">
-                                          {TASK_STATUS_OPTIONS.map((status) => (
+                                          {getStatusesForTask(task).map((status) => (
                                             <SelectItem key={status} value={status} className="text-xs">
                                               <div className="flex items-center gap-2">
                                                 {getStatusIcon(status)}

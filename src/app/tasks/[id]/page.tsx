@@ -472,7 +472,7 @@ export default function TaskDetailPage() {
                   </div>
                 )}
                 
-                {task.actualHours && (
+                {task.actualHours != null && task.actualHours > 0 && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Actual Hours</span>
                     <span className="font-medium">{task.actualHours}h</span>

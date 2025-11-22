@@ -105,6 +105,23 @@ interface Task {
 }
 
 interface Project {
+  settings?: {
+    kanbanStatuses?: Array<{
+      key: string
+      title: string
+      color?: string
+      order: number
+    }>
+    allowTimeTracking?: boolean
+    allowManualTimeSubmission?: boolean
+    allowExpenseTracking?: boolean
+    requireApproval?: boolean
+    notifications?: {
+      taskUpdates?: boolean
+      budgetAlerts?: boolean
+      deadlineReminders?: boolean
+    }
+  }
   _id: string
   name: string
 }
@@ -120,7 +137,7 @@ interface TaskOption {
   label: string
 }
 
-const columns = [
+const defaultColumns = [
   { id: 'backlog', title: 'Backlog', color: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200' },
   { id: 'todo', title: 'To Do', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' },
   { id: 'in_progress', title: 'In Progress', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
@@ -254,6 +271,7 @@ export default function KanbanPage() {
   const [dateRangeFilter, setDateRangeFilter] = useState<DateRange | undefined>()
   const [taskNumberFilter, setTaskNumberFilter] = useState('all')
   const [taskNumberFilterQuery, setTaskNumberFilterQuery] = useState('')
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const hasFetchedProjects = useRef(false)
 
   // Use the task state management hook
@@ -334,6 +352,74 @@ export default function KanbanPage() {
     }
   }, [])
 
+  const fetchSelectedProject = useCallback(async (projectId: string) => {
+    if (projectId === 'all') {
+      setSelectedProject(null)
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}`)
+      const data = await response.json()
+
+      if (data.success) {
+        setSelectedProject(data.data)
+      } else {
+        setSelectedProject(null)
+      }
+    } catch (err) {
+      console.error('Failed to fetch project:', err)
+      setSelectedProject(null)
+    }
+  }, [])
+
+  const getColumns = useCallback(() => {
+    // If a specific project is selected and has custom columns, use them
+    if (selectedProject?.settings?.kanbanStatuses && selectedProject.settings.kanbanStatuses.length > 0) {
+      // Sort by order and map to the expected format
+      return selectedProject.settings.kanbanStatuses
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .map(col => ({
+          id: col.key,
+          title: col.title,
+          color: col.color || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+        }))
+    }
+    
+    // When "all" is selected or no custom columns, collect unique statuses from all projects
+    if (projectFilter === 'all' && projects.length > 0) {
+      const statusSet = new Set<string>()
+      const statusMap = new Map<string, { title: string; color: string }>()
+      
+      // Collect all unique statuses from all projects
+      projects.forEach(project => {
+        if (project.settings?.kanbanStatuses) {
+          project.settings.kanbanStatuses.forEach(col => {
+            if (!statusSet.has(col.key)) {
+              statusSet.add(col.key)
+              statusMap.set(col.key, {
+                title: col.title,
+                color: col.color || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+              })
+            }
+          })
+        }
+      })
+      
+      // If we found custom statuses, use them; otherwise use defaults
+      if (statusMap.size > 0) {
+        return Array.from(statusMap.entries()).map(([key, value]) => ({
+          id: key,
+          title: value.title,
+          color: value.color
+        }))
+      }
+    }
+    
+    // Fall back to default columns
+    return defaultColumns
+  }, [selectedProject, projectFilter, projects])
+
   useEffect(() => {
     const assignedToMap = new Map<string, PersonOption>()
     const assignedByMap = new Map<string, PersonOption>()
@@ -379,6 +465,15 @@ export default function KanbanPage() {
       setTaskNumberFilter('all')
     }
   }, [assignedToOptions, assignedByOptions, assignedToFilter, assignedByFilter, taskNumberFilter, tasks])
+
+  // Fetch selected project when project filter changes
+  useEffect(() => {
+    fetchSelectedProject(projectFilter)
+    // Also refresh projects list to get updated column settings
+    if (projectFilter !== 'all') {
+      fetchProjects(true)
+    }
+  }, [projectFilter, fetchSelectedProject, fetchProjects])
 
   const checkAuth = useCallback(async () => {
     try {
@@ -557,6 +652,7 @@ export default function KanbanPage() {
     if (!activeTask) return
 
     // Determine the new status based on the drop target
+    const columns = getColumns()
     let newStatus = activeTask.status
     if (typeof overId === 'string' && columns.some(col => col.id === overId)) {
       newStatus = overId as any
@@ -881,7 +977,7 @@ export default function KanbanPage() {
               onDragEnd={handleDragEnd}
             >
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                {columns.map((column) => {
+                {getColumns().map((column) => {
                   const columnTasks = getTasksByStatus(column.id)
                   
                   return (

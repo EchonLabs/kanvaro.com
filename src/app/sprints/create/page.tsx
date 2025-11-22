@@ -14,7 +14,7 @@ import {
   Save,
   Loader2,
   AlertTriangle,
-  Target
+  Zap
 } from 'lucide-react'
 
 interface Project {
@@ -238,7 +238,7 @@ export default function CreateSprintPage() {
           </Button>
           <div className="flex-1 min-w-0">
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground flex items-center space-x-2">
-              <Target className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-blue-600 flex-shrink-0" />
+              <Zap className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-blue-600 flex-shrink-0" />
               <span className="truncate">Create New Sprint</span>
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground mt-1">Create a new sprint for your project</p>

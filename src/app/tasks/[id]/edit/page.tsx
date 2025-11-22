@@ -397,6 +397,8 @@ export default function EditTaskPage() {
       const data = await res.json()
 
       if (data.success) {
+        // Optimistically update the UI immediately without re-fetching
+        // The API already returns the updated task data
         const mappedTask = mapTaskFormState(data.data)
         const mappedSubtasks = mapSubtasksFromResponse(data.data?.subtasks)
 
