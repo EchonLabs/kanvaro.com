@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { formatToTitleCase } from '@/lib/utils'
 import { useTaskSync, useTaskState } from '@/hooks/useTaskSync'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -101,51 +102,7 @@ export default function CalendarPage() {
     onTaskDelete: handleTaskDelete
   })
 
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-      
-      if (response.ok) {
-        setAuthError('')
-        await fetchEvents()
-        // Start real-time synchronization after successful auth
-        startPolling()
-      } else if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-        
-        if (refreshResponse.ok) {
-          setAuthError('')
-          await fetchEvents()
-          // Start real-time synchronization after successful refresh
-          startPolling()
-        } else {
-          setAuthError('Session expired')
-          stopPolling()
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        stopPolling()
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      stopPolling()
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    }
-  }, [router, startPolling, stopPolling])
-
-  useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
-
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch('/api/calendar')
@@ -161,7 +118,76 @@ export default function CalendarPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  // Check auth and fetch events only once on mount
+  useEffect(() => {
+    let mounted = true
+    let hasFetched = false
+
+    const checkAuth = async () => {
+      // Prevent duplicate calls
+      if (hasFetched) return
+      
+      try {
+        const response = await fetch('/api/auth/me')
+        
+        if (!mounted || hasFetched) return
+
+        if (response.ok) {
+          setAuthError('')
+          // Fetch events only once after auth check
+          if (!hasFetched) {
+            hasFetched = true
+            await fetchEvents()
+            // Start real-time synchronization after successful auth
+            startPolling()
+          }
+        } else if (response.status === 401) {
+          const refreshResponse = await fetch('/api/auth/refresh', {
+            method: 'POST'
+          })
+          
+          if (!mounted || hasFetched) return
+
+          if (refreshResponse.ok) {
+            setAuthError('')
+            // Fetch events only once after refresh
+            if (!hasFetched) {
+              hasFetched = true
+              await fetchEvents()
+              // Start real-time synchronization after successful refresh
+              startPolling()
+            }
+          } else {
+            setAuthError('Session expired')
+            stopPolling()
+            setTimeout(() => {
+              router.push('/login')
+            }, 2000)
+          }
+        } else {
+          stopPolling()
+          router.push('/login')
+        }
+      } catch (error) {
+        if (!mounted || hasFetched) return
+        console.error('Auth check failed:', error)
+        setAuthError('Authentication failed')
+        stopPolling()
+        setTimeout(() => {
+          router.push('/login')
+        }, 2000)
+      }
+    }
+
+    checkAuth()
+
+    return () => {
+      mounted = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run once on mount - fetchEvents, startPolling, stopPolling, router are stable
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -653,11 +679,11 @@ export default function CalendarPage() {
                                 }`} />
                                 <h4 className="font-medium text-foreground">{event.title}</h4>
                                 <Badge className={getTypeColor(event.type)}>
-                                  {event.type}
+                                  {formatToTitleCase(event.type)}
                                 </Badge>
                               </div>
                               <Badge className={getPriorityColor(event.priority)}>
-                                {event.priority}
+                                {formatToTitleCase(event.priority)}
                               </Badge>
                             </div>
                             {event.description && (

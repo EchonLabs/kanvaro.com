@@ -3,10 +3,10 @@ import connectDB from '@/lib/db-config';
 import { authenticateUser } from '@/lib/auth-utils';
 import { PermissionService } from '@/lib/permissions/permission-service';
 
+
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
-    
     const authResult = await authenticateUser();
     if ('error' in authResult) {
       return NextResponse.json(
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     userPermissions.projectPermissions.forEach((permissions, projectId) => {
       projectPermissions[projectId] = permissions;
     });
-    
+
     const projectRoles: Record<string, string> = {};
     userPermissions.projectRoles.forEach((role, projectId) => {
       projectRoles[projectId] = role;
@@ -36,6 +36,8 @@ export async function GET(req: NextRequest) {
       userRole: userPermissions.userRole,
       accessibleProjects: await PermissionService.getAccessibleProjects(userId)
     });
+
+
   } catch (error) {
     console.error('Error fetching user permissions:', error);
     return NextResponse.json(

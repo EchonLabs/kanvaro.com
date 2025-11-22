@@ -1,3 +1,182 @@
+## [1.3.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.3.0...v1.3.1) (2025-11-21)
+
+
+### Bug Fixes
+
+* fix create task ([3f71760](https://github.com/EchonLabs/kanvaro.com/commit/3f71760754cad7ad487963a1af8c9d9d0ff13d49))
+
+# [1.3.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.2.4...v1.3.0) (2025-11-21)
+
+
+### Bug Fixes
+
+* speedup task creation ([fe8bf85](https://github.com/EchonLabs/kanvaro.com/commit/fe8bf854a7e6a9f28675b4ec2b79a170bdbb729d))
+
+
+### Features
+
+* add sprint changes ([c8afe33](https://github.com/EchonLabs/kanvaro.com/commit/c8afe33c4e2f9b194096a498a785dede90474f7f))
+
+## [1.2.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.2.3...v1.2.4) (2025-11-21)
+
+
+### Bug Fixes
+
+* add consoles to check errors ([cc19cc4](https://github.com/EchonLabs/kanvaro.com/commit/cc19cc4bb95d307af0aa8dc96af53009e258a194))
+
+## [1.2.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.2.2...v1.2.3) (2025-11-21)
+
+
+### Bug Fixes
+
+* kanbarn board loading issue ([c8b55e8](https://github.com/EchonLabs/kanvaro.com/commit/c8b55e8346766f70a8534ff93f95e827861a71e9))
+* remove settings part from stories ([f0d0fef](https://github.com/EchonLabs/kanvaro.com/commit/f0d0fefa916f858a295ffe50e645c7c67f31d6df))
+
+## [1.2.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.2.1...v1.2.2) (2025-11-21)
+
+
+### Bug Fixes
+
+* add changes in invitation and email ([f8a4843](https://github.com/EchonLabs/kanvaro.com/commit/f8a48436c72cba3813887c85c9a336fe4dab1b79))
+
+## [1.2.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.2.0...v1.2.1) (2025-11-21)
+
+
+### Bug Fixes
+
+* add backlog to kanbarn board ([bb3c561](https://github.com/EchonLabs/kanvaro.com/commit/bb3c561e549aeac102d286bd767ab1b51b71ac82))
+
+# [1.2.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.16...v1.2.0) (2025-11-20)
+
+
+### Features
+
+* add title case ([2ce0e67](https://github.com/EchonLabs/kanvaro.com/commit/2ce0e673f0173cd58528aeb90746f1d00b9368d4))
+
+## [1.1.16](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.15...v1.1.16) (2025-11-20)
+
+
+### Bug Fixes
+
+* add title cases ([9bdedef](https://github.com/EchonLabs/kanvaro.com/commit/9bdedeff48f56cc4643d2031c3c274c7efbcd321))
+
+## [1.1.15](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.14...v1.1.15) (2025-11-20)
+
+
+### Bug Fixes
+
+* add changes in calender view ([c106bba](https://github.com/EchonLabs/kanvaro.com/commit/c106bba7ff6433fe09a7e69ff1947d6d71cd67ca))
+* due data is not older date ([82c26b3](https://github.com/EchonLabs/kanvaro.com/commit/82c26b3ecf645badbfc44704a7c3c3355b19d6a4))
+
+## [1.1.14](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.13...v1.1.14) (2025-11-20)
+
+
+### Bug Fixes
+
+* add time tracking fixes ([c0769d3](https://github.com/EchonLabs/kanvaro.com/commit/c0769d30d32ccc14dbbfc2466b9d9c2590560584))
+* fix task issues ([96b8b1f](https://github.com/EchonLabs/kanvaro.com/commit/96b8b1f3551b38ae0482d0c08ea3d91d8b2d1f6b))
+
+## [1.1.13](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.12...v1.1.13) (2025-11-20)
+
+
+### Bug Fixes
+
+* add task edit new changes ([2b1641a](https://github.com/EchonLabs/kanvaro.com/commit/2b1641aecbd86bb86d40eb6e7859487e768b7f72))
+* stories edit flow ([1fdb6e8](https://github.com/EchonLabs/kanvaro.com/commit/1fdb6e83190b980beaf4b65530748c806e2f4a4f))
+
+## [1.1.12](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.11...v1.1.12) (2025-11-19)
+
+
+### Bug Fixes
+
+* fix build issue ([0571870](https://github.com/EchonLabs/kanvaro.com/commit/05718705398a5e4d6b8af328b27518a66540abe0))
+
+## [1.1.11](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.10...v1.1.11) (2025-11-19)
+
+
+### Bug Fixes
+
+* add changes in kanbarn board ([fb1d208](https://github.com/EchonLabs/kanvaro.com/commit/fb1d2087dd5b09aafc7b964e7bfbf1b1e8a6a0b8))
+* add changes in project setting ([e3640a9](https://github.com/EchonLabs/kanvaro.com/commit/e3640a962255b340c695456f89264846b5118042))
+* add chnges in assigned to section ([35c524a](https://github.com/EchonLabs/kanvaro.com/commit/35c524a3f84b07c9f6fccb8df5995a599618d71f))
+* add project and task changes ([20eef34](https://github.com/EchonLabs/kanvaro.com/commit/20eef34226a333f1e9ccfb0053e48391352e8db5))
+
+## [1.1.10](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.9...v1.1.10) (2025-11-11)
+
+
+### Bug Fixes
+
+* :bug: revert signup changes ([ba80157](https://github.com/EchonLabs/kanvaro.com/commit/ba80157ac9545497de38f4afa3c985160b084453))
+
+## [1.1.9](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.8...v1.1.9) (2025-11-11)
+
+
+### Reverts
+
+* Revert "fix: debug issues in dev" ([a157140](https://github.com/EchonLabs/kanvaro.com/commit/a15714057a88e271b1a9fbf8af8ddc17c597e9ff))
+
+## [1.1.8](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.7...v1.1.8) (2025-11-11)
+
+
+### Bug Fixes
+
+* debug issues in dev ([42de66a](https://github.com/EchonLabs/kanvaro.com/commit/42de66a1b10ac7e3f913912aaf5c9e511fa44944))
+
+## [1.1.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.6...v1.1.7) (2025-11-11)
+
+
+### Bug Fixes
+
+* fix bugs in sign up ([2c2977b](https://github.com/EchonLabs/kanvaro.com/commit/2c2977bbf94a62fb4436dd8515f6ca156f16efda))
+
+## [1.1.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.5...v1.1.6) (2025-11-11)
+
+
+### Bug Fixes
+
+* reverting config changes ([c9ef665](https://github.com/EchonLabs/kanvaro.com/commit/c9ef6655093875f395f4a646239228006db0a915))
+
+## [1.1.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.4...v1.1.5) (2025-11-11)
+
+
+### Bug Fixes
+
+* fix always redirect to setup issue ([578f821](https://github.com/EchonLabs/kanvaro.com/commit/578f82140e5328295c8301ee504a5faa5e1754c0))
+
+## [1.1.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.3...v1.1.4) (2025-11-10)
+
+
+### Bug Fixes
+
+* :bug: add backlog  fixes ([34671b9](https://github.com/EchonLabs/kanvaro.com/commit/34671b975a28d7c9c8f4895a25c86fa9c5c8f9fe))
+* add changes in filters in backlog ([3d5ef17](https://github.com/EchonLabs/kanvaro.com/commit/3d5ef170386092a170231f572e5ef76689e6d07c))
+* add mobile responsive in set up ([685b2a9](https://github.com/EchonLabs/kanvaro.com/commit/685b2a93a8fdf28af7af1713e24d223e951c3ef1))
+* add time log issues ([9e14a90](https://github.com/EchonLabs/kanvaro.com/commit/9e14a906cff3c5e35247cb8d92cb7107cff8f3b7))
+
+## [1.1.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.2...v1.1.3) (2025-11-10)
+
+
+### Bug Fixes
+
+* undo changes ([3251a2f](https://github.com/EchonLabs/kanvaro.com/commit/3251a2f5e01c520fff03305a37275faf05ede4de))
+
+## [1.1.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.1...v1.1.2) (2025-11-10)
+
+
+### Bug Fixes
+
+* add git ignore chnages ([768075c](https://github.com/EchonLabs/kanvaro.com/commit/768075cbb1f66f10a983c4bae8530db4a84f43db))
+
+## [1.1.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.1.0...v1.1.1) (2025-11-10)
+
+
+### Bug Fixes
+
+* add to spritn option in backlog tasks ([2854f5f](https://github.com/EchonLabs/kanvaro.com/commit/2854f5f06dc810b4f6ee48455c1768046133b76b))
+* fix timer filtering issues ([224ebc3](https://github.com/EchonLabs/kanvaro.com/commit/224ebc3406aba2e6f0e06e89c784cdcf6d460038))
+* fix version number issue and sign in ([1a2af46](https://github.com/EchonLabs/kanvaro.com/commit/1a2af460a438d63b420a953a8fe024f9781c0a94))
+* role error msg will lead to scroll the page up ([000ff25](https://github.com/EchonLabs/kanvaro.com/commit/000ff25cefe945ce7b803dc1d5f64be7b800fedb))
+
 # [1.1.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.0.25...v1.1.0) (2025-11-07)
 
 

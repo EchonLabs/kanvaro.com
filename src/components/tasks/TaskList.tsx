@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
+import { formatToTitleCase } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
@@ -33,7 +34,7 @@ interface Task {
   _id: string
   title: string
   description: string
-  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
+  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled' | 'backlog'
   priority: 'low' | 'medium' | 'high' | 'critical'
   type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
   assignedTo?: {
@@ -112,6 +113,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
       case 'todo': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
       case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
       case 'review': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+      case 'backlog': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
       case 'testing': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
       case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
       case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
@@ -124,6 +126,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
       case 'todo': return <Target className="h-4 w-4" />
       case 'in_progress': return <Play className="h-4 w-4" />
       case 'review': return <AlertTriangle className="h-4 w-4" />
+      case 'backlog': return <Target className="h-4 w-4" />
       case 'testing': return <CheckCircle className="h-4 w-4" />
       case 'done': return <CheckCircle className="h-4 w-4" />
       case 'cancelled': return <XCircle className="h-4 w-4" />
@@ -363,6 +366,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
               <SelectItem value="todo">To Do</SelectItem>
               <SelectItem value="in_progress">In Progress</SelectItem>
               <SelectItem value="review">Review</SelectItem>
+              <SelectItem value="backlog">Backlog</SelectItem>
               <SelectItem value="testing">Testing</SelectItem>
               <SelectItem value="done">Done</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -411,13 +415,13 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                     <h4 className="font-medium text-foreground text-sm sm:text-base truncate flex-1 min-w-0">{task.title}</h4>
                     <Badge className={getStatusColor(task.status) + ' flex-shrink-0'}>
                       {getStatusIcon(task.status)}
-                      <span className="ml-1">{task.status.replace('_', ' ')}</span>
+                      <span className="ml-1">{formatToTitleCase(task.status)}</span>
                     </Badge>
                     <Badge className={getPriorityColor(task.priority) + ' flex-shrink-0'}>
-                      {task.priority}
+                      {formatToTitleCase(task.priority)}
                     </Badge>
                     <Badge className={getTypeColor(task.type) + ' flex-shrink-0'}>
-                      {task.type}
+                      {formatToTitleCase(task.type)}
                     </Badge>
                   </div>
                   <p className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">
@@ -471,6 +475,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                       <SelectItem value="todo">To Do</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="review">Review</SelectItem>
+                      <SelectItem value="backlog">Backlog</SelectItem>
                       <SelectItem value="testing">Testing</SelectItem>
                       <SelectItem value="done">Done</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>

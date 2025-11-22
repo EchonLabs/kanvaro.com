@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -137,6 +137,8 @@ export function CreateRoleModal({ isOpen, onClose, onRoleCreated }: CreateRoleMo
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [expandedCategories, setExpandedCategories] = useState<Set<PermissionCategory>>(new Set())
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const errorRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -150,18 +152,28 @@ export function CreateRoleModal({ isOpen, onClose, onRoleCreated }: CreateRoleMo
     e.preventDefault()
     setError('')
 
+    const validationErrors: string[] = []
+
     if (!formData.name.trim()) {
-      setError('Role name is required')
-      return
+      validationErrors.push('Role name is required')
     }
 
     if (!formData.description.trim()) {
-      setError('Role description is required')
-      return
+      validationErrors.push('Role description is required')
     }
 
     if (formData.permissions.length === 0) {
-      setError('At least one permission must be selected')
+      validationErrors.push('At least one permission must be selected')
+    }
+
+    if (validationErrors.length > 0) {
+      setError(validationErrors[0])
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        })
+      }
       return
     }
 
@@ -190,6 +202,24 @@ export function CreateRoleModal({ isOpen, onClose, onRoleCreated }: CreateRoleMo
     }
   }
 
+  useEffect(() => {
+    if (!error) return
+    const timer = setTimeout(() => {
+      if (errorRef.current && scrollContainerRef.current) {
+        const errorElement = errorRef.current
+        const container = scrollContainerRef.current
+        const offsetTop =
+          errorElement.offsetTop - container.offsetTop
+        container.scrollTo({
+          top: offsetTop,
+          behavior: 'smooth'
+        })
+      }
+    }, 0)
+
+    return () => clearTimeout(timer)
+  }, [error])
+
   const handlePermissionChange = (permission: string, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
@@ -197,6 +227,7 @@ export function CreateRoleModal({ isOpen, onClose, onRoleCreated }: CreateRoleMo
         ? [...prev.permissions, permission]
         : prev.permissions.filter(p => p !== permission)
     }))
+    if (error) setError('')
   }
 
   const handleCategoryToggle = (category: PermissionCategory) => {
@@ -229,12 +260,15 @@ export function CreateRoleModal({ isOpen, onClose, onRoleCreated }: CreateRoleMo
         permissions: Array.from(new Set([...prev.permissions, ...categoryPermissions]))
       }))
     }
+    if (error) setError('')
   }
 
   // Check if form is valid - all required fields must be filled
   const isFormValid = !!formData.name.trim() && 
                       !!formData.description.trim() && 
                       formData.permissions.length > 0
+
+  const hasBlockingError = !!error
 
   if (!isOpen) return null
 
@@ -253,10 +287,13 @@ export function CreateRoleModal({ isOpen, onClose, onRoleCreated }: CreateRoleMo
           </Button>
         </CardHeader>
 
-        <CardContent className="flex-1 overflow-y-auto px-4 sm:px-6 py-3 sm:py-4">
+        <CardContent
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto px-4 sm:px-6 py-3 sm:py-4"
+        >
           <form onSubmit={handleSubmit} className="space-y-6" id="create-role-form">
             {error && (
-              <Alert variant="destructive">
+              <Alert variant="destructive" ref={errorRef}>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
@@ -267,7 +304,10 @@ export function CreateRoleModal({ isOpen, onClose, onRoleCreated }: CreateRoleMo
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, name: e.target.value }))
+                    if (error) setError('')
+                  }}
                   placeholder="Enter role name"
                   required
                 />
@@ -278,7 +318,10 @@ export function CreateRoleModal({ isOpen, onClose, onRoleCreated }: CreateRoleMo
                 <Textarea
                   id="description"
                   value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, description: e.target.value }))
+                    if (error) setError('')
+                  }}
                   placeholder="Describe what this role can do"
                   rows={3}
                   required
@@ -372,7 +415,11 @@ export function CreateRoleModal({ isOpen, onClose, onRoleCreated }: CreateRoleMo
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" form="create-role-form" disabled={loading || !isFormValid}>
+            <Button
+              type="submit"
+              form="create-role-form"
+              disabled={loading || !isFormValid || hasBlockingError}
+            >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

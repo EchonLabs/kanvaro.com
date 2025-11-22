@@ -92,7 +92,7 @@ export const ProgressSteps = ({ steps, currentStep }: ProgressStepsProps) => {
       </ol>
 
       {/* Mobile Horizontal Layout */}
-      <ol className="lg:hidden flex space-x-2 overflow-x-auto scrollbar-hide pb-2">
+      <ol className="lg:hidden grid grid-cols-2 sm:grid-cols-3 gap-3">
         {steps.map((step, stepIdx) => {
           const Icon = step.icon
           const isCompleted = stepIdx < currentIndex
@@ -100,12 +100,12 @@ export const ProgressSteps = ({ steps, currentStep }: ProgressStepsProps) => {
           const isUpcoming = stepIdx > currentIndex
 
           return (
-            <li key={step.id} className="flex flex-col items-center space-y-2 min-w-0 flex-shrink-0">
+            <li key={step.id} className="flex flex-col items-center space-y-2 rounded-lg border p-3 bg-background">
               {/* Step Circle */}
-              <div className="relative">
+              <div className="relative flex items-center justify-center">
                 <div
                   className={cn(
-                    'flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all duration-200',
+                    'flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-200',
                     {
                       'border-primary bg-primary text-primary-foreground shadow-lg': isCompleted,
                       'border-primary bg-background text-primary shadow-lg ring-4 ring-primary/20': isCurrent,
@@ -121,16 +121,16 @@ export const ProgressSteps = ({ steps, currentStep }: ProgressStepsProps) => {
                 </div>
                 
                 {/* Step Number */}
-                <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-background border border-current flex items-center justify-center text-xs font-semibold">
+                <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-background border border-current flex items-center justify-center text-[10px] font-semibold">
                   {stepIdx + 1}
                 </div>
               </div>
 
               {/* Step Title */}
-              <div className="text-center">
+              <div className="text-center w-full">
                 <span
                   className={cn(
-                    'text-xs font-medium transition-colors duration-200 block',
+                    'text-xs font-medium transition-colors duration-200 block leading-tight break-words',
                     {
                       'text-primary': isCurrent,
                       'text-muted-foreground': isUpcoming,

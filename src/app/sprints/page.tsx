@@ -7,11 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 import { Progress } from '@/components/ui/Progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
+import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
+import { Label } from '@/components/ui/label'
 import { 
   Plus, 
   Search, 
@@ -55,6 +58,7 @@ interface Sprint {
   capacity: number
   velocity: number
   teamMembers: Array<{
+    _id?: string
     firstName: string
     lastName: string
     email: string
@@ -86,6 +90,21 @@ export default function SprintsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [success, setSuccess] = useState('')
+  const [updatingSprintId, setUpdatingSprintId] = useState<string | null>(null)
+  const [completeModalOpen, setCompleteModalOpen] = useState(false)
+  const [completingSprintId, setCompletingSprintId] = useState<string | null>(null)
+  const [completionMode, setCompletionMode] = useState<'existing' | 'new'>('existing')
+  const [availableSprints, setAvailableSprints] = useState<Sprint[]>([])
+  const [availableSprintsLoading, setAvailableSprintsLoading] = useState(false)
+  const [selectedTargetSprintId, setSelectedTargetSprintId] = useState('')
+  const [completeError, setCompleteError] = useState('')
+  const [incompleteTasks, setIncompleteTasks] = useState<Array<{ _id: string; title: string; status: string }>>([])
+  const [newSprintForm, setNewSprintForm] = useState({
+    name: '',
+    startDate: '',
+    endDate: '',
+    capacity: ''
+  })
 
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -184,6 +203,281 @@ export default function SprintsPage() {
     } catch (e) {
       setError('Failed to delete sprint')
     }
+  }
+
+  const formatDateInputValue = (date: Date): string => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const formatTaskStatusLabel = (status: string) => {
+    const statusMap: Record<string, string> = {
+      backlog: 'Backlog',
+      todo: 'To Do',
+      in_progress: 'In Progress',
+      review: 'In Review',
+      testing: 'Testing',
+      done: 'Done',
+      completed: 'Completed',
+      cancelled: 'Cancelled'
+    }
+    return statusMap[status] || formatToTitleCase(status)
+  }
+
+  const loadAvailableSprints = useCallback(async (excludeSprintId: string) => {
+    try {
+      setAvailableSprintsLoading(true)
+      const response = await fetch('/api/sprints?limit=200')
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to load sprints')
+      }
+
+      const sprintList: Sprint[] = Array.isArray(data.data) ? data.data : []
+      const filtered = sprintList.filter(
+        sprintOption =>
+          sprintOption._id !== excludeSprintId && ['planning', 'active'].includes(sprintOption.status)
+      )
+
+      setAvailableSprints(filtered)
+    } catch (err) {
+      console.error('Failed to load sprints list:', err)
+      setAvailableSprints([])
+      setCompleteError(err instanceof Error ? err.message : 'Failed to load sprints')
+    } finally {
+      setAvailableSprintsLoading(false)
+    }
+  }, [])
+
+  const checkSprintForIncompleteTasks = async (sprintId: string): Promise<Array<{ _id: string; title: string; status: string }>> => {
+    try {
+      const response = await fetch(`/api/sprints/${sprintId}`)
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        return []
+      }
+
+      const tasks = data.data?.tasks || []
+      return tasks
+        .filter((task: any) => !['done', 'completed'].includes(task.status))
+        .map((task: any) => ({
+          _id: task._id,
+          title: task.title,
+          status: task.status
+        }))
+    } catch (err) {
+      console.error('Failed to check sprint tasks:', err)
+      return []
+    }
+  }
+
+  const handleSprintLifecycleAction = async (sprintId: string, action: 'start' | 'complete') => {
+    if (action === 'complete') {
+      const incomplete = await checkSprintForIncompleteTasks(sprintId)
+      
+      if (incomplete.length > 0) {
+        setIncompleteTasks(incomplete)
+        setCompletingSprintId(sprintId)
+        setCompleteModalOpen(true)
+        await loadAvailableSprints(sprintId)
+        
+        const sprint = sprints.find(s => s._id === sprintId)
+        if (sprint) {
+          const baseStart = sprint.endDate ? new Date(sprint.endDate) : new Date()
+          const startDate = formatDateInputValue(baseStart)
+          const endDateObj = new Date(baseStart)
+          endDateObj.setDate(endDateObj.getDate() + 14)
+          const endDate = formatDateInputValue(endDateObj)
+
+          setNewSprintForm({
+            name: `${sprint.name} - Next Sprint`,
+            startDate,
+            endDate,
+            capacity: sprint.capacity ? String(sprint.capacity) : ''
+          })
+        }
+        return
+      }
+    }
+
+    try {
+      setUpdatingSprintId(sprintId)
+      setError('')
+
+      const response = await fetch(`/api/sprints/${sprintId}/${action}`, {
+        method: 'POST'
+      })
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        setError(data.error || `Failed to ${action} sprint`)
+        return
+      }
+
+      setSprints(prev => prev.map(s => (s._id === sprintId ? data.data : s)))
+      showSuccess(action === 'start' ? 'Sprint started successfully.' : 'Sprint completed successfully.')
+    } catch (err) {
+      console.error(`${action} sprint error:`, err)
+      setError(`Failed to ${action} sprint`)
+    } finally {
+      setUpdatingSprintId(null)
+    }
+  }
+
+  const finalizeCompleteSprint = async (targetSprintId?: string, newSprintData?: Sprint) => {
+    if (!completingSprintId) return
+
+    const options: RequestInit = { method: 'POST' }
+    if (targetSprintId) {
+      options.headers = { 'Content-Type': 'application/json' }
+      options.body = JSON.stringify({ targetSprintId })
+    }
+
+    const res = await fetch(`/api/sprints/${completingSprintId}/complete`, options)
+    const data = await res.json().catch(() => ({}))
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to complete sprint')
+    }
+
+    setSprints(prev => {
+      let updated = prev.map(s => (s._id === completingSprintId ? data.data : s))
+      
+      // If a new sprint was created, add it to the list
+      if (newSprintData) {
+        // Check if it's not already in the list
+        const exists = updated.some(s => s._id === newSprintData._id)
+        if (!exists) {
+          updated = [newSprintData, ...updated]
+        }
+      }
+      
+      return updated
+    })
+    showSuccess('Sprint completed successfully.')
+    setCompleteModalOpen(false)
+    setCompletingSprintId(null)
+    setIncompleteTasks([])
+    setSelectedTargetSprintId('')
+    setCompleteError('')
+  }
+
+  const handleCompleteModalConfirm = async () => {
+    if (!completingSprintId) return
+
+    if (!incompleteTasks.length) {
+      try {
+        setUpdatingSprintId(completingSprintId)
+        await finalizeCompleteSprint()
+      } catch (err) {
+        setCompleteError(err instanceof Error ? err.message : 'Failed to complete sprint')
+      } finally {
+        setUpdatingSprintId(null)
+      }
+      return
+    }
+
+    if (completionMode === 'existing') {
+      if (!selectedTargetSprintId) {
+        setCompleteError('Select a sprint to move the remaining tasks into.')
+        return
+      }
+      try {
+        setUpdatingSprintId(completingSprintId)
+        await finalizeCompleteSprint(selectedTargetSprintId)
+      } catch (err) {
+        setCompleteError(err instanceof Error ? err.message : 'Failed to move tasks to the selected sprint')
+      } finally {
+        setUpdatingSprintId(null)
+      }
+      return
+    }
+
+    if (!newSprintForm.name || !newSprintForm.startDate || !newSprintForm.endDate) {
+      setCompleteError('Provide a name and date range for the new sprint.')
+      return
+    }
+
+      const sprint = sprints.find(s => s._id === completingSprintId)
+      if (!sprint?.project?._id) {
+        setCompleteError('Sprint project information is missing.')
+        return
+      }
+
+      try {
+        setUpdatingSprintId(completingSprintId)
+        
+        let teamMemberIds: string[] = []
+        if (sprint.teamMembers && sprint.teamMembers.length > 0) {
+          const fullSprintResponse = await fetch(`/api/sprints/${completingSprintId}`)
+          const fullSprintData = await fullSprintResponse.json()
+          if (fullSprintResponse.ok && fullSprintData.success) {
+            teamMemberIds = (fullSprintData.data?.teamMembers || [])
+              .map((m: any) => m._id || m)
+              .filter(Boolean)
+          } else {
+            teamMemberIds = sprint.teamMembers
+              .map((m: any) => m._id || m)
+              .filter(Boolean)
+          }
+        }
+
+        const createResponse = await fetch('/api/sprints', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: newSprintForm.name,
+            description: `Auto-created from completion of ${sprint.name}`,
+            project: sprint.project._id,
+            startDate: newSprintForm.startDate,
+            endDate: newSprintForm.endDate,
+            goal: sprint.goal,
+            capacity: Number(newSprintForm.capacity) || sprint.capacity,
+            teamMembers: teamMemberIds
+          })
+        })
+
+      const createdSprint = await createResponse.json()
+      if (!createResponse.ok || !createdSprint.success) {
+        throw new Error(createdSprint.error || 'Failed to create sprint')
+      }
+
+      const newSprintId = createdSprint.data?._id
+      if (!newSprintId) {
+        throw new Error('New sprint ID missing in response')
+      }
+
+      // Fetch full sprint details to get all populated fields
+      const fullSprintResponse = await fetch(`/api/sprints/${newSprintId}`)
+      const fullSprintData = await fullSprintResponse.json()
+      
+      let newSprint: Sprint | undefined
+      if (fullSprintResponse.ok && fullSprintData.success) {
+        newSprint = fullSprintData.data
+      } else {
+        // Fallback to the created sprint data if fetch fails
+        newSprint = createdSprint.data
+      }
+
+      await finalizeCompleteSprint(newSprintId, newSprint)
+    } catch (err) {
+      setCompleteError(err instanceof Error ? err.message : 'Failed to create sprint')
+    } finally {
+      setUpdatingSprintId(null)
+    }
+  }
+
+  const isCompleteConfirmDisabled = () => {
+    if (updatingSprintId === completingSprintId) return true
+    if (!incompleteTasks.length) return false
+    if (completionMode === 'existing') {
+      return !selectedTargetSprintId
+    }
+    return !newSprintForm.name || !newSprintForm.startDate || !newSprintForm.endDate
   }
 
   const getStatusColor = (status: string) => {
@@ -348,13 +642,13 @@ export default function SprintsPage() {
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Sprint
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => {
+                              {/* <DropdownMenuItem onClick={(e) => {
                                 e.stopPropagation()
                                 router.push(`/sprints/${sprint._id}?tab=settings`)
                               }}>
                                 <Settings className="h-4 w-4 mr-2" />
                                 Settings
-                              </DropdownMenuItem>
+                              </DropdownMenuItem> */}
                               <DropdownMenuItem onClick={(e) => {
                                 e.stopPropagation()
                                 router.push(`/sprints/${sprint._id}/edit`)
@@ -383,7 +677,7 @@ export default function SprintsPage() {
                         <div className="flex items-center space-x-2">
                           <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
                             {getStatusIcon(sprint?.status)}
-                            <span className="ml-1 hidden sm:inline">{sprint?.status}</span>
+                            <span className="ml-1 hidden sm:inline">{formatToTitleCase(sprint?.status)}</span>
                           </Badge>
                         </div>
 
@@ -430,6 +724,36 @@ export default function SprintsPage() {
                             {Math.ceil((new Date(sprint?.endDate).getTime() - new Date(sprint?.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
                           </div>
                         </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          {sprint.status === 'planning' && (
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleSprintLifecycleAction(sprint._id, 'start')
+                              }}
+                              disabled={updatingSprintId === sprint._id}
+                            >
+                              <Play className="h-4 w-4 mr-1" />
+                              {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
+                            </Button>
+                          )}
+                          {sprint.status === 'active' && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleSprintLifecycleAction(sprint._id, 'complete')
+                              }}
+                              disabled={updatingSprintId === sprint._id}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              {updatingSprintId === sprint._id ? 'Completing...' : 'Complete Sprint'}
+                            </Button>
+                          )}
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
@@ -448,9 +772,9 @@ export default function SprintsPage() {
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
                           <div className="flex-1 min-w-0 w-full">
                             <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2 mb-2">
-                              <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
+                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
                                 {getStatusIcon(sprint?.status)}
-                                <span className="ml-1 hidden sm:inline">{sprint?.status}</span>
+                                <span className="ml-1 hidden sm:inline">{formatToTitleCase(sprint?.status)}</span>
                               </Badge>
                             </div>
                             <div className="flex items-start gap-2 mb-2">
@@ -486,6 +810,35 @@ export default function SprintsPage() {
                                 <span>Velocity: {sprint?.velocity || 0}</span>
                               </div>
                             </div>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {sprint.status === 'planning' && (
+                          <Button
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleSprintLifecycleAction(sprint._id, 'start')
+                            }}
+                            disabled={updatingSprintId === sprint._id}
+                          >
+                            <Play className="h-4 w-4 mr-1" />
+                            {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
+                          </Button>
+                        )}
+                        {sprint.status === 'active' && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleSprintLifecycleAction(sprint._id, 'complete')
+                            }}
+                            disabled={updatingSprintId === sprint._id}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            {updatingSprintId === sprint._id ? 'Completing...' : 'Complete Sprint'}
+                          </Button>
+                        )}
+                      </div>
                           </div>
                           <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
                             <div className="text-right sm:text-left">
@@ -550,6 +903,210 @@ export default function SprintsPage() {
             </Tabs>
           </CardContent>
         </Card>
+
+        <ResponsiveDialog
+          open={completeModalOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setCompleteModalOpen(false)
+              setCompleteError('')
+              setSelectedTargetSprintId('')
+              setCompletionMode('existing')
+              setCompletingSprintId(null)
+              setIncompleteTasks([])
+              return
+            }
+            setCompleteModalOpen(true)
+          }}
+          title="Complete Sprint"
+          description={
+            incompleteTasks.length
+              ? `There are ${incompleteTasks.length} incomplete task${
+                  incompleteTasks.length === 1 ? '' : 's'
+                }. Move them before completing the sprint.`
+              : 'All tasks are completed. You can finish the sprint now.'
+          }
+          footer={
+            <div className="flex flex-col sm:flex-row sm:justify-end gap-2 w-full">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCompleteModalOpen(false)
+                  setCompleteError('')
+                  setSelectedTargetSprintId('')
+                  setCompletionMode('existing')
+                  setCompletingSprintId(null)
+                  setIncompleteTasks([])
+                }}
+                disabled={updatingSprintId === completingSprintId}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCompleteModalConfirm}
+                disabled={isCompleteConfirmDisabled()}
+              >
+                {updatingSprintId === completingSprintId ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Complete Sprint
+                  </>
+                )}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            {completeError && (
+              <Alert variant="destructive">
+                <AlertDescription>{completeError}</AlertDescription>
+              </Alert>
+            )}
+
+            {incompleteTasks.length > 0 ? (
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm font-medium text-foreground">
+                    Incomplete Tasks
+                  </Label>
+                  <div className="mt-2 space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {incompleteTasks.map(task => (
+                      <div key={task._id} className="rounded-md border bg-muted/40 px-3 py-2">
+                        <p className="text-sm font-medium truncate" title={task.title}>
+                          {task.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Current status: {formatTaskStatusLabel(task.status)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={completionMode === 'existing' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setCompletionMode('existing')
+                      setSelectedTargetSprintId('')
+                      setCompleteError('')
+                    }}
+                  >
+                    Move to Existing Sprint
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={completionMode === 'new' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setCompletionMode('new')
+                      setCompleteError('')
+                    }}
+                  >
+                    Create New Sprint
+                  </Button>
+                </div>
+
+                {completionMode === 'existing' ? (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-foreground">Select Sprint</Label>
+                    <Select
+                      value={selectedTargetSprintId}
+                      onValueChange={(value) => setSelectedTargetSprintId(value)}
+                      disabled={availableSprintsLoading || availableSprints.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={availableSprintsLoading ? 'Loading...' : 'Choose sprint'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableSprintsLoading ? (
+                          <div className="px-2 py-1 text-sm text-muted-foreground">
+                            Loading sprints...
+                          </div>
+                        ) : availableSprints.length === 0 ? (
+                          <div className="px-2 py-1 text-sm text-muted-foreground">
+                            No planning or active sprints available. Create a new sprint instead.
+                          </div>
+                        ) : (
+                          availableSprints.map(option => (
+                            <SelectItem key={option._id} value={option._id}>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{option.name}</span>
+                                {option.project?.name && (
+                                  <span className="text-xs text-muted-foreground">
+                                    Project: {option.project.name}
+                                  </span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <Label className="text-sm text-foreground">Sprint Name</Label>
+                      <Input
+                        value={newSprintForm.name}
+                        onChange={(event) =>
+                          setNewSprintForm(prev => ({ ...prev, name: event.target.value }))
+                        }
+                        placeholder="Sprint name"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-sm text-foreground">Start Date</Label>
+                        <Input
+                          type="date"
+                          value={newSprintForm.startDate}
+                          onChange={(event) =>
+                            setNewSprintForm(prev => ({ ...prev, startDate: event.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm text-foreground">End Date</Label>
+                        <Input
+                          type="date"
+                          value={newSprintForm.endDate}
+                          onChange={(event) =>
+                            setNewSprintForm(prev => ({ ...prev, endDate: event.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-foreground">Capacity (hours)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={newSprintForm.capacity}
+                        onChange={(event) =>
+                          setNewSprintForm(prev => ({ ...prev, capacity: event.target.value }))
+                        }
+                        placeholder="Team capacity"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                All tasks in this sprint are completed. You can finish the sprint immediately.
+              </p>
+            )}
+          </div>
+        </ResponsiveDialog>
       </div>
     </MainLayout>
   )

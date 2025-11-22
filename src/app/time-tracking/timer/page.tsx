@@ -68,6 +68,13 @@ export default function TimerPage() {
   const [selectedTask, setSelectedTask] = useState<string>('')
   const [description, setDescription] = useState('')
   const [error, setError] = useState('')
+  const [timeLogsRefreshKey, setTimeLogsRefreshKey] = useState(0)
+  const [liveActiveTimer, setLiveActiveTimer] = useState<any | null | undefined>(undefined)
+  const [activeTimerSnapshot, setActiveTimerSnapshot] = useState<any | null>(null)
+  const [pendingActiveProject, setPendingActiveProject] = useState<string | null>(null)
+  const [pendingActiveTask, setPendingActiveTask] = useState<string | null>(null)
+  const [pendingActiveDescription, setPendingActiveDescription] = useState<string>('')
+  const [initializedFromActive, setInitializedFromActive] = useState(false)
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -80,6 +87,7 @@ export default function TimerPage() {
           setUser(userData)
           setAuthError('')
           await fetchProjects(userData)
+          await fetchActiveTimer(userData)
         } else if (response.status === 401) {
           const refreshResponse = await fetch('/api/auth/refresh', {
             method: 'POST'
@@ -92,6 +100,7 @@ export default function TimerPage() {
             setUser(refreshData.user)
             setAuthError('')
             await fetchProjects(refreshData.user)
+            await fetchActiveTimer(refreshData.user)
           } else {
             setAuthError('Session expired')
             setTimeout(() => {
@@ -118,6 +127,16 @@ export default function TimerPage() {
   // Preselect project from query params when projects are loaded
   useEffect(() => {
     if (!projects || projects.length === 0) return
+    if (pendingActiveProject && projects.some(p => p._id === pendingActiveProject)) {
+      if (pendingActiveDescription) {
+        setDescription(pendingActiveDescription)
+      }
+      if (selectedProject !== pendingActiveProject) {
+        handleProjectChange(pendingActiveProject)
+      }
+      setPendingActiveProject(null)
+      return
+    }
     if (selectedProject) return
     let pid = searchParams?.get('project') || searchParams?.get('projectId') || ''
     const pnameRaw = searchParams?.get('projectName') || ''
@@ -131,11 +150,21 @@ export default function TimerPage() {
     if (projectIdToSelect) {
       handleProjectChange(projectIdToSelect)
     }
-  }, [projects, searchParams, selectedProject])
+  }, [projects, searchParams, selectedProject, pendingActiveProject, pendingActiveDescription])
 
   // Preselect task from query params when tasks are loaded
   useEffect(() => {
     if (!tasks || tasks.length === 0) return
+    if (pendingActiveTask && tasks.some(t => t._id === pendingActiveTask)) {
+      handleTaskChange(pendingActiveTask)
+      if (pendingActiveDescription) {
+        setDescription(pendingActiveDescription)
+      }
+      setPendingActiveTask(null)
+      setPendingActiveDescription('')
+      setInitializedFromActive(true)
+      return
+    }
     if (selectedTask) return
     if (!selectedProject) return
     
@@ -153,7 +182,16 @@ export default function TimerPage() {
     if (taskIdToSelect && tasks.some(t => t._id === taskIdToSelect)) {
       handleTaskChange(taskIdToSelect)
     }
-  }, [tasks, searchParams, selectedTask, selectedProject])
+  }, [tasks, searchParams, selectedTask, selectedProject, pendingActiveTask, pendingActiveDescription])
+
+  useEffect(() => {
+    if (!pendingActiveDescription) return
+    if (pendingActiveProject || pendingActiveTask) return
+    if (initializedFromActive) return
+    setDescription((prev) => prev || pendingActiveDescription)
+    setPendingActiveDescription('')
+    setInitializedFromActive(true)
+  }, [pendingActiveDescription, pendingActiveProject, pendingActiveTask, initializedFromActive])
 
   const fetchProjects = async (currentUser?: User | null) => {
     try {
@@ -210,6 +248,49 @@ export default function TimerPage() {
     } catch (err) {
       console.error('Failed to fetch tasks:', err)
       setTasks([])
+    }
+  }
+
+  const fetchActiveTimer = async (currentUser?: User | null) => {
+    const effectiveUser = currentUser ?? user
+    if (!effectiveUser) return
+
+    try {
+      const params = new URLSearchParams({
+        userId: effectiveUser.id,
+        organizationId: effectiveUser.organization
+      })
+      const response = await fetch(`/api/time-tracking/timer?${params.toString()}`)
+      const data = await response.json()
+
+      if (response.ok && data?.activeTimer) {
+        setActiveTimerSnapshot(data.activeTimer)
+        setLiveActiveTimer(data.activeTimer)
+
+        const projectId = data.activeTimer.project?._id || null
+        const taskId = data.activeTimer.task?._id || null
+        const timerDescription = data.activeTimer.description || ''
+
+        if (projectId) {
+          setPendingActiveProject(projectId)
+        }
+        if (taskId) {
+          setPendingActiveTask(taskId)
+        }
+        if (timerDescription) {
+          setPendingActiveDescription(timerDescription)
+        }
+        setInitializedFromActive(false)
+      } else {
+        setActiveTimerSnapshot(null)
+        setLiveActiveTimer(null)
+        setPendingActiveProject(null)
+        setPendingActiveTask(null)
+        setPendingActiveDescription('')
+        setInitializedFromActive(true)
+      }
+    } catch (error) {
+      console.error('Failed to fetch active timer:', error)
     }
   }
 
@@ -274,7 +355,21 @@ export default function TimerPage() {
     <MainLayout>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <Button variant="ghost" onClick={() => router.push('/time-tracking')} className="flex-shrink-0 w-full sm:w-auto">
+          <Button 
+            variant="ghost" 
+            onClick={() => {
+              // Use browser history to go back to the previous page
+              // If the page was accessed from dashboard, it will go back to dashboard
+              // Otherwise, it will go back to the previous page (likely time-tracking)
+              if (typeof window !== 'undefined' && window.history.length > 1) {
+                router.back()
+              } else {
+                // Fallback to time-tracking if no history available
+                router.push('/time-tracking')
+              }
+            }} 
+            className="flex-shrink-0 w-full sm:w-auto"
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -325,57 +420,60 @@ export default function TimerPage() {
                 </Select>
               </div>
 
-              {selectedProject && (
-                <div className="space-y-2">
-                  <Label htmlFor="task">Task *</Label>
-                  <Select value={selectedTask} onValueChange={handleTaskChange}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a task" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.isArray(tasks) && tasks.map((task) => (
-                        <SelectItem key={task._id} value={task._id}>
-                          <div className="flex items-center space-x-2">
-                            <Target className="h-4 w-4 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">{task.title}</div>
-                              <div className="text-xs sm:text-sm text-muted-foreground truncate">
-                                {task.status} • {task.priority}
-                              </div>
+              <div className="space-y-2">
+                <Label htmlFor="task">Task *</Label>
+                <Select
+                  value={selectedTask}
+                  onValueChange={handleTaskChange}
+                  disabled={!selectedProject || !Array.isArray(tasks) || tasks.length === 0}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={selectedProject ? 'Select a task' : 'Select a project first'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.isArray(tasks) && tasks.map((task) => (
+                      <SelectItem key={task._id} value={task._id}>
+                        <div className="flex items-center space-x-2">
+                          <Target className="h-4 w-4 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">{task.title}</div>
+                            <div className="text-xs sm:text-sm text-muted-foreground truncate">
+                              {task.status} • {task.priority}
                             </div>
                           </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {Array.isArray(tasks) && tasks.length === 0 && (
-                    <p className="text-xs text-muted-foreground">No tasks available in this project. Please create or assign a task to start tracking.</p>
-                  )}
-                </div>
-              )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedProject && Array.isArray(tasks) && tasks.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    No tasks available in this project. Please create or assign a task to start tracking.
+                  </p>
+                )}
+              </div>
             </div>
 
-            {selectedProject && (
-              <div className="space-y-2">
-                <Label htmlFor="description">Description *</Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="What are you working on?"
-                  rows={2}
-                  required
-                  className="w-full"
-                />
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="description">Description *</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={selectedProject ? 'What are you working on?' : 'Select a project to enable time tracking'}
+                rows={2}
+                required
+                disabled={!selectedProject || !selectedTask}
+                className="w-full"
+              />
+            </div>
 
-            {selectedProject && user && selectedTask && (
+            {user && (
               <div className="my-4">
                 <Timer
                   userId={user.id}
                   organizationId={user.organization}
-                  projectId={selectedProject}
+                  projectId={selectedProject || undefined}
                   taskId={selectedTask || undefined}
                   description={description}
                   onTimerUpdate={(timer) => {
@@ -384,15 +482,18 @@ export default function TimerPage() {
                       setSelectedTask('')
                       setSelectedProject('')
                       setTasks([])
+                      setActiveTimerSnapshot(null)
+                      setPendingActiveProject(null)
+                      setPendingActiveTask(null)
+                      setPendingActiveDescription('')
+                      setInitializedFromActive(true)
+                    } else {
+                      setActiveTimerSnapshot(timer)
                     }
+                    setLiveActiveTimer(timer ?? null)
+                    setTimeLogsRefreshKey((prev) => prev + 1)
                   }}
                 />
-              </div>
-            )}
-
-            {selectedProject && user && !selectedTask && (
-              <div className="text-center py-4">
-                <p className="text-sm text-muted-foreground">Select a task to start the timer.</p>
               </div>
             )}
 
@@ -402,17 +503,9 @@ export default function TimerPage() {
                 organizationId={user.organization}
                 projectId={selectedProject || undefined}
                 taskId={selectedTask || undefined}
+                refreshKey={timeLogsRefreshKey}
+                liveActiveTimer={liveActiveTimer}
               />
-            )}
-
-            {!selectedProject && (
-              <div className="text-center py-8">
-                <Target className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-base sm:text-lg font-medium mb-2">Select a Project</h3>
-                <p className="text-sm sm:text-base text-muted-foreground">
-                  Choose a project above to start tracking time
-                </p>
-              </div>
             )}
           </CardContent>
         </Card>

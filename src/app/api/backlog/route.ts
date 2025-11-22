@@ -3,7 +3,9 @@ import connectDB from '@/lib/db-config'
 import { Task } from '@/models/Task'
 import { Story } from '@/models/Story'
 import { Epic } from '@/models/Epic'
+import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
+import '@/models/Sprint'
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,53 +39,123 @@ export async function GET(request: NextRequest) {
       ]
     } : {}
 
-    // Build additional filters
-    const filters: any = {
-      ...searchFilter,
-      organization: organizationId
-    }
-    
-    if (type) {
-      filters.type = type
-    }
-    
-    if (priority) {
-      filters.priority = priority
-    }
-    
-    if (status) {
-      filters.status = status
+    const includeTasks = !type || type === 'task'
+    const includeStories = !type || type === 'story'
+    const includeEpics = !type || type === 'epic'
+
+    const projectDocs = await Project.find({ organization: organizationId }).select('_id')
+    const projectIds = projectDocs.map(doc => doc._id)
+
+    if (projectIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 0
+        }
+      })
     }
 
-    // Get all backlog items (tasks, stories, epics)
+    const taskFilter: any = {
+      ...searchFilter,
+      organization: organizationId,
+      project: { $in: projectIds },
+      archived: false
+    }
+
+    const storyFilter: any = {
+      ...searchFilter,
+      project: { $in: projectIds },
+      archived: false
+    }
+
+    const epicFilter: any = {
+      ...searchFilter,
+      project: { $in: projectIds },
+      archived: false
+    }
+
+    if (priority) {
+      taskFilter.priority = priority
+      storyFilter.priority = priority
+      epicFilter.priority = priority
+    }
+
+    if (status) {
+      const taskStatuses: string[] = []
+      const storyStatuses: string[] = []
+      const epicStatuses: string[] = []
+
+      switch (status) {
+        case 'backlog':
+          taskStatuses.push('todo')
+          storyStatuses.push('backlog', 'todo')
+          epicStatuses.push('backlog', 'todo')
+          break
+        case 'in_progress':
+          taskStatuses.push('in_progress')
+          storyStatuses.push('in_progress')
+          epicStatuses.push('in_progress')
+          break
+        case 'done':
+          taskStatuses.push('done')
+          storyStatuses.push('done', 'completed')
+          epicStatuses.push('done', 'completed')
+          break
+        default:
+          taskStatuses.push(status)
+          storyStatuses.push(status)
+          epicStatuses.push(status)
+      }
+
+      if (taskStatuses.length) {
+        taskFilter.status = taskStatuses.length === 1 ? taskStatuses[0] : { $in: taskStatuses }
+      }
+      if (storyStatuses.length) {
+        storyFilter.status = storyStatuses.length === 1 ? storyStatuses[0] : { $in: storyStatuses }
+      }
+      if (epicStatuses.length) {
+        epicFilter.status = epicStatuses.length === 1 ? epicStatuses[0] : { $in: epicStatuses }
+      }
+    }
+
     const [tasks, stories, epics] = await Promise.all([
-      Task.find({ ...filters, project: { $exists: true } })
-        .populate('project', 'name')
-        .populate('assignedTo', 'firstName lastName email')
-        .populate('createdBy', 'firstName lastName email')
-        .populate('story', 'title')
-        .populate('sprint', 'name')
-        .sort({ priority: -1, createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit),
-      
-      Story.find({ ...filters, project: { $exists: true } })
-        .populate('project', 'name')
-        .populate('assignedTo', 'firstName lastName email')
-        .populate('createdBy', 'firstName lastName email')
-        .populate('epic', 'title')
-        .populate('sprint', 'name')
-        .sort({ priority: -1, createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit),
-      
-      Epic.find({ ...filters, project: { $exists: true } })
-        .populate('project', 'name')
-        .populate('assignedTo', 'firstName lastName email')
-        .populate('createdBy', 'firstName lastName email')
-        .sort({ priority: -1, createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
+      includeTasks
+        ? Task.find(taskFilter)
+            .populate('project', 'name')
+            .populate('assignedTo', 'firstName lastName email')
+            .populate('createdBy', 'firstName lastName email')
+            .populate('story', 'title')
+            .populate('sprint', 'name')
+            .sort({ priority: -1, createdAt: -1 })
+            .skip((page - 1) * limit)
+            .limit(limit)
+        : Promise.resolve([]),
+
+      includeStories
+        ? Story.find(storyFilter)
+            .populate('project', 'name')
+            .populate('assignedTo', 'firstName lastName email')
+            .populate('createdBy', 'firstName lastName email')
+            .populate('epic', 'title')
+            .populate('sprint', 'name')
+            .sort({ priority: -1, createdAt: -1 })
+            .skip((page - 1) * limit)
+            .limit(limit)
+        : Promise.resolve([]),
+
+      includeEpics
+        ? Epic.find(epicFilter)
+            .populate('project', 'name')
+            .populate('assignedTo', 'firstName lastName email')
+            .populate('createdBy', 'firstName lastName email')
+            .sort({ priority: -1, createdAt: -1 })
+            .skip((page - 1) * limit)
+            .limit(limit)
+        : Promise.resolve([])
     ])
 
     // Combine and format all items

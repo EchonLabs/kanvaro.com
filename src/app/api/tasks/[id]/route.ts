@@ -1,12 +1,89 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
-import { Task } from '@/models/Task'
+import { Task, TASK_STATUS_VALUES, TaskStatus } from '@/models/Task'
 import { Project } from '@/models/Project'
 import { User } from '@/models/User'
+import { Sprint } from '@/models/Sprint'
 import { authenticateUser } from '@/lib/auth-utils'
 import { CompletionService } from '@/lib/completion-service'
 import { notificationService } from '@/lib/notification-service'
 import { invalidateCache } from '@/lib/redis'
+
+const TASK_STATUS_SET = new Set<TaskStatus>(TASK_STATUS_VALUES)
+
+function sanitizeLabels(input: any): string[] {
+  if (Array.isArray(input)) {
+    return input
+      .filter((value): value is string => typeof value === 'string')
+      .map(label => label.trim())
+      .filter(label => label.length > 0)
+  }
+
+  if (typeof input === 'string') {
+    return input
+      .split(',')
+      .map(part => part.trim())
+      .filter(part => part.length > 0)
+  }
+
+  return []
+}
+
+type IncomingSubtask = {
+  _id?: string
+  title?: unknown
+  description?: unknown
+  status?: unknown
+  isCompleted?: unknown
+}
+
+function sanitizeSubtasks(input: any): Array<{
+  _id?: string
+  title: string
+  description?: string
+  status: TaskStatus
+  isCompleted: boolean
+}> {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  return input
+    .filter((item: IncomingSubtask) => typeof item?.title === 'string' && item.title.trim().length > 0)
+    .map((item: IncomingSubtask) => {
+      const rawStatus = typeof item.status === 'string' ? item.status : undefined
+      const status = rawStatus && TASK_STATUS_SET.has(rawStatus as TaskStatus)
+        ? rawStatus as TaskStatus
+        : 'backlog'
+
+      const sanitized: {
+        _id?: string
+        title: string
+        description?: string
+        status: TaskStatus
+        isCompleted: boolean
+      } = {
+        title: (item.title as string).trim(),
+        status,
+        isCompleted: typeof item.isCompleted === 'boolean'
+          ? item.isCompleted
+          : status === 'done'
+      }
+
+      if (item._id && typeof item._id === 'string') {
+        sanitized._id = item._id
+      }
+
+      if (typeof item.description === 'string') {
+        const trimmed = item.description.trim()
+        if (trimmed.length > 0) {
+          sanitized.description = trimmed
+        }
+      }
+
+      return sanitized
+    })
+}
 
 export async function GET(
   request: NextRequest,
@@ -71,6 +148,7 @@ export async function PUT(
 ) {
   try {
     await connectDB()
+    console.log('[Task PUT] Connected to DB', { taskId: params?.id })
 
     const authResult = await authenticateUser()
     if ('error' in authResult) {
@@ -85,7 +163,80 @@ export async function PUT(
     const organizationId = user.organization
     const taskId = params.id
 
-    const updateData = await request.json()
+    const rawUpdate = await request.json()
+    const updateData: Record<string, any> = { ...rawUpdate }
+    console.log('[Task PUT] Incoming payload', {
+      taskId,
+      receivedKeys: Object.keys(updateData)
+    })
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'status')) {
+      // Allow any string status to support custom kanban statuses per project
+      // Validation should be done at the application level based on project settings
+      if (typeof updateData.status !== 'string' || updateData.status.trim().length === 0) {
+        delete updateData.status
+      } else {
+        updateData.status = updateData.status.trim()
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'labels')) {
+      updateData.labels = sanitizeLabels(updateData.labels)
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'subtasks')) {
+      updateData.subtasks = sanitizeSubtasks(updateData.subtasks)
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'storyPoints')) {
+      const value = updateData.storyPoints
+      if (value === '' || value === null || typeof value === 'undefined') {
+        updateData.storyPoints = undefined
+      } else {
+        const numeric = typeof value === 'number' ? value : Number(value)
+        updateData.storyPoints = Number.isFinite(numeric) ? numeric : undefined
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'estimatedHours')) {
+      const value = updateData.estimatedHours
+      if (value === '' || value === null || typeof value === 'undefined') {
+        updateData.estimatedHours = undefined
+      } else {
+        const numeric = typeof value === 'number' ? value : Number(value)
+        updateData.estimatedHours = Number.isFinite(numeric) ? numeric : undefined
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'dueDate')) {
+      const value = updateData.dueDate
+      if (!value) {
+        updateData.dueDate = undefined
+      } else {
+        updateData.dueDate = new Date(value)
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'assignedTo')) {
+      if (typeof updateData.assignedTo === 'string') {
+        const trimmed = updateData.assignedTo.trim()
+        updateData.assignedTo = trimmed.length > 0 ? trimmed : undefined
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'parentTask')) {
+      if (typeof updateData.parentTask === 'string') {
+        const trimmed = updateData.parentTask.trim()
+        updateData.parentTask = trimmed.length > 0 ? trimmed : undefined
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'story')) {
+      if (typeof updateData.story === 'string') {
+        const trimmed = updateData.story.trim()
+        updateData.story = trimmed.length > 0 ? trimmed : undefined
+      }
+    }
 
     // Add optimistic locking with version field
     const currentTask = await Task.findOne({
@@ -96,6 +247,15 @@ export async function PUT(
         { createdBy: userId }
       ]
     })
+    if (!currentTask) {
+      console.warn('[Task PUT] Task not found or unauthorized', { taskId, userId })
+    } else {
+      console.log('[Task PUT] Current task loaded', {
+        taskId,
+        currentStatus: currentTask.status,
+        currentSprint: currentTask.sprint
+      })
+    }
 
     // If status is changing, set position to end of target column
     if (updateData.status && updateData.status !== currentTask.status) {
@@ -107,6 +267,7 @@ export async function PUT(
     }
 
     if (!currentTask) {
+      console.warn('[Task PUT] Task not found or unauthorized on update', { taskId, userId })
       return NextResponse.json(
         { error: 'Task not found or unauthorized' },
         { status: 404 }
@@ -142,7 +303,7 @@ export async function PUT(
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
       .populate('story', 'title status')
-      .populate('sprint', 'name status')
+      .populate('sprint', 'name status startDate endDate teamMembers')
       .populate('parentTask', 'title')
 
     if (!task) {
@@ -150,6 +311,52 @@ export async function PUT(
         { error: 'Task not found or unauthorized' },
         { status: 404 }
       )
+    }
+
+    // Synchronize sprint tasks array if sprint changed
+    if (Object.prototype.hasOwnProperty.call(updateData, 'sprint')) {
+      const newSprintId = updateData.sprint
+      const oldSprintId = currentTask.sprint
+
+      const updates: Promise<unknown>[] = []
+
+      if (oldSprintId && (!newSprintId || oldSprintId.toString() !== newSprintId)) {
+        updates.push(
+          Sprint.findByIdAndUpdate(
+            oldSprintId,
+            { $pull: { tasks: task._id } },
+            { new: false }
+          ).exec().catch(error => {
+            console.error('Failed to remove task from previous sprint:', error)
+          })
+        )
+      }
+
+      if (newSprintId) {
+        const sprintDoc = await Sprint.findById(newSprintId).select('_id project')
+        if (sprintDoc) {
+          if (sprintDoc.project.toString() !== task.project.toString()) {
+            console.warn(
+              `Task ${taskId} assigned to different project sprint. Task project: ${task.project}, Sprint project: ${sprintDoc.project}`
+            )
+          }
+          updates.push(
+            Sprint.findByIdAndUpdate(
+              newSprintId,
+              { $addToSet: { tasks: task._id } },
+              { new: false }
+            ).exec().catch(error => {
+              console.error('Failed to add task to sprint:', error)
+            })
+          )
+        } else {
+          console.warn(`Sprint ${newSprintId} not found when updating task ${taskId}`)
+        }
+      }
+
+      if (updates.length > 0) {
+        await Promise.allSettled(updates)
+      }
     }
 
     // Invalidate tasks cache for this organization
@@ -218,6 +425,12 @@ export async function PUT(
       console.error('Failed to send task update notifications:', notificationError)
       // Don't fail the task update if notification fails
     }
+
+    console.log('[Task PUT] Task updated successfully', {
+      taskId,
+      newStatus: task.status,
+      sprint: task.sprint?._id
+    })
 
     return NextResponse.json({
       success: true,

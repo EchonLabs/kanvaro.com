@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Checkbox'
+import { formatToTitleCase } from '@/lib/utils'
 import { Calendar, User, ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -159,10 +160,10 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
                     {task.title && task.title.length > 10 ? `${task.title.slice(0, 10)}…` : task.title}
                   </h4>
                   <Badge className={`${getStatusColor(task.status)} text-xs flex-shrink-0`}>
-                    {task.status}
+                    {formatToTitleCase(task.status)}
                   </Badge>
                   <Badge className={`${getPriorityColor(task.priority)} text-xs flex-shrink-0`}>
-                    {task.priority}
+                    {formatToTitleCase(task.priority)}
                   </Badge>
                 </div>
                 

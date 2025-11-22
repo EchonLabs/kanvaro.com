@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
+import { formatToTitleCase } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -65,6 +66,7 @@ export default function MembersPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [editingMember, setEditingMember] = useState<Member | null>(null)
+  const [activeTab, setActiveTab] = useState('members')
 
   const checkAuth = useCallback(async () => {
     try {
@@ -138,6 +140,8 @@ export default function MembersPage() {
         setShowInviteModal(false)
         setSuccess('Invitation sent successfully!')
         setError('')
+        // Switch to Pending Invitations tab
+        setActiveTab('invitations')
         // Clear success message after 5 seconds
         setTimeout(() => setSuccess(''), 5000)
         // Refresh authentication state and then fetch members
@@ -305,7 +309,7 @@ export default function MembersPage() {
         </Alert>
       )}
 
-      <Tabs defaultValue="members" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="members">
             <Users className="h-4 w-4 mr-2" />
@@ -391,8 +395,8 @@ export default function MembersPage() {
                         </div>
                         <p className="text-xs sm:text-sm text-muted-foreground truncate">{member.email}</p>
                         <div className="flex items-center space-x-2 mt-1 flex-wrap gap-2">
-                          <Badge className={getRoleColor(member.role) + ' flex-shrink-0'}>
-                            {member.role.replace('_', ' ')}
+                          <Badge className={getRoleColor(member.role) + ' flex-shrink-0 pointer-events-none hover:opacity-100'}>
+                            {formatToTitleCase(member.role)}
                           </Badge>
                           <span className="text-xs text-muted-foreground whitespace-nowrap">
                             Joined {new Date(member.createdAt).toLocaleDateString()}
@@ -448,7 +452,7 @@ export default function MembersPage() {
                           Invited by {invitation.invitedBy.firstName} {invitation.invitedBy.lastName}
                         </p>
                         <div className="flex items-center space-x-2 mt-1 flex-wrap gap-2">
-                          <Badge className={getRoleColor(invitation.role) + ' flex-shrink-0'}>
+                          <Badge className={getRoleColor(invitation.role) + ' flex-shrink-0 pointer-events-none hover:opacity-100'}>
                             {invitation.role.replace('_', ' ')}
                           </Badge>
                           <span className="text-xs text-muted-foreground whitespace-nowrap">

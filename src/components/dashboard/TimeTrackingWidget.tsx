@@ -183,12 +183,18 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
           <div className="space-y-2">
             <div className="text-xs sm:text-sm break-words">
               <span className="font-medium">Project:</span>{' '}
-              <span 
-                className={activeTimer.project.name.length > 20 ? 'truncate' : ''}
-                title={activeTimer.project.name.length > 20 ? activeTimer.project.name : undefined}
-              >
-                {activeTimer.project.name.length > 20 ? `${activeTimer.project.name.slice(0, 20)}…` : activeTimer.project.name}
-              </span>
+              {activeTimer.project?.name ? (
+                <span
+                  className={activeTimer.project.name.length > 20 ? 'truncate' : ''}
+                  title={activeTimer.project.name.length > 20 ? activeTimer.project.name : undefined}
+                >
+                  {activeTimer.project.name.length > 20
+                    ? `${activeTimer.project.name.slice(0, 20)}…`
+                    : activeTimer.project.name}
+                </span>
+              ) : (
+                <span className="italic text-muted-foreground">Unknown project</span>
+              )}
             </div>
             {activeTimer.task && (
               <div className="text-xs sm:text-sm break-words">

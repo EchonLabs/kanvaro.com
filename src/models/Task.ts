@@ -1,9 +1,22 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
+export const TASK_STATUS_VALUES = ['backlog', 'todo', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const
+export type TaskStatus = typeof TASK_STATUS_VALUES[number]
+
+export interface ITaskSubtask {
+  _id?: mongoose.Types.ObjectId
+  title: string
+  description?: string
+  status: TaskStatus
+  isCompleted: boolean
+  createdAt?: Date
+  updatedAt?: Date
+}
+
 export interface ITask extends Document {
   title: string
   description: string
-  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
+  status: TaskStatus
   priority: 'low' | 'medium' | 'high' | 'critical'
   type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
   organization: mongoose.Types.ObjectId
@@ -37,15 +50,40 @@ export interface ITask extends Document {
     createdAt: Date
     updatedAt: Date
   }[]
+  subtasks: ITaskSubtask[]
   archived: boolean
   position: number
-  // Test management fields
   linkedTestCase?: mongoose.Types.ObjectId
   foundInVersion?: string
   testExecutionId?: mongoose.Types.ObjectId
   createdAt: Date
   updatedAt: Date
 }
+
+const SubtaskSchema = new Schema<ITaskSubtask>({
+  title: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 200
+  },
+  description: {
+    type: String,
+    trim: true,
+    maxlength: 1000
+  },
+  status: {
+    type: String,
+    default: 'todo',
+    trim: true
+    // Note: No enum restriction to allow custom kanban statuses per project
+    // Status validation should be done at the application level based on project settings
+  },
+  isCompleted: {
+    type: Boolean,
+    default: false
+  }
+}, { timestamps: true })
 
 const TaskSchema = new Schema<ITask>({
   title: {
@@ -60,7 +98,10 @@ const TaskSchema = new Schema<ITask>({
   },
   status: {
     type: String,
-    default: 'todo'
+    default: 'backlog',
+    trim: true
+    // Note: No enum restriction to allow custom kanban statuses per project
+    // Status validation should be done at the application level based on project settings
   },
   priority: {
     type: String,
@@ -156,8 +197,11 @@ const TaskSchema = new Schema<ITask>({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
   }],
+  subtasks: {
+    type: [SubtaskSchema],
+    default: []
+  },
   archived: { type: Boolean, default: false },
-  // Test management fields
   linkedTestCase: {
     type: Schema.Types.ObjectId,
     ref: 'TestCase'

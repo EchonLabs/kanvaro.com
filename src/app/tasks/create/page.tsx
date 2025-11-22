@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Checkbox } from '@/components/ui/Checkbox'
 import { 
   ArrowLeft,
   Save,
@@ -16,7 +17,8 @@ import {
   AlertTriangle,
   Target,
   Plus,
-  X
+  X,
+  Trash2
 } from 'lucide-react'
 
 interface Project {
@@ -68,6 +70,25 @@ interface Story {
   updatedAt: string
 }
 
+type SubtaskStatus = 'backlog' | 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
+
+interface Subtask {
+  title: string
+  description?: string
+  status: SubtaskStatus
+  isCompleted: boolean
+}
+
+const SUBTASK_STATUS_OPTIONS: Array<{ value: SubtaskStatus; label: string }> = [
+  { value: 'backlog', label: 'Backlog' },
+  { value: 'todo', label: 'To Do' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'review', label: 'Review' },
+  { value: 'testing', label: 'Testing' },
+  { value: 'done', label: 'Done' },
+  { value: 'cancelled', label: 'Cancelled' }
+]
+
 export default function CreateTaskPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -82,6 +103,7 @@ export default function CreateTaskPage() {
   const [assignedToIds, setAssignedToIds] = useState<string[]>([]);
   const [assigneeQuery, setAssigneeQuery] = useState('');
   const [newLabel, setNewLabel] = useState('')
+  const [subtasks, setSubtasks] = useState<Subtask[]>([])
 
   const [formData, setFormData] = useState({
     title: '',
@@ -93,7 +115,6 @@ export default function CreateTaskPage() {
     assignedTo: '',
     priority: 'medium',
     type: 'task',
-    status: 'todo',
     dueDate: '',
     estimatedHours: '',
     storyPoints: '',
@@ -213,11 +234,31 @@ export default function CreateTaskPage() {
       }
 
       // Validate required fields before submitting
+      const missingSubtaskTitle = subtasks.some(st => !(st.title && st.title.trim().length > 0))
       if (!formData.title.trim() || !formData.project || !formData.dueDate) {
         setError('Please fill in all required fields')
         setLoading(false)
         return
       }
+
+      if (assignedToIds.length === 0) {
+        setError('Please assign this task to at least one user')
+        setLoading(false)
+        return
+      }
+
+      if (missingSubtaskTitle) {
+        setError('Please fill in all required subtask titles')
+        setLoading(false)
+        return
+      }
+
+      const preparedSubtasks = subtasks.map(subtask => ({
+        title: subtask.title.trim(),
+        description: subtask.description?.trim() || undefined,
+        status: subtask.status,
+        isCompleted: subtask.status === 'done' ? true : subtask.isCompleted
+      }))
 
       const response = await fetch('/api/tasks', {
         method: 'POST',
@@ -234,22 +275,23 @@ export default function CreateTaskPage() {
           assignedTo: assignedToIds.length === 1 ? assignedToIds[0] : assignedToIds.length > 0 ? assignedToIds[0] : undefined,
           priority: formData.priority,
           type: formData.type,
-          status: formData.status,
+          status: 'backlog',
           dueDate: formData.dueDate,
           estimatedHours: formData.estimatedHours ? parseInt(formData.estimatedHours) : undefined,
           storyPoints: formData.storyPoints ? parseInt(formData.storyPoints) : undefined,
-          labels: Array.isArray(formData.labels) ? formData.labels : []
+          labels: Array.isArray(formData.labels) ? formData.labels : [],
+          subtasks: preparedSubtasks
         })
       })
 
+      // Read response body only once - you can't read it twice!
+      const data = await response.json().catch(() => ({ error: 'Failed to parse response' }))
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to create task' }))
-        setError(errorData.error || 'Failed to create task')
+        setError(data.error || 'Failed to create task')
         setLoading(false)
         return
       }
-
-      const data = await response.json()
 
       if (data.success) {
         router.push('/tasks')
@@ -296,6 +338,49 @@ export default function CreateTaskPage() {
     }))
   }
 
+  const addSubtask = () => {
+    setSubtasks([...subtasks, {
+      title: '',
+      description: '',
+      status: 'todo',
+      isCompleted: false
+    }])
+  }
+
+  const updateSubtask = (index: number, field: keyof Subtask, value: any) => {
+    setSubtasks(prev => {
+      const updated = [...prev]
+      updated[index] = {
+        ...updated[index],
+        [field]: field === 'status' ? (value as SubtaskStatus) : value
+      }
+      if (field === 'status') {
+        updated[index].isCompleted = (value as SubtaskStatus) === 'done'
+      }
+      return updated
+    })
+  }
+
+  const toggleSubtaskCompletion = (index: number, checked: boolean) => {
+    setSubtasks(prev => {
+      const updated = [...prev]
+      const current = updated[index]
+      const nextStatus: SubtaskStatus = checked
+        ? 'done'
+        : (current.status === 'done' ? 'todo' : (current.status || 'todo'))
+      updated[index] = {
+        ...current,
+        status: nextStatus,
+        isCompleted: checked
+      }
+      return updated
+    })
+  }
+
+  const removeSubtask = (index: number) => {
+    setSubtasks(subtasks.filter((_, i) => i !== index))
+  }
+
   // Memoize filtered projects to avoid recalculating on every render
   const filteredProjects = useMemo(() => {
     if (!projectQuery.trim()) return projects
@@ -318,9 +403,11 @@ export default function CreateTaskPage() {
     return (
       !!formData.title.trim() &&
       !!formData.project &&
-      !!formData.dueDate
+      !!formData.dueDate &&
+      assignedToIds.length > 0 &&
+      !subtasks.some(st => !(st.title && st.title.trim().length > 0))
     )
-  }, [formData.title, formData.project, formData.dueDate])
+  }, [formData.title, formData.project, formData.dueDate, assignedToIds.length, subtasks])
 
   if (authError) {
     return (
@@ -423,7 +510,7 @@ export default function CreateTaskPage() {
 
                   {formData.project && (
                     <div>
-                      <label className="text-sm font-medium text-foreground">Assigned To</label>
+                      <label className="text-sm font-medium text-foreground">Assigned To *</label>
                       <div className="space-y-2">
                         <Select
                           value=""
@@ -439,13 +526,14 @@ export default function CreateTaskPage() {
                           onOpenChange={(open) => { if (open) setAssigneeQuery(""); }}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder={loadingProjectMembers ? 'Loading members...' : 'Select team members'} />
+                            <SelectValue placeholder={loadingProjectMembers ? 'Loading members...' : 'Select a team member'} />
                           </SelectTrigger>
                           <SelectContent className="z-[10050] p-0">
                             <div className="p-2">
                               <Input
                                 value={assigneeQuery}
                                 onChange={e => setAssigneeQuery(e.target.value)}
+                                onKeyDown={(e) => e.stopPropagation()}
                                 placeholder={loadingProjectMembers ? 'Loading members...' : 'Type to search team members'}
                                 className="mb-2"
                               />
@@ -546,23 +634,6 @@ export default function CreateTaskPage() {
                       </SelectContent>
                     </Select>
                   </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-foreground">Status</label>
-                    <Select value={formData.status} onValueChange={(value) => handleChange('status', value)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todo">To Do</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="review">Review</SelectItem>
-                        <SelectItem value="testing">Testing</SelectItem>
-                        <SelectItem value="done">Done</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
 
                 <div className="space-y-4">
@@ -656,6 +727,93 @@ export default function CreateTaskPage() {
                   </div>
                 </div>
               </div>
+
+            {/* Subtasks Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">Subtasks</h3>
+                <Button type="button" variant="outline" size="sm" onClick={addSubtask}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Subtask
+                </Button>
+              </div>
+
+              {subtasks.map((subtask, index) => (
+                <div key={index} className="p-4 border rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Subtask {index + 1}</h4>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeSubtask(index)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <label className="text-sm font-medium text-foreground">Title *</label>
+                      <Input
+                        value={subtask.title}
+                        onChange={(e) => updateSubtask(index, 'title', e.target.value)}
+                        placeholder="Subtask title"
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-foreground">Status</label>
+                      <Select
+                        value={subtask.status}
+                        onValueChange={(value) => updateSubtask(index, 'status', value as SubtaskStatus)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SUBTASK_STATUS_OPTIONS.map(option => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      checked={subtask.isCompleted || subtask.status === 'done'}
+                      onCheckedChange={(checked) => toggleSubtaskCompletion(index, !!checked)}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      Mark as completed
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Description</label>
+                    <Textarea
+                      value={subtask.description || ''}
+                      onChange={(e) => updateSubtask(index, 'description', e.target.value)}
+                      placeholder="Subtask description"
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              ))}
+
+              {subtasks.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Target className="h-12 w-12 mx-auto mb-4" />
+                  <p>No subtasks added yet</p>
+                  <p className="text-sm">Click "Add Subtask" to create subtasks for this task</p>
+                </div>
+              )}
+            </div>
 
               <div className="flex justify-end space-x-4">
                 <Button type="button" variant="outline" onClick={() => router.back()}>

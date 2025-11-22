@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
     const organizationId = searchParams.get('organizationId')
     const projectId = searchParams.get('projectId')
     const userId = searchParams.get('userId')
+    const assignedBy = searchParams.get('assignedBy')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const reportType = searchParams.get('reportType') || 'summary'
@@ -60,6 +61,12 @@ export async function GET(request: NextRequest) {
 
     if (projectId) baseQuery.project = projectId
     if (userId) baseQuery.user = userId
+    if (assignedBy) baseQuery.approvedBy = assignedBy
+
+    // For CSV export, use the new detailed format
+    if (format === 'csv') {
+      return await getDetailedCsvReport(baseQuery)
+    }
 
     switch (reportType) {
       case 'summary':
@@ -383,4 +390,47 @@ async function getBillableReport(query: any, format: string) {
   }
 
   return NextResponse.json({ billableReport })
+}
+
+// New detailed CSV export with format: User, Project, Task, Date, Start, End, Duration(h), Notes
+async function getDetailedCsvReport(query: any) {
+  const entries = await TimeEntry.find(query)
+    .populate('user', 'firstName lastName email')
+    .populate('project', 'name')
+    .populate('task', 'title')
+    .populate('approvedBy', 'firstName lastName email')
+    .sort({ startTime: 1 })
+    .lean()
+
+  const rows = entries.map((entry: any) => {
+    const userName = entry.user 
+      ? `${entry.user.firstName || ''} ${entry.user.lastName || ''}`.trim() || entry.user.email
+      : 'Unknown User'
+    const projectName = entry.project?.name || 'Unknown Project'
+    const taskTitle = entry.task?.title || ''
+    const date = entry.startTime ? new Date(entry.startTime).toISOString().split('T')[0] : ''
+    const startTime = entry.startTime ? new Date(entry.startTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : ''
+    const endTime = entry.endTime ? new Date(entry.endTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : ''
+    const durationHours = entry.duration ? (entry.duration / 60).toFixed(2) : '0.00'
+    const notes = entry.notes || entry.description || ''
+
+    return [userName, projectName, taskTitle, date, startTime, endTime, durationHours, notes]
+  })
+
+  const headers = ['User', 'Project', 'Task', 'Date', 'Start', 'End', 'Duration(h)', 'Notes']
+  const csv = buildCsv(headers, rows)
+  
+  // Add BOM for UTF-8 encoding (Excel compatibility)
+  const bom = '\uFEFF'
+  const csvWithBom = bom + csv
+  
+  const now = new Date().toISOString().split('T')[0]
+  return new NextResponse(csvWithBom, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="time-report-${now}.csv"`,
+      'Cache-Control': 'no-store'
+    }
+  })
 }

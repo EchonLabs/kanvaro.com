@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 12)
 
     // Create user
-    const user = new User({
+    const userData: any = {
       firstName: firstName || invitation.firstName || '',
       lastName: lastName || invitation.lastName || '',
       email: invitation.email,
@@ -51,7 +51,14 @@ export async function POST(request: NextRequest) {
       organization: invitation.organization._id,
       isActive: true,
       emailVerified: true
-    })
+    }
+
+    // Add customRole if it exists in the invitation
+    if (invitation.customRole) {
+      userData.customRole = invitation.customRole
+    }
+
+    const user = new User(userData)
 
     await user.save()
 

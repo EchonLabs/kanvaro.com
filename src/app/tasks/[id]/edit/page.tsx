@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -9,37 +9,161 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, ArrowLeft, CheckCircle } from 'lucide-react'
+import { Checkbox } from '@/components/ui/Checkbox'
+import { Loader2, ArrowLeft, CheckCircle, Plus, Trash2, Target, User, Clock, Calendar } from 'lucide-react'
 
-interface Task {
+const STATUS_OPTIONS = [
+  { value: 'backlog', label: 'Backlog' },
+  { value: 'todo', label: 'To Do' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'review', label: 'Review' },
+  { value: 'testing', label: 'Testing' },
+  { value: 'done', label: 'Done' },
+  { value: 'cancelled', label: 'Cancelled' }
+] as const
+
+type TaskStatus = typeof STATUS_OPTIONS[number]['value']
+type TaskPriority = 'low' | 'medium' | 'high' | 'critical'
+type TaskType = 'task' | 'bug' | 'feature' | 'improvement' | 'subtask'
+
+type SubtaskStatus = TaskStatus
+
+interface Subtask {
+  _id?: string
+  title: string
+  description?: string
+  status: SubtaskStatus
+  isCompleted: boolean
+  createdAt?: string
+  updatedAt?: string
+}
+
+interface User {
   _id: string
+  firstName: string
+  lastName: string
+  email: string
+}
+
+interface Project {
+  _id: string
+  name: string
+}
+
+interface TaskFormState {
   title: string
   description: string
-  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
-  priority: 'low' | 'medium' | 'high' | 'critical'
-  type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
+  status: TaskStatus
+  priority: TaskPriority
+  type: TaskType
+  project?: string
+  assignedTo?: string
+  dueDate?: string
+  labels?: string
+  estimatedHours?: number
+  storyPoints?: number
 }
+
+const mapTaskFormState = (data: any): TaskFormState => ({
+  title: data?.title ?? '',
+  description: data?.description ?? '',
+  status: (data?.status ?? 'backlog') as TaskStatus,
+  priority: (data?.priority ?? 'medium') as TaskPriority,
+  type: (data?.type ?? 'task') as TaskType,
+  project: data?.project?._id ?? undefined,
+  assignedTo: data?.assignedTo?._id ?? undefined,
+  dueDate: data?.dueDate ? new Date(data.dueDate).toISOString().split('T')[0] : undefined,
+  labels: Array.isArray(data?.labels) ? data.labels.join(', ') : undefined,
+  estimatedHours: typeof data?.estimatedHours === 'number' ? data.estimatedHours : undefined,
+  storyPoints: typeof data?.storyPoints === 'number' ? data.storyPoints : undefined
+})
+
+const mapSubtasksFromResponse = (input: any): Subtask[] => {
+  if (!Array.isArray(input)) return []
+  return input.map((item: any) => ({
+    _id: typeof item?._id === 'string' ? item._id : undefined,
+    title: item?.title ?? '',
+    description: item?.description ?? '',
+    status: (item?.status ?? 'todo') as SubtaskStatus,
+    isCompleted: typeof item?.isCompleted === 'boolean' ? item.isCompleted : item?.status === 'done',
+    createdAt: item?.createdAt,
+    updatedAt: item?.updatedAt
+  }))
+}
+
+const sanitizeSubtasksForPayload = (subtasks: Subtask[]) =>
+  subtasks
+    .filter((subtask) => subtask.title.trim().length > 0)
+    .map((subtask) => ({
+      _id: subtask._id,
+      title: subtask.title.trim(),
+      description: subtask.description?.trim() || undefined,
+      status: subtask.status,
+      isCompleted: subtask.status === 'done' ? true : subtask.isCompleted
+    }))
+
+const normalizeSubtasksForCompare = (subtasks: Subtask[]) =>
+  sanitizeSubtasksForPayload(subtasks).map((subtask) => ({
+    _id: subtask._id ?? null,
+    title: subtask.title,
+    description: subtask.description ?? '',
+    status: subtask.status,
+    isCompleted: subtask.isCompleted
+  }))
 
 export default function EditTaskPage() {
   const router = useRouter()
   const params = useParams()
   const taskId = params.id as string
 
-  const [task, setTask] = useState<Task | null>(null)
-  const [originalTask, setOriginalTask] = useState<Task | null>(null)
+  const [task, setTask] = useState<TaskFormState | null>(null)
+  const [originalTask, setOriginalTask] = useState<TaskFormState | null>(null)
+  const [subtasks, setSubtasks] = useState<Subtask[]>([])
+  const [originalSubtasks, setOriginalSubtasks] = useState<Subtask[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loadingProjects, setLoadingProjects] = useState(false)
+  const [projectFilterQuery, setProjectFilterQuery] = useState('')
+  const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
+  const [labelsInput, setLabelsInput] = useState('')
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const messageRef = useRef<HTMLDivElement>(null)
 
   const fetchTask = useCallback(async () => {
     try {
       setLoading(true)
       const res = await fetch(`/api/tasks/${taskId}`)
       const data = await res.json()
+
       if (data.success) {
-        setTask(data.data)
-        setOriginalTask(data.data)
+        const mappedTask = mapTaskFormState(data.data)
+        const mappedSubtasks = mapSubtasksFromResponse(data.data?.subtasks)
+
+        setTask(mappedTask)
+        setOriginalTask(mappedTask)
+        setSubtasks(mappedSubtasks)
+        setOriginalSubtasks(mappedSubtasks)
+        setLabelsInput(Array.isArray(data.data?.labels) ? data.data.labels.join(', ') : '')
+        setError('')
+        // Reset filter queries
+        setProjectFilterQuery('')
+        setAssignedToFilterQuery('')
+        fetchProjects()
+        
+        // Fetch team members for the project if one is set
+        // On initial load: fetch team members and preserve existing assignee if valid
+        if (mappedTask.project) {
+          // Fetch team members with current assignee ID to validate it
+          fetchProjectTeamMembers(mappedTask.project, mappedTask.assignedTo)
+        } else {
+          // If no project, clear users
+          setUsers([])
+        }
       } else {
         setError(data.error || 'Failed to load task')
       }
@@ -51,13 +175,206 @@ export default function EditTaskPage() {
   }, [taskId])
 
   useEffect(() => {
-    if (taskId) fetchTask()
+    if (taskId) {
+      fetchTask()
+    }
   }, [taskId, fetchTask])
+
+  const fetchProjects = async () => {
+    setLoadingProjects(true)
+    try {
+      const response = await fetch('/api/projects?limit=1000&page=1')
+      const data = await response.json()
+      
+      if (data.success && Array.isArray(data.data)) {
+        setProjects(data.data.map((p: any) => ({ _id: p._id, name: p.name })))
+      } else {
+        setProjects([])
+      }
+    } catch (error) {
+      console.error('Failed to fetch projects:', error)
+      setProjects([])
+    } finally {
+      setLoadingProjects(false)
+    }
+  }
+
+  const fetchProjectTeamMembers = async (projectId: string, preserveAssigneeId?: string) => {
+    if (!projectId) {
+      setUsers([])
+      if (preserveAssigneeId) {
+        setTask((prev) => prev ? ({ ...prev, assignedTo: undefined }) : prev)
+      }
+      return
+    }
+    
+    setLoadingUsers(true)
+    try {
+      // Fetch project details to get team members (same approach as create page)
+      const response = await fetch(`/api/projects/${projectId}`)
+      const data = await response.json()
+      
+      if (!response.ok || !data.success || !data.data) {
+        setUsers([])
+        if (preserveAssigneeId) {
+          setTask((prev) => prev ? ({ ...prev, assignedTo: undefined }) : prev)
+        }
+        return
+      }
+      
+      // Extract team members from project data (same as create page)
+      const rawMembers = Array.isArray(data.data.teamMembers) 
+        ? data.data.teamMembers 
+        : []
+      
+      // Map team members to User format - handle direct user objects
+      const teamMembers: User[] = rawMembers
+        .map((member: any) => {
+          // Handle both populated and non-populated formats
+          const userObj = member.user || member
+          const userId = userObj?._id || member?._id
+          const firstName = userObj?.firstName || member?.firstName
+          const lastName = userObj?.lastName || member?.lastName
+          const email = userObj?.email || member?.email
+          
+          // Validate required fields
+          if (!userId || !firstName || !lastName) {
+            return null
+          }
+          
+          return {
+            _id: String(userId),
+            firstName: String(firstName),
+            lastName: String(lastName),
+            email: email ? String(email) : ''
+          }
+        })
+        .filter((member: User | null): member is User => member !== null)
+      
+      // Set the team members list
+      setUsers(teamMembers)
+      
+      // Handle assignee preservation/validation
+      if (preserveAssigneeId) {
+        const assigneeIdStr = String(preserveAssigneeId)
+        const assigneeInTeam = teamMembers.some((u: User) => String(u._id) === assigneeIdStr)
+        
+        if (assigneeInTeam) {
+          // Assignee is in the new team, preserve it
+          setTask((prev) => {
+            if (prev && String(prev.assignedTo) !== assigneeIdStr) {
+              return { ...prev, assignedTo: preserveAssigneeId }
+            }
+            return prev
+          })
+        } else {
+          // Assignee is not in the new team, clear it
+          setTask((prev) => {
+            if (prev && String(prev.assignedTo) === assigneeIdStr) {
+              return { ...prev, assignedTo: undefined }
+            }
+            return prev
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch project team members:', error)
+      setUsers([])
+      if (preserveAssigneeId) {
+        setTask((prev) => prev ? ({ ...prev, assignedTo: undefined }) : prev)
+      }
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
+
+  const filteredProjectOptions = useMemo(() => {
+    const query = projectFilterQuery.trim().toLowerCase()
+    if (!query) return projects
+    return projects.filter((project) => project.name.toLowerCase().includes(query))
+  }, [projects, projectFilterQuery])
+
+  const filteredAssignedToOptions = useMemo(() => {
+    const query = assignedToFilterQuery.trim().toLowerCase()
+    if (!query) return users
+    return users.filter((user) =>
+      `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(query) ||
+      (user.email && user.email.toLowerCase().includes(query))
+    )
+  }, [users, assignedToFilterQuery])
+
+  const addSubtask = () => {
+    setSubtasks((prev) => ([
+      ...prev,
+      {
+        title: '',
+        description: '',
+        status: 'todo',
+        isCompleted: false
+      }
+    ]))
+  }
+
+  const updateSubtask = (index: number, field: keyof Subtask, value: any) => {
+    setSubtasks((prev) => {
+      const updated = [...prev]
+      updated[index] = {
+        ...updated[index],
+        [field]: field === 'status' ? (value as SubtaskStatus) : value
+      }
+      if (field === 'status') {
+        updated[index].isCompleted = (value as SubtaskStatus) === 'done'
+      }
+      return updated
+    })
+  }
+
+  const toggleSubtaskCompletion = (index: number, checked: boolean) => {
+    setSubtasks((prev) => {
+      const updated = [...prev]
+      const current = updated[index]
+      const nextStatus: SubtaskStatus = checked
+        ? 'done'
+        : (current.status === 'done' ? 'todo' : current.status || 'todo')
+      updated[index] = {
+        ...current,
+        status: nextStatus,
+        isCompleted: checked
+      }
+      return updated
+    })
+  }
+
+  const removeSubtask = (index: number) => {
+    setSubtasks((prev) => prev.filter((_, i) => i !== index))
+  }
 
   const handleSave = async () => {
     if (!task) return
+
+    // Validate required fields
+    if (!task.project) {
+      setError('Project is required')
+      setSaving(false)
+      return
+    }
+    
+    if (!task.assignedTo) {
+      setError('Assigned To is required')
+      setSaving(false)
+      return
+    }
+
     try {
       setSaving(true)
+      setError('')
+      const preparedSubtasks = sanitizeSubtasksForPayload(subtasks)
+      
+      // Parse labels from comma-separated string
+      const labels = labelsInput
+        ? labelsInput.split(',').map(label => label.trim()).filter(label => label.length > 0)
+        : []
+
       const res = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -66,15 +383,31 @@ export default function EditTaskPage() {
           description: task.description,
           status: task.status,
           priority: task.priority,
-          type: task.type
+          type: task.type,
+          project: task.project || undefined,
+          assignedTo: task.assignedTo || undefined,
+          dueDate: task.dueDate || undefined,
+          labels: labels,
+          estimatedHours: task.estimatedHours || undefined,
+          storyPoints: task.storyPoints || undefined,
+          subtasks: preparedSubtasks
         })
       })
+
       const data = await res.json()
+
       if (data.success) {
+        const mappedTask = mapTaskFormState(data.data)
+        const mappedSubtasks = mapSubtasksFromResponse(data.data?.subtasks)
+
+        setTask(mappedTask)
+        setOriginalTask(mappedTask)
+        setSubtasks(mappedSubtasks)
+        setOriginalSubtasks(mappedSubtasks)
+        setLabelsInput(Array.isArray(data.data?.labels) ? data.data.labels.join(', ') : '')
         setSuccess('Task updated successfully')
         setTimeout(() => setSuccess(''), 4000)
-        // Reset originalTask to current to mark as not-dirty after save
-        setOriginalTask(task)
+        setError('')
       } else {
         setError(data.error || 'Failed to save task')
       }
@@ -84,6 +417,38 @@ export default function EditTaskPage() {
       setSaving(false)
     }
   }
+
+  const comparableOriginalSubtasks = useMemo(() => normalizeSubtasksForCompare(originalSubtasks), [originalSubtasks])
+  const comparableCurrentSubtasks = useMemo(() => normalizeSubtasksForCompare(subtasks), [subtasks])
+
+  const isDirty = useMemo(() => {
+    if (!task || !originalTask) return false
+    const taskChanged = JSON.stringify(task) !== JSON.stringify(originalTask)
+    const subtasksChanged = JSON.stringify(comparableCurrentSubtasks) !== JSON.stringify(comparableOriginalSubtasks)
+    
+    // Check labels separately since they're stored in a separate state
+    const originalLabelsStr = Array.isArray(originalTask.labels) ? originalTask.labels.join(', ') : (originalTask.labels || '')
+    const labelsChanged = labelsInput.trim() !== originalLabelsStr.trim()
+    
+    return taskChanged || subtasksChanged || labelsChanged
+  }, [task, originalTask, comparableCurrentSubtasks, comparableOriginalSubtasks, labelsInput])
+
+  const isValid = useMemo(() => {
+    if (!task) return false
+    // Check all required fields
+    return !!(task.title?.trim() && task.project && task.assignedTo)
+  }, [task])
+
+  // Auto-scroll to message when error or success appears
+  useEffect(() => {
+    if ((error || success) && messageRef.current) {
+      messageRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start',
+        inline: 'nearest'
+      })
+    }
+  }, [error, success])
 
   if (loading) {
     return (
@@ -101,7 +466,7 @@ export default function EditTaskPage() {
   if (error || !task) {
     return (
       <MainLayout>
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-3xl mx-auto">
           <Button variant="ghost" onClick={() => router.back()} className="mb-4">
             <ArrowLeft className="h-4 w-4 mr-2" /> Back
           </Button>
@@ -115,94 +480,407 @@ export default function EditTaskPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-2xl mx-auto space-y-4">
+      <div className="max-w-3xl mx-auto space-y-4">
         <Button variant="ghost" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
+
+        <div ref={messageRef}>
+          {success && (
+            <Alert>
+              <div className="flex items-center">
+                <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                <AlertDescription>{success}</AlertDescription>
+              </div>
+            </Alert>
+          )}
+
+          {error && !success && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle>Edit Task</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Title</label>
-              <Input
-                value={task.title}
-                onChange={(e) => setTask({ ...task, title: e.target.value })}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Description</label>
-              <Textarea
-                value={task.description || ''}
-                onChange={(e) => setTask({ ...task, description: e.target.value })}
-                className="mt-1"
-                rows={4}
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <CardContent className="space-y-6">
+            <div className="grid gap-4">
               <div>
-                <label className="text-sm font-medium">Status</label>
-                <Select value={task.status} onValueChange={(v) => setTask({ ...task, status: v as Task['status'] })}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todo">To Do</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="review">Review</SelectItem>
-                    <SelectItem value="testing">Testing</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium">Title</label>
+                <Input
+                  value={task.title}
+                  onChange={(e) => setTask((prev) => prev ? ({ ...prev, title: e.target.value }) : prev)}
+                  className="mt-1"
+                />
               </div>
               <div>
-                <label className="text-sm font-medium">Priority</label>
-                <Select value={task.priority} onValueChange={(v) => setTask({ ...task, priority: v as Task['priority'] })}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium">Description</label>
+                <Textarea
+                  value={task.description}
+                  onChange={(e) => setTask((prev) => prev ? ({ ...prev, description: e.target.value }) : prev)}
+                  className="mt-1"
+                  rows={4}
+                />
               </div>
-              <div>
-                <label className="text-sm font-medium">Type</label>
-                <Select value={task.type} onValueChange={(v) => setTask({ ...task, type: v as Task['type'] })}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="task">Task</SelectItem>
-                    <SelectItem value="bug">Bug</SelectItem>
-                    <SelectItem value="feature">Feature</SelectItem>
-                    <SelectItem value="improvement">Improvement</SelectItem>
-                    <SelectItem value="subtask">Subtask</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Status</label>
+                  <Select value={task.status} onValueChange={(v) => setTask((prev) => prev ? ({ ...prev, status: v as TaskStatus }) : prev)}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Priority</label>
+                  <Select value={task.priority} onValueChange={(v) => setTask((prev) => prev ? ({ ...prev, priority: v as TaskPriority }) : prev)}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Type</label>
+                  <Select value={task.type} onValueChange={(v) => setTask((prev) => prev ? ({ ...prev, type: v as TaskType }) : prev)}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="task">Task</SelectItem>
+                      <SelectItem value="bug">Bug</SelectItem>
+                      <SelectItem value="feature">Feature</SelectItem>
+                      <SelectItem value="improvement">Improvement</SelectItem>
+                      <SelectItem value="subtask">Subtask</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Target className="h-4 w-4" />
+                    Project *
+                  </label>
+                  <Select 
+                    value={task.project || ''} 
+                    onValueChange={(v) => {
+                      const newProjectId = v || undefined
+                      const currentAssigneeId = task?.assignedTo
+                      
+                      // Update project but DON'T clear assignee yet - will be validated when team members load
+                      setTask((prev) => prev ? ({ ...prev, project: newProjectId }) : prev)
+                      setProjectFilterQuery('')
+                      setAssignedToFilterQuery('')
+                      
+                      // Fetch team members for new project and preserve assignee if they're in the new team
+                      if (newProjectId) {
+                        // Pass current assignee ID to preserve it if valid in new project
+                        fetchProjectTeamMembers(newProjectId, currentAssigneeId)
+                      } else {
+                        setUsers([])
+                        setTask((prev) => prev ? ({ ...prev, assignedTo: undefined }) : prev)
+                      }
+                    }}
+                    disabled={loadingProjects}
+                    required
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder={loadingProjects ? "Loading projects..." : "Select project"} />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div 
+                        className="p-2"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        <Input
+                          value={projectFilterQuery}
+                          onChange={(e) => setProjectFilterQuery(e.target.value)}
+                          placeholder="Search projects"
+                          className="mb-2"
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => {
+                            e.stopPropagation()
+                            // Prevent Select from handling keyboard navigation when typing
+                            if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+                              e.preventDefault()
+                            }
+                          }}
+                          onFocus={(e) => e.stopPropagation()}
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          {loadingProjects ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground flex items-center space-x-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Loading projects...</span>
+                            </div>
+                          ) : filteredProjectOptions.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                          ) : (
+                            filteredProjectOptions.map((project) => (
+                              <SelectItem key={project._id} value={project._id}>
+                                {project.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Assigned To *
+                  </label>
+                  <Select 
+                    value={task.assignedTo || ''} 
+                    onValueChange={(v) => {
+                      setTask((prev) => prev ? ({ ...prev, assignedTo: v || undefined }) : prev)
+                      setAssignedToFilterQuery('')
+                    }}
+                    disabled={loadingUsers || !task.project}
+                    required
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue 
+                        placeholder={
+                          loadingUsers 
+                            ? "Loading team members..." 
+                            : !task.project 
+                              ? "Select project first" 
+                              : users.length === 0
+                                ? "No team members available"
+                                : task.assignedTo && users.some(u => String(u._id) === String(task.assignedTo))
+                                  ? undefined // Will display selected user name automatically
+                                  : "Select team member"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div 
+                        className="p-2"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        <Input
+                          value={assignedToFilterQuery}
+                          onChange={(e) => setAssignedToFilterQuery(e.target.value)}
+                          placeholder="Search assignees"
+                          className="mb-2"
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => {
+                            e.stopPropagation()
+                            // Prevent Select from handling keyboard navigation when typing
+                            if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+                              e.preventDefault()
+                            }
+                          }}
+                          onFocus={(e) => e.stopPropagation()}
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          {loadingUsers ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground flex items-center space-x-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Loading members...</span>
+                            </div>
+                          ) : !task.project ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">Please select a project first</div>
+                          ) : users.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No team members in this project</div>
+                          ) : filteredAssignedToOptions.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching team members</div>
+                          ) : (
+                            filteredAssignedToOptions.map((user) => (
+                              <SelectItem key={user._id} value={user._id}>
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="font-medium">{user.firstName} {user.lastName}</span>
+                                  {user.email && (
+                                    <span className="text-xs text-muted-foreground ml-2 truncate max-w-[180px]">
+                                      {user.email}
+                                    </span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Estimated Hours
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.5"
+                    value={task.estimatedHours || ''}
+                    onChange={(e) => setTask((prev) => prev ? ({ 
+                      ...prev, 
+                      estimatedHours: e.target.value ? parseFloat(e.target.value) : undefined 
+                    }) : prev)}
+                    placeholder="e.g., 8"
+                    className="mt-1"
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Story Points</label>
+                  <Input
+                    type="number"
+                    value={task.storyPoints || ''}
+                    onChange={(e) => setTask((prev) => prev ? ({ 
+                      ...prev, 
+                      storyPoints: e.target.value ? parseInt(e.target.value) : undefined 
+                    }) : prev)}
+                    placeholder="e.g., 5"
+                    className="mt-1"
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Due Date
+                  </label>
+                  <Input
+                    type="date"
+                    value={task.dueDate || ''}
+                    onChange={(e) => setTask((prev) => prev ? ({ ...prev, dueDate: e.target.value || undefined }) : prev)}
+                    className="mt-1"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Labels</label>
+                  <Input
+                    value={labelsInput}
+                    onChange={(e) => setLabelsInput(e.target.value)}
+                    placeholder="e.g., frontend, urgent, design"
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Separate multiple labels with commas</p>
+                </div>
               </div>
             </div>
 
-            {success && (
-              <div className="w-full">
-                <Alert className="w-full">
-                  <div className="flex items-center">
-                    <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-                    <AlertDescription>{success}</AlertDescription>
-                  </div>
-                </Alert>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mt-2">
+                <div>
+                  <h3 className="text-lg font-medium">Subtask Details</h3>
+                  <p className="text-sm text-muted-foreground">Manage subtasks linked to this task</p>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={addSubtask}>
+                  <Plus className="h-4 w-4 mr-2" /> Add Subtask
+                </Button>
               </div>
-            )}
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => router.push(`/tasks`)}>Cancel</Button>
-              <Button onClick={handleSave} disabled={saving || !(task && originalTask && (
-                task.title !== originalTask.title ||
-                (task.description || '') !== (originalTask.description || '') ||
-                task.status !== originalTask.status ||
-                task.priority !== originalTask.priority ||
-                task.type !== originalTask.type
-              ))}>
-                {saving ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>) : 'Save Changes'}
+
+              {subtasks.length === 0 && (
+                <div className="text-center py-10 text-muted-foreground border rounded-lg">
+                  <p className="font-medium">No subtasks yet</p>
+                  <p className="text-sm">Use the button above to add a new subtask.</p>
+                </div>
+              )}
+
+              {subtasks.map((subtask, index) => (
+                <div key={subtask._id || index} className="p-4 border rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Subtask {index + 1}</h4>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeSubtask(index)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <label className="text-sm font-medium">Title *</label>
+                      <Input
+                        value={subtask.title}
+                        onChange={(e) => updateSubtask(index, 'title', e.target.value)}
+                        placeholder="Subtask title"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium">Status</label>
+                      <Select
+                        value={subtask.status}
+                        onValueChange={(value) => updateSubtask(index, 'status', value as SubtaskStatus)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="z-[10050]">
+                          {STATUS_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      checked={subtask.isCompleted || subtask.status === 'done'}
+                      onCheckedChange={(checked) => toggleSubtaskCompletion(index, !!checked)}
+                    />
+                    <span className="text-sm text-muted-foreground">Mark as completed</span>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">Description</label>
+                    <Textarea
+                      value={subtask.description || ''}
+                      onChange={(e) => updateSubtask(index, 'description', e.target.value)}
+                      placeholder="Subtask description"
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-2">
+              <Button variant="outline" onClick={() => router.push('/tasks')}>Cancel</Button>
+              <Button onClick={handleSave} disabled={saving || !isDirty || !isValid}>
+                {saving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...
+                  </>
+                ) : 'Save Changes'}
               </Button>
             </div>
           </CardContent>

@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 import { 
   GripVertical, 
   MoreHorizontal, 
@@ -139,10 +140,10 @@ export default function SortableTask({
           
           <div className="flex flex-wrap items-center gap-1 sm:gap-2">
             <Badge className={`${getPriorityColor(task.priority)} text-xs`}>
-              {task.priority}
+              {formatToTitleCase(task.priority)}
             </Badge>
             <Badge className={`${getTypeColor(task.type)} text-xs`}>
-              {task.type}
+              {formatToTitleCase(task.type)}
             </Badge>
           </div>
           

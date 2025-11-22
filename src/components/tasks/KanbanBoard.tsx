@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { 
@@ -77,6 +78,14 @@ interface Project {
   isDraft: boolean
   createdAt: string
   updatedAt: string
+  settings?: {
+    kanbanStatuses?: Array<{
+      key: string
+      title: string
+      color?: string
+      order: number
+    }>
+  }
 }
 
 interface KanbanBoardProps {
@@ -87,6 +96,7 @@ interface KanbanBoardProps {
 }
 
 const defaultColumns = [
+  { key: 'backlog', title: 'Backlog', color: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200' },
   { key: 'todo', title: 'To Do', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' },
   { key: 'in_progress', title: 'In Progress', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
   { key: 'review', title: 'Review', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
@@ -187,6 +197,12 @@ export default function KanbanBoard({ projectId, onCreateTask, onEditTask, onDel
   }, [selectedProjectId, fetchTasks])
 
   const getColumns = () => {
+    // Use custom columns from project settings if available, otherwise use defaults
+    if (project?.settings?.kanbanStatuses && project.settings.kanbanStatuses.length > 0) {
+      // Sort by order to ensure correct display order
+      return [...project.settings.kanbanStatuses].sort((a, b) => (a.order || 0) - (b.order || 0))
+    }
+    // Fall back to default columns if no custom columns are set
     return defaultColumns
   }
 
@@ -346,8 +362,10 @@ export default function KanbanBoard({ projectId, onCreateTask, onEditTask, onDel
     setCreateTaskStatus(undefined)
   }
 
-  const handleColumnsUpdated = () => {
-    fetchTasks()
+  const handleColumnsUpdated = async () => {
+    // Refetch project to get updated columns, then refresh tasks
+    await fetchProject()
+    await fetchTasks()
   }
 
   if (loading) {
@@ -390,6 +408,8 @@ export default function KanbanBoard({ projectId, onCreateTask, onEditTask, onDel
               variant="outline" 
               size="sm"
               onClick={() => setShowColumnSettings(true)}
+              disabled={selectedProjectId === 'all'}
+              title={selectedProjectId === 'all' ? 'Please select a specific project to manage columns' : 'Manage Kanban columns'}
               className="w-full sm:w-auto"
             >
               <Settings className="h-4 w-4 mr-2" />
@@ -423,14 +443,23 @@ export default function KanbanBoard({ projectId, onCreateTask, onEditTask, onDel
         onDragEnd={handleDragEnd}
       >
         <div className="overflow-x-auto overflow-y-hidden -mx-4 px-4 sm:mx-0 sm:px-0">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6 min-w-max sm:min-w-0">
+          <div 
+            className="grid gap-4 sm:gap-6 min-w-max sm:min-w-0"
+            style={{
+              gridTemplateColumns: `repeat(${getColumns().length}, minmax(280px, 1fr))`,
+            }}
+          >
           {getColumns().map((column) => {
             const columnTasks = getTasksByStatus(column.key)
             
             return (
               <VirtualizedColumn
                 key={column.key}
-                column={column}
+                column={{
+                  key: column.key,
+                  title: column.title,
+                  color: column.color || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                }}
                 tasks={columnTasks}
                 onCreateTask={handleCreateTask}
                 getPriorityColor={getPriorityColor}
@@ -478,12 +507,15 @@ export default function KanbanBoard({ projectId, onCreateTask, onEditTask, onDel
         isOpen={showColumnSettings}
         onClose={() => setShowColumnSettings(false)}
         projectId={selectedProjectId === 'all' ? '' : selectedProjectId}
-        currentColumns={getColumns().map(col => ({
-          key: col.key,
-          title: col.title,
-          color: col.color,
-          order: getColumns().indexOf(col)
-        }))}
+        currentColumns={getColumns().map((col, index) => {
+          const order = 'order' in col ? (col.order !== undefined ? col.order : index) : index
+          return {
+            key: col.key,
+            title: col.title,
+            color: col.color || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
+            order
+          }
+        })}
         onColumnsUpdated={handleColumnsUpdated}
       />
     </div>
