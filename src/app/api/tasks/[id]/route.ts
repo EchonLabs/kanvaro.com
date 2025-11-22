@@ -11,6 +11,78 @@ import { invalidateCache } from '@/lib/redis'
 
 const TASK_STATUS_SET = new Set<TaskStatus>(TASK_STATUS_VALUES)
 
+// Type definitions for lean query results
+interface LeanTask {
+  _id: any
+  title: string
+  description?: string
+  status: string
+  priority?: string
+  type?: string
+  project?: {
+    _id?: any
+    name?: string
+  } | any
+  assignedTo?: {
+    _id?: any
+    firstName?: string
+    lastName?: string
+    email?: string
+  } | any
+  createdBy?: {
+    _id?: any
+    firstName?: string
+    lastName?: string
+    email?: string
+  } | any
+  story?: {
+    _id?: any
+    title?: string
+    status?: string
+  } | any
+  sprint?: {
+    _id?: any
+    name?: string
+    status?: string
+    startDate?: Date | string
+    endDate?: Date | string
+    teamMembers?: any[]
+  } | any
+  parentTask?: {
+    _id?: any
+    title?: string
+  } | any
+  taskNumber?: number
+  displayId?: string
+  storyPoints?: number
+  dueDate?: Date | string
+  estimatedHours?: number
+  actualHours?: number
+  labels?: string[]
+  subtasks?: any[]
+  position?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  [key: string]: any
+}
+
+interface LeanSprint {
+  _id?: any
+  project?: {
+    _id?: any
+    name?: string
+  } | any
+  name?: string
+  status?: string
+  [key: string]: any
+}
+
+interface LeanProject {
+  _id?: any
+  name?: string
+  [key: string]: any
+}
+
 function sanitizeLabels(input: any): string[] {
   if (Array.isArray(input)) {
     return input
@@ -287,7 +359,8 @@ export async function PUT(
     }
 
     // Find and update task with concurrency protection
-    const task = await Task.findOneAndUpdate(
+    // Use lean() for faster query - returns plain object instead of Mongoose document
+    const taskResult = await Task.findOneAndUpdate(
       {
         _id: taskId,
         organization: organizationId,
@@ -305,138 +378,191 @@ export async function PUT(
       .populate('story', 'title status')
       .populate('sprint', 'name status startDate endDate teamMembers')
       .populate('parentTask', 'title')
+      .lean()
 
-    if (!task) {
+    if (!taskResult) {
       return NextResponse.json(
         { error: 'Task not found or unauthorized' },
         { status: 404 }
       )
     }
 
-    // Synchronize sprint tasks array if sprint changed
-    if (Object.prototype.hasOwnProperty.call(updateData, 'sprint')) {
-      const newSprintId = updateData.sprint
-      const oldSprintId = currentTask.sprint
+    // Type assertion: findOneAndUpdate always returns a single document or null, never an array
+    const taskResultTyped = Array.isArray(taskResult) ? taskResult[0] : taskResult
+    if (!taskResultTyped) {
+      return NextResponse.json(
+        { error: 'Task not found or unauthorized' },
+        { status: 404 }
+      )
+    }
 
-      const updates: Promise<unknown>[] = []
+    // Cast to LeanTask type for type safety (using unknown first to avoid type errors)
+    const task: LeanTask = taskResultTyped as unknown as LeanTask
 
-      if (oldSprintId && (!newSprintId || oldSprintId.toString() !== newSprintId)) {
-        updates.push(
-          Sprint.findByIdAndUpdate(
-            oldSprintId,
-            { $pull: { tasks: task._id } },
-            { new: false }
-          ).exec().catch(error => {
-            console.error('Failed to remove task from previous sprint:', error)
-          })
-        )
-      }
+    // Prepare response immediately
+    const responseData = {
+      success: true,
+      message: 'Task updated successfully',
+      data: task
+    }
 
-      if (newSprintId) {
-        const sprintDoc = await Sprint.findById(newSprintId).select('_id project')
-        if (sprintDoc) {
-          if (sprintDoc.project.toString() !== task.project.toString()) {
-            console.warn(
-              `Task ${taskId} assigned to different project sprint. Task project: ${task.project}, Sprint project: ${sprintDoc.project}`
+    // Run async operations in background without blocking response
+    const taskIdStr = String(task._id || taskId)
+    const taskProjectId = (typeof task.project === 'object' && task.project !== null && '_id' in task.project)
+      ? task.project._id
+      : task.project
+    
+    setImmediate(async () => {
+      try {
+        // Synchronize sprint tasks array if sprint changed
+        if (Object.prototype.hasOwnProperty.call(updateData, 'sprint')) {
+          const newSprintId = updateData.sprint
+          const oldSprintId = currentTask.sprint
+
+          const updates: Promise<unknown>[] = []
+
+          if (oldSprintId && (!newSprintId || oldSprintId.toString() !== newSprintId)) {
+            updates.push(
+              Sprint.findByIdAndUpdate(
+                oldSprintId,
+                { $pull: { tasks: taskIdStr } },
+                { new: false }
+              ).exec().catch(error => {
+                console.error('Failed to remove task from previous sprint:', error)
+              })
             )
           }
-          updates.push(
-            Sprint.findByIdAndUpdate(
-              newSprintId,
-              { $addToSet: { tasks: task._id } },
-              { new: false }
-            ).exec().catch(error => {
-              console.error('Failed to add task to sprint:', error)
+
+          if (newSprintId) {
+            const sprintDocResult = await Sprint.findById(newSprintId).select('_id project').lean()
+            const sprintDocResultTyped = Array.isArray(sprintDocResult) ? sprintDocResult[0] : sprintDocResult
+            if (sprintDocResultTyped) {
+              const sprintDoc: LeanSprint = sprintDocResultTyped as LeanSprint
+              const sprintProjectId = (typeof sprintDoc.project === 'object' && sprintDoc.project !== null && '_id' in sprintDoc.project)
+                ? sprintDoc.project._id
+                : sprintDoc.project
+              if (sprintProjectId && sprintProjectId.toString() !== taskProjectId?.toString()) {
+                console.warn(
+                  `Task ${taskId} assigned to different project sprint. Task project: ${taskProjectId}, Sprint project: ${sprintProjectId}`
+                )
+              }
+              updates.push(
+                Sprint.findByIdAndUpdate(
+                  newSprintId,
+                  { $addToSet: { tasks: taskIdStr } },
+                  { new: false }
+                ).exec().catch(error => {
+                  console.error('Failed to add task to sprint:', error)
+                })
+              )
+            } else {
+              console.warn(`Sprint ${newSprintId} not found when updating task ${taskId}`)
+            }
+          }
+
+          if (updates.length > 0) {
+            await Promise.allSettled(updates)
+          }
+        }
+
+        // Invalidate tasks cache for this organization (non-blocking)
+        invalidateCache(`tasks:*:org:${organizationId}:*`).catch(error => {
+          console.error('Failed to invalidate cache:', error)
+        })
+
+        // Check if task status changed to 'done' and trigger completion logic
+        if (updateData.status === 'done' && currentTask.status !== 'done') {
+          CompletionService.handleTaskStatusChange(taskId).catch(error => {
+            console.error('Error in completion service:', error)
+          })
+        }
+
+        // Send notifications for important changes (non-blocking)
+        const notificationPromises: Promise<unknown>[] = []
+        
+        // Notify if task was assigned to someone new
+        if (updateData.assignedTo && updateData.assignedTo !== currentTask.assignedTo?.toString()) {
+          notificationPromises.push(
+            Project.findById(taskProjectId).select('name').lean().then(projectResult => {
+              const projectResultTyped = Array.isArray(projectResult) ? projectResult[0] : projectResult
+              const project: LeanProject = projectResultTyped as LeanProject
+              return notificationService.notifyTaskUpdate(
+                taskIdStr,
+                'assigned',
+                updateData.assignedTo,
+                organizationId,
+                task.title,
+                project?.name
+              )
+            }).catch(error => {
+              console.error('Failed to send assignment notification:', error)
             })
           )
-        } else {
-          console.warn(`Sprint ${newSprintId} not found when updating task ${taskId}`)
         }
-      }
 
-      if (updates.length > 0) {
-        await Promise.allSettled(updates)
-      }
-    }
-
-    // Invalidate tasks cache for this organization
-    await invalidateCache(`tasks:*:org:${organizationId}:*`)
-
-    // Check if task status changed to 'done' and trigger completion logic
-    if (updateData.status === 'done' && currentTask.status !== 'done') {
-      // Run completion check asynchronously to avoid blocking the response
-      setImmediate(() => {
-        CompletionService.handleTaskStatusChange(taskId).catch(error => {
-          console.error('Error in completion service:', error)
-        })
-      })
-    }
-
-    // Send notifications for important changes
-    try {
-      // Notify if task was assigned to someone new
-      if (updateData.assignedTo && updateData.assignedTo !== currentTask.assignedTo?.toString()) {
-        const project = await Project.findById(task.project).select('name')
-        const updatedByUser = await User.findById(userId).select('firstName lastName')
-        
-        await notificationService.notifyTaskUpdate(
-          taskId,
-          'assigned',
-          updateData.assignedTo,
-          organizationId,
-          task.title,
-          project?.name
-        )
-      }
-
-      // Notify if task was completed
-      if (updateData.status === 'done' && currentTask.status !== 'done') {
-        const project = await Project.findById(task.project).select('name')
-        const completedByUser = await User.findById(userId).select('firstName lastName')
-        
-        // Notify the task creator if different from the one who completed it
-        if (task.createdBy.toString() !== userId) {
-          await notificationService.notifyTaskUpdate(
-            taskId,
-            'completed',
-            task.createdBy.toString(),
-            organizationId,
-            task.title,
-            project?.name
+        // Notify if task was completed
+        if (updateData.status === 'done' && currentTask.status !== 'done') {
+          notificationPromises.push(
+            Project.findById(taskProjectId).select('name').lean().then(projectResult => {
+              const projectResultTyped = Array.isArray(projectResult) ? projectResult[0] : projectResult
+              const project: LeanProject = projectResultTyped as LeanProject
+              // Notify the task creator if different from the one who completed it
+              const createdBy = task.createdBy
+              const createdById = (typeof createdBy === 'object' && createdBy !== null && '_id' in createdBy)
+                ? createdBy._id
+                : createdBy
+              if (createdById && String(createdById) !== userId) {
+                return notificationService.notifyTaskUpdate(
+                  taskIdStr,
+                  'completed',
+                  String(createdById),
+                  organizationId,
+                  task.title,
+                  project?.name
+                )
+              }
+            }).catch(error => {
+              console.error('Failed to send completion notification:', error)
+            })
           )
         }
-      }
 
-      // Notify if task was updated (but not by the assignee)
-      if (updateData.assignedTo && updateData.assignedTo !== userId) {
-        const project = await Project.findById(task.project).select('name')
-        const updatedByUser = await User.findById(userId).select('firstName lastName')
-        
-        await notificationService.notifyTaskUpdate(
-          taskId,
-          'updated',
-          updateData.assignedTo,
-          organizationId,
-          task.title,
-          project?.name
-        )
+        // Notify if task was updated (but not by the assignee)
+        if (updateData.assignedTo && updateData.assignedTo !== userId) {
+          notificationPromises.push(
+            Project.findById(taskProjectId).select('name').lean().then(projectResult => {
+              const projectResultTyped = Array.isArray(projectResult) ? projectResult[0] : projectResult
+              const project: LeanProject = projectResultTyped as LeanProject
+              return notificationService.notifyTaskUpdate(
+                taskIdStr,
+                'updated',
+                updateData.assignedTo,
+                organizationId,
+                task.title,
+                project?.name
+              )
+            }).catch(error => {
+              console.error('Failed to send update notification:', error)
+            })
+          )
+        }
+
+        // Wait for all notifications to complete (but don't block response)
+        await Promise.allSettled(notificationPromises)
+      } catch (error) {
+        console.error('Error in background task update operations:', error)
       }
-    } catch (notificationError) {
-      console.error('Failed to send task update notifications:', notificationError)
-      // Don't fail the task update if notification fails
-    }
+    })
 
     console.log('[Task PUT] Task updated successfully', {
       taskId,
       newStatus: task.status,
-      sprint: task.sprint?._id
+      sprint: (typeof task.sprint === 'object' && task.sprint !== null && '_id' in task.sprint)
+        ? task.sprint._id
+        : task.sprint
     })
 
-    return NextResponse.json({
-      success: true,
-      message: 'Task updated successfully',
-      data: task
-    })
+    return NextResponse.json(responseData)
 
   } catch (error) {
     console.error('Update task error:', error)

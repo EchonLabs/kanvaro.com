@@ -11,6 +11,8 @@ import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/Checkbox'
+import { useOrganization } from '@/hooks/useOrganization'
+import { applyRoundingRules } from '@/lib/utils'
 
 interface TimeLogsProps {
   userId: string
@@ -117,11 +119,24 @@ export function TimeLogs({
     }
   }, [resolvedUserId, resolvedOrgId])
 
+  const { organization } = useOrganization()
+
   // Load time entries
   const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60)
-    const mins = Math.floor(minutes % 60)
-    const secs = Math.floor((minutes % 1) * 60)
+    // Apply rounding rules if enabled
+    let displayMinutes = minutes
+    const roundingRules = organization?.settings?.timeTracking?.roundingRules
+    if (roundingRules?.enabled) {
+      displayMinutes = applyRoundingRules(minutes, {
+        enabled: roundingRules.enabled,
+        increment: roundingRules.increment || 15,
+        roundUp: roundingRules.roundUp ?? true
+      })
+    }
+    
+    const hours = Math.floor(displayMinutes / 60)
+    const mins = Math.floor(displayMinutes % 60)
+    const secs = Math.floor((displayMinutes % 1) * 60)
     return `${hours}h ${mins}m${secs > 0 ? ` ${secs}s` : ''}`
   }
 

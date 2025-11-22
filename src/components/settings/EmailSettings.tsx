@@ -82,22 +82,22 @@ export function EmailSettings() {
     const newErrors: Record<string, string> = {}
 
     if (formData.provider === 'smtp') {
-      if (!formData.smtp.host.trim()) newErrors.host = 'SMTP host is required'
+      if (!formData.smtp.host.trim()) newErrors.host = 'SMTP Host is required'
       if (!formData.smtp.username.trim()) newErrors.username = 'Username is required'
       if (!formData.smtp.password.trim()) newErrors.password = 'Password is required'
-      if (!formData.smtp.fromEmail.trim()) newErrors.fromEmail = 'From email is required'
-      if (!formData.smtp.fromName.trim()) newErrors.fromName = 'From name is required'
+      if (!formData.smtp.fromEmail.trim()) newErrors.fromEmail = 'From Email is required'
+      if (!formData.smtp.fromName.trim()) newErrors.fromName = 'From Name is required'
       if (formData.smtp.fromEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.smtp.fromEmail)) {
-        newErrors.fromEmail = 'Please enter a valid email address'
+        newErrors.fromEmail = 'Please enter a valid Email Address'
       }
     } else if (formData.provider === 'azure') {
       if (!formData.azure.clientId.trim()) newErrors.clientId = 'Client ID is required'
       if (!formData.azure.clientSecret.trim()) newErrors.clientSecret = 'Client Secret is required'
       if (!formData.azure.tenantId.trim()) newErrors.tenantId = 'Tenant ID is required'
-      if (!formData.azure.fromEmail.trim()) newErrors.fromEmail = 'From email is required'
-      if (!formData.azure.fromName.trim()) newErrors.fromName = 'From name is required'
+      if (!formData.azure.fromEmail.trim()) newErrors.fromEmail = 'From Email is required'
+      if (!formData.azure.fromName.trim()) newErrors.fromName = 'From Name is required'
       if (formData.azure.fromEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.azure.fromEmail)) {
-        newErrors.fromEmail = 'Please enter a valid email address'
+        newErrors.fromEmail = 'Please enter a valid Email Address'
       }
     }
 

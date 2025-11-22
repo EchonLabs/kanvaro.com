@@ -6,6 +6,7 @@ import { TimeTrackingSettings } from '@/models/TimeTrackingSettings'
 import { Project } from '@/models/Project'
 import { User } from '@/models/User'
 import { Organization } from '@/models/Organization'
+import { applyRoundingRules } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -212,9 +213,34 @@ export async function PUT(request: NextRequest) {
         break
 
       case 'stop':
+        // Get time tracking settings for rounding
+        let stopSettings = await TimeTrackingSettings.findOne({
+          organization: activeTimer.organization,
+          project: activeTimer.project
+        }) || await TimeTrackingSettings.findOne({
+          organization: activeTimer.organization,
+          project: null
+        })
+
+        // If no TimeTrackingSettings exist, get from organization
+        if (!stopSettings) {
+          const organization = await Organization.findById(activeTimer.organization)
+          if (organization) {
+            stopSettings = {
+              roundingRules: organization.settings.timeTracking.roundingRules
+            } as any
+          }
+        }
+
         // Create time entry
         const baseDuration = (now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60)
         const totalDuration = Math.max(0, baseDuration - activeTimer.totalPausedDuration)
+
+        // Apply rounding rules if enabled
+        let finalDuration = totalDuration
+        if (stopSettings?.roundingRules?.enabled) {
+          finalDuration = applyRoundingRules(totalDuration, stopSettings.roundingRules)
+        }
 
         const timeEntry = new TimeEntry({
           user: activeTimer.user,
@@ -224,7 +250,7 @@ export async function PUT(request: NextRequest) {
           description: description || activeTimer.description,
           startTime: activeTimer.startTime,
           endTime: now,
-          duration: totalDuration,
+          duration: finalDuration,
           isBillable: activeTimer.isBillable,
           hourlyRate: activeTimer.hourlyRate,
           status: 'completed',

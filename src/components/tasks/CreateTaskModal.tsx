@@ -64,10 +64,9 @@ interface TaskFormData {
   priority: 'low' | 'medium' | 'high' | 'critical'
   type: 'task' | 'bug' | 'feature' | 'improvement' | 'subtask'
   assignedTo: string
-  storyPoints: string
   dueDate: string
   estimatedHours: string
-  labels: string
+  labels: string[]
 }
 
 export default function CreateTaskModal({
@@ -91,16 +90,16 @@ export default function CreateTaskModal({
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
   const [assignedToIds, setAssignedToIds] = useState<string[]>([])
   const [assigneeQuery, setAssigneeQuery] = useState('')
+  const [newLabel, setNewLabel] = useState('')
   const [formData, setFormData] = useState<TaskFormData>({
     title: '',
     description: '',
     priority: 'medium',
     type: 'task',
     assignedTo: '',
-    storyPoints: '',
     dueDate: '',
     estimatedHours: '',
-    labels: ''
+    labels: []
   })
 
   const effectiveProjectId = projectId || selectedProjectId
@@ -176,14 +175,14 @@ export default function CreateTaskModal({
         priority: 'medium',
         type: 'task',
         assignedTo: '',
-        storyPoints: '',
         dueDate: '',
         estimatedHours: '',
-        labels: ''
+        labels: []
       })
       setSubtasks([])
       setAssignedToIds([])
       setAssigneeQuery('')
+      setNewLabel('')
       setProjectMembers([])
       setLoadingProjectMembers(false)
       if (!projectId) setSelectedProjectId('')
@@ -234,6 +233,23 @@ export default function CreateTaskModal({
     setSubtasks(subtasks.filter((_, i) => i !== index))
   }
 
+  const addLabel = () => {
+    if (newLabel.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        labels: [...prev.labels, newLabel.trim()]
+      }))
+      setNewLabel('')
+    }
+  }
+
+  const removeLabel = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      labels: prev.labels.filter((_, i) => i !== index)
+    }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -281,10 +297,9 @@ export default function CreateTaskModal({
           project: effectiveProjectId,
           assignedTo: assignedToIds.length === 1 ? assignedToIds[0] : undefined,
           assignees: assignedToIds.length > 1 ? assignedToIds : undefined,
-          storyPoints: formData.storyPoints ? parseInt(formData.storyPoints) : undefined,
           estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined,
           dueDate: formData.dueDate || undefined,
-          labels: formData.labels ? formData.labels.split(',').map(label => label.trim()) : [],
+          labels: Array.isArray(formData.labels) ? formData.labels : [],
           subtasks: preparedSubtasks
         })
       })
@@ -301,12 +316,9 @@ export default function CreateTaskModal({
       if (data.success) {
         setSuccess('Task created successfully')
         onTaskCreated()
-        const newId = data?.data?._id
         onClose()
         setTimeout(() => {
-          if (newId) {
-            router.push(`/tasks/${newId}`)
-          }
+          router.push('/tasks')
         }, 300)
         // Reset form
         setFormData({
@@ -315,14 +327,14 @@ export default function CreateTaskModal({
           priority: 'medium',
           type: 'task',
           assignedTo: '',
-          storyPoints: '',
           dueDate: '',
           estimatedHours: '',
-          labels: ''
+          labels: []
         })
         setSubtasks([])
         setAssignedToIds([])
         setAssigneeQuery('')
+        setNewLabel('')
         if (!projectId) setSelectedProjectId('')
       } else {
         setError(data.error || 'Failed to create task')
@@ -596,17 +608,6 @@ export default function CreateTaskModal({
               )}
 
               <div>
-                <label className="text-sm font-medium text-foreground">Story Points</label>
-                <Input
-                  type="number"
-                  value={formData.storyPoints}
-                  onChange={(e) => setFormData({...formData, storyPoints: e.target.value})}
-                  placeholder="e.g., 5"
-                  className="mt-1"
-                />
-              </div>
-
-              <div>
                 <label className="text-sm font-medium text-foreground">Estimated Hours</label>
                 <Input
                   type="number"
@@ -632,13 +633,40 @@ export default function CreateTaskModal({
 
               <div>
                 <label className="text-sm font-medium text-foreground">Labels</label>
-                <Input
-                  value={formData.labels}
-                  onChange={(e) => setFormData({...formData, labels: e.target.value})}
-                  placeholder="e.g., frontend, urgent, design"
-                  className="mt-1"
-                />
-                <p className="text-xs text-muted-foreground mt-1">Separate multiple labels with commas</p>
+                <div className="space-y-2">
+                  <div className="flex space-x-2">
+                    <Input
+                      value={newLabel}
+                      onChange={(e) => setNewLabel(e.target.value)}
+                      placeholder="Enter label"
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLabel())}
+                      className="mt-1"
+                    />
+                    <Button type="button" onClick={addLabel} size="sm" disabled={newLabel.trim() === ''} className="mt-1">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {formData.labels.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {formData.labels.map((label, index) => (
+                        <div 
+                          key={index} 
+                          className="inline-flex items-center gap-1.5 bg-muted px-3 py-1.5 rounded-md text-sm"
+                        >
+                          <span>{label}</span>
+                          <button
+                            type="button"
+                            aria-label="Remove label"
+                            className="text-muted-foreground hover:text-foreground focus:outline-none transition-colors"
+                            onClick={() => removeLabel(index)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 

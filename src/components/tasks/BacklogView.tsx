@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -32,7 +32,7 @@ interface Task {
   _id: string
   title: string
   description: string
-  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
+  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled' | 'backlog'
   priority: 'low' | 'medium' | 'high' | 'critical'
   type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
   assignedTo?: {
@@ -59,8 +59,20 @@ interface BacklogViewProps {
   onCreateTask: () => void
 }
 
+interface Story {
+  _id: string
+  title: string
+  status: 'backlog' | 'in_progress' | 'completed' | 'cancelled' | 'done'
+  storyPoints?: number
+  project?: {
+    _id: string
+    name: string
+  }
+}
+
 export default function BacklogView({ projectId, onCreateTask }: BacklogViewProps) {
   const [tasks, setTasks] = useState<Task[]>([])
+  const [stories, setStories] = useState<Story[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -70,6 +82,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
 
   useEffect(() => {
     fetchTasks()
+    fetchStories()
   }, [projectId])
 
   const fetchTasks = async () => {
@@ -92,8 +105,23 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
     }
   }
 
+  const fetchStories = async () => {
+    try {
+      const url = projectId === 'all' ? '/api/stories' : `/api/stories?projectId=${projectId}`
+      const response = await fetch(url)
+      const data = await response.json()
+
+      if (data.success) {
+        setStories(data.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch stories:', err)
+    }
+  }
+
   const refreshTasks = () => {
     fetchTasks()
+    fetchStories()
   }
 
   const getPriorityColor = (priority: string) => {
@@ -260,15 +288,18 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
     }
   }
 
-  const getBacklogStats = () => {
+  const stats = useMemo(() => {
     const totalTasks = tasks.length
     const todoTasks = tasks.filter(task => task.status === 'todo').length
     const inProgressTasks = tasks.filter(task => task.status === 'in_progress').length
     const completedTasks = tasks.filter(task => task.status === 'done').length
-    const totalStoryPoints = tasks.reduce((sum, task) => sum + (task.storyPoints || 0), 0)
-    const completedStoryPoints = tasks
-      .filter(task => task.status === 'done')
-      .reduce((sum, task) => sum + (task.storyPoints || 0), 0)
+    
+    // Calculate story points from user stories (not tasks)
+    // Consider stories with status 'done' or 'completed' as completed
+    const totalStoryPoints = stories.reduce((sum, story) => sum + (story.storyPoints || 0), 0)
+    const completedStoryPoints = stories
+      .filter(story => story.status === 'done' || story.status === 'completed')
+      .reduce((sum, story) => sum + (story.storyPoints || 0), 0)
 
     return {
       totalTasks,
@@ -279,9 +310,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
       completedStoryPoints,
       completionPercentage: totalStoryPoints > 0 ? Math.round((completedStoryPoints / totalStoryPoints) * 100) : 0
     }
-  }
-
-  const stats = getBacklogStats()
+  }, [tasks, stories])
 
   if (loading) {
     return (
@@ -393,14 +422,22 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span>Progress</span>
-              <span>{stats.completionPercentage}%</span>
+              <span className="font-medium">{stats.completionPercentage}%</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
               <div 
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${stats.completionPercentage}%` }}
+                className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full transition-all duration-300 ease-out"
+                style={{ 
+                  width: `${Math.min(100, Math.max(0, stats.completionPercentage || 0))}%`,
+                  minWidth: stats.completionPercentage > 0 ? '2px' : '0px'
+                }}
               />
             </div>
+            {stats.totalStoryPoints === 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                No story points assigned yet
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -526,6 +563,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
                     <SelectContent>
                       <SelectItem value="todo">To Do</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="backlog">Backlog</SelectItem>
                       <SelectItem value="review">Review</SelectItem>
                       <SelectItem value="testing">Testing</SelectItem>
                       <SelectItem value="done">Done</SelectItem>

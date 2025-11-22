@@ -395,12 +395,19 @@ export default function CreateStoryPage() {
 
                   <div>
                     <label className="text-sm font-medium text-foreground">Story Points</label>
-                    <Input
-                      type="number"
-                      value={formData.storyPoints}
-                      onChange={(e) => handleChange('storyPoints', e.target.value)}
-                      placeholder="Enter story points"
-                    />
+                    <Select value={formData.storyPoints} onValueChange={(value) => handleChange('storyPoints', value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select story points" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1</SelectItem>
+                        <SelectItem value="2">2</SelectItem>
+                        <SelectItem value="3">3</SelectItem>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="8">8</SelectItem>
+                        <SelectItem value="13">13</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div>

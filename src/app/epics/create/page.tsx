@@ -39,7 +39,6 @@ export default function CreateEpicPage() {
     priority: 'medium',
     dueDate: '',
     estimatedHours: '',
-    storyPoints: '',
     labels: ''
   })
 
@@ -112,7 +111,6 @@ export default function CreateEpicPage() {
           ...formData,
           title: formData.name?.trim() || undefined,
           estimatedHours: formData.estimatedHours ? parseInt(formData.estimatedHours) : undefined,
-          storyPoints: formData.storyPoints ? parseInt(formData.storyPoints) : undefined,
           labels: formData.labels ? formData.labels.split(',').map(label => label.trim()) : []
         })
       })
@@ -279,16 +277,6 @@ export default function CreateEpicPage() {
                       value={formData.estimatedHours}
                       onChange={(e) => handleChange('estimatedHours', e.target.value)}
                       placeholder="Enter estimated hours"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-foreground">Story Points</label>
-                    <Input
-                      type="number"
-                      value={formData.storyPoints}
-                      onChange={(e) => handleChange('storyPoints', e.target.value)}
-                      placeholder="Enter story points"
                     />
                   </div>
 
