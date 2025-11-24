@@ -1,3 +1,10 @@
+## [1.4.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.0...v1.4.1) (2025-11-24)
+
+
+### Bug Fixes
+
+* add config.json ([cd9fae5](https://github.com/EchonLabs/kanvaro.com/commit/cd9fae5077a58d4f122816dd2a2c66ed20f9d592))
+
 # [1.4.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.3.1...v1.4.0) (2025-11-22)
 
 
