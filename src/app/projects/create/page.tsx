@@ -1585,18 +1585,19 @@ export default function CreateProjectPage() {
       </Tabs>
 
       {/* Navigation Buttons */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 pt-6 mt-8 border-t border-muted">
         <Button
           variant="outline"
           onClick={handlePrevious}
           disabled={currentStep === 1}
+          className="w-full sm:w-auto"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Previous
         </Button>
 
         {currentStep < steps.length && (
-          <Button onClick={handleNext}>
+          <Button onClick={handleNext} className="w-full sm:w-auto">
             Next
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>

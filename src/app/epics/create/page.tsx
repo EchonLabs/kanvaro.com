@@ -163,7 +163,7 @@ export default function CreateEpicPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 overflow-x-hidden">
+      <div className="space-y-8 sm:space-y-10 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <Button variant="ghost" onClick={() => router.push('/epics')} className="w-full sm:w-auto">
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -301,7 +301,7 @@ export default function CreateEpicPage() {
                 />
               </div>
 
-              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4">
+              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 pt-6 mt-8 border-t border-muted">
                 <Button type="button" variant="outline" onClick={() => router.push('/epics')} className="w-full sm:w-auto">
                   Cancel
                 </Button>

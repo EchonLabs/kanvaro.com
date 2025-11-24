@@ -253,7 +253,7 @@ export default function CreateStoryPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 overflow-x-hidden">
+      <div className="space-y-8 sm:space-y-10 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <Button variant="ghost" onClick={() => router.push('/stories')} className="w-full sm:w-auto">
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -284,16 +284,6 @@ export default function CreateStoryPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-foreground">Title *</label>
-                    <Input
-                      value={formData.title}
-                      onChange={(e) => handleChange('title', e.target.value)}
-                      placeholder="Enter story title"
-                      required
-                    />
-                  </div>
-
                   <div>
                     <label className="text-sm font-medium text-foreground">Project *</label>
                     <Select
@@ -326,6 +316,16 @@ export default function CreateStoryPage() {
                         </div>
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Title *</label>
+                    <Input
+                      value={formData.title}
+                      onChange={(e) => handleChange('title', e.target.value)}
+                      placeholder="Enter story title"
+                      required
+                    />
                   </div>
 
                   <div>
@@ -537,7 +537,7 @@ export default function CreateStoryPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4">
+              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 pt-6 mt-8 border-t border-muted">
                 <Button type="button" variant="outline" onClick={() => router.push('/stories')} className="w-full sm:w-auto">
                   Cancel
                 </Button>

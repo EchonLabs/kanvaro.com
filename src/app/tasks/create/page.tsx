@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Checkbox } from '@/components/ui/Checkbox'
 import { 
   ArrowLeft,
   Save,
@@ -18,8 +17,10 @@ import {
   Target,
   Plus,
   X,
-  Trash2
+  Trash2,
+  Paperclip
 } from 'lucide-react'
+import { AttachmentList } from '@/components/ui/AttachmentList'
 
 interface Project {
   _id: string
@@ -79,6 +80,35 @@ interface Subtask {
   isCompleted: boolean
 }
 
+interface CurrentUser {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+}
+
+interface AttachmentDraft {
+  name: string
+  url: string
+  size: number
+  type: string
+  uploadedAt: string
+  uploadedByName: string
+  uploadedById: string
+}
+
+function mapUserResponse(data: any): CurrentUser | null {
+  if (!data) return null
+  const id = typeof data.id === 'string' ? data.id : (typeof data._id === 'string' ? data._id : '')
+  if (!id) return null
+  return {
+    id,
+    firstName: data.firstName || '',
+    lastName: data.lastName || '',
+    email: data.email || ''
+  }
+}
+
 const SUBTASK_STATUS_OPTIONS: Array<{ value: SubtaskStatus; label: string }> = [
   { value: 'backlog', label: 'Backlog' },
   { value: 'todo', label: 'To Do' },
@@ -104,6 +134,11 @@ export default function CreateTaskPage() {
   const [assigneeQuery, setAssigneeQuery] = useState('');
   const [newLabel, setNewLabel] = useState('')
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+  const [attachments, setAttachments] = useState<AttachmentDraft[]>([])
+  const [attachmentError, setAttachmentError] = useState('')
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
     title: '',
@@ -137,20 +172,32 @@ export default function CreateTaskPage() {
   }, [])
 
   const checkAuth = useCallback(async () => {
+    const handleAuthenticated = async (payload: any) => {
+      const normalizedUser = mapUserResponse(payload)
+      if (normalizedUser) {
+        setCurrentUser(normalizedUser)
+      }
+      setAuthError('')
+      await fetchProjects()
+    }
+
     try {
       const response = await fetch('/api/auth/me')
-      
+
       if (response.ok) {
-        setAuthError('')
-        await fetchProjects()
-      } else if (response.status === 401) {
+        const userPayload = await response.json()
+        await handleAuthenticated(userPayload)
+        return
+      }
+
+      if (response.status === 401) {
         const refreshResponse = await fetch('/api/auth/refresh', {
           method: 'POST'
         })
-        
+
         if (refreshResponse.ok) {
-          setAuthError('')
-          await fetchProjects()
+          const refreshData = await refreshResponse.json().catch(() => ({}))
+          await handleAuthenticated(refreshData?.user || refreshData)
         } else {
           setAuthError('Session expired')
           setTimeout(() => {
@@ -278,7 +325,15 @@ export default function CreateTaskPage() {
           dueDate: formData.dueDate,
           estimatedHours: formData.estimatedHours ? parseInt(formData.estimatedHours) : undefined,
           labels: Array.isArray(formData.labels) ? formData.labels : [],
-          subtasks: preparedSubtasks
+          subtasks: preparedSubtasks,
+          attachments: attachments.map(attachment => ({
+            name: attachment.name,
+            url: attachment.url,
+            size: attachment.size,
+            type: attachment.type,
+            uploadedAt: attachment.uploadedAt,
+            uploadedBy: attachment.uploadedById
+          }))
         })
       })
 
@@ -293,6 +348,7 @@ export default function CreateTaskPage() {
 
       if (data.success) {
         router.push('/tasks')
+        setAttachments([])
       } else {
         setError(data.error || 'Failed to create task')
         setLoading(false)
@@ -359,25 +415,74 @@ export default function CreateTaskPage() {
     })
   }
 
-  const toggleSubtaskCompletion = (index: number, checked: boolean) => {
-    setSubtasks(prev => {
-      const updated = [...prev]
-      const current = updated[index]
-      const nextStatus: SubtaskStatus = checked
-        ? 'done'
-        : (current.status === 'done' ? 'todo' : (current.status || 'todo'))
-      updated[index] = {
-        ...current,
-        status: nextStatus,
-        isCompleted: checked
-      }
-      return updated
-    })
-  }
-
   const removeSubtask = (index: number) => {
     setSubtasks(subtasks.filter((_, i) => i !== index))
   }
+
+  const uploadAttachmentFile = useCallback(async (file: File) => {
+    if (!currentUser) {
+      throw new Error('User information is still loading. Please try again.')
+    }
+
+    const formDataUpload = new FormData()
+    formDataUpload.append('attachment', file)
+    const displayName = `${currentUser.firstName} ${currentUser.lastName}`.trim() || currentUser.email
+    if (displayName) {
+      formDataUpload.append('uploadedByName', displayName)
+    }
+
+    const response = await fetch('/api/uploads/attachments', {
+      method: 'POST',
+      body: formDataUpload
+    })
+
+    const uploadResult = await response.json().catch(() => ({ error: 'Failed to upload attachment' }))
+    if (!response.ok || !uploadResult?.success) {
+      throw new Error(uploadResult.error || 'Failed to upload attachment')
+    }
+
+    const attachmentData = uploadResult.data
+    setAttachments(prev => [
+      ...prev,
+      {
+        name: attachmentData.name,
+        url: attachmentData.url,
+        size: attachmentData.size,
+        type: attachmentData.type,
+        uploadedAt: attachmentData.uploadedAt,
+        uploadedByName: attachmentData.uploadedByName || displayName,
+        uploadedById: currentUser.id
+      }
+    ])
+  }, [currentUser])
+
+  const handleAttachmentInputChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    event.target.value = ''
+
+    try {
+      setAttachmentError('')
+      setIsUploadingAttachment(true)
+      await uploadAttachmentFile(file)
+    } catch (err) {
+      setAttachmentError(err instanceof Error ? err.message : 'Failed to upload attachment')
+    } finally {
+      setIsUploadingAttachment(false)
+    }
+  }, [uploadAttachmentFile])
+
+  const handleAttachmentButtonClick = useCallback(() => {
+    if (!currentUser) {
+      setAttachmentError('User information is still loading. Please try again shortly.')
+      return
+    }
+    attachmentInputRef.current?.click()
+  }, [currentUser])
+
+  const handleAttachmentDelete = useCallback((index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index))
+  }, [])
 
   // Memoize filtered projects to avoid recalculating on every render
   const filteredProjects = useMemo(() => {
@@ -406,6 +511,19 @@ export default function CreateTaskPage() {
       !subtasks.some(st => !(st.title && st.title.trim().length > 0))
     )
   }, [formData.title, formData.project, formData.dueDate, assignedToIds.length, subtasks])
+
+  const attachmentListItems = useMemo(
+    () =>
+      attachments.map(att => ({
+        name: att.name,
+        url: att.url,
+        size: att.size,
+        type: att.type,
+        uploadedAt: att.uploadedAt,
+        uploadedBy: att.uploadedByName
+      })),
+    [attachments]
+  )
 
   if (authError) {
     return (
@@ -454,25 +572,6 @@ export default function CreateTaskPage() {
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-foreground">Title *</label>
-                    <Input
-                      value={formData.title}
-                      onChange={(e) => handleChange('title', e.target.value)}
-                      placeholder="Enter task title"
-                      required
-                    />
-                  </div>
-
-                  {/* <div>
-                    <label className="text-sm font-medium text-foreground">Task ID</label>
-                    <Input
-                      value={formData.displayId}
-                      onChange={(e) => handleChange('displayId', e.target.value)}
-                      placeholder="e.g. 3.2"
-                    />
-                  </div> */}
-
-                  <div>
                     <label className="text-sm font-medium text-foreground">Project *</label>
                     <Select
                       value={formData.project}
@@ -505,6 +604,25 @@ export default function CreateTaskPage() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Title *</label>
+                    <Input
+                      value={formData.title}
+                      onChange={(e) => handleChange('title', e.target.value)}
+                      placeholder="Enter task title"
+                      required
+                    />
+                  </div>
+
+                  {/* <div>
+                    <label className="text-sm font-medium text-foreground">Task ID</label>
+                    <Input
+                      value={formData.displayId}
+                      onChange={(e) => handleChange('displayId', e.target.value)}
+                      placeholder="e.g. 3.2"
+                    />
+                  </div> */}
 
                   {formData.project && (
                     <div>
@@ -685,6 +803,43 @@ export default function CreateTaskPage() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Attachments</label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    ref={attachmentInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={handleAttachmentInputChange}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAttachmentButtonClick}
+                    disabled={isUploadingAttachment || !currentUser}
+                  >
+                    <Paperclip className="h-4 w-4 mr-2" />
+                    {isUploadingAttachment ? 'Uploading...' : 'Add Attachment'}
+                  </Button>
+                  {!currentUser && (
+                    <span className="text-xs text-muted-foreground">Loading user info...</span>
+                  )}
+                </div>
+                {attachmentError && (
+                  <p className="text-sm text-red-600">{attachmentError}</p>
+                )}
+                {attachments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No attachments added yet.</p>
+                ) : (
+                  <AttachmentList
+                    attachments={attachmentListItems}
+                    onDelete={handleAttachmentDelete}
+                    canDelete={!loading}
+                  />
+                )}
+              </div>
+
               <div>
                 <label className="text-sm font-medium text-foreground">Labels</label>
                 <div className="space-y-2">
@@ -723,7 +878,7 @@ export default function CreateTaskPage() {
               </div>
 
             {/* Subtasks Section */}
-            <div className="space-y-4">
+            <div className="space-y-4 pt-6 mt-6 border-t border-muted">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">Subtasks</h3>
                 <Button type="button" variant="outline" size="sm" onClick={addSubtask}>
@@ -757,16 +912,6 @@ export default function CreateTaskPage() {
                     />
                   </div>
 
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      checked={subtask.isCompleted || subtask.status === 'done'}
-                      onCheckedChange={(checked) => toggleSubtaskCompletion(index, !!checked)}
-                    />
-                    <span className="text-sm text-muted-foreground">
-                      Mark as completed
-                    </span>
-                  </div>
-
                   <div>
                     <label className="text-sm font-medium text-foreground">Description</label>
                     <Textarea
@@ -788,11 +933,11 @@ export default function CreateTaskPage() {
               )}
             </div>
 
-              <div className="flex justify-end space-x-4">
-                <Button type="button" variant="outline" onClick={() => router.back()}>
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-end pt-6 mt-8 border-t border-muted">
+                <Button type="button" variant="outline" onClick={() => router.back()} className="w-full sm:w-auto">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={loading || !isFormValid}>
+                <Button type="submit" disabled={loading || !isFormValid} className="w-full sm:w-auto">
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
