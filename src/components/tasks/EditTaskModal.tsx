@@ -87,11 +87,14 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
     labels: ''
   })
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
+  const [initialFormData, setInitialFormData] = useState<TaskFormData | null>(null)
+  const [initialSubtasks, setInitialSubtasks] = useState<Subtask[]>([])
+  const [availableStatuses, setAvailableStatuses] = useState<Array<{ value: SubtaskStatus; label: string }>>(SUBTASK_STATUS_OPTIONS)
 
   useEffect(() => {
     if (isOpen && task) {
       // Populate form with task data
-      setFormData({
+      const initialData: TaskFormData = {
         title: task.title || '',
         description: task.description || '',
         status: (task.status || 'backlog') as SubtaskStatus,
@@ -102,26 +105,60 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
         dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
         estimatedHours: task.estimatedHours?.toString() || '',
         labels: task.labels?.join(', ') || ''
-      })
+      }
+      setFormData(initialData)
+      setInitialFormData(initialData)
       
       // Set subtasks if they exist
-      if (task.subtasks && Array.isArray(task.subtasks)) {
-        setSubtasks(task.subtasks.map((subtask: any) => ({
-          _id: subtask._id,
-          title: subtask.title,
-          description: subtask.description || '',
-          status: (subtask.status || 'todo') as SubtaskStatus,
-          isCompleted: typeof subtask.isCompleted === 'boolean'
-            ? subtask.isCompleted
-            : subtask.status === 'done'
-        })))
-      } else {
-        setSubtasks([])
-      }
+      const initialSubtasksData: Subtask[] = task.subtasks && Array.isArray(task.subtasks)
+        ? task.subtasks.map((subtask: any) => ({
+            _id: subtask._id,
+            title: subtask.title,
+            description: subtask.description || '',
+            status: (subtask.status || 'todo') as SubtaskStatus,
+            isCompleted: typeof subtask.isCompleted === 'boolean'
+              ? subtask.isCompleted
+              : subtask.status === 'done'
+          }))
+        : []
+      setSubtasks(initialSubtasksData)
+      setInitialSubtasks(initialSubtasksData)
       
       fetchUsers()
+      // Fetch project statuses if project is available
+      if (task.project) {
+        const projectId = typeof task.project === 'string' ? task.project : task.project._id
+        if (projectId) {
+          fetchProjectStatuses(projectId)
+        }
+      }
     }
   }, [isOpen, task])
+
+  const fetchProjectStatuses = async (projectId?: string) => {
+    if (!projectId) {
+      setAvailableStatuses(SUBTASK_STATUS_OPTIONS)
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}`)
+      const data = await response.json()
+      
+      if (data.success && data.data?.settings?.kanbanStatuses && data.data.settings.kanbanStatuses.length > 0) {
+        const statuses = data.data.settings.kanbanStatuses.map((col: any) => ({
+          value: col.key as SubtaskStatus,
+          label: col.title
+        }))
+        setAvailableStatuses(statuses)
+      } else {
+        setAvailableStatuses(SUBTASK_STATUS_OPTIONS)
+      }
+    } catch (err) {
+      console.error('Failed to fetch project statuses:', err)
+      setAvailableStatuses(SUBTASK_STATUS_OPTIONS)
+    }
+  }
 
   const fetchUsers = async () => {
     setLoadingUsers(true)
@@ -175,8 +212,12 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
       const data = await response.json()
       
       if (data.success) {
-        onTaskUpdated()
+        // Close modal immediately for better UX
         onClose()
+        // Call update callback asynchronously to not block UI
+        setTimeout(() => {
+          onTaskUpdated()
+        }, 0)
       } else {
         setError(data.error || 'Failed to update task')
       }
@@ -229,6 +270,96 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
   const removeSubtask = (index: number) => {
     setSubtasks(subtasks.filter((_, i) => i !== index))
   }
+
+  const hasChanges = (): boolean => {
+    // If initial data hasn't been loaded yet, no changes can be detected
+    if (!initialFormData) return false
+
+    // Normalize values for comparison
+    const normalizeString = (val: string | undefined | null): string => {
+      return (val || '').trim()
+    }
+
+    const normalizeNumber = (val: string | undefined | null): string => {
+      return (val || '').trim()
+    }
+
+    // Normalize assignedTo: empty string and 'unassigned' are equivalent
+    const normalizeAssignedTo = (val: string): string => {
+      if (!val || val === 'unassigned') return ''
+      return val
+    }
+
+    // Check if form data has changed
+    const formDataChanged = 
+      normalizeString(formData.title) !== normalizeString(initialFormData.title) ||
+      normalizeString(formData.description) !== normalizeString(initialFormData.description) ||
+      formData.status !== initialFormData.status ||
+      formData.priority !== initialFormData.priority ||
+      formData.type !== initialFormData.type ||
+      normalizeAssignedTo(formData.assignedTo) !== normalizeAssignedTo(initialFormData.assignedTo) ||
+      normalizeNumber(formData.storyPoints) !== normalizeNumber(initialFormData.storyPoints) ||
+      normalizeNumber(formData.estimatedHours) !== normalizeNumber(initialFormData.estimatedHours) ||
+      (formData.dueDate || '') !== (initialFormData.dueDate || '') ||
+      normalizeString(formData.labels) !== normalizeString(initialFormData.labels)
+
+    if (formDataChanged) {
+      return true
+    }
+
+    // Filter out empty new subtasks (those without _id and empty title) for comparison
+    // Only count subtasks that have either an _id (existing) or a non-empty title (new but filled)
+    const validCurrentSubtasks = subtasks.filter(st => {
+      if (st._id) return true // Existing subtask
+      return st.title.trim().length > 0 // New subtask with content
+    })
+    
+    const validInitialSubtasks = initialSubtasks.filter(st => {
+      if (st._id) return true // Existing subtask
+      return st.title.trim().length > 0 // New subtask with content
+    })
+
+    // Check if subtasks have changed (length difference)
+    if (validCurrentSubtasks.length !== validInitialSubtasks.length) {
+      return true
+    }
+
+    // If no valid subtasks, no changes in subtasks
+    if (validCurrentSubtasks.length === 0) {
+      return false
+    }
+
+    // Compare each subtask by index (order matters)
+    for (let i = 0; i < validCurrentSubtasks.length; i++) {
+      const current = validCurrentSubtasks[i]
+      const initial = validInitialSubtasks[i]
+      
+      if (!initial) {
+        return true // New subtask added
+      }
+      
+      // For existing subtasks with _id, verify _id matches
+      if (current._id && initial._id && current._id !== initial._id) {
+        return true // Different subtask at this position
+      }
+      
+      // Check if subtask content has changed
+      if (
+        normalizeString(current.title) !== normalizeString(initial.title) ||
+        normalizeString(current.description) !== normalizeString(initial.description) ||
+        current.status !== initial.status ||
+        current.isCompleted !== initial.isCompleted
+      ) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  // Compute if there are changes and if button should be enabled
+  const hasFormChanges = hasChanges()
+  const isButtonDisabled = loading || !formData.title.trim() || !initialFormData || !hasFormChanges
 
   if (!isOpen || !task) return null
 
@@ -285,13 +416,11 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="backlog">Backlog</SelectItem>
-                    <SelectItem value="todo">To Do</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="review">Review</SelectItem>
-                    <SelectItem value="testing">Testing</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    {availableStatuses.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -498,7 +627,11 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" form="edit-task-form" disabled={loading || !formData.title || !formData.assignedTo || formData.assignedTo === 'unassigned'}>
+            <Button 
+              type="submit" 
+              form="edit-task-form" 
+              disabled={isButtonDisabled}
+            >
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

@@ -76,9 +76,54 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [availableStatuses, setAvailableStatuses] = useState<string[]>(['todo', 'in_progress', 'review', 'testing', 'done', 'cancelled', 'backlog'])
+
+  const fetchProjectStatuses = async (projId: string) => {
+    if (projId === 'all') {
+      // For "all", collect statuses from all projects
+      try {
+        const response = await fetch('/api/projects')
+        const data = await response.json()
+        
+        if (data.success && Array.isArray(data.data)) {
+          const statusSet = new Set<string>()
+          data.data.forEach((project: any) => {
+            if (project.settings?.kanbanStatuses) {
+              project.settings.kanbanStatuses.forEach((col: any) => statusSet.add(col.key))
+            }
+          })
+          if (statusSet.size > 0) {
+            setAvailableStatuses(Array.from(statusSet))
+          } else {
+            setAvailableStatuses(['todo', 'in_progress', 'review', 'testing', 'done', 'cancelled', 'backlog'])
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch project statuses:', err)
+        setAvailableStatuses(['todo', 'in_progress', 'review', 'testing', 'done', 'cancelled', 'backlog'])
+      }
+    } else {
+      // For specific project, fetch its statuses
+      try {
+        const response = await fetch(`/api/projects/${projId}`)
+        const data = await response.json()
+        
+        if (data.success && data.data?.settings?.kanbanStatuses && data.data.settings.kanbanStatuses.length > 0) {
+          const statuses = data.data.settings.kanbanStatuses.map((col: any) => col.key)
+          setAvailableStatuses(statuses)
+        } else {
+          setAvailableStatuses(['todo', 'in_progress', 'review', 'testing', 'done', 'cancelled', 'backlog'])
+        }
+      } catch (err) {
+        console.error('Failed to fetch project statuses:', err)
+        setAvailableStatuses(['todo', 'in_progress', 'review', 'testing', 'done', 'cancelled', 'backlog'])
+      }
+    }
+  }
 
   useEffect(() => {
     fetchTasks()
+    fetchProjectStatuses(projectId)
   }, [projectId])
 
   const fetchTasks = async () => {
@@ -361,16 +406,14 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
             <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="todo">To Do</SelectItem>
-              <SelectItem value="in_progress">In Progress</SelectItem>
-              <SelectItem value="review">Review</SelectItem>
-              <SelectItem value="backlog">Backlog</SelectItem>
-              <SelectItem value="testing">Testing</SelectItem>
-              <SelectItem value="done">Done</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    {availableStatuses.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {formatToTitleCase(status)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
           </Select>
           <Select value={priorityFilter} onValueChange={setPriorityFilter}>
             <SelectTrigger className="w-full sm:w-40">

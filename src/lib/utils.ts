@@ -64,3 +64,27 @@ export function formatToTitleCase(text: string | undefined | null): string {
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ')
 }
+
+/**
+ * Applies rounding rules to a time duration in minutes
+ * @param duration - Duration in minutes
+ * @param roundingRules - Rounding rules configuration
+ * @returns Rounded duration in minutes
+ */
+export function applyRoundingRules(
+  duration: number,
+  roundingRules: { enabled: boolean; increment: number; roundUp: boolean }
+): number {
+  if (!roundingRules.enabled || duration <= 0) {
+    return duration
+  }
+
+  const increment = roundingRules.increment
+  if (roundingRules.roundUp) {
+    // Round up to nearest increment
+    return Math.ceil(duration / increment) * increment
+  } else {
+    // Round down to nearest increment
+    return Math.floor(duration / increment) * increment
+  }
+}

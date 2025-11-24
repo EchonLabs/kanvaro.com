@@ -68,7 +68,8 @@ export function Timer({ userId, organizationId, projectId, taskId, description =
     )
   }
 
-  // Format time display
+  // Format time display - NO rounding for real-time timer display
+  // Rounding is only applied when saving the time entry
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60)
     const mins = Math.floor(minutes % 60)

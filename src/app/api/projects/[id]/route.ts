@@ -55,7 +55,10 @@ export async function GET(
     // Calculate progress from tasks
     const tasks = await Task.find({ project: projectId })
     const totalTasks = tasks.length
-    const tasksCompleted = tasks.filter(task => task.status === 'done').length
+    // Consider tasks with status 'done' or 'completed' as completed
+    const tasksCompleted = tasks.filter(
+      task => task.status === 'done' || task.status === 'completed'
+    ).length
     const completionPercentage = totalTasks > 0 ? Math.round((tasksCompleted / totalTasks) * 100) : 0
 
     const progress = {

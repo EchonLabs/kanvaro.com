@@ -2,6 +2,8 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { FolderOpen, CheckSquare, Users, Clock, TrendingUp, TrendingDown, Loader2 } from 'lucide-react'
+import { useOrganization } from '@/hooks/useOrganization'
+import { applyRoundingRules } from '@/lib/utils'
 
 interface StatsCardsProps {
   stats?: {
@@ -23,9 +25,22 @@ interface StatsCardsProps {
 }
 
 export function StatsCards({ stats, changes, isLoading }: StatsCardsProps) {
+  const { organization } = useOrganization()
+  
   const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60)
-    const mins = Math.floor(minutes % 60)
+    // Apply rounding rules if enabled
+    let displayMinutes = minutes
+    const roundingRules = organization?.settings?.timeTracking?.roundingRules
+    if (roundingRules?.enabled) {
+      displayMinutes = applyRoundingRules(minutes, {
+        enabled: roundingRules.enabled,
+        increment: roundingRules.increment || 15,
+        roundUp: roundingRules.roundUp ?? true
+      })
+    }
+    
+    const hours = Math.floor(displayMinutes / 60)
+    const mins = Math.floor(displayMinutes % 60)
     return `${hours}h ${mins}m`
   }
 

@@ -16,6 +16,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/Dialog'
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { 
   X, 
   Plus, 
@@ -27,17 +42,96 @@ import {
   CheckCircle
 } from 'lucide-react'
 
+interface Column {
+  key: string
+  title: string
+  color?: string
+  order: number
+}
+
 interface ColumnSettingsModalProps {
   isOpen: boolean
   onClose: () => void
   projectId: string
-  currentColumns: Array<{
-    key: string
-    title: string
-    color?: string
-    order: number
-  }>
+  currentColumns: Array<Column>
   onColumnsUpdated: () => void
+}
+
+// Sortable Column Item Component
+function SortableColumnItem({
+  column,
+  index,
+  onUpdate,
+  onDelete,
+}: {
+  column: Column
+  index: number
+  onUpdate: (index: number, field: string, value: string) => void
+  onDelete: (index: number) => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: `column-${index}` })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center space-x-3 p-3 border rounded-lg bg-background"
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="flex items-center space-x-2 cursor-grab active:cursor-grabbing"
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+        <Badge className={column.color}>
+          {column.title}
+        </Badge>
+      </div>
+      <div className="flex-1 grid gap-2 md:grid-cols-2">
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">
+            Title <span className="text-destructive">*</span>
+          </label>
+          <Input
+            value={column.title}
+            onChange={(e) => onUpdate(index, 'title', e.target.value)}
+            className="h-8"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">
+            Key <span className="text-destructive">*</span>
+          </label>
+          <Input
+            value={column.key}
+            onChange={(e) => onUpdate(index, 'key', e.target.value)}
+            className="h-8"
+          />
+        </div>
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => onDelete(index)}
+        className="text-destructive hover:text-destructive"
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  )
 }
 
 export default function ColumnSettingsModal({ 
@@ -62,10 +156,21 @@ export default function ColumnSettingsModal({
   const [checkingTasks, setCheckingTasks] = useState(false)
   const [migratingTasks, setMigratingTasks] = useState(false)
 
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  )
+
   useEffect(() => {
     if (isOpen) {
-      setColumns(currentColumns)
-      setOriginalColumns(JSON.parse(JSON.stringify(currentColumns))) // Deep copy
+      // Sort columns by order to ensure consistent display
+      const sortedColumns = [...currentColumns].sort((a, b) => (a.order || 0) - (b.order || 0))
+      setColumns(sortedColumns)
+      setOriginalColumns(JSON.parse(JSON.stringify(sortedColumns))) // Deep copy
       setError('')
       setSuccess('')
       
@@ -129,14 +234,12 @@ export default function ColumnSettingsModal({
   const hasChanges = () => {
     if (columns.length !== originalColumns.length) return true
     
-    // Sort by order for comparison
-    const sortedColumns = [...columns].sort((a, b) => a.order - b.order)
-    const sortedOriginal = [...originalColumns].sort((a, b) => a.order - b.order)
-    
-    for (let i = 0; i < sortedColumns.length; i++) {
-      const col = sortedColumns[i]
-      const orig = sortedOriginal[i]
+    // Compare by index position (order) - columns should be in the same order
+    for (let i = 0; i < columns.length; i++) {
+      const col = columns[i]
+      const orig = originalColumns[i]
       
+      // Check if key, title, or order changed
       if (!orig || col.key !== orig.key || col.title !== orig.title || col.order !== orig.order) {
         return true
       }
@@ -292,6 +395,29 @@ export default function ColumnSettingsModal({
     setColumns(updated)
   }
 
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id) {
+      return
+    }
+
+    const activeIndex = columns.findIndex((_, i) => `column-${i}` === active.id)
+    const overIndex = columns.findIndex((_, i) => `column-${i}` === over.id)
+
+    if (activeIndex !== -1 && overIndex !== -1) {
+      const reorderedColumns = arrayMove(columns, activeIndex, overIndex)
+      
+      // Update order property based on new position
+      const updatedColumns = reorderedColumns.map((col, index) => ({
+        ...col,
+        order: index,
+      }))
+      
+      setColumns(updatedColumns)
+    }
+  }
+
   const handleSave = async () => {
     if (!projectId || projectId.trim() === '') {
       setError('Project ID is missing. Please select a project to save column settings.')
@@ -304,6 +430,9 @@ export default function ColumnSettingsModal({
     setSuccess('')
 
     try {
+      // Ensure columns are sorted by order before saving
+      const sortedColumns = [...columns].sort((a, b) => (a.order || 0) - (b.order || 0))
+      
       const response = await fetch(`/api/projects/${projectId}`, {
         method: 'PUT',
         headers: {
@@ -311,7 +440,7 @@ export default function ColumnSettingsModal({
         },
         body: JSON.stringify({
           settings: {
-            kanbanStatuses: columns
+            kanbanStatuses: sortedColumns
           }
         })
       })
@@ -504,48 +633,31 @@ export default function ColumnSettingsModal({
             {/* Existing columns */}
             <div className="space-y-4">
               <h4 className="text-lg font-medium">Current Columns</h4>
-              <div className="space-y-3">
-                {columns.map((column, index) => (
-                  <div key={index} className="flex items-center space-x-3 p-3 border rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <GripVertical className="h-4 w-4 text-muted-foreground" />
-                      <Badge className={column.color}>
-                        {column.title}
-                      </Badge>
-                    </div>
-                    <div className="flex-1 grid gap-2 md:grid-cols-2">
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">
-                          Title <span className="text-destructive">*</span>
-                        </label>
-                        <Input
-                          value={column.title}
-                          onChange={(e) => updateColumn(index, 'title', e.target.value)}
-                          className="h-8"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">
-                          Key <span className="text-destructive">*</span>
-                        </label>
-                        <Input
-                          value={column.key}
-                          onChange={(e) => updateColumn(index, 'key', e.target.value)}
-                          className="h-8"
-                        />
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeColumn(index)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+              <p className="text-sm text-muted-foreground">
+                Drag and drop columns to reorder them. The new order will be saved when you click "Save Changes".
+              </p>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={columns.map((_, index) => `column-${index}`)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-3">
+                    {columns.map((column, index) => (
+                      <SortableColumnItem
+                        key={`column-${index}`}
+                        column={column}
+                        index={index}
+                        onUpdate={updateColumn}
+                        onDelete={removeColumn}
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
             </div>
 
           </div>

@@ -6,6 +6,7 @@ import { Project } from '@/models/Project'
 import { User } from '@/models/User'
 import { Organization } from '@/models/Organization'
 import { Task } from '@/models/Task'
+import { applyRoundingRules } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -241,12 +242,7 @@ export async function POST(request: NextRequest) {
     // Apply rounding rules if enabled
     let finalDuration = duration || calculatedDuration
     if (settings.roundingRules.enabled) {
-      const increment = settings.roundingRules.increment
-      if (settings.roundingRules.roundUp) {
-        finalDuration = Math.ceil(finalDuration / increment) * increment
-      } else {
-        finalDuration = Math.floor(finalDuration / increment) * increment
-      }
+      finalDuration = applyRoundingRules(finalDuration, settings.roundingRules)
     }
 
     // Create time entry

@@ -51,6 +51,7 @@ export default function EditSprintPage() {
   const [availableMembers, setAvailableMembers] = useState<TeamMember[]>([])
   const [membersLoading, setMembersLoading] = useState(false)
   const [membersError, setMembersError] = useState('')
+  const [calculatedVelocity, setCalculatedVelocity] = useState<number>(0)
 
   const fetchProjectMembers = useCallback(async (projectId?: string) => {
     if (!projectId) {
@@ -86,6 +87,28 @@ export default function EditSprintPage() {
       const data = await res.json()
       if (res.ok && data.success) {
         const s = data.data
+        
+        // Calculate velocity from completed stories
+        try {
+          const storiesRes = await fetch(`/api/stories?sprintId=${sprintId}`)
+          const storiesData = await storiesRes.json()
+          if (storiesRes.ok && storiesData.success) {
+            const completedStories = (storiesData.data || []).filter(
+              (story: any) => story.status === 'completed'
+            )
+            const velocity = completedStories.reduce(
+              (sum: number, story: any) => sum + (story.storyPoints || 0),
+              0
+            )
+            setCalculatedVelocity(velocity)
+          } else {
+            setCalculatedVelocity(0)
+          }
+        } catch (e) {
+          console.error('Failed to fetch stories for velocity calculation:', e)
+          setCalculatedVelocity(0)
+        }
+        
         setForm({
           name: s?.name || '',
           description: s?.description || '',
@@ -94,7 +117,7 @@ export default function EditSprintPage() {
           endDate: s?.endDate ? new Date(s.endDate).toISOString().slice(0, 10) : '',
           goal: s?.goal || '',
           capacity: s?.capacity ?? '',
-          velocity: s?.velocity ?? ''
+          velocity: '' // Will be calculated, not editable
         })
         setTeamMembers(Array.isArray(s?.teamMembers) ? s.teamMembers.map((member: TeamMember) => member._id) : [])
         await fetchProjectMembers(s?.project?._id)
@@ -118,7 +141,7 @@ export default function EditSprintPage() {
       const res = await fetch(`/api/sprints/${sprintId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+          body: JSON.stringify({
           name: form.name,
           description: form.description,
           status: form.status,
@@ -126,7 +149,8 @@ export default function EditSprintPage() {
           endDate: form.endDate ? new Date(form.endDate) : undefined,
           goal: form.goal,
           capacity: form.capacity === '' ? undefined : Number(form.capacity),
-          velocity: form.velocity === '' ? undefined : Number(form.velocity),
+          // Velocity is calculated from completed stories, not sent from form
+          velocity: calculatedVelocity,
           teamMembers
         })
       })
@@ -236,8 +260,18 @@ export default function EditSprintPage() {
                 <Input type="number" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} className="mt-1" />
               </div>
               <div>
-                <label className="text-sm font-medium">Velocity</label>
-                <Input type="number" value={form.velocity} onChange={(e) => setForm({ ...form, velocity: e.target.value })} className="mt-1" />
+                <label className="text-sm font-medium">Velocity (calculated)</label>
+                <Input 
+                  type="number" 
+                  value={calculatedVelocity} 
+                  readOnly 
+                  disabled
+                  className="mt-1 bg-muted cursor-not-allowed" 
+                  title="Velocity is automatically calculated from completed user stories"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Calculated from completed stories only
+                </p>
               </div>
             </div>
 

@@ -89,10 +89,7 @@ export default function EditStoryPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [epics, setEpics] = useState<Epic[]>([])
   const [sprints, setSprints] = useState<Sprint[]>([])
-  const [projectMembers, setProjectMembers] = useState<User[]>([])
-  const [loadingProjectMembers, setLoadingProjectMembers] = useState(false)
   const [projectQuery, setProjectQuery] = useState('')
-  const [assigneeQuery, setAssigneeQuery] = useState('')
   const [newCriteria, setNewCriteria] = useState('')
   const [tagsInput, setTagsInput] = useState('')
 
@@ -119,30 +116,6 @@ export default function EditStoryPage() {
     }
   }, [])
 
-  const fetchProjectMembers = useCallback(async (projectId: string) => {
-    if (!projectId) {
-      setProjectMembers([])
-      return
-    }
-
-    setLoadingProjectMembers(true)
-    try {
-      const response = await fetch(`/api/projects/${projectId}`)
-      const data = await response.json()
-
-      if (response.ok && data.success && data.data) {
-        const members = Array.isArray(data.data.teamMembers) ? data.data.teamMembers : []
-        setProjectMembers(members)
-      } else {
-        setProjectMembers([])
-      }
-    } catch (error) {
-      console.error('Failed to fetch project members:', error)
-      setProjectMembers([])
-    } finally {
-      setLoadingProjectMembers(false)
-    }
-  }, [])
 
   const fetchEpics = useCallback(async (projectId: string) => {
     if (!projectId) {
@@ -203,7 +176,6 @@ export default function EditStoryPage() {
         if (storyData.project?._id) {
           fetchEpics(storyData.project._id)
           fetchSprints(storyData.project._id)
-          fetchProjectMembers(storyData.project._id)
         }
       } else {
         setError(data.error || 'Failed to load story')
@@ -213,20 +185,11 @@ export default function EditStoryPage() {
     } finally {
       setLoading(false)
     }
-  }, [storyId, fetchProjects, fetchEpics, fetchSprints, fetchProjectMembers])
+  }, [storyId, fetchProjects, fetchEpics, fetchSprints])
 
   useEffect(() => {
     if (storyId) fetchStory()
   }, [storyId, fetchStory])
-
-  const filteredProjectMembers = useMemo(() => {
-    if (!assigneeQuery.trim()) return projectMembers
-    const q = assigneeQuery.toLowerCase().trim()
-    return projectMembers.filter(u =>
-      `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q)
-    )
-  }, [projectMembers, assigneeQuery])
 
   const filteredProjects = useMemo(() => {
     if (!projectQuery.trim()) return projects
@@ -271,7 +234,6 @@ export default function EditStoryPage() {
           project: story.project?._id || undefined,
           epic: story.epic?._id || undefined,
           sprint: story.sprint?._id || undefined,
-          assignedTo: story.assignedTo?._id || undefined,
           dueDate: story.dueDate || undefined,
           estimatedHours: story.estimatedHours || undefined,
           storyPoints: story.storyPoints || undefined,
@@ -306,7 +268,6 @@ export default function EditStoryPage() {
       (story.project?._id || '') !== (originalStory.project?._id || '') ||
       (story.epic?._id || '') !== (originalStory.epic?._id || '') ||
       (story.sprint?._id || '') !== (originalStory.sprint?._id || '') ||
-      (story.assignedTo?._id || '') !== (originalStory.assignedTo?._id || '') ||
       (story.dueDate || '') !== (originalStory.dueDate || '') ||
       (story.estimatedHours || 0) !== (originalStory.estimatedHours || 0) ||
       (story.storyPoints || 0) !== (originalStory.storyPoints || 0)
@@ -416,18 +377,15 @@ export default function EditStoryPage() {
                       setStory({
                         ...story,
                         project: { _id: selectedProject._id, name: selectedProject.name },
-                        assignedTo: undefined,
                         epic: undefined,
                         sprint: undefined
                       })
                       fetchEpics(value)
                       fetchSprints(value)
-                      fetchProjectMembers(value)
                     } else {
-                      setStory({ ...story, project: undefined, assignedTo: undefined, epic: undefined, sprint: undefined })
+                      setStory({ ...story, project: undefined, epic: undefined, sprint: undefined })
                       setEpics([])
                       setSprints([])
-                      setProjectMembers([])
                     }
                     setProjectQuery('')
                   }}
@@ -460,74 +418,6 @@ export default function EditStoryPage() {
                 </Select>
               </div>
 
-              {story.project && (
-                <div>
-                  <label className="text-sm font-medium">Assigned To</label>
-                  <Select
-                    value={story.assignedTo?._id || ''}
-                    onValueChange={(value) => {
-                      if (value === '__unassigned') {
-                        setStory({ ...story, assignedTo: undefined })
-                        return
-                      }
-                      const selectedUser = projectMembers.find(u => u._id === value)
-                      if (selectedUser) {
-                        setStory({
-                          ...story,
-                          assignedTo: {
-                            _id: selectedUser._id,
-                            firstName: selectedUser.firstName,
-                            lastName: selectedUser.lastName,
-                            email: selectedUser.email
-                          }
-                        })
-                      }
-                      setAssigneeQuery('')
-                    }}
-                    onOpenChange={(open) => { if (open) setAssigneeQuery('') }}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder={loadingProjectMembers ? 'Loading members...' : 'Select a team member'} />
-                    </SelectTrigger>
-                    <SelectContent className="z-[10050] p-0">
-                      <div className="p-2">
-                        <Input
-                          value={assigneeQuery}
-                          onChange={e => setAssigneeQuery(e.target.value)}
-                          onKeyDown={(e) => e.stopPropagation()}
-                          placeholder={loadingProjectMembers ? 'Loading members...' : 'Type to search team members'}
-                          className="mb-2"
-                        />
-                        <div className="max-h-56 overflow-y-auto">
-                          {loadingProjectMembers ? (
-                            <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span>Loading members...</span>
-                            </div>
-                          ) : projectMembers.length === 0 ? (
-                            <>
-                              <SelectItem value="__unassigned">Unassigned</SelectItem>
-                              <div className="px-2 py-1 text-sm text-muted-foreground">No team members found</div>
-                            </>
-                          ) : filteredProjectMembers.length > 0 ? (
-                            <>
-                              <SelectItem value="__unassigned">Unassigned</SelectItem>
-                              {filteredProjectMembers.map(user => (
-                                <SelectItem key={user._id} value={user._id}>
-                                  {user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span>
-                                </SelectItem>
-                              ))}
-                            </>
-                          ) : (
-                            <div className="px-2 py-1 text-sm text-muted-foreground">No matching members</div>
-                          )}
-                        </div>
-                      </div>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
               <div>
                 <label className="text-sm font-medium">Epic</label>
                 <Select
@@ -548,12 +438,17 @@ export default function EditStoryPage() {
                     <SelectValue placeholder={story.project ? "Select an epic" : "Select project first"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No Epic</SelectItem>
-                    {epics.map((epic) => (
-                      <SelectItem key={epic._id} value={epic._id}>
-                        {epic.title}
-                      </SelectItem>
-                    ))}
+                    {epics.length === 0 ? (
+                      <SelectItem value="none">No Epic</SelectItem>
+                    ) : (
+                      <>
+                        {epics.map((epic) => (
+                          <SelectItem key={epic._id} value={epic._id}>
+                            {epic.title}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -578,12 +473,17 @@ export default function EditStoryPage() {
                     <SelectValue placeholder={story.project ? "Select a sprint" : "Select project first"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No Sprint</SelectItem>
-                    {sprints.map((sprint) => (
-                      <SelectItem key={sprint._id} value={sprint._id}>
-                        {sprint.name}
-                      </SelectItem>
-                    ))}
+                    {sprints.length === 0 ? (
+                      <SelectItem value="none">No Sprint</SelectItem>
+                    ) : (
+                      <>
+                        {sprints.map((sprint) => (
+                          <SelectItem key={sprint._id} value={sprint._id}>
+                            {sprint.name}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -649,14 +549,22 @@ export default function EditStoryPage() {
 
               <div>
                 <label className="text-sm font-medium">Story Points</label>
-                <Input
-                  type="number"
-                  value={story.storyPoints || ''}
-                  onChange={(e) => setStory({ ...story, storyPoints: e.target.value ? parseInt(e.target.value) : undefined })}
-                  placeholder="Enter story points"
-                  className="mt-1"
-                  min="0"
-                />
+                <Select 
+                  value={story.storyPoints ? String(story.storyPoints) : ''} 
+                  onValueChange={(value) => setStory({ ...story, storyPoints: value ? parseInt(value) : undefined })}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select story points" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1</SelectItem>
+                    <SelectItem value="2">2</SelectItem>
+                    <SelectItem value="3">3</SelectItem>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="8">8</SelectItem>
+                    <SelectItem value="13">13</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
