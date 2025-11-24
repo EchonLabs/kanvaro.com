@@ -1,3 +1,10 @@
+## [1.4.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.1...v1.4.2) (2025-11-24)
+
+
+### Bug Fixes
+
+* update git ignore file ([a909808](https://github.com/EchonLabs/kanvaro.com/commit/a909808be4ae566afbb6a8120eed2fd767e108f1))
+
 ## [1.4.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.0...v1.4.1) (2025-11-24)
 
 

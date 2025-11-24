@@ -44,6 +44,8 @@ next-env.d.ts
 
 # OS
 Thumbs.db
+config.json
+
 
 # Logs
 # logs
