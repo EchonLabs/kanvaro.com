@@ -42,8 +42,22 @@ interface Story {
   } | null
   epic?: {
     _id: string
-    name: string
-  }
+    title: string
+    description?: string
+    status?: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
+    priority?: 'low' | 'medium' | 'high' | 'critical'
+    dueDate?: string
+    tags?: string[]
+    project?: {
+      _id: string
+      name: string
+    }
+    createdBy?: {
+      firstName: string
+      lastName: string
+      email: string
+    }
+  } | null
   sprint?: {
     _id: string
     name: string
@@ -301,12 +315,89 @@ export default function StoryDetailPage() {
               <Card className="overflow-x-hidden">
                 <CardHeader>
                   <CardTitle>Epic</CardTitle>
+                  <CardDescription>Linked epic details</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex items-center space-x-2 min-w-0">
-                    <Layers className="h-4 w-4 text-purple-600 flex-shrink-0" />
-                    <span className="text-sm truncate" title={story.epic.name}>{story.epic.name}</span>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start space-x-2 min-w-0">
+                    <Layers className="h-4 w-4 text-purple-600 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate" title={story.epic.title}>
+                        {story.epic.title}
+                      </p>
+                      {story.epic.description && (
+                        <p className="text-xs text-muted-foreground mt-1 break-words">
+                          {story.epic.description}
+                        </p>
+                      )}
+                    </div>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {story.epic.status && (
+                      <div className="flex items-center justify-between text-xs sm:text-sm">
+                        <span className="text-muted-foreground">Status</span>
+                        <Badge className={`${getStatusColor(story.epic.status)} text-xs`}>
+                          {getStatusIcon(story.epic.status)}
+                          <span className="ml-1 hidden sm:inline">{formatToTitleCase(story.epic.status)}</span>
+                        </Badge>
+                      </div>
+                    )}
+
+                    {story.epic.priority && (
+                      <div className="flex items-center justify-between text-xs sm:text-sm">
+                        <span className="text-muted-foreground">Priority</span>
+                        <Badge className={`${getPriorityColor(story.epic.priority)} text-xs`}>
+                          {formatToTitleCase(story.epic.priority)}
+                        </Badge>
+                      </div>
+                    )}
+
+                    {story.epic.project?.name && (
+                      <div className="flex items-center justify-between text-xs sm:text-sm">
+                        <span className="text-muted-foreground">Project</span>
+                        <span
+                          className="font-medium truncate max-w-[160px] text-right sm:text-left"
+                          title={story.epic.project.name}
+                        >
+                          {story.epic.project.name.length > 15
+                            ? `${story.epic.project.name.slice(0, 15)}…`
+                            : story.epic.project.name}
+                        </span>
+                      </div>
+                    )}
+
+                    {story.epic.dueDate && (
+                      <div className="flex items-center justify-between text-xs sm:text-sm">
+                        <span className="text-muted-foreground">Due Date</span>
+                        <span className="font-medium whitespace-nowrap">
+                          {new Date(story.epic.dueDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {story.epic.tags && story.epic.tags.length > 0 && (
+                    <div className="space-y-2">
+                      <span className="text-xs sm:text-sm text-muted-foreground">Tags</span>
+                      <div className="flex flex-wrap gap-1">
+                        {story.epic.tags.map((tag, index) => (
+                          <Badge key={index} variant="outline" className="text-xs">
+                            <Star className="h-3 w-3 mr-1" />
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {story.epic.createdBy && (
+                    <div className="flex items-center justify-between text-xs sm:text-sm">
+                      <span className="text-muted-foreground">Created By</span>
+                      <span className="font-medium truncate max-w-[200px] text-right sm:text-left">
+                        {story.epic.createdBy.firstName} {story.epic.createdBy.lastName}
+                      </span>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

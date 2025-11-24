@@ -37,7 +37,7 @@ interface Story {
   _id: string
   title: string
   description: string
-  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
+  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'|'backlog'
   priority: 'low' | 'medium' | 'high' | 'critical'
   project?: {
     _id: string
@@ -494,6 +494,7 @@ export default function EditStoryPage() {
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todo">To Do</SelectItem>
+                    <SelectItem value="backlog">Backlog</SelectItem>
                     <SelectItem value="in_progress">In Progress</SelectItem>
                     <SelectItem value="review">Review</SelectItem>
                     <SelectItem value="testing">Testing</SelectItem>

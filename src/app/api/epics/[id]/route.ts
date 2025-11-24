@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Epic } from '@/models/Epic'
+import { Story } from '@/models/Story'
 import { authenticateUser } from '@/lib/auth-utils'
 
 export async function GET(
@@ -36,9 +37,48 @@ export async function GET(
       )
     }
 
+    const stories = await Story.find({
+      epic: epicId,
+      archived: { $ne: true }
+    })
+      .select('status storyPoints')
+      .lean()
+
+    const storyStats = stories.reduce((stats, story) => {
+      const storyPoints = typeof story.storyPoints === 'number' ? story.storyPoints : 0
+      stats.totalStories += 1
+      stats.totalStoryPoints += storyPoints
+      const isCompleted = ['done', 'completed'].includes(story.status)
+      if (isCompleted) {
+        stats.storiesCompleted += 1
+        stats.storyPointsCompleted += storyPoints
+      }
+      return stats
+    }, {
+      totalStories: 0,
+      storiesCompleted: 0,
+      totalStoryPoints: 0,
+      storyPointsCompleted: 0
+    })
+
+    const completionPercentage = storyStats.totalStories > 0
+      ? Math.round((storyStats.storiesCompleted / storyStats.totalStories) * 100)
+      : 0
+
+    const epicData = {
+      ...epic.toObject(),
+      progress: {
+        completionPercentage,
+        storiesCompleted: storyStats.storiesCompleted,
+        totalStories: storyStats.totalStories,
+        storyPointsCompleted: storyStats.storyPointsCompleted,
+        totalStoryPoints: storyStats.totalStoryPoints
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      data: epic
+      data: epicData
     })
 
   } catch (error) {
