@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Epic } from '@/models/Epic'
+import { Story } from '@/models/Story'
 import { authenticateUser } from '@/lib/auth-utils'
 
 export async function GET(request: NextRequest) {
@@ -60,17 +61,69 @@ export async function GET(request: NextRequest) {
 
     const total = await Epic.countDocuments(epicQuery)
 
-    // Calculate progress for each epic (this would typically come from stories)
-    const epicsWithProgress = epics.map(epic => ({
-      ...epic,
-      progress: {
-        completionPercentage: 0,
-        storiesCompleted: 0,
-        totalStories: 0,
-        storyPointsCompleted: 0,
-        totalStoryPoints: 0
+    const epicIds = epics.map(epic => epic._id?.toString()).filter(Boolean)
+
+    const stories = await Story.find({
+      epic: { $in: epicIds },
+      archived: { $ne: true }
+    })
+      .select('epic status storyPoints')
+      .lean()
+
+    const storyStats = stories.reduce<Record<string, {
+      totalStories: number
+      storiesCompleted: number
+      totalStoryPoints: number
+      storyPointsCompleted: number
+    }>>((acc, story) => {
+      const epicId = story.epic?.toString()
+      if (!epicId) return acc
+      if (!acc[epicId]) {
+        acc[epicId] = {
+          totalStories: 0,
+          storiesCompleted: 0,
+          totalStoryPoints: 0,
+          storyPointsCompleted: 0
+        }
       }
-    }))
+
+      const stats = acc[epicId]
+      stats.totalStories += 1
+      const storyPoints = typeof story.storyPoints === 'number' ? story.storyPoints : 0
+      stats.totalStoryPoints += storyPoints
+
+      const isCompleted = ['done', 'completed'].includes(story.status)
+      if (isCompleted) {
+        stats.storiesCompleted += 1
+        stats.storyPointsCompleted += storyPoints
+      }
+
+      return acc
+    }, {})
+
+    const epicsWithProgress = epics.map(epic => {
+      const stats = storyStats[epic._id?.toString() || ''] || {
+        totalStories: 0,
+        storiesCompleted: 0,
+        totalStoryPoints: 0,
+        storyPointsCompleted: 0
+      }
+
+      const completionPercentage = stats.totalStories > 0
+        ? Math.round((stats.storiesCompleted / stats.totalStories) * 100)
+        : 0
+
+      return {
+        ...epic,
+        progress: {
+          completionPercentage,
+          storiesCompleted: stats.storiesCompleted,
+          totalStories: stats.totalStories,
+          storyPointsCompleted: stats.storyPointsCompleted,
+          totalStoryPoints: stats.totalStoryPoints
+        }
+      }
+    })
 
     return NextResponse.json({
       success: true,

@@ -381,12 +381,12 @@ export default function EpicDetailPage() {
                   </div>
                 )}
                 
-                {epic?.storyPoints && (
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                    <span className="text-xs sm:text-sm text-muted-foreground">Story Points</span>
-                    <span className="text-xs sm:text-sm font-medium">{epic?.storyPoints}</span>
-                  </div>
-                )}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Story Points</span>
+                  <span className="text-xs sm:text-sm font-medium">
+                    {epic?.progress?.totalStoryPoints ?? 0}
+                  </span>
+                </div>
                 
                 {epic?.estimatedHours && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">

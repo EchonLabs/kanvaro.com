@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
-import { Progress } from '@/components/ui/Progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Input } from '@/components/ui/Input'
@@ -93,6 +92,10 @@ interface Sprint {
       email: string
   } | null
   archived?: boolean
+  movedToSprint?: {
+    _id: string
+    name: string
+  } | null
   }>
   createdAt: string
   updatedAt: string
@@ -715,7 +718,15 @@ export default function SprintDetailPage() {
                     <span className="text-muted-foreground">Overall Progress</span>
                     <span className="font-medium">{sprint?.progress?.completionPercentage || 0}%</span>
                   </div>
-                  <Progress value={sprint?.progress?.completionPercentage || 0} className="h-1.5 sm:h-2" />
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
+                    <div 
+                      className="bg-blue-600 dark:bg-blue-500 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
+                      style={{ 
+                        width: `${Math.min(100, Math.max(0, sprint?.progress?.completionPercentage || 0))}%`,
+                        minWidth: sprint?.progress?.completionPercentage && sprint.progress.completionPercentage > 0 ? '2px' : '0'
+                      }}
+                    />
+                  </div>
                 </div>
 
                 {!sprint?.progress?.totalTasks && (
@@ -835,7 +846,7 @@ export default function SprintDetailPage() {
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-base sm:text-lg">Sprint Tasks</CardTitle>
                 <CardDescription className="text-xs sm:text-sm">
-                  {sprintTasks.length} task{sprintTasks.length === 1 ? '' : 's'}
+                  {sprintTasks.length} task{sprintTasks.length === 1 ? '' : 's'} {sprint?.status === 'completed' ? '(including completed and spillover tasks)' : ''}
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 sm:p-6 pt-0 space-y-4">
@@ -847,7 +858,7 @@ export default function SprintDetailPage() {
 
                 {sprintTasks.length === 0 ? (
                   <p className="text-sm sm:text-base text-muted-foreground">
-                    No tasks are currently assigned to this sprint.
+                    No tasks {sprint?.status === 'completed' ? 'were' : 'are currently'} assigned to this sprint.
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
@@ -868,6 +879,11 @@ export default function SprintDetailPage() {
                                 ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}`
                                 : 'Unassigned'}
                             </p>
+                            {task.movedToSprint && (
+                              <p className="text-xs font-medium text-orange-600 dark:text-orange-400 mt-1">
+                                Moved to: {task.movedToSprint.name}
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-[11px] uppercase">
@@ -876,6 +892,11 @@ export default function SprintDetailPage() {
                             {task.archived && (
                               <Badge variant="secondary" className="text-[11px] uppercase">
                                 Archived
+                              </Badge>
+                            )}
+                            {task.movedToSprint && (
+                              <Badge variant="outline" className="text-[11px] bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400 border-orange-200 dark:border-orange-800">
+                                Spillover
                               </Badge>
                             )}
                           </div>
@@ -887,30 +908,39 @@ export default function SprintDetailPage() {
                           </Badge>
                         </div>
 
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">Status</Label>
-                          <Select
-                            value={task.status}
-                            onValueChange={(value) => handleTaskStatusChange(task._id, value)}
-                            disabled={taskStatusUpdating === task._id || task.archived}
-                          >
-                            <SelectTrigger className="text-sm">
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {TASK_STATUS_OPTIONS.map(option => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {task.archived && (
+                        {!task.movedToSprint && (
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Status</Label>
+                            <Select
+                              value={task.status}
+                              onValueChange={(value) => handleTaskStatusChange(task._id, value)}
+                              disabled={taskStatusUpdating === task._id || task.archived}
+                            >
+                              <SelectTrigger className="text-sm">
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TASK_STATUS_OPTIONS.map(option => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {task.archived && (
+                              <p className="text-xs text-muted-foreground">
+                                This task is archived and no longer appears on active boards.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {task.movedToSprint && (
+                          <div className="rounded-md border bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800 p-2">
                             <p className="text-xs text-muted-foreground">
-                              This task is archived and no longer appears on active boards.
+                              This task has been moved to <span className="font-medium text-orange-700 dark:text-orange-400">{task.movedToSprint.name}</span>
                             </p>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

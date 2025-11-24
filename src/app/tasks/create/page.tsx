@@ -255,8 +255,8 @@ export default function CreateTaskPage() {
       const preparedSubtasks = subtasks.map(subtask => ({
         title: subtask.title.trim(),
         description: subtask.description?.trim() || undefined,
-        status: subtask.status,
-        isCompleted: subtask.status === 'done' ? true : subtask.isCompleted
+        status: 'backlog', // Sub-tasks always created with backlog status
+        isCompleted: false
       }))
 
       const response = await fetch('/api/tasks', {
@@ -340,7 +340,7 @@ export default function CreateTaskPage() {
     setSubtasks([...subtasks, {
       title: '',
       description: '',
-      status: 'todo',
+      status: 'backlog',
       isCompleted: false
     }])
   }
@@ -747,35 +747,14 @@ export default function CreateTaskPage() {
                     </Button>
                   </div>
                   
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div>
-                      <label className="text-sm font-medium text-foreground">Title *</label>
-                      <Input
-                        value={subtask.title}
-                        onChange={(e) => updateSubtask(index, 'title', e.target.value)}
-                        placeholder="Subtask title"
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="text-sm font-medium text-foreground">Status</label>
-                      <Select
-                        value={subtask.status}
-                        onValueChange={(value) => updateSubtask(index, 'status', value as SubtaskStatus)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SUBTASK_STATUS_OPTIONS.map(option => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Title *</label>
+                    <Input
+                      value={subtask.title}
+                      onChange={(e) => updateSubtask(index, 'title', e.target.value)}
+                      placeholder="Subtask title"
+                      required
+                    />
                   </div>
 
                   <div className="flex items-center space-x-2">
