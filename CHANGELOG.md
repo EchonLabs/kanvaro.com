@@ -1,3 +1,10 @@
+## [1.4.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.3...v1.4.4) (2025-11-24)
+
+
+### Bug Fixes
+
+* add consoles to check vconfig ([3b56214](https://github.com/EchonLabs/kanvaro.com/commit/3b5621401fdd5ad14275992ad36a6a52197f3052))
+
 ## [1.4.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.2...v1.4.3) (2025-11-24)
 
 
