@@ -52,7 +52,8 @@ export async function GET() {
             timezone: user.timezone,
             language: user.language,
             currency: user.currency,
-            preferences: user.preferences
+            preferences: user.preferences,
+            lastLogin: user.lastLogin
           }
         } else {
           console.log('User not found or inactive')
@@ -99,7 +100,8 @@ export async function GET() {
                 timezone: user.timezone,
                 language: user.language,
                 currency: user.currency,
-                preferences: user.preferences
+                preferences: user.preferences,
+                lastLogin: user.lastLogin
               }
             } else {
               console.log('User not found or inactive via refresh token')
@@ -158,7 +160,8 @@ export async function GET() {
             timezone: user.timezone,
             language: user.language,
             currency: user.currency,
-            preferences: user.preferences
+            preferences: user.preferences,
+            lastLogin: user.lastLogin
           }
         } else {
           console.log('User not found or inactive via refresh token only')

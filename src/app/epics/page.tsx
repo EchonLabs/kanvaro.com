@@ -253,7 +253,7 @@ export default function EpicsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 overflow-x-hidden">
+      <div className="space-y-8 sm:space-y-10 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Epics</h1>

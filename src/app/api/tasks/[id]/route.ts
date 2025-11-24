@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import mongoose from 'mongoose'
 import connectDB from '@/lib/db-config'
 import { Task, TASK_STATUS_VALUES, TaskStatus } from '@/models/Task'
 import { Project } from '@/models/Project'
@@ -157,6 +158,48 @@ function sanitizeSubtasks(input: any): Array<{
     })
 }
 
+function sanitizeAttachments(
+  input: any,
+  defaultUserId: string
+): Array<{
+  name: string
+  url: string
+  size: number
+  type: string
+  uploadedBy: mongoose.Types.ObjectId
+  uploadedAt: Date
+}> {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  const fallbackUserObjectId = defaultUserId ? new mongoose.Types.ObjectId(defaultUserId) : undefined
+
+  return input
+    .filter((item: any) => typeof item?.name === 'string' && item.name.trim().length > 0 && typeof item?.url === 'string' && item.url.trim().length > 0)
+    .map((item: any) => {
+      const uploadedByIdRaw =
+        typeof item.uploadedBy === 'string'
+          ? item.uploadedBy
+          : typeof item.uploadedBy?._id === 'string'
+            ? item.uploadedBy._id
+            : undefined
+
+      const uploadedBy = uploadedByIdRaw
+        ? new mongoose.Types.ObjectId(uploadedByIdRaw)
+        : fallbackUserObjectId
+
+      return {
+        name: item.name.trim(),
+        url: item.url.trim(),
+        size: typeof item.size === 'number' ? item.size : 0,
+        type: typeof item.type === 'string' ? item.type.trim() : 'application/octet-stream',
+        uploadedBy: uploadedBy || fallbackUserObjectId || new mongoose.Types.ObjectId(defaultUserId),
+        uploadedAt: item.uploadedAt ? new Date(item.uploadedAt) : new Date()
+      }
+    })
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -186,12 +229,22 @@ export async function GET(
         { createdBy: userId }
       ]
     })
-      .populate('project', '_id name')
-      .populate('assignedTo', 'firstName lastName email')
-      .populate('createdBy', 'firstName lastName email')
-      .populate('story', 'title status')
-      .populate('sprint', 'name status')
-      .populate('parentTask', 'title')
+      .populate([
+        { path: 'project', select: '_id name' },
+        { path: 'assignedTo', select: 'firstName lastName email' },
+        { path: 'createdBy', select: 'firstName lastName email' },
+        {
+          path: 'story',
+          select: 'title status epic',
+          populate: {
+            path: 'epic',
+            select: 'title status'
+          }
+        },
+        { path: 'sprint', select: 'name status startDate endDate' },
+        { path: 'parentTask', select: 'title' },
+        { path: 'attachments.uploadedBy', select: 'firstName lastName email' }
+      ])
 
     if (!task) {
       return NextResponse.json(
@@ -258,6 +311,10 @@ export async function PUT(
 
     if (Object.prototype.hasOwnProperty.call(updateData, 'subtasks')) {
       updateData.subtasks = sanitizeSubtasks(updateData.subtasks)
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'attachments')) {
+      updateData.attachments = sanitizeAttachments(updateData.attachments, userId)
     }
 
     if (Object.prototype.hasOwnProperty.call(updateData, 'storyPoints')) {
@@ -391,12 +448,22 @@ export async function PUT(
       { ...updateData, updatedAt: new Date() },
       { new: true }
     )
-      .populate('project', '_id name')
-      .populate('assignedTo', 'firstName lastName email')
-      .populate('createdBy', 'firstName lastName email')
-      .populate('story', 'title status')
-      .populate('sprint', 'name status startDate endDate teamMembers')
-      .populate('parentTask', 'title')
+      .populate([
+        { path: 'project', select: '_id name' },
+        { path: 'assignedTo', select: 'firstName lastName email' },
+        { path: 'createdBy', select: 'firstName lastName email' },
+        {
+          path: 'story',
+          select: 'title status epic',
+          populate: {
+            path: 'epic',
+            select: 'title status'
+          }
+        },
+        { path: 'sprint', select: 'name status startDate endDate teamMembers' },
+        { path: 'parentTask', select: 'title' },
+        { path: 'attachments.uploadedBy', select: 'firstName lastName email' }
+      ])
       .lean()
 
     if (!taskResult) {
