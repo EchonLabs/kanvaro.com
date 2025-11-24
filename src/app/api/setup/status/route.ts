@@ -7,18 +7,28 @@ export async function GET() {
   try {
     const config = loadConfig()
     
+    if (config.setupCompleted && config.database) {
+      return NextResponse.json({
+        setupCompleted: true,
+        hasConfig: true,
+        hasUsers: true,
+        organizationId: config.organizationId,
+        message: 'Application is configured and ready'
+      })
+    }
+
     // Check if there are actually users in the database
-    let hasUsers: boolean | null = null
+    let hasUsers = false
     try {
       await connectDB()
       const userCount = await User.countDocuments()
       hasUsers = userCount > 0
     } catch (error) {
-      console.log('Database connection failed while checking users:', error)
+      console.log('Database connection failed, assuming no users:', error)
     }
     
-    // Setup is completed if config says so and we didn't positively detect an empty user collection
-    const setupCompleted = config.setupCompleted && hasUsers !== false
+    // Setup is only completed if config says so AND there are users in the database
+    const setupCompleted = config.setupCompleted && hasUsers
     
     return NextResponse.json({
       setupCompleted,
@@ -27,9 +37,9 @@ export async function GET() {
       organizationId: config.organizationId,
       message: setupCompleted 
         ? 'Application is configured and ready' 
-        : hasUsers === false
+        : hasUsers 
           ? 'Application setup is required' 
-          : 'Unable to verify users, setup status unknown'
+          : 'No users found, setup required'
     })
   } catch (error) {
     console.error('Failed to check setup status:', error)
