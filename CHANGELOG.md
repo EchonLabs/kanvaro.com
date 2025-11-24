@@ -1,3 +1,10 @@
+## [1.4.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.2...v1.4.3) (2025-11-24)
+
+
+### Bug Fixes
+
+* add sprint changes ([e13df8d](https://github.com/EchonLabs/kanvaro.com/commit/e13df8de73431053108c7644de3af37eb1b3cf0a))
+
 ## [1.4.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.1...v1.4.2) (2025-11-24)
 
 
