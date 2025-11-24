@@ -99,6 +99,48 @@ export async function POST(
       }
     }
 
+    // Only check for incomplete sub-tasks if there's NO target sprint to move tasks to
+    // If there's a target sprint, allow completion and move tasks (with their incomplete sub-tasks) to the next sprint
+    if (!targetSprintId) {
+      const sprintTasks = await Task.find({
+        sprint: sprintId,
+        organization: organizationId,
+        archived: { $ne: true }
+      }).select('_id title subtasks')
+
+      const tasksWithIncompleteSubtasks: Array<{ taskId: string; taskTitle: string; incompleteSubtasks: Array<{ title: string; status: string }> }> = []
+
+      for (const task of sprintTasks) {
+        if (task.subtasks && Array.isArray(task.subtasks) && task.subtasks.length > 0) {
+          const incompleteSubtasks = task.subtasks.filter((subtask: any) => {
+            const status = subtask.status || 'backlog'
+            return status !== 'done' && status !== 'completed' && !subtask.isCompleted
+          })
+
+          if (incompleteSubtasks.length > 0) {
+            tasksWithIncompleteSubtasks.push({
+              taskId: task._id.toString(),
+              taskTitle: task.title,
+              incompleteSubtasks: incompleteSubtasks.map((subtask: any) => ({
+                title: subtask.title || 'Untitled',
+                status: subtask.status || 'backlog'
+              }))
+            })
+          }
+        }
+      }
+
+      if (tasksWithIncompleteSubtasks.length > 0) {
+        return NextResponse.json(
+          {
+            error: 'Cannot complete sprint with incomplete sub-tasks. Please move tasks to another sprint or complete all sub-tasks.',
+            incompleteSubtasks: tasksWithIncompleteSubtasks
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     sprint.status = 'completed'
     sprint.actualEndDate = new Date()
     await sprint.save()
@@ -129,11 +171,7 @@ export async function POST(
           { sprint: undefined, status: 'backlog' }
         )
       }
-
-      await Sprint.findByIdAndUpdate(
-        sprintId,
-        { $pull: { tasks: { $in: incompleteTaskIds } } }
-      )
+      // DO NOT remove tasks from sprint's tasks array - keep history for display
     }
 
     const completedTaskFilter = {
@@ -150,11 +188,7 @@ export async function POST(
         { _id: { $in: completedTaskIds } },
         { archived: true }
       )
-
-      await Sprint.findByIdAndUpdate(
-        sprintId,
-        { $pull: { tasks: { $in: completedTaskIds } } }
-      )
+      // DO NOT remove completed tasks from sprint's tasks array - keep history for display
     }
 
     const updatedSprint = await Sprint.findById(sprintId)

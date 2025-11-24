@@ -30,7 +30,14 @@ export async function GET(
       _id: storyId,
     })
       .populate('project', 'name')
-      .populate('epic', 'name')
+      .populate({
+        path: 'epic',
+        select: 'title description status priority dueDate tags project createdBy',
+        populate: [
+          { path: 'project', select: 'name' },
+          { path: 'createdBy', select: 'firstName lastName email' }
+        ]
+      })
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
       .populate('sprint', 'name')
@@ -87,7 +94,14 @@ export async function PUT(
       { new: true }
     )
       .populate('project', 'name')
-      .populate('epic', 'name')
+      .populate({
+        path: 'epic',
+        select: 'title description status priority dueDate tags project createdBy',
+        populate: [
+          { path: 'project', select: 'name' },
+          { path: 'createdBy', select: 'firstName lastName email' }
+        ]
+      })
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
       .populate('sprint', 'name')

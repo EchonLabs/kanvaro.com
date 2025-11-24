@@ -6,7 +6,7 @@ import { MainLayout } from '@/components/layout/MainLayout'
 import { TimeLogs } from '@/components/time-tracking/TimeLogs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { ArrowLeft, Clock, Loader2 } from 'lucide-react'
+import { Clock, Loader2 } from 'lucide-react'
 
 export default function TimeLogsPage() {
   const router = useRouter()
@@ -80,18 +80,12 @@ export default function TimeLogsPage() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" onClick={() => router.push('/time-tracking')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center space-x-2">
-              <Clock className="h-8 w-8 text-blue-600" />
-              <span>Time Logs</span>
-            </h1>
-            <p className="text-muted-foreground">Review and manage your time entries</p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold text-foreground flex items-center space-x-2">
+            <Clock className="h-8 w-8 text-blue-600" />
+            <span>Time Logs</span>
+          </h1>
+          <p className="text-muted-foreground">Review and manage your time entries</p>
         </div>
 
         <Card>

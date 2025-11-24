@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Sprint } from '@/models/Sprint'
+import { Task } from '@/models/Task'
+import { Story } from '@/models/Story'
 import { authenticateUser } from '@/lib/auth-utils'
  
 export async function GET(request: NextRequest) {
@@ -67,17 +69,79 @@ export async function GET(request: NextRequest) {
     // Count total for pagination
     const total = await Sprint.countDocuments(sprintQueryFilters)
 
-    // Add placeholder progress stats for now
-    const sprintsWithProgress = sprints.map((sprint) => ({
-      ...sprint,
-      progress: {
-        completionPercentage: 0,
-        tasksCompleted: 0,
-        totalTasks: 0,
-        storyPointsCompleted: 0,
-        totalStoryPoints: 0,
-      },
-    }))
+    // Calculate progress & velocity for each sprint using linked tasks/stories
+    const sprintsWithProgress = await Promise.all(
+      sprints.map(async (sprint) => {
+        const sprintId = (sprint as any)._id.toString()
+        const sprintTaskIds = sprint.tasks || []
+
+        // Find all tasks currently associated with this sprint
+        const tasks = await Task.find({
+          $or: [
+            { _id: { $in: sprintTaskIds } },
+            { sprint: sprintId }
+          ],
+          organization: organizationId,
+          archived: { $ne: true }
+        }).select('status storyPoints').lean()
+
+        const totalTasks = tasks.length
+        // Consider tasks with status 'done' or 'completed' as completed
+        const tasksCompleted = tasks.filter(
+          task => task.status === 'done' || task.status === 'completed'
+        ).length
+        
+        const completionPercentage = totalTasks > 0 
+          ? Math.round((tasksCompleted / totalTasks) * 100) 
+          : 0
+
+        // Use stories assigned to the sprint (stories hold story points)
+        const projectId =
+          typeof sprint.project === 'object' && sprint.project !== null
+            ? (sprint.project as any)._id
+            : sprint.project
+
+        const storyFilters: Record<string, any> = {
+          sprint: sprintId,
+          archived: { $ne: true }
+        }
+        if (projectId) {
+          storyFilters.project = projectId
+        }
+
+        const stories = await Story.find(storyFilters)
+          .select('status storyPoints')
+          .lean()
+
+        const doneStoryStatuses = new Set(['done', 'completed'])
+
+        const totalStoryPoints = stories.reduce((sum, story) => {
+          return sum + (story.storyPoints || 0)
+        }, 0)
+
+        const storyPointsCompleted = stories
+          .filter(story => doneStoryStatuses.has((story.status || '').toLowerCase()))
+          .reduce((sum, story) => {
+            return sum + (story.storyPoints || 0)
+          }, 0)
+
+        const storyPointsCompletionPercentage =
+          totalStoryPoints > 0 ? Math.round((storyPointsCompleted / totalStoryPoints) * 100) : 0
+
+        return {
+          ...sprint,
+          velocity: storyPointsCompleted,
+          progress: {
+            completionPercentage,
+            tasksCompleted,
+            totalTasks,
+            storyPointsCompleted,
+            totalStoryPoints,
+            storyPointsCompletionPercentage
+          },
+        }
+      })
+    )
 
     // ✅ Unified JSON response structure (same as /api/tasks)
     return NextResponse.json({

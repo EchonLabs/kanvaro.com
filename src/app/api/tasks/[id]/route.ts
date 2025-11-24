@@ -346,6 +346,25 @@ export async function PUT(
       )
     }
 
+    // If task status is changing to 'todo', update all sub-tasks to 'todo'
+    if (updateData.status === 'todo' && currentTask.status !== 'todo') {
+      // Use existing subtasks from currentTask if subtasks are not being updated in this request
+      const subtasksToUpdate = Object.prototype.hasOwnProperty.call(updateData, 'subtasks')
+        ? sanitizeSubtasks(updateData.subtasks)
+        : (currentTask.subtasks && Array.isArray(currentTask.subtasks) ? currentTask.subtasks : [])
+      
+      if (subtasksToUpdate.length > 0) {
+        const updatedSubtasks = subtasksToUpdate.map((subtask: any) => ({
+          _id: subtask._id,
+          title: subtask.title || '',
+          description: subtask.description,
+          status: 'todo' as TaskStatus,
+          isCompleted: false
+        }))
+        updateData.subtasks = updatedSubtasks
+      }
+    }
+
     // Check for concurrent modifications
     if (updateData.expectedVersion && currentTask.updatedAt.getTime() !== new Date(updateData.expectedVersion).getTime()) {
       return NextResponse.json(

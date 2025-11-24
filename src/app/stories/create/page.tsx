@@ -42,7 +42,9 @@ export default function CreateStoryPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [epics, setEpics] = useState<Epic[]>([])
   const [sprints, setSprints] = useState<Sprint[]>([])
-  const [projectQuery, setProjectQuery] = useState("");
+  const [projectQuery, setProjectQuery] = useState('')
+  const [epicQuery, setEpicQuery] = useState('')
+  const [sprintQuery, setSprintQuery] = useState('')
 
   const [formData, setFormData] = useState({
     title: '',
@@ -125,7 +127,10 @@ export default function CreateStoryPage() {
 
       if (data.success && Array.isArray(data.data)) {
         setEpics(data.data)
-        
+        // If epics are loaded and current selection is "none", clear it
+        if (formData.epic === 'none' && data.data.length > 0) {
+          setFormData(prev => ({ ...prev, epic: '' }))
+        }
       } else {
         setEpics([])
       }
@@ -306,6 +311,7 @@ export default function CreateStoryPage() {
                             onChange={e => setProjectQuery(e.target.value)}
                             placeholder="Type to search projects"
                             className="mb-2"
+                            onKeyDown={e => e.stopPropagation()}
                           />
                           <div className="max-h-56 overflow-y-auto">
                             {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).map((project) => (
@@ -324,34 +330,100 @@ export default function CreateStoryPage() {
 
                   <div>
                     <label className="text-sm font-medium text-foreground">Epic</label>
-                    <Select value={formData.epic} onValueChange={(value) => handleChange('epic', value)}>
+                    <Select
+                      value={formData.epic}
+                      onValueChange={(value) => handleChange('epic', value)}
+                      onOpenChange={open => {
+                        if (open) setEpicQuery('')
+                      }}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select an epic" />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Epic</SelectItem>
-                        {Array.isArray(epics) && epics.map((epic) => (
-                          <SelectItem key={epic._id} value={epic._id}>
-                            {epic.title}
-                          </SelectItem>
-                        ))}
+                      <SelectContent className="z-[10050] p-0">
+                        {Array.isArray(epics) && epics.length > 0 ? (
+                          <div className="p-2">
+                            <Input
+                              value={epicQuery}
+                              onChange={e => setEpicQuery(e.target.value)}
+                              placeholder="Type to search epics"
+                              className="mb-2"
+                              onKeyDown={e => e.stopPropagation()}
+                            />
+                            <div className="max-h-56 overflow-y-auto">
+                              {epics
+                                .filter(epic =>
+                                  !epicQuery.trim() ||
+                                  epic.title.toLowerCase().includes(epicQuery.toLowerCase())
+                                )
+                                .map(epic => (
+                                  <SelectItem key={epic._id} value={epic._id}>
+                                    {epic.title}
+                                  </SelectItem>
+                                ))}
+                              {epics.filter(epic =>
+                                !epicQuery.trim() ||
+                                epic.title.toLowerCase().includes(epicQuery.toLowerCase())
+                              ).length === 0 && (
+                                <div className="px-2 py-1 text-sm text-muted-foreground">
+                                  No matching epics
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <SelectItem value="none">No Epic</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div>
                     <label className="text-sm font-medium text-foreground">Sprint</label>
-                    <Select value={formData.sprint} onValueChange={(value) => handleChange('sprint', value)}>
+                    <Select
+                      value={formData.sprint}
+                      onValueChange={(value) => handleChange('sprint', value)}
+                      onOpenChange={open => {
+                        if (open) setSprintQuery('')
+                      }}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select a sprint" />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Sprint</SelectItem>
-                        {Array.isArray(sprints) && sprints.map((sprint) => (
-                          <SelectItem key={sprint._id} value={sprint._id}>
-                            {sprint.name}
-                          </SelectItem>
-                        ))}
+                      <SelectContent className="z-[10050] p-0">
+                        {Array.isArray(sprints) && sprints.length > 0 ? (
+                          <div className="p-2">
+                            <Input
+                              value={sprintQuery}
+                              onChange={e => setSprintQuery(e.target.value)}
+                              placeholder="Type to search sprints"
+                              className="mb-2"
+                              onKeyDown={e => e.stopPropagation()}
+                            />
+                            <div className="max-h-56 overflow-y-auto">
+                              {sprints
+                                .filter(sprint =>
+                                  !sprintQuery.trim() ||
+                                  sprint.name.toLowerCase().includes(sprintQuery.toLowerCase())
+                                )
+                                .map(sprint => (
+                                  <SelectItem key={sprint._id} value={sprint._id}>
+                                    {sprint.name}
+                                  </SelectItem>
+                                ))}
+                              {sprints.filter(sprint =>
+                                !sprintQuery.trim() ||
+                                sprint.name.toLowerCase().includes(sprintQuery.toLowerCase())
+                              ).length === 0 && (
+                                <div className="px-2 py-1 text-sm text-muted-foreground">
+                                  No matching sprints
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <SelectItem value="none">No Sprint</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
