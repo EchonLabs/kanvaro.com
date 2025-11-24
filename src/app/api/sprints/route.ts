@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
         // Deduplicate tasks in case they were matched by both clauses above
         const taskMap = new Map<string, typeof taskDocs[number]>()
         taskDocs.forEach(task => {
-          taskMap.set(task._id.toString(), task)
+          taskMap.set((task as any)._id.toString(), task)
         })
         const tasks = Array.from(taskMap.values())
 
