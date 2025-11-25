@@ -1,3 +1,10 @@
+## [1.4.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.5...v1.4.6) (2025-11-25)
+
+
+### Bug Fixes
+
+* add bug fixes in time ([ff14233](https://github.com/EchonLabs/kanvaro.com/commit/ff142331369200576963dfd20ac6268a49820bb8))
+
 ## [1.4.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.4...v1.4.5) (2025-11-24)
 
 
