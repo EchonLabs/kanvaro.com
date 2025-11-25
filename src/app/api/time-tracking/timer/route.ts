@@ -101,14 +101,14 @@ const buildNotificationPayload = (
   timeEntryId: string,
   projectUrl: string
 ) => ({
-  type: 'time_tracking',
+  type: 'time_tracking' as const,
   title,
   message,
   data: {
-    entityType: 'time_entry',
+    entityType: 'time_entry' as const,
     entityId: timeEntryId,
-    action: 'updated',
-    priority: 'low',
+    action: 'updated' as const,
+    priority: 'low' as const,
     url: projectUrl
   },
   sendEmail: false,
@@ -148,7 +148,11 @@ async function stopTimerAndBuildResponse(
   const totalDuration = calculateCurrentDurationMinutes(activeTimer, now)
   let finalDuration = totalDuration
   if (stopSettings.roundingRules?.enabled) {
-    finalDuration = applyRoundingRules(totalDuration, stopSettings.roundingRules)
+    finalDuration = applyRoundingRules(totalDuration, {
+      enabled: stopSettings.roundingRules.enabled ?? false,
+      increment: stopSettings.roundingRules.increment ?? 15,
+      roundUp: stopSettings.roundingRules.roundUp ?? true
+    })
   }
   const hasTimeLogged = finalDuration > 0
 
