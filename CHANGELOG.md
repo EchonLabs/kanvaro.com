@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.6...v1.5.0) (2025-11-25)
+
+
+### Features
+
+* add landing page changes ([93feaea](https://github.com/EchonLabs/kanvaro.com/commit/93feaea0dd54084295c2ff578402f516e93d9433))
+
 ## [1.4.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.5...v1.4.6) (2025-11-25)
 
 
