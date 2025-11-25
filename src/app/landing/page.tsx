@@ -168,22 +168,9 @@ export default function LandingPage() {
     if (ctaLoading) return
     setCtaLoading(true)
     try {
-      const authResponse = await fetch('/api/auth/me')
-      if (authResponse.ok) {
-        router.push('/dashboard')
-        return
-      }
-
-      const setupResponse = await fetch('/api/setup/status')
-      const setupData = await setupResponse.json().catch(() => ({}))
-      if (!setupResponse.ok || !setupData.setupCompleted) {
-        router.push('/setup')
-        return
-      }
-
-      router.push('/login')
+      router.push('/workspace')
     } catch (error) {
-      router.push('/login')
+      router.push('/workspace')
     } finally {
       setCtaLoading(false)
     }
@@ -206,7 +193,7 @@ export default function LandingPage() {
               Workleze-inspired control room
             </p>
             <div className="space-y-8">
-              <h1 className="text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl lg:text-[4rem] xl:text-[4.5rem] dark:text-white">
+              <h1 className="text-3xl font-semibold leading-tight text-slate-900 sm:text-4xl lg:text-[3rem] xl:text-[3.5rem] dark:text-white">
                 The calmest way to manage <span className="text-[#7afdea]">projects, tasks</span> and time.
               </h1>
               <p className="text-base text-slate-600 sm:text-lg lg:text-base xl:text-lg dark:text-white/80 leading-relaxed">
