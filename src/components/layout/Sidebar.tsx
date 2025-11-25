@@ -25,6 +25,7 @@ import {
   Calendar,
   User,
   Zap,
+  Rocket,
   Shield,
   Play,
   Bell,

@@ -31,7 +31,6 @@ export function OrganizationSettings() {
     language: 'en',
     industry: '',
     size: 'small' as 'startup' | 'small' | 'medium' | 'enterprise',
-    allowSelfRegistration: false,
     requireEmailVerification: true,
     defaultUserRole: 'team_member',
     timeTracking: {
@@ -63,6 +62,7 @@ export function OrganizationSettings() {
       }
     }
   })
+  const [roundingIncrementInput, setRoundingIncrementInput] = useState('15')
   
   const [logo, setLogo] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
@@ -172,38 +172,82 @@ export function OrganizationSettings() {
         language: organization.language || 'en',
         industry: organization.industry || '',
         size: organization.size || 'small',
-        allowSelfRegistration: organization.settings?.allowSelfRegistration || false,
         requireEmailVerification: organization.settings?.requireEmailVerification || true,
         defaultUserRole: organization.settings?.defaultUserRole || 'team_member',
         timeTracking: {
-          allowTimeTracking: organization.settings?.timeTracking?.allowTimeTracking ?? true,
-          allowManualTimeSubmission: organization.settings?.timeTracking?.allowManualTimeSubmission ?? true,
-          requireApproval: organization.settings?.timeTracking?.requireApproval ?? false,
-          allowBillableTime: organization.settings?.timeTracking?.allowBillableTime ?? true,
-          defaultHourlyRate: organization.settings?.timeTracking?.defaultHourlyRate ?? 0,
-          maxDailyHours: organization.settings?.timeTracking?.maxDailyHours ?? 12,
-          maxWeeklyHours: organization.settings?.timeTracking?.maxWeeklyHours ?? 60,
-          maxSessionHours: organization.settings?.timeTracking?.maxSessionHours ?? 8,
-          allowOvertime: organization.settings?.timeTracking?.allowOvertime ?? false,
-          requireDescription: organization.settings?.timeTracking?.requireDescription ?? true,
-          requireCategory: organization.settings?.timeTracking?.requireCategory ?? false,
-          allowFutureTime: organization.settings?.timeTracking?.allowFutureTime ?? false,
-          allowPastTime: organization.settings?.timeTracking?.allowPastTime ?? true,
-          pastTimeLimitDays: organization.settings?.timeTracking?.pastTimeLimitDays ?? 30,
+          allowTimeTracking: true,
+          allowManualTimeSubmission: true,
+          requireApproval: false,
+          allowBillableTime: true,
+          defaultHourlyRate: 0,
+          maxDailyHours: 12,
+          maxWeeklyHours: 60,
+          maxSessionHours: 8,
+          allowOvertime: false,
+          requireDescription: true,
+          requireCategory: false,
+          allowFutureTime: false,
+          allowPastTime: true,
+          pastTimeLimitDays: 30,
           roundingRules: {
-            enabled: organization.settings?.timeTracking?.roundingRules?.enabled ?? false,
-            increment: organization.settings?.timeTracking?.roundingRules?.increment ?? 15,
-            roundUp: organization.settings?.timeTracking?.roundingRules?.roundUp ?? true
+            enabled: false,
+            increment: 15,
+            roundUp: true
           },
           notifications: {
-            onTimerStart: organization.settings?.timeTracking?.notifications?.onTimerStart ?? false,
-            onTimerStop: organization.settings?.timeTracking?.notifications?.onTimerStop ?? true,
-            onOvertime: organization.settings?.timeTracking?.notifications?.onOvertime ?? true,
-            onApprovalNeeded: organization.settings?.timeTracking?.notifications?.onApprovalNeeded ?? true,
-            onTimeSubmitted: organization.settings?.timeTracking?.notifications?.onTimeSubmitted ?? true
+            onTimerStart: false,
+            onTimerStop: true,
+            onOvertime: true,
+            onApprovalNeeded: true,
+            onTimeSubmitted: true
           }
         }
       })
+
+      // Load time tracking settings from TimeTrackingSettings collection
+      const loadTimeTrackingSettings = async () => {
+        try {
+          const response = await fetch('/api/time-tracking/settings')
+          if (response.ok) {
+            const data = await response.json()
+            if (data.settings) {
+              setFormData(prev => ({
+                ...prev,
+                timeTracking: {
+                  allowTimeTracking: data.settings.allowTimeTracking ?? prev.timeTracking.allowTimeTracking,
+                  allowManualTimeSubmission: data.settings.allowManualTimeSubmission ?? prev.timeTracking.allowManualTimeSubmission,
+                  requireApproval: data.settings.requireApproval ?? prev.timeTracking.requireApproval,
+                  allowBillableTime: data.settings.allowBillableTime ?? prev.timeTracking.allowBillableTime,
+                  defaultHourlyRate: data.settings.defaultHourlyRate ?? prev.timeTracking.defaultHourlyRate,
+                  maxDailyHours: data.settings.maxDailyHours ?? prev.timeTracking.maxDailyHours,
+                  maxWeeklyHours: data.settings.maxWeeklyHours ?? prev.timeTracking.maxWeeklyHours,
+                  maxSessionHours: data.settings.maxSessionHours ?? prev.timeTracking.maxSessionHours,
+                  allowOvertime: data.settings.allowOvertime ?? prev.timeTracking.allowOvertime,
+                  requireDescription: data.settings.requireDescription ?? prev.timeTracking.requireDescription,
+                  requireCategory: data.settings.requireCategory ?? prev.timeTracking.requireCategory,
+                  allowFutureTime: data.settings.allowFutureTime ?? prev.timeTracking.allowFutureTime,
+                  allowPastTime: data.settings.allowPastTime ?? prev.timeTracking.allowPastTime,
+                  pastTimeLimitDays: data.settings.pastTimeLimitDays ?? prev.timeTracking.pastTimeLimitDays,
+                  roundingRules: data.settings.roundingRules ?? prev.timeTracking.roundingRules,
+                  notifications: data.settings.notifications ?? prev.timeTracking.notifications
+                }
+              }))
+              // Update rounding increment input if available
+              if (data.settings.roundingRules?.increment) {
+                setRoundingIncrementInput(data.settings.roundingRules.increment.toString())
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load time tracking settings:', error)
+        }
+      }
+
+      loadTimeTrackingSettings()
+      const orgIncrement = organization.settings?.timeTracking?.roundingRules?.increment
+      setRoundingIncrementInput(
+        typeof orgIncrement === 'number' && !Number.isNaN(orgIncrement) ? orgIncrement.toString() : '15'
+      )
       
       // Set logo previews if they exist
       if (organization.logo) {
@@ -282,7 +326,6 @@ export function OrganizationSettings() {
     try {
       const formDataToSend = new FormData()
       formDataToSend.append('data', JSON.stringify({
-        allowSelfRegistration: formData.allowSelfRegistration,
         requireEmailVerification: formData.requireEmailVerification,
         defaultUserRole: formData.defaultUserRole
       }))
@@ -311,14 +354,14 @@ export function OrganizationSettings() {
     setTimeTrackingMessage(null)
 
     try {
-      const formDataToSend = new FormData()
-      formDataToSend.append('data', JSON.stringify({
-        timeTracking: formData.timeTracking
-      }))
-
-      const response = await fetch('/api/organization', {
+      const response = await fetch('/api/time-tracking/settings', {
         method: 'PUT',
-        body: formDataToSend,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          settings: formData.timeTracking
+        }),
       })
 
       if (!response.ok) {
@@ -326,10 +369,23 @@ export function OrganizationSettings() {
         throw new Error(errorData.error || 'Failed to update time tracking settings')
       }
 
+      const data = await response.json()
+      
+      // Update form data with the saved settings to ensure consistency
+      if (data.settings) {
+        setFormData(prev => ({
+          ...prev,
+          timeTracking: data.settings
+        }))
+      }
+
       refetch()
       setTimeTrackingMessage({ type: 'success', text: 'Time tracking settings updated successfully' })
     } catch (error) {
-      setTimeTrackingMessage({ type: 'error', text: 'Failed to update time tracking settings' })
+      setTimeTrackingMessage({ 
+        type: 'error', 
+        text: error instanceof Error ? error.message : 'Failed to update time tracking settings' 
+      })
     } finally {
       setSavingTimeTracking(false)
     }
@@ -762,20 +818,6 @@ export function OrganizationSettings() {
         <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
             <div className="space-y-0.5 flex-1 min-w-0">
-              <Label className="text-xs sm:text-sm">Allow Self Registration</Label>
-              <p className="text-xs sm:text-sm text-muted-foreground break-words">
-                Allow users to register themselves without invitation
-              </p>
-            </div>
-            <Switch
-              checked={formData.allowSelfRegistration}
-              onCheckedChange={(checked) => setFormData({ ...formData, allowSelfRegistration: checked })}
-              className="flex-shrink-0"
-            />
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-            <div className="space-y-0.5 flex-1 min-w-0">
               <Label className="text-xs sm:text-sm">Require Email Verification</Label>
               <p className="text-xs sm:text-sm text-muted-foreground break-words">
                 Require users to verify their email address before accessing the system
@@ -1107,14 +1149,22 @@ export function OrganizationSettings() {
                       <Input
                         id="roundingIncrement"
                         type="number"
-                        value={formData.timeTracking.roundingRules.increment}
-                        onChange={(e) => setFormData({ 
-                          ...formData, 
-                          timeTracking: { 
-                            ...formData.timeTracking, 
-                            roundingRules: { ...formData.timeTracking.roundingRules, increment: Number(e.target.value) }
-                          }
-                        })}
+                        value={roundingIncrementInput}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          const parsedValue = Number(value)
+                          setRoundingIncrementInput(value)
+                          setFormData({ 
+                            ...formData, 
+                            timeTracking: { 
+                              ...formData.timeTracking, 
+                              roundingRules: { 
+                                ...formData.timeTracking.roundingRules, 
+                                increment: value === '' || Number.isNaN(parsedValue) ? 0 : parsedValue 
+                              }
+                            }
+                          })
+                        }}
                         min="1"
                         max="60"
                         className="text-xs sm:text-sm"

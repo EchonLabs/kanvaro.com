@@ -28,9 +28,11 @@ import {
   Bug,
   Wrench,
   Layers,
-  Circle
+  Circle,
+  Paperclip
 } from 'lucide-react'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { AttachmentList } from '@/components/ui/AttachmentList'
 
 interface Task {
   _id: string
@@ -57,6 +59,14 @@ interface Task {
   story?: {
     _id: string
     title: string
+    epic?: {
+      _id: string
+      title: string
+    }
+  }
+  sprint?: {
+    _id: string
+    name: string
   }
   parentTask?: {
     _id: string
@@ -78,6 +88,18 @@ interface Task {
     createdAt: string
     updatedAt: string
   }[]
+  attachments?: Array<{
+    name: string
+    url: string
+    size: number
+    type: string
+    uploadedAt?: string
+    uploadedBy?: {
+      firstName?: string
+      lastName?: string
+      email?: string
+    }
+  }>
 }
 
 export default function TaskDetailPage() {
@@ -270,31 +292,49 @@ export default function TaskDetailPage() {
     )
   }
 
+  const attachmentListItems = (task.attachments || []).map(attachment => ({
+    name: attachment.name,
+    url: attachment.url,
+    size: attachment.size,
+    type: attachment.type,
+    uploadedAt: attachment.uploadedAt || new Date().toISOString(),
+    uploadedBy:
+      attachment.uploadedBy
+        ? `${attachment.uploadedBy.firstName || ''} ${attachment.uploadedBy.lastName || ''}`.trim() ||
+          attachment.uploadedBy.email ||
+          'Unknown'
+        : 'Unknown'
+  }))
+
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={() => router.back()}>
+      <div className="space-y-6 overflow-x-hidden">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto min-w-0">
+            <Button variant="ghost" onClick={() => router.back()} className="w-full sm:w-auto flex-shrink-0">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground flex items-center space-x-2">
-                {getTypeIcon(task.type)}
-                <span>{task.title} {task.displayId}</span>
+            <div className="flex-1 min-w-0 w-full sm:w-auto">
+              <h1 
+                className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0"
+                title={`${task.title} ${task.displayId}`}
+              >
+                <span className="flex-shrink-0">{getTypeIcon(task.type)}</span>
+                <span className="truncate min-w-0">{task.title} {task.displayId}</span>
               </h1>
-              <p className="text-muted-foreground">Task Details</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Task Details</p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" onClick={() => router.push(`/tasks/${taskId}/edit`)}>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-shrink-0">
+            <Button variant="outline" onClick={() => router.push(`/tasks/${taskId}/edit`)} className="w-full sm:w-auto">
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
             <Button 
               variant="destructive" 
               onClick={() => setShowDeleteConfirmModal(true)}
+              className="w-full sm:w-auto"
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
@@ -440,6 +480,42 @@ export default function TaskDetailPage() {
                   )}
                 </div>
                 
+                {task.sprint?.name && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Sprint</span>
+                    <span
+                      className="font-medium truncate max-w-[200px]"
+                      title={task.sprint.name.length > 20 ? task.sprint.name : undefined}
+                    >
+                      {task.sprint.name.length > 20 ? `${task.sprint.name.slice(0, 20)}…` : task.sprint.name}
+                    </span>
+                  </div>
+                )}
+                
+                {task.story?.title && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Story</span>
+                    <span
+                      className="font-medium truncate max-w-[200px]"
+                      title={task.story.title.length > 20 ? task.story.title : undefined}
+                    >
+                      {task.story.title.length > 20 ? `${task.story.title.slice(0, 20)}…` : task.story.title}
+                    </span>
+                  </div>
+                )}
+                
+                {task.story?.epic?.title && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Epic</span>
+                    <span
+                      className="font-medium truncate max-w-[200px]"
+                      title={task.story.epic.title.length > 20 ? task.story.epic.title : undefined}
+                    >
+                      {task.story.epic.title.length > 20 ? `${task.story.epic.title.slice(0, 20)}…` : task.story.epic.title}
+                    </span>
+                  </div>
+                )}
+                
                 {task.assignedTo && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Assigned To</span>
@@ -498,6 +574,22 @@ export default function TaskDetailPage() {
                 </CardContent>
               </Card>
             )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Paperclip className="h-4 w-4" />
+                  <span>Attachments</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {attachmentListItems.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No attachments uploaded.</p>
+                ) : (
+                  <AttachmentList attachments={attachmentListItems} canDelete={false} />
+                )}
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader>

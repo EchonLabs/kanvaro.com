@@ -446,7 +446,7 @@ export default function KanbanBoard({ projectId, onCreateTask, onEditTask, onDel
           <div 
             className="grid gap-4 sm:gap-6 min-w-max sm:min-w-0"
             style={{
-              gridTemplateColumns: `repeat(${getColumns().length}, minmax(280px, 1fr))`,
+              gridTemplateColumns: `repeat(${getColumns().length}, minmax(320px, 1fr))`,
             }}
           >
           {getColumns().map((column) => {

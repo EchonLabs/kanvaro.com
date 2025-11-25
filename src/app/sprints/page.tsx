@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
-import { Progress } from '@/components/ui/Progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -40,7 +39,9 @@ import {
   Eye,
   Settings,
   Edit,
-  Trash2
+  Trash2,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react'
 
 interface Sprint {
@@ -68,12 +69,25 @@ interface Sprint {
     lastName: string
     email: string
   }
+  tasks?: string[]
+  stories?: string[]
+  attachments?: Array<{
+    name: string
+    url: string
+    size: number
+    type: string
+    uploadedBy: string
+    uploadedAt: string
+  }>
+  actualStartDate?: string
+  actualEndDate?: string
   progress: {
     completionPercentage: number
     tasksCompleted: number
     totalTasks: number
     storyPointsCompleted: number
     totalStoryPoints: number
+    storyPointsCompletionPercentage?: number
   }
   createdAt: string
   updatedAt: string
@@ -98,7 +112,19 @@ export default function SprintsPage() {
   const [availableSprintsLoading, setAvailableSprintsLoading] = useState(false)
   const [selectedTargetSprintId, setSelectedTargetSprintId] = useState('')
   const [completeError, setCompleteError] = useState('')
-  const [incompleteTasks, setIncompleteTasks] = useState<Array<{ _id: string; title: string; status: string }>>([])
+  const [incompleteTasks, setIncompleteTasks] = useState<Array<{ 
+    _id: string
+    title: string
+    status: string
+    subtasks?: Array<{
+      _id?: string
+      title: string
+      description?: string
+      status: string
+      isCompleted: boolean
+    }>
+  }>>([])
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
   const [newSprintForm, setNewSprintForm] = useState({
     name: '',
     startDate: '',
@@ -226,6 +252,38 @@ export default function SprintsPage() {
     return statusMap[status] || formatToTitleCase(status)
   }
 
+  const toggleTaskExpansion = (taskId: string) => {
+    setExpandedTasks(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(taskId)) {
+        newSet.delete(taskId)
+      } else {
+        newSet.add(taskId)
+      }
+      return newSet
+    })
+  }
+
+  const getIncompleteSubtasks = (task: typeof incompleteTasks[0]) => {
+    if (!task.subtasks || !Array.isArray(task.subtasks)) return []
+    return task.subtasks.filter((subtask: any) => {
+      const status = subtask.status || 'backlog'
+      return status !== 'done' && status !== 'completed' && !subtask.isCompleted
+    })
+  }
+
+  const TASK_STATUS_BADGE_MAP: Record<string, string> = {
+    backlog: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200',
+    todo: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+    in_progress: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+    review: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+    testing: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+    blocked: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+    done: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+    completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+    cancelled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+  }
+
   const loadAvailableSprints = useCallback(async (excludeSprintId: string) => {
     try {
       setAvailableSprintsLoading(true)
@@ -252,7 +310,18 @@ export default function SprintsPage() {
     }
   }, [])
 
-  const checkSprintForIncompleteTasks = async (sprintId: string): Promise<Array<{ _id: string; title: string; status: string }>> => {
+  const checkSprintForIncompleteTasks = async (sprintId: string): Promise<Array<{ 
+    _id: string
+    title: string
+    status: string
+    subtasks?: Array<{
+      _id?: string
+      title: string
+      description?: string
+      status: string
+      isCompleted: boolean
+    }>
+  }>> => {
     try {
       const response = await fetch(`/api/sprints/${sprintId}`)
       const data = await response.json()
@@ -267,7 +336,8 @@ export default function SprintsPage() {
         .map((task: any) => ({
           _id: task._id,
           title: task.title,
-          status: task.status
+          status: task.status,
+          subtasks: Array.isArray(task.subtasks) ? task.subtasks : []
         }))
     } catch (err) {
       console.error('Failed to check sprint tasks:', err)
@@ -341,6 +411,13 @@ export default function SprintsPage() {
     const data = await res.json().catch(() => ({}))
 
     if (!res.ok || !data.success) {
+      // If there are incomplete subtasks, format the error message
+      if (data.incompleteSubtasks && Array.isArray(data.incompleteSubtasks)) {
+        const taskList = data.incompleteSubtasks
+          .map((item: any) => `"${item.taskTitle}" (${item.incompleteSubtasks.length} incomplete)`)
+          .join(', ')
+        throw new Error(`Cannot complete sprint. Tasks with incomplete sub-tasks: ${taskList}`)
+      }
       throw new Error(data.error || 'Failed to complete sprint')
     }
 
@@ -483,8 +560,8 @@ export default function SprintsPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'planning': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'completed': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'active': return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
       case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
     }
@@ -539,7 +616,7 @@ export default function SprintsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 overflow-x-hidden">
+      <div className="space-y-8 sm:space-y-10 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Sprints</h1>
@@ -612,7 +689,29 @@ export default function SprintsPage() {
 
               <TabsContent value="grid" className="space-y-4">
                 <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredSprints.map((sprint) => (
+                  {filteredSprints.map((sprint) => {
+                    const totalTasks = sprint?.progress?.totalTasks ?? (Array.isArray(sprint?.tasks) ? sprint.tasks.length : 0)
+                    const hasTasks = (totalTasks ?? 0) > 0
+                    const completionPercentage = Math.min(
+                      100,
+                      Math.max(0, sprint?.progress?.completionPercentage ?? 0)
+                    )
+                    const storyPointsPercentage = (() => {
+                      if (typeof sprint?.progress?.storyPointsCompletionPercentage === 'number') {
+                        return Math.min(
+                          100,
+                          Math.max(0, sprint.progress.storyPointsCompletionPercentage)
+                        )
+                      }
+                      const completed = sprint?.progress?.storyPointsCompleted ?? 0
+                      const total = sprint?.progress?.totalStoryPoints ?? 0
+                      if (!total) return 0
+                      return Math.min(100, Math.max(0, Math.round((completed / total) * 100)))
+                    })()
+                    const storyPointsCompleted = sprint?.progress?.storyPointsCompleted ?? 0
+                    const totalStoryPoints = sprint?.progress?.totalStoryPoints ?? 0
+
+                    return (
                     <Card 
                       key={sprint._id} 
                       className="hover:shadow-md transition-shadow cursor-pointer overflow-x-hidden"
@@ -686,7 +785,15 @@ export default function SprintsPage() {
                             <span className="text-muted-foreground">Progress</span>
                             <span className="font-medium">{sprint?.progress?.completionPercentage || 0}%</span>
                           </div>
-                          <Progress value={sprint?.progress?.completionPercentage || 0} className="h-1.5 sm:h-2" />
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
+                            <div 
+                              className="bg-blue-600 dark:bg-blue-500 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
+                              style={{ 
+                                width: `${sprint?.progress?.completionPercentage || 0}%`,
+                                minWidth: sprint?.progress?.completionPercentage || 0 > 0 ? '2px' : '0'
+                              }}
+                            />
+                          </div>
                           <div className="text-xs text-muted-foreground">
                             {sprint?.progress?.tasksCompleted || 0} of {sprint?.progress?.totalTasks || 0} tasks completed
                           </div>
@@ -696,8 +803,17 @@ export default function SprintsPage() {
                           <div className="flex items-center justify-between text-xs sm:text-sm">
                             <span className="text-muted-foreground">Story Points</span>
                             <span className="font-medium">
-                              {sprint?.progress?.storyPointsCompleted || 0} / {sprint?.progress?.totalStoryPoints || 0}
+                              {storyPointsCompleted} / {totalStoryPoints}
                             </span>
+                          </div>
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
+                            <div
+                              className="bg-emerald-500 dark:bg-emerald-400 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
+                              style={{
+                                width: `${storyPointsPercentage}%`,
+                                minWidth: storyPointsPercentage > 0 ? '2px' : '0'
+                              }}
+                            />
                           </div>
                           <div className="flex items-center justify-between text-xs sm:text-sm">
                             <span className="text-muted-foreground">Velocity</span>
@@ -726,19 +842,20 @@ export default function SprintsPage() {
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                          {sprint.status === 'planning' && (
-                            <Button
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleSprintLifecycleAction(sprint._id, 'start')
-                              }}
-                              disabled={updatingSprintId === sprint._id}
-                            >
-                              <Play className="h-4 w-4 mr-1" />
-                              {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
-                            </Button>
-                          )}
+                        {sprint.status === 'planning' && (
+                          <Button
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleSprintLifecycleAction(sprint._id, 'start')
+                            }}
+                            disabled={updatingSprintId === sprint._id || !hasTasks}
+                            title={!hasTasks ? 'Add tasks to this sprint before starting it.' : undefined}
+                          >
+                            <Play className="h-4 w-4 mr-1" />
+                            {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
+                          </Button>
+                        )}
                           {sprint.status === 'active' && (
                             <Button
                               size="sm"
@@ -756,13 +873,36 @@ export default function SprintsPage() {
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
+                    )
+                  })}
                 </div>
               </TabsContent>
 
               <TabsContent value="list" className="space-y-4">
                 <div className="space-y-4">
-                  {filteredSprints.map((sprint) => (
+                  {filteredSprints.map((sprint) => {
+                    const totalTasks = sprint?.progress?.totalTasks ?? (Array.isArray(sprint?.tasks) ? sprint.tasks.length : 0)
+                    const hasTasks = (totalTasks ?? 0) > 0
+                    const completionPercentage = Math.min(
+                      100,
+                      Math.max(0, sprint?.progress?.completionPercentage ?? 0)
+                    )
+                    const storyPointsPercentage = (() => {
+                      if (typeof sprint?.progress?.storyPointsCompletionPercentage === 'number') {
+                        return Math.min(
+                          100,
+                          Math.max(0, sprint.progress.storyPointsCompletionPercentage)
+                        )
+                      }
+                      const completed = sprint?.progress?.storyPointsCompleted ?? 0
+                      const total = sprint?.progress?.totalStoryPoints ?? 0
+                      if (!total) return 0
+                      return Math.min(100, Math.max(0, Math.round((completed / total) * 100)))
+                    })()
+                    const storyPointsCompleted = sprint?.progress?.storyPointsCompleted ?? 0
+                    const totalStoryPoints = sprint?.progress?.totalStoryPoints ?? 0
+
+                    return (
                     <Card 
                       key={sprint?._id} 
                       className="hover:shadow-md transition-shadow cursor-pointer overflow-x-hidden"
@@ -772,7 +912,7 @@ export default function SprintsPage() {
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
                           <div className="flex-1 min-w-0 w-full">
                             <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2 mb-2">
-                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
+                              <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
                                 {getStatusIcon(sprint?.status)}
                                 <span className="ml-1 hidden sm:inline">{formatToTitleCase(sprint?.status)}</span>
                               </Badge>
@@ -818,7 +958,8 @@ export default function SprintsPage() {
                               e.stopPropagation()
                               handleSprintLifecycleAction(sprint._id, 'start')
                             }}
-                            disabled={updatingSprintId === sprint._id}
+                            disabled={updatingSprintId === sprint._id || !hasTasks}
+                            title={!hasTasks ? 'Add tasks to this sprint before starting it.' : undefined}
                           >
                             <Play className="h-4 w-4 mr-1" />
                             {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
@@ -842,11 +983,26 @@ export default function SprintsPage() {
                           </div>
                           <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
                             <div className="text-right sm:text-left">
-                              <div className="text-xs sm:text-sm font-medium text-foreground">{sprint?.progress?.completionPercentage || 0}%</div>
-                              <div className="w-16 sm:w-20 bg-gray-200 rounded-full h-1.5 sm:h-2">
+                              <div className="text-xs sm:text-sm font-medium text-foreground">{completionPercentage}%</div>
+                              <div className="w-16 sm:w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
                                 <div 
-                                  className="bg-blue-600 h-1.5 sm:h-2 rounded-full"
-                                  style={{ width: `${sprint?.progress?.completionPercentage || 0}%` }}
+                                  className="bg-blue-600 dark:bg-blue-500 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
+                                  style={{ 
+                                    width: `${completionPercentage}%`,
+                                    minWidth: completionPercentage > 0 ? '2px' : '0'
+                                  }}
+                                />
+                              </div>
+                              <div className="text-[11px] text-muted-foreground mt-1">
+                                Story Points: {storyPointsCompleted} / {totalStoryPoints}
+                              </div>
+                              <div className="w-16 sm:w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden mt-1">
+                                <div
+                                  className="bg-emerald-500 dark:bg-emerald-400 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
+                                  style={{
+                                    width: `${storyPointsPercentage}%`,
+                                    minWidth: storyPointsPercentage > 0 ? '2px' : '0'
+                                  }}
                                 />
                               </div>
                             </div>
@@ -863,13 +1019,6 @@ export default function SprintsPage() {
                                 }}>
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Sprint
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/sprints/${sprint._id}?tab=settings`)
-                                }}>
-                                  <Settings className="h-4 w-4 mr-2" />
-                                  Settings
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={(e) => {
                                   e.stopPropagation()
@@ -897,7 +1046,8 @@ export default function SprintsPage() {
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
+                    )
+                  })}
                 </div>
               </TabsContent>
             </Tabs>
@@ -914,6 +1064,7 @@ export default function SprintsPage() {
               setCompletionMode('existing')
               setCompletingSprintId(null)
               setIncompleteTasks([])
+              setExpandedTasks(new Set())
               return
             }
             setCompleteModalOpen(true)
@@ -937,6 +1088,7 @@ export default function SprintsPage() {
                   setCompletionMode('existing')
                   setCompletingSprintId(null)
                   setIncompleteTasks([])
+                  setExpandedTasks(new Set())
                 }}
                 disabled={updatingSprintId === completingSprintId}
               >
@@ -974,17 +1126,91 @@ export default function SprintsPage() {
                   <Label className="text-sm font-medium text-foreground">
                     Incomplete Tasks
                   </Label>
-                  <div className="mt-2 space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {incompleteTasks.map(task => (
-                      <div key={task._id} className="rounded-md border bg-muted/40 px-3 py-2">
-                        <p className="text-sm font-medium truncate" title={task.title}>
-                          {task.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Current status: {formatTaskStatusLabel(task.status)}
-                        </p>
-                      </div>
-                    ))}
+                  <div className="mt-2 space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {incompleteTasks.map(task => {
+                      const incompleteSubtasks = getIncompleteSubtasks(task)
+                      const hasIncompleteSubtasks = incompleteSubtasks.length > 0
+                      const isExpanded = expandedTasks.has(task._id)
+                      
+                      return (
+                        <div key={task._id} className="rounded-md border bg-muted/40 px-3 py-2 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              {hasIncompleteSubtasks && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    toggleTaskExpansion(task._id)
+                                  }}
+                                  className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-all hover:scale-110 active:scale-95 p-0.5 rounded hover:bg-muted/50"
+                                  aria-label={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
+                                  title={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4 transition-transform" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4 transition-transform" />
+                                  )}
+                                </button>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate" title={task.title}>
+                                  {task.title}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Current status: {formatTaskStatusLabel(task.status)}
+                                </p>
+                                {hasIncompleteSubtasks && (
+                                  <p className="text-xs font-medium text-orange-600 dark:text-orange-400 mt-1">
+                                    {incompleteSubtasks.length} incomplete sub-task{incompleteSubtasks.length === 1 ? '' : 's'}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {isExpanded && hasIncompleteSubtasks && (
+                            <div className="ml-6 space-y-2 border-l-2 border-primary/20 dark:border-primary/30 pl-3 pt-1 overflow-hidden transition-all duration-300 ease-in-out">
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                                Incomplete Sub-tasks
+                              </p>
+                              <div className="space-y-2">
+                                {incompleteSubtasks.map((subtask: any, index: number) => (
+                                  <div
+                                    key={subtask._id || `subtask-${index}`}
+                                    className="rounded-md border p-2.5 space-y-1.5 transition-all hover:shadow-sm bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800"
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex items-start gap-2 flex-1 min-w-0">
+                                        <AlertTriangle className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-xs font-medium text-foreground" title={subtask.title}>
+                                            {subtask.title}
+                                          </p>
+                                          {subtask.description && (
+                                            <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                                              {subtask.description}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <Badge
+                                        className={`${
+                                          TASK_STATUS_BADGE_MAP[subtask.status] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                                        } text-[10px] flex-shrink-0`}
+                                      >
+                                        {formatTaskStatusLabel(subtask.status)}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
 

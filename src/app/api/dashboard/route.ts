@@ -30,26 +30,45 @@ export async function GET(request: NextRequest) {
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
 
-    // Get projects where user is creator or team member
+    // Get all projects in organization (for organization-wide stats)
     const projectsQuery = {
       organization: organizationId,
+      is_deleted: { $ne: true }
+    }
+
+    // Get projects where user is creator or team member (for user-specific views)
+    const userProjectsQuery = {
+      organization: organizationId,
+      is_deleted: { $ne: true },
       $or: [
         { createdBy: userId },
         { teamMembers: userId }
       ]
     }
 
-    // Get tasks assigned to or created by the user
+    // Get all tasks in organization (for organization-wide stats)
     const tasksQuery = {
       organization: organizationId,
+      is_deleted: { $ne: true }
+    }
+
+    // Get tasks assigned to or created by the user (for user-specific views)
+    const userTasksQuery = {
+      organization: organizationId,
+      is_deleted: { $ne: true },
       $or: [
         { assignedTo: userId },
         { createdBy: userId }
       ]
     }
 
-    // Get time entries for the user
+    // Get all time entries in organization (for organization-wide stats)
     const timeEntriesQuery = {
+      organization: organizationId
+    }
+
+    // Get time entries for the user (for user-specific views)
+    const userTimeEntriesQuery = {
       user: userId,
       organization: organizationId
     }
@@ -67,52 +86,55 @@ export async function GET(request: NextRequest) {
       recentTasks,
       teamActivity
     ] = await Promise.all([
-      // Get all projects for stats
+      // Get all projects for stats (organization-wide)
       Project.find(projectsQuery)
         .populate('createdBy', 'firstName lastName email')
         .populate('teamMembers', 'firstName lastName email')
         .populate('client', 'firstName lastName email'),
 
-      // Get all tasks for stats
+      // Get all tasks for stats (organization-wide)
       Task.find(tasksQuery)
         .populate('assignedTo', 'firstName lastName email')
         .populate('createdBy', 'firstName lastName email')
         .populate('project', 'name'),
 
-      // Get time entries for stats
+      // Get all time entries for stats (organization-wide)
       TimeEntry.find(timeEntriesQuery)
         .populate('project', 'name')
         .populate('task', 'title'),
 
-      // Get team members count
-      User.countDocuments({ organization: organizationId }),
+      // Get active team members count (only active users)
+      User.countDocuments({ 
+        organization: organizationId,
+        isActive: true
+      }),
 
-      // Get active projects count
+      // Get active projects count (organization-wide)
       Project.countDocuments({
         ...projectsQuery,
         status: 'active'
       }),
 
-      // Get completed tasks this month
+      // Get completed tasks this month (organization-wide)
       Task.countDocuments({
         ...tasksQuery,
-        status: 'done',
+        status: { $in: ['done', 'completed'] },
         completedAt: { $gte: startOfMonth }
       }),
 
-      // Get time tracking stats
-      getTimeStats(userId, organizationId, startOfDay, startOfWeek, startOfMonth, now),
+      // Get time tracking stats (organization-wide)
+      getTimeStats(organizationId, startOfDay, startOfWeek, startOfMonth, now),
 
-      // Get recent projects (last 4)
-      Project.find(projectsQuery)
+      // Get recent projects (user-specific, last 4)
+      Project.find(userProjectsQuery)
         .populate('createdBy', 'firstName lastName email')
         .populate('teamMembers', 'firstName lastName email')
         .populate('client', 'firstName lastName email')
         .sort({ updatedAt: -1 })
         .limit(4),
 
-      // Get recent tasks (last 5)
-      Task.find(tasksQuery)
+      // Get recent tasks (user-specific, last 5)
+      Task.find(userTasksQuery)
         .populate('assignedTo', 'firstName lastName email')
         .populate('createdBy', 'firstName lastName email')
         .populate('project', 'name')
@@ -152,7 +174,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Calculate changes from last month
-    const lastMonthStats = await getLastMonthStats(userId, organizationId, startOfLastMonth, endOfLastMonth)
+    const lastMonthStats = await getLastMonthStats(organizationId, startOfLastMonth, endOfLastMonth)
     const changes = {
       activeProjects: activeProjects - lastMonthStats.activeProjects,
       completedTasks: completedTasks - lastMonthStats.completedTasks,
@@ -181,12 +203,11 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function getTimeStats(userId: string, organizationId: string, startOfDay: Date, startOfWeek: Date, startOfMonth: Date, endDate: Date) {
+async function getTimeStats(organizationId: string, startOfDay: Date, startOfWeek: Date, startOfMonth: Date, endDate: Date) {
   const [todayStats, weekStats, monthStats] = await Promise.all([
     TimeEntry.aggregate([
       {
         $match: {
-          user: userId,
           organization: organizationId,
           startTime: { $gte: startOfDay, $lte: endDate },
           status: 'completed'
@@ -196,14 +217,21 @@ async function getTimeStats(userId: string, organizationId: string, startOfDay: 
         $group: {
           _id: null,
           totalDuration: { $sum: '$duration' },
-          totalCost: { $sum: '$cost' }
+          totalCost: { 
+            $sum: { 
+              $cond: [
+                { $and: ['$hourlyRate', '$duration', { $eq: ['$isBillable', true] }] },
+                { $multiply: [{ $divide: ['$hourlyRate', 60] }, '$duration'] },
+                0
+              ]
+            }
+          }
         }
       }
     ]),
     TimeEntry.aggregate([
       {
         $match: {
-          user: userId,
           organization: organizationId,
           startTime: { $gte: startOfWeek, $lte: endDate },
           status: 'completed'
@@ -213,14 +241,21 @@ async function getTimeStats(userId: string, organizationId: string, startOfDay: 
         $group: {
           _id: null,
           totalDuration: { $sum: '$duration' },
-          totalCost: { $sum: '$cost' }
+          totalCost: { 
+            $sum: { 
+              $cond: [
+                { $and: ['$hourlyRate', '$duration', { $eq: ['$isBillable', true] }] },
+                { $multiply: [{ $divide: ['$hourlyRate', 60] }, '$duration'] },
+                0
+              ]
+            }
+          }
         }
       }
     ]),
     TimeEntry.aggregate([
       {
         $match: {
-          user: userId,
           organization: organizationId,
           startTime: { $gte: startOfMonth, $lte: endDate },
           status: 'completed'
@@ -230,7 +265,15 @@ async function getTimeStats(userId: string, organizationId: string, startOfDay: 
         $group: {
           _id: null,
           totalDuration: { $sum: '$duration' },
-          totalCost: { $sum: '$cost' }
+          totalCost: { 
+            $sum: { 
+              $cond: [
+                { $and: ['$hourlyRate', '$duration', { $eq: ['$isBillable', true] }] },
+                { $multiply: [{ $divide: ['$hourlyRate', 60] }, '$duration'] },
+                0
+              ]
+            }
+          }
         }
       }
     ])
@@ -254,30 +297,26 @@ async function getTimeStats(userId: string, organizationId: string, startOfDay: 
   }
 }
 
-async function getLastMonthStats(userId: string, organizationId: string, startOfLastMonth: Date, endOfLastMonth: Date) {
+async function getLastMonthStats(organizationId: string, startOfLastMonth: Date, endOfLastMonth: Date) {
   const [activeProjects, completedTasks, teamMembers, hoursTracked] = await Promise.all([
     Project.countDocuments({
       organization: organizationId,
-      $or: [
-        { createdBy: userId },
-        { teamMembers: userId }
-      ],
+      is_deleted: { $ne: true },
       status: 'active'
     }),
     Task.countDocuments({
       organization: organizationId,
-      $or: [
-        { assignedTo: userId },
-        { createdBy: userId }
-      ],
-      status: 'done',
+      is_deleted: { $ne: true },
+      status: { $in: ['done', 'completed'] },
       completedAt: { $gte: startOfLastMonth, $lte: endOfLastMonth }
     }),
-    User.countDocuments({ organization: organizationId }),
+    User.countDocuments({ 
+      organization: organizationId,
+      isActive: true
+    }),
     TimeEntry.aggregate([
       {
         $match: {
-          user: userId,
           organization: organizationId,
           startTime: { $gte: startOfLastMonth, $lte: endOfLastMonth },
           status: 'completed'

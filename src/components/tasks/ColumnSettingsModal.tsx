@@ -169,8 +169,13 @@ export default function ColumnSettingsModal({
     if (isOpen) {
       // Sort columns by order to ensure consistent display
       const sortedColumns = [...currentColumns].sort((a, b) => (a.order || 0) - (b.order || 0))
-      setColumns(sortedColumns)
-      setOriginalColumns(JSON.parse(JSON.stringify(sortedColumns))) // Deep copy
+      const normalizedColumns = sortedColumns.map(column =>
+        column.key === 'backlog'
+          ? { ...column, color: backlogColumnColor }
+          : column
+      )
+      setColumns(normalizedColumns)
+      setOriginalColumns(JSON.parse(JSON.stringify(normalizedColumns))) // Deep copy
       setError('')
       setSuccess('')
       
@@ -207,6 +212,8 @@ export default function ColumnSettingsModal({
     'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200',
     'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200',
   ]
+
+  const backlogColumnColor = 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100'
 
   // Get the next available color that's not already used
   const getNextAvailableColor = (existingColumns: typeof columns): string => {

@@ -193,6 +193,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Duplicate prevention: Check for existing project with same name by same user (excluding deleted projects)
+    // Optimized query - only select needed fields, use lean for faster query
     if (name && name.trim()) {
       const existingProject = await Project.findOne({
         name: name.trim(),
@@ -203,7 +204,7 @@ export async function POST(request: NextRequest) {
           { isDraft: false },
           { isDraft: isDraft } // Only check draft status if we're creating a draft
         ]
-      })
+      }).select('_id').lean() // Only select _id, use lean for faster query
 
       if (existingProject) {
         return NextResponse.json(
@@ -262,38 +263,41 @@ export async function POST(request: NextRequest) {
         customFields: customFields || {}
       })
 
+      // Save and populate in one operation
       await project.save()
+      await project.populate([
+        { path: 'createdBy', select: 'firstName lastName email' },
+        { path: 'teamMembers', select: 'firstName lastName email' },
+        { path: 'client', select: 'firstName lastName email' }
+      ])
 
-      // Populate the created project
-      const populatedProject = await Project.findById(project._id)
-        .populate('createdBy', 'firstName lastName email')
-        .populate('teamMembers', 'firstName lastName email')
-        .populate('client', 'firstName lastName email')
-
-      // Send notifications to team members
-      if (teamMembers && teamMembers.length > 0) {
-        try {
-          const createdByUser = await User.findById(userId).select('firstName lastName')
-          const createdByName = createdByUser ? `${createdByUser.firstName} ${createdByUser.lastName}` : 'Someone'
-          
-          await notificationService.notifyProjectUpdate(
-            project._id.toString(),
-            'created',
-            teamMembers,
-            organizationId,
-            name || 'Untitled Project'
-          )
-        } catch (notificationError) {
-          console.error('Failed to send project creation notifications:', notificationError)
-          // Don't fail the project creation if notification fails
-        }
-      }
-
-      return {
+      // Return response immediately - send notifications asynchronously
+      const response = {
         success: true,
         message: 'Project created successfully',
-        data: populatedProject
+        data: project.toObject()
       }
+
+      // Send notifications asynchronously (non-blocking)
+      if (teamMembers && teamMembers.length > 0) {
+        // Run in background without blocking the response
+        ;(async () => {
+          try {
+            await notificationService.notifyProjectUpdate(
+              project._id.toString(),
+              'created',
+              teamMembers,
+              organizationId,
+              name || 'Untitled Project'
+            )
+          } catch (notificationError) {
+            console.error('Failed to send project creation notifications (non-blocking):', notificationError)
+            // Don't fail the project creation if notification fails
+          }
+        })()
+      }
+
+      return response
     })()
 
     // Store the promise in pending requests

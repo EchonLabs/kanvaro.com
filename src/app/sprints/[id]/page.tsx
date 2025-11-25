@@ -7,13 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
-import { Progress } from '@/components/ui/Progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
+import { useProjectKanbanStatuses } from '@/hooks/useProjectKanbanStatuses'
+import { DEFAULT_TASK_STATUS_OPTIONS, DEFAULT_TASK_STATUS_BADGE_MAP, type TaskStatusOption } from '@/constants/taskStatuses'
 import { 
   ArrowLeft,
   Calendar,
@@ -93,6 +94,10 @@ interface Sprint {
       email: string
   } | null
   archived?: boolean
+  movedToSprint?: {
+    _id: string
+    name: string
+  } | null
   }>
   createdAt: string
   updatedAt: string
@@ -109,31 +114,6 @@ interface SprintOption {
     name: string
   }
 }
-
-const TASK_STATUS_OPTIONS = [
-  { value: 'backlog', label: 'Backlog' },
-  { value: 'todo', label: 'To Do' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'review', label: 'In Review' },
-  { value: 'testing', label: 'Testing' },
-  { value: 'done', label: 'Done' },
-  { value: 'cancelled', label: 'Cancelled' }
-]
-
-const TASK_STATUS_BADGE_MAP: Record<string, string> = {
-  backlog: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200',
-  todo: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  in_progress: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-  review: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-  testing: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-  blocked: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-  done: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  cancelled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-}
-
-const formatTaskStatusLabel = (status: string) =>
-  TASK_STATUS_OPTIONS.find(option => option.value === status)?.label || formatToTitleCase(status)
 
 const buildTaskSummaryFromTasks = (tasks?: Sprint['tasks']) => {
   if (!tasks) {
@@ -222,6 +202,7 @@ export default function SprintDetailPage() {
   })
   const [taskStatusUpdating, setTaskStatusUpdating] = useState<string | null>(null)
   const [taskStatusError, setTaskStatusError] = useState('')
+  const { getStatusesForProject } = useProjectKanbanStatuses()
 
   useEffect(() => {
     if (!successMessage) return
@@ -231,10 +212,83 @@ export default function SprintDetailPage() {
 
   const sprintTasks = sprint?.tasks || []
 
+  const projectStatusOptions = useMemo<TaskStatusOption[]>(() => {
+    if (!sprint?.project?._id) {
+      return DEFAULT_TASK_STATUS_OPTIONS
+    }
+    const statuses = getStatusesForProject(sprint.project._id)
+    if (statuses?.length) {
+      return statuses.map(status => ({
+        value: status.key,
+        label: status.title || formatToTitleCase(status.key),
+        color: status.color
+      }))
+    }
+    return DEFAULT_TASK_STATUS_OPTIONS
+  }, [sprint?.project?._id, getStatusesForProject])
+
+  const formatTaskStatusLabel = useCallback(
+    (status: string) => {
+      const option = projectStatusOptions.find(opt => opt.value === status)
+      return option?.label || formatToTitleCase(status)
+    },
+    [projectStatusOptions]
+  )
+
+  const getTaskStatusBadgeClass = useCallback(
+    (status: string) => {
+      const option = projectStatusOptions.find(opt => opt.value === status)
+      return option?.color || DEFAULT_TASK_STATUS_BADGE_MAP[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+    },
+    [projectStatusOptions]
+  )
+
   const incompleteTasks = useMemo(
     () => sprintTasks.filter(task => !['done', 'completed'].includes(task.status)),
     [sprintTasks]
   )
+
+  // Calculate task counts per status based on project's custom statuses
+  const taskBreakdownByStatus = useMemo(() => {
+    const breakdown: Array<{ status: string; label: string; count: number; color?: string }> = []
+    
+    if (!sprintTasks.length) return breakdown
+
+    // Get all unique statuses from tasks
+    const taskStatuses = new Set(sprintTasks.map(task => task.status))
+    
+    // For each status in project's configuration, count tasks
+    projectStatusOptions.forEach(option => {
+      if (taskStatuses.has(option.value)) {
+        const count = sprintTasks.filter(task => task.status === option.value).length
+        if (count > 0) {
+          breakdown.push({
+            status: option.value,
+            label: option.label,
+            count,
+            color: option.color
+          })
+        }
+      }
+    })
+    
+    // Also include any task statuses that aren't in the project config (fallback)
+    taskStatuses.forEach(status => {
+      if (!projectStatusOptions.find(opt => opt.value === status)) {
+        const count = sprintTasks.filter(task => task.status === status).length
+        if (count > 0) {
+          breakdown.push({
+            status,
+            label: formatToTitleCase(status),
+            count,
+            color: DEFAULT_TASK_STATUS_BADGE_MAP[status]
+          })
+        }
+      }
+    })
+    
+    return breakdown
+  }, [sprintTasks, projectStatusOptions])
 
   const isCompleteConfirmDisabled = useMemo(() => {
     if (completingSprint) return true
@@ -503,6 +557,10 @@ export default function SprintDetailPage() {
 
   const handleTaskStatusChange = async (taskId: string, newStatus: string) => {
     try {
+      if (!projectStatusOptions.some(option => option.value === newStatus)) {
+        setTaskStatusError('Selected status is not available for this project.')
+        return
+      }
       setTaskStatusUpdating(taskId)
       setTaskStatusError('')
       const response = await fetch(`/api/tasks/${taskId}`, {
@@ -609,20 +667,20 @@ export default function SprintDetailPage() {
     <MainLayout>
       <div className="space-y-6 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
-            <Button variant="ghost" onClick={() => router.push('/sprints')} className="w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto min-w-0">
+            <Button variant="ghost" onClick={() => router.push('/sprints')} className="w-full sm:w-auto flex-shrink-0">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 w-full sm:w-auto">
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0">
-                <Target className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-blue-600 flex-shrink-0" />
-                <span className="truncate" title={sprint?.name}>{sprint?.name}</span>
+                <Target className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-blue-600 flex-shrink-0" />
+                <span className="truncate min-w-0" title={sprint?.name}>{sprint?.name}</span>
               </h1>
               <p className="text-xs sm:text-sm text-muted-foreground">Sprint Details</p>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-shrink-0">
             <Button variant="outline" onClick={() => router.push(`/sprints/${sprintId}/edit`)} className="w-full sm:w-auto">
               <Edit className="h-4 w-4 mr-2" />
               Edit
@@ -715,7 +773,15 @@ export default function SprintDetailPage() {
                     <span className="text-muted-foreground">Overall Progress</span>
                     <span className="font-medium">{sprint?.progress?.completionPercentage || 0}%</span>
                   </div>
-                  <Progress value={sprint?.progress?.completionPercentage || 0} className="h-1.5 sm:h-2" />
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
+                    <div 
+                      className="bg-blue-600 dark:bg-blue-500 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
+                      style={{ 
+                        width: `${Math.min(100, Math.max(0, sprint?.progress?.completionPercentage || 0))}%`,
+                        minWidth: sprint?.progress?.completionPercentage && sprint.progress.completionPercentage > 0 ? '2px' : '0'
+                      }}
+                    />
+                  </div>
                 </div>
 
                 {!sprint?.progress?.totalTasks && (
@@ -782,48 +848,26 @@ export default function SprintDetailPage() {
                     <div className="space-y-3">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">Task Breakdown</p>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {/* Total card */}
                         <div className="rounded-md border bg-background px-3 py-2">
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <span>Total</span>
                             <List className="h-3.5 w-3.5" />
                           </div>
-                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.total ?? 0}</p>
+                          <p className="mt-1 text-base font-semibold">{sprintTasks.length}</p>
                         </div>
-                        <div className="rounded-md border bg-background px-3 py-2">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>In Progress</span>
-                            <PauseCircle className="h-3.5 w-3.5 text-blue-500" />
+                        {/* Dynamic status cards based on project's custom statuses */}
+                        {taskBreakdownByStatus.map(({ status, label, count, color }) => (
+                          <div key={status} className="rounded-md border bg-background px-3 py-2">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span className="truncate">{label}</span>
+                              <Badge className={`${color || DEFAULT_TASK_STATUS_BADGE_MAP[status] || 'bg-gray-100 text-gray-800'} h-3.5 px-1.5 text-[10px]`}>
+                                {count}
+                              </Badge>
+                            </div>
+                            <p className="mt-1 text-base font-semibold">{count}</p>
                           </div>
-                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.inProgress ?? 0}</p>
-                        </div>
-                        <div className="rounded-md border bg-background px-3 py-2">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>To do</span>
-                            <Target className="h-3.5 w-3.5 text-slate-500" />
-                          </div>
-                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.todo ?? 0}</p>
-                        </div>
-                        <div className="rounded-md border bg-background px-3 py-2">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>Completed</span>
-                            <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
-                          </div>
-                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.completed ?? 0}</p>
-                        </div>
-                        <div className="rounded-md border bg-background px-3 py-2">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>Blocked</span>
-                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-                          </div>
-                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.blocked ?? 0}</p>
-                        </div>
-                        <div className="rounded-md border bg-background px-3 py-2">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>Cancelled</span>
-                            <XCircle className="h-3.5 w-3.5 text-red-500" />
-                          </div>
-                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.cancelled ?? 0}</p>
-                        </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -835,7 +879,7 @@ export default function SprintDetailPage() {
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-base sm:text-lg">Sprint Tasks</CardTitle>
                 <CardDescription className="text-xs sm:text-sm">
-                  {sprintTasks.length} task{sprintTasks.length === 1 ? '' : 's'}
+                  {sprintTasks.length} task{sprintTasks.length === 1 ? '' : 's'} {sprint?.status === 'completed' ? '(including completed and spillover tasks)' : ''}
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 sm:p-6 pt-0 space-y-4">
@@ -847,7 +891,7 @@ export default function SprintDetailPage() {
 
                 {sprintTasks.length === 0 ? (
                   <p className="text-sm sm:text-base text-muted-foreground">
-                    No tasks are currently assigned to this sprint.
+                    No tasks {sprint?.status === 'completed' ? 'were' : 'are currently'} assigned to this sprint.
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
@@ -868,6 +912,11 @@ export default function SprintDetailPage() {
                                 ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}`
                                 : 'Unassigned'}
                             </p>
+                            {task.movedToSprint && (
+                              <p className="text-xs font-medium text-orange-600 dark:text-orange-400 mt-1">
+                                Moved to: {task.movedToSprint.name}
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-[11px] uppercase">
@@ -878,39 +927,53 @@ export default function SprintDetailPage() {
                                 Archived
                               </Badge>
                             )}
+                            {task.movedToSprint && (
+                              <Badge variant="outline" className="text-[11px] bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400 border-orange-200 dark:border-orange-800">
+                                Spillover
+                              </Badge>
+                            )}
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <Badge className={`${TASK_STATUS_BADGE_MAP[task.status] || 'bg-gray-100 text-gray-800'} text-[11px]`}>
+                          <Badge className={`${getTaskStatusBadgeClass(task.status)} text-[11px]`}>
                             {formatTaskStatusLabel(task.status)}
                           </Badge>
                         </div>
 
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">Status</Label>
-                          <Select
-                            value={task.status}
-                            onValueChange={(value) => handleTaskStatusChange(task._id, value)}
-                            disabled={taskStatusUpdating === task._id || task.archived}
-                          >
-                            <SelectTrigger className="text-sm">
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {TASK_STATUS_OPTIONS.map(option => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {task.archived && (
+                        {!task.movedToSprint && (
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Status</Label>
+                            <Select
+                              value={task.status}
+                              onValueChange={(value) => handleTaskStatusChange(task._id, value)}
+                              disabled={taskStatusUpdating === task._id || task.archived}
+                            >
+                              <SelectTrigger className="text-sm">
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {projectStatusOptions.map(option => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {task.archived && (
+                              <p className="text-xs text-muted-foreground">
+                                This task is archived and no longer appears on active boards.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {task.movedToSprint && (
+                          <div className="rounded-md border bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800 p-2">
                             <p className="text-xs text-muted-foreground">
-                              This task is archived and no longer appears on active boards.
+                              This task has been moved to <span className="font-medium text-orange-700 dark:text-orange-400">{task.movedToSprint.name}</span>
                             </p>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

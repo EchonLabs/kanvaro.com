@@ -170,7 +170,7 @@ export default function DashboardPage() {
   return (
     <MainLayout>
       <PageContent>
-        <div className="space-y-6 overflow-x-hidden">
+        <div className="space-y-8 sm:space-y-10 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex-1 min-w-0 w-full sm:w-auto">
             <DashboardHeader user={user} />
@@ -202,7 +202,7 @@ export default function DashboardPage() {
         )}
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+          <div className="lg:col-span-2 flex flex-col gap-6 sm:gap-8">
             <StatsCards 
               stats={dashboardData?.stats} 
               changes={dashboardData?.changes}
@@ -222,7 +222,7 @@ export default function DashboardPage() {
             />
           </div>
           
-          <div className="space-y-4 sm:space-y-6">
+          <div className="flex flex-col gap-6 sm:gap-8">
             {user.id && user.organization && (
               <TimeTrackingWidget 
                 userId={user.id} 

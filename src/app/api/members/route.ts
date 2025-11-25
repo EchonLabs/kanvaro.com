@@ -79,7 +79,9 @@ export async function GET(request: NextRequest) {
       organization: organizationId,
       isAccepted: false,
       expiresAt: { $gt: new Date() }
-    }).populate('invitedBy', 'firstName lastName email')
+    })
+      .populate('invitedBy', 'firstName lastName email')
+      .populate('customRole', 'name')
 
     return NextResponse.json({
       success: true,

@@ -35,8 +35,7 @@ import {
   Settings,
   Edit,
   Trash2,
-  Eye,
-  ArrowLeft
+  Eye
 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 
@@ -296,25 +295,20 @@ export default function ProjectsPage() {
   return (
     <MainLayout>
       <PageContent>
-        <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" size="sm" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Projects</h1>
-            <p className="text-muted-foreground">Manage and track your projects</p>
-          </div>
+        <div className="space-y-6 sm:space-y-8 lg:space-y-10">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">Projects</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage and track your projects</p>
         </div>
         <PermissionGate permission={Permission.PROJECT_CREATE}>
           <Button 
             onClick={() => router.push('/projects/create')}
-            className="flex items-center justify-center gap-2 w-full sm:w-auto hover:bg-primary/90 hover:shadow-lg hover:scale-105 transition-all duration-200"
+            className="flex items-center justify-center gap-2 w-full sm:w-auto text-sm sm:text-base hover:bg-primary/90 hover:shadow-lg transition-all duration-200"
           >
             <Plus className="h-4 w-4" />
-            Create New Project
+            <span className="sm:inline">Create New Project</span>
+            <span className="sm:hidden">New Project</span>
           </Button>
         </PermissionGate>
       </div>
@@ -327,29 +321,29 @@ export default function ProjectsPage() {
       )}
 
       <Card>
-        <CardHeader>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+        <CardHeader className="p-4 sm:p-6">
+          <div className="space-y-3 sm:space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <CardTitle>All Projects</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-lg sm:text-xl">All Projects</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
                   {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''} found
                 </CardDescription>
               </div>
             </div>
-            <div className="flex flex-col gap-2 sm:gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <div className="flex flex-col gap-2 sm:gap-3">
+              <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <Input
                   placeholder="Search projects..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-full"
+                  className="pl-10 w-full text-sm sm:text-base"
                 />
               </div>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full sm:w-40">
+                  <SelectTrigger className="w-full sm:w-[140px] text-sm">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -362,7 +356,7 @@ export default function ProjectsPage() {
                   </SelectContent>
                 </Select>
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                  <SelectTrigger className="w-full sm:w-40">
+                  <SelectTrigger className="w-full sm:w-[140px] text-sm">
                     <SelectValue placeholder="Priority" />
                   </SelectTrigger>
                   <SelectContent>
@@ -377,11 +371,11 @@ export default function ProjectsPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6 pt-0">
           <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'grid' | 'list')}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="grid">Grid View</TabsTrigger>
-              <TabsTrigger value="list">List View</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
+              <TabsTrigger value="grid" className="text-xs sm:text-sm">Grid View</TabsTrigger>
+              <TabsTrigger value="list" className="text-xs sm:text-sm">List View</TabsTrigger>
             </TabsList>
 
             {success && (
@@ -391,56 +385,51 @@ export default function ProjectsPage() {
               </Alert>
             )}
 
-            <TabsContent value="grid" className="space-y-4">
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <TabsContent value="grid" className="space-y-4 mt-0">
+              <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredProjects.map((project) => (
                   <Card 
                     key={project._id} 
-                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    className="hover:shadow-md transition-shadow cursor-pointer flex flex-col"
                     onClick={() => router.push(`/projects/${project._id}`)}
                   >
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center min-w-0">
+                    <CardHeader className="p-4 sm:p-6 pb-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1.5 min-w-0 flex-1">
+                          <div className="flex items-start gap-2 min-w-0">
                             <div className="flex-1 min-w-0">
-                              <CardTitle className="text-lg min-w-0">
-                                <span
-                                  className="sm:hidden block truncate"
-                                  title={project.name && project.name.length > 10 ? project.name : undefined}
-                                >
-                                  {project.name && project.name.length > 10 ? `${project.name.slice(0, 10)}…` : project.name}
-                                </span>
-                                <span
-                                  className="hidden sm:inline truncate"
-                                  title={project.name && project.name.length > 10 ? project.name : undefined}
-                                >
-                                  {project.name && project.name.length > 10 ? `${project.name.slice(0, 10)}…` : project.name}
-                                </span>
+                              <CardTitle className="text-base sm:text-lg truncate" title={project.name}>
+                                {project.name}
                               </CardTitle>
                             </div>
-                            <div className="flex flex-shrink-0 items-center space-x-2 ml-2">
+                            <div className="flex flex-shrink-0 items-center gap-1.5 flex-wrap">
                               {typeof project.projectNumber !== 'undefined' && (
-                                <Badge variant="outline">#{project.projectNumber}</Badge>
+                                <Badge variant="outline" className="text-xs">#{project.projectNumber}</Badge>
                               )}
                               {project.isDraft && (
-                                <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-xs">
                                   Draft
                                 </Badge>
                               )}
                             </div>
                           </div>
-                          <CardDescription className="line-clamp-2" title={project.description}>
+                          <CardDescription className="line-clamp-2 text-xs sm:text-sm" title={project.description}>
                             {project.description || 'No description'}
                           </CardDescription>
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-8 w-8 p-0 flex-shrink-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">More options</span>
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuItem onClick={(e) => {
                               e.stopPropagation()
                               router.push(`/projects/${project._id}`)
@@ -481,25 +470,25 @@ export default function ProjectsPage() {
                         </DropdownMenu>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center space-x-2">
-                        <Badge className={getStatusColor(project.status)}>
-                          {getStatusIcon(project.status)}
-                          <span className="ml-1">{formatToTitleCase(project.status)}</span>
+                    <CardContent className="p-4 sm:p-6 pt-0 space-y-3 sm:space-y-4 flex-1 flex flex-col">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <Badge className={`${getStatusColor(project.status)} text-xs`}>
+                          <span className="hidden sm:inline">{getStatusIcon(project.status)}</span>
+                          <span className="sm:ml-1">{formatToTitleCase(project.status)}</span>
                         </Badge>
-                        <Badge className={getPriorityColor(project.priority)}>
+                        <Badge className={`${getPriorityColor(project.priority)} text-xs`}>
                           {formatToTitleCase(project.priority)}
                         </Badge>
                       </div>
 
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center justify-between text-xs sm:text-sm">
                           <span className="text-muted-foreground">Progress</span>
                           <span className="font-medium">{project.progress?.completionPercentage || 0}%</span>
                         </div>
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 sm:h-2.5 overflow-hidden">
                           <div 
-                            className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full transition-all duration-300 ease-out"
+                            className="bg-blue-600 dark:bg-blue-500 h-full rounded-full transition-all duration-300 ease-out"
                             style={{ 
                               width: `${Math.min(100, Math.max(0, project.progress?.completionPercentage || 0))}%`,
                               minWidth: (project.progress?.completionPercentage || 0) > 0 ? '2px' : '0px'
@@ -513,26 +502,26 @@ export default function ProjectsPage() {
                         )}
                       </div>
 
-                      <div className="flex items-center justify-between text-sm text-gray-500">
-                        <div className="flex items-center space-x-1">
-                          <Users className="h-4 w-4" />
-                          <span>{project.teamMembers.length} members</span>
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center space-x-1.5">
+                          <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                          <span>{project.teamMembers.length} {project.teamMembers.length === 1 ? 'member' : 'members'}</span>
                         </div>
                         {project.budget && (
-                          <div className="flex items-center space-x-1">
-                            <DollarSign className="h-4 w-4" />
-                            <span>{project.budget.currency} {project.budget.total}</span>
+                          <div className="flex items-center space-x-1.5">
+                            <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <span className="whitespace-nowrap">{project.budget.currency} {project.budget.total.toLocaleString()}</span>
                           </div>
                         )}
                       </div>
 
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center space-x-1 text-gray-500">
-                          <Calendar className="h-4 w-4" />
-                          <span>{new Date(project.startDate).toLocaleDateString()}</span>
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm pt-1">
+                        <div className="flex items-center space-x-1.5 text-gray-500 dark:text-gray-400">
+                          <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                          <span className="whitespace-nowrap">{new Date(project.startDate).toLocaleDateString()}</span>
                         </div>
                         {project.endDate && (
-                          <div className="text-gray-500">
+                          <div className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm whitespace-nowrap">
                             Due {new Date(project.endDate).toLocaleDateString()}
                           </div>
                         )}
@@ -551,72 +540,68 @@ export default function ProjectsPage() {
                     className="hover:shadow-md transition-shadow cursor-pointer"
                     onClick={() => router.push(`/projects/${project._id}`)}
                   >
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4 min-w-0">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center mb-2 min-w-0">
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-medium min-w-0">
-                                  <span
-                                    className="sm:hidden block truncate"
-                                    title={project.name && project.name.length > 10 ? project.name : undefined}
-                                  >
-                                    {project.name && project.name.length > 10 ? `${project.name.slice(0, 10)}…` : project.name}
-                                  </span>
-                                <span
-                                  className="hidden sm:inline truncate"
-                                  title={project.name && project.name.length > 10 ? project.name : undefined}
-                                >
-                                  {project.name && project.name.length > 10 ? `${project.name.slice(0, 10)}…` : project.name}
-                                </span>
-                                </h3>
-                              </div>
-                              <div className="flex flex-shrink-0 items-center space-x-2 ml-2">
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                        {/* Main Content */}
+                        <div className="flex-1 min-w-0">
+                          {/* Title and Badges Row */}
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-medium text-base sm:text-lg truncate" title={project.name}>
+                                {project.name}
+                              </h3>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 flex-shrink-0">
                               {typeof project.projectNumber !== 'undefined' && (
-                                <Badge variant="outline">#{project.projectNumber}</Badge>
+                                <Badge variant="outline" className="text-xs">#{project.projectNumber}</Badge>
                               )}
                               {project.isDraft && (
-                                <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-xs">
                                   Draft
                                 </Badge>
                               )}
-                              <Badge className={getStatusColor(project.status)}>
-                                {getStatusIcon(project.status)}
-                                <span className="ml-1">{formatToTitleCase(project.status)}</span>
+                              <Badge className={`${getStatusColor(project.status)} text-xs`}>
+                                <span className="hidden sm:inline">{getStatusIcon(project.status)}</span>
+                                <span className="sm:ml-1">{formatToTitleCase(project.status)}</span>
                               </Badge>
-                              <Badge className={getPriorityColor(project.priority)}>
+                              <Badge className={`${getPriorityColor(project.priority)} text-xs`}>
                                 {formatToTitleCase(project.priority)}
                               </Badge>
-                              </div>
-                            </div>
-                            <p className="text-sm text-gray-600 mb-2 line-clamp-2" title={project.description}>
-                              {project.description || 'No description'}
-                            </p>
-                            <div className="flex items-center space-x-4 text-sm text-gray-500">
-                              <div className="flex items-center space-x-1">
-                                <Users className="h-4 w-4" />
-                                <span>{project.teamMembers.length} members</span>
-                              </div>
-                              <div className="flex items-center space-x-1">
-                                <Calendar className="h-4 w-4" />
-                                <span>{new Date(project.startDate).toLocaleDateString()}</span>
-                              </div>
-                              {project.budget && (
-                                <div className="flex items-center space-x-1">
-                                  <DollarSign className="h-4 w-4" />
-                                  <span>{project.budget.currency} {project.budget.total}</span>
-                                </div>
-                              )}
                             </div>
                           </div>
+                          
+                          {/* Description */}
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2" title={project.description}>
+                            {project.description || 'No description'}
+                          </p>
+                          
+                          {/* Metadata - Wraps on mobile */}
+                          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                            <div className="flex items-center space-x-1.5">
+                              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                              <span>{project.teamMembers.length} {project.teamMembers.length === 1 ? 'member' : 'members'}</span>
+                            </div>
+                            <div className="flex items-center space-x-1.5">
+                              <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                              <span className="whitespace-nowrap">{new Date(project.startDate).toLocaleDateString()}</span>
+                            </div>
+                            {project.budget && (
+                              <div className="flex items-center space-x-1.5">
+                                <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                                <span className="whitespace-nowrap">{project.budget.currency} {project.budget.total.toLocaleString()}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="text-right">
-                            <div className="text-sm font-medium">{project.progress?.completionPercentage || 0}%</div>
-                            <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
+                        
+                        {/* Progress and Actions - Stacks on mobile */}
+                        <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-2 flex-shrink-0">
+                          {/* Progress Section */}
+                          <div className="flex items-center gap-2 sm:flex-col sm:items-end">
+                            <div className="text-sm font-medium whitespace-nowrap">{project.progress?.completionPercentage || 0}%</div>
+                            <div className="w-24 sm:w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2 sm:h-2.5 overflow-hidden">
                               <div 
-                                className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full transition-all duration-300 ease-out"
+                                className="bg-blue-600 dark:bg-blue-500 h-full rounded-full transition-all duration-300 ease-out"
                                 style={{ 
                                   width: `${Math.min(100, Math.max(0, project.progress?.completionPercentage || 0))}%`,
                                   minWidth: (project.progress?.completionPercentage || 0) > 0 ? '2px' : '0px'
@@ -624,18 +609,26 @@ export default function ProjectsPage() {
                               />
                             </div>
                             {project.progress && project.progress.totalTasks > 0 && (
-                              <p className="text-xs text-muted-foreground mt-1">
+                              <p className="text-xs text-muted-foreground hidden sm:block mt-1">
                                 {project.progress.tasksCompleted}/{project.progress.totalTasks}
                               </p>
                             )}
                           </div>
+                          
+                          {/* Dropdown Menu */}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="h-8 w-8 p-0 flex-shrink-0"
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">More options</span>
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
+                            <DropdownMenuContent align="end" className="w-48">
                               <DropdownMenuItem onClick={(e) => {
                                 e.stopPropagation()
                                 router.push(`/projects/${project._id}`)
@@ -676,6 +669,15 @@ export default function ProjectsPage() {
                           </DropdownMenu>
                         </div>
                       </div>
+                      
+                      {/* Task Progress Info - Mobile only */}
+                      {project.progress && project.progress.totalTasks > 0 && (
+                        <div className="mt-2 sm:hidden">
+                          <p className="text-xs text-muted-foreground">
+                            {project.progress.tasksCompleted} of {project.progress.totalTasks} tasks completed
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}

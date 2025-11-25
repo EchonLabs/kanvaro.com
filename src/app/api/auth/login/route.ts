@@ -114,6 +114,10 @@ export async function POST(request: Request) {
       )
     }
 
+    // Update last login timestamp
+    user.lastLogin = new Date()
+    await user.save()
+
     // Create JWT tokens
     console.log('Creating JWT tokens for user:', user.email)
     const accessToken = jwt.sign(
@@ -173,7 +177,8 @@ export async function POST(request: Request) {
       timezone: user.timezone,
       language: user.language,
       currency: user.currency,
-      preferences: user.preferences
+      preferences: user.preferences,
+      lastLogin: user.lastLogin
     }
 
     console.log('Login successful for user:', user.email)

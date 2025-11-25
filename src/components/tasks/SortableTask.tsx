@@ -146,6 +146,11 @@ export default function SortableTask({
               {formatToTitleCase(task.type)}
             </Badge>
           </div>
+          {task.displayId && (
+            <p className="text-[11px] text-muted-foreground font-medium">
+              #{task.displayId}
+            </p>
+          )}
           
           <div className="text-xs text-muted-foreground space-y-1 min-w-0">
             {task.project && (
@@ -191,14 +196,23 @@ export default function SortableTask({
           )}
 
           {task.labels && task.labels.length > 0 && (
-            <div className="flex flex-wrap gap-1">
+            <div className="flex items-center gap-1 overflow-hidden flex-nowrap">
               {task.labels.slice(0, 2).map((label, index) => (
-                <Badge key={index} variant="outline" className="text-xs">
+                <Badge
+                  key={index}
+                  variant="outline"
+                  className="text-xs truncate max-w-[85px] whitespace-nowrap flex-shrink-0"
+                  title={label}
+                >
                   {label}
                 </Badge>
               ))}
               {task.labels.length > 2 && (
-                <Badge variant="outline" className="text-xs">
+                <Badge
+                  variant="outline"
+                  className="text-xs flex-shrink-0"
+                  title={task.labels.slice(2).join(', ')}
+                >
                   +{task.labels.length - 2}
                 </Badge>
               )}

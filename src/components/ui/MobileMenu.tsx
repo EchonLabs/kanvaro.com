@@ -35,7 +35,8 @@ import {
   Target,
   Activity,
   BookOpen,
-  LogOut
+  LogOut,
+  Rocket
 } from 'lucide-react'
 
 const navigationItems = [
