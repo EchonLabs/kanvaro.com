@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import React, { useState, useEffect, Suspense, useRef, startTransition } from 'react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { ArrowLeft, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 import { DocNode, Audience, Category } from '@/lib/docs/types';
 import { Sidebar } from './Sidebar';
 import { AudienceFilter } from './AudienceFilter';
@@ -26,10 +28,40 @@ function DocsLayoutContent({
   initialSearch
 }: DocsLayoutProps) {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedAudience, setSelectedAudience] = useState<Audience | undefined>();
   const [selectedCategory, setSelectedCategory] = useState<Category | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isNavigating, setIsNavigating] = useState(false);
+  const referrerRef = useRef<string | null>(null);
+
+  // Store referrer on mount for back navigation
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !referrerRef.current) {
+      // Check if there's a referrer in sessionStorage (set by navigation)
+      const storedReferrer = sessionStorage.getItem('docsReferrer');
+      if (storedReferrer && storedReferrer !== pathname) {
+        referrerRef.current = storedReferrer;
+      } else if (document.referrer) {
+        // Extract path from document.referrer if it's from our domain
+        try {
+          const referrerUrl = new URL(document.referrer);
+          if (referrerUrl.origin === window.location.origin && referrerUrl.pathname !== pathname) {
+            referrerRef.current = referrerUrl.pathname + referrerUrl.search;
+          } else {
+            referrerRef.current = '/dashboard';
+          }
+        } catch {
+          referrerRef.current = '/dashboard';
+        }
+      } else {
+        // Default to dashboard
+        referrerRef.current = '/dashboard';
+      }
+    }
+  }, [pathname]);
 
   // Initialize state from URL params or initial props
   useEffect(() => {
@@ -41,6 +73,32 @@ function DocsLayoutContent({
     setSelectedCategory(category);
     setSearchQuery(search);
   }, [searchParams, initialAudience, initialCategory, initialSearch]);
+
+  // Handle back navigation with smooth transition
+  const handleBack = (e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    // Use stored referrer or try browser history, fallback to dashboard
+    const backUrl = referrerRef.current || '/dashboard';
+    
+    // Use startTransition for smooth, non-blocking navigation
+    startTransition(() => {
+      setIsNavigating(true);
+      
+      // Try browser back first if available, otherwise use stored referrer
+      if (typeof window !== 'undefined' && window.history.length > 1 && !referrerRef.current) {
+        router.back();
+      } else {
+        router.push(backUrl);
+      }
+      
+      // Scroll to top instantly for smooth experience
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      
+      // Reset navigation state quickly
+      setTimeout(() => setIsNavigating(false), 150);
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -76,7 +134,7 @@ function DocsLayoutContent({
         <header className="bg-background border-b">
           <div className="px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
-              <div className="flex items-center">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={() => setSidebarOpen(true)}
                   className="lg:hidden p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -85,7 +143,21 @@ function DocsLayoutContent({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
                 </button>
-                <h1 className="ml-4 lg:ml-0 text-xl font-semibold text-foreground">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleBack}
+                  disabled={isNavigating}
+                  className="flex-shrink-0 transition-all duration-200 hover:bg-muted/80 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isNavigating ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                  )}
+                  <span>Back</span>
+                </Button>
+                <h1 className="text-xl font-semibold text-foreground">
                   {visibility === 'internal' ? 'Internal Documentation' : 'Documentation'}
                 </h1>
               </div>

@@ -76,14 +76,26 @@ export async function GET(request: NextRequest) {
         const sprintTaskIds = sprint.tasks || []
 
         // Find all tasks currently associated with this sprint
-        const tasks = await Task.find({
+        const includeArchivedTasks = sprint.status === 'completed' || sprint.status === 'cancelled'
+        const taskQuery: Record<string, any> = {
           $or: [
             { _id: { $in: sprintTaskIds } },
             { sprint: sprintId }
           ],
-          organization: organizationId,
-          archived: { $ne: true }
-        }).select('status storyPoints').lean()
+          organization: organizationId
+        }
+        if (!includeArchivedTasks) {
+          taskQuery.archived = { $ne: true }
+        }
+
+        const taskDocs = await Task.find(taskQuery).select('status storyPoints _id').lean()
+
+        // Deduplicate tasks in case they were matched by both clauses above
+        const taskMap = new Map<string, typeof taskDocs[number]>()
+        taskDocs.forEach(task => {
+          taskMap.set((task as any)._id.toString(), task)
+        })
+        const tasks = Array.from(taskMap.values())
 
         const totalTasks = tasks.length
         // Consider tasks with status 'done' or 'completed' as completed

@@ -323,8 +323,8 @@ export default function ProfilePage() {
                         lastName: profile?.lastName,
                         email: profile?.email
                       }}
-                      size={80}
-                      className="h-20 w-20"
+                      size={120}
+                      className="h-32 w-32"
                     />
                     <div className="space-y-2">
                       <input
@@ -775,7 +775,7 @@ export default function ProfilePage() {
           </Tabs>
 
           {/* Save Button */}
-          <div className="flex justify-end">
+          <div className="flex justify-end pt-6 mt-8 border-t border-muted">
             <Button onClick={handleSave} disabled={profileLoading} size="lg">
               {profileLoading ? (
                 <>

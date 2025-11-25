@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Checkbox } from '@/components/ui/Checkbox'
 import { 
   X, 
   Plus, 
@@ -19,9 +18,11 @@ import {
   Clock,
   AlertTriangle,
   Loader2,
-  Trash2
+  Trash2,
+  Paperclip,
+  Check
 } from 'lucide-react'
-import { Check } from 'lucide-react'
+import { AttachmentList } from '@/components/ui/AttachmentList'
 
 interface CreateTaskModalProps {
   isOpen: boolean
@@ -37,6 +38,35 @@ interface User {
   firstName: string
   lastName: string
   email: string
+}
+
+interface CurrentUser {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+}
+
+interface AttachmentDraft {
+  name: string
+  url: string
+  size: number
+  type: string
+  uploadedAt: string
+  uploadedByName: string
+  uploadedById: string
+}
+
+const mapUserResponse = (data: any): CurrentUser | null => {
+  if (!data) return null
+  const id = typeof data.id === 'string' ? data.id : (typeof data._id === 'string' ? data._id : '')
+  if (!id) return null
+  return {
+    id,
+    firstName: data.firstName || '',
+    lastName: data.lastName || '',
+    email: data.email || ''
+  }
 }
 
 type SubtaskStatus = 'backlog' | 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
@@ -101,6 +131,11 @@ export default function CreateTaskModal({
     estimatedHours: '',
     labels: []
   })
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+  const [attachments, setAttachments] = useState<AttachmentDraft[]>([])
+  const [attachmentError, setAttachmentError] = useState('')
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
 
   const effectiveProjectId = projectId || selectedProjectId
   const hasProjectSelected = Boolean(effectiveProjectId)
@@ -147,9 +182,38 @@ export default function CreateTaskModal({
     }
   }
 
+  const fetchCurrentUser = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/me')
+      if (response.ok) {
+        const data = await response.json()
+        const normalized = mapUserResponse(data)
+        if (normalized) {
+          setCurrentUser(normalized)
+        }
+        return
+      }
+
+      if (response.status === 401) {
+        const refreshResponse = await fetch('/api/auth/refresh', { method: 'POST' })
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json().catch(() => ({}))
+          const normalized = mapUserResponse(refreshData?.user || refreshData)
+          if (normalized) {
+            setCurrentUser(normalized)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch current user:', error)
+    }
+  }, [])
+
   // Fetch project members when modal opens or project selection changes
   useEffect(() => {
     if (!isOpen) return
+
+    fetchCurrentUser()
 
     if (projectId) {
       fetchProjectMembers(projectId)
@@ -162,7 +226,7 @@ export default function CreateTaskModal({
     if (!projectId) {
       fetchProjects()
     }
-  }, [isOpen, projectId, selectedProjectId, fetchProjectMembers])
+  }, [isOpen, projectId, selectedProjectId, fetchProjectMembers, fetchCurrentUser])
 
   // Reset form state whenever modal closes so it opens clean next time
   useEffect(() => {
@@ -186,6 +250,9 @@ export default function CreateTaskModal({
       setProjectMembers([])
       setLoadingProjectMembers(false)
       if (!projectId) setSelectedProjectId('')
+      setAttachments([])
+      setAttachmentError('')
+      setIsUploadingAttachment(false)
     }
   }, [isOpen, projectId])
 
@@ -213,22 +280,6 @@ export default function CreateTaskModal({
     })
   }
 
-  const toggleSubtaskCompletion = (index: number, checked: boolean) => {
-    setSubtasks(prev => {
-      const updated = [...prev]
-      const current = updated[index]
-      const nextStatus: SubtaskStatus = checked
-        ? 'done'
-        : (current.status === 'done' ? 'todo' : (current.status || 'todo'))
-      updated[index] = {
-        ...current,
-        status: nextStatus,
-        isCompleted: checked
-      }
-      return updated
-    })
-  }
-
   const removeSubtask = (index: number) => {
     setSubtasks(subtasks.filter((_, i) => i !== index))
   }
@@ -249,6 +300,70 @@ export default function CreateTaskModal({
       labels: prev.labels.filter((_, i) => i !== index)
     }))
   }
+
+  const uploadAttachmentFile = useCallback(async (file: File) => {
+    if (!currentUser) {
+      throw new Error('User information is still loading.')
+    }
+
+    const formDataUpload = new FormData()
+    formDataUpload.append('attachment', file)
+    const displayName = `${currentUser.firstName} ${currentUser.lastName}`.trim() || currentUser.email
+    if (displayName) {
+      formDataUpload.append('uploadedByName', displayName)
+    }
+
+    const response = await fetch('/api/uploads/attachments', {
+      method: 'POST',
+      body: formDataUpload
+    })
+    const uploadData = await response.json().catch(() => ({ error: 'Failed to upload attachment' }))
+    if (!response.ok || !uploadData?.success) {
+      throw new Error(uploadData.error || 'Failed to upload attachment')
+    }
+
+    const attachmentInfo = uploadData.data
+    setAttachments(prev => [
+      ...prev,
+      {
+        name: attachmentInfo.name,
+        url: attachmentInfo.url,
+        size: attachmentInfo.size,
+        type: attachmentInfo.type,
+        uploadedAt: attachmentInfo.uploadedAt,
+        uploadedByName: attachmentInfo.uploadedByName || displayName,
+        uploadedById: currentUser.id
+      }
+    ])
+  }, [currentUser])
+
+  const handleAttachmentInputChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    event.target.value = ''
+
+    try {
+      setAttachmentError('')
+      setIsUploadingAttachment(true)
+      await uploadAttachmentFile(file)
+    } catch (err) {
+      setAttachmentError(err instanceof Error ? err.message : 'Failed to upload attachment')
+    } finally {
+      setIsUploadingAttachment(false)
+    }
+  }, [uploadAttachmentFile])
+
+  const handleAttachmentButtonClick = useCallback(() => {
+    if (!currentUser) {
+      setAttachmentError('User information is still loading. Please wait a moment.')
+      return
+    }
+    attachmentInputRef.current?.click()
+  }, [currentUser])
+
+  const handleAttachmentDelete = useCallback((index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index))
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -300,7 +415,15 @@ export default function CreateTaskModal({
           estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined,
           dueDate: formData.dueDate || undefined,
           labels: Array.isArray(formData.labels) ? formData.labels : [],
-          subtasks: preparedSubtasks
+          subtasks: preparedSubtasks,
+          attachments: attachments.map(att => ({
+            name: att.name,
+            url: att.url,
+            size: att.size,
+            type: att.type,
+            uploadedAt: att.uploadedAt,
+            uploadedBy: att.uploadedById
+          }))
         })
       })
 
@@ -336,6 +459,8 @@ export default function CreateTaskModal({
         setAssigneeQuery('')
         setNewLabel('')
         if (!projectId) setSelectedProjectId('')
+        setAttachments([])
+        setAttachmentError('')
       } else {
         setError(data.error || 'Failed to create task')
         setLoading(false)
@@ -360,6 +485,19 @@ export default function CreateTaskModal({
       return () => clearTimeout(t)
     }
   }, [error])
+
+  const attachmentListItems = useMemo(
+    () =>
+      attachments.map(att => ({
+        name: att.name,
+        url: att.url,
+        size: att.size,
+        type: att.type,
+        uploadedAt: att.uploadedAt,
+        uploadedBy: att.uploadedByName
+      })),
+    [attachments]
+  )
 
   if (!isOpen) return null
 
@@ -467,6 +605,43 @@ export default function CreateTaskModal({
                   className="mt-1"
                   rows={3}
                 />
+              </div>
+
+              <div className="md:col-span-2 space-y-2">
+                <label className="text-sm font-medium text-foreground">Attachments</label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    ref={attachmentInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={handleAttachmentInputChange}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAttachmentButtonClick}
+                    disabled={isUploadingAttachment || !currentUser}
+                  >
+                    <Paperclip className="h-4 w-4 mr-2" />
+                    {isUploadingAttachment ? 'Uploading...' : 'Add Attachment'}
+                  </Button>
+                  {!currentUser && (
+                    <span className="text-xs text-muted-foreground">Loading user info...</span>
+                  )}
+                </div>
+                {attachmentError && (
+                  <p className="text-sm text-red-600">{attachmentError}</p>
+                )}
+                {attachments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No attachments added yet.</p>
+                ) : (
+                  <AttachmentList
+                    attachments={attachmentListItems}
+                    onDelete={handleAttachmentDelete}
+                    canDelete={!loading}
+                  />
+                )}
               </div>
 
               <div>
@@ -703,16 +878,6 @@ export default function CreateTaskModal({
                       placeholder="Subtask title"
                       required
                     />
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      checked={subtask.isCompleted || subtask.status === 'done'}
-                      onCheckedChange={(checked) => toggleSubtaskCompletion(index, !!checked)}
-                    />
-                    <span className="text-sm text-muted-foreground">
-                      Mark as completed
-                    </span>
                   </div>
 
                   <div>

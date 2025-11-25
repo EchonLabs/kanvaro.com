@@ -39,6 +39,15 @@ type IncomingSubtask = {
   isCompleted?: unknown
 }
 
+type IncomingAttachment = {
+  name?: unknown
+  url?: unknown
+  size?: unknown
+  type?: unknown
+  uploadedBy?: unknown
+  uploadedAt?: unknown
+}
+
 function sanitizeSubtasks(input: any): Array<{
   _id?: string
   title: string
@@ -85,6 +94,50 @@ function sanitizeSubtasks(input: any): Array<{
 
       return sanitized
     })
+}
+
+function sanitizeAttachments(input: any, defaultUserId: string) {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  return input
+    .map((item: IncomingAttachment) => {
+      if (typeof item?.name !== 'string' || typeof item?.url !== 'string') {
+        return null
+      }
+
+      const sizeValue = typeof item.size === 'number'
+        ? item.size
+        : typeof item.size === 'string'
+          ? Number(item.size)
+          : undefined
+
+      if (typeof sizeValue !== 'number' || Number.isNaN(sizeValue)) {
+        return null
+      }
+
+      const typeValue = typeof item.type === 'string' ? item.type : 'application/octet-stream'
+      const uploadedByValue =
+        typeof item.uploadedBy === 'string' && item.uploadedBy.trim().length > 0
+          ? item.uploadedBy.trim()
+          : defaultUserId
+
+      const uploadedAtValue =
+        typeof item.uploadedAt === 'string'
+          ? new Date(item.uploadedAt)
+          : new Date()
+
+      return {
+        name: item.name,
+        url: item.url,
+        size: sizeValue,
+        type: typeValue,
+        uploadedBy: uploadedByValue,
+        uploadedAt: uploadedAtValue
+      }
+    })
+    .filter((attachment): attachment is NonNullable<typeof attachment> => attachment !== null)
 }
 
 export async function GET(request: NextRequest) {
@@ -281,7 +334,8 @@ export async function POST(request: NextRequest) {
       dueDate,
       estimatedHours,
       labels,
-      subtasks
+      subtasks,
+      attachments
     } = payload
 
     // Check if user can create tasks (project-scoped permission)
@@ -367,6 +421,7 @@ export async function POST(request: NextRequest) {
         : (typeof estimatedHours === 'string' && estimatedHours.trim() !== '' ? Number(estimatedHours) : undefined),
       labels: sanitizeLabels(labels),
       subtasks: sanitizeSubtasks(subtasks),
+      attachments: sanitizeAttachments(attachments, userId),
       position: nextPosition
     })
 
@@ -380,6 +435,7 @@ export async function POST(request: NextRequest) {
       .populate('story', 'title status')
       .populate('sprint', 'name status')
       .populate('parentTask', 'title')
+      .populate('attachments.uploadedBy', 'firstName lastName email')
 
     // Return response immediately to avoid blocking on slow operations
     const responseData = {

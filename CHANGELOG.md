@@ -1,3 +1,31 @@
+# [1.5.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.6...v1.5.0) (2025-11-25)
+
+
+### Features
+
+* add landing page changes ([93feaea](https://github.com/EchonLabs/kanvaro.com/commit/93feaea0dd54084295c2ff578402f516e93d9433))
+
+## [1.4.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.5...v1.4.6) (2025-11-25)
+
+
+### Bug Fixes
+
+* add bug fixes in time ([ff14233](https://github.com/EchonLabs/kanvaro.com/commit/ff142331369200576963dfd20ac6268a49820bb8))
+
+## [1.4.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.4...v1.4.5) (2025-11-24)
+
+
+### Bug Fixes
+
+* add fixes ([00ece98](https://github.com/EchonLabs/kanvaro.com/commit/00ece9879648643ed8be72274b8863909727015f))
+
+## [1.4.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.3...v1.4.4) (2025-11-24)
+
+
+### Bug Fixes
+
+* add consoles to check vconfig ([3b56214](https://github.com/EchonLabs/kanvaro.com/commit/3b5621401fdd5ad14275992ad36a6a52197f3052))
+
 ## [1.4.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.2...v1.4.3) (2025-11-24)
 
 

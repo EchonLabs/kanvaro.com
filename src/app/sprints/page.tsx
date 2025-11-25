@@ -604,7 +604,7 @@ export default function SprintsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 overflow-x-hidden">
+      <div className="space-y-8 sm:space-y-10 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Sprints</h1>
@@ -769,14 +769,14 @@ export default function SprintsPage() {
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-xs sm:text-sm">
                             <span className="text-muted-foreground">Progress</span>
-                            <span className="font-medium">{completionPercentage}%</span>
+                            <span className="font-medium">{sprint?.progress?.completionPercentage || 0}%</span>
                           </div>
                           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
                             <div 
                               className="bg-blue-600 dark:bg-blue-500 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
                               style={{ 
-                                width: `${completionPercentage}%`,
-                                minWidth: completionPercentage > 0 ? '2px' : '0'
+                                width: `${sprint?.progress?.completionPercentage || 0}%`,
+                                minWidth: sprint?.progress?.completionPercentage || 0 > 0 ? '2px' : '0'
                               }}
                             />
                           </div>

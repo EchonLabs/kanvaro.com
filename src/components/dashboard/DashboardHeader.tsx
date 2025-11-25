@@ -22,6 +22,16 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
     minute: '2-digit'
   })
 
+  const lastLoginText = user?.lastLogin
+    ? new Date(user.lastLogin).toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : 'Not available'
+
   return (
     <Card className="border-0 overflow-x-hidden">
       <CardContent className="p-4 sm:p-6">
@@ -45,7 +55,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
           
           <div className="text-left sm:text-right space-y-2 flex-shrink-0 w-full sm:w-auto">
             <div className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
-              Last login: 2 hours ago
+              Last login: {lastLoginText}
             </div>
             <div className="flex sm:justify-end">
               <Badge variant="secondary" className="text-xs">

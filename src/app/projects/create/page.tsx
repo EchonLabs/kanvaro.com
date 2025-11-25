@@ -133,6 +133,7 @@ export default function CreateProjectPage() {
     tags: [],
     customFields: {}
   })
+  const [budgetTotalInput, setBudgetTotalInput] = useState('0')
 
   const steps = [
     { id: 1, title: 'Basic Information', description: 'Project name and description' },
@@ -558,6 +559,11 @@ export default function CreateProjectPage() {
           tags: project.tags || [],
           customFields: project.customFields || {}
         })
+        setBudgetTotalInput(
+          typeof project.budget?.total === 'number' && !Number.isNaN(project.budget.total)
+            ? project.budget.total.toString()
+            : '0'
+        )
       } else {
         setError('Failed to load project data')
       }
@@ -813,11 +819,19 @@ export default function CreateProjectPage() {
                   <Input
                     id="totalBudget"
                     type="number"
-                    value={formData.budget.total}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      budget: { ...prev.budget, total: parseFloat(e.target.value) || 0 }
-                    }))}
+                    value={budgetTotalInput}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      const parsedValue = parseFloat(value)
+                      setBudgetTotalInput(value)
+                      setFormData(prev => ({
+                        ...prev,
+                        budget: {
+                          ...prev.budget,
+                          total: value === '' || Number.isNaN(parsedValue) ? 0 : parsedValue
+                        }
+                      }))
+                    }}
                     placeholder="0.00"
                   />
                 </div>
@@ -1585,18 +1599,19 @@ export default function CreateProjectPage() {
       </Tabs>
 
       {/* Navigation Buttons */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 pt-6 mt-8 border-t border-muted">
         <Button
           variant="outline"
           onClick={handlePrevious}
           disabled={currentStep === 1}
+          className="w-full sm:w-auto"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Previous
         </Button>
 
         {currentStep < steps.length && (
-          <Button onClick={handleNext}>
+          <Button onClick={handleNext} className="w-full sm:w-auto">
             Next
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>

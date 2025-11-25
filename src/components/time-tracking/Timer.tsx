@@ -15,6 +15,7 @@ interface TimerProps {
   projectId?: string
   taskId?: string
   description?: string
+  requireDescription?: boolean
   onTimerUpdate?: (timer: any) => void
 }
 
@@ -33,7 +34,7 @@ interface ActiveTimer {
   maxSessionHours: number
 }
 
-export function Timer({ userId, organizationId, projectId, taskId, description = '', onTimerUpdate }: TimerProps) {
+export function Timer({ userId, organizationId, projectId, taskId, description = '', requireDescription = true, onTimerUpdate }: TimerProps) {
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -159,11 +160,6 @@ export function Timer({ userId, organizationId, projectId, taskId, description =
   }, [userId, organizationId, loadActiveTimer])
 
   const handleStartTimer = async () => {
-    if (!description.trim()) {
-      setError('Description is required')
-      return
-    }
-
     if (!userId) {
       setError('User ID is missing - please refresh the page')
       return
@@ -290,9 +286,16 @@ export function Timer({ userId, organizationId, projectId, taskId, description =
 
       if (response.ok) {
         console.log('Timer/stop: clearing activeTimer (previous id)', (activeTimer as any)?._id)
+        const hasTimeLogged = data.hasTimeLogged && data.duration > 0
         setActiveTimer(null)
         setDisplayTime('00:00:00')
-        onTimerUpdate?.(null)
+        // Pass timeEntry info through callback so parent can decide whether to show notifications
+        // If time was logged, pass info; otherwise pass null (no notification needed)
+        if (hasTimeLogged && data.timeEntry) {
+          onTimerUpdate?.({ timeEntry: data.timeEntry, hasTimeLogged: true, duration: data.duration })
+        } else {
+          onTimerUpdate?.(null)
+        }
       } else {
         console.error('Timer/stop: failed', data?.error)
         setError(data.error || 'Failed to stop timer')
@@ -410,7 +413,12 @@ export function Timer({ userId, organizationId, projectId, taskId, description =
 
       <Button
         onClick={handleStartTimer}
-        disabled={isLoading || !description.trim() || !projectId || !taskId}
+        disabled={
+          isLoading || 
+          !projectId || 
+          !taskId || 
+          (requireDescription && !description.trim())
+        }
         className="w-full"
       >
         <Play className="h-4 w-4 mr-2" />

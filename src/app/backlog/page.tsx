@@ -10,8 +10,7 @@ import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from '@radix-ui/react-dropdown-menu'
-import { DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Label } from '@/components/ui/label'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
@@ -863,7 +862,7 @@ export default function BacklogPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-8 sm:space-y-10">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Product Backlog</h1>

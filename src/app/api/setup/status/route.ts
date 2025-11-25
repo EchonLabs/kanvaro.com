@@ -6,20 +6,22 @@ import { User } from '@/models/User'
 export async function GET() {
   try {
     const config = loadConfig()
-    
+    console.log('config for prod issue fix', config)
     // Check if there are actually users in the database
     let hasUsers: boolean | null = null
     try {
       await connectDB()
       const userCount = await User.countDocuments()
+      console.log('userCount for prod issue fix', userCount)
       hasUsers = userCount > 0
+      console.log('hasUsers for prod issue fix', hasUsers)
     } catch (error) {
       console.log('Database connection failed while checking users:', error)
     }
     
     // Setup is completed if config says so and we didn't positively detect an empty user collection
     const setupCompleted = config.setupCompleted && hasUsers !== false
-    
+    console.log('setupCompleted for prod issue fix', setupCompleted)
     return NextResponse.json({
       setupCompleted,
       hasConfig: !!config.database,
@@ -32,6 +34,7 @@ export async function GET() {
           : 'Unable to verify users, setup status unknown'
     })
   } catch (error) {
+    console.log('error for prod issue fix', error)
     console.error('Failed to check setup status:', error)
     return NextResponse.json({
       setupCompleted: false,

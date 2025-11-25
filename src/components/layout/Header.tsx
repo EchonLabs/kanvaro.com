@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { Bell, User, Sun, Moon, Monitor, LogOut, UserCircle, X, Check, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge'
 import { OrganizationLogo } from '@/components/ui/OrganizationLogo'
 import { GlobalSearch } from '@/components/search/GlobalSearch'
 import { useNotifications } from '@/hooks/useNotifications'
+import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +34,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
   const { theme, setTheme } = useTheme()
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, loading } = useNotifications({
     limit: 10,
@@ -43,22 +45,54 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
     setMounted(true)
   }, [])
 
-  // Load user data
+  // Load user data and refresh when returning from profile page
+  const loadUser = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/me')
+      if (response.ok) {
+        const userData = await response.json()
+        setUser(userData)
+      }
+    } catch (error) {
+      console.error('Failed to load user data:', error)
+    }
+  }, [])
+
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const response = await fetch('/api/auth/me')
-        if (response.ok) {
-          const userData = await response.json()
-          setUser(userData)
-        }
-      } catch (error) {
-        console.error('Failed to load user data:', error)
+    loadUser()
+  }, [loadUser])
+
+  // Refresh user data when returning from profile page
+  useEffect(() => {
+    if (pathname && pathname !== '/profile') {
+      // Small delay to ensure profile update is saved
+      const timer = setTimeout(() => {
+        loadUser()
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [pathname, loadUser])
+
+  // Refresh user data when page regains focus (e.g., after updating profile)
+  useEffect(() => {
+    const handleFocus = () => {
+      loadUser()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadUser()
       }
     }
 
-    loadUser()
-  }, [])
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [loadUser])
 
   const handleLogout = async () => {
     try {
@@ -76,6 +110,12 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
       // Still redirect to login even if logout API fails
       router.push('/login')
     }
+  }
+
+  const getUserDisplayName = () => {
+    if (!user) return 'My Account'
+    const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim()
+    return fullName || user.email || 'My Account'
   }
 
   return (
@@ -104,7 +144,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
       <div className="flex items-center space-x-1 sm:space-x-2 ml-2 sm:ml-4">
         {/* Theme Toggle Buttons - Hidden on mobile */}
         {mounted && (
-              <div className="hidden md:flex items-center border rounded-md">
+          <div className="hidden md:flex items-center border rounded-md">
             <Button
               variant={theme === 'light' ? 'default' : 'ghost'}
               size="sm"
@@ -224,9 +264,28 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
         {/* User Profile Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-9 px-2 sm:px-3" title="My Account">
-              <User className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">
+            <Button 
+              variant="ghost" 
+              className="h-9 px-2 sm:px-3 group relative flex items-center gap-2" 
+              title={getUserDisplayName()}
+            >
+              {user ? (
+                <GravatarAvatar 
+                  user={{
+                    avatar: user.avatar,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    email: user.email
+                  }}
+                  size={32}
+                  className="flex-shrink-0"
+                />
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                  <User className="h-4 w-4" />
+                </div>
+              )}
+              <span className="hidden sm:inline ml-0 sm:ml-2 opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
                 {user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email : 'User'}
               </span>
             </Button>

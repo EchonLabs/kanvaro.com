@@ -78,6 +78,22 @@ export interface IOrganization extends Document {
     ssl: boolean
     uri: string
   }
+  landingPageImages?: {
+    heroDashboard?: string
+    modulePreview?: string
+    stepImages?: {
+      step1?: string
+      step2?: string
+      step3?: string
+    }
+    showcaseImages?: {
+      tasks?: string
+      projects?: string
+      members?: string
+      timeLogs?: string
+      reports?: string
+    }
+  }
   createdAt: Date
   updatedAt: Date
 }
@@ -167,9 +183,26 @@ const OrganizationSchema = new Schema<IOrganization>({
     authSource: String,
     ssl: Boolean,
     uri: String
+  },
+  landingPageImages: {
+    heroDashboard: String,
+    modulePreview: String,
+    stepImages: {
+      step1: String,
+      step2: String,
+      step3: String
+    },
+    showcaseImages: {
+      tasks: String,
+      projects: String,
+      members: String,
+      timeLogs: String,
+      reports: String
+    }
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  strict: false // Allow saving fields not explicitly defined in schema (for flexibility)
 })
 
 export const Organization = mongoose.models.Organization || mongoose.model<IOrganization>('Organization', OrganizationSchema)

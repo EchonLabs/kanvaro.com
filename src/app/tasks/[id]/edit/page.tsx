@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef, ChangeEvent } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -10,7 +10,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Checkbox } from '@/components/ui/Checkbox'
-import { Loader2, ArrowLeft, CheckCircle, Plus, Trash2, Target, User, Clock, Calendar } from 'lucide-react'
+import { AttachmentList } from '@/components/ui/AttachmentList'
+import { Loader2, ArrowLeft, CheckCircle, Plus, Trash2, Target, User, Clock, Calendar, Paperclip, AlertTriangle } from 'lucide-react'
 
 const STATUS_OPTIONS = [
   { value: 'backlog', label: 'Backlog' },
@@ -111,6 +112,78 @@ const normalizeSubtasksForCompare = (subtasks: Subtask[]) =>
     isCompleted: subtask.isCompleted
   }))
 
+interface AttachmentDraft {
+  _id?: string
+  name: string
+  url: string
+  size: number
+  type: string
+  uploadedAt: string
+  uploadedById?: string
+  uploadedByName?: string
+}
+
+interface CurrentUser {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+}
+
+const mapAttachmentsFromResponse = (input: any): AttachmentDraft[] => {
+  if (!Array.isArray(input)) return []
+  return input
+    .filter((item: any) => typeof item?.name === 'string' && typeof item?.url === 'string')
+    .map((item: any) => {
+      const uploadedBy = item?.uploadedBy
+      const uploadedById =
+        typeof uploadedBy === 'string'
+          ? uploadedBy
+          : typeof uploadedBy?._id === 'string'
+            ? uploadedBy._id
+            : undefined
+
+      const uploadedByName =
+        typeof uploadedBy === 'object' && uploadedBy !== null
+          ? `${uploadedBy.firstName || ''} ${uploadedBy.lastName || ''}`.trim() ||
+            uploadedBy.email ||
+            'Unknown'
+          : undefined
+
+      return {
+        _id: typeof item?._id === 'string' ? item._id : undefined,
+        name: item.name,
+        url: item.url,
+        size: typeof item.size === 'number' ? item.size : 0,
+        type: typeof item.type === 'string' ? item.type : 'application/octet-stream',
+        uploadedAt: item.uploadedAt ? new Date(item.uploadedAt).toISOString() : new Date().toISOString(),
+        uploadedById,
+        uploadedByName
+      }
+    })
+}
+
+const normalizeAttachmentsForCompare = (attachments: AttachmentDraft[]) =>
+  attachments.map((attachment) => ({
+    name: attachment.name,
+    url: attachment.url,
+    size: attachment.size,
+    type: attachment.type,
+    uploadedById: attachment.uploadedById ?? null
+  }))
+
+const mapCurrentUser = (input: any): CurrentUser | null => {
+  if (!input) return null
+  const id = typeof input.id === 'string' ? input.id : (typeof input._id === 'string' ? input._id : '')
+  if (!id) return null
+  return {
+    id,
+    firstName: input.firstName || '',
+    lastName: input.lastName || '',
+    email: input.email || ''
+  }
+}
+
 export default function EditTaskPage() {
   const router = useRouter()
   const params = useParams()
@@ -127,6 +200,12 @@ export default function EditTaskPage() {
   const [projectFilterQuery, setProjectFilterQuery] = useState('')
   const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
   const [labelsInput, setLabelsInput] = useState('')
+  const [attachments, setAttachments] = useState<AttachmentDraft[]>([])
+  const [originalAttachments, setOriginalAttachments] = useState<AttachmentDraft[]>([])
+  const [attachmentError, setAttachmentError] = useState('')
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -143,11 +222,14 @@ export default function EditTaskPage() {
       if (data.success) {
         const mappedTask = mapTaskFormState(data.data)
         const mappedSubtasks = mapSubtasksFromResponse(data.data?.subtasks)
+        const mappedAttachments = mapAttachmentsFromResponse(data.data?.attachments)
 
         setTask(mappedTask)
         setOriginalTask(mappedTask)
         setSubtasks(mappedSubtasks)
         setOriginalSubtasks(mappedSubtasks)
+        setAttachments(mappedAttachments)
+        setOriginalAttachments(mappedAttachments)
         setLabelsInput(Array.isArray(data.data?.labels) ? data.data.labels.join(', ') : '')
         setError('')
         // Reset filter queries
@@ -174,11 +256,42 @@ export default function EditTaskPage() {
     }
   }, [taskId])
 
+  const fetchCurrentUser = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/me')
+      if (response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        const userData = mapCurrentUser(payload?.user || payload)
+        if (userData) {
+          setCurrentUser(userData)
+        }
+        return
+      }
+
+      if (response.status === 401) {
+        const refreshResponse = await fetch('/api/auth/refresh', { method: 'POST' })
+        if (refreshResponse.ok) {
+          const refreshPayload = await refreshResponse.json().catch(() => ({}))
+          const userData = mapCurrentUser(refreshPayload?.user || refreshPayload)
+          if (userData) {
+            setCurrentUser(userData)
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load current user', err)
+    }
+  }, [])
+
   useEffect(() => {
     if (taskId) {
       fetchTask()
     }
   }, [taskId, fetchTask])
+
+  useEffect(() => {
+    fetchCurrentUser()
+  }, [fetchCurrentUser])
 
   const fetchProjects = async () => {
     setLoadingProjects(true)
@@ -349,6 +462,71 @@ export default function EditTaskPage() {
     setSubtasks((prev) => prev.filter((_, i) => i !== index))
   }
 
+  const uploadAttachmentFile = useCallback(async (file: File) => {
+    if (!currentUser) {
+      throw new Error('User information is still loading. Please try again.')
+    }
+
+    const formDataUpload = new FormData()
+    formDataUpload.append('attachment', file)
+    const displayName = `${currentUser.firstName} ${currentUser.lastName}`.trim() || currentUser.email
+    if (displayName) {
+      formDataUpload.append('uploadedByName', displayName)
+    }
+
+    const response = await fetch('/api/uploads/attachments', {
+      method: 'POST',
+      body: formDataUpload
+    })
+
+    const uploadResult = await response.json().catch(() => ({ error: 'Failed to upload attachment' }))
+    if (!response.ok || !uploadResult?.success) {
+      throw new Error(uploadResult.error || 'Failed to upload attachment')
+    }
+
+    const attachmentData = uploadResult.data
+    setAttachments((prev) => [
+      ...prev,
+      {
+        name: attachmentData.name,
+        url: attachmentData.url,
+        size: attachmentData.size,
+        type: attachmentData.type,
+        uploadedAt: attachmentData.uploadedAt,
+        uploadedByName: attachmentData.uploadedByName || displayName,
+        uploadedById: currentUser.id
+      }
+    ])
+  }, [currentUser])
+
+  const handleAttachmentInputChange = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    event.target.value = ''
+
+    try {
+      setAttachmentError('')
+      setIsUploadingAttachment(true)
+      await uploadAttachmentFile(file)
+    } catch (err) {
+      setAttachmentError(err instanceof Error ? err.message : 'Failed to upload attachment')
+    } finally {
+      setIsUploadingAttachment(false)
+    }
+  }, [uploadAttachmentFile])
+
+  const handleAttachmentButtonClick = useCallback(() => {
+    if (!currentUser) {
+      setAttachmentError('User information is still loading. Please try again shortly.')
+      return
+    }
+    attachmentInputRef.current?.click()
+  }, [currentUser])
+
+  const handleAttachmentDelete = useCallback((index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index))
+  }, [])
+
   const handleSave = async () => {
     if (!task) return
 
@@ -369,6 +547,17 @@ export default function EditTaskPage() {
       setSaving(true)
       setError('')
       const preparedSubtasks = sanitizeSubtasksForPayload(subtasks)
+      const preparedAttachments = attachments
+        .filter((attachment) => attachment.name && attachment.url)
+        .map((attachment) => ({
+          name: attachment.name.trim(),
+          url: attachment.url.trim(),
+          size: attachment.size ?? 0,
+          type: attachment.type || 'application/octet-stream',
+          uploadedAt: attachment.uploadedAt,
+          uploadedBy: attachment.uploadedById || currentUser?.id || ''
+        }))
+        .filter((attachment) => attachment.uploadedBy)
       
       // Parse labels from comma-separated string
       const labels = labelsInput
@@ -390,7 +579,8 @@ export default function EditTaskPage() {
           labels: labels,
           estimatedHours: task.estimatedHours || undefined,
           storyPoints: task.storyPoints || undefined,
-          subtasks: preparedSubtasks
+          subtasks: preparedSubtasks,
+          attachments: preparedAttachments
         })
       })
 
@@ -401,11 +591,14 @@ export default function EditTaskPage() {
         // The API already returns the updated task data
         const mappedTask = mapTaskFormState(data.data)
         const mappedSubtasks = mapSubtasksFromResponse(data.data?.subtasks)
+        const mappedAttachments = mapAttachmentsFromResponse(data.data?.attachments)
 
         setTask(mappedTask)
         setOriginalTask(mappedTask)
         setSubtasks(mappedSubtasks)
         setOriginalSubtasks(mappedSubtasks)
+        setAttachments(mappedAttachments)
+        setOriginalAttachments(mappedAttachments)
         setLabelsInput(Array.isArray(data.data?.labels) ? data.data.labels.join(', ') : '')
         setSuccess('Task updated successfully')
         setTimeout(() => setSuccess(''), 4000)
@@ -422,18 +615,35 @@ export default function EditTaskPage() {
 
   const comparableOriginalSubtasks = useMemo(() => normalizeSubtasksForCompare(originalSubtasks), [originalSubtasks])
   const comparableCurrentSubtasks = useMemo(() => normalizeSubtasksForCompare(subtasks), [subtasks])
+  const comparableOriginalAttachments = useMemo(() => normalizeAttachmentsForCompare(originalAttachments), [originalAttachments])
+  const comparableCurrentAttachments = useMemo(() => normalizeAttachmentsForCompare(attachments), [attachments])
+  const attachmentListItems = useMemo(() => {
+    return attachments.map((attachment) => ({
+      name: attachment.name,
+      url: attachment.url,
+      size: attachment.size,
+      type: attachment.type,
+      uploadedAt: attachment.uploadedAt,
+      uploadedBy:
+        attachment.uploadedByName ||
+        (attachment.uploadedById && attachment.uploadedById === currentUser?.id
+          ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email || 'You'
+          : 'Unknown')
+    }))
+  }, [attachments, currentUser])
 
   const isDirty = useMemo(() => {
     if (!task || !originalTask) return false
     const taskChanged = JSON.stringify(task) !== JSON.stringify(originalTask)
     const subtasksChanged = JSON.stringify(comparableCurrentSubtasks) !== JSON.stringify(comparableOriginalSubtasks)
+    const attachmentsChanged = JSON.stringify(comparableCurrentAttachments) !== JSON.stringify(comparableOriginalAttachments)
     
     // Check labels separately since they're stored in a separate state
     const originalLabelsStr = Array.isArray(originalTask.labels) ? originalTask.labels.join(', ') : (originalTask.labels || '')
     const labelsChanged = labelsInput.trim() !== originalLabelsStr.trim()
     
-    return taskChanged || subtasksChanged || labelsChanged
-  }, [task, originalTask, comparableCurrentSubtasks, comparableOriginalSubtasks, labelsInput])
+    return taskChanged || subtasksChanged || labelsChanged || attachmentsChanged
+  }, [task, originalTask, comparableCurrentSubtasks, comparableOriginalSubtasks, comparableCurrentAttachments, comparableOriginalAttachments, labelsInput])
 
   const isValid = useMemo(() => {
     if (!task) return false
@@ -787,6 +997,51 @@ export default function EditTaskPage() {
                   />
                   <p className="text-xs text-muted-foreground mt-1">Separate multiple labels with commas</p>
                 </div>
+              </div>
+
+              <div className="space-y-4 border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium flex items-center gap-2">
+                    <Paperclip className="h-4 w-4 text-muted-foreground" />
+                    Attachments
+                  </h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAttachmentButtonClick}
+                    disabled={isUploadingAttachment}
+                    className="flex items-center gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Attachment
+                  </Button>
+                </div>
+                <input
+                  type="file"
+                  ref={attachmentInputRef}
+                  onChange={handleAttachmentInputChange}
+                  className="hidden"
+                />
+                {isUploadingAttachment && (
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Uploading attachment...</span>
+                  </div>
+                )}
+                {attachmentError && (
+                  <Alert variant="destructive">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>{attachmentError}</AlertDescription>
+                    </div>
+                  </Alert>
+                )}
+                <AttachmentList
+                  attachments={attachmentListItems}
+                  onDelete={handleAttachmentDelete}
+                  canDelete
+                />
               </div>
             </div>
 

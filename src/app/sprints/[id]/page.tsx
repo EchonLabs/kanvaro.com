@@ -612,20 +612,20 @@ export default function SprintDetailPage() {
     <MainLayout>
       <div className="space-y-6 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
-            <Button variant="ghost" onClick={() => router.push('/sprints')} className="w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto min-w-0">
+            <Button variant="ghost" onClick={() => router.push('/sprints')} className="w-full sm:w-auto flex-shrink-0">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 w-full sm:w-auto">
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0">
-                <Target className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-blue-600 flex-shrink-0" />
-                <span className="truncate" title={sprint?.name}>{sprint?.name}</span>
+                <Target className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-blue-600 flex-shrink-0" />
+                <span className="truncate min-w-0" title={sprint?.name}>{sprint?.name}</span>
               </h1>
               <p className="text-xs sm:text-sm text-muted-foreground">Sprint Details</p>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-shrink-0">
             <Button variant="outline" onClick={() => router.push(`/sprints/${sprintId}/edit`)} className="w-full sm:w-auto">
               <Edit className="h-4 w-4 mr-2" />
               Edit

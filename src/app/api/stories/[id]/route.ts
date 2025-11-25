@@ -40,7 +40,13 @@ export async function GET(
       })
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
-      .populate('sprint', 'name')
+      .populate({
+        path: 'sprint',
+        select: 'name description status startDate endDate goal project',
+        populate: [
+          { path: 'project', select: 'name' }
+        ]
+      })
 
     if (!story) {
       return NextResponse.json(
@@ -104,7 +110,13 @@ export async function PUT(
       })
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
-      .populate('sprint', 'name')
+      .populate({
+        path: 'sprint',
+        select: 'name description status startDate endDate goal project',
+        populate: [
+          { path: 'project', select: 'name' }
+        ]
+      })
 
     if (!story) {
       return NextResponse.json(
