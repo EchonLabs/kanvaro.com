@@ -1,3 +1,10 @@
+## [1.6.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.6.0...v1.6.1) (2025-11-25)
+
+
+### Bug Fixes
+
+* add time log changes ([3dbbb12](https://github.com/EchonLabs/kanvaro.com/commit/3dbbb12215843d69398806f2e2073df265d58272))
+
 # [1.6.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.5.0...v1.6.0) (2025-11-25)
 
 
