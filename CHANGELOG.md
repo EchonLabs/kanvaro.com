@@ -1,3 +1,15 @@
+# [1.6.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.5.0...v1.6.0) (2025-11-25)
+
+
+### Bug Fixes
+
+* add fixes ([6b189cd](https://github.com/EchonLabs/kanvaro.com/commit/6b189cd0c1a20f97a5d4855ff3305ec247cfb1e7))
+
+
+### Features
+
+* add new changes ([d5aa060](https://github.com/EchonLabs/kanvaro.com/commit/d5aa06082c87869239159eca1cf6511d93604f1b))
+
 # [1.5.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.4.6...v1.5.0) (2025-11-25)
 
 
