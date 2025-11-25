@@ -544,6 +544,11 @@ export default function TasksClient({
     }
   }
 
+  const getTruncatedTaskTitle = (title?: string) => {
+    if (!title) return ''
+    return title.length > 10 ? `${title.slice(0, 10)}…` : title
+  }
+
   // Fetch projects with their kanbanStatuses
   const fetchProjectsWithStatuses = useCallback(async () => {
     try {
@@ -1176,7 +1181,7 @@ export default function TasksClient({
         }}
         onConfirm={handleDeleteTask}
         title="Delete Task"
-        description={`Are you sure you want to delete "${selectedTask?.title}"? This action cannot be undone.`}
+        description={`Are you sure you want to delete "${getTruncatedTaskTitle(selectedTask?.title)}"? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
         variant="destructive"
