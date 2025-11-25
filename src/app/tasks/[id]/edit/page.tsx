@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { AttachmentList } from '@/components/ui/AttachmentList'
-import { Loader2, ArrowLeft, CheckCircle, Plus, Trash2, Target, User, Clock, Calendar, Paperclip, AlertTriangle } from 'lucide-react'
+import { Loader2, ArrowLeft, CheckCircle, Plus, Trash2, Target, User, Clock, Calendar, Paperclip, AlertTriangle, X } from 'lucide-react'
 
 const STATUS_OPTIONS = [
   { value: 'backlog', label: 'Backlog' },
@@ -184,6 +184,31 @@ const mapCurrentUser = (input: any): CurrentUser | null => {
   }
 }
 
+const extractAssigneeIds = (data: any): string[] => {
+  const ids: string[] = []
+  if (Array.isArray(data?.assignees)) {
+    data.assignees.forEach((assignee: any) => {
+      const id =
+        typeof assignee === 'string'
+          ? assignee
+          : typeof assignee?._id === 'string'
+            ? assignee._id
+            : undefined
+      if (id) ids.push(String(id))
+    })
+  }
+  if (ids.length === 0 && data?.assignedTo) {
+    const single =
+      typeof data.assignedTo === 'string'
+        ? data.assignedTo
+        : typeof data.assignedTo?._id === 'string'
+          ? data.assignedTo._id
+          : undefined
+    if (single) ids.push(String(single))
+  }
+  return ids
+}
+
 export default function EditTaskPage() {
   const router = useRouter()
   const params = useParams()
@@ -199,6 +224,8 @@ export default function EditTaskPage() {
   const [loadingProjects, setLoadingProjects] = useState(false)
   const [projectFilterQuery, setProjectFilterQuery] = useState('')
   const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
+  const [assignedToIds, setAssignedToIds] = useState<string[]>([])
+  const [originalAssignedToIds, setOriginalAssignedToIds] = useState<string[]>([])
   const [labelsInput, setLabelsInput] = useState('')
   const [attachments, setAttachments] = useState<AttachmentDraft[]>([])
   const [originalAttachments, setOriginalAttachments] = useState<AttachmentDraft[]>([])
@@ -213,6 +240,14 @@ export default function EditTaskPage() {
   const [success, setSuccess] = useState('')
   const messageRef = useRef<HTMLDivElement>(null)
 
+  const updateAssignees = useCallback((updater: (prev: string[]) => string[]) => {
+    setAssignedToIds(prev => {
+      const next = updater(prev)
+      setTask(prevTask => prevTask ? ({ ...prevTask, assignedTo: next[0] }) : prevTask)
+      return next
+    })
+  }, [setTask])
+
   const fetchTask = useCallback(async () => {
     try {
       setLoading(true)
@@ -223,14 +258,26 @@ export default function EditTaskPage() {
         const mappedTask = mapTaskFormState(data.data)
         const mappedSubtasks = mapSubtasksFromResponse(data.data?.subtasks)
         const mappedAttachments = mapAttachmentsFromResponse(data.data?.attachments)
+        const initialAssignees = extractAssigneeIds(data.data)
+        const normalizedTask = {
+          ...mappedTask,
+          assignedTo: initialAssignees[0] ?? mappedTask.assignedTo
+        }
 
-        setTask(mappedTask)
-        setOriginalTask(mappedTask)
+        setTask(normalizedTask)
+        setOriginalTask(normalizedTask)
         setSubtasks(mappedSubtasks)
         setOriginalSubtasks(mappedSubtasks)
         setAttachments(mappedAttachments)
         setOriginalAttachments(mappedAttachments)
         setLabelsInput(Array.isArray(data.data?.labels) ? data.data.labels.join(', ') : '')
+        const initialAssigneeState = initialAssignees.length > 0
+          ? initialAssignees
+          : normalizedTask.assignedTo
+            ? [normalizedTask.assignedTo]
+            : []
+        updateAssignees(() => initialAssigneeState)
+        setOriginalAssignedToIds(initialAssigneeState)
         setError('')
         // Reset filter queries
         setProjectFilterQuery('')
@@ -239,12 +286,12 @@ export default function EditTaskPage() {
         
         // Fetch team members for the project if one is set
         // On initial load: fetch team members and preserve existing assignee if valid
-        if (mappedTask.project) {
-          // Fetch team members with current assignee ID to validate it
-          fetchProjectTeamMembers(mappedTask.project, mappedTask.assignedTo)
+        if (normalizedTask.project) {
+          fetchProjectTeamMembers(normalizedTask.project, normalizedTask.assignedTo)
         } else {
           // If no project, clear users
           setUsers([])
+          updateAssignees(() => [])
         }
       } else {
         setError(data.error || 'Failed to load task')
@@ -254,7 +301,7 @@ export default function EditTaskPage() {
     } finally {
       setLoading(false)
     }
-  }, [taskId])
+  }, [taskId, updateAssignees])
 
   const fetchCurrentUser = useCallback(async () => {
     try {
@@ -315,42 +362,33 @@ export default function EditTaskPage() {
   const fetchProjectTeamMembers = async (projectId: string, preserveAssigneeId?: string) => {
     if (!projectId) {
       setUsers([])
-      if (preserveAssigneeId) {
-        setTask((prev) => prev ? ({ ...prev, assignedTo: undefined }) : prev)
-      }
+      updateAssignees(() => [])
       return
     }
     
     setLoadingUsers(true)
     try {
-      // Fetch project details to get team members (same approach as create page)
       const response = await fetch(`/api/projects/${projectId}`)
       const data = await response.json()
       
       if (!response.ok || !data.success || !data.data) {
         setUsers([])
-        if (preserveAssigneeId) {
-          setTask((prev) => prev ? ({ ...prev, assignedTo: undefined }) : prev)
-        }
+        updateAssignees(() => [])
         return
       }
       
-      // Extract team members from project data (same as create page)
       const rawMembers = Array.isArray(data.data.teamMembers) 
         ? data.data.teamMembers 
         : []
       
-      // Map team members to User format - handle direct user objects
       const teamMembers: User[] = rawMembers
         .map((member: any) => {
-          // Handle both populated and non-populated formats
           const userObj = member.user || member
           const userId = userObj?._id || member?._id
           const firstName = userObj?.firstName || member?.firstName
           const lastName = userObj?.lastName || member?.lastName
           const email = userObj?.email || member?.email
           
-          // Validate required fields
           if (!userId || !firstName || !lastName) {
             return null
           }
@@ -364,38 +402,20 @@ export default function EditTaskPage() {
         })
         .filter((member: User | null): member is User => member !== null)
       
-      // Set the team members list
       setUsers(teamMembers)
       
-      // Handle assignee preservation/validation
-      if (preserveAssigneeId) {
-        const assigneeIdStr = String(preserveAssigneeId)
-        const assigneeInTeam = teamMembers.some((u: User) => String(u._id) === assigneeIdStr)
-        
-        if (assigneeInTeam) {
-          // Assignee is in the new team, preserve it
-          setTask((prev) => {
-            if (prev && String(prev.assignedTo) !== assigneeIdStr) {
-              return { ...prev, assignedTo: preserveAssigneeId }
-            }
-            return prev
-          })
-        } else {
-          // Assignee is not in the new team, clear it
-          setTask((prev) => {
-            if (prev && String(prev.assignedTo) === assigneeIdStr) {
-              return { ...prev, assignedTo: undefined }
-            }
-            return prev
-          })
+      updateAssignees((prev) => {
+        const valid = prev.filter(id => teamMembers.some((member) => String(member._id) === String(id)))
+        const preserveId = preserveAssigneeId ? String(preserveAssigneeId) : undefined
+        if (preserveId && teamMembers.some((member) => String(member._id) === preserveId) && !valid.includes(preserveId)) {
+          valid.push(preserveId)
         }
-      }
+        return valid
+      })
     } catch (error) {
       console.error('Failed to fetch project team members:', error)
       setUsers([])
-      if (preserveAssigneeId) {
-        setTask((prev) => prev ? ({ ...prev, assignedTo: undefined }) : prev)
-      }
+      updateAssignees(() => [])
     } finally {
       setLoadingUsers(false)
     }
@@ -530,16 +550,13 @@ export default function EditTaskPage() {
   const handleSave = async () => {
     if (!task) return
 
-    // Validate required fields
     if (!task.project) {
       setError('Project is required')
-      setSaving(false)
       return
     }
     
-    if (!task.assignedTo) {
-      setError('Assigned To is required')
-      setSaving(false)
+    if (assignedToIds.length === 0) {
+      setError('Please assign this task to at least one team member')
       return
     }
 
@@ -574,7 +591,8 @@ export default function EditTaskPage() {
           priority: task.priority,
           type: task.type,
           project: task.project || undefined,
-          assignedTo: task.assignedTo || undefined,
+          assignedTo: assignedToIds[0],
+          assignees: assignedToIds.length > 1 ? assignedToIds : undefined,
           dueDate: task.dueDate || undefined,
           labels: labels,
           estimatedHours: task.estimatedHours || undefined,
@@ -592,6 +610,7 @@ export default function EditTaskPage() {
         const mappedTask = mapTaskFormState(data.data)
         const mappedSubtasks = mapSubtasksFromResponse(data.data?.subtasks)
         const mappedAttachments = mapAttachmentsFromResponse(data.data?.attachments)
+        const updatedAssignees = extractAssigneeIds(data.data)
 
         setTask(mappedTask)
         setOriginalTask(mappedTask)
@@ -600,6 +619,8 @@ export default function EditTaskPage() {
         setAttachments(mappedAttachments)
         setOriginalAttachments(mappedAttachments)
         setLabelsInput(Array.isArray(data.data?.labels) ? data.data.labels.join(', ') : '')
+        updateAssignees(() => updatedAssignees)
+        setOriginalAssignedToIds(updatedAssignees)
         setSuccess('Task updated successfully')
         setTimeout(() => setSuccess(''), 4000)
         setError('')
@@ -642,14 +663,26 @@ export default function EditTaskPage() {
     const originalLabelsStr = Array.isArray(originalTask.labels) ? originalTask.labels.join(', ') : (originalTask.labels || '')
     const labelsChanged = labelsInput.trim() !== originalLabelsStr.trim()
     
-    return taskChanged || subtasksChanged || labelsChanged || attachmentsChanged
-  }, [task, originalTask, comparableCurrentSubtasks, comparableOriginalSubtasks, comparableCurrentAttachments, comparableOriginalAttachments, labelsInput])
+    const assigneesChanged = JSON.stringify(assignedToIds) !== JSON.stringify(originalAssignedToIds)
+    
+    return taskChanged || subtasksChanged || labelsChanged || attachmentsChanged || assigneesChanged
+  }, [
+    task,
+    originalTask,
+    comparableCurrentSubtasks,
+    comparableOriginalSubtasks,
+    comparableCurrentAttachments,
+    comparableOriginalAttachments,
+    labelsInput,
+    assignedToIds,
+    originalAssignedToIds
+  ])
 
   const isValid = useMemo(() => {
     if (!task) return false
     // Check all required fields
-    return !!(task.title?.trim() && task.project && task.assignedTo)
-  }, [task])
+    return !!(task.title?.trim() && task.project && assignedToIds.length > 0)
+  }, [task, assignedToIds])
 
   // Auto-scroll to message when error or success appears
   useEffect(() => {
@@ -799,7 +832,7 @@ export default function EditTaskPage() {
                         fetchProjectTeamMembers(newProjectId, currentAssigneeId)
                       } else {
                         setUsers([])
-                        setTask((prev) => prev ? ({ ...prev, assignedTo: undefined }) : prev)
+                        updateAssignees(() => [])
                       }
                     }}
                     disabled={loadingProjects}
@@ -857,83 +890,104 @@ export default function EditTaskPage() {
                     <User className="h-4 w-4" />
                     Assigned To *
                   </label>
-                  <Select 
-                    value={task.assignedTo || ''} 
-                    onValueChange={(v) => {
-                      setTask((prev) => prev ? ({ ...prev, assignedTo: v || undefined }) : prev)
-                      setAssignedToFilterQuery('')
-                    }}
-                    disabled={loadingUsers || !task.project}
-                    required
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue 
-                        placeholder={
-                          loadingUsers 
-                            ? "Loading team members..." 
-                            : !task.project 
-                              ? "Select project first" 
-                              : users.length === 0
-                                ? "No team members available"
-                                : task.assignedTo && users.some(u => String(u._id) === String(task.assignedTo))
-                                  ? undefined // Will display selected user name automatically
-                                  : "Select team member"
+                  <div className="space-y-2 mt-1">
+                    <Select
+                      value=""
+                      onValueChange={(value) => {
+                        if (!assignedToIds.includes(value)) {
+                          updateAssignees(prev => [...prev, value])
                         }
-                      />
-                    </SelectTrigger>
-                    <SelectContent className="z-[10050] p-0">
-                      <div 
-                        className="p-2"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                      >
-                        <Input
-                          value={assignedToFilterQuery}
-                          onChange={(e) => setAssignedToFilterQuery(e.target.value)}
-                          placeholder="Search assignees"
-                          className="mb-2"
-                          autoFocus
-                          onClick={(e) => e.stopPropagation()}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => {
-                            e.stopPropagation()
-                            // Prevent Select from handling keyboard navigation when typing
-                            if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
-                              e.preventDefault()
-                            }
-                          }}
-                          onFocus={(e) => e.stopPropagation()}
-                        />
-                        <div className="max-h-56 overflow-y-auto">
-                          {loadingUsers ? (
-                            <div className="px-2 py-1 text-xs text-muted-foreground flex items-center space-x-2">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span>Loading members...</span>
-                            </div>
-                          ) : !task.project ? (
-                            <div className="px-2 py-1 text-xs text-muted-foreground">Please select a project first</div>
-                          ) : users.length === 0 ? (
-                            <div className="px-2 py-1 text-xs text-muted-foreground">No team members in this project</div>
-                          ) : filteredAssignedToOptions.length === 0 ? (
-                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching team members</div>
-                          ) : (
-                            filteredAssignedToOptions.map((user) => (
-                              <SelectItem key={user._id} value={user._id}>
-                                <div className="flex items-center justify-between w-full">
-                                  <span className="font-medium">{user.firstName} {user.lastName}</span>
-                                  {user.email && (
-                                    <span className="text-xs text-muted-foreground ml-2 truncate max-w-[180px]">
-                                      {user.email}
-                                    </span>
-                                  )}
+                      }}
+                      disabled={loadingUsers || !task.project}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={
+                          loadingUsers
+                            ? 'Loading team members...'
+                            : !task.project
+                              ? 'Select project first'
+                              : users.length === 0
+                                ? 'No team members available'
+                                : 'Select team members'
+                        } />
+                      </SelectTrigger>
+                      <SelectContent className="z-[10050] p-0">
+                        <div className="p-2">
+                          <Input
+                            value={assignedToFilterQuery}
+                            onChange={(e) => setAssignedToFilterQuery(e.target.value)}
+                            placeholder="Search team members"
+                            className="mb-2"
+                          />
+                          <div className="max-h-56 overflow-y-auto">
+                            {loadingUsers ? (
+                              <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Loading members...</span>
+                              </div>
+                            ) : users.length === 0 ? (
+                              <div className="px-2 py-1 text-xs text-muted-foreground">
+                                No team members found for this project
+                              </div>
+                            ) : (
+                              filteredAssignedToOptions.length === 0 ? (
+                                <div className="px-2 py-1 text-xs text-muted-foreground">
+                                  No matching team members
                                 </div>
-                              </SelectItem>
-                            ))
-                          )}
+                              ) : (
+                                filteredAssignedToOptions.map((member: User) => {
+                                  const isSelected = assignedToIds.includes(member._id)
+                                  return (
+                                    <SelectItem
+                                      key={member._id}
+                                      value={member._id}
+                                      disabled={isSelected}
+                                      className={isSelected ? 'opacity-50 cursor-not-allowed' : ''}
+                                    >
+                                      <div className="flex items-center justify-between w-full">
+                                        <span>{member.firstName} {member.lastName}</span>
+                                        {member.email && (
+                                          <span className="text-xs text-muted-foreground ml-2 truncate max-w-[180px]">
+                                            {member.email}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </SelectItem>
+                                  )
+                                })
+                              )
+                            )}
+                          </div>
                         </div>
+                      </SelectContent>
+                    </Select>
+                    {assignedToIds.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {assignedToIds.map((id: string) => {
+                          const member = users.find(u => u._id === id)
+                          if (!member) return null
+                          return (
+                            <span
+                              key={id}
+                              className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
+                            >
+                              <span>{member.firstName} {member.lastName}</span>
+                              <button
+                                type="button"
+                                aria-label="Remove assignee"
+                                className="text-muted-foreground hover:text-foreground focus:outline-none"
+                                onClick={() => {
+                                  updateAssignees(prev => prev.filter((x: string) => x !== id))
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </span>
+                          )
+                        })}
                       </div>
-                    </SelectContent>
-                  </Select>
+                    )}
+                  </div>
                 </div>
               </div>
 

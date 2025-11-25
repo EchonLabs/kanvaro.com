@@ -88,6 +88,8 @@ const SUBTASK_STATUS_OPTIONS: Array<{ value: SubtaskStatus; label: string }> = [
   { value: 'cancelled', label: 'Cancelled' }
 ]
 
+const MAX_LABEL_LENGTH = 50
+
 interface TaskFormData {
   title: string
   description: string
@@ -285,13 +287,19 @@ export default function CreateTaskModal({
   }
 
   const addLabel = () => {
-    if (newLabel.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        labels: [...prev.labels, newLabel.trim()]
-      }))
-      setNewLabel('')
+    const trimmed = newLabel.trim()
+    if (!trimmed) return
+
+    if (trimmed.length > MAX_LABEL_LENGTH) {
+      setError(`Labels must be ${MAX_LABEL_LENGTH} characters or fewer.`)
+      return
     }
+
+    setFormData(prev => ({
+      ...prev,
+      labels: [...prev.labels, trimmed]
+    }))
+    setNewLabel('')
   }
 
   const removeLabel = (index: number) => {
@@ -815,6 +823,7 @@ export default function CreateTaskModal({
                       onChange={(e) => setNewLabel(e.target.value)}
                       placeholder="Enter label"
                       onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLabel())}
+                      maxLength={MAX_LABEL_LENGTH}
                       className="mt-1"
                     />
                     <Button type="button" onClick={addLabel} size="sm" disabled={newLabel.trim() === ''} className="mt-1">
