@@ -28,6 +28,8 @@ interface Column {
   color: string
 }
 
+const CARD_VERTICAL_GAP = 28
+
 interface VirtualizedColumnProps {
   column: Column
   tasks: PopulatedTask[]
@@ -59,8 +61,9 @@ export default function VirtualizedColumn({
   const rowVirtualizer = useVirtualizer({
     count: tasks.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 185,
+    estimateSize: () => 220,
     overscan: 6,
+    measureElement: (element) => element?.getBoundingClientRect().height || 0,
   })
 
   const setDroppableRef = (node: HTMLDivElement | null) => {
@@ -69,7 +72,7 @@ export default function VirtualizedColumn({
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 min-w-[280px] sm:min-w-0 w-full sm:w-auto">
+    <div className="space-y-4 sm:space-y-6 min-w-[320px] sm:min-w-0 w-full sm:w-auto">
       <div className="flex items-center justify-between rounded-xl bg-muted/40 px-4 py-3 shadow-sm">
         <div className="flex items-center space-x-2 min-w-0">
           <Badge className={`${column.color} text-xs sm:text-sm truncate px-2 py-1`}>
@@ -130,7 +133,8 @@ export default function VirtualizedColumn({
                       width: '100%',
                       height: `${virtualRow.size}px`,
                       transform: `translateY(${virtualRow.start}px)`,
-                      padding: '0 0.35rem 1rem 0.35rem',
+                      padding: `0 0.35rem 0 0.35rem`,
+                      marginBottom: `${CARD_VERTICAL_GAP}px`,
                     }}
                   >
                     <SortableTask 

@@ -13,6 +13,8 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
+import { useProjectKanbanStatuses } from '@/hooks/useProjectKanbanStatuses'
+import { DEFAULT_TASK_STATUS_OPTIONS, DEFAULT_TASK_STATUS_BADGE_MAP, type TaskStatusOption } from '@/constants/taskStatuses'
 import { 
   ArrowLeft,
   Calendar,
@@ -113,31 +115,6 @@ interface SprintOption {
   }
 }
 
-const TASK_STATUS_OPTIONS = [
-  { value: 'backlog', label: 'Backlog' },
-  { value: 'todo', label: 'To Do' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'review', label: 'In Review' },
-  { value: 'testing', label: 'Testing' },
-  { value: 'done', label: 'Done' },
-  { value: 'cancelled', label: 'Cancelled' }
-]
-
-const TASK_STATUS_BADGE_MAP: Record<string, string> = {
-  backlog: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200',
-  todo: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  in_progress: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-  review: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-  testing: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-  blocked: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-  done: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  cancelled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-}
-
-const formatTaskStatusLabel = (status: string) =>
-  TASK_STATUS_OPTIONS.find(option => option.value === status)?.label || formatToTitleCase(status)
-
 const buildTaskSummaryFromTasks = (tasks?: Sprint['tasks']) => {
   if (!tasks) {
     return undefined
@@ -225,6 +202,7 @@ export default function SprintDetailPage() {
   })
   const [taskStatusUpdating, setTaskStatusUpdating] = useState<string | null>(null)
   const [taskStatusError, setTaskStatusError] = useState('')
+  const { getStatusesForProject } = useProjectKanbanStatuses()
 
   useEffect(() => {
     if (!successMessage) return
@@ -234,10 +212,83 @@ export default function SprintDetailPage() {
 
   const sprintTasks = sprint?.tasks || []
 
+  const projectStatusOptions = useMemo<TaskStatusOption[]>(() => {
+    if (!sprint?.project?._id) {
+      return DEFAULT_TASK_STATUS_OPTIONS
+    }
+    const statuses = getStatusesForProject(sprint.project._id)
+    if (statuses?.length) {
+      return statuses.map(status => ({
+        value: status.key,
+        label: status.title || formatToTitleCase(status.key),
+        color: status.color
+      }))
+    }
+    return DEFAULT_TASK_STATUS_OPTIONS
+  }, [sprint?.project?._id, getStatusesForProject])
+
+  const formatTaskStatusLabel = useCallback(
+    (status: string) => {
+      const option = projectStatusOptions.find(opt => opt.value === status)
+      return option?.label || formatToTitleCase(status)
+    },
+    [projectStatusOptions]
+  )
+
+  const getTaskStatusBadgeClass = useCallback(
+    (status: string) => {
+      const option = projectStatusOptions.find(opt => opt.value === status)
+      return option?.color || DEFAULT_TASK_STATUS_BADGE_MAP[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+    },
+    [projectStatusOptions]
+  )
+
   const incompleteTasks = useMemo(
     () => sprintTasks.filter(task => !['done', 'completed'].includes(task.status)),
     [sprintTasks]
   )
+
+  // Calculate task counts per status based on project's custom statuses
+  const taskBreakdownByStatus = useMemo(() => {
+    const breakdown: Array<{ status: string; label: string; count: number; color?: string }> = []
+    
+    if (!sprintTasks.length) return breakdown
+
+    // Get all unique statuses from tasks
+    const taskStatuses = new Set(sprintTasks.map(task => task.status))
+    
+    // For each status in project's configuration, count tasks
+    projectStatusOptions.forEach(option => {
+      if (taskStatuses.has(option.value)) {
+        const count = sprintTasks.filter(task => task.status === option.value).length
+        if (count > 0) {
+          breakdown.push({
+            status: option.value,
+            label: option.label,
+            count,
+            color: option.color
+          })
+        }
+      }
+    })
+    
+    // Also include any task statuses that aren't in the project config (fallback)
+    taskStatuses.forEach(status => {
+      if (!projectStatusOptions.find(opt => opt.value === status)) {
+        const count = sprintTasks.filter(task => task.status === status).length
+        if (count > 0) {
+          breakdown.push({
+            status,
+            label: formatToTitleCase(status),
+            count,
+            color: DEFAULT_TASK_STATUS_BADGE_MAP[status]
+          })
+        }
+      }
+    })
+    
+    return breakdown
+  }, [sprintTasks, projectStatusOptions])
 
   const isCompleteConfirmDisabled = useMemo(() => {
     if (completingSprint) return true
@@ -506,6 +557,10 @@ export default function SprintDetailPage() {
 
   const handleTaskStatusChange = async (taskId: string, newStatus: string) => {
     try {
+      if (!projectStatusOptions.some(option => option.value === newStatus)) {
+        setTaskStatusError('Selected status is not available for this project.')
+        return
+      }
       setTaskStatusUpdating(taskId)
       setTaskStatusError('')
       const response = await fetch(`/api/tasks/${taskId}`, {
@@ -793,48 +848,26 @@ export default function SprintDetailPage() {
                     <div className="space-y-3">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">Task Breakdown</p>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {/* Total card */}
                         <div className="rounded-md border bg-background px-3 py-2">
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <span>Total</span>
                             <List className="h-3.5 w-3.5" />
                           </div>
-                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.total ?? 0}</p>
+                          <p className="mt-1 text-base font-semibold">{sprintTasks.length}</p>
                         </div>
-                        <div className="rounded-md border bg-background px-3 py-2">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>In Progress</span>
-                            <PauseCircle className="h-3.5 w-3.5 text-blue-500" />
+                        {/* Dynamic status cards based on project's custom statuses */}
+                        {taskBreakdownByStatus.map(({ status, label, count, color }) => (
+                          <div key={status} className="rounded-md border bg-background px-3 py-2">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span className="truncate">{label}</span>
+                              <Badge className={`${color || DEFAULT_TASK_STATUS_BADGE_MAP[status] || 'bg-gray-100 text-gray-800'} h-3.5 px-1.5 text-[10px]`}>
+                                {count}
+                              </Badge>
+                            </div>
+                            <p className="mt-1 text-base font-semibold">{count}</p>
                           </div>
-                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.inProgress ?? 0}</p>
-                        </div>
-                        <div className="rounded-md border bg-background px-3 py-2">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>To do</span>
-                            <Target className="h-3.5 w-3.5 text-slate-500" />
-                          </div>
-                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.todo ?? 0}</p>
-                        </div>
-                        <div className="rounded-md border bg-background px-3 py-2">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>Completed</span>
-                            <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
-                          </div>
-                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.completed ?? 0}</p>
-                        </div>
-                        <div className="rounded-md border bg-background px-3 py-2">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>Blocked</span>
-                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-                          </div>
-                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.blocked ?? 0}</p>
-                        </div>
-                        <div className="rounded-md border bg-background px-3 py-2">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>Cancelled</span>
-                            <XCircle className="h-3.5 w-3.5 text-red-500" />
-                          </div>
-                          <p className="mt-1 text-base font-semibold">{sprint.taskSummary?.cancelled ?? 0}</p>
-                        </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -903,7 +936,7 @@ export default function SprintDetailPage() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <Badge className={`${TASK_STATUS_BADGE_MAP[task.status] || 'bg-gray-100 text-gray-800'} text-[11px]`}>
+                          <Badge className={`${getTaskStatusBadgeClass(task.status)} text-[11px]`}>
                             {formatTaskStatusLabel(task.status)}
                           </Badge>
                         </div>
@@ -920,7 +953,7 @@ export default function SprintDetailPage() {
                                 <SelectValue placeholder="Select status" />
                               </SelectTrigger>
                               <SelectContent>
-                                {TASK_STATUS_OPTIONS.map(option => (
+                                {projectStatusOptions.map(option => (
                                   <SelectItem key={option.value} value={option.value}>
                                     {option.label}
                                   </SelectItem>

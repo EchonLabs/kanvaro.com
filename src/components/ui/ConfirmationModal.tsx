@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { AlertTriangle, X } from 'lucide-react'
@@ -34,9 +35,14 @@ export function ConfirmationModal({
   const modalId = useId()
   const titleId = `${modalId}-title`
   const descriptionId = `${modalId}-description`
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    if (!isOpen) return
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isOpen || !mounted) return
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -51,13 +57,22 @@ export function ConfirmationModal({
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isOpen, onClose])
+  }, [isOpen, onClose, mounted])
 
-  if (!isOpen) return null
+  useEffect(() => {
+    if (!isOpen || !mounted) return
 
-  return (
+    document.body.classList.add('modal-open')
+    return () => {
+      document.body.classList.remove('modal-open')
+    }
+  }, [isOpen, mounted])
+
+  if (!isOpen || !mounted) return null
+
+  return createPortal(
     <div
-      className="fixed inset-0 w-screen h-screen bg-white/85 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      className="modal-overlay fixed inset-0 w-screen h-screen bg-white/60 dark:bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
       role="presentation"
       onClick={onClose}
     >
@@ -110,6 +125,7 @@ export function ConfirmationModal({
           </div>
         </CardContent>
       </Card>
-    </div>
+    </div>,
+    document.body
   )
 }
