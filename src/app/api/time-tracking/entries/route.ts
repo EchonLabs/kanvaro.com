@@ -201,13 +201,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Time tracking not enabled' }, { status: 403 })
       }
 
+      // Check project.settings.requireApproval as fallback
+      const projectRequireApproval = project?.settings?.requireApproval ?? undefined
+
       // Create default TimeTrackingSettings based on organization settings
       settings = new TimeTrackingSettings({
         organization: organizationId,
         project: null,
         allowTimeTracking: organization.settings.timeTracking.allowTimeTracking,
         allowManualTimeSubmission: organization.settings.timeTracking.allowManualTimeSubmission,
-        requireApproval: organization.settings.timeTracking.requireApproval,
+        requireApproval: projectRequireApproval !== undefined ? projectRequireApproval : organization.settings.timeTracking.requireApproval,
         allowBillableTime: organization.settings.timeTracking.allowBillableTime,
         defaultHourlyRate: organization.settings.timeTracking.defaultHourlyRate,
         maxDailyHours: organization.settings.timeTracking.maxDailyHours,
@@ -224,6 +227,11 @@ export async function POST(request: NextRequest) {
       })
 
       await settings.save()
+    } else {
+      // If settings exist but requireApproval is not set, check project.settings.requireApproval as fallback
+      if ((settings.requireApproval === undefined || settings.requireApproval === null) && project?.settings?.requireApproval !== undefined) {
+        settings.requireApproval = project.settings.requireApproval
+      }
     }
 
     if (!settings.allowManualTimeSubmission) {
@@ -278,8 +286,25 @@ export async function POST(request: NextRequest) {
     const user = await User.findById(userId)
     const finalHourlyRate = hourlyRate || user?.billingRate || settings.defaultHourlyRate
 
+    const requestedDuration = duration || calculatedDuration
+
+    if (
+      settings.allowOvertime === false &&
+      settings.maxSessionHours &&
+      requestedDuration > settings.maxSessionHours * 60
+    ) {
+      return NextResponse.json(
+        {
+          error: `Session duration exceeds the maximum of ${settings.maxSessionHours} ${
+            settings.maxSessionHours === 1 ? 'hour' : 'hours'
+          }. Overtime is disabled for this organization.`
+        },
+        { status: 400 }
+      )
+    }
+
     // Apply rounding rules if enabled
-    let finalDuration = duration || calculatedDuration
+    let finalDuration = requestedDuration
     if (settings.roundingRules.enabled) {
       finalDuration = applyRoundingRules(finalDuration, settings.roundingRules)
     }

@@ -27,6 +27,8 @@ import {
 } from 'lucide-react'
 import { InviteMemberModal } from '@/components/members/InviteMemberModal'
 import { EditMemberModal } from '@/components/members/EditMemberModal'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 interface Member {
   _id: string
@@ -75,6 +77,12 @@ export default function MembersPage() {
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [editingMember, setEditingMember] = useState<Member | null>(null)
   const [activeTab, setActiveTab] = useState('members')
+  const { hasPermission, loading: permissionsLoading } = usePermissions()
+
+  const canViewMembers = hasPermission(Permission.TEAM_READ) || hasPermission(Permission.USER_READ)
+  const canInviteMembers = hasPermission(Permission.TEAM_INVITE) || hasPermission(Permission.USER_INVITE)
+  const canEditMembers = hasPermission(Permission.USER_UPDATE)
+  const canEditAdminMembers = hasPermission(Permission.USER_MANAGE_ROLES)
 
   const checkAuth = useCallback(async () => {
     try {
@@ -133,6 +141,12 @@ export default function MembersPage() {
   }
 
   const handleInviteMember = async (inviteData: any) => {
+    if (!canInviteMembers) {
+      setError('You do not have permission to invite members.')
+      setSuccess('')
+      return
+    }
+
     try {
       const response = await fetch('/api/members/invite', {
         method: 'POST',
@@ -165,6 +179,18 @@ export default function MembersPage() {
   }
 
   const handleUpdateMember = async (memberId: string, updates: any) => {
+    const member = members.find((m) => m._id === memberId)
+    if (!member) {
+      setError('Member not found')
+      return
+    }
+
+    const requiresAdminAccess = member.role === 'admin'
+    if (!canEditMembers || (requiresAdminAccess && !canEditAdminMembers)) {
+      setError('You do not have permission to edit this member.')
+      return
+    }
+
     try {
       const response = await fetch('/api/members', {
         method: 'PUT',
@@ -289,6 +315,35 @@ export default function MembersPage() {
     )
   }
 
+  if (!permissionsLoading && !canViewMembers) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center space-y-2">
+            <p className="text-lg font-semibold text-foreground">Access restricted</p>
+            <p className="text-sm text-muted-foreground">You do not have permission to view team members.</p>
+          </div>
+        </div>
+      </MainLayout>
+    )
+  }
+
+  const handleOpenInviteModal = () => {
+    if (!canInviteMembers) {
+      setError('You do not have permission to invite members.')
+      setSuccess('')
+      return
+    }
+    setShowInviteModal(true)
+  }
+
+  const canEditMemberRecord = (member: Member) => {
+    if (member.role === 'admin') {
+      return canEditAdminMembers
+    }
+    return canEditMembers
+  }
+
   return (
     <MainLayout>
       <div className="space-y-6 sm:space-y-8">
@@ -297,14 +352,16 @@ export default function MembersPage() {
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">Team Members</h1>
             <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage your team members and invitations</p>
           </div>
-          <Button 
-            onClick={() => setShowInviteModal(true)} 
-            className="w-full sm:w-auto flex-shrink-0 text-sm sm:text-base"
-          >
-            <UserPlus className="h-4 w-4 mr-2" />
-            <span className="sm:inline">Invite Member</span>
-            <span className="sm:hidden">Invite</span>
-          </Button>
+          {canInviteMembers && (
+            <Button 
+              onClick={handleOpenInviteModal} 
+              className="w-full sm:w-auto flex-shrink-0 text-sm sm:text-base"
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              <span className="sm:inline">Invite Member</span>
+              <span className="sm:hidden">Invite</span>
+            </Button>
+          )}
         </div>
 
       {error && (
@@ -427,7 +484,13 @@ export default function MembersPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setEditingMember(member)}
+                          onClick={() => canEditMemberRecord(member) && setEditingMember(member)}
+                          disabled={!canEditMemberRecord(member)}
+                          title={
+                            canEditMemberRecord(member)
+                              ? undefined
+                              : 'You do not have permission to edit this member'
+                          }
                           className="flex-1 sm:flex-initial text-xs sm:text-sm"
                         >
                           Edit
@@ -511,14 +574,14 @@ export default function MembersPage() {
         </TabsContent>
       </Tabs>
 
-      {showInviteModal && (
+      {showInviteModal && canInviteMembers && (
         <InviteMemberModal
           onClose={() => setShowInviteModal(false)}
           onInvite={handleInviteMember}
         />
       )}
 
-      {editingMember && (
+      {editingMember && canEditMemberRecord(editingMember) && (
         <EditMemberModal
           member={editingMember}
           onClose={() => setEditingMember(null)}

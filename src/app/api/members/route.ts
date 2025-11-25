@@ -4,6 +4,8 @@ import { User } from '@/models/User'
 import { UserInvitation } from '@/models/UserInvitation'
 import { authenticateUser } from '@/lib/auth-utils'
 import { normalizeUploadUrl } from '@/lib/file-utils'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionService } from '@/lib/permissions/permission-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +24,12 @@ export async function GET(request: NextRequest) {
     const organizationId = user.organization
 
     // Check if user has permission to view members
-    if (!['admin', 'project_manager'].includes(user.role)) {
+    const [canReadTeam, canReadUsers] = await Promise.all([
+      PermissionService.hasPermission(userId, Permission.TEAM_READ),
+      PermissionService.hasPermission(userId, Permission.USER_READ)
+    ])
+
+    if (!canReadTeam && !canReadUsers) {
       return NextResponse.json(
         { error: 'Insufficient permissions' },
         { status: 403 }
@@ -125,7 +132,8 @@ export async function PUT(request: NextRequest) {
     const { memberId, updates } = await request.json()
 
     // Check if user has permission to update members
-    if (!['admin', 'project_manager'].includes(user.role)) {
+    const canEditMembers = await PermissionService.hasPermission(userId, Permission.USER_UPDATE)
+    if (!canEditMembers) {
       return NextResponse.json(
         { error: 'Insufficient permissions' },
         { status: 403 }
@@ -143,6 +151,16 @@ export async function PUT(request: NextRequest) {
         { error: 'Member not found' },
         { status: 404 }
       )
+    }
+
+    if (member.role === 'admin') {
+      const canManageAdminUsers = await PermissionService.hasPermission(userId, Permission.USER_MANAGE_ROLES)
+      if (!canManageAdminUsers) {
+        return NextResponse.json(
+          { error: 'You do not have permission to edit administrator accounts' },
+          { status: 403 }
+        )
+      }
     }
 
     // Update member

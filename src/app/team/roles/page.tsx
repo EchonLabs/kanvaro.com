@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -44,6 +44,7 @@ export default function RolesPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const hasInitializedRef = useRef(false)
 
   const checkAuth = useCallback(async () => {
     try {
@@ -79,6 +80,8 @@ export default function RolesPage() {
   }, [router])
 
   useEffect(() => {
+    if (hasInitializedRef.current) return
+    hasInitializedRef.current = true
     checkAuth()
   }, [checkAuth])
 

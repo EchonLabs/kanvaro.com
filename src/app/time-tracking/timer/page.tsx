@@ -175,8 +175,8 @@ export default function TimerPage() {
       }
     }
 
-    // Check maxSessionHours
-    if (timeTrackingSettings?.maxSessionHours) {
+    // Check maxSessionHours only when overtime is disabled
+    if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxSessionHours) {
       const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
       const durationHours = durationMinutes / 60
       const maxHours = timeTrackingSettings.maxSessionHours
@@ -186,7 +186,15 @@ export default function TimerPage() {
         return
       }
     }
-  }, [manualLogData.startDate, manualLogData.startTime, manualLogData.endDate, manualLogData.endTime, timeTrackingSettings?.maxSessionHours, timeTrackingSettings?.allowFutureTime])
+  }, [
+    manualLogData.startDate,
+    manualLogData.startTime,
+    manualLogData.endDate,
+    manualLogData.endTime,
+    timeTrackingSettings?.maxSessionHours,
+    timeTrackingSettings?.allowFutureTime,
+    timeTrackingSettings?.allowOvertime
+  ])
 
   // Validate session hours when relevant fields change
   useEffect(() => {
@@ -537,7 +545,7 @@ export default function TimerPage() {
     const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
     const durationHours = durationMinutes / 60
 
-    if (timeTrackingSettings?.maxSessionHours && durationHours > timeTrackingSettings.maxSessionHours) {
+    if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxSessionHours && durationHours > timeTrackingSettings.maxSessionHours) {
       const maxHours = timeTrackingSettings.maxSessionHours
       setError(`⚠️ Session duration exceeded: The logged time (${durationHours.toFixed(2)} hours) exceeds the maximum allowed session duration of ${maxHours} ${maxHours === 1 ? 'hour' : 'hours'}. Please break this into multiple sessions or contact your administrator if you need to log longer sessions.`)
       return
@@ -1005,6 +1013,7 @@ export default function TimerPage() {
                       taskId={selectedTask || undefined}
                       description={description}
                       requireDescription={timeTrackingSettings?.requireDescription === true}
+                      allowOvertime={timeTrackingSettings?.allowOvertime !== false}
                       onTimerUpdate={(timer) => {
                         if (!timer) {
                           resetTimerForm()
