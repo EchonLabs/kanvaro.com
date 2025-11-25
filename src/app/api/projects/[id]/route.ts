@@ -136,6 +136,63 @@ export async function PUT(
     // Build update object with proper handling for nested fields
     const updateObject: any = { $set: {} }
     
+    // Explicitly handle status field if provided
+    if (updateData.status !== undefined) {
+      updateObject.$set['status'] = updateData.status
+    }
+    
+    // Explicitly handle priority field if provided
+    if (updateData.priority !== undefined) {
+      updateObject.$set['priority'] = updateData.priority
+    }
+    
+    // Handle budget updates (nested object)
+    if (updateData.budget !== undefined) {
+      updateObject.$set['budget'] = updateData.budget
+    }
+    
+    // Handle teamMembers array
+    if (updateData.teamMembers !== undefined) {
+      updateObject.$set['teamMembers'] = updateData.teamMembers
+    }
+    
+    // Handle client (single value, but may come as array from frontend)
+    if (updateData.clients !== undefined) {
+      // Frontend sends clients as array, but we store as single client
+      updateObject.$set['client'] = Array.isArray(updateData.clients) && updateData.clients.length > 0 
+        ? updateData.clients[0] 
+        : updateData.clients
+    } else if (updateData.client !== undefined) {
+      updateObject.$set['client'] = updateData.client
+    }
+    
+    // Handle tags array
+    if (updateData.tags !== undefined) {
+      updateObject.$set['tags'] = updateData.tags
+    }
+    
+    // Handle customFields object
+    if (updateData.customFields !== undefined) {
+      updateObject.$set['customFields'] = updateData.customFields
+    }
+    
+    // Handle date fields (convert string dates to Date objects)
+    if (updateData.startDate !== undefined) {
+      updateObject.$set['startDate'] = updateData.startDate 
+        ? new Date(updateData.startDate) 
+        : updateData.startDate
+    }
+    if (updateData.endDate !== undefined) {
+      updateObject.$set['endDate'] = updateData.endDate 
+        ? new Date(updateData.endDate) 
+        : updateData.endDate
+    }
+    
+    // Handle isDraft flag
+    if (updateData.isDraft !== undefined) {
+      updateObject.$set['isDraft'] = updateData.isDraft
+    }
+    
     // Extract settings if present and handle nested updates
     if (updateData.settings) {
       if (updateData.settings.kanbanStatuses !== undefined) {
@@ -161,17 +218,29 @@ export async function PUT(
       }
     }
     
-    // Add other top-level fields to $set
+    // Add other top-level fields to $set (excluding fields already handled above)
+    const excludedKeys = [
+      'settings', 
+      'status', 
+      'priority', 
+      'budget', 
+      'teamMembers', 
+      'clients', 
+      'client', 
+      'tags', 
+      'customFields',
+      'startDate',
+      'endDate',
+      'isDraft'
+    ] // Already handled above
     Object.keys(updateData).forEach(key => {
-      if (key !== 'settings') {
+      if (!excludedKeys.includes(key) && updateData[key] !== undefined) {
         updateObject.$set[key] = updateData[key]
       }
     })
 
-    // If no $set fields, fall back to direct update
-    const finalUpdateData = Object.keys(updateObject.$set).length > 0 
-      ? updateObject 
-      : updateData
+    // Always use $set operator for proper MongoDB updates
+    const finalUpdateData = updateObject
 
     // Find and update project (only update non-deleted projects)
     const project = await Project.findOneAndUpdate(

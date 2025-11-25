@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Button } from '@/components/ui/Button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import {
@@ -68,23 +69,26 @@ const modules = [
 
 const steps = [
   {
-    title: 'Blueprint & Import',
+    title: 'Dashboard & Overview',
     description:
-      'Bring spreadsheets, Trello boards, or Jira projects. Kanvaro maps them to Workleze-style canvases instantly.',
-    caption: '1. Build your operating model',
-    gradient: '#2d2ef5, #6f55ff'
+      'Your command center. See everything at a glance: active tasks, project progress, team activity, time tracking, and key metrics in one unified dashboard.',
+    caption: '1. Start with your dashboard',
+    gradient: '#2d2ef5, #6f55ff',
+    imageKey: 'heroDashboard' as const
   },
   {
-    title: 'Collaborate in Context',
-    description: 'Create squads, assign flows, and host async standups inside every task and project.',
-    caption: '2. Orchestrate sprint to sprint',
-    gradient: '#0bbcd6, #19f2a5'
+    title: 'Tasks & Project Management',
+    description: 'Manage tasks with Kanban boards, track sprints, create epics, and organize work with powerful filtering and search capabilities.',
+    caption: '2. Organize and execute',
+    gradient: '#0bbcd6, #19f2a5',
+    imageKey: 'tasks' as const
   },
   {
-    title: 'Forecast & Celebrate',
-    description: 'Surface delivery health, time tracking, and exec-ready updates in seconds.',
-    caption: '3. Broadcast wins in a click',
-    gradient: '#ff7ab6, #feae68'
+    title: 'Team & Time Tracking',
+    description: 'Invite team members, manage permissions, track billable hours, monitor capacity, and generate comprehensive reports.',
+    caption: '3. Collaborate and measure',
+    gradient: '#ff7ab6, #feae68',
+    imageKey: 'members' as const
   }
 ]
 
@@ -135,9 +139,30 @@ const testimonials = [
   }
 ]
 
+// Cloudinary image URLs - directly set here
+const LANDING_PAGE_IMAGES = {
+  heroDashboard: "https://res.cloudinary.com/dichgutd0/image/upload/v1764044927/EL-Core-Assets/Static/Kanvaro/he_1_xqkbdw.png",
+  modulePreview: null,
+  stepImages: {
+    step1: "https://res.cloudinary.com/dichgutd0/image/upload/v1764044928/EL-Core-Assets/Static/Kanvaro/3_1_benfd7.png",
+    step2: "https://res.cloudinary.com/dichgutd0/image/upload/v1764044928/EL-Core-Assets/Static/Kanvaro/7_a8ky5x.png",
+    step3: "https://res.cloudinary.com/dichgutd0/image/upload/v1764044929/EL-Core-Assets/Static/Kanvaro/1_qpvyfp.png"
+  },
+  showcaseImages: {
+    tasks: "https://res.cloudinary.com/dichgutd0/image/upload/v1764044930/EL-Core-Assets/Static/Kanvaro/2_ocdtse.png",
+    projects: "https://res.cloudinary.com/dichgutd0/image/upload/v1764044930/EL-Core-Assets/Static/Kanvaro/6_n6p2bu.png",
+    members: "https://res.cloudinary.com/dichgutd0/image/upload/v1764044929/EL-Core-Assets/Static/Kanvaro/5_1_dpjhwk.png",
+    timeLogs: "https://res.cloudinary.com/dichgutd0/image/upload/v1764044928/EL-Core-Assets/Static/Kanvaro/4_jwnslu.png",
+    reports: "https://res.cloudinary.com/dichgutd0/image/upload/v1764044929/EL-Core-Assets/Static/Kanvaro/1_qpvyfp.png"
+  }
+}
+
 export default function LandingPage() {
   const router = useRouter()
   const [ctaLoading, setCtaLoading] = useState(false)
+  
+  // Use the hardcoded images directly
+  const images = LANDING_PAGE_IMAGES
 
   const handleGetStarted = async () => {
     if (ctaLoading) return
@@ -175,47 +200,47 @@ export default function LandingPage() {
           </span>
           <ThemeToggle />
         </div>
-        <div className="relative mx-auto flex max-w-6xl flex-col gap-12 px-6 py-16 lg:flex-row lg:items-center lg:py-24">
-          <div className="space-y-8 text-center lg:text-left">
-            <p className="inline-flex items-center gap-2 rounded-full border border-slate-300/60 bg-white/70 px-4 py-1 text-xs uppercase tracking-[0.3em] text-slate-600 dark:border-white/15 dark:bg-white/5 dark:text-white/80">
+        <div className="relative mx-auto flex max-w-7xl flex-col gap-16 px-6 pt-8 pb-20 lg:flex-row lg:items-center lg:pt-12 lg:pb-32">
+          <div className="space-y-10 text-center lg:text-left lg:flex-1">
+            <p className="inline-flex items-center gap-2 rounded-full border border-slate-300/60 bg-white/70 px-5 py-2 text-sm uppercase tracking-[0.3em] text-slate-600 dark:border-white/15 dark:bg-white/5 dark:text-white/80">
               Workleze-inspired control room
             </p>
-            <div className="space-y-6">
-              <h1 className="text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl lg:text-[4rem] dark:text-white">
+            <div className="space-y-8">
+              <h1 className="text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl lg:text-[4rem] xl:text-[4.5rem] dark:text-white">
                 The calmest way to manage <span className="text-[#7afdea]">projects, tasks</span> and time.
               </h1>
-              <p className="text-lg text-slate-600 sm:text-xl dark:text-white/80">
+              <p className="text-base text-slate-600 sm:text-lg lg:text-base xl:text-lg dark:text-white/80 leading-relaxed">
                 Kanvaro mirrors the Workleze look (without the pricing clutter) so visitors instantly
                 see Tasks, Projects, Members, Time Logs, and Reports in one cinematic view.
               </p>
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
+            <div className="flex flex-col gap-4 sm:flex-row sm:justify-center lg:justify-start">
               <Button
                 onClick={handleGetStarted}
                 disabled={ctaLoading}
-                className="h-12 rounded-full bg-[#7bffde] px-8 text-slate-900 shadow-[0_20px_45px_rgba(123,255,222,0.35)] transition hover:-translate-y-1 hover:bg-[#62f5cf] disabled:opacity-70"
+                className="h-14 rounded-full bg-[#7bffde] px-10 text-base font-semibold text-slate-900 shadow-[0_20px_45px_rgba(123,255,222,0.35)] transition hover:-translate-y-1 hover:bg-[#62f5cf] disabled:opacity-70"
               >
                 {ctaLoading ? (
                   <>
                     Loading Workspaces
-                    <ArrowRight className="ml-2 h-4 w-4 animate-pulse" />
+                    <ArrowRight className="ml-2 h-5 w-5 animate-pulse" />
                   </>
                 ) : (
                   <>
                     Enter the workspace
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                    <ArrowRight className="ml-2 h-5 w-5" />
                   </>
                 )}
               </Button>
               <Button
                 variant="outline"
-                className="h-12 rounded-full border-slate-300 bg-white px-8 text-slate-900 hover:bg-slate-100 dark:border-white/40 dark:bg-transparent dark:text-white dark:hover:bg-white/10"
+                className="h-14 rounded-full border-slate-300 bg-white px-10 text-base font-semibold text-slate-900 hover:bg-slate-100 dark:border-white/40 dark:bg-transparent dark:text-white dark:hover:bg-white/10"
               >
-                <Play className="mr-2 h-4 w-4" />
+                <Play className="mr-2 h-5 w-5" />
                 Watch 60s tour
               </Button>
             </div>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-5 sm:grid-cols-3">
               {stats.map(stat => (
                 <div
                   key={stat.label}
@@ -235,8 +260,29 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="relative mx-auto w-full max-w-xl rounded-[2.5rem] border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_40px_60px_rgba(15,23,42,0.1)] backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-white dark:shadow-[0_30px_60px_rgba(0,0,0,0.35)]">
-            <div className="rounded-3xl bg-white p-6 text-slate-900 shadow-inner dark:bg-[#0d1329] dark:text-white">
+          <div className="relative mx-auto w-full max-w-2xl lg:max-w-3xl xl:max-w-4xl rounded-[3rem] border border-slate-200 bg-white p-8 text-slate-900 shadow-[0_50px_80px_rgba(15,23,42,0.15)] backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-white dark:shadow-[0_40px_80px_rgba(0,0,0,0.45)]">
+            {images.heroDashboard ? (
+              <div className="relative w-full aspect-[16/10] rounded-3xl overflow-hidden shadow-2xl border-2 border-slate-200/50 dark:border-white/10 group hover:border-[#7bffde]/50 transition-all duration-300">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent z-10" />
+                <Image
+                  src={images.heroDashboard}
+                  alt="Dashboard Preview"
+                  fill
+                  className="object-cover group-hover:scale-105 transition-transform duration-700"
+                  priority
+                  unoptimized
+                />
+                <div className="absolute bottom-6 left-6 right-6 z-20">
+                  <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl p-4 border border-slate-200/50 dark:border-white/10 shadow-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" />
+                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Live Dashboard Preview</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-3xl bg-white p-6 text-slate-900 shadow-inner dark:bg-[#0d1329] dark:text-white">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-slate-500 dark:text-white/60">Sprint cockpit</p>
                 <span className="rounded-full bg-[#0fdbb3]/20 px-3 py-1 text-xs text-[#1c9b84] dark:bg-[#0fdbb3]/10 dark:text-[#75ffdf]">
@@ -281,6 +327,7 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
+            )}
           </div>
         </div>
       </section>
@@ -324,40 +371,63 @@ export default function LandingPage() {
 
       <section className="bg-gradient-to-b from-[#eef2ff] to-[#f9fbff] px-6 py-20 dark:from-[#050c1d] dark:to-[#030714] sm:py-28">
         <div className="mx-auto max-w-6xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#7bffde]">Steps</p>
-          <h2 className="mt-4 text-3xl font-semibold sm:text-4xl">
-            Guided journeyevery step looks like a screenshot.
+          <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#7bffde]">Key Features</p>
+          <h2 className="mt-4 text-3xl font-semibold sm:text-4xl lg:text-5xl">
+            Core system modules - your complete project management solution
           </h2>
-          <p className="mt-4 text-slate-600 dark:text-white/70">
-            Follow the same narrative Workleze uses: import, collaborate, and broadcast results with cinematic previews.
+          <p className="mt-4 text-lg text-slate-600 dark:text-white/70 max-w-3xl mx-auto">
+            Everything you need in one platform: Dashboard, Tasks, Projects, Team Management, Time Tracking, and Reports.
           </p>
         </div>
-        <div className="mx-auto mt-12 grid gap-6 lg:grid-cols-3">
-          {steps.map((step, idx) => (
-            <div
-              key={step.title}
-              className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_25px_55px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.03] dark:shadow-[0_35px_65px_rgba(5,7,19,0.75)]"
-            >
-              <p className="text-xs uppercase tracking-[0.6em] text-slate-400 dark:text-white/40">0{idx + 1}</p>
-              <h3 className="mt-3 text-2xl font-semibold text-slate-900 dark:text-white">{step.title}</h3>
-              <p className="mt-3 text-sm text-slate-600 dark:text-white/70">{step.description}</p>
+        <div className="mx-auto mt-12 grid gap-8 lg:grid-cols-3">
+          {steps.map((step, idx) => {
+            // Get the appropriate image based on imageKey
+            let imageUrl: string | null = null
+            if (step.imageKey === 'heroDashboard') {
+              imageUrl = images.heroDashboard
+            } else if (step.imageKey === 'tasks') {
+              imageUrl = images.showcaseImages?.tasks || null
+            } else if (step.imageKey === 'members') {
+              imageUrl = images.showcaseImages?.members || null
+            }
+
+            return (
               <div
-                className="mt-6 aspect-[4/3] rounded-2xl border border-white/10 p-4"
-                style={{ backgroundImage: `linear-gradient(135deg, ${step.gradient})` }}
+                key={step.title}
+                className="rounded-[32px] border border-slate-200 bg-white p-8 shadow-[0_25px_55px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.03] dark:shadow-[0_35px_65px_rgba(5,7,19,0.75)]"
               >
-                <div className="h-full w-full rounded-xl bg-white/20 backdrop-blur">
-                  <div className="flex h-full flex-col justify-between p-4 text-left">
-                    <span className="text-xs uppercase tracking-[0.5em] text-white/90">{step.caption}</span>
-                    <div className="space-y-2 text-sm text-white">
-                      <div className="rounded-xl bg-white/15 p-3">Drag & drop roadmap builder</div>
-                      <div className="rounded-xl bg-white/15 p-3">Layered board preview</div>
-                      <div className="rounded-xl bg-white/15 p-3">Stakeholder snapshot</div>
+                <p className="text-xs uppercase tracking-[0.6em] text-slate-400 dark:text-white/40">0{idx + 1}</p>
+                <h3 className="mt-4 text-2xl font-semibold text-slate-900 dark:text-white">{step.title}</h3>
+                <p className="mt-4 text-base text-slate-600 dark:text-white/70 leading-relaxed">{step.description}</p>
+                {imageUrl ? (
+                  <div className="mt-6 aspect-[16/10] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 shadow-lg hover:shadow-xl transition-all duration-300 group relative">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
+                    <div className="absolute top-4 left-4 z-20 bg-[#7bffde]/90 backdrop-blur-sm rounded-lg px-3 py-1.5">
+                      <span className="text-xs font-semibold text-slate-900">Module {idx + 1}</span>
+                    </div>
+                    <Image
+                      src={imageUrl}
+                      alt={step.title}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className="mt-6 aspect-[16/10] rounded-2xl border border-white/10 p-4"
+                    style={{ backgroundImage: `linear-gradient(135deg, ${step.gradient})` }}
+                  >
+                    <div className="h-full w-full rounded-xl bg-white/20 backdrop-blur">
+                      <div className="flex h-full flex-col justify-between p-4 text-left">
+                        <span className="text-xs uppercase tracking-[0.5em] text-white/90">{step.caption}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </section>
 
@@ -384,21 +454,47 @@ export default function LandingPage() {
             </Button>
           </div>
           <div className="mt-12 grid gap-6 lg:grid-cols-3">
-            {showcases.map(showcase => (
-              <div
-                key={showcase.name}
-                className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_25px_55px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-gradient-to-br dark:from-[#09132b] dark:to-[#050914] dark:shadow-[0_25px_55px_rgba(2,4,10,0.75)]"
-              >
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-semibold text-slate-900 dark:text-white">{showcase.name}</h3>
-                  <span className="text-sm text-[#2bbfa1] dark:text-[#7bffde]">{showcase.metric}</span>
+            {showcases.map(showcase => {
+              // Map showcase names to image keys
+              const imageKeyMap: Record<string, keyof typeof images.showcaseImages> = {
+                'Tasks': 'tasks',
+                'Projects': 'projects',
+                'Members': 'members',
+                'Time Logs': 'timeLogs',
+                'Reports': 'reports'
+              }
+              const imageKey = imageKeyMap[showcase.name]
+              const imageUrl = imageKey ? images.showcaseImages?.[imageKey] : null
+              
+              return (
+                <div
+                  key={showcase.name}
+                  className="group rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_25px_55px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_35px_65px_rgba(15,23,42,0.15)] dark:border-white/10 dark:bg-gradient-to-br dark:from-[#09132b] dark:to-[#050914] dark:shadow-[0_25px_55px_rgba(2,4,10,0.75)] dark:hover:border-[#7bffde]/30"
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-semibold text-slate-900 dark:text-white">{showcase.name}</h3>
+                    <span className="text-sm text-[#2bbfa1] dark:text-[#7bffde]">{showcase.metric}</span>
+                  </div>
+                  <p className="mt-3 text-sm text-slate-600 dark:text-white/70">{showcase.detail}</p>
+                  {imageUrl ? (
+                    <div className="mt-6 relative aspect-[16/10] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 group-hover:border-[#7bffde]/50 transition-all duration-300 shadow-lg hover:shadow-xl">
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
+                      <Image
+                        src={imageUrl}
+                        alt={showcase.name}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-500"
+                        unoptimized
+                      />
+                    </div>
+                  ) : (
+                    <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-xs uppercase tracking-[0.4em] text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-white/40">
+                      Screenshot placeholder
+                    </div>
+                  )}
                 </div>
-                <p className="mt-3 text-sm text-slate-600 dark:text-white/70">{showcase.detail}</p>
-                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-xs uppercase tracking-[0.4em] text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-white/40">
-                  Screenshot placeholder
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </section>

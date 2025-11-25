@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { hasDatabaseConfig } from '@/lib/db-config'
 import { Organization } from '@/models/Organization'
+import { TimeTrackingSettings } from '@/models/TimeTrackingSettings'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -449,6 +450,66 @@ export async function PUT(request: NextRequest) {
         { error: 'Failed to update organization' },
         { status: 500 }
       )
+    }
+
+    // Sync TimeTrackingSettings collection with organization settings if timeTracking was updated
+    if (timeTracking) {
+      try {
+        // Prepare update object - use values from timeTracking, fallback to organization defaults
+        const updateFields: any = {
+          organization: organization._id,
+          project: null
+        }
+
+        // Set all fields explicitly, handling undefined values properly
+        if (timeTracking.allowTimeTracking !== undefined) updateFields.allowTimeTracking = timeTracking.allowTimeTracking
+        if (timeTracking.allowManualTimeSubmission !== undefined) updateFields.allowManualTimeSubmission = timeTracking.allowManualTimeSubmission
+        if (timeTracking.requireApproval !== undefined) updateFields.requireApproval = timeTracking.requireApproval
+        if (timeTracking.allowBillableTime !== undefined) updateFields.allowBillableTime = timeTracking.allowBillableTime
+        if (timeTracking.defaultHourlyRate !== undefined) updateFields.defaultHourlyRate = timeTracking.defaultHourlyRate
+        if (timeTracking.maxDailyHours !== undefined) updateFields.maxDailyHours = timeTracking.maxDailyHours
+        if (timeTracking.maxWeeklyHours !== undefined) updateFields.maxWeeklyHours = timeTracking.maxWeeklyHours
+        if (timeTracking.maxSessionHours !== undefined) updateFields.maxSessionHours = timeTracking.maxSessionHours
+        if (timeTracking.allowOvertime !== undefined) updateFields.allowOvertime = timeTracking.allowOvertime
+        if (timeTracking.requireDescription !== undefined) updateFields.requireDescription = timeTracking.requireDescription
+        if (timeTracking.requireCategory !== undefined) updateFields.requireCategory = timeTracking.requireCategory
+        if (timeTracking.allowFutureTime !== undefined) updateFields.allowFutureTime = timeTracking.allowFutureTime
+        if (timeTracking.allowPastTime !== undefined) updateFields.allowPastTime = timeTracking.allowPastTime
+        if (timeTracking.pastTimeLimitDays !== undefined) updateFields.pastTimeLimitDays = timeTracking.pastTimeLimitDays
+        if (timeTracking.roundingRules !== undefined) updateFields.roundingRules = timeTracking.roundingRules
+        if (timeTracking.notifications !== undefined) updateFields.notifications = timeTracking.notifications
+
+        // Find or create the organization-level TimeTrackingSettings (project: null)
+        const orgTimeTrackingSettings = await TimeTrackingSettings.findOneAndUpdate(
+          {
+            organization: organization._id,
+            project: null
+          },
+          {
+            $set: updateFields
+          },
+          {
+            new: true,
+            upsert: true,
+            setDefaultsOnInsert: true
+          }
+        )
+
+        if (!orgTimeTrackingSettings) {
+          console.warn('Failed to sync TimeTrackingSettings collection with organization settings')
+        } else {
+          console.log('TimeTrackingSettings synced successfully:', {
+            requireDescription: orgTimeTrackingSettings.requireDescription,
+            requireApproval: orgTimeTrackingSettings.requireApproval,
+            allowOvertime: orgTimeTrackingSettings.allowOvertime,
+            allowFutureTime: orgTimeTrackingSettings.allowFutureTime
+          })
+        }
+      } catch (error) {
+        console.error('Error syncing TimeTrackingSettings:', error)
+        // Don't fail the entire request if TimeTrackingSettings sync fails
+        // The Organization document is already updated
+      }
     }
     
     return NextResponse.json({

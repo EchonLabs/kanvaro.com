@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { PermissionProvider } from '@/lib/permissions/permission-context'
+import { ToastProviderWrapper } from '@/components/providers/ToastProviderWrapper'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -44,7 +45,9 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <PermissionProvider initialPermissions={initialPermissions}>
-            {children}
+            <ToastProviderWrapper>
+              {children}
+            </ToastProviderWrapper>
           </PermissionProvider>
         </ThemeProvider>
       </body>

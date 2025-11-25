@@ -518,18 +518,18 @@ export default function CreateStoryPage() {
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
-                  <div className="space-y-1">
+                  <div className="flex flex-wrap gap-2">
                     {formData.acceptanceCriteria.map((criteria, index) => (
-                      <div key={index} className="flex items-center space-x-2 min-w-0">
-                        <span className="text-sm truncate flex-1 min-w-0" title={criteria}>{criteria}</span>
+                      <div key={index} className="flex items-center gap-1.5 px-3 py-1.5 bg-muted rounded-md border border-muted-foreground/20">
+                        <span className="text-sm truncate max-w-[200px] sm:max-w-none" title={criteria}>{criteria}</span>
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           onClick={() => removeCriteria(index)}
-                          className="flex-shrink-0"
+                          className="h-5 w-5 p-0 flex-shrink-0 hover:bg-destructive/10 hover:text-destructive"
                         >
-                          <X className="h-4 w-4" />
+                          <X className="h-3 w-3" />
                         </Button>
                       </div>
                     ))}

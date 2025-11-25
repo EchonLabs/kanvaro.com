@@ -27,7 +27,8 @@ import {
   Plus,
   Star,
   BookOpen,
-  Layers
+  Layers,
+  Rocket
 } from 'lucide-react'
 
 interface Story {
@@ -61,7 +62,16 @@ interface Story {
   sprint?: {
     _id: string
     name: string
-  }
+    description?: string
+    status?: 'planning' | 'active' | 'completed' | 'cancelled'
+    startDate?: string
+    endDate?: string
+    goal?: string
+    project?: {
+      _id: string
+      name: string
+    }
+  } | null
   assignedTo?: {
     firstName: string
     lastName: string
@@ -179,6 +189,10 @@ export default function StoryDetailPage() {
       case 'testing': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
       case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
       case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+      // Sprint statuses
+      case 'planning': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'active': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
     }
   }
@@ -188,6 +202,10 @@ export default function StoryDetailPage() {
       case 'todo': return <Target className="h-4 w-4" />
       case 'in_progress': return <Play className="h-4 w-4" />
       case 'review': return <AlertTriangle className="h-4 w-4" />
+      // Sprint statuses
+      case 'planning': return <Calendar className="h-4 w-4" />
+      case 'active': return <Play className="h-4 w-4" />
+      case 'completed': return <CheckCircle className="h-4 w-4" />
       case 'testing': return <Zap className="h-4 w-4" />
       case 'done': return <CheckCircle className="h-4 w-4" />
       case 'cancelled': return <XCircle className="h-4 w-4" />
@@ -251,23 +269,23 @@ export default function StoryDetailPage() {
     <MainLayout>
       <div className="space-y-6 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
-            <Button variant="ghost" onClick={() => router.push('/stories')} className="w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto min-w-0">
+            <Button variant="ghost" onClick={() => router.push('/stories')} className="w-full sm:w-auto flex-shrink-0">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div className="min-w-0">
+            <div className="flex-1 min-w-0 w-full sm:w-auto">
               <h1
-                className="text-2xl sm:text-3xl font-bold text-foreground truncate max-w-full flex items-center space-x-2 min-w-0"
+                className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0"
                 title={story.title}
               >
-                <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 flex-shrink-0" />
-                <span>{story.title}</span>
+                <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-blue-600 flex-shrink-0" />
+                <span className="truncate min-w-0">{story.title}</span>
               </h1>
-              <p className="text-sm sm:text-base text-muted-foreground">User Story Details</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">User Story Details</p>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-shrink-0">
             <Button variant="outline" onClick={() => router.push(`/stories/${storyId}/edit`)} className="w-full sm:w-auto">
               <Edit className="h-4 w-4 mr-2" />
               Edit
@@ -406,11 +424,70 @@ export default function StoryDetailPage() {
               <Card className="overflow-x-hidden">
                 <CardHeader>
                   <CardTitle>Sprint</CardTitle>
+                  <CardDescription>Linked sprint details</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex items-center space-x-2 min-w-0">
-                    <Target className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                    <span className="text-sm truncate" title={story.sprint.name}>{story.sprint.name}</span>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start space-x-2 min-w-0">
+                    <Rocket className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate" title={story.sprint.name}>
+                        {story.sprint.name}
+                      </p>
+                      {story.sprint.description && (
+                        <p className="text-xs text-muted-foreground mt-1 break-words">
+                          {story.sprint.description}
+                        </p>
+                      )}
+                      {story.sprint.goal && (
+                        <p className="text-xs text-muted-foreground mt-1 break-words">
+                          <span className="font-medium">Goal:</span> {story.sprint.goal}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {story.sprint.status && (
+                      <div className="flex items-center justify-between text-xs sm:text-sm">
+                        <span className="text-muted-foreground">Status</span>
+                        <Badge className={`${getStatusColor(story.sprint.status)} text-xs`}>
+                          {getStatusIcon(story.sprint.status)}
+                          <span className="ml-1 hidden sm:inline">{formatToTitleCase(story.sprint.status)}</span>
+                        </Badge>
+                      </div>
+                    )}
+
+                    {story.sprint.project?.name && (
+                      <div className="flex items-center justify-between text-xs sm:text-sm">
+                        <span className="text-muted-foreground">Project</span>
+                        <span
+                          className="font-medium truncate max-w-[160px] text-right sm:text-left"
+                          title={story.sprint.project.name}
+                        >
+                          {story.sprint.project.name.length > 15
+                            ? `${story.sprint.project.name.slice(0, 15)}…`
+                            : story.sprint.project.name}
+                        </span>
+                      </div>
+                    )}
+
+                    {story.sprint.startDate && (
+                      <div className="flex items-center justify-between text-xs sm:text-sm">
+                        <span className="text-muted-foreground">Start Date</span>
+                        <span className="font-medium whitespace-nowrap">
+                          {new Date(story.sprint.startDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+
+                    {story.sprint.endDate && (
+                      <div className="flex items-center justify-between text-xs sm:text-sm">
+                        <span className="text-muted-foreground">End Date</span>
+                        <span className="font-medium whitespace-nowrap">
+                          {new Date(story.sprint.endDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
