@@ -36,8 +36,7 @@ import {
   Edit
 } from 'lucide-react'
 import { Permission, PermissionGate } from '@/lib/permissions'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@radix-ui/react-dropdown-menu'
-import { DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 
 interface Story {

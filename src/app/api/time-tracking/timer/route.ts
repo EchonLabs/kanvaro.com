@@ -7,6 +7,8 @@ import { Project } from '@/models/Project'
 import { User } from '@/models/User'
 import { Organization } from '@/models/Organization'
 import { applyRoundingRules } from '@/lib/utils'
+import { notificationService } from '@/lib/notification-service'
+import { isNotificationEnabled } from '@/lib/notification-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -62,12 +64,11 @@ export async function POST(request: NextRequest) {
     
     console.log('Extracted fields:', { userId, organizationId, projectId, taskId, description })
 
-    if (!userId || !organizationId || !projectId || !description) {
+    if (!userId || !organizationId || !projectId) {
       console.log('Missing required fields:', { 
         userId: !!userId, 
         organizationId: !!organizationId, 
-        projectId: !!projectId, 
-        description: !!description 
+        projectId: !!projectId
       })
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
@@ -89,15 +90,30 @@ console.log('existingTimer',existingTimer);
       return NextResponse.json({ error: 'Time tracking not allowed for this project' }, { status: 403 })
     }
 
-    // Get time tracking settings
+    // Get time tracking settings - check project-specific first, then organization-wide
     let settings = await TimeTrackingSettings.findOne({
       organization: organizationId,
       project: projectId
-    }) || await TimeTrackingSettings.findOne({
-      organization: organizationId,
-      project: null
     })
-console.log('setting',settings);
+    
+    if (!settings) {
+      settings = await TimeTrackingSettings.findOne({
+        organization: organizationId,
+        project: null
+      })
+    }
+    
+    console.log('Time tracking settings found:', {
+      hasSettings: !!settings,
+      settingsId: settings?._id?.toString(),
+      isProjectSpecific: settings?.project?.toString() === projectId,
+      projectId: settings?.project?.toString(),
+      requestedProjectId: projectId,
+      requireDescription: settings?.requireDescription,
+      requireDescriptionType: typeof settings?.requireDescription,
+      allowTimeTracking: settings?.allowTimeTracking,
+      allSettingsKeys: settings ? Object.keys(settings.toObject()) : []
+    })
 
     // If no TimeTrackingSettings exist, create default ones based on organization settings
     if (!settings) {
@@ -137,6 +153,30 @@ console.log('setting',settings);
       return NextResponse.json({ error: 'Time tracking not enabled' }, { status: 403 })
     }
 
+    // Validate description if required
+    // Explicitly check if requireDescription is true (handle both boolean true and undefined as false)
+    const requireDescription = settings.requireDescription === true
+    const hasDescription = description && typeof description === 'string' && description.trim().length > 0
+    
+    console.log('Description validation:', {
+      requireDescription,
+      hasDescription,
+      descriptionValue: description,
+      descriptionType: typeof description,
+      descriptionLength: description?.length,
+      settingsRequireDescription: settings.requireDescription,
+      settingsRequireDescriptionType: typeof settings.requireDescription
+    })
+    
+    // Only validate description if it's explicitly required
+    if (requireDescription === true && !hasDescription) {
+      console.log('Validation failed: Description is required but missing')
+      return NextResponse.json({ error: 'Description is required for time entries' }, { status: 400 })
+    }
+    
+    // If description is not required and empty, use empty string or default
+    const finalDescription = description || ''
+
     // Get user's hourly rate if not provided
     const user = await User.findById(userId)
     const finalHourlyRate = hourlyRate || user?.billingRate || settings.defaultHourlyRate
@@ -147,7 +187,7 @@ console.log('setting',settings);
       organization: organizationId,
       project: projectId,
       task: taskId,
-      description,
+      description: finalDescription,
       startTime: new Date(),
       category,
       tags: tags || [],
@@ -159,13 +199,36 @@ console.log('activeTimer',activeTimer);
 
     await activeTimer.save()
 
+    // Send timer start notification if enabled
+    const shouldNotifyStart = await isNotificationEnabled(organizationId, 'onTimerStart', projectId)
+    if (shouldNotifyStart) {
+      const project = await Project.findById(projectId).select('name')
+      const projectName = project?.name || 'Unknown Project'
+      
+      await notificationService.createNotification(userId, organizationId, {
+        type: 'time_tracking',
+        title: 'Timer Started',
+        message: `Timer started for project "${projectName}"${description ? `: ${description}` : ''}`,
+        data: {
+          entityType: 'time_entry',
+          entityId: activeTimer._id.toString(),
+          action: 'created',
+          priority: 'low',
+          url: `/time-tracking/timer`
+        },
+        sendEmail: false,
+        sendPush: false
+      })
+    }
+
     return NextResponse.json({
       message: 'Timer started successfully',
       activeTimer: {
         ...activeTimer.toObject(),
         currentDuration: 0,
         isPaused: false
-      }
+      },
+      notificationSent: shouldNotifyStart
     })
   } catch (error) {
     console.error('Error starting timer:', error)
@@ -227,9 +290,23 @@ export async function PUT(request: NextRequest) {
           const organization = await Organization.findById(activeTimer.organization)
           if (organization) {
             stopSettings = {
-              roundingRules: organization.settings.timeTracking.roundingRules
+              roundingRules: organization.settings.timeTracking.roundingRules,
+              maxDailyHours: organization.settings.timeTracking.maxDailyHours,
+              maxWeeklyHours: organization.settings.timeTracking.maxWeeklyHours,
+              allowOvertime: organization.settings.timeTracking.allowOvertime,
+              requireApproval: organization.settings.timeTracking.requireApproval,
+              requireDescription: organization.settings.timeTracking.requireDescription
             } as any
           }
+        }
+
+        // Validate description if required
+        const finalDescription = description || activeTimer.description
+        const requireDescription = stopSettings?.requireDescription ?? false
+        const hasDescription = finalDescription && typeof finalDescription === 'string' && finalDescription.trim().length > 0
+        
+        if (requireDescription && !hasDescription) {
+          return NextResponse.json({ error: 'Description is required for time entries' }, { status: 400 })
         }
 
         // Create time entry
@@ -242,18 +319,49 @@ export async function PUT(request: NextRequest) {
           finalDuration = applyRoundingRules(totalDuration, stopSettings.roundingRules)
         }
 
+        // Check if time was actually logged (must be > 0)
+        const hasTimeLogged = finalDuration > 0
+
+        // If no time was logged, just delete the timer without creating a time entry
+        if (!hasTimeLogged) {
+          await ActiveTimer.findByIdAndDelete(activeTimer._id)
+          return NextResponse.json({
+            message: 'Timer stopped. No time was logged (0 minutes).',
+            timeEntry: null,
+            hasTimeLogged: false,
+            duration: 0,
+            notificationsSent: {
+              timerStop: false,
+              overtime: false,
+              approvalNeeded: false,
+              timeSubmitted: false
+            }
+          })
+        }
+
+        // Check for overtime
+        const hoursLogged = finalDuration / 60
+        const isOvertime = !stopSettings?.allowOvertime && (
+          hoursLogged > (stopSettings?.maxDailyHours || 8) ||
+          hoursLogged > (stopSettings?.maxWeeklyHours || 40)
+        )
+
+        // Determine status based on approval requirement
+        const requiresApproval = stopSettings?.requireApproval ?? false
+        const entryStatus = requiresApproval ? 'pending' : 'completed'
+
         const timeEntry = new TimeEntry({
           user: activeTimer.user,
           organization: activeTimer.organization,
           project: activeTimer.project,
           task: activeTimer.task,
-          description: description || activeTimer.description,
+          description: finalDescription,
           startTime: activeTimer.startTime,
           endTime: now,
           duration: finalDuration,
           isBillable: activeTimer.isBillable,
           hourlyRate: activeTimer.hourlyRate,
-          status: 'completed',
+          status: entryStatus,
           category: category || activeTimer.category,
           tags: tags || activeTimer.tags
         })
@@ -263,9 +371,123 @@ export async function PUT(request: NextRequest) {
         // Delete active timer
         await ActiveTimer.findByIdAndDelete(activeTimer._id)
 
+        // Send notifications based on settings (only reached if time was logged)
+        const notifications = {
+          timerStop: await isNotificationEnabled(activeTimer.organization.toString(), 'onTimerStop', activeTimer.project?.toString()),
+          overtime: await isNotificationEnabled(activeTimer.organization.toString(), 'onOvertime', activeTimer.project?.toString()),
+          approvalNeeded: await isNotificationEnabled(activeTimer.organization.toString(), 'onApprovalNeeded', activeTimer.project?.toString()),
+          timeSubmitted: await isNotificationEnabled(activeTimer.organization.toString(), 'onTimeSubmitted', activeTimer.project?.toString())
+        }
+
+        const project = await Project.findById(activeTimer.project).select('name')
+        const projectName = project?.name || 'Unknown Project'
+        const hoursFormatted = `${Math.floor(hoursLogged)}h ${Math.round((hoursLogged % 1) * 60)}m`
+
+        const notificationsSent = {
+          timerStop: false,
+          overtime: false,
+          approvalNeeded: false,
+          timeSubmitted: false
+        }
+
+        // Timer stop notification
+        if (notifications.timerStop) {
+          await notificationService.createNotification(
+            activeTimer.user.toString(),
+            activeTimer.organization.toString(),
+            {
+              type: 'time_tracking',
+              title: 'Timer Stopped',
+              message: `Timer stopped for project "${projectName}". Logged ${hoursFormatted}.`,
+              data: {
+                entityType: 'time_entry',
+                entityId: timeEntry._id.toString(),
+                action: 'updated',
+                priority: 'low',
+                url: `/time-tracking/logs`
+              },
+              sendEmail: false,
+              sendPush: false
+            }
+          )
+          notificationsSent.timerStop = true
+        }
+
+        // Overtime notification
+        if (isOvertime && notifications.overtime) {
+          await notificationService.createNotification(
+            activeTimer.user.toString(),
+            activeTimer.organization.toString(),
+            {
+              type: 'time_tracking',
+              title: 'Overtime Alert',
+              message: `Overtime detected: ${hoursFormatted} logged for project "${projectName}". This exceeds the daily/weekly limit.`,
+              data: {
+                entityType: 'time_entry',
+                entityId: timeEntry._id.toString(),
+                action: 'updated',
+                priority: 'high',
+                url: `/time-tracking/logs`
+              },
+              sendEmail: false,
+              sendPush: false
+            }
+          )
+          notificationsSent.overtime = true
+        }
+
+        // Approval needed notification
+        if (requiresApproval && notifications.approvalNeeded) {
+          await notificationService.createNotification(
+            activeTimer.user.toString(),
+            activeTimer.organization.toString(),
+            {
+              type: 'time_tracking',
+              title: 'Approval Required',
+              message: `Time entry for project "${projectName}" (${hoursFormatted}) requires approval.`,
+              data: {
+                entityType: 'time_entry',
+                entityId: timeEntry._id.toString(),
+                action: 'updated',
+                priority: 'medium',
+                url: `/time-tracking/logs`
+              },
+              sendEmail: false,
+              sendPush: false
+            }
+          )
+          notificationsSent.approvalNeeded = true
+        }
+
+        // Time submitted notification (only if not requiring approval, as approval needed covers that case)
+        if (!requiresApproval && notifications.timeSubmitted) {
+          await notificationService.createNotification(
+            activeTimer.user.toString(),
+            activeTimer.organization.toString(),
+            {
+              type: 'time_tracking',
+              title: 'Time Submitted',
+              message: `Time entry for project "${projectName}" (${hoursFormatted}) has been submitted successfully.`,
+              data: {
+                entityType: 'time_entry',
+                entityId: timeEntry._id.toString(),
+                action: 'created',
+                priority: 'low',
+                url: `/time-tracking/logs`
+              },
+              sendEmail: false,
+              sendPush: false
+            }
+          )
+          notificationsSent.timeSubmitted = true
+        }
+
         return NextResponse.json({
           message: 'Timer stopped successfully',
-          timeEntry: timeEntry.toObject()
+          timeEntry: timeEntry.toObject(),
+          hasTimeLogged,
+          duration: finalDuration,
+          notificationsSent
         })
 
       case 'update':

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { MobileMenu } from '@/components/ui/MobileMenu'
+import { useTimeTrackingNotifications } from '@/hooks/useTimeTrackingNotifications'
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -12,6 +13,9 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  
+  // Listen for time tracking notifications and show toast popups
+  useTimeTrackingNotifications()
 
   return (
     <div className="flex h-screen bg-background overflow-x-hidden">

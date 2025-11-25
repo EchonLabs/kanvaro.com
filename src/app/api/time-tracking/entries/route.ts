@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
       notes
     } = body
 
-    if (!userId || !organizationId || !projectId || !description) {
+    if (!userId || !organizationId || !projectId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -169,13 +169,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Time tracking not allowed for this project' }, { status: 403 })
     }
 
-    // Get time tracking settings
+    // Get time tracking settings - check project-specific first, then organization-wide
     let settings = await TimeTrackingSettings.findOne({
       organization: organizationId,
       project: projectId
-    }) || await TimeTrackingSettings.findOne({
-      organization: organizationId,
-      project: null
+    })
+    
+    if (!settings) {
+      settings = await TimeTrackingSettings.findOne({
+        organization: organizationId,
+        project: null
+      })
+    }
+    
+    console.log('Manual time entry - Time tracking settings found:', {
+      hasSettings: !!settings,
+      settingsId: settings?._id?.toString(),
+      isProjectSpecific: settings?.project?.toString() === projectId,
+      projectId: settings?.project?.toString(),
+      requestedProjectId: projectId,
+      requireDescription: settings?.requireDescription,
+      requireDescriptionType: typeof settings?.requireDescription,
+      allowManualTimeSubmission: settings?.allowManualTimeSubmission
     })
 
     // If no TimeTrackingSettings exist, create default ones based on organization settings
@@ -215,6 +230,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Manual time submission not allowed' }, { status: 403 })
     }
 
+    // Validate description if required
+    // Explicitly check if requireDescription is true (handle both boolean true and undefined as false)
+    const requireDescription = settings.requireDescription === true
+    const hasDescription = description && typeof description === 'string' && description.trim().length > 0
+    
+    console.log('Manual time entry - Description validation:', {
+      requireDescription,
+      hasDescription,
+      descriptionValue: description,
+      descriptionType: typeof description,
+      descriptionLength: description?.length,
+      settingsRequireDescription: settings.requireDescription,
+      settingsRequireDescriptionType: typeof settings.requireDescription
+    })
+    
+    // Only validate description if it's explicitly required
+    if (requireDescription === true && !hasDescription) {
+      console.log('Validation failed: Description is required but missing')
+      return NextResponse.json({ error: 'Description is required for time entries' }, { status: 400 })
+    }
+    
+    // If description is not required and empty, use empty string or default
+    const finalDescription = description || ''
+
     // Validate time
     const start = new Date(startTime)
     const end = endTime ? new Date(endTime) : new Date()
@@ -251,7 +290,7 @@ export async function POST(request: NextRequest) {
       organization: organizationId,
       project: projectId,
       task: taskId,
-      description,
+      description: finalDescription,
       startTime: start,
       endTime: end,
       duration: finalDuration,
