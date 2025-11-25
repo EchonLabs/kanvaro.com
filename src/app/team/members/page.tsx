@@ -34,6 +34,11 @@ interface Member {
   lastName: string
   email: string
   role: string
+  customRole?: {
+    _id: string
+    name: string
+    description?: string
+  }
   isActive: boolean
   createdAt: string
   lastLogin?: string
@@ -43,6 +48,10 @@ interface PendingInvitation {
   _id: string
   email: string
   role: string
+  customRole?: {
+    _id: string
+    name: string
+  }
   invitedBy: {
     firstName: string
     lastName: string
@@ -249,6 +258,11 @@ export default function MembersPage() {
     }
   }
 
+  const getMemberRoleLabel = (member: Member) => member.customRole?.name || formatToTitleCase(member.role)
+
+  const getInvitationRoleLabel = (invitation: PendingInvitation) =>
+    invitation.customRole?.name || formatToTitleCase(invitation.role)
+
   if (loading) {
     return (
       <MainLayout>
@@ -401,7 +415,7 @@ export default function MembersPage() {
                           <p className="text-xs sm:text-sm text-muted-foreground truncate mb-2">{member.email}</p>
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge className={`${getRoleColor(member.role)} text-xs flex-shrink-0`}>
-                              {formatToTitleCase(member.role)}
+                              {getMemberRoleLabel(member)}
                             </Badge>
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
                               Joined {new Date(member.createdAt).toLocaleDateString()}
@@ -465,7 +479,7 @@ export default function MembersPage() {
                           </p>
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge className={`${getRoleColor(invitation.role)} text-xs flex-shrink-0`}>
-                              {formatToTitleCase(invitation.role)}
+                              {getInvitationRoleLabel(invitation)}
                             </Badge>
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
                               Expires {new Date(invitation.expiresAt).toLocaleDateString()}

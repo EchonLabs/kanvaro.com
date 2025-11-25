@@ -1190,10 +1190,10 @@ export default function BacklogPage() {
                                 {item.title}
                               </h3>
                               <Badge className={getTypeColor(item.type)}>
-                                {item.type}
+                                {formatToTitleCase(item.type)}
                               </Badge>
                               <Badge className={getPriorityColor(item.priority)}>
-                                {item.priority}
+                                {formatToTitleCase(item.priority)}
                               </Badge>
                               <Badge className={getStatusColor(item.status)}>
                                 {formatToTitleCase(item.status)}
@@ -1572,7 +1572,7 @@ export default function BacklogPage() {
                     >
                       <span className="truncate">{task.title}</span>
                       <Badge variant="outline" className="flex-shrink-0">
-                        {task.priority}
+                        {formatToTitleCase(task.priority)}
                       </Badge>
                     </li>
                   ))}

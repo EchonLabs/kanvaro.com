@@ -95,6 +95,7 @@ interface Task {
     email: string
   }
   taskNumber?: string | number
+  displayId?: string
   storyPoints?: number
   dueDate?: string
   estimatedHours?: number
@@ -593,11 +594,16 @@ export default function KanbanPage() {
     )
   }, [taskNumberOptions, taskNumberFilterQuery])
 
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase()
+
   const filteredTasks = tasks.filter(task => {
-    const matchesSearch = !searchQuery || 
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (task.project?.name && task.project.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    const matchesSearch =
+      !normalizedSearchQuery ||
+      task.title.toLowerCase().includes(normalizedSearchQuery) ||
+      (task.description || '').toLowerCase().includes(normalizedSearchQuery) ||
+      (task.project?.name || '').toLowerCase().includes(normalizedSearchQuery) ||
+      (task.displayId || '').toLowerCase().includes(normalizedSearchQuery) ||
+      (task._id || '').toLowerCase().includes(normalizedSearchQuery)
     
     const matchesProject = projectFilter === 'all' || (task.project?._id && task.project._id === projectFilter)
     const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
@@ -1185,6 +1191,11 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
               {formatToTitleCase(task?.type)}
             </Badge>
           </div>
+          {task.displayId && (
+            <p className="text-xs text-muted-foreground font-medium mt-1">
+              #{task.displayId}
+            </p>
+          )}
           
           <div className="text-xs text-muted-foreground">
             <div className="flex items-center space-x-1 mb-1">
@@ -1223,15 +1234,24 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
           )}
           
           {task?.labels?.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {task?.labels?.slice(0, 2).map((label, index) => (
-                <Badge key={index} variant="outline" className="text-xs">
+            <div className="flex items-center gap-1 overflow-hidden flex-nowrap">
+              {task.labels.slice(0, 2).map((label, index) => (
+                <Badge
+                  key={index}
+                  variant="outline"
+                  className="text-xs truncate max-w-[85px] whitespace-nowrap flex-shrink-0"
+                  title={label}
+                >
                   {label}
                 </Badge>
               ))}
-              {task?.labels?.length > 2 && (
-                <Badge variant="outline" className="text-xs">
-                  +{task?.labels?.length - 2}
+              {task.labels.length > 2 && (
+                <Badge
+                  variant="outline"
+                  className="text-xs flex-shrink-0"
+                  title={task.labels.slice(2).join(', ')}
+                >
+                  +{task.labels.length - 2}
                 </Badge>
               )}
             </div>

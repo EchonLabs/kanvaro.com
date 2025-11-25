@@ -69,6 +69,18 @@ interface Sprint {
     lastName: string
     email: string
   }
+  tasks?: string[]
+  stories?: string[]
+  attachments?: Array<{
+    name: string
+    url: string
+    size: number
+    type: string
+    uploadedBy: string
+    uploadedAt: string
+  }>
+  actualStartDate?: string
+  actualEndDate?: string
   progress: {
     completionPercentage: number
     tasksCompleted: number
@@ -678,6 +690,8 @@ export default function SprintsPage() {
               <TabsContent value="grid" className="space-y-4">
                 <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                   {filteredSprints.map((sprint) => {
+                    const totalTasks = sprint?.progress?.totalTasks ?? (Array.isArray(sprint?.tasks) ? sprint.tasks.length : 0)
+                    const hasTasks = (totalTasks ?? 0) > 0
                     const completionPercentage = Math.min(
                       100,
                       Math.max(0, sprint?.progress?.completionPercentage ?? 0)
@@ -828,19 +842,20 @@ export default function SprintsPage() {
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                          {sprint.status === 'planning' && (
-                            <Button
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleSprintLifecycleAction(sprint._id, 'start')
-                              }}
-                              disabled={updatingSprintId === sprint._id}
-                            >
-                              <Play className="h-4 w-4 mr-1" />
-                              {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
-                            </Button>
-                          )}
+                        {sprint.status === 'planning' && (
+                          <Button
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleSprintLifecycleAction(sprint._id, 'start')
+                            }}
+                            disabled={updatingSprintId === sprint._id || !hasTasks}
+                            title={!hasTasks ? 'Add tasks to this sprint before starting it.' : undefined}
+                          >
+                            <Play className="h-4 w-4 mr-1" />
+                            {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
+                          </Button>
+                        )}
                           {sprint.status === 'active' && (
                             <Button
                               size="sm"
@@ -866,6 +881,8 @@ export default function SprintsPage() {
               <TabsContent value="list" className="space-y-4">
                 <div className="space-y-4">
                   {filteredSprints.map((sprint) => {
+                    const totalTasks = sprint?.progress?.totalTasks ?? (Array.isArray(sprint?.tasks) ? sprint.tasks.length : 0)
+                    const hasTasks = (totalTasks ?? 0) > 0
                     const completionPercentage = Math.min(
                       100,
                       Math.max(0, sprint?.progress?.completionPercentage ?? 0)
@@ -941,7 +958,8 @@ export default function SprintsPage() {
                               e.stopPropagation()
                               handleSprintLifecycleAction(sprint._id, 'start')
                             }}
-                            disabled={updatingSprintId === sprint._id}
+                            disabled={updatingSprintId === sprint._id || !hasTasks}
+                            title={!hasTasks ? 'Add tasks to this sprint before starting it.' : undefined}
                           >
                             <Play className="h-4 w-4 mr-1" />
                             {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
@@ -1001,13 +1019,6 @@ export default function SprintsPage() {
                                 }}>
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Sprint
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/sprints/${sprint._id}?tab=settings`)
-                                }}>
-                                  <Settings className="h-4 w-4 mr-2" />
-                                  Settings
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={(e) => {
                                   e.stopPropagation()

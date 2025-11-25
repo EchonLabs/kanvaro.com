@@ -38,6 +38,7 @@ import {
 } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useDebounce } from '@/hooks/useDebounce'
+import { useProjectKanbanStatuses } from '@/hooks/useProjectKanbanStatuses'
 import dynamic from 'next/dynamic'
 import { Permission, PermissionGate } from '@/lib/permissions'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
@@ -45,18 +46,17 @@ import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { format } from 'date-fns'
 import { DateRange } from 'react-day-picker'
+import { DEFAULT_TASK_STATUS_KEYS, type TaskStatusKey } from '@/constants/taskStatuses'
 
 // Dynamically import heavy modals
 const CreateTaskModal = dynamic(() => import('./CreateTaskModal'), { ssr: false })
 const KanbanBoard = dynamic(() => import('./KanbanBoard'), { ssr: false })
 
-const TASK_STATUS_OPTIONS = ['todo', 'in_progress', 'review', 'testing', 'done', 'cancelled', 'backlog'] as const
-
 interface Task {
   _id: string
   title: string
   description: string
-  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled' | 'backlog'
+  status: TaskStatusKey
   priority: 'low' | 'medium' | 'high' | 'critical'
   type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
   displayId?: string
@@ -156,7 +156,7 @@ export default function TasksClient({
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
-  const [projectsWithStatuses, setProjectsWithStatuses] = useState<Map<string, Array<{ key: string; title: string; order: number }>>>(new Map())
+  const { statusMap: projectsWithStatuses } = useProjectKanbanStatuses()
 
   const startDateBoundary = useMemo(() => {
     if (!dateRangeFilter?.from) return null
@@ -549,28 +549,6 @@ export default function TasksClient({
     return title.length > 10 ? `${title.slice(0, 10)}…` : title
   }
 
-  // Fetch projects with their kanbanStatuses
-  const fetchProjectsWithStatuses = useCallback(async () => {
-    try {
-      const response = await fetch('/api/projects')
-      const data = await response.json()
-      
-      if (data.success && Array.isArray(data.data)) {
-        const statusMap = new Map<string, Array<{ key: string; title: string; order: number }>>()
-        
-        data.data.forEach((project: any) => {
-          if (project._id && project.settings?.kanbanStatuses && project.settings.kanbanStatuses.length > 0) {
-            statusMap.set(project._id, project.settings.kanbanStatuses)
-          }
-        })
-        
-        setProjectsWithStatuses(statusMap)
-      }
-    } catch (error) {
-      console.error('Failed to fetch projects with statuses:', error)
-    }
-  }, [])
-
   // Get available statuses for a specific task (from its project)
   const getStatusesForTask = useCallback((task: Task): string[] => {
     const projectId = task.project?._id
@@ -579,7 +557,7 @@ export default function TasksClient({
       return statuses.map(s => s.key)
     }
     // Fall back to default statuses
-    return Array.from(TASK_STATUS_OPTIONS)
+    return Array.from(DEFAULT_TASK_STATUS_KEYS)
   }, [projectsWithStatuses])
 
   // Get all available statuses (for filter dropdowns)
@@ -601,13 +579,8 @@ export default function TasksClient({
       }
     }
     // Fall back to default statuses
-    return Array.from(TASK_STATUS_OPTIONS)
+    return Array.from(DEFAULT_TASK_STATUS_KEYS)
   }, [projectFilter, projectsWithStatuses])
-
-  // Fetch projects with statuses on mount and when project filter changes
-  useEffect(() => {
-    fetchProjectsWithStatuses()
-  }, [fetchProjectsWithStatuses, projectFilter])
 
   const handleTaskCreated = () => {
     fetchTasks(true)
@@ -691,6 +664,9 @@ export default function TasksClient({
       setStatusUpdatingId(null)
     }
   }
+  const shouldShowInitialLoader = loading && tasks.length === 0
+  const shouldShowInlineLoader = loading && tasks.length > 0
+
   return (
     <div className="space-y-8 sm:space-y-10 overflow-x-hidden">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -953,6 +929,20 @@ export default function TasksClient({
             )}
 
             <TabsContent value="list" className="space-y-4">
+              {shouldShowInitialLoader ? (
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                  <Loader2 className="h-6 w-6 animate-spin mb-3" />
+                  <p className="text-sm font-medium">Loading tasks...</p>
+                  <p className="text-xs text-muted-foreground/80">Please wait while we fetch your workspace.</p>
+                </div>
+              ) : (
+              <>
+              {shouldShowInlineLoader && (
+                <div className="flex items-center justify-center py-8 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  <span className="text-sm">Refreshing tasks...</span>
+                </div>
+              )}
               <div 
                 ref={parentRef}
                 className="h-[400px] sm:h-[500px] md:h-[600px] overflow-auto overflow-x-hidden"
@@ -1142,9 +1132,25 @@ export default function TasksClient({
                   </div>
                 )}
               </div>
+              </>
+              )}
             </TabsContent>
 
             <TabsContent value="kanban" className="space-y-4">
+              {shouldShowInitialLoader ? (
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                  <Loader2 className="h-6 w-6 animate-spin mb-3" />
+                  <p className="text-sm font-medium">Loading tasks...</p>
+                  <p className="text-xs text-muted-foreground/80">Please wait while we fetch your workspace.</p>
+                </div>
+              ) : (
+              <>
+              {shouldShowInlineLoader && (
+                <div className="flex items-center justify-center py-8 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  <span className="text-sm">Refreshing board...</span>
+                </div>
+              )}
               <KanbanBoard 
                 projectId="all" 
                 onCreateTask={() => setShowCreateTaskModal(true)} 
@@ -1157,6 +1163,8 @@ export default function TasksClient({
                     No tasks found.
                   </div>
                 </div>
+              )}
+              </>
               )}
             </TabsContent>
           </Tabs>
