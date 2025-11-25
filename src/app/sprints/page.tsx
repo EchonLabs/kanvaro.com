@@ -69,6 +69,18 @@ interface Sprint {
     lastName: string
     email: string
   }
+  tasks?: string[]
+  stories?: string[]
+  attachments?: Array<{
+    name: string
+    url: string
+    size: number
+    type: string
+    uploadedBy: string
+    uploadedAt: string
+  }>
+  actualStartDate?: string
+  actualEndDate?: string
   progress: {
     completionPercentage: number
     tasksCompleted: number
