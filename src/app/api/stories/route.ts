@@ -136,8 +136,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify epic exists if provided
+    let epicDoc = null
     if (epic) {
-      const epicDoc = await Epic.findOne({
+      epicDoc = await Epic.findOne({
         _id: epic,
         project: project
       })
@@ -147,6 +148,23 @@ export async function POST(request: NextRequest) {
           { error: 'Epic not found' },
           { status: 404 }
         )
+      }
+
+      // Validate story dueDate doesn't exceed epic dueDate
+      if (dueDate && epicDoc.dueDate) {
+        const storyDueDate = new Date(dueDate)
+        const epicDueDate = new Date(epicDoc.dueDate)
+        
+        // Reset time to compare only dates
+        storyDueDate.setHours(0, 0, 0, 0)
+        epicDueDate.setHours(0, 0, 0, 0)
+        
+        if (storyDueDate > epicDueDate) {
+          return NextResponse.json(
+            { error: 'Story Due Date cannot be later than the selected Epic\'s Due Date.' },
+            { status: 400 }
+          )
+        }
       }
     }
 

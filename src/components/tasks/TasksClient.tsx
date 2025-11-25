@@ -549,12 +549,17 @@ export default function TasksClient({
     return title.length > 10 ? `${title.slice(0, 10)}…` : title
   }
 
+  const ensureBacklogIncluded = (statuses: string[]): string[] => {
+    if (statuses.includes('backlog')) return statuses
+    return ['backlog', ...statuses]
+  }
+
   // Get available statuses for a specific task (from its project)
   const getStatusesForTask = useCallback((task: Task): string[] => {
     const projectId = task.project?._id
     if (projectId && projectsWithStatuses.has(projectId)) {
       const statuses = projectsWithStatuses.get(projectId)!
-      return statuses.map(s => s.key)
+      return ensureBacklogIncluded(statuses.map(s => s.key))
     }
     // Fall back to default statuses
     return Array.from(DEFAULT_TASK_STATUS_KEYS)
@@ -566,7 +571,7 @@ export default function TasksClient({
       // If a specific project is selected, use its statuses
       if (projectsWithStatuses.has(projectFilter)) {
         const statuses = projectsWithStatuses.get(projectFilter)!
-        return statuses.map(s => s.key)
+        return ensureBacklogIncluded(statuses.map(s => s.key))
       }
     } else {
       // If "all" is selected, collect unique statuses from all projects
@@ -575,7 +580,8 @@ export default function TasksClient({
         statuses.forEach(s => statusSet.add(s.key))
       })
       if (statusSet.size > 0) {
-        return Array.from(statusSet)
+        const list = Array.from(statusSet)
+        return ensureBacklogIncluded(list)
       }
     }
     // Fall back to default statuses
@@ -726,14 +732,14 @@ export default function TasksClient({
                   <SelectTrigger className="w-full sm:w-40">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    {getAllAvailableStatuses().map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {formatToTitleCase(status)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      {getAllAvailableStatuses().map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {formatToTitleCase(status)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                 </Select>
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
                   <SelectTrigger className="w-full sm:w-40">

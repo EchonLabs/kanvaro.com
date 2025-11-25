@@ -27,6 +27,7 @@ interface Project {
 interface Epic {
   _id: string
   title: string
+  dueDate?: string
 }
 
 interface Sprint {
@@ -45,6 +46,8 @@ export default function CreateStoryPage() {
   const [projectQuery, setProjectQuery] = useState('')
   const [epicQuery, setEpicQuery] = useState('')
   const [sprintQuery, setSprintQuery] = useState('')
+  const [selectedEpicDueDate, setSelectedEpicDueDate] = useState<string | null>(null)
+  const [dueDateError, setDueDateError] = useState('')
 
   const [formData, setFormData] = useState({
     title: '',
@@ -118,6 +121,7 @@ export default function CreateStoryPage() {
   const fetchEpics = async (projectId: string) => {
     if (!projectId) {
       setEpics([])
+      setSelectedEpicDueDate(null)
       return
     }
 
@@ -131,13 +135,61 @@ export default function CreateStoryPage() {
         if (formData.epic === 'none' && data.data.length > 0) {
           setFormData(prev => ({ ...prev, epic: '' }))
         }
+        // If current epic is still in the list, update its dueDate
+        if (formData.epic && formData.epic !== 'none') {
+          const currentEpic = data.data.find((e: Epic) => e._id === formData.epic)
+          if (currentEpic) {
+            const formattedDueDate = formatDateForInput(currentEpic.dueDate)
+            setSelectedEpicDueDate(formattedDueDate)
+            validateDueDate(formData.dueDate, formattedDueDate || undefined)
+          } else {
+            setSelectedEpicDueDate(null)
+            setDueDateError('')
+          }
+        }
       } else {
         setEpics([])
+        setSelectedEpicDueDate(null)
       }
     } catch (err) {
       console.error('Failed to fetch epics:', err)
       setEpics([])
+      setSelectedEpicDueDate(null)
     }
+  }
+
+  const formatDateForInput = (dateString?: string | null): string | null => {
+    if (!dateString) return null
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return null
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const validateDueDate = (storyDueDate: string, epicDueDate?: string) => {
+    setDueDateError('')
+    
+    if (!storyDueDate) {
+      return
+    }
+
+    if (epicDueDate) {
+      const storyDate = new Date(storyDueDate)
+      const epicDate = new Date(epicDueDate)
+      
+      // Reset time to compare only dates
+      storyDate.setHours(0, 0, 0, 0)
+      epicDate.setHours(0, 0, 0, 0)
+      
+      if (storyDate > epicDate) {
+        setDueDateError('Story Due Date cannot be later than the selected Epic\'s Due Date.')
+        return false
+      }
+    }
+    
+    return true
   }
 
   const fetchSprints = async (projectId: string) => {
@@ -164,6 +216,15 @@ export default function CreateStoryPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setDueDateError('')
+
+    // Validate dueDate before submission
+    if (formData.dueDate && selectedEpicDueDate) {
+      if (!validateDueDate(formData.dueDate, selectedEpicDueDate)) {
+        setLoading(false)
+        return
+      }
+    }
 
     try {
       const response = await fetch('/api/stories', {
@@ -202,7 +263,42 @@ export default function CreateStoryPage() {
       setFormData(prev => ({
         ...prev,
         project: value,
+        epic: '', // Clear epic when project changes
       }))
+      setSelectedEpicDueDate(null)
+      setDueDateError('')
+      return
+    }
+
+    if (field === 'epic') {
+      const selectedEpic = epics.find(e => e._id === value)
+      if (selectedEpic) {
+        const formattedDueDate = formatDateForInput(selectedEpic.dueDate)
+        setSelectedEpicDueDate(formattedDueDate)
+        // Validate current dueDate against epic's dueDate
+        if (formData.dueDate) {
+          validateDueDate(formData.dueDate, formattedDueDate || undefined)
+        }
+      } else {
+        setSelectedEpicDueDate(null)
+        setDueDateError('')
+      }
+      setFormData(prev => ({
+        ...prev,
+        epic: value
+      }))
+      return
+    }
+
+    if (field === 'dueDate') {
+      setFormData(prev => ({
+        ...prev,
+        dueDate: value
+      }))
+      // Validate against epic's dueDate if epic is selected
+      if (selectedEpicDueDate) {
+        validateDueDate(value, selectedEpicDueDate)
+      }
       return
     }
 
@@ -452,7 +548,17 @@ export default function CreateStoryPage() {
                       type="date"
                       value={formData.dueDate}
                       onChange={(e) => handleChange('dueDate', e.target.value)}
+                      max={selectedEpicDueDate || undefined}
+                      className={dueDateError ? 'border-destructive' : ''}
                     />
+                    {dueDateError && (
+                      <p className="text-sm text-destructive mt-1">{dueDateError}</p>
+                    )}
+                    {selectedEpicDueDate && !dueDateError && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Epic Due Date: {new Date(selectedEpicDueDate + 'T00:00:00').toLocaleDateString()}
+                      </p>
+                    )}
                   </div>
 
                   <div>
