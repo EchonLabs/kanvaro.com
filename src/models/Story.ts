@@ -8,7 +8,7 @@ export interface IStory extends Document {
   epic?: mongoose.Types.ObjectId
   createdBy: mongoose.Types.ObjectId
   assignedTo?: mongoose.Types.ObjectId
-  status: 'backlog' | 'in_progress' | 'completed' | 'cancelled'
+  status: 'backlog' | 'in_progress' | 'completed' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   storyPoints?: number
   estimatedHours?: number
@@ -67,7 +67,7 @@ const StorySchema = new Schema<IStory>({
   },
   status: {
     type: String,
-    enum: ['backlog', 'in_progress', 'completed', 'cancelled'],
+    enum: ['backlog', 'in_progress', 'completed', 'done', 'cancelled'],
     default: 'backlog'
   },
   priority: {

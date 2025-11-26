@@ -313,6 +313,7 @@ export async function GET(request: NextRequest) {
             .populate('assignedTo', 'firstName lastName email')
             .populate('createdBy', 'firstName lastName email')
             .populate('story', 'title')
+            .populate('epic', 'title')
             .populate('sprint', 'name status')
         : Promise.resolve([]),
 

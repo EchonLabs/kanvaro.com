@@ -20,15 +20,20 @@ export class CompletionService {
       // Check if all tasks are completed (status = 'done')
       const allTasksCompleted = tasks.every(task => task.status === 'done')
       
-      if (allTasksCompleted && story.status !== 'completed') {
+      if (allTasksCompleted && story.status !== 'done') {
         await Story.findByIdAndUpdate(storyId, {
-          status: 'completed',
+          status: 'done',
           completedAt: new Date()
         })
         
         // Check if sprint should be completed
         if (story.sprint) {
           await this.checkSprintCompletion(story.sprint.toString())
+        }
+        
+        // Check if epic should be completed (based on stories, not sprints)
+        if (story.epic) {
+          await this.checkEpicCompletion(story.epic.toString())
         }
       }
     } catch (error) {
@@ -49,8 +54,8 @@ export class CompletionService {
       
       if (stories.length === 0) return
 
-      // Check if all stories are completed
-      const allStoriesCompleted = stories.every(story => story.status === 'completed')
+      // Check if all stories are done
+      const allStoriesCompleted = stories.every(story => story.status === 'done')
       
       if (allStoriesCompleted && sprint.status !== 'completed') {
         await Sprint.findByIdAndUpdate(sprintId, {
@@ -72,7 +77,10 @@ export class CompletionService {
   }
 
   /**
-   * Check and update epic completion based on its sprints
+   * Check and update epic completion based on its stories and tasks
+   * Epic is done when:
+   * 1. All user stories in the epic have status 'done'
+   * 2. AND all tasks that belong to stories in this epic have status 'done'
    */
   static async checkEpicCompletion(epicId: string): Promise<void> {
     try {
@@ -82,22 +90,28 @@ export class CompletionService {
       // Get all stories for this epic
       const stories = await Story.find({ epic: epicId })
       
-      if (stories.length === 0) return
+      // Check if all stories are done (status = 'done')
+      const allStoriesCompleted = stories.length > 0 
+        ? stories.every(story => story.status === 'done')
+        : true // If no stories, consider this condition met
 
-      // Get all sprints that contain stories from this epic
-      const sprintIds = Array.from(new Set(stories.map(story => story.sprint).filter(Boolean)))
-      
-      if (sprintIds.length === 0) return
+      // Get all tasks that belong to stories in this epic
+      const storyIds = stories.map(story => story._id)
+      const tasksInStories = storyIds.length > 0
+        ? await Task.find({ story: { $in: storyIds } })
+        : []
 
-      // Get all sprints for this epic
-      const sprints = await Sprint.find({ _id: { $in: sprintIds } })
-      
-      // Check if all sprints are completed
-      const allSprintsCompleted = sprints.every(sprint => sprint.status === 'completed')
-      
-      if (allSprintsCompleted && epic.status !== 'completed') {
+      // Check if all tasks are completed (status = 'done')
+      const allTasksCompleted = tasksInStories.length > 0
+        ? tasksInStories.every(task => task.status === 'done')
+        : true // If no tasks, consider this condition met
+
+      // Epic is done only when BOTH conditions are met:
+      // 1. All stories are done
+      // 2. All tasks are done
+      if (allStoriesCompleted && allTasksCompleted && epic.status !== 'done') {
         await Epic.findByIdAndUpdate(epicId, {
-          status: 'completed',
+          status: 'done',
           completedAt: new Date()
         })
       }
@@ -111,12 +125,21 @@ export class CompletionService {
    */
   static async handleTaskStatusChange(taskId: string): Promise<void> {
     try {
-      const task = await Task.findById(taskId)
+      const task = await Task.findById(taskId).populate('story', 'epic')
       if (!task) return
 
       // If task is completed, check story completion
       if (task.status === 'done' && task.story) {
         await this.checkStoryCompletion(task.story.toString())
+        
+        // Also check epic completion if the story belongs to an epic
+        // This ensures epic completion is checked when tasks change status
+        if (typeof task.story === 'object' && task.story !== null && 'epic' in task.story && task.story.epic) {
+          const epicId = typeof task.story.epic === 'object' && task.story.epic !== null && '_id' in task.story.epic
+            ? task.story.epic._id.toString()
+            : task.story.epic.toString()
+          await this.checkEpicCompletion(epicId)
+        }
       }
     } catch (error) {
       console.error('Error handling task status change:', error)

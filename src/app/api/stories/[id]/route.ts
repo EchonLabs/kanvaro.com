@@ -126,24 +126,13 @@ export async function PUT(
       )
     }
 
-    // If this story belongs to an epic, and its status changed, check whether
-    // all stories for that epic are now completed. If so, mark the epic as completed.
+    // If this story belongs to an epic, check if epic should be completed
+    // Use the completion service to ensure consistent logic
     if (story.epic) {
-      const epicId = story.epic as any
-
-      const epicStories = await Story.find({
-        epic: epicId,
-        archived: { $ne: true }
-      }).select('status')
-
-      const totalStories = epicStories.length
-      const storiesCompleted = epicStories.filter(
-        (s) => s.status === 'done'
-      ).length
-
-      if (totalStories > 0 && storiesCompleted === totalStories) {
-        await Epic.findByIdAndUpdate(epicId, { status: 'done' })
-      }
+      const { CompletionService } = await import('@/lib/completion-service')
+      CompletionService.checkEpicCompletion(story.epic.toString()).catch(error => {
+        console.error('Error checking epic completion:', error)
+      })
     }
 
     return NextResponse.json({
