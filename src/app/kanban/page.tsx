@@ -577,8 +577,10 @@ export default function KanbanPage() {
     const map = new Map<string, TaskOption>()
     tasks.forEach(task => {
       const id = task._id
-      const label = task.taskNumber
-        ? `#${task.taskNumber} - ${task.title}`
+      // Use displayId if available, otherwise fall back to taskNumber, otherwise just title
+      const identifier = task.displayId || (task.taskNumber ? String(task.taskNumber) : null)
+      const label = identifier
+        ? `#${identifier} - ${task.title}`
         : task.title
       map.set(id, { id, label })
     })
@@ -614,6 +616,7 @@ export default function KanbanPage() {
     const matchesAssignedBy = assignedByFilter === 'all' || (createdById && createdById === assignedByFilter)
     const taskIdMatches = taskNumberFilter === 'all' ||
       task._id === taskNumberFilter ||
+      (task.displayId && task.displayId === taskNumberFilter) ||
       (task.taskNumber && String(task.taskNumber) === taskNumberFilter)
     const dueDate = task.dueDate ? new Date(task.dueDate) : null
     const matchesStartDate = !startDateBoundary || (dueDate && dueDate >= startDateBoundary)
@@ -758,7 +761,7 @@ export default function KanbanPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Kanban Board</h1>
             <p className="text-sm sm:text-base text-muted-foreground">Visual task management with drag and drop</p>
           </div>
-          <Button onClick={() => router.push('/tasks/create')} className="w-full sm:w-auto">
+          <Button onClick={() => handleCreateTask()} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             New Task
           </Button>
@@ -1026,6 +1029,7 @@ export default function KanbanPage() {
         }}
         projectId={projectFilter === 'all' ? '' : projectFilter}
         defaultStatus={createTaskStatus}
+        stayOnCurrentPage={true}
         onTaskCreated={() => {
           setShowCreateTaskModal(false)
           setCreateTaskStatus(undefined)

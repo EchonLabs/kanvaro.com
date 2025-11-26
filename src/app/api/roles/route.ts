@@ -37,22 +37,7 @@ export async function GET(req: NextRequest) {
         _id: 'admin',
         name: 'Administrator',
         description: 'Full access to all features and settings',
-        permissions: [
-          'user:create',
-          'user:read',
-          'user:update',
-          'user:delete',
-          'project:create',
-          'project:read',
-          'project:update',
-          'project:delete',
-          'team:read',
-          'team:manage',
-          'settings:read',
-          'settings:update',
-          'reports:read',
-          'reports:export'
-        ],
+        permissions: Object.values(Permission),
         isSystem: true,
         userCount: 1,
         createdAt: new Date().toISOString()

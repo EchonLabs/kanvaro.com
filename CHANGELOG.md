@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.7.0...v1.8.0) (2025-11-26)
+
+
+### Features
+
+* add not approved tasks ([cef9d03](https://github.com/EchonLabs/kanvaro.com/commit/cef9d03010c7213ce347b0280f457642851ce1c8))
+
 # [1.7.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.6.1...v1.7.0) (2025-11-25)
 
 

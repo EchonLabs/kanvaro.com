@@ -868,6 +868,7 @@ export function getPermissionScope(permission: Permission): PermissionScope {
   const globalPermissions = [
     Permission.USER_CREATE,
     Permission.USER_DELETE,
+    Permission.USER_INVITE, // Organization-wide permission to invite users
     Permission.USER_MANAGE_ROLES,
     Permission.ORGANIZATION_UPDATE,
     Permission.ORGANIZATION_DELETE,
@@ -875,6 +876,7 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.ORGANIZATION_MANAGE_BILLING,
     Permission.PROJECT_CREATE, // Project creation is a global permission
     Permission.PROJECT_VIEW_ALL,
+    Permission.TEAM_INVITE, // Organization-wide permission to invite team members
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.FINANCIAL_READ,
     Permission.REPORTING_VIEW,
