@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.8.0...v1.9.0) (2025-11-26)
+
+
+### Features
+
+* add task bug fixes ([dfcb140](https://github.com/EchonLabs/kanvaro.com/commit/dfcb14073173e3f20f3986478cc694fa5ae564d1))
+
 # [1.8.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.7.0...v1.8.0) (2025-11-26)
 
 
