@@ -50,7 +50,25 @@ import { DEFAULT_TASK_STATUS_KEYS, type TaskStatusKey } from '@/constants/taskSt
 
 // Dynamically import heavy modals
 const CreateTaskModal = dynamic(() => import('./CreateTaskModal'), { ssr: false })
-const KanbanBoard = dynamic(() => import('./KanbanBoard'), { ssr: false })
+type KanbanBoardComponentProps = {
+    projectId: string
+    filters?: {
+        search?: string
+        status?: string
+        priority?: string
+        type?: string
+        assignedTo?: string
+        createdBy?: string
+        createdAtFrom?: string
+        createdAtTo?: string
+    }
+    onProjectChange?: (projectId: string) => void
+    onCreateTask: () => void
+    onEditTask?: (task: any) => void
+    onDeleteTask?: (taskId: string) => void
+}
+
+const KanbanBoard = dynamic<KanbanBoardComponentProps>(() => import('./KanbanBoard'), { ssr: false })
 
 interface Task {
     _id: string
@@ -214,16 +232,31 @@ export default function TasksClient({
             }
         })
 
-        setProjectOptions(Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name)))
+        setProjectOptions((prev) => {
+            const combined = new Map<string, ProjectSummary>()
+            prev.forEach((project) => combined.set(project._id, project))
+            projectMap.forEach((project, key) => combined.set(key, project))
+            return Array.from(combined.values()).sort((a, b) => a.name.localeCompare(b.name))
+        })
 
         // Only show user filters if user can view all tasks
         if (canViewAllTasks) {
-            setAssignedToOptions(Array.from(assignedToMap.values()).sort((a, b) =>
-                `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
-            ))
-            setCreatedByOptions(Array.from(createdByMap.values()).sort((a, b) =>
-                `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
-            ))
+            setAssignedToOptions((prev) => {
+                const combined = new Map<string, UserSummary>()
+                prev.forEach((user) => combined.set(user._id, user))
+                assignedToMap.forEach((user, key) => combined.set(key, user))
+                return Array.from(combined.values()).sort((a, b) =>
+                    `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
+                )
+            })
+            setCreatedByOptions((prev) => {
+                const combined = new Map<string, UserSummary>()
+                prev.forEach((user) => combined.set(user._id, user))
+                createdByMap.forEach((user, key) => combined.set(key, user))
+                return Array.from(combined.values()).sort((a, b) =>
+                    `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
+                )
+            })
         }
     }, [tasks, canViewAllTasks])
 
@@ -327,6 +360,45 @@ export default function TasksClient({
         estimateSize: () => 120,
         overscan: 8,
     })
+
+    const kanbanFilters = useMemo(() => {
+        const params: {
+            search?: string
+            status?: string
+            priority?: string
+            type?: string
+            assignedTo?: string
+            createdBy?: string
+            createdAtFrom?: string
+            createdAtTo?: string
+        } = {}
+
+        if (debouncedSearch) params.search = debouncedSearch
+        if (statusFilter !== 'all') params.status = statusFilter
+        if (priorityFilter !== 'all') params.priority = priorityFilter
+        if (typeFilter !== 'all') params.type = typeFilter
+        if (canViewAllTasks) {
+            if (assignedToFilter !== 'all') params.assignedTo = assignedToFilter
+            if (createdByFilter !== 'all') params.createdBy = createdByFilter
+        }
+        if (dateRangeFilter?.from) {
+            params.createdAtFrom = dateRangeFilter.from.toISOString().split('T')[0]
+        }
+        if (dateRangeFilter?.to) {
+            params.createdAtTo = dateRangeFilter.to.toISOString().split('T')[0]
+        }
+
+        return params
+    }, [
+        debouncedSearch,
+        statusFilter,
+        priorityFilter,
+        typeFilter,
+        assignedToFilter,
+        createdByFilter,
+        dateRangeFilter,
+        canViewAllTasks
+    ])
 
     // Fetch tasks with current filters
     const fetchTasks = useCallback(async (reset = false) => {
@@ -774,12 +846,31 @@ export default function TasksClient({
                                     </SelectTrigger>
                                     <SelectContent className="z-[10050] p-0">
                                         <div className="p-2">
-                                            <Input
-                                                value={projectFilterQuery}
-                                                onChange={(e) => setProjectFilterQuery(e.target.value)}
-                                                placeholder="Search projects"
-                                                className="mb-2"
-                                            />
+                                            <div className="relative mb-2">
+                                                <Input
+                                                    value={projectFilterQuery}
+                                                    onChange={(e) => setProjectFilterQuery(e.target.value)}
+                                                    placeholder="Search projects"
+                                                    className="pr-10"
+                                                    onKeyDown={(e) => e.stopPropagation()}
+                                                    onMouseDown={(e) => e.stopPropagation()}
+                                                />
+                                                {projectFilterQuery && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.preventDefault()
+                                                            e.stopPropagation()
+                                                            setProjectFilterQuery('')
+                                                            setProjectFilter('all')
+                                                        }}
+                                                        className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                                                        aria-label="Clear project filter"
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </button>
+                                                )}
+                                            </div>
                                             <div className="max-h-56 overflow-y-auto">
                                                 <SelectItem value="all">All Projects</SelectItem>
                                                 {filteredProjectOptions.length === 0 ? (
@@ -803,12 +894,31 @@ export default function TasksClient({
                                             </SelectTrigger>
                                             <SelectContent className="z-[10050] p-0">
                                                 <div className="p-2">
-                                                    <Input
-                                                        value={assignedToFilterQuery}
-                                                        onChange={(e) => setAssignedToFilterQuery(e.target.value)}
-                                                        placeholder="Search assignees"
-                                                        className="mb-2"
-                                                    />
+                                                    <div className="relative mb-2">
+                                                        <Input
+                                                            value={assignedToFilterQuery}
+                                                            onChange={(e) => setAssignedToFilterQuery(e.target.value)}
+                                                            placeholder="Search assignees"
+                                                            className="pr-10"
+                                                            onKeyDown={(e) => e.stopPropagation()}
+                                                            onMouseDown={(e) => e.stopPropagation()}
+                                                        />
+                                                        {assignedToFilterQuery && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.preventDefault()
+                                                                    e.stopPropagation()
+                                                                    setAssignedToFilterQuery('')
+                                                                    setAssignedToFilter('all')
+                                                                }}
+                                                                className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                                                                aria-label="Clear assignee filter"
+                                                            >
+                                                                <X className="h-4 w-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                     <div className="max-h-56 overflow-y-auto">
                                                         <SelectItem value="all">All Assignees</SelectItem>
                                                         {filteredAssignedToOptions.length === 0 ? (
@@ -830,12 +940,31 @@ export default function TasksClient({
                                             </SelectTrigger>
                                             <SelectContent className="z-[10050] p-0">
                                                 <div className="p-2">
-                                                    <Input
-                                                        value={createdByFilterQuery}
-                                                        onChange={(e) => setCreatedByFilterQuery(e.target.value)}
-                                                        placeholder="Search creators"
-                                                        className="mb-2"
-                                                    />
+                                                    <div className="relative mb-2">
+                                                        <Input
+                                                            value={createdByFilterQuery}
+                                                            onChange={(e) => setCreatedByFilterQuery(e.target.value)}
+                                                            placeholder="Search creators"
+                                                            className="pr-10"
+                                                            onKeyDown={(e) => e.stopPropagation()}
+                                                            onMouseDown={(e) => e.stopPropagation()}
+                                                        />
+                                                        {createdByFilterQuery && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.preventDefault()
+                                                                    e.stopPropagation()
+                                                                    setCreatedByFilterQuery('')
+                                                                    setCreatedByFilter('all')
+                                                                }}
+                                                                className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                                                                aria-label="Clear creator filter"
+                                                            >
+                                                                <X className="h-4 w-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                     <div className="max-h-56 overflow-y-auto">
                                                         <SelectItem value="all">All Creators</SelectItem>
                                                         {filteredCreatedByOptions.length === 0 ? (
@@ -1158,7 +1287,9 @@ export default function TasksClient({
                                         </div>
                                     )}
                                     <KanbanBoard
-                                        projectId="all"
+                                        projectId={projectFilter}
+                                        filters={kanbanFilters}
+                                        onProjectChange={setProjectFilter}
                                         onCreateTask={() => setShowCreateTaskModal(true)}
                                         onEditTask={handleKanbanEditTask}
                                         onDeleteTask={handleKanbanDeleteTask}
