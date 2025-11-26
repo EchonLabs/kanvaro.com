@@ -212,33 +212,16 @@ async function stopTimerAndBuildResponse(
     (hoursLogged > (stopSettings.maxDailyHours || 8) ||
       hoursLogged > (stopSettings.maxWeeklyHours || 40))
 
-  const notifications = {
-    timerStop: await isNotificationEnabled(
-      organizationId,
-      'onTimerStop',
-      projectValue?.toString()
-    ),
-    overtime: await isNotificationEnabled(
-      organizationId,
-      'onOvertime',
-      projectValue?.toString()
-    ),
-    approvalNeeded: await isNotificationEnabled(
-      organizationId,
-      'onApprovalNeeded',
-      projectValue?.toString()
-    ),
-    timeSubmitted: await isNotificationEnabled(
-      organizationId,
-      'onTimeSubmitted',
-      projectValue?.toString()
-    )
-  }
-
+  // Only send notifications if time was actually logged
+  // Notifications should only be sent when timer stops with logged time
   const project = projectValue ? await Project.findById(projectValue).select('name') : null
   const projectName = project?.name || 'Unknown Project'
   const hoursFormatted = `${Math.floor(hoursLogged)}h ${Math.round((hoursLogged % 1) * 60)}m`
   const projectUrl = '/time-tracking/logs'
+  
+  // Check if the formatted duration is "0h 0m" (even if hasTimeLogged is true due to seconds)
+  // We don't want to spam users with 0h 0m notifications
+  const isZeroDurationDisplay = hoursFormatted === '0h 0m'
 
   const notificationsSent = {
     timerStop: false,
@@ -247,7 +230,15 @@ async function stopTimerAndBuildResponse(
     timeSubmitted: false
   }
 
-  if (notifications.timerStop) {
+  // Only send notifications if time was logged (hasTimeLogged is already checked above)
+  // Timer Stop notification - only when timer is stopped
+  const timerStopEnabled = await isNotificationEnabled(
+    organizationId,
+    'onTimerStop',
+    projectValue?.toString()
+  )
+  
+  if (timerStopEnabled && hasTimeLogged && !isZeroDurationDisplay) {
     await notificationService.createNotification(
       activeTimer.user.toString(),
       organizationId,
@@ -263,70 +254,94 @@ async function stopTimerAndBuildResponse(
     notificationsSent.timerStop = true
   }
 
-  if (isOvertime && notifications.overtime) {
-    await notificationService.createNotification(
-      activeTimer.user.toString(),
+  // Overtime notification - only if overtime detected
+  if (isOvertime && hasTimeLogged) {
+    const overtimeEnabled = await isNotificationEnabled(
       organizationId,
-      {
-        type: 'time_tracking',
-        title: 'Overtime Alert',
-        message: `Overtime detected: ${hoursFormatted} logged for project "${projectName}". This exceeds the daily/weekly limit.`,
-        data: {
-          entityType: 'time_entry',
-          entityId: timeEntry._id.toString(),
-          action: 'updated',
-          priority: 'high',
-          url: projectUrl
-        },
-        sendEmail: false,
-        sendPush: false
-      }
+      'onOvertime',
+      projectValue?.toString()
     )
-    notificationsSent.overtime = true
+    if (overtimeEnabled) {
+      await notificationService.createNotification(
+        activeTimer.user.toString(),
+        organizationId,
+        {
+          type: 'time_tracking' as const,
+          title: 'Overtime Alert',
+          message: `Overtime detected: ${hoursFormatted} logged for project "${projectName}". This exceeds the daily/weekly limit.`,
+          data: {
+            entityType: 'time_entry' as const,
+            entityId: timeEntry._id.toString(),
+            action: 'updated' as const,
+            priority: 'high' as const,
+            url: projectUrl
+          },
+          sendEmail: false,
+          sendPush: false
+        }
+      )
+      notificationsSent.overtime = true
+    }
   }
 
-  if (requiresApproval && notifications.approvalNeeded) {
-    await notificationService.createNotification(
-      activeTimer.user.toString(),
+  // Approval Required notification - only if approval is required AND time was logged
+  if (requiresApproval && hasTimeLogged && !isZeroDurationDisplay) {
+    const approvalNeededEnabled = await isNotificationEnabled(
       organizationId,
-      {
-        type: 'time_tracking',
-        title: 'Approval Required',
-        message: `Time entry for project "${projectName}" (${hoursFormatted}) requires approval.`,
-        data: {
-          entityType: 'time_entry',
-          entityId: timeEntry._id.toString(),
-          action: 'updated',
-          priority: 'medium',
-          url: projectUrl
-        },
-        sendEmail: false,
-        sendPush: false
-      }
+      'onApprovalNeeded',
+      projectValue?.toString()
     )
-    notificationsSent.approvalNeeded = true
+    if (approvalNeededEnabled) {
+      await notificationService.createNotification(
+        activeTimer.user.toString(),
+        organizationId,
+        {
+          type: 'time_tracking' as const,
+          title: 'Approval Required',
+          message: `Time entry for project "${projectName}" (${hoursFormatted}) requires approval.`,
+          data: {
+            entityType: 'time_entry' as const,
+            entityId: timeEntry._id.toString(),
+            action: 'updated' as const,
+            priority: 'medium' as const,
+            url: projectUrl
+          },
+          sendEmail: false,
+          sendPush: false
+        }
+      )
+      notificationsSent.approvalNeeded = true
+    }
   }
 
-  if (!requiresApproval && notifications.timeSubmitted) {
-    await notificationService.createNotification(
-      activeTimer.user.toString(),
+  // Time Submitted notification - only if no approval required AND time was logged
+  if (!requiresApproval && hasTimeLogged && !isZeroDurationDisplay) {
+    const timeSubmittedEnabled = await isNotificationEnabled(
       organizationId,
-      {
-        type: 'time_tracking',
-        title: 'Time Submitted',
-        message: `Time entry for project "${projectName}" (${hoursFormatted}) has been submitted successfully.`,
-        data: {
-          entityType: 'time_entry',
-          entityId: timeEntry._id.toString(),
-          action: 'created',
-          priority: 'low',
-          url: projectUrl
-        },
-        sendEmail: false,
-        sendPush: false
-      }
+      'onTimeSubmitted',
+      projectValue?.toString()
     )
-    notificationsSent.timeSubmitted = true
+    if (timeSubmittedEnabled) {
+      await notificationService.createNotification(
+        activeTimer.user.toString(),
+        organizationId,
+        {
+          type: 'time_tracking' as const,
+          title: 'Time Submitted',
+          message: `Time entry for project "${projectName}" (${hoursFormatted}) has been submitted successfully.`,
+          data: {
+            entityType: 'time_entry' as const,
+            entityId: timeEntry._id.toString(),
+            action: 'created' as const,
+            priority: 'low' as const,
+            url: projectUrl
+          },
+          sendEmail: false,
+          sendPush: false
+        }
+      )
+      notificationsSent.timeSubmitted = true
+    }
   }
 
   return {

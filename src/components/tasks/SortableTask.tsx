@@ -145,12 +145,13 @@ export default function SortableTask({
             <Badge className={`${getTypeColor(task.type)} text-xs`}>
               {formatToTitleCase(task.type)}
             </Badge>
+            {task.displayId && (
+              <span className="text-[11px] text-muted-foreground font-medium">
+                #{task.displayId}
+              </span>
+            )}
           </div>
-          {task.displayId && (
-            <p className="text-[11px] text-muted-foreground font-medium">
-              #{task.displayId}
-            </p>
-          )}
+         
           
           <div className="text-xs text-muted-foreground space-y-1 min-w-0">
             {task.project && (

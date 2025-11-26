@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  ChevronLeft,
+  ChevronRight,
   Calendar as CalendarIcon,
   Clock,
   User,
@@ -18,6 +18,7 @@ import {
   Plus,
   AlertTriangle
 } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface Task {
   _id: string
@@ -125,24 +126,24 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
     const startingDayOfWeek = firstDay.getDay()
 
     const days = []
-    
+
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < startingDayOfWeek; i++) {
       days.push(null)
     }
-    
+
     // Add days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       days.push(new Date(year, month, day))
     }
-    
+
     return days
   }
 
   const getWeekDays = (date: Date) => {
     const startOfWeek = new Date(date)
     startOfWeek.setDate(date.getDate() - date.getDay())
-    
+
     const days = []
     for (let i = 0; i < 7; i++) {
       const day = new Date(startOfWeek)
@@ -197,9 +198,9 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
   }
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long' 
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long'
     })
   }
 
@@ -208,14 +209,14 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
     startOfWeek.setDate(date.getDate() - date.getDay())
     const endOfWeek = new Date(startOfWeek)
     endOfWeek.setDate(startOfWeek.getDate() + 6)
-    
+
     return `${startOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
   }
 
   const formatDayDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
+    return date.toLocaleDateString('en-US', {
       weekday: 'long',
-      year: 'numeric', 
+      year: 'numeric',
       month: 'long',
       day: 'numeric'
     })
@@ -238,260 +239,270 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
   }
 
   return (
-    <div className="space-y-8 sm:space-y-10">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h3 className="text-xl sm:text-2xl font-semibold text-foreground">Calendar View</h3>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            View tasks by their due dates
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap w-full sm:w-auto">
-          <div className="flex items-center gap-1 w-full sm:w-auto">
-            <Button
-              variant={view === 'month' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setView('month')}
-              className="flex-1 sm:flex-initial"
-            >
-              Month
+    <TooltipProvider>
+      <div className="space-y-8 sm:space-y-10">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-xl sm:text-2xl font-semibold text-foreground">Calendar View</h3>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">
+              View tasks by their due dates
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap w-full sm:w-auto">
+            <div className="flex items-center gap-1 w-full sm:w-auto">
+              <Button
+                variant={view === 'month' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setView('month')}
+                className="flex-1 sm:flex-initial"
+              >
+                Month
+              </Button>
+              <Button
+                variant={view === 'week' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setView('week')}
+                className="flex-1 sm:flex-initial"
+              >
+                Week
+              </Button>
+              <Button
+                variant={view === 'day' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setView('day')}
+                className="flex-1 sm:flex-initial"
+              >
+                Day
+              </Button>
+            </div>
+            <Button variant="outline" size="sm" onClick={refreshTasks} className="w-full sm:w-auto">
+              <CalendarIcon className="h-4 w-4 mr-2" />
+              Refresh
             </Button>
-            <Button
-              variant={view === 'week' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setView('week')}
-              className="flex-1 sm:flex-initial"
-            >
-              Week
-            </Button>
-            <Button
-              variant={view === 'day' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setView('day')}
-              className="flex-1 sm:flex-initial"
-            >
-              Day
+            <Button onClick={onCreateTask} className="w-full sm:w-auto">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Task
             </Button>
           </div>
-          <Button variant="outline" size="sm" onClick={refreshTasks} className="w-full sm:w-auto">
-            <CalendarIcon className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-          <Button onClick={onCreateTask} className="w-full sm:w-auto">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Task
-          </Button>
         </div>
-      </div>
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+        {error && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-      {view === 'month' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>{formatDate(currentDate)}</CardTitle>
-              <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm" onClick={() => navigateMonth('prev')}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
-                  Today
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => navigateMonth('next')}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-7 gap-1">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="p-2 text-center text-sm font-medium text-muted-foreground">
-                  {day}
+        {view === 'month' && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>{formatDate(currentDate)}</CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" onClick={() => navigateMonth('prev')}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
+                    Today
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => navigateMonth('next')}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
                 </div>
-              ))}
-              {getDaysInMonth(currentDate).map((date, index) => (
-                <div
-                  key={index}
-                  className={`min-h-[100px] p-2 border border-border ${
-                    date ? 'bg-background' : 'bg-muted/30'
-                  } ${isToday(date || new Date()) ? 'bg-primary/10 border-primary/20' : ''}`}
-                >
-                  {date && (
-                    <>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-sm font-medium ${
-                          isToday(date) ? 'text-primary' : 'text-foreground'
-                        }`}>
-                          {date.getDate()}
-                        </span>
-                        {getTasksForDate(date).length > 0 && (
-                          <Badge variant="secondary" className="text-xs">
-                            {getTasksForDate(date).length}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        {getTasksForDate(date).slice(0, 3).map(task => (
-                          <div
-                            key={task._id}
-                            className="text-xs p-1 rounded bg-card border shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                            onClick={() => router.push(`/tasks/${task._id}`)}
-                          >
-                            <div className="font-medium truncate">{task.title}</div>
-                            <div className="flex items-center space-x-1">
-                              <Badge className={`text-xs ${getPriorityColor(task.priority)}`}>
-                                {formatToTitleCase(task.priority)}
-                              </Badge>
-                              <Badge className={`text-xs ${getStatusColor(task.status)}`}>
-                                {formatToTitleCase(task.status)}
-                              </Badge>
-                            </div>
-                          </div>
-                        ))}
-                        {getTasksForDate(date).length > 3 && (
-                          <div className="text-xs text-muted-foreground">
-                            +{getTasksForDate(date).length - 3} more
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {view === 'week' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>{formatWeekDate(currentDate)}</CardTitle>
-              <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm" onClick={() => navigateWeek('prev')}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
-                  Today
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => navigateWeek('next')}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-7 gap-1">
-              {getWeekDays(currentDate).map((date, index) => (
-                <div key={index} className="min-h-[200px] p-2 border border-border">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={`text-sm font-medium ${
-                      isToday(date) ? 'text-primary' : 'text-foreground'
-                    }`}>
-                      {date.toLocaleDateString('en-US', { weekday: 'short' })}
-                    </span>
-                    <span className={`text-sm ${
-                      isToday(date) ? 'text-primary font-medium' : 'text-muted-foreground'
-                    }`}>
-                      {date.getDate()}
-                    </span>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-7 gap-1">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="p-2 text-center text-sm font-medium text-muted-foreground">
+                    {day}
                   </div>
-                  <div className="space-y-1">
-                    {getTasksForDate(date).map(task => (
-                      <div
-                        key={task._id}
-                        className="text-xs p-2 rounded bg-card border shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                        onClick={() => router.push(`/tasks/${task._id}`)}
-                      >
-                        <div className="font-medium truncate">{task.title}</div>
-                        <div className="flex items-center space-x-1 mt-1">
-                          <Badge className={`text-xs ${getPriorityColor(task.priority)}`}>
-                            {formatToTitleCase(task.priority)}
-                          </Badge>
-                          <Badge className={`text-xs ${getStatusColor(task.status)}`}>
-                            {formatToTitleCase(task.status)}
-                          </Badge>
+                ))}
+                {getDaysInMonth(currentDate).map((date, index) => (
+                  <div
+                    key={index}
+                    className={`min-h-[100px] p-2 border border-border ${date ? 'bg-background' : 'bg-muted/30'
+                      } ${isToday(date || new Date()) ? 'bg-primary/10 border-primary/20' : ''}`}
+                  >
+                    {date && (
+                      <>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-sm font-medium ${isToday(date) ? 'text-primary' : 'text-foreground'
+                            }`}>
+                            {date.getDate()}
+                          </span>
+                          {getTasksForDate(date).length > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              {getTasksForDate(date).length}
+                            </Badge>
+                          )}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {view === 'day' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>{formatDayDate(currentDate)}</CardTitle>
-              <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm" onClick={() => navigateDay('prev')}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
-                  Today
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => navigateDay('next')}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-4">
-              {getDayHours().map(hour => (
-                <div key={hour} className="flex items-start space-x-4 p-3 border border-border rounded-lg">
-                  <div className="w-16 text-sm text-muted-foreground">
-                    {hour === 0 ? '12:00 AM' : hour < 12 ? `${hour}:00 AM` : hour === 12 ? '12:00 PM' : `${hour - 12}:00 PM`}
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    {getTasksForDate(currentDate).filter(task => {
-                      if (!task.dueDate) return false
-                      const taskDate = new Date(task.dueDate)
-                      const taskHour = taskDate.getHours()
-                      return taskHour === hour
-                    }).map(task => (
-                      <div
-                        key={task._id}
-                        className="p-3 rounded bg-card border shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                        onClick={() => router.push(`/tasks/${task._id}`)}
-                      >
-                        <div className="font-medium">{task.title}</div>
-                        <div className="text-sm text-muted-foreground mt-1">{task.description}</div>
-                        <div className="flex items-center space-x-2 mt-2">
-                          <Badge className={`text-xs ${getPriorityColor(task.priority)}`}>
-                            {formatToTitleCase(task.priority)}
-                          </Badge>
-                          <Badge className={`text-xs ${getStatusColor(task.status)}`}>
-                            {formatToTitleCase(task.status)}
-                          </Badge>
-                          {task.assignedTo && (
-                            <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-                              <User className="h-3 w-3" />
-                              <span>{task.assignedTo.firstName} {task.assignedTo.lastName}</span>
+                        <div className="space-y-1">
+                          {getTasksForDate(date).slice(0, 3).map(task => (
+                            <Tooltip key={task._id}>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className="text-xs p-1 rounded bg-card border shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                                  onClick={() => router.push(`/tasks/${task._id}`)}
+                                >
+                                  <div className="font-medium truncate">{task.title}</div>
+                                  <div className="flex items-center space-x-1">
+                                    <Badge className={`text-xs ${getPriorityColor(task.priority)}`}>
+                                      {formatToTitleCase(task.priority)}
+                                    </Badge>
+                                    <Badge className={`text-xs ${getStatusColor(task.status)}`}>
+                                      {formatToTitleCase(task.status)}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{task.title}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          ))}
+                          {getTasksForDate(date).length > 3 && (
+                            <div className="text-xs text-muted-foreground">
+                              +{getTasksForDate(date).length - 3} more
                             </div>
                           )}
                         </div>
-                      </div>
-                    ))}
+                      </>
+                    )}
                   </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {view === 'week' && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>{formatWeekDate(currentDate)}</CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" onClick={() => navigateWeek('prev')}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
+                    Today
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => navigateWeek('next')}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-7 gap-1">
+                {getWeekDays(currentDate).map((date, index) => (
+                  <div key={index} className="min-h-[200px] p-2 border border-border">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-sm font-medium ${isToday(date) ? 'text-primary' : 'text-foreground'
+                        }`}>
+                        {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                      </span>
+                      <span className={`text-sm ${isToday(date) ? 'text-primary font-medium' : 'text-muted-foreground'
+                        }`}>
+                        {date.getDate()}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      {getTasksForDate(date).map(task => (
+                        <Tooltip key={task._id}>
+                          <TooltipTrigger asChild>
+                            <div
+                              className="text-xs p-2 rounded bg-card border shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                              onClick={() => router.push(`/tasks/${task._id}`)}
+                            >
+                              <div className="font-medium truncate">{task.title}</div>
+                              <div className="flex items-center space-x-1 mt-1">
+                                <Badge className={`text-xs ${getPriorityColor(task.priority)}`}>
+                                  {formatToTitleCase(task.priority)}
+                                </Badge>
+                                <Badge className={`text-xs ${getStatusColor(task.status)}`}>
+                                  {formatToTitleCase(task.status)}
+                                </Badge>
+                              </div>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{task.title}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {view === 'day' && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>{formatDayDate(currentDate)}</CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" onClick={() => navigateDay('prev')}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
+                    Today
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => navigateDay('next')}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-4">
+                {getDayHours().map(hour => (
+                  <div key={hour} className="flex items-start space-x-4 p-3 border border-border rounded-lg">
+                    <div className="w-16 text-sm text-muted-foreground">
+                      {hour === 0 ? '12:00 AM' : hour < 12 ? `${hour}:00 AM` : hour === 12 ? '12:00 PM' : `${hour - 12}:00 PM`}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      {getTasksForDate(currentDate).filter(task => {
+                        if (!task.dueDate) return false
+                        const taskDate = new Date(task.dueDate)
+                        const taskHour = taskDate.getHours()
+                        return taskHour === hour
+                      }).map(task => (
+                        <div
+                          key={task._id}
+                          className="p-3 rounded bg-card border shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                          onClick={() => router.push(`/tasks/${task._id}`)}
+                        >
+                          <div className="font-medium">{task.title}</div>
+                          <div className="text-sm text-muted-foreground mt-1">{task.description}</div>
+                          <div className="flex items-center space-x-2 mt-2">
+                            <Badge className={`text-xs ${getPriorityColor(task.priority)}`}>
+                              {formatToTitleCase(task.priority)}
+                            </Badge>
+                            <Badge className={`text-xs ${getStatusColor(task.status)}`}>
+                              {formatToTitleCase(task.status)}
+                            </Badge>
+                            {task.assignedTo && (
+                              <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+                                <User className="h-3 w-3" />
+                                <span>{task.assignedTo.firstName} {task.assignedTo.lastName}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </TooltipProvider>
   )
 }

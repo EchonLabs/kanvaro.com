@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { BarChart3, PieChart, TrendingUp, Download, Calendar, Users, DollarSign, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -81,6 +81,9 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   const [error, setError] = useState('')
   const [projects, setProjects] = useState<Array<{ _id: string; name: string }>>([])
   const [users, setUsers] = useState<Array<{ _id: string; firstName: string; lastName: string; email: string }>>([])
+  const [projectFilterQuery, setProjectFilterQuery] = useState('')
+  const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
+  const [assignedByFilterQuery, setAssignedByFilterQuery] = useState('')
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -166,6 +169,30 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     loadFilterData()
   }, [organizationId])
 
+  const filteredProjectOptions = useMemo(() => {
+    const query = projectFilterQuery.trim().toLowerCase()
+    if (!query) return projects
+    return projects.filter((project) => project.name.toLowerCase().includes(query))
+  }, [projects, projectFilterQuery])
+
+  const filteredAssignedToOptions = useMemo(() => {
+    const query = assignedToFilterQuery.trim().toLowerCase()
+    if (!query) return users
+    return users.filter((user) =>
+      `${user.firstName} ${user.lastName}`.toLowerCase().includes(query) ||
+      user.email.toLowerCase().includes(query)
+    )
+  }, [users, assignedToFilterQuery])
+
+  const filteredAssignedByOptions = useMemo(() => {
+    const query = assignedByFilterQuery.trim().toLowerCase()
+    if (!query) return users
+    return users.filter((user) =>
+      `${user.firstName} ${user.lastName}`.toLowerCase().includes(query) ||
+      user.email.toLowerCase().includes(query)
+    )
+  }, [users, assignedByFilterQuery])
+
   const formatDuration = (minutes: number) => {
     // Apply rounding rules if enabled
     let displayMinutes = minutes
@@ -177,7 +204,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
         roundUp: roundingRules.roundUp ?? true
       })
     }
-    
+
     const hours = Math.floor(displayMinutes / 60)
     const mins = Math.floor(displayMinutes % 60)
     return `${hours}h ${mins}m`
@@ -205,7 +232,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       if (filters.endDate) params.append('endDate', filters.endDate)
 
       const response = await fetch(`/api/time-tracking/reports?${params}`)
-      
+
       if (response.ok) {
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
@@ -273,49 +300,97 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
             </div>
             <div>
               <Label htmlFor="projectId">Project</Label>
-              <Select value={filters.projectId} onValueChange={(value) => setFilters(prev => ({ ...prev, projectId: value }))}>
+              <Select value={filters.projectId} onValueChange={(value) => { setFilters(prev => ({ ...prev, projectId: value })); setProjectFilterQuery(''); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Projects" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Projects</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project._id} value={project._id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="p-0">
+                  <div className="p-2">
+                    <Input
+                      value={projectFilterQuery}
+                      onChange={(e) => setProjectFilterQuery(e.target.value)}
+                      placeholder="Search projects"
+                      className="mb-2"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                    <div className="max-h-56 overflow-y-auto">
+                      <SelectItem value="all">All Projects</SelectItem>
+                      {filteredProjectOptions.length === 0 ? (
+                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                      ) : (
+                        filteredProjectOptions.map((project) => (
+                          <SelectItem key={project._id} value={project._id}>
+                            {project.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label htmlFor="assignedTo">Assigned To</Label>
-              <Select value={filters.assignedTo} onValueChange={(value) => setFilters(prev => ({ ...prev, assignedTo: value }))}>
+              <Select value={filters.assignedTo} onValueChange={(value) => { setFilters(prev => ({ ...prev, assignedTo: value })); setAssignedToFilterQuery(''); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Users" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Users</SelectItem>
-                  {users.map((user) => (
-                    <SelectItem key={user._id} value={user._id}>
-                      {user.firstName} {user.lastName} ({user.email})
-                    </SelectItem>
-                  ))}
+                <SelectContent className="p-0">
+                  <div className="p-2">
+                    <Input
+                      value={assignedToFilterQuery}
+                      onChange={(e) => setAssignedToFilterQuery(e.target.value)}
+                      placeholder="Search users"
+                      className="mb-2"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                    <div className="max-h-56 overflow-y-auto">
+                      <SelectItem value="all">All Users</SelectItem>
+                      {filteredAssignedToOptions.length === 0 ? (
+                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching users</div>
+                      ) : (
+                        filteredAssignedToOptions.map((user) => (
+                          <SelectItem key={user._id} value={user._id}>
+                            {user.firstName} {user.lastName} ({user.email})
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label htmlFor="assignedBy">Assigned By</Label>
-              <Select value={filters.assignedBy} onValueChange={(value) => setFilters(prev => ({ ...prev, assignedBy: value }))}>
+              <Select value={filters.assignedBy} onValueChange={(value) => { setFilters(prev => ({ ...prev, assignedBy: value })); setAssignedByFilterQuery(''); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Approvers" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Approvers</SelectItem>
-                  {users.map((user) => (
-                    <SelectItem key={user._id} value={user._id}>
-                      {user.firstName} {user.lastName} ({user.email})
-                    </SelectItem>
-                  ))}
+                <SelectContent className="p-0">
+                  <div className="p-2">
+                    <Input
+                      value={assignedByFilterQuery}
+                      onChange={(e) => setAssignedByFilterQuery(e.target.value)}
+                      placeholder="Search approvers"
+                      className="mb-2"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                    <div className="max-h-56 overflow-y-auto">
+                      <SelectItem value="all">All Approvers</SelectItem>
+                      {filteredAssignedByOptions.length === 0 ? (
+                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching approvers</div>
+                      ) : (
+                        filteredAssignedByOptions.map((user) => (
+                          <SelectItem key={user._id} value={user._id}>
+                            {user.firstName} {user.lastName} ({user.email})
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </SelectContent>
               </Select>
             </div>
