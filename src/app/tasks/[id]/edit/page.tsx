@@ -62,7 +62,7 @@ interface TaskFormState {
   dueDate?: string
   labels?: string
   estimatedHours?: number
-  storyPoints?: number
+  // storyPoints?: number
 }
 
 const mapTaskFormState = (data: any): TaskFormState => ({
@@ -76,7 +76,7 @@ const mapTaskFormState = (data: any): TaskFormState => ({
   dueDate: data?.dueDate ? new Date(data.dueDate).toISOString().split('T')[0] : undefined,
   labels: Array.isArray(data?.labels) ? data.labels.join(', ') : undefined,
   estimatedHours: typeof data?.estimatedHours === 'number' ? data.estimatedHours : undefined,
-  storyPoints: typeof data?.storyPoints === 'number' ? data.storyPoints : undefined
+ // storyPoints: typeof data?.storyPoints === 'number' ? data.storyPoints : undefined
 })
 
 const mapSubtasksFromResponse = (input: any): Subtask[] => {
@@ -238,7 +238,6 @@ export default function EditTaskPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const messageRef = useRef<HTMLDivElement>(null)
 
   const updateAssignees = useCallback((updater: (prev: string[]) => string[]) => {
     setAssignedToIds(prev => {
@@ -596,7 +595,7 @@ export default function EditTaskPage() {
           dueDate: task.dueDate || undefined,
           labels: labels,
           estimatedHours: task.estimatedHours || undefined,
-          storyPoints: task.storyPoints || undefined,
+        //  storyPoints: task.storyPoints || undefined,
           subtasks: preparedSubtasks,
           attachments: preparedAttachments
         })
@@ -684,14 +683,10 @@ export default function EditTaskPage() {
     return !!(task.title?.trim() && task.project && assignedToIds.length > 0)
   }, [task, assignedToIds])
 
-  // Auto-scroll to message when error or success appears
+  // Scroll to top to reveal status messages
   useEffect(() => {
-    if ((error || success) && messageRef.current) {
-      messageRef.current.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'start',
-        inline: 'nearest'
-      })
+    if (error || success) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }, [error, success])
 
@@ -730,27 +725,27 @@ export default function EditTaskPage() {
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
 
-        <div ref={messageRef}>
-          {success && (
-            <Alert>
-              <div className="flex items-center">
-                <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-                <AlertDescription>{success}</AlertDescription>
-              </div>
-            </Alert>
-          )}
-
-          {error && !success && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-        </div>
-
         <Card>
           <CardHeader>
             <CardTitle>Edit Task</CardTitle>
           </CardHeader>
+          {(success || error) && (
+            <div className="px-6 -mt-4 mb-2 space-y-3">
+              {success && (
+                <Alert>
+                  <div className="flex items-center">
+                    <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                    <AlertDescription>{success}</AlertDescription>
+                  </div>
+                </Alert>
+              )}
+              {!success && error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
           <CardContent className="space-y-6">
             <div className="grid gap-4">
               <div>
@@ -1011,7 +1006,7 @@ export default function EditTaskPage() {
                   />
                 </div>
 
-                <div>
+                {/* <div>
                   <label className="text-sm font-medium">Story Points</label>
                   <Input
                     type="number"
@@ -1024,7 +1019,7 @@ export default function EditTaskPage() {
                     className="mt-1"
                     min="0"
                   />
-                </div>
+                </div> */}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
