@@ -91,8 +91,8 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Recent Tasks</CardTitle>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => router.push('/tasks')}
             >
@@ -104,8 +104,8 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
         <CardContent>
           <div className="text-center py-8">
             <p className="text-muted-foreground">No tasks found</p>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="mt-4"
               onClick={() => router.push('/tasks/create')}
             >
@@ -120,17 +120,17 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
   return (
     <Card className="overflow-x-hidden">
       <CardHeader className="p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+        <div className="flex flex-row items-center justify-between gap-2">
           <CardTitle className="text-base sm:text-lg truncate">Recent Tasks</CardTitle>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
               router.push('/tasks')
             }}
-            className="w-full sm:w-auto flex-shrink-0"
+            className="flex-shrink-0"
           >
             View All
             <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1" />
@@ -140,39 +140,41 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
       <CardContent className="p-4 sm:p-6 pt-0">
         <div className="space-y-2 sm:space-y-3">
           {tasks.map((task) => (
-            <div 
-              key={task._id} 
+            <div
+              key={task._id}
               className="flex items-start sm:items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer overflow-x-hidden"
               onClick={() => router.push(`/tasks/${task._id}`)}
             >
-              <Checkbox 
+              <Checkbox
                 checked={task.status === 'done'}
                 className="flex-shrink-0 mt-1 sm:mt-0"
                 readOnly
               />
-              
+
               <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <h4 
-                    className={`text-xs sm:text-sm font-medium truncate flex-1 min-w-0 ${task.status === 'done' ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}
-                    title={task.title && task.title.length > 10 ? task.title : undefined}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1 min-w-0">
+                  <h4
+                    className={`text-xs sm:text-sm font-medium truncate ${task.status === 'done' ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}
+                    title={task.title}
                   >
-                    {task.title && task.title.length > 10 ? `${task.title.slice(0, 10)}…` : task.title}
+                    {task.title}
                   </h4>
-                  <Badge className={`${getStatusColor(task.status)} text-xs flex-shrink-0`}>
-                    {formatToTitleCase(task.status)}
-                  </Badge>
-                  <Badge className={`${getPriorityColor(task.priority)} text-xs flex-shrink-0`}>
-                    {formatToTitleCase(task.priority)}
-                  </Badge>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Badge className={`${getStatusColor(task.status)} text-xs whitespace-nowrap`}>
+                      {formatToTitleCase(task.status)}
+                    </Badge>
+                    <Badge className={`${getPriorityColor(task.priority)} text-xs whitespace-nowrap`}>
+                      {formatToTitleCase(task.priority)}
+                    </Badge>
+                  </div>
                 </div>
-                
+
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-gray-600 dark:text-gray-400">
-                  <span 
+                  <span
                     className="font-medium truncate"
-                    title={task.project?.name && task.project.name.length > 10 ? task.project.name : undefined}
+                    title={task.project?.name}
                   >
-                    {task.project?.name && task.project.name.length > 10 ? `${task.project.name.slice(0, 10)}…` : (task.project?.name || 'No Project')}
+                    {task.project?.name || 'No Project'}
                   </span>
                   {task.assignedTo && (
                     <div className="flex items-center whitespace-nowrap">
@@ -188,7 +190,7 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
                   )}
                 </div>
               </div>
-              
+
               <Button variant="ghost" size="sm" className="flex-shrink-0 hidden sm:inline-flex">
                 View
               </Button>

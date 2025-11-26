@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { useProjectKanbanStatuses } from '@/hooks/useProjectKanbanStatuses'
 import { DEFAULT_TASK_STATUS_OPTIONS, DEFAULT_TASK_STATUS_BADGE_MAP, type TaskStatusOption } from '@/constants/taskStatuses'
-import { 
+import {
   ArrowLeft,
   Calendar,
   Clock,
@@ -33,7 +33,8 @@ import {
   TrendingUp,
   List,
   PauseCircle,
-  Gauge
+  Gauge,
+  Zap
 } from 'lucide-react'
 
 interface Sprint {
@@ -92,12 +93,12 @@ interface Sprint {
       firstName: string
       lastName: string
       email: string
-  } | null
-  archived?: boolean
-  movedToSprint?: {
-    _id: string
-    name: string
-  } | null
+    } | null
+    archived?: boolean
+    movedToSprint?: {
+      _id: string
+      name: string
+    } | null
   }>
   createdAt: string
   updatedAt: string
@@ -177,7 +178,7 @@ export default function SprintDetailPage() {
   const router = useRouter()
   const params = useParams()
   const sprintId = params.id as string
-  
+
   const [sprint, setSprint] = useState<Sprint | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -251,12 +252,12 @@ export default function SprintDetailPage() {
   // Calculate task counts per status based on project's custom statuses
   const taskBreakdownByStatus = useMemo(() => {
     const breakdown: Array<{ status: string; label: string; count: number; color?: string }> = []
-    
+
     if (!sprintTasks.length) return breakdown
 
     // Get all unique statuses from tasks
     const taskStatuses = new Set(sprintTasks.map(task => task.status))
-    
+
     // For each status in project's configuration, count tasks
     projectStatusOptions.forEach(option => {
       if (taskStatuses.has(option.value)) {
@@ -271,7 +272,7 @@ export default function SprintDetailPage() {
         }
       }
     })
-    
+
     // Also include any task statuses that aren't in the project config (fallback)
     taskStatuses.forEach(status => {
       if (!projectStatusOptions.find(opt => opt.value === status)) {
@@ -286,7 +287,7 @@ export default function SprintDetailPage() {
         }
       }
     })
-    
+
     return breakdown
   }, [sprintTasks, projectStatusOptions])
 
@@ -323,7 +324,7 @@ export default function SprintDetailPage() {
   const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me')
-      
+
       if (response.ok) {
         setAuthError('')
         await fetchSprint()
@@ -331,7 +332,7 @@ export default function SprintDetailPage() {
         const refreshResponse = await fetch('/api/auth/refresh', {
           method: 'POST'
         })
-        
+
         if (refreshResponse.ok) {
           setAuthError('')
           await fetchSprint()
@@ -674,7 +675,7 @@ export default function SprintDetailPage() {
             </Button>
             <div className="flex-1 min-w-0 w-full sm:w-auto">
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0">
-                <Target className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-blue-600 flex-shrink-0" />
+                <Zap className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-blue-600 flex-shrink-0" />
                 <span className="truncate min-w-0" title={sprint?.name}>{sprint?.name}</span>
               </h1>
               <p className="text-xs sm:text-sm text-muted-foreground">Sprint Details</p>
@@ -774,9 +775,9 @@ export default function SprintDetailPage() {
                     <span className="font-medium">{sprint?.progress?.completionPercentage || 0}%</span>
                   </div>
                   <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
-                    <div 
+                    <div
                       className="bg-blue-600 dark:bg-blue-500 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
-                      style={{ 
+                      style={{
                         width: `${Math.min(100, Math.max(0, sprint?.progress?.completionPercentage || 0))}%`,
                         minWidth: sprint?.progress?.completionPercentage && sprint.progress.completionPercentage > 0 ? '2px' : '0'
                       }}
@@ -898,9 +899,8 @@ export default function SprintDetailPage() {
                     {sprintTasks.map(task => (
                       <div
                         key={task._id}
-                        className={`rounded-lg border bg-background p-3 sm:p-4 space-y-3 ${
-                          task.archived ? 'border-dashed opacity-90' : ''
-                        }`}
+                        className={`rounded-lg border bg-background p-3 sm:p-4 space-y-3 ${task.archived ? 'border-dashed opacity-90' : ''
+                          }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
@@ -995,50 +995,50 @@ export default function SprintDetailPage() {
                     <span className="ml-1">{formatToTitleCase(sprint?.status)}</span>
                   </Badge>
                 </div>
-                
+
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <span className="text-xs sm:text-sm text-muted-foreground">Project</span>
-                  <span 
+                  <span
                     className="text-xs sm:text-sm font-medium truncate max-w-[200px] sm:max-w-none text-right sm:text-left"
                     title={sprint?.project?.name && sprint?.project?.name.length > 10 ? sprint?.project?.name : undefined}
                   >
                     {sprint?.project?.name && sprint?.project?.name.length > 10 ? `${sprint?.project?.name.slice(0, 10)}…` : sprint?.project?.name}
                   </span>
                 </div>
-                
+
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <span className="text-xs sm:text-sm text-muted-foreground">Duration</span>
                   <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
                     {Math.ceil((new Date(sprint?.endDate).getTime() - new Date(sprint?.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
                   </span>
                 </div>
-                
+
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <span className="text-xs sm:text-sm text-muted-foreground">Start Date</span>
                   <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
                     {new Date(sprint?.startDate).toLocaleDateString()}
                   </span>
                 </div>
-                
+
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <span className="text-xs sm:text-sm text-muted-foreground">End Date</span>
                   <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
                     {new Date(sprint?.endDate).toLocaleDateString()}
                   </span>
                 </div>
-                
+
                 {getDaysRemaining() > 0 && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                     <span className="text-xs sm:text-sm text-muted-foreground">Days Remaining</span>
                     <span className="text-xs sm:text-sm font-medium text-orange-600 whitespace-nowrap">{getDaysRemaining()}</span>
                   </div>
                 )}
-                
+
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <span className="text-xs sm:text-sm text-muted-foreground">Capacity</span>
                   <span className="text-xs sm:text-sm font-medium whitespace-nowrap">{sprint?.capacity}h</span>
                 </div>
-                
+
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <span className="text-xs sm:text-sm text-muted-foreground">Velocity</span>
                   <span className="text-xs sm:text-sm font-medium whitespace-nowrap">{sprint?.velocity}</span>
@@ -1112,9 +1112,8 @@ export default function SprintDetailPage() {
           title="Complete Sprint"
           description={
             incompleteTasks.length
-              ? `There are ${incompleteTasks.length} incomplete task${
-                  incompleteTasks.length === 1 ? '' : 's'
-                }. Move them before completing the sprint.`
+              ? `There are ${incompleteTasks.length} incomplete task${incompleteTasks.length === 1 ? '' : 's'
+              }. Move them before completing the sprint.`
               : 'All tasks are completed. You can finish the sprint now.'
           }
           footer={

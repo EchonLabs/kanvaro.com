@@ -74,8 +74,8 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Recent Projects</CardTitle>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => router.push('/projects')}
             >
@@ -87,8 +87,8 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
         <CardContent>
           <div className="text-center py-8">
             <p className="text-muted-foreground">No projects found</p>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="mt-4"
               onClick={() => router.push('/projects/create')}
             >
@@ -103,13 +103,13 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
   return (
     <Card className="overflow-x-hidden">
       <CardHeader className="p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+        <div className="flex flex-row items-center justify-between gap-2">
           <CardTitle className="text-base sm:text-lg truncate">Recent Projects</CardTitle>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={() => router.push('/projects')}
-            className="w-full sm:w-auto flex-shrink-0"
+            className="flex-shrink-0"
           >
             View All
             <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1" />
@@ -119,18 +119,18 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
       <CardContent className="p-4 sm:p-6 pt-0">
         <div className="space-y-3 sm:space-y-4">
           {projects.map((project) => (
-            <div 
-              key={project._id} 
+            <div
+              key={project._id}
               className="border rounded-lg p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer overflow-x-hidden"
               onClick={() => router.push(`/projects/${project._id}`)}
             >
               <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3 sm:gap-0 mb-3">
                 <div className="flex-1 min-w-0">
-                  <h3 
+                  <h3
                     className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate"
-                    title={project.name && project.name.length > 10 ? project.name : undefined}
+                    title={project.name}
                   >
-                    {project.name && project.name.length > 10 ? `${project.name.slice(0, 10)}…` : project.name}
+                    {project.name}
                   </h3>
                   <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1 break-words line-clamp-2">
                     {project.description || 'No description available'}
@@ -142,7 +142,7 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
                   </Badge>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs sm:text-sm">
                   <span className="text-gray-600 dark:text-gray-400">Progress</span>
@@ -150,7 +150,7 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
                 </div>
                 <Progress value={project.progress || 0} className="h-2" />
               </div>
-              
+
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 mt-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                   {project.endDate && (

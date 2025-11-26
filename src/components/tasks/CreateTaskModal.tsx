@@ -31,6 +31,7 @@ interface CreateTaskModalProps {
   onTaskCreated: () => void
   defaultStatus?: string
   availableStatuses?: Array<{ key: string; title: string }>
+  stayOnCurrentPage?: boolean // If true, don't redirect after task creation
 }
 
 interface User {
@@ -107,7 +108,8 @@ export default function CreateTaskModal({
   projectId,
   onTaskCreated,
   defaultStatus: _defaultStatus,
-  availableStatuses: _availableStatuses
+  availableStatuses: _availableStatuses,
+  stayOnCurrentPage = false
 }: CreateTaskModalProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -448,9 +450,12 @@ export default function CreateTaskModal({
         setSuccess('Task created successfully')
         onTaskCreated()
         onClose()
-        setTimeout(() => {
-          router.push('/tasks')
-        }, 300)
+        // Only redirect to tasks page if not staying on current page (e.g., kanban board)
+        if (!stayOnCurrentPage) {
+          setTimeout(() => {
+            router.push('/tasks')
+          }, 300)
+        }
         // Reset form
         setFormData({
           title: '',
