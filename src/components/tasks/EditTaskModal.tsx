@@ -63,7 +63,6 @@ interface TaskFormData {
   priority: 'low' | 'medium' | 'high' | 'critical'
   type: 'task' | 'bug' | 'feature' | 'improvement' | 'subtask'
   assignedTo: string
-  storyPoints: string
   dueDate: string
   estimatedHours: string
   labels: string
@@ -81,7 +80,6 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
     priority: 'medium',
     type: 'task',
     assignedTo: '',
-    storyPoints: '',
     dueDate: '',
     estimatedHours: '',
     labels: ''
@@ -101,7 +99,6 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
         priority: task.priority || 'medium',
         type: task.type || 'task',
         assignedTo: task.assignedTo?._id || '',
-        storyPoints: task.storyPoints?.toString() || '',
         dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
         estimatedHours: task.estimatedHours?.toString() || '',
         labels: task.labels?.join(', ') || ''
@@ -201,7 +198,6 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
         body: JSON.stringify({
           ...formData,
           assignedTo: formData.assignedTo === 'unassigned' ? undefined : formData.assignedTo || undefined,
-          storyPoints: formData.storyPoints ? parseInt(formData.storyPoints) : undefined,
           estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined,
           dueDate: formData.dueDate || undefined,
           labels: formData.labels ? formData.labels.split(',').map(label => label.trim()) : [],
@@ -298,7 +294,6 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
       formData.priority !== initialFormData.priority ||
       formData.type !== initialFormData.type ||
       normalizeAssignedTo(formData.assignedTo) !== normalizeAssignedTo(initialFormData.assignedTo) ||
-      normalizeNumber(formData.storyPoints) !== normalizeNumber(initialFormData.storyPoints) ||
       normalizeNumber(formData.estimatedHours) !== normalizeNumber(initialFormData.estimatedHours) ||
       (formData.dueDate || '') !== (initialFormData.dueDate || '') ||
       normalizeString(formData.labels) !== normalizeString(initialFormData.labels)
@@ -486,17 +481,6 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
                     )}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-foreground">Story Points</label>
-                <Input
-                  type="number"
-                  value={formData.storyPoints}
-                  onChange={(e) => setFormData({...formData, storyPoints: e.target.value})}
-                  placeholder="e.g., 5"
-                  className="mt-1"
-                />
               </div>
 
               <div>

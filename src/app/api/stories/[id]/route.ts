@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Story } from '@/models/Story'
+import { Epic } from '@/models/Epic'
 import { authenticateUser } from '@/lib/auth-utils'
 
 export async function GET(
@@ -123,6 +124,26 @@ export async function PUT(
         { error: 'Story not found or unauthorized' },
         { status: 404 }
       )
+    }
+
+    // If this story belongs to an epic, and its status changed, check whether
+    // all stories for that epic are now completed. If so, mark the epic as completed.
+    if (story.epic) {
+      const epicId = story.epic as any
+
+      const epicStories = await Story.find({
+        epic: epicId,
+        archived: { $ne: true }
+      }).select('status')
+
+      const totalStories = epicStories.length
+      const storiesCompleted = epicStories.filter(
+        (s) => s.status === 'done'
+      ).length
+
+      if (totalStories > 0 && storiesCompleted === totalStories) {
+        await Epic.findByIdAndUpdate(epicId, { status: 'done' })
+      }
     }
 
     return NextResponse.json({
