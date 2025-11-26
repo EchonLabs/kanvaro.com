@@ -11,6 +11,8 @@ import { cache, invalidateCache } from '@/lib/redis'
 import crypto from 'crypto'
 import { Counter } from '@/models/Counter'
 
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 const TASK_STATUS_SET = new Set<TaskStatus>(TASK_STATUS_VALUES)
 
 function sanitizeLabels(input: any): string[] {
@@ -209,18 +211,23 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      if (search.length >= 3) {
-        filters.$text = { $search: search };
-      } else {
-        filters.$and = [
-          {
-            $or: [
-              { title: { $regex: search, $options: 'i' } },
-              { description: { $regex: search, $options: 'i' } },
-            ],
-          },
-        ];
+      const trimmedSearch = search.trim()
+      const escapedSearch = escapeRegex(trimmedSearch)
+      const fuzzyRegex = new RegExp(escapedSearch, 'i')
+      const displayIdRegex = new RegExp(`^${escapedSearch}$`, 'i')
+      const orFilters: any[] = [
+        { title: fuzzyRegex },
+        { description: fuzzyRegex },
+        { displayId: trimmedSearch.includes('.') ? displayIdRegex : fuzzyRegex }
+      ]
+
+      const numericValue = Number(trimmedSearch)
+      if (!Number.isNaN(numericValue)) {
+        orFilters.push({ taskNumber: numericValue })
       }
+
+      filters.$and = filters.$and || []
+      filters.$and.push({ $or: orFilters })
     }
 
     if (status) filters.status = status;
