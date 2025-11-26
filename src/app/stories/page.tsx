@@ -33,7 +33,8 @@ import {
   BookOpen,
   Trash2,
   Eye,
-  Edit
+  Edit,
+  GripVertical
 } from 'lucide-react'
 import { Permission, PermissionGate } from '@/lib/permissions'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
@@ -43,7 +44,7 @@ interface Story {
   _id: string
   title: string
   description: string
-  status: 'backlog' | 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
+  status: 'backlog' | 'in_progress' | 'completed' | 'cancelled' | string
   priority: 'low' | 'medium' | 'high' | 'critical'
   project?: {
     _id: string
@@ -76,6 +77,21 @@ interface Story {
   updatedAt: string
 }
 
+interface ProjectSummary {
+  _id: string
+  name: string
+}
+
+interface EpicSummary {
+  _id: string
+  name: string
+}
+
+interface SprintSummary {
+  _id: string
+  name: string
+}
+
 export default function StoriesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -88,10 +104,18 @@ export default function StoriesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
+  const [projectFilter, setProjectFilter] = useState('all')
+  const [epicFilter, setEpicFilter] = useState('all')
+  const [sprintFilter, setSprintFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list')
   const [selectedStory, setSelectedStory] = useState<Story | null>(null)
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [deleting, setDeleting] = useState(false);
+  const [draggedStoryId, setDraggedStoryId] = useState<string | null>(null)
+
+  const [projectOptions, setProjectOptions] = useState<ProjectSummary[]>([])
+  const [epicOptions, setEpicOptions] = useState<EpicSummary[]>([])
+  const [sprintOptions, setSprintOptions] = useState<SprintSummary[]>([])
 
   const checkAuth = useCallback(async () => {
     try {
@@ -157,6 +181,51 @@ export default function StoriesPage() {
     }
   }
 
+  // Build filter option lists from loaded stories
+  useEffect(() => {
+    if (!stories.length) {
+      setProjectOptions([])
+      setEpicOptions([])
+      setSprintOptions([])
+      return
+    }
+
+    const projectMap = new Map<string, ProjectSummary>()
+    const epicMap = new Map<string, EpicSummary>()
+    const sprintMap = new Map<string, SprintSummary>()
+
+    stories.forEach((story) => {
+      if (story.project?._id) {
+        projectMap.set(story.project._id, {
+          _id: story.project._id,
+          name: story.project.name
+        })
+      }
+      if (story.epic?._id) {
+        epicMap.set(story.epic._id, {
+          _id: story.epic._id,
+          name: story.epic.name
+        })
+      }
+      if (story.sprint?._id) {
+        sprintMap.set(story.sprint._id, {
+          _id: story.sprint._id,
+          name: story.sprint.name
+        })
+      }
+    })
+
+    const safeCompare = (a?: { name?: string }, b?: { name?: string }) => {
+      const an = a?.name || ''
+      const bn = b?.name || ''
+      return an.localeCompare(bn)
+    }
+
+    setProjectOptions(Array.from(projectMap.values()).sort(safeCompare))
+    setEpicOptions(Array.from(epicMap.values()).sort(safeCompare))
+    setSprintOptions(Array.from(sprintMap.values()).sort(safeCompare))
+  }, [stories])
+
   const handleDeleteClick = (story: Story) => {
     setSelectedStory(story)
     setShowDeleteConfirmModal(true)
@@ -187,11 +256,8 @@ export default function StoriesPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'backlog': return 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200'
-      case 'todo': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
       case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'review': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-      case 'testing': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-      case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
       case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
     }
@@ -200,11 +266,8 @@ export default function StoriesPage() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'backlog': return <List className="h-4 w-4" />
-      case 'todo': return <Target className="h-4 w-4" />
       case 'in_progress': return <Play className="h-4 w-4" />
-      case 'review': return <AlertTriangle className="h-4 w-4" />
-      case 'testing': return <Zap className="h-4 w-4" />
-      case 'done': return <CheckCircle className="h-4 w-4" />
+      case 'completed': return <CheckCircle className="h-4 w-4" />
       case 'cancelled': return <XCircle className="h-4 w-4" />
       default: return <Target className="h-4 w-4" />
     }
@@ -228,9 +291,55 @@ export default function StoriesPage() {
     
     const matchesStatus = statusFilter === 'all' || story.status === statusFilter
     const matchesPriority = priorityFilter === 'all' || story.priority === priorityFilter
+    const matchesProject =
+      projectFilter === 'all' || (story.project?._id ? story.project._id === projectFilter : false)
+    const matchesEpic =
+      epicFilter === 'all' || (story.epic?._id ? story.epic._id === epicFilter : false)
+    const matchesSprint =
+      sprintFilter === 'all' || (story.sprint?._id ? story.sprint._id === sprintFilter : false)
 
-    return matchesSearch && matchesStatus && matchesPriority
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesPriority &&
+      matchesProject &&
+      matchesEpic &&
+      matchesSprint
+    )
   })
+
+  const kanbanStatuses: Array<Story['status']> = ['backlog', 'in_progress', 'completed', 'cancelled']
+
+  const handleKanbanStatusChange = async (story: Story, nextStatus: Story['status']) => {
+    if (nextStatus === story.status) return
+
+    try {
+      const response = await fetch(`/api/stories/${story._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: nextStatus })
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update story status')
+      }
+
+      setStories(prev =>
+        prev.map((item) =>
+          item._id === story._id ? { ...item, status: nextStatus } : item
+        )
+      )
+      setSuccess('Story status updated successfully.')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (err) {
+      console.error('Failed to update story status:', err)
+      setError(err instanceof Error ? err.message : 'Failed to update story status')
+      setTimeout(() => setError(''), 4000)
+    }
+  }
 
   if (loading) {
     return (
@@ -314,11 +423,8 @@ export default function StoriesPage() {
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
                       <SelectItem value="backlog">Backlog</SelectItem>
-                      <SelectItem value="todo">To Do</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="review">Review</SelectItem>
-                      <SelectItem value="testing">Testing</SelectItem>
-                      <SelectItem value="done">Done</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
@@ -332,6 +438,48 @@ export default function StoriesPage() {
                       <SelectItem value="medium">Medium</SelectItem>
                       <SelectItem value="high">High</SelectItem>
                       <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+                  <Select value={projectFilter} onValueChange={setProjectFilter}>
+                    <SelectTrigger className="w-full sm:w-40">
+                      <SelectValue placeholder="Filter by project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Projects</SelectItem>
+                      {projectOptions.map((project) => (
+                        <SelectItem key={project._id} value={project._id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={epicFilter} onValueChange={setEpicFilter}>
+                    <SelectTrigger className="w-full sm:w-40">
+                      <SelectValue placeholder="Filter by epic" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Epics</SelectItem>
+                      {epicOptions.map((epic) => (
+                        <SelectItem key={epic._id} value={epic._id}>
+                          {epic.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={sprintFilter} onValueChange={setSprintFilter}>
+                    <SelectTrigger className="w-full sm:w-40">
+                      <SelectValue placeholder="Filter by sprint" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Sprints</SelectItem>
+                      {sprintOptions.map((sprint) => (
+                        <SelectItem key={sprint._id} value={sprint._id}>
+                          {sprint.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -435,7 +583,7 @@ export default function StoriesPage() {
                           <div className="flex items-center space-x-2">
                             <div className="text-right">
                               {story.assignedTo && (
-                                <div className="text-sm text-muted-foreground">
+                                <div className="text-sm text-muted-foreground truncate max-w-[120px]" title={`${story.assignedTo.firstName} ${story.assignedTo.lastName}`}>
                                   {story.assignedTo.firstName} {story.assignedTo.lastName}
                                 </div>
                               )}
@@ -479,9 +627,133 @@ export default function StoriesPage() {
               </TabsContent>
 
               <TabsContent value="kanban" className="space-y-4">
-                <div className="text-center py-8">
-                  <Kanban className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">Kanban board view will be implemented here</p>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {kanbanStatuses.map((statusKey) => {
+                    const columnStories = filteredStories.filter((story) => story.status === statusKey)
+                    const label =
+                      statusKey === 'completed'
+                        ? 'Done'
+                        : formatToTitleCase(statusKey)
+
+                    return (
+                      <div
+                        key={statusKey}
+                        className="bg-muted/40 rounded-lg border border-border flex flex-col max-h-[70vh]"
+                        onDragOver={(e) => {
+                          e.preventDefault()
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          if (!draggedStoryId) return
+                          const story = stories.find((s) => s._id === draggedStoryId)
+                          if (!story) return
+                          handleKanbanStatusChange(story, statusKey)
+                          setDraggedStoryId(null)
+                        }}
+                      >
+                        <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge className={getStatusColor(statusKey)}>
+                              {getStatusIcon(statusKey)}
+                              <span className="ml-1 text-xs">{label}</span>
+                            </Badge>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {columnStories.length}
+                          </span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                          {columnStories.length === 0 ? (
+                            <p className="text-xs text-muted-foreground text-center py-4">
+                              No stories
+                            </p>
+                          ) : (
+                            columnStories.map((story) => (
+                              <Card
+                                key={story._id}
+                                className="hover:shadow-sm transition-shadow cursor-pointer"
+                                draggable
+                                onDragStart={() => setDraggedStoryId(story._id)}
+                                onClick={() => router.push(`/stories/${story._id}`)}
+                              >
+                                <CardContent className="p-3 space-y-2">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                      <h3 className="font-medium text-xs sm:text-sm text-foreground truncate">
+                                        {story.title}
+                                      </h3>
+                                      <p className="text-[11px] sm:text-xs text-muted-foreground line-clamp-2 mt-1">
+                                        {story.description || 'No description'}
+                                      </p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="text-muted-foreground hover:text-foreground cursor-grab flex-shrink-0"
+                                      onMouseDown={(e) => {
+                                        // Prevent opening the story when starting a drag
+                                        e.stopPropagation()
+                                      }}
+                                    >
+                                      <GripVertical className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-1 mt-1">
+                                    <Badge className={getPriorityColor(story.priority)}>
+                                      {formatToTitleCase(story.priority)}
+                                    </Badge>
+                                    {story.project?.name && (
+                                      <Badge variant="outline" className="text-[10px] max-w-[80px] truncate" title={story.project.name}>
+                                        {story.project.name}
+                                      </Badge>
+                                    )}
+                                    {story.epic?.name && (
+                                      <Badge variant="outline" className="text-[10px] max-w-[80px] truncate" title={story.epic.name}>
+                                        {story.epic.name}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center justify-between mt-2">
+                                    {story.assignedTo && (
+                                      <span className="text-[11px] text-muted-foreground truncate">
+                                        {story.assignedTo.firstName} {story.assignedTo.lastName}
+                                      </span>
+                                    )}
+                                    <Select
+                                      value={story.status}
+                                      onValueChange={(value) =>
+                                        handleKanbanStatusChange(
+                                          story,
+                                          value as Story['status']
+                                        )
+                                      }
+                                    >
+                                      <SelectTrigger className="h-7 w-[120px] text-[11px]">
+                                        <SelectValue placeholder="Status" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {kanbanStatuses.map((status) => (
+                                          <SelectItem key={status} value={status} className="text-xs">
+                                            <div className="flex items-center gap-2">
+                                              {getStatusIcon(status)}
+                                              <span>
+                                                {status === 'completed'
+                                                  ? 'Done'
+                                                  : formatToTitleCase(status)}
+                                              </span>
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </TabsContent>
             </Tabs>

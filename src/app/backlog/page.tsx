@@ -59,8 +59,8 @@ interface BacklogItem {
   title: string
   description: string
   type: 'epic' | 'story' | 'task'
-  priority: 'low' | 'medium' | 'high' | 'critical'
-  status: 'backlog' | 'sprint' | 'in_progress' | 'done'
+  priority: string
+  status: string
   project?: ProjectSummary | null
   assignedTo?: UserSummary | null
   createdBy: UserSummary
@@ -93,16 +93,7 @@ interface SprintOption {
   } | null
 }
 
-const ALLOWED_BACKLOG_STATUSES: BacklogItem['status'][] = ['backlog', 'sprint', 'in_progress', 'done']
-
-function normalizeBacklogStatus(status: string | undefined): BacklogItem['status'] {
-  if (typeof status !== 'string') {
-    return 'backlog'
-  }
-  return ALLOWED_BACKLOG_STATUSES.includes(status as BacklogItem['status'])
-    ? (status as BacklogItem['status'])
-    : 'backlog'
-}
+const ALLOWED_BACKLOG_STATUSES: string[] = ['backlog', 'todo', 'sprint', 'in_progress', 'done']
 
 function truncateText(value: string, maxLength = 20): string {
   if (!value) {
@@ -229,18 +220,10 @@ export default function BacklogPage() {
 
       if (data.success) {
         const rawItems = Array.isArray(data.data) ? data.data : []
-        const normalized = rawItems.map((item: any) => {
-          const status =
-            item.type === 'task' && item.sprint
-              ? 'sprint'
-              : normalizeBacklogStatus(item.status)
-
-          return {
-            ...item,
-            status,
-            labels: Array.isArray(item.labels) ? item.labels : []
-          }
-        }) as BacklogItem[]
+        const normalized = rawItems.map((item: any) => ({
+          ...item,
+          labels: Array.isArray(item.labels) ? item.labels : []
+        })) as BacklogItem[]
         setBacklogItems(normalized)
 
         const projectMap = new Map<string, ProjectSummary>()
@@ -620,7 +603,8 @@ export default function BacklogPage() {
             return {
               ...item,
               sprint: undefined,
-              status: 'backlog'
+              status: 'backlog',
+              backlogStatus: 'backlog'
             }
           }
           return item
@@ -764,9 +748,14 @@ export default function BacklogPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'backlog': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'todo': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
       case 'sprint': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
       case 'in_progress': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+      case 'review': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+      case 'testing': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
       case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
     }
   }
@@ -780,7 +769,19 @@ export default function BacklogPage() {
       
       const matchesType = typeFilter === 'all' || item.type === typeFilter
       const matchesPriority = priorityFilter === 'all' || item.priority === priorityFilter
-      const matchesStatus = statusFilter === 'all' || item.status === statusFilter
+
+      // Treat "done" / "completed" as final states that should not appear in the
+      // default backlog view.
+      const isFinalTask = item.type === 'task' && item.status === 'done'
+      const isFinalStory = item.type === 'story' && (item.status === 'completed' || item.status === 'done')
+      const isFinalEpic = item.type === 'epic' && (item.status === 'completed' || item.status === 'done')
+
+      const isFinal = isFinalTask || isFinalStory || isFinalEpic
+
+      const matchesStatus =
+        statusFilter === 'all'
+          ? !isFinal
+          : item.status === statusFilter
       const matchesProject =
         projectFilterValue === 'all' ||
         (item.project?._id ? item.project._id === projectFilterValue : false)
@@ -1159,6 +1160,7 @@ export default function BacklogPage() {
           <CardContent>
             <div className="space-y-4">
               {filteredAndSortedItems.map((item) => {
+                
                 const isTask = item.type === 'task'
                 const isSelected = selectedTaskIds.includes(item._id)
                 const showCheckbox = selectMode && isTask
@@ -1196,7 +1198,7 @@ export default function BacklogPage() {
                                 {formatToTitleCase(item.priority)}
                               </Badge>
                               <Badge className={getStatusColor(item.status)}>
-                                {formatToTitleCase(item.status)}
+                                {formatToTitleCase(item.status.replace('_', ' '))}
                               </Badge>
                               {item.epic && (
                                 <Badge
@@ -1267,7 +1269,9 @@ export default function BacklogPage() {
                               {item.labels.length > 0 && (
                                 <div className="flex items-center space-x-1">
                                   <Star className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span className="truncate">{item.labels.join(', ')}</span>
+                                  <span className="truncate">
+                                    {truncateText(item.labels.join(', '), 30)}
+                                  </span>
                                 </div>
                               )}
                             </div>
@@ -1329,6 +1333,15 @@ export default function BacklogPage() {
                                   >
                                     <Edit className="h-4 w-4 mr-2" />
                                     <span>Edit Story</span>
+                                  </DropdownMenuItem>
+                                )}
+                                {item.type === 'epic' && (
+                                  <DropdownMenuItem
+                                    onClick={() => router.push(`/epics/${item._id}/edit`)}
+                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    <span>Edit Epic</span>
                                   </DropdownMenuItem>
                                 )}
 

@@ -14,7 +14,8 @@ import { Loader2, ArrowLeft } from 'lucide-react'
 interface EpicForm {
   title: string
   description: string
-  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled' | 'backlog'
+  // Match Epic model status: backlog | in_progress | completed | cancelled
+  status: 'backlog' | 'in_progress' | 'completed' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   dueDate: string
   estimatedHours: number | string
@@ -29,7 +30,7 @@ export default function EditEpicPage() {
   const [form, setForm] = useState<EpicForm>({
     title: '',
     description: '',
-    status: 'todo',
+    status: 'backlog',
     priority: 'medium',
     dueDate: '',
     estimatedHours: '',
@@ -38,6 +39,11 @@ export default function EditEpicPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [initialForm, setInitialForm] = useState<EpicForm | null>(null)
+  const [storyProgress, setStoryProgress] = useState<{
+    totalStories: number
+    storiesCompleted: number
+  } | null>(null)
 
   const fetchEpic = useCallback(async () => {
     try {
@@ -46,15 +52,25 @@ export default function EditEpicPage() {
       const data = await res.json()
       if (res.ok && data.success) {
         const e = data.data
-        setForm({
+        const nextForm: EpicForm = {
           title: e?.title || '',
           description: e?.description || '',
-          status: (e?.status || 'todo'),
+          status: (e?.status || 'backlog') as EpicForm['status'],
           priority: (e?.priority || 'medium'),
           dueDate: e?.dueDate ? new Date(e.dueDate).toISOString().slice(0, 10) : '',
           estimatedHours: e?.estimatedHours ?? '',
           labels: Array.isArray(e?.tags) ? e.tags.join(', ') : ''
-        })
+        }
+        setForm(nextForm)
+        setInitialForm(nextForm)
+        if (e?.progress) {
+          setStoryProgress({
+            totalStories: e.progress.totalStories ?? 0,
+            storiesCompleted: e.progress.storiesCompleted ?? 0
+          })
+        } else {
+          setStoryProgress(null)
+        }
         setError('')
       } else {
         setError(data?.error || 'Failed to load epic')
@@ -101,6 +117,14 @@ export default function EditEpicPage() {
       setSaving(false)
     }
   }
+
+  const canMarkCompleted =
+    !storyProgress ||
+    storyProgress.totalStories === 0 ||
+    storyProgress.storiesCompleted >= storyProgress.totalStories
+
+  const statusBlocked = form.status === 'completed' && !canMarkCompleted
+  const hasChanges = initialForm !== null && JSON.stringify(form) !== JSON.stringify(initialForm)
 
   if (loading) {
     return (
@@ -161,18 +185,32 @@ export default function EditEpicPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium">Status</label>
-                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as EpicForm['status'] })}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <Select
+                  value={form.status}
+                  onValueChange={(v) => setForm({ ...form, status: v as EpicForm['status'] })}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="todo">To Do</SelectItem>
                     <SelectItem value="backlog">Backlog</SelectItem>
                     <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="review">Review</SelectItem>
-                    <SelectItem value="testing">Testing</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
+                    <SelectItem value="completed">Done</SelectItem>
                     <SelectItem value="cancelled">Cancelled</SelectItem>
                   </SelectContent>
                 </Select>
+                {storyProgress && storyProgress.totalStories > 0 && !statusBlocked && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Stories completed: {storyProgress.storiesCompleted}/{storyProgress.totalStories}.<br />
+                    You can only mark this epic as Done when all linked stories are completed.
+                  </p>
+                )}
+                {statusBlocked && storyProgress && storyProgress.totalStories > 0 && (
+                  <p className="mt-1 text-xs text-red-500">
+                    Cannot set status to Done. Stories completed: {storyProgress.storiesCompleted}/
+                    {storyProgress.totalStories}.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium">Priority</label>
@@ -206,7 +244,10 @@ export default function EditEpicPage() {
 
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => router.push(`/epics/${epicId}`)}>Cancel</Button>
-              <Button onClick={handleSave} disabled={saving}>
+              <Button
+                onClick={handleSave}
+                disabled={saving || !hasChanges || statusBlocked}
+              >
                 {saving ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>) : 'Save Changes'}
               </Button>
             </div>
