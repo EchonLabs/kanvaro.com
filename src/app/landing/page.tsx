@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
@@ -19,7 +19,12 @@ import {
   Mail,
   Phone,
   Linkedin,
-  Twitter
+  Twitter,
+  Calendar,
+  Zap,
+  Shield,
+  TrendingUp,
+  ArrowUp
 } from 'lucide-react'
 
 const stats = [
@@ -31,92 +36,112 @@ const stats = [
 const modules = [
   {
     icon: <ListChecks className="h-6 w-6 text-[#7bffde]" />,
-    name: 'Tasks Workspace',
-    description: 'Kanban, swimlanes, recurring tasks, SLAs, and approvals.',
-    badge: 'Sprint-ready'
+    name: 'Tasks & Agile Workspace',
+    description: 'Kanban boards, backlog management, sprints, user stories, and epics. Full agile support with customizable workflows.',
+    badge: 'Agile-ready',
+    route: '/tasks'
   },
   {
     icon: <Layers className="h-6 w-6 text-[#a0a7ff]" />,
-    name: 'Projects & Epics',
-    description: 'Cross-squad planning boards with dependencies and risk view.',
-    badge: 'Portfolio lens'
+    name: 'Projects & Portfolio',
+    description: 'Create projects with templates, manage epics, track dependencies, and visualize roadmaps with Gantt charts.',
+    badge: 'Portfolio view',
+    route: '/projects'
   },
   {
     icon: <Users className="h-6 w-6 text-[#ffc7ff]" />,
-    name: 'Members & Permissions',
-    description: 'Invite contractors, map roles, and audit every decision.',
-    badge: 'Granular roles'
+    name: 'Team & Permissions',
+    description: 'Invite team members, assign roles, manage permissions, and control access with granular role-based security.',
+    badge: 'Role-based',
+    route: '/team/members'
   },
   {
     icon: <Watch className="h-6 w-6 text-[#9effff]" />,
-    name: 'Time Logs & Capacity',
-    description: 'Track billable hours, utilization, and capacity alerts live.',
-    badge: 'Live signals'
+    name: 'Time Tracking & Logs',
+    description: 'Track billable hours, monitor capacity, approve time entries, and generate comprehensive time reports.',
+    badge: 'Billable-ready',
+    route: '/time-tracking'
   },
   {
     icon: <BarChart3 className="h-6 w-6 text-[#ffdd8f]" />,
-    name: 'Reports & Insights',
-    description: 'Executive dashboards with burn-up, forecasts, and OKR rollups.',
-    badge: 'Exec-ready'
+    name: 'Reports & Analytics',
+    description: 'Financial reports, team performance, project analytics, Gantt charts, and executive dashboards with real-time insights.',
+    badge: 'Real-time',
+    route: '/reports'
   },
   {
     icon: <Activity className="h-6 w-6 text-[#9fc5ff]" />,
-    name: 'Automation Studio',
-    description: 'Trigger notifications, workflows, and syncs across tools.',
-    badge: 'No-code rules'
+    name: 'Test Management',
+    description: 'Manage test suites, create test cases, plan executions, and generate comprehensive test reports for quality assurance.',
+    badge: 'QA-focused',
+    route: '/test-management'
   }
 ]
 
-const steps = [
+const flows = [
   {
-    title: 'Dashboard & Overview',
+    title: 'Project Creation Flow',
     description:
-      'Your command center. See everything at a glance: active tasks, project progress, team activity, time tracking, and key metrics in one unified dashboard.',
-    caption: '1. Start with your dashboard',
+      'Start with project templates or create from scratch. Set up teams, define epics and user stories, plan sprints, and launch with full visibility.',
+    caption: '1. Plan & Launch',
     gradient: '#2d2ef5, #6f55ff',
-    imageKey: 'heroDashboard' as const
+    imageKey: 'heroDashboard' as const,
+    steps: ['Create Project', 'Assign Team', 'Define Epics', 'Plan Sprints', 'Launch']
   },
   {
-    title: 'Tasks & Project Management',
-    description: 'Manage tasks with Kanban boards, track sprints, create epics, and organize work with powerful filtering and search capabilities.',
-    caption: '2. Organize and execute',
+    title: 'Task Execution Flow',
+    description: 'From backlog to done: Create tasks, assign to team members, track progress on Kanban boards, manage sprints, and complete with approvals.',
+    caption: '2. Execute & Track',
     gradient: '#0bbcd6, #19f2a5',
-    imageKey: 'tasks' as const
+    imageKey: 'tasks' as const,
+    steps: ['Backlog', 'Sprint Planning', 'In Progress', 'Review', 'Done']
   },
   {
-    title: 'Team & Time Tracking',
-    description: 'Invite team members, manage permissions, track billable hours, monitor capacity, and generate comprehensive reports.',
-    caption: '3. Collaborate and measure',
+    title: 'Time & Reporting Flow',
+    description: 'Track time with timers or manual logs, get approvals, monitor capacity, generate reports, and export for invoicing and analysis.',
+    caption: '3. Measure & Report',
     gradient: '#ff7ab6, #feae68',
-    imageKey: 'members' as const
+    imageKey: 'members' as const,
+    steps: ['Time Tracking', 'Approval', 'Reports', 'Analytics', 'Export']
   }
 ]
 
 const showcases = [
   {
-    name: 'Tasks',
-    metric: '38 In-flight',
-    detail: 'Grouped by squads with SLA timers and blockers surfaced instantly.'
+    name: 'Tasks & Backlog',
+    metric: 'Multi-view',
+    detail: 'Kanban boards, backlog, my tasks, user stories, and epics. Full agile workflow support with sprint planning.',
+    route: '/tasks'
   },
   {
-    name: 'Projects',
-    metric: '12 Initiatives',
-    detail: 'Roadmap heat map with dependencies, approvals, and scorecards.'
+    name: 'Projects & Epics',
+    metric: 'Portfolio',
+    detail: 'Project templates, epic management, Gantt charts, dependencies, and comprehensive project analytics.',
+    route: '/projects'
   },
   {
-    name: 'Members',
-    metric: '87 Active',
-    detail: 'Role-aware views for workload, PTO, and utilization in one glance.'
+    name: 'Team Management',
+    metric: 'Role-based',
+    detail: 'Member invitations, custom roles, granular permissions, and team activity tracking with audit logs.',
+    route: '/team/members'
   },
   {
-    name: 'Time Logs',
-    metric: '423 hrs this week',
-    detail: 'Billable vs non-billable, split by cost center, synced to invoices.'
+    name: 'Time Tracking',
+    metric: 'Billable-ready',
+    detail: 'Live timer, manual logs, approval workflows, capacity monitoring, and detailed time reports with export.',
+    route: '/time-tracking'
   },
   {
-    name: 'Reports',
-    metric: '15 Live dashboards',
-    detail: 'Velocity, story health, and exec-ready OKR snapshots streamed live.'
+    name: 'Reports & Analytics',
+    metric: 'Real-time',
+    detail: 'Financial reports, team performance, project Gantt charts, burn-up/down, and executive dashboards.',
+    route: '/reports'
+  },
+  {
+    name: 'Test Management',
+    metric: 'QA Suite',
+    detail: 'Test suites, test cases, execution plans, test reports, and quality metrics for comprehensive QA workflows.',
+    route: '/test-management'
   }
 ]
 
@@ -160,9 +185,27 @@ const LANDING_PAGE_IMAGES = {
 export default function LandingPage() {
   const router = useRouter()
   const [ctaLoading, setCtaLoading] = useState(false)
+  const [showBackToTop, setShowBackToTop] = useState(false)
   
   // Use the hardcoded images directly
   const images = LANDING_PAGE_IMAGES
+
+  useEffect(() => {
+    const handleScroll = () => {
+      // Show button when user scrolls down 300px
+      setShowBackToTop(window.scrollY > 300)
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    })
+  }
 
   const handleGetStarted = async () => {
     if (ctaLoading) return
@@ -190,15 +233,15 @@ export default function LandingPage() {
         <div className="relative mx-auto flex max-w-7xl flex-col gap-16 px-6 pt-8 pb-20 lg:flex-row lg:items-center lg:pt-12 lg:pb-32">
           <div className="space-y-10 text-center lg:text-left lg:flex-1">
             <p className="inline-flex items-center gap-2 rounded-full border border-slate-300/60 bg-white/70 px-5 py-2 text-sm uppercase tracking-[0.3em] text-slate-600 dark:border-white/15 dark:bg-white/5 dark:text-white/80">
-              Workleze-inspired control room
+              All-in-one project management platform
             </p>
             <div className="space-y-8">
               <h1 className="text-3xl font-semibold leading-tight text-slate-900 sm:text-4xl lg:text-[3rem] xl:text-[3.5rem] dark:text-white">
-                The calmest way to manage <span className="text-[#7afdea]">projects, tasks</span> and time.
+                Complete project management for <span className="text-[#7afdea]">modern teams</span> and agile workflows.
               </h1>
               <p className="text-base text-slate-600 sm:text-lg lg:text-base xl:text-lg dark:text-white/80 leading-relaxed">
-                Kanvaro mirrors the Workleze look (without the pricing clutter) so visitors instantly
-                see Tasks, Projects, Members, Time Logs, and Reports in one cinematic view.
+                Experience the power of unified project management. Kanvaro delivers a seamless, cinematic interface where 
+                Tasks, Projects, Team Members, Time Logs, and Reports converge into one intuitive workspace. 
               </p>
             </div>
             <div className="flex flex-col gap-4 sm:flex-row sm:justify-center lg:justify-start">
@@ -325,31 +368,33 @@ export default function LandingPage() {
             Operating modules
           </p>
           <h2 className="mt-4 text-3xl font-semibold sm:text-4xl">
-            Every Workleze-like module, shown beautifully.
+            Explore all modules in one unified workspace.
           </h2>
           <p className="mt-4 text-slate-600 dark:text-white/70">
-            Walk prospects through Tasks, Projects, Members, Time Logs, and Reports without hopping tabs.
-            Each card feels like an interactive screenshot.
+            From project planning to time tracking, from team management to comprehensive reporting. 
+            Every module is designed to work seamlessly together, giving you complete visibility and control.
           </p>
         </div>
         <div className="mx-auto mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {modules.map(module => (
             <div
               key={module.name}
-              className="group rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_20px_40px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:border-slate-300 dark:border-white/10 dark:bg-white/5 dark:shadow-[0_25px_55px_rgba(4,7,20,0.6)]"
+              className="group rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_20px_40px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_30px_60px_rgba(15,23,42,0.12)] dark:border-white/10 dark:bg-white/5 dark:shadow-[0_25px_55px_rgba(4,7,20,0.6)] dark:hover:border-[#7bffde]/30 cursor-pointer"
+              onClick={() => module.route && router.push(module.route)}
             >
               <div className="flex items-center justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 dark:bg-white/5">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 dark:bg-white/5 group-hover:bg-[#7bffde]/10 transition-colors">
                   {module.icon}
                 </div>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600 dark:bg-white/10 dark:text-white/70">
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-white/70">
                   {module.badge}
                 </span>
               </div>
-              <h3 className="mt-5 text-xl font-semibold text-slate-900 dark:text-white">{module.name}</h3>
-              <p className="mt-3 text-sm text-slate-600 dark:text-white/70">{module.description}</p>
-              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-xs uppercase tracking-[0.4em] text-slate-500 dark:border-white/10 dark:bg-[#050c1e] dark:text-white/50">
-                UI preview
+              <h3 className="mt-5 text-xl font-semibold text-slate-900 dark:text-white group-hover:text-[#7bffde] transition-colors">{module.name}</h3>
+              <p className="mt-3 text-sm text-slate-600 dark:text-white/70 leading-relaxed">{module.description}</p>
+              <div className="mt-6 flex items-center gap-2 text-xs font-semibold text-[#7bffde] uppercase tracking-[0.3em]">
+                <span>Explore Module</span>
+                <ArrowRight className="h-3 w-3" />
               </div>
             </div>
           ))}
@@ -360,14 +405,15 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#7bffde]">Key Features</p>
           <h2 className="mt-4 text-3xl font-semibold sm:text-4xl lg:text-5xl">
-            Core system modules - your complete project management solution
+            Complete workflows from planning to delivery
           </h2>
           <p className="mt-4 text-lg text-slate-600 dark:text-white/70 max-w-3xl mx-auto">
-            Everything you need in one platform: Dashboard, Tasks, Projects, Team Management, Time Tracking, and Reports.
+            See how teams use Kanvaro: from project creation and sprint planning to time tracking and comprehensive reporting. 
+            Every workflow is optimized for efficiency and visibility.
           </p>
         </div>
         <div className="mx-auto mt-12 grid gap-8 lg:grid-cols-3">
-          {steps.map((step, idx) => {
+          {flows.map((step, idx) => {
             // Get the appropriate image based on imageKey
             let imageUrl: string | null = null
             if (step.imageKey === 'heroDashboard') {
@@ -383,9 +429,21 @@ export default function LandingPage() {
                 key={step.title}
                 className="rounded-[32px] border border-slate-200 bg-white p-8 shadow-[0_25px_55px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.03] dark:shadow-[0_35px_65px_rgba(5,7,19,0.75)]"
               >
-                <p className="text-xs uppercase tracking-[0.6em] text-slate-400 dark:text-white/40">0{idx + 1}</p>
+                <p className="text-xs uppercase tracking-[0.6em] text-slate-400 dark:text-white/40">Flow {idx + 1}</p>
                 <h3 className="mt-4 text-2xl font-semibold text-slate-900 dark:text-white">{step.title}</h3>
                 <p className="mt-4 text-base text-slate-600 dark:text-white/70 leading-relaxed">{step.description}</p>
+                {step.steps && (
+                  <div className="mt-6 flex flex-wrap gap-2">
+                    {step.steps.map((flowStep, stepIdx) => (
+                      <span
+                        key={stepIdx}
+                        className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 dark:bg-white/10 dark:text-white/80"
+                      >
+                        {flowStep}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {imageUrl ? (
                   <div className="mt-6 aspect-[16/10] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 shadow-lg hover:shadow-xl transition-all duration-300 group relative">
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
@@ -426,10 +484,11 @@ export default function LandingPage() {
                 Module walkthrough
               </p>
               <h2 className="mt-3 text-3xl font-semibold sm:text-4xl">
-                Tasks, projects, members, timelogs, reports.
+                Interactive module previews
               </h2>
               <p className="mt-4 text-slate-600 dark:text-white/70">
-                Each surface mirrors Workleze's card aesthetic so stakeholders understand what they're buying without extra clicks.
+                Click through each module to see real interfaces. Explore tasks, projects, team management, 
+                time tracking, reports, and test management in action.
               </p>
             </div>
             <Button
@@ -440,15 +499,16 @@ export default function LandingPage() {
               {ctaLoading ? 'Checking access' : 'Launch interactive preview'}
             </Button>
           </div>
-          <div className="mt-12 grid gap-6 lg:grid-cols-3">
+          <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {showcases.map(showcase => {
               // Map showcase names to image keys
               const imageKeyMap: Record<string, keyof typeof images.showcaseImages> = {
-                'Tasks': 'tasks',
-                'Projects': 'projects',
-                'Members': 'members',
-                'Time Logs': 'timeLogs',
-                'Reports': 'reports'
+                'Tasks & Backlog': 'tasks',
+                'Projects & Epics': 'projects',
+                'Team Management': 'members',
+                'Time Tracking': 'timeLogs',
+                'Reports & Analytics': 'reports',
+                'Test Management': 'reports' // Using reports image as placeholder
               }
               const imageKey = imageKeyMap[showcase.name]
               const imageUrl = imageKey ? images.showcaseImages?.[imageKey] : null
@@ -456,16 +516,22 @@ export default function LandingPage() {
               return (
                 <div
                   key={showcase.name}
-                  className="group rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_25px_55px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_35px_65px_rgba(15,23,42,0.15)] dark:border-white/10 dark:bg-gradient-to-br dark:from-[#09132b] dark:to-[#050914] dark:shadow-[0_25px_55px_rgba(2,4,10,0.75)] dark:hover:border-[#7bffde]/30"
+                  className="group rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_25px_55px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_35px_65px_rgba(15,23,42,0.15)] dark:border-white/10 dark:bg-gradient-to-br dark:from-[#09132b] dark:to-[#050914] dark:shadow-[0_25px_55px_rgba(2,4,10,0.75)] dark:hover:border-[#7bffde]/30 cursor-pointer"
+                  onClick={() => showcase.route && router.push(showcase.route)}
                 >
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-semibold text-slate-900 dark:text-white">{showcase.name}</h3>
-                    <span className="text-sm text-[#2bbfa1] dark:text-[#7bffde]">{showcase.metric}</span>
+                    <h3 className="text-xl font-semibold text-slate-900 dark:text-white group-hover:text-[#7bffde] transition-colors">{showcase.name}</h3>
+                    <span className="rounded-full bg-[#7bffde]/20 px-3 py-1 text-xs font-semibold text-[#2bbfa1] dark:text-[#7bffde]">{showcase.metric}</span>
                   </div>
-                  <p className="mt-3 text-sm text-slate-600 dark:text-white/70">{showcase.detail}</p>
+                  <p className="mt-3 text-sm text-slate-600 dark:text-white/70 leading-relaxed">{showcase.detail}</p>
                   {imageUrl ? (
                     <div className="mt-6 relative aspect-[16/10] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 group-hover:border-[#7bffde]/50 transition-all duration-300 shadow-lg hover:shadow-xl">
                       <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
+                      <div className="absolute top-4 right-4 z-20 bg-[#7bffde]/90 backdrop-blur-sm rounded-lg px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-xs font-semibold text-slate-900 flex items-center gap-1">
+                          Explore <ArrowRight className="h-3 w-3" />
+                        </span>
+                      </div>
                       <Image
                         src={imageUrl}
                         alt={showcase.name}
@@ -476,9 +542,13 @@ export default function LandingPage() {
                     </div>
                   ) : (
                     <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-xs uppercase tracking-[0.4em] text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-white/40">
-                      Screenshot placeholder
+                      Module Preview
                     </div>
                   )}
+                  <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-[#7bffde] uppercase tracking-[0.2em]">
+                    <span>Click to explore</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </div>
                 </div>
               )
             })}
@@ -487,6 +557,105 @@ export default function LandingPage() {
       </section>
 
       <section className="bg-gradient-to-b from-[#f2f6ff] to-[#eef3ff] px-6 py-20 dark:from-[#050a1c] dark:to-[#030610] sm:py-28">
+        <div className="mx-auto max-w-6xl">
+          <div className="text-center mb-12">
+            <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#7bffde]">
+              Comprehensive Reporting & Analytics
+            </p>
+            <h2 className="mt-4 text-3xl font-semibold sm:text-4xl">
+              Real-time insights for data-driven decisions
+            </h2>
+            <p className="mt-4 text-slate-600 dark:text-white/70 max-w-3xl mx-auto">
+              Generate detailed reports for financial analysis, team performance, project progress, and time tracking. 
+              Export data, visualize with Gantt charts, and make informed decisions with comprehensive analytics.
+            </p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {[
+              { 
+                name: 'Financial Reports', 
+                desc: 'Budget tracking, expenses, invoicing, and financial analytics with cost center breakdowns',
+                icon: <TrendingUp className="h-5 w-5 text-[#7bffde]" />
+              },
+              { 
+                name: 'Team Reports', 
+                desc: 'Performance metrics, workload analysis, team productivity, and utilization dashboards',
+                icon: <Users className="h-5 w-5 text-[#a0a7ff]" />
+              },
+              { 
+                name: 'Project Reports', 
+                desc: 'Gantt charts, progress tracking, project health dashboards, and milestone analytics',
+                icon: <Layers className="h-5 w-5 text-[#ffc7ff]" />
+              },
+              { 
+                name: 'Time Reports', 
+                desc: 'Billable hours, capacity planning, utilization analytics, and time entry approvals',
+                icon: <Watch className="h-5 w-5 text-[#9effff]" />
+              }
+            ].map((report, idx) => (
+              <div
+                key={report.name}
+                className="group rounded-[24px] border border-slate-200 bg-white p-6 shadow-[0_15px_35px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(15,23,42,0.12)] dark:border-white/10 dark:bg-white/5 dark:shadow-[0_20px_45px_rgba(3,6,14,0.75)]"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#7bffde]/10 mb-4 group-hover:bg-[#7bffde]/20 transition-colors">
+                  {report.icon}
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{report.name}</h3>
+                <p className="mt-2 text-sm text-slate-600 dark:text-white/70 leading-relaxed">{report.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[#f7f9ff] px-6 py-20 dark:bg-[#040714] sm:py-28">
+        <div className="mx-auto max-w-6xl">
+          <div className="text-center mb-12">
+            <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#7bffde]">
+              Team Collaboration
+            </p>
+            <h2 className="mt-4 text-3xl font-semibold sm:text-4xl">
+              Invite your team and collaborate seamlessly
+            </h2>
+            <p className="mt-4 text-slate-600 dark:text-white/70 max-w-3xl mx-auto">
+              Bring your entire team together. Invite members, assign roles, manage permissions, 
+              and work together on projects with real-time collaboration and activity tracking.
+            </p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            {[
+              {
+                icon: <Users className="h-6 w-6 text-[#7bffde]" />,
+                title: 'Team Invitations',
+                description: 'Invite team members via email, assign roles, and manage access with granular permissions.'
+              },
+              {
+                icon: <Shield className="h-6 w-6 text-[#a0a7ff]" />,
+                title: 'Role-Based Access',
+                description: 'Custom roles with fine-grained permissions. Control who can view, edit, or manage projects and tasks.'
+              },
+              {
+                icon: <Activity className="h-6 w-6 text-[#ffc7ff]" />,
+                title: 'Activity Tracking',
+                description: 'Real-time activity feeds, notifications, and audit logs to keep everyone informed and accountable.'
+              }
+            ].map((feature, idx) => (
+              <div
+                key={feature.title}
+                className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-[0_20px_40px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/5 dark:shadow-[0_25px_55px_rgba(4,7,20,0.6)]"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 dark:bg-white/5 mb-6">
+                  {feature.icon}
+                </div>
+                <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-3">{feature.title}</h3>
+                <p className="text-sm text-slate-600 dark:text-white/70 leading-relaxed">{feature.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[#eef2ff] px-6 py-20 dark:bg-[#030611] sm:py-24">
         <div className="mx-auto max-w-5xl text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#7bffde]">
             Loved by product teams
@@ -515,10 +684,11 @@ export default function LandingPage() {
       <section className="bg-[#eef2ff] px-6 py-16 dark:bg-[#030611] sm:py-24">
         <div className="mx-auto max-w-4xl rounded-[40px] border border-slate-200 bg-gradient-to-r from-[#fefefe] via-[#f6f7fb] to-[#eef2ff] p-10 text-center shadow-[0_30px_70px_rgba(15,23,42,0.12)] dark:border-white/10 dark:bg-gradient-to-r dark:from-[#0f1329] dark:via-[#151c3d] dark:to-[#0a1f3b] dark:shadow-[0_35px_75px_rgba(3,7,17,0.85)]">
           <h2 className="text-3xl font-semibold text-slate-900 dark:text-white sm:text-4xl">
-            Showcase Kanvaro like Workleze. Keep the story yours.
+            Ready to transform your project management?
           </h2>
           <p className="mt-4 text-slate-600 dark:text-white/75">
-            Launch the Workleze-inspired experience, invite your team, and give prospects one place to explore modules, flows, and reports.
+            Invite your team, explore all modules, experience complete workflows, and access comprehensive reports. 
+            Everything you need to manage projects, track time, and deliver results all in one powerful platform.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <Button
@@ -568,6 +738,17 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* Back to Top Button */}
+      {showBackToTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-8 right-8 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-[#7bffde] text-slate-900 shadow-[0_10px_30px_rgba(123,255,222,0.4)] transition-all duration-300 hover:scale-110 hover:bg-[#62f5cf] hover:shadow-[0_15px_40px_rgba(123,255,222,0.5)] dark:bg-[#7bffde] dark:text-slate-900"
+          aria-label="Back to top"
+        >
+          <ArrowUp className="h-5 w-5" />
+        </button>
+      )}
     </main>
   )
 }

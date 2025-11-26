@@ -43,7 +43,7 @@ interface Story {
   _id: string
   title: string
   description: string
-  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
+  status: 'backlog' | 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   project?: {
     _id: string
@@ -186,6 +186,7 @@ export default function StoriesPage() {
   }
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'backlog': return 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200'
       case 'todo': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
       case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
       case 'review': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
@@ -198,6 +199,7 @@ export default function StoriesPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
+      case 'backlog': return <List className="h-4 w-4" />
       case 'todo': return <Target className="h-4 w-4" />
       case 'in_progress': return <Play className="h-4 w-4" />
       case 'review': return <AlertTriangle className="h-4 w-4" />
@@ -311,6 +313,7 @@ export default function StoriesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="backlog">Backlog</SelectItem>
                       <SelectItem value="todo">To Do</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="review">Review</SelectItem>

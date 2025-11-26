@@ -15,6 +15,8 @@ import {
   Settings as SettingsIcon,
   Loader2
 } from 'lucide-react'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('organization')
@@ -22,6 +24,7 @@ export default function SettingsPage() {
   const [user, setUser] = useState<any>(null)
   const [authError, setAuthError] = useState('')
   const router = useRouter()
+  const { hasPermission, loading: permissionsLoading } = usePermissions()
 
   const checkAuth = useCallback(async () => {
     try {
@@ -109,6 +112,23 @@ export default function SettingsPage() {
           <p className="text-xs sm:text-sm text-muted-foreground">No user data available</p>
         </div>
       </div>
+    )
+  }
+
+  const canViewSettings = hasPermission(Permission.SETTINGS_READ)
+
+  if (!permissionsLoading && !canViewSettings) {
+    return (
+      <MainLayout>
+        <div className="min-h-[50vh] flex items-center justify-center px-4">
+          <div className="text-center max-w-md space-y-3">
+            <p className="text-lg font-semibold text-foreground">Access restricted</p>
+            <p className="text-sm text-muted-foreground">
+              You do not have permission to view application settings. Please contact your administrator if you believe this is a mistake.
+            </p>
+          </div>
+        </div>
+      </MainLayout>
     )
   }
 

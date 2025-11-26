@@ -9,6 +9,8 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { notificationService } from '@/lib/notification-service'
 import crypto from 'crypto'
 import mongoose from 'mongoose'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionService } from '@/lib/permissions/permission-service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,7 +48,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has permission to invite members
-    if (!['admin', 'project_manager'].includes(user.role)) {
+    const [hasTeamInvite, hasUserInvite] = await Promise.all([
+      PermissionService.hasPermission(userId, Permission.TEAM_INVITE),
+      PermissionService.hasPermission(userId, Permission.USER_INVITE)
+    ])
+
+    if (!hasTeamInvite && !hasUserInvite) {
       return NextResponse.json(
         { error: 'Insufficient permissions' },
         { status: 403 }
