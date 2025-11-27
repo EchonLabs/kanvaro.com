@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, type ReactElement } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { formatToTitleCase, cn } from '@/lib/utils'
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { Calendar as DateRangeCalendar } from '@/components/ui/calendar'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DndContext,
   DragEndEvent,
@@ -757,6 +758,7 @@ export default function KanbanPage() {
 
   return (
     <MainLayout>
+      <TooltipProvider delayDuration={200}>
       <div className="space-y-8 sm:space-y-10">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
@@ -849,11 +851,10 @@ export default function KanbanPage() {
                 </Select>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
-                <div className="border border-dashed border-border/40 dark:border-border/60 hover:border-border/70 dark:hover:border-border rounded-lg bg-background/80 shadow-sm p-0.5 transition-colors">
-                  <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
-                    <SelectTrigger className="w-full border-0 bg-transparent">
-                      <SelectValue placeholder="Assigned To" />
-                    </SelectTrigger>
+                <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Assigned To" />
+                  </SelectTrigger>
                   <SelectContent className="z-[10050] p-0">
                     <div className="p-2">
                       <Input
@@ -877,13 +878,11 @@ export default function KanbanPage() {
                     </div>
                   </SelectContent>
                 </Select>
-                </div>
 
-                <div className="border border-dashed border-border/40 dark:border-border/60 hover:border-border/70 dark:hover:border-border rounded-lg bg-background/80 shadow-sm p-0.5 transition-colors">
-                  <Select value={assignedByFilter} onValueChange={setAssignedByFilter}>
-                    <SelectTrigger className="w-full border-0 bg-transparent">
-                      <SelectValue placeholder="Assigned By" />
-                    </SelectTrigger>
+                <Select value={assignedByFilter} onValueChange={setAssignedByFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Assigned By" />
+                  </SelectTrigger>
                   <SelectContent className="z-[10050] p-0">
                     <div className="p-2">
                       <Input
@@ -907,13 +906,11 @@ export default function KanbanPage() {
                     </div>
                   </SelectContent>
                 </Select>
-                </div>
 
-                <div className="border border-dashed border-border/40 dark:border-border/60 hover:border-border/70 dark:hover:border-border rounded-lg bg-background/80 shadow-sm p-0.5 transition-colors">
-                  <Select value={taskNumberFilter} onValueChange={setTaskNumberFilter}>
-                    <SelectTrigger className="w-full border-0 bg-transparent">
-                      <SelectValue placeholder="Select Task Number" />
-                    </SelectTrigger>
+                <Select value={taskNumberFilter} onValueChange={setTaskNumberFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Task Number" />
+                  </SelectTrigger>
                   <SelectContent className="z-[10050] p-0">
                     <div className="p-2">
                       <Input
@@ -937,7 +934,6 @@ export default function KanbanPage() {
                     </div>
                   </SelectContent>
                 </Select>
-                </div>
 
                 <div className="border border-dashed border-border/40 dark:border-border/60 hover:border-border/70 dark:hover:border-border rounded-lg bg-background/80 shadow-sm p-0.5 transition-colors">
                   <div className="flex flex-col gap-2">
@@ -1029,7 +1025,7 @@ export default function KanbanPage() {
           </CardContent>
         </Card>
       </div>
-
+      </TooltipProvider>
       {/* Modals */}
       <CreateTaskModal
         isOpen={showCreateTaskModal}
@@ -1138,9 +1134,11 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
       <CardContent className="p-4">
         <div className="space-y-3">
           <div className="flex items-start justify-between">
-            <h4 className="font-medium text-foreground text-sm line-clamp-2">
-              {task.title}
-            </h4>
+            <TruncateTooltip text={task.title}>
+              <h4 className="font-medium text-foreground text-sm line-clamp-2">
+                {task.title}
+              </h4>
+            </TruncateTooltip>
             <div className="flex items-center space-x-1">
               <Button 
                 variant="ghost" 
@@ -1214,7 +1212,9 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
           <div className="text-xs text-muted-foreground">
             <div className="flex items-center space-x-1 mb-1">
               <Target className="h-3 w-3" />
+              <TruncateTooltip text={task?.project?.name}>
                 <span className="text-foreground text-sm line-clamp-2">{task?.project?.name}</span>
+              </TruncateTooltip>
             </div>
             {task.dueDate && (
               <div className="flex items-center space-x-1 mb-1">
@@ -1241,23 +1241,25 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
               <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
                 {task?.assignedTo?.firstName[0]}{task?.assignedTo?.lastName[0]}
               </div>
-              <span className="text-xs text-muted-foreground">
-                {task?.assignedTo?.firstName} {task?.assignedTo?.lastName}
-              </span>
+              <TruncateTooltip text={`${task?.assignedTo?.firstName} ${task?.assignedTo?.lastName}`}>
+                <span className="text-xs text-muted-foreground">
+                  {task?.assignedTo?.firstName} {task?.assignedTo?.lastName}
+                </span>
+              </TruncateTooltip>
             </div>
           )}
           
           {task?.labels?.length > 0 && (
             <div className="flex items-center gap-1 overflow-hidden flex-nowrap">
               {task.labels.slice(0, 2).map((label, index) => (
-                <Badge
-                  key={index}
-                  variant="outline"
-                  className="text-xs truncate max-w-[85px] whitespace-nowrap flex-shrink-0"
-                  title={label}
-                >
-                  {label}
-                </Badge>
+                <TruncateTooltip key={`${label}-${index}`} text={label}>
+                  <Badge
+                    variant="outline"
+                    className="text-xs truncate max-w-[85px] whitespace-nowrap flex-shrink-0"
+                  >
+                    {label}
+                  </Badge>
+                </TruncateTooltip>
               ))}
               {task.labels.length > 2 && (
                 <Badge
@@ -1273,5 +1275,28 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+interface TruncateTooltipProps {
+  text?: string | number | null
+  children: ReactElement
+}
+
+function TruncateTooltip({ text, children }: TruncateTooltipProps) {
+  const displayText = text === undefined || text === null ? '' : String(text)
+  if (!displayText.trim()) {
+    return children
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {children}
+      </TooltipTrigger>
+      <TooltipContent side="top" align="start">
+        <p className="max-w-sm break-words">{displayText}</p>
+      </TooltipContent>
+    </Tooltip>
   )
 }
