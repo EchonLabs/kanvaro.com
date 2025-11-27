@@ -83,11 +83,16 @@ export async function POST(req: NextRequest) {
       eventType, 
       title, 
       description, 
-      scheduledDate, 
+      scheduledDate,
+      startTime,
+      endTime,
       duration, 
+      status,
       attendees, 
       location, 
-      meetingLink 
+      meetingLink,
+      attachments,
+      notificationSettings
     } = body
 
     // Check if user has permission to manage sprints for this project
@@ -98,8 +103,35 @@ export async function POST(req: NextRequest) {
 
     // Verify sprint exists and belongs to the project
     const sprint = await Sprint.findById(sprintId)
-    if (!sprint || sprint.project.toString() !== projectId) {
-      return NextResponse.json({ error: 'Sprint not found or does not belong to project' }, { status: 404 })
+    if (!sprint) {
+      return NextResponse.json({ error: 'Sprint not found' }, { status: 404 })
+    }
+    
+    // Check if sprint belongs to the project
+    // Handle both ObjectId and string comparison
+    let sprintProjectId: string
+    
+    // Check if project is populated or is an ObjectId
+    if (typeof sprint.project === 'object' && sprint.project !== null) {
+      // Project is populated or is an object
+      sprintProjectId = (sprint.project as any)._id 
+        ? (sprint.project as any)._id.toString() 
+        : sprint.project.toString()
+    } else {
+      // Project is an ObjectId
+      sprintProjectId = sprint.project.toString()
+    }
+    
+    const projectIdStr = projectId.toString()
+    
+    if (sprintProjectId !== projectIdStr) {
+      console.error('Sprint project mismatch:', {
+        sprintProjectId,
+        projectIdStr,
+        sprintId: sprint._id.toString(),
+        sprintProjectType: typeof sprint.project
+      })
+      return NextResponse.json({ error: 'Sprint does not belong to the specified project' }, { status: 400 })
     }
 
     const sprintEvent = new SprintEvent({
@@ -109,11 +141,20 @@ export async function POST(req: NextRequest) {
       title,
       description,
       scheduledDate: new Date(scheduledDate),
+      startTime,
+      endTime,
       duration,
+      status: status || 'scheduled',
       attendees,
       facilitator: authResult.user.id,
       location,
-      meetingLink
+      meetingLink,
+      attachments: attachments?.map((att: any) => ({
+        ...att,
+        uploadedBy: authResult.user.id,
+        uploadedAt: new Date()
+      })),
+      notificationSettings
     })
 
     await sprintEvent.save()
