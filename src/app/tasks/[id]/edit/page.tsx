@@ -51,6 +51,24 @@ interface Project {
   name: string
 }
 
+interface Story {
+  _id: string
+  title: string
+  epic?: {
+    _id: string
+    title: string
+  }
+}
+
+interface Epic {
+  _id: string
+  title: string
+  project: {
+    _id: string
+    name: string
+  }
+}
+
 interface TaskFormState {
   title: string
   description: string
@@ -62,6 +80,8 @@ interface TaskFormState {
   dueDate?: string
   labels?: string
   estimatedHours?: number
+  story?: string
+  epic?: string
   // storyPoints?: number
 }
 
@@ -76,6 +96,8 @@ const mapTaskFormState = (data: any): TaskFormState => ({
   dueDate: data?.dueDate ? new Date(data.dueDate).toISOString().split('T')[0] : undefined,
   labels: Array.isArray(data?.labels) ? data.labels.join(', ') : undefined,
   estimatedHours: typeof data?.estimatedHours === 'number' ? data.estimatedHours : undefined,
+  story: data?.story?._id ?? data?.story ?? undefined,
+  epic: data?.epic?._id ?? data?.epic ?? undefined,
  // storyPoints: typeof data?.storyPoints === 'number' ? data.storyPoints : undefined
 })
 
@@ -222,6 +244,12 @@ export default function EditTaskPage() {
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [loadingProjects, setLoadingProjects] = useState(false)
+  const [stories, setStories] = useState<Story[]>([])
+  const [epics, setEpics] = useState<Epic[]>([])
+  const [loadingStories, setLoadingStories] = useState(false)
+  const [loadingEpics, setLoadingEpics] = useState(false)
+  const [storyQuery, setStoryQuery] = useState('')
+  const [epicQuery, setEpicQuery] = useState('')
   const [projectFilterQuery, setProjectFilterQuery] = useState('')
   const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
   const [assignedToIds, setAssignedToIds] = useState<string[]>([])
@@ -287,10 +315,14 @@ export default function EditTaskPage() {
         // On initial load: fetch team members and preserve existing assignee if valid
         if (normalizedTask.project) {
           fetchProjectTeamMembers(normalizedTask.project, normalizedTask.assignedTo)
+          fetchStories(normalizedTask.project)
+          fetchEpics(normalizedTask.project)
         } else {
           // If no project, clear users
           setUsers([])
           updateAssignees(() => [])
+          setStories([])
+          setEpics([])
         }
       } else {
         setError(data.error || 'Failed to load task')
@@ -417,6 +449,54 @@ export default function EditTaskPage() {
       updateAssignees(() => [])
     } finally {
       setLoadingUsers(false)
+    }
+  }
+
+  const fetchStories = async (projectId: string) => {
+    if (!projectId) {
+      setStories([])
+      return
+    }
+
+    setLoadingStories(true)
+    try {
+      const response = await fetch(`/api/stories?projectId=${projectId}`)
+      const data = await response.json()
+
+      if (data.success && Array.isArray(data.data)) {
+        setStories(data.data)
+      } else {
+        setStories([])
+      }
+    } catch (err) {
+      console.error('Failed to fetch stories:', err)
+      setStories([])
+    } finally {
+      setLoadingStories(false)
+    }
+  }
+
+  const fetchEpics = async (projectId: string) => {
+    if (!projectId) {
+      setEpics([])
+      return
+    }
+
+    setLoadingEpics(true)
+    try {
+      const response = await fetch(`/api/epics?project=${projectId}`)
+      const data = await response.json()
+
+      if (data.success && Array.isArray(data.data)) {
+        setEpics(data.data)
+      } else {
+        setEpics([])
+      }
+    } catch (err) {
+      console.error('Failed to fetch epics:', err)
+      setEpics([])
+    } finally {
+      setLoadingEpics(false)
     }
   }
 
@@ -596,6 +676,8 @@ export default function EditTaskPage() {
           labels: labels,
           estimatedHours: task.estimatedHours || undefined,
         //  storyPoints: task.storyPoints || undefined,
+          story: task.story || undefined,
+          epic: task.epic || undefined,
           subtasks: preparedSubtasks,
           attachments: preparedAttachments
         })
@@ -817,7 +899,7 @@ export default function EditTaskPage() {
                       const currentAssigneeId = task?.assignedTo
                       
                       // Update project but DON'T clear assignee yet - will be validated when team members load
-                      setTask((prev) => prev ? ({ ...prev, project: newProjectId }) : prev)
+                      setTask((prev) => prev ? ({ ...prev, project: newProjectId, story: undefined, epic: undefined }) : prev)
                       setProjectFilterQuery('')
                       setAssignedToFilterQuery('')
                       
@@ -825,9 +907,13 @@ export default function EditTaskPage() {
                       if (newProjectId) {
                         // Pass current assignee ID to preserve it if valid in new project
                         fetchProjectTeamMembers(newProjectId, currentAssigneeId)
+                        fetchStories(newProjectId)
+                        fetchEpics(newProjectId)
                       } else {
                         setUsers([])
                         updateAssignees(() => [])
+                        setStories([])
+                        setEpics([])
                       }
                     }}
                     disabled={loadingProjects}
@@ -985,6 +1071,136 @@ export default function EditTaskPage() {
                   </div>
                 </div>
               </div>
+
+              {task.project && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">User Story</label>
+                    <Select 
+                      value={task.story || ''} 
+                      onValueChange={(value) => {
+                        const selectedStory = stories.find(s => s._id === value)
+                        setTask((prev) => prev ? ({ 
+                          ...prev, 
+                          story: value,
+                          epic: selectedStory?.epic?._id || undefined
+                        }) : prev)
+                      }}
+                      onOpenChange={(open) => { if (open) setStoryQuery('') }}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder={loadingStories ? 'Loading stories...' : 'Select a story'} />
+                      </SelectTrigger>
+                      <SelectContent className="z-[10050] p-0">
+                        <div className="p-2">
+                          <Input
+                            value={storyQuery}
+                            onChange={(e) => setStoryQuery(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            placeholder={loadingStories ? 'Loading stories...' : 'Type to search stories'}
+                            className="mb-2"
+                          />
+                          <div className="max-h-56 overflow-y-auto">
+                            {loadingStories ? (
+                              <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Loading stories...</span>
+                              </div>
+                            ) : (() => {
+                              const q = storyQuery.toLowerCase().trim()
+                              const filtered = stories.filter(s => 
+                                !q || s.title.toLowerCase().includes(q)
+                              )
+                              
+                              if (filtered.length === 0) {
+                                return (
+                                  <div className="px-2 py-1 text-sm text-muted-foreground">No matching stories</div>
+                                )
+                              }
+                              
+                              return filtered.map((story) => (
+                                <SelectItem key={story._id} value={story._id}>
+                                  {story.title}
+                                </SelectItem>
+                              ))
+                            })()}
+                          </div>
+                        </div>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">Epic</label>
+                    <Select 
+                      value={task.epic || ''} 
+                      onValueChange={(value) => setTask((prev) => prev ? ({ ...prev, epic: value || undefined }) : prev)}
+                      disabled={loadingEpics}
+                      onOpenChange={(open) => { if (open) setEpicQuery('') }}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder={loadingEpics ? 'Loading epics...' : 'Select an epic'} />
+                      </SelectTrigger>
+                      <SelectContent className="z-[10050] p-0">
+                        <div className="p-2">
+                          <Input
+                            value={epicQuery}
+                            onChange={(e) => setEpicQuery(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            placeholder={loadingEpics ? 'Loading epics...' : 'Type to search epics'}
+                            className="mb-2"
+                          />
+                          <div className="max-h-56 overflow-y-auto">
+                            {loadingEpics ? (
+                              <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Loading epics...</span>
+                              </div>
+                            ) : (() => {
+                              const q = epicQuery.toLowerCase().trim()
+                              let availableEpics: Epic[] = []
+                              
+                              if (!task.story) {
+                                // No story selected, show all epics
+                                availableEpics = epics
+                              } else {
+                                // Story selected, check if it has an epic
+                                const selectedStory = stories.find(s => s._id === task.story)
+                                if (selectedStory?.epic) {
+                                  // Story has an epic, show only that epic
+                                  const epicExists = epics.find(e => e._id === selectedStory.epic!._id)
+                                  if (epicExists) {
+                                    availableEpics = [epicExists]
+                                  }
+                                } else {
+                                  // Story selected but no epic, show all epics
+                                  availableEpics = epics
+                                }
+                              }
+                              
+                              const filtered = availableEpics.filter(e => 
+                                !q || e.title.toLowerCase().includes(q)
+                              )
+                              
+                              if (filtered.length === 0) {
+                                return (
+                                  <div className="px-2 py-1 text-sm text-muted-foreground">No matching epics</div>
+                                )
+                              }
+                              
+                              return filtered.map((epic) => (
+                                <SelectItem key={epic._id} value={epic._id}>
+                                  {epic.title}
+                                </SelectItem>
+                              ))
+                            })()}
+                          </div>
+                        </div>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
