@@ -266,15 +266,29 @@ export default function CreateProjectPage() {
       const url = isEditMode ? `/api/projects/${editProjectId}` : '/api/projects'
       const method = isEditMode ? 'PUT' : 'POST'
 
+      const normalizedClients = Array.isArray(formData.clients)
+        ? formData.clients.filter(clientId => typeof clientId === 'string' && clientId.trim() !== '')
+        : []
+
+      const payload: any = {
+        ...formData,
+        isDraft
+      }
+
+      if (normalizedClients.length > 0) {
+        payload.clients = normalizedClients
+      } else if (isEditMode) {
+        payload.clients = []
+      } else {
+        delete payload.clients
+      }
+
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          ...formData,
-          isDraft
-        })
+        body: JSON.stringify(payload)
       })
 
       const data = await response.json()

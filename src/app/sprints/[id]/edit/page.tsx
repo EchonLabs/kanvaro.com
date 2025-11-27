@@ -10,8 +10,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/Badge'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/Command'
 import { Loader2, ArrowLeft, Users, X } from 'lucide-react'
 
 interface SprintForm {
@@ -51,14 +49,15 @@ export default function EditSprintPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [teamMembers, setTeamMembers] = useState<string[]>([])
+  const [teamMemberQuery, setTeamMemberQuery] = useState('')
   const [initialTeamMembers, setInitialTeamMembers] = useState<string[] | null>(null)
   const [availableMembers, setAvailableMembers] = useState<TeamMember[]>([])
   const [membersLoading, setMembersLoading] = useState(false)
   const [membersError, setMembersError] = useState('')
   const [calculatedVelocity, setCalculatedVelocity] = useState<number>(0)
   const [memberLookup, setMemberLookup] = useState<Record<string, TeamMember>>({})
-  const [memberPickerOpen, setMemberPickerOpen] = useState(false)
   const [initialForm, setInitialForm] = useState<SprintForm | null>(null)
+  const [successMessage, setSuccessMessage] = useState('')
 
   const storeMemberDetails = useCallback((members?: TeamMember[]) => {
     if (!Array.isArray(members) || members.length === 0) return
@@ -177,6 +176,13 @@ export default function EditSprintPage() {
     if (sprintId) fetchSprint()
   }, [sprintId, fetchSprint])
 
+  useEffect(() => {
+    if (!successMessage) return
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    const timeout = setTimeout(() => setSuccessMessage(''), 4000)
+    return () => clearTimeout(timeout)
+  }, [successMessage])
+
   const handleSave = async () => {
     if (!hasChanges) return
     try {
@@ -199,7 +205,41 @@ export default function EditSprintPage() {
       })
       const data = await res.json()
       if (data.success) {
-        router.push(`/sprints/${sprintId}`)
+        const updatedSprint = data.data
+        if (updatedSprint) {
+          const updatedForm: SprintForm = {
+            name: updatedSprint?.name || '',
+            description: updatedSprint?.description || '',
+            status: updatedSprint?.status || 'planning',
+            startDate: updatedSprint?.startDate ? new Date(updatedSprint.startDate).toISOString().slice(0, 10) : '',
+            endDate: updatedSprint?.endDate ? new Date(updatedSprint.endDate).toISOString().slice(0, 10) : '',
+            goal: updatedSprint?.goal || '',
+            capacity:
+              updatedSprint?.capacity === null || updatedSprint?.capacity === undefined
+                ? ''
+                : String(updatedSprint.capacity),
+            velocity: ''
+          }
+          setForm(updatedForm)
+          setInitialForm(updatedForm)
+
+          const updatedTeamMembersRaw = Array.isArray(updatedSprint?.teamMembers) ? updatedSprint.teamMembers : []
+          const updatedTeamMemberIds = updatedTeamMembersRaw
+            .map((member: TeamMember | string) =>
+              typeof member === 'string' ? member : member?._id
+            )
+            .filter((memberId: string | undefined): memberId is string => Boolean(memberId))
+          setTeamMembers(updatedTeamMemberIds)
+          setInitialTeamMembers(updatedTeamMemberIds)
+          storeMemberDetails(
+            updatedTeamMembersRaw.filter(
+              (member: TeamMember | string | null | undefined): member is TeamMember =>
+                typeof member === 'object' && member !== null
+            )
+          )
+        }
+        setSuccessMessage('Sprint updated successfully')
+        setError('')
       } else {
         setError(data.error || 'Failed to save sprint')
       }
@@ -210,13 +250,19 @@ export default function EditSprintPage() {
     }
   }
 
-  const selectableMembers = availableMembers.filter((member) => !teamMembers.includes(member._id))
-  const isSelectDisabled = selectableMembers.length === 0 || membersLoading
+  const filteredTeamOptions = useMemo(() => {
+    const query = teamMemberQuery.trim().toLowerCase()
+    if (!query) return availableMembers
+    return availableMembers.filter((member) => {
+      const fullName = `${member.firstName} ${member.lastName}`.toLowerCase()
+      return (
+        fullName.includes(query) ||
+        (member.email ? member.email.toLowerCase().includes(query) : false)
+      )
+    })
+  }, [availableMembers, teamMembers, teamMemberQuery])
 
-  const handleAddMember = (memberId: string) => {
-    setTeamMembers((prev) => (prev.includes(memberId) ? prev : [...prev, memberId]))
-    setMemberPickerOpen(false)
-  }
+  const isSelectDisabled = membersLoading || availableMembers.length === 0
 
   const handleRemoveMember = (memberId: string) => {
     setTeamMembers((prev) => prev.filter((id) => id !== memberId))
@@ -282,6 +328,11 @@ export default function EditSprintPage() {
         <Button variant="ghost" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
+        {successMessage && (
+          <Alert variant="success">
+            <AlertDescription>{successMessage}</AlertDescription>
+          </Alert>
+        )}
         <Card>
           <CardHeader>
             <CardTitle>Edit Sprint</CardTitle>
@@ -376,57 +427,80 @@ export default function EditSprintPage() {
               )}
               <div className="space-y-3">
                 <div className="space-y-2">
-                  <Popover open={memberPickerOpen} onOpenChange={setMemberPickerOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        type="button"
-                        disabled={isSelectDisabled}
-                        className="w-full justify-between"
-                      >
-                        {membersLoading
+                  <Select
+                    value=""
+                    onValueChange={(value) => {
+                      if (!teamMembers.includes(value)) {
+                        setTeamMembers((prev) => [...prev, value])
+                        setTeamMemberQuery('')
+                      }
+                    }}
+                    disabled={isSelectDisabled}
+                  >
+                  <SelectTrigger className="w-full">
+                    <SelectValue
+                      placeholder={
+                        membersLoading
                           ? 'Loading team members...'
-                          : selectableMembers.length === 0
-                            ? availableMembers.length === 0
-                              ? 'No team members for this project'
-                              : 'All project members already assigned'
-                            : 'Select a member to add'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="p-0 w-[320px]" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search team members..." className="h-9" />
-                        <CommandList>
-                          <CommandEmpty>No matching team members.</CommandEmpty>
-                          <CommandGroup heading="Members">
-                            {selectableMembers.map((member) => (
-                              <CommandItem
-                                key={member._id}
-                                value={`${member.firstName} ${member.lastName} ${member.email}`}
-                                onSelect={() => handleAddMember(member._id)}
-                              >
-                                <div className="flex flex-col text-left">
-                                  <span className="text-sm font-medium">
-                                    {member.firstName} {member.lastName}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {member.email}
-                                  </span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                  {!membersLoading && availableMembers.length === 0 ? (
+                          : availableMembers.length === 0
+                            ? 'No team members for this project'
+                            : 'Search team members'
+                      }
+                    />
+                  </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div className="p-2">
+                        <Input
+                          value={teamMemberQuery}
+                          onChange={(e) => setTeamMemberQuery(e.target.value)}
+                          placeholder="Search team members"
+                          className="mb-2"
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          {membersLoading ? (
+                            <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Loading members...</span>
+                            </div>
+                          ) : availableMembers.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">
+                              No team members available
+                            </div>
+                          ) : filteredTeamOptions.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">
+                              No matching team members
+                            </div>
+                          ) : (
+                            filteredTeamOptions.map((member) => {
+                              const isSelected = teamMembers.includes(member._id)
+                              return (
+                                <SelectItem
+                                  key={member._id}
+                                  value={member._id}
+                                  disabled={isSelected}
+                                  className={isSelected ? 'opacity-50 cursor-not-allowed' : ''}
+                                >
+                                  <div className="flex items-center justify-between w-full">
+                                    <span className="text-sm font-medium truncate">
+                                      {member.firstName} {member.lastName}
+                                    </span>
+                                    {member.email && (
+                                      <span className="text-xs text-muted-foreground ml-2 truncate max-w-[150px]">
+                                        {member.email}
+                                      </span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              )
+                            })
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                  {!membersLoading && availableMembers.length === 0 && (
                     <p className="text-xs text-muted-foreground italic">
                       No team members available for this sprint&apos;s project.
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Use the dropdown to search and add sprint members.
                     </p>
                   )}
                 </div>
