@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/Checkbox'
 import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules } from '@/lib/utils'
+import { useFeaturePermissions } from '@/lib/permissions/permission-context'
 
 interface TimeLogsProps {
   userId: string
@@ -120,6 +121,7 @@ export function TimeLogs({
   }, [resolvedUserId, resolvedOrgId])
 
   const { organization } = useOrganization()
+  const { canApproveTime } = useFeaturePermissions()
 
   // Load time entries
   const formatDuration = (minutes: number) => {
@@ -336,22 +338,25 @@ export function TimeLogs({
     }
   }
 
-  const handleApproveEntries = async (action: 'approve' | 'reject') => {
-    if (selectedEntries.length === 0) return
+  const handleApproveEntries = async (action: 'approve' | 'reject', entryId?: string) => {
+    const entryIds = entryId ? [entryId] : selectedEntries
+    if (entryIds.length === 0) return
 
     try {
       const response = await fetch('/api/time-tracking/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          timeEntryIds: selectedEntries,
+          timeEntryIds: entryIds,
           approvedBy: resolvedUserId,
           action
         })
       })
 
       if (response.ok) {
-        setSelectedEntries([])
+        if (!entryId) {
+          setSelectedEntries([])
+        }
         loadTimeEntries()
         onTimeEntryUpdate?.()
       } else {
@@ -581,20 +586,22 @@ export function TimeLogs({
           ) : (
             <div className="space-y-2">
               {/* Table Header - Hidden on mobile */}
-              <div className="hidden md:grid grid-cols-12 gap-4 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium">
-                <div className="col-span-1">
+              <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium ${canApproveTime ? 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px_110px]' : 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px]'}`}>
+                <div>
                   <Checkbox
                     checked={allSelected}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                   />
                 </div>
-                <div className="col-span-4">Description</div>
-                <div className="col-span-2">Project (Task)</div>
-                <div className="col-span-1">Start Time</div>
-                <div className="col-span-1">End Time</div>
-                <div className="col-span-1">Duration</div>
-                <div className="col-span-1">Status</div>
-                <div className="col-span-1">Billable</div>
+                <div>Description</div>
+                <div>Project (Task)</div>
+                <div>Start Time</div>
+                <div>End Time</div>
+                <div>Duration</div>
+                <div>Status</div>
+                <div>Billable</div>
+                <div>Approval</div>
+                {canApproveTime && <div>Actions</div>}
               </div>
 
               {/* Table Rows */}
@@ -667,11 +674,48 @@ export function TimeLogs({
                         {entry.isBillable ? 'Billable' : 'Non-billable'}
                       </Badge>
                     </div>
+                    <div>
+                      <div className="text-muted-foreground">Approval</div>
+                      <div className="mt-1">
+                        <Badge 
+                          variant={entry.isApproved ? 'default' : 'secondary'} 
+                          className="text-xs"
+                        >
+                          {entry.isApproved ? 'Approved' : 'Pending'}
+                        </Badge>
+                      </div>
+                    </div>
+                    {canApproveTime && !entry.__isActive && (
+                      <div>
+                        <div className="text-muted-foreground">Actions</div>
+                        <div className="mt-1 flex gap-1">
+                          {!entry.isApproved ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => handleApproveEntries('approve', entry._id)}
+                            >
+                              <Check className="h-3 w-3" />
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => handleApproveEntries('reject', entry._id)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Desktop Table View */}
-                  <div className="hidden md:grid grid-cols-12 gap-4 p-3">
-                    <div className="col-span-1 flex items-center">
+                  <div className={`hidden md:grid gap-2 p-3 ${canApproveTime ? 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px_110px]' : 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px]'}`}>
+                    <div className="flex items-center">
                       {!entry.__isActive ? (
                         <Checkbox
                           checked={selectedEntries.includes(entry._id)}
@@ -679,10 +723,10 @@ export function TimeLogs({
                         />
                       ) : null}
                     </div>
-                    <div className="col-span-4 truncate">
+                    <div className="truncate">
                       <div className="font-medium text-xs sm:text-sm truncate" title={entry.description}>{entry.description}</div>
                     </div>
-                    <div className="col-span-2 text-xs sm:text-sm truncate">
+                    <div className="text-xs sm:text-sm truncate">
                       {entry?.project?.name ? (
                         <>
                           <span title={entry.project.name} className="text-foreground">{entry.project.name}</span>
@@ -698,22 +742,22 @@ export function TimeLogs({
                         </span>
                       )}
                     </div>
-                    <div className="col-span-1 text-xs sm:text-sm leading-tight">
+                    <div className="text-xs sm:text-sm leading-tight">
                       {(() => { const p = formatDateParts(entry.startTime); return (<>
                         <div>{p.date}</div>
                         <div className="text-muted-foreground">{p.time}</div>
                       </>) })()}
                     </div>
-                    <div className="col-span-1 text-xs sm:text-sm leading-tight">
+                    <div className="text-xs sm:text-sm leading-tight">
                       {entry.endTime ? (() => { const p = formatDateParts(entry.endTime as string); return (<>
                         <div>{p.date}</div>
                         <div className="text-muted-foreground">{p.time}</div>
                       </>) })() : '-'}
                     </div>
-                    <div className="col-span-1 text-xs sm:text-sm">
+                    <div className="text-xs sm:text-sm">
                       {formatDuration(entry.duration)}
                     </div>
-                    <div className="col-span-1">
+                    <div className="flex items-center">
                       <Badge
                         variant={
                           entry.status === 'completed'
@@ -722,16 +766,56 @@ export function TimeLogs({
                             ? 'default'
                             : 'secondary'
                         }
-                        className="text-xs capitalize"
+                        className="text-xs capitalize whitespace-nowrap"
                       >
                         {entry.status}
                       </Badge>
                     </div>
-                    <div className="col-span-1">
-                      <Badge variant={entry.isBillable ? 'default' : 'outline'} className="text-xs">
+                    <div className="flex items-center">
+                      <Badge variant={entry.isBillable ? 'default' : 'outline'} className="text-xs whitespace-nowrap">
                         {entry.isBillable ? 'Yes' : 'No'}
                       </Badge>
                     </div>
+                    <div>
+                      <Badge 
+                        variant={entry.isApproved ? 'default' : 'secondary'} 
+                        className="text-xs"
+                      >
+                        {entry.isApproved ? 'Approved' : 'Pending'}
+                      </Badge>
+                      {entry.approvedBy && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          by {entry.approvedBy.firstName} {entry.approvedBy.lastName}
+                        </div>
+                      )}
+                    </div>
+                    {canApproveTime && !entry.__isActive && (
+                      <div className="flex items-center gap-1">
+                        {!entry.isApproved ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => handleApproveEntries('approve', entry._id)}
+                            title="Approve"
+                          >
+                            <Check className="h-3 w-3 mr-1" />
+                            Approve
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => handleApproveEntries('reject', entry._id)}
+                            title="Reject"
+                          >
+                            <X className="h-3 w-3 mr-1" />
+                            Reject
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

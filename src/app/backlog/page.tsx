@@ -59,8 +59,8 @@ interface BacklogItem {
   title: string
   description: string
   type: 'epic' | 'story' | 'task'
-  priority: 'low' | 'medium' | 'high' | 'critical'
-  status: 'backlog' | 'sprint' | 'in_progress' | 'done'
+  priority: string
+  status: string
   project?: ProjectSummary | null
   assignedTo?: UserSummary | null
   createdBy: UserSummary
@@ -75,8 +75,9 @@ interface BacklogItem {
   }
   epic?: {
     _id: string
-    name: string
-  }
+    name?: string
+    title?: string
+  } | string
   createdAt: string
   updatedAt: string
 }
@@ -93,16 +94,7 @@ interface SprintOption {
   } | null
 }
 
-const ALLOWED_BACKLOG_STATUSES: BacklogItem['status'][] = ['backlog', 'sprint', 'in_progress', 'done']
-
-function normalizeBacklogStatus(status: string | undefined): BacklogItem['status'] {
-  if (typeof status !== 'string') {
-    return 'backlog'
-  }
-  return ALLOWED_BACKLOG_STATUSES.includes(status as BacklogItem['status'])
-    ? (status as BacklogItem['status'])
-    : 'backlog'
-}
+const ALLOWED_BACKLOG_STATUSES: string[] = ['backlog', 'todo', 'sprint', 'in_progress', 'done']
 
 function truncateText(value: string, maxLength = 20): string {
   if (!value) {
@@ -136,7 +128,11 @@ export default function BacklogPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [selectMode, setSelectMode] = useState(false)
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
+  const [selectedStoryIds, setSelectedStoryIds] = useState<string[]>([])
   const [taskIdsForSprint, setTaskIdsForSprint] = useState<string[]>([])
+  const [storyIdsForSprint, setStoryIdsForSprint] = useState<string[]>([])
+  const [tasksFromStories, setTasksFromStories] = useState<BacklogItem[]>([])
+  const [loadingTasksFromStories, setLoadingTasksFromStories] = useState(false)
   const [showSprintModal, setShowSprintModal] = useState(false)
   const [sprints, setSprints] = useState<SprintOption[]>([])
   const [selectedSprintId, setSelectedSprintId] = useState('')
@@ -229,18 +225,10 @@ export default function BacklogPage() {
 
       if (data.success) {
         const rawItems = Array.isArray(data.data) ? data.data : []
-        const normalized = rawItems.map((item: any) => {
-          const status =
-            item.type === 'task' && item.sprint
-              ? 'sprint'
-              : normalizeBacklogStatus(item.status)
-
-          return {
-            ...item,
-            status,
-            labels: Array.isArray(item.labels) ? item.labels : []
-          }
-        }) as BacklogItem[]
+        const normalized = rawItems.map((item: any) => ({
+          ...item,
+          labels: Array.isArray(item.labels) ? item.labels : []
+        })) as BacklogItem[]
         setBacklogItems(normalized)
 
         const projectMap = new Map<string, ProjectSummary>()
@@ -310,8 +298,21 @@ export default function BacklogPage() {
     })
   }
 
+  const setStorySelected = (storyId: string, shouldSelect: boolean) => {
+    setSelectedStoryIds((prev) => {
+      if (shouldSelect) {
+        if (prev.includes(storyId)) {
+          return prev
+        }
+        return [...prev, storyId]
+      }
+      return prev.filter((id) => id !== storyId)
+    })
+  }
+
   const clearSelection = () => {
     setSelectedTaskIds([])
+    setSelectedStoryIds([])
   }
 
   const clearSprintSelection = () => {
@@ -327,6 +328,8 @@ export default function BacklogPage() {
   const resetSprintModalState = () => {
     clearSprintSelection()
     setTaskIdsForSprint([])
+    setStoryIdsForSprint([])
+    setTasksFromStories([])
     setSprintModalMode('assign')
     setCurrentSprintInfo(null)
   }
@@ -337,20 +340,129 @@ export default function BacklogPage() {
     resetSprintModalState()
   }
 
-  const handleOpenSprintModal = (
+  const fetchTasksForStories = async (storyIds: string[]) => {
+    if (storyIds.length === 0) {
+      setTasksFromStories([])
+      return
+    }
+
+    setLoadingTasksFromStories(true)
+    try {
+      // Get story titles for display
+      const storyMap = new Map<string, string>()
+      
+      for (const storyId of storyIds) {
+        try {
+          const storyResponse = await fetch(`/api/stories/${storyId}`)
+          const storyData = await storyResponse.json()
+          const storyTitle = storyData.success && storyData.data ? storyData.data.title : 'Unknown Story'
+          storyMap.set(storyId, storyTitle)
+        } catch (err) {
+          console.error(`Failed to fetch story ${storyId}:`, err)
+          storyMap.set(storyId, 'Unknown Story')
+        }
+      }
+
+      // Filter tasks from backlogItems where task.story matches the selected story IDs
+      // The story field in tasks can be either:
+      // - A string (ID) - when not populated
+      // - An object with _id property - when populated
+      // - An object with _id as ObjectId - when populated from MongoDB
+      const tasksFromStoriesList: BacklogItem[] = []
+      
+      backlogItems.forEach((item) => {
+        if (item.type !== 'task') return
+        
+        // Check if this task belongs to any of the selected stories
+        let taskStoryId: string | null = null
+        
+        // Access story field from the item (it may not be in the TypeScript interface but exists in runtime)
+        const taskStory = (item as any).story
+        
+        // Handle different formats of story field
+        if (taskStory) {
+          if (typeof taskStory === 'string') {
+            // Story is a string ID
+            taskStoryId = taskStory
+          } else if (typeof taskStory === 'object') {
+            // Story is populated - could be { _id: string } or { _id: ObjectId }
+            if (taskStory._id) {
+              taskStoryId = typeof taskStory._id === 'string' 
+                ? taskStory._id 
+                : taskStory._id.toString()
+            } else if (taskStory.toString) {
+              // Might be a Mongoose ObjectId directly
+              taskStoryId = taskStory.toString()
+            }
+          }
+        }
+        
+        // Check if task's story ID matches any selected story ID
+        // Normalize both IDs to strings for comparison
+        if (taskStoryId) {
+          const normalizedTaskStoryId = taskStoryId.toString()
+          const matchesStory = storyIds.some(storyId => {
+            const normalizedStoryId = storyId.toString()
+            return normalizedTaskStoryId === normalizedStoryId
+          })
+          
+          if (matchesStory) {
+            // Find which story this task belongs to
+            const matchedStoryId = storyIds.find(storyId => 
+              storyId.toString() === normalizedTaskStoryId
+            )
+            const storyTitle = matchedStoryId ? storyMap.get(matchedStoryId) || 'Unknown Story' : 'Unknown Story'
+            
+            tasksFromStoriesList.push({
+              ...item,
+              // Store story info for display
+              _sourceStoryId: normalizedTaskStoryId,
+              _sourceStoryTitle: storyTitle
+            } as any)
+          }
+        }
+      })
+
+      // Remove duplicates based on _id
+      const uniqueTasks = Array.from(
+        new Map(tasksFromStoriesList.map(task => [task._id, task])).values()
+      )
+      
+      setTasksFromStories(uniqueTasks)
+    } catch (error) {
+      console.error('Failed to fetch tasks for stories:', error)
+      setTasksFromStories([])
+    } finally {
+      setLoadingTasksFromStories(false)
+    }
+  }
+
+  const handleOpenSprintModal = async (
     taskIds: string[],
+    storyIds: string[] = [],
     options?: {
       mode?: 'assign' | 'manage'
       existingSprint?: { _id: string; name: string }
     }
   ) => {
     const uniqueTaskIds = Array.from(new Set(taskIds.filter(Boolean)))
-    if (uniqueTaskIds.length === 0) return
+    const uniqueStoryIds = Array.from(new Set(storyIds.filter(Boolean)))
+    
+    if (uniqueTaskIds.length === 0 && uniqueStoryIds.length === 0) return
 
     setTaskIdsForSprint(uniqueTaskIds)
+    setStoryIdsForSprint(uniqueStoryIds)
     clearSprintSelection()
     setSprintModalMode(options?.mode ?? 'assign')
     setCurrentSprintInfo(options?.existingSprint ?? null)
+    
+    // Fetch tasks for selected stories
+    if (uniqueStoryIds.length > 0) {
+      await fetchTasksForStories(uniqueStoryIds)
+    } else {
+      setTasksFromStories([])
+    }
+    
     setShowSprintModal(true)
   }
 
@@ -398,6 +510,12 @@ export default function BacklogPage() {
       )
       return validIds.length === prev.length ? prev : validIds
     })
+    setSelectedStoryIds((prev) => {
+      const validIds = prev.filter((id) =>
+        backlogItems.some((item) => item._id === id && item.type === 'story')
+      )
+      return validIds.length === prev.length ? prev : validIds
+    })
   }, [backlogItems])
 
   useEffect(() => {
@@ -413,13 +531,56 @@ export default function BacklogPage() {
   }, [projectOptions, assignedToOptions, assignedByOptions, projectFilterValue, assignedToFilter, assignedByFilter])
 
   const selectedTaskCount = selectedTaskIds.length
+  const selectedStoryCount = selectedStoryIds.length
 
-  const tasksForSprint = useMemo(
+  // Get all tasks that will be added to sprint:
+  // 1. Directly selected tasks (from backlogItems)
+  // 2. Tasks from selected stories
+  const allTasksForSprint = useMemo(() => {
+    // Get directly selected tasks from backlogItems
+    const directTasks = backlogItems
+      .filter((item) => item.type === 'task' && taskIdsForSprint.includes(item._id))
+      .map(task => ({
+        ...task,
+        _isDirectlySelected: true,
+        _sourceStoryId: undefined,
+        _sourceStoryTitle: undefined
+      }))
+    
+    // Mark tasks from stories
+    const tasksFromStoriesMarked = tasksFromStories.map(task => ({
+      ...task,
+      _isDirectlySelected: false
+    }))
+    
+    // Combine all tasks
+    const allTasks = [...directTasks, ...tasksFromStoriesMarked]
+    
+    // Remove duplicates based on _id, prioritizing directly selected tasks
+    const taskMap = new Map<string, typeof directTasks[0] | typeof tasksFromStoriesMarked[0]>()
+    
+    // First add tasks from stories
+    tasksFromStoriesMarked.forEach(task => {
+      if (!taskMap.has(task._id)) {
+        taskMap.set(task._id, task)
+      }
+    })
+    
+    // Then add directly selected tasks (they will overwrite if duplicate, which is correct)
+    directTasks.forEach(task => {
+      taskMap.set(task._id, task)
+    })
+    
+    return Array.from(taskMap.values())
+  }, [backlogItems, taskIdsForSprint, tasksFromStories])
+
+  // Get selected stories for display
+  const storiesForSprint = useMemo(
     () =>
       backlogItems.filter(
-        (item) => item.type === 'task' && taskIdsForSprint.includes(item._id)
+        (item) => item.type === 'story' && storyIdsForSprint.includes(item._id)
       ),
-    [backlogItems, taskIdsForSprint]
+    [backlogItems, storyIdsForSprint]
   )
 
   const filteredSprints = useMemo(() => {
@@ -462,17 +623,33 @@ export default function BacklogPage() {
 
   const sprintModalTitle =
     sprintModalMode === 'manage'
-      ? taskIdsForSprint.length > 1
-        ? `Manage Sprint for ${taskIdsForSprint.length} Tasks`
+      ? allTasksForSprint.length > 1
+        ? `Manage Sprint for ${allTasksForSprint.length} Tasks`
         : 'Manage Sprint Assignment'
-      : taskIdsForSprint.length > 1
-        ? `Add ${taskIdsForSprint.length} Tasks to Sprint`
-        : 'Add Task to Sprint'
+      : (() => {
+          const hasStories = storiesForSprint.length > 0
+          const hasTasks = taskIdsForSprint.length > 0
+          const totalItems = storiesForSprint.length + taskIdsForSprint.length
+          
+          if (hasStories && hasTasks) {
+            return `Add ${storiesForSprint.length} Story${storiesForSprint.length !== 1 ? 'ies' : ''} and ${taskIdsForSprint.length} Task${taskIdsForSprint.length !== 1 ? 's' : ''} to Sprint`
+          } else if (hasStories) {
+            return storiesForSprint.length > 1
+              ? `Add ${storiesForSprint.length} Stories to Sprint`
+              : 'Add Story to Sprint'
+          } else {
+            return taskIdsForSprint.length > 1
+              ? `Add ${taskIdsForSprint.length} Tasks to Sprint`
+              : 'Add Task to Sprint'
+          }
+        })()
 
   const sprintModalDescription =
     sprintModalMode === 'manage'
       ? 'Change the sprint or remove it from this task.'
-      : 'Select a sprint to move the selected task(s) into. Only planning and active sprints are available.'
+      : storiesForSprint.length > 0
+        ? `Select a sprint to add the selected ${storiesForSprint.length > 0 ? `${storiesForSprint.length} story${storiesForSprint.length !== 1 ? 'ies' : ''} and all their related tasks` : ''}${taskIdsForSprint.length > 0 ? `${storiesForSprint.length > 0 ? ', plus' : ''} ${taskIdsForSprint.length} task${taskIdsForSprint.length !== 1 ? 's' : ''}` : ''} to. Only planning and active sprints are available.`
+        : 'Select a sprint to move the selected task(s) into. Only planning and active sprints are available.'
 
   const handleSprintAssignment = async () => {
     if (!selectedSprintId) {
@@ -499,8 +676,51 @@ export default function BacklogPage() {
     setSprintsError('')
 
     try {
-      const results = await Promise.all(
-        taskIdsForSprint.map(async (taskId) => {
+      // Get all task IDs to add (directly selected + from stories)
+      const allTaskIdsToAdd = [
+        ...taskIdsForSprint,
+        ...tasksFromStories.map(task => task._id)
+      ]
+      const uniqueTaskIds = Array.from(new Set(allTaskIdsToAdd))
+
+      // First, add stories to sprint
+      const storyResults = await Promise.all(
+        storyIdsForSprint.map(async (storyId) => {
+          const response = await fetch(`/api/stories/${storyId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              sprint: selectedSprintId
+            })
+          })
+
+          let body: any = null
+          try {
+            body = await response.json()
+          } catch {
+            // Ignore JSON parse errors
+          }
+
+          return {
+            storyId,
+            ok: response.ok && body?.success,
+            body
+          }
+        })
+      )
+
+      const failedStories = storyResults.filter((result) => !result.ok)
+      if (failedStories.length > 0) {
+        console.error('Failed to assign some stories to sprint:', failedStories)
+        setSprintsError('Failed to add one or more stories to the sprint. Please try again.')
+        return
+      }
+
+      // Then, add all tasks to sprint
+      const taskResults = await Promise.all(
+        uniqueTaskIds.map(async (taskId) => {
           const response = await fetch(`/api/tasks/${taskId}`, {
             method: 'PUT',
             headers: {
@@ -527,16 +747,29 @@ export default function BacklogPage() {
         })
       )
 
-      const failed = results.filter((result) => !result.ok)
-      if (failed.length > 0) {
-        console.error('Failed to assign some tasks to sprint:', failed)
+      const failedTasks = taskResults.filter((result) => !result.ok)
+      if (failedTasks.length > 0) {
+        console.error('Failed to assign some tasks to sprint:', failedTasks)
         setSprintsError('Failed to add one or more tasks to the sprint. Please try again.')
         return
       }
 
+      // Update backlog items state
       setBacklogItems((prev) =>
         prev.map((item) => {
-          if (item.type === 'task' && taskIdsForSprint.includes(item._id)) {
+          // Update stories
+          if (item.type === 'story' && storyIdsForSprint.includes(item._id)) {
+            return {
+              ...item,
+              sprint: {
+                _id: sprint._id,
+                name: sprint.name,
+                status: sprint.status
+              }
+            }
+          }
+          // Update tasks
+          if (item.type === 'task' && uniqueTaskIds.includes(item._id)) {
             return {
               ...item,
               sprint: {
@@ -551,20 +784,27 @@ export default function BacklogPage() {
         })
       )
 
-      setSuccess(
-        taskIdsForSprint.length > 1
-          ? `${taskIdsForSprint.length} tasks assigned to ${sprint.name} successfully.`
-          : `Task assigned to ${sprint.name} successfully.`
-      )
+      // Build success message
+      const parts: string[] = []
+      if (storiesForSprint.length > 0) {
+        parts.push(`${storiesForSprint.length} story${storiesForSprint.length !== 1 ? 'ies' : ''}`)
+      }
+      if (uniqueTaskIds.length > 0) {
+        parts.push(`${uniqueTaskIds.length} task${uniqueTaskIds.length !== 1 ? 's' : ''}`)
+      }
+      const message = `${parts.join(' and ')} assigned to ${sprint.name} successfully.`
+
+      setSuccess(message)
       setTimeout(() => setSuccess(''), 3000)
 
       setShowSprintModal(false)
       resetSprintModalState()
       setSelectedTaskIds([])
+      setSelectedStoryIds([])
       setSelectMode(false)
     } catch (error) {
-      console.error('Failed to assign tasks to sprint:', error)
-      setSprintsError('Failed to add tasks to sprint. Please try again.')
+      console.error('Failed to assign items to sprint:', error)
+      setSprintsError('Failed to add items to sprint. Please try again.')
     } finally {
       setAssigningSprint(false)
     }
@@ -579,7 +819,43 @@ export default function BacklogPage() {
     setSprintsError('')
 
     try {
-      const results = await Promise.all(
+      // Remove stories from sprint
+      const storyResults = await Promise.all(
+        storyIdsForSprint.map(async (storyId) => {
+          const response = await fetch(`/api/stories/${storyId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              sprint: null
+            })
+          })
+
+          let body: any = null
+          try {
+            body = await response.json()
+          } catch {
+            // Ignore JSON parse errors
+          }
+
+          return {
+            storyId,
+            ok: response.ok && body?.success,
+            body
+          }
+        })
+      )
+
+      const failedStories = storyResults.filter((result) => !result.ok)
+      if (failedStories.length > 0) {
+        console.error('Failed to remove sprint from some stories:', failedStories)
+        setSprintsError('Failed to remove sprint from one or more stories. Please try again.')
+        return
+      }
+
+      // Remove tasks from sprint
+      const taskResults = await Promise.all(
         taskIdsForSprint.map(async (taskId) => {
           const response = await fetch(`/api/tasks/${taskId}`, {
             method: 'PUT',
@@ -607,40 +883,57 @@ export default function BacklogPage() {
         })
       )
 
-      const failed = results.filter((result) => !result.ok)
-      if (failed.length > 0) {
-        console.error('Failed to remove sprint from some tasks:', failed)
-        setSprintsError('Failed to remove sprint from the task. Please try again.')
+      const failedTasks = taskResults.filter((result) => !result.ok)
+      if (failedTasks.length > 0) {
+        console.error('Failed to remove sprint from some tasks:', failedTasks)
+        setSprintsError('Failed to remove sprint from one or more tasks. Please try again.')
         return
       }
 
+      // Update backlog items state
       setBacklogItems((prev) =>
         prev.map((item) => {
+          // Remove sprint from stories
+          if (item.type === 'story' && storyIdsForSprint.includes(item._id)) {
+            return {
+              ...item,
+              sprint: undefined
+            }
+          }
+          // Remove sprint from tasks
           if (item.type === 'task' && taskIdsForSprint.includes(item._id)) {
             return {
               ...item,
               sprint: undefined,
-              status: 'backlog'
+              status: 'backlog',
+              backlogStatus: 'backlog'
             }
           }
           return item
         })
       )
 
-      setSuccess(
-        taskIdsForSprint.length > 1
-          ? `${taskIdsForSprint.length} tasks removed from sprint successfully.`
-          : 'Task removed from sprint successfully.'
-      )
+      // Build success message
+      const parts: string[] = []
+      if (storyIdsForSprint.length > 0) {
+        parts.push(`${storyIdsForSprint.length} story${storyIdsForSprint.length !== 1 ? 'ies' : ''}`)
+      }
+      if (taskIdsForSprint.length > 0) {
+        parts.push(`${taskIdsForSprint.length} task${taskIdsForSprint.length !== 1 ? 's' : ''}`)
+      }
+      const message = `${parts.join(' and ')} removed from sprint successfully.`
+
+      setSuccess(message)
       setTimeout(() => setSuccess(''), 3000)
 
       setShowSprintModal(false)
       resetSprintModalState()
       setSelectedTaskIds([])
+      setSelectedStoryIds([])
       setSelectMode(false)
     } catch (error) {
-      console.error('Failed to remove task from sprint:', error)
-      setSprintsError('Failed to remove sprint from the task. Please try again.')
+      console.error('Failed to remove items from sprint:', error)
+      setSprintsError('Failed to remove sprint from the items. Please try again.')
     } finally {
       setRemovingSprint(false)
     }
@@ -764,9 +1057,14 @@ export default function BacklogPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'backlog': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'todo': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
       case 'sprint': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
       case 'in_progress': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+      case 'review': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+      case 'testing': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
       case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
     }
   }
@@ -780,7 +1078,19 @@ export default function BacklogPage() {
       
       const matchesType = typeFilter === 'all' || item.type === typeFilter
       const matchesPriority = priorityFilter === 'all' || item.priority === priorityFilter
-      const matchesStatus = statusFilter === 'all' || item.status === statusFilter
+
+      // Treat "done" / "completed" as final states that should not appear in the
+      // default backlog view.
+      const isFinalTask = item.type === 'task' && item.status === 'done'
+      const isFinalStory = item.type === 'story' && (item.status === 'completed' || item.status === 'done')
+      const isFinalEpic = item.type === 'epic' && (item.status === 'completed' || item.status === 'done')
+
+      const isFinal = isFinalTask || isFinalStory || isFinalEpic
+
+      const matchesStatus =
+        statusFilter === 'all'
+          ? !isFinal
+          : item.status === statusFilter
       const matchesProject =
         projectFilterValue === 'all' ||
         (item.project?._id ? item.project._id === projectFilterValue : false)
@@ -1114,12 +1424,12 @@ export default function BacklogPage() {
                     </Button>
                     {selectMode && (
                       <>
-                        <Button
-                          size="sm"
-                          onClick={() => handleOpenSprintModal(selectedTaskIds)}
-                          disabled={selectedTaskCount === 0 || assigningSprint}
-                          className="w-full sm:w-auto"
-                        >
+                    <Button
+                      size="sm"
+                      onClick={() => handleOpenSprintModal(selectedTaskIds, selectedStoryIds)}
+                      disabled={(selectedTaskCount === 0 && selectedStoryCount === 0) || assigningSprint}
+                      className="w-full sm:w-auto"
+                    >
                           {assigningSprint ? (
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           ) : (
@@ -1142,15 +1452,22 @@ export default function BacklogPage() {
                   </div>
                   {selectMode && (
                     <div className="text-sm text-muted-foreground w-full sm:w-auto text-left sm:text-right">
-                      {selectedTaskCount > 0
-                        ? `${selectedTaskCount} task${selectedTaskCount !== 1 ? 's' : ''} selected`
-                        : 'No tasks selected'}
+                      {(() => {
+                        const parts: string[] = []
+                        if (selectedStoryCount > 0) {
+                          parts.push(`${selectedStoryCount} story${selectedStoryCount !== 1 ? 'ies' : ''}`)
+                        }
+                        if (selectedTaskCount > 0) {
+                          parts.push(`${selectedTaskCount} task${selectedTaskCount !== 1 ? 's' : ''}`)
+                        }
+                        return parts.length > 0 ? parts.join(' and ') + ' selected' : 'No items selected'
+                      })()}
                     </div>
                   )}
                 </div>
                 {selectMode && (
                   <p className="text-xs text-muted-foreground">
-                    Only task items can be added to sprints. Use the checkboxes to choose the tasks you want to move.
+                    Select stories or tasks to add to a sprint. When a story is selected, all its related tasks will be automatically included.
                   </p>
                 )}
               </div>
@@ -1159,9 +1476,13 @@ export default function BacklogPage() {
           <CardContent>
             <div className="space-y-4">
               {filteredAndSortedItems.map((item) => {
+                
                 const isTask = item.type === 'task'
-                const isSelected = selectedTaskIds.includes(item._id)
-                const showCheckbox = selectMode && isTask
+                const isStory = item.type === 'story'
+                const isTaskSelected = isTask && selectedTaskIds.includes(item._id)
+                const isStorySelected = isStory && selectedStoryIds.includes(item._id)
+                const isSelected = isTaskSelected || isStorySelected
+                const showCheckbox = selectMode && (isTask || isStory)
 
                 return (
                   <Card
@@ -1176,9 +1497,13 @@ export default function BacklogPage() {
                         {showCheckbox && (
                           <Checkbox
                             checked={isSelected}
-                            onCheckedChange={(checked) =>
-                              setTaskSelected(item._id, Boolean(checked))
-                            }
+                            onCheckedChange={(checked) => {
+                              if (isTask) {
+                                setTaskSelected(item._id, Boolean(checked))
+                              } else if (isStory) {
+                                setStorySelected(item._id, Boolean(checked))
+                              }
+                            }}
                             aria-label={`Select ${item.title}`}
                             className="mt-1"
                           />
@@ -1196,14 +1521,20 @@ export default function BacklogPage() {
                                 {formatToTitleCase(item.priority)}
                               </Badge>
                               <Badge className={getStatusColor(item.status)}>
-                                {formatToTitleCase(item.status)}
+                                {formatToTitleCase(item.status.replace('_', ' '))}
                               </Badge>
                               {item.epic && (
                                 <Badge
                                   variant="outline"
                                   className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
                                 >
-                                  {item.epic.name}
+                                  {(() => {
+                                    if (typeof item.epic === 'string') {
+                                      return 'Epic'
+                                    }
+                                    const epicObj = item.epic as { _id: string; name?: string; title?: string }
+                                    return epicObj.title || epicObj.name || 'Epic'
+                                  })()}
                                 </Badge>
                               )}
                               {item.sprint && (
@@ -1267,7 +1598,9 @@ export default function BacklogPage() {
                               {item.labels.length > 0 && (
                                 <div className="flex items-center space-x-1">
                                   <Star className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span className="truncate">{item.labels.join(', ')}</span>
+                                  <span className="truncate">
+                                    {truncateText(item.labels.join(', '), 30)}
+                                  </span>
                                 </div>
                               )}
                             </div>
@@ -1331,24 +1664,46 @@ export default function BacklogPage() {
                                     <span>Edit Story</span>
                                   </DropdownMenuItem>
                                 )}
-
-                                {item.type === 'task' && !item.sprint && (
+                                {item.type === 'epic' && (
                                   <DropdownMenuItem
-                                    onClick={() => handleOpenSprintModal([item._id], { mode: 'assign' })}
+                                    onClick={() => router.push(`/epics/${item._id}/edit`)}
+                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    <span>Edit Epic</span>
+                                  </DropdownMenuItem>
+                                )}
+
+                                {(item.type === 'task' || item.type === 'story') && !item.sprint && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      if (item.type === 'task') {
+                                        handleOpenSprintModal([item._id], [], { mode: 'assign' })
+                                      } else if (item.type === 'story') {
+                                        handleOpenSprintModal([], [item._id], { mode: 'assign' })
+                                      }
+                                    }}
                                     className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
                                   >
                                     <Kanban className="h-4 w-4 mr-2" />
                                     <span>Add to Sprint</span>
                                   </DropdownMenuItem>
                                 )}
-                                {item.type === 'task' && item.sprint && (
+                                {(item.type === 'task' || item.type === 'story') && item.sprint && (
                                   <DropdownMenuItem
-                                    onClick={() =>
-                                      handleOpenSprintModal([item._id], {
-                                        mode: 'manage',
-                                        existingSprint: { _id: item.sprint!._id, name: item.sprint!.name }
-                                      })
-                                    }
+                                    onClick={() => {
+                                      if (item.type === 'task') {
+                                        handleOpenSprintModal([item._id], [], {
+                                          mode: 'manage',
+                                          existingSprint: { _id: item.sprint!._id, name: item.sprint!.name }
+                                        })
+                                      } else if (item.type === 'story') {
+                                        handleOpenSprintModal([], [item._id], {
+                                          mode: 'manage',
+                                          existingSprint: { _id: item.sprint!._id, name: item.sprint!.name }
+                                        })
+                                      }
+                                    }}
                                     className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
                                   >
                                     <Kanban className="h-4 w-4 mr-2" />
@@ -1442,8 +1797,9 @@ export default function BacklogPage() {
                   disabled={
                     assigningSprint ||
                     removingSprint ||
-                    taskIdsForSprint.length === 0 ||
-                    !selectedSprintId
+                    (taskIdsForSprint.length === 0 && storyIdsForSprint.length === 0) ||
+                    !selectedSprintId ||
+                    loadingTasksFromStories
                   }
                 >
                   {assigningSprint ? (
@@ -1555,27 +1911,104 @@ export default function BacklogPage() {
               </Select>
             </div>
 
-            <div>
-              <Label className="text-sm font-medium text-foreground">
-                Selected tasks
-              </Label>
-              {tasksForSprint.length === 0 ? (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Choose one or more tasks from the backlog to add them to a sprint.
+            {loadingTasksFromStories && (
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Loading tasks from selected stories...</span>
+              </div>
+            )}
+
+            {storiesForSprint.length > 0 && (
+              <div>
+                <Label className="text-sm font-medium text-foreground">
+                  Selected Stories ({storiesForSprint.length})
+                </Label>
+                <p className="mt-1 mb-2 text-xs text-muted-foreground">
+                  All tasks related to these stories will be added to the sprint.
                 </p>
-              ) : (
-                <ul className="mt-2 space-y-2">
-                  {tasksForSprint.map((task) => (
+                <ul className="mt-2 space-y-2 max-h-32 overflow-y-auto">
+                  {storiesForSprint.map((story) => (
                     <li
-                      key={task._id}
-                      className="flex items-center justify-between gap-2 text-sm text-muted-foreground"
+                      key={story._id}
+                      className="flex items-center justify-between gap-2 text-sm p-2 rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800"
                     >
-                      <span className="truncate">{task.title}</span>
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 flex-shrink-0">
+                          Story
+                        </Badge>
+                        <span className="truncate font-medium">{story.title}</span>
+                      </div>
                       <Badge variant="outline" className="flex-shrink-0">
-                        {formatToTitleCase(task.priority)}
+                        {formatToTitleCase(story.priority)}
                       </Badge>
                     </li>
                   ))}
+                </ul>
+              </div>
+            )}
+
+            <div>
+              <Label className="text-sm font-medium text-foreground">
+                Tasks to Add ({allTasksForSprint.length})
+                {storiesForSprint.length > 0 && (
+                  <span className="text-xs text-muted-foreground ml-2">
+                    ({taskIdsForSprint.length} directly selected + {tasksFromStories.length} from stories)
+                  </span>
+                )}
+              </Label>
+              {allTasksForSprint.length === 0 ? (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {storiesForSprint.length > 0
+                    ? 'No tasks found for the selected stories.'
+                    : 'Choose one or more tasks or stories from the backlog to add them to a sprint.'}
+                </p>
+              ) : (
+                <ul className="mt-2 space-y-2 max-h-48 overflow-y-auto">
+                  {allTasksForSprint.map((task) => {
+                    const isFromStory = !!(task as any)._sourceStoryId
+                    const isDirectlySelected = (task as any)._isDirectlySelected === true
+                    const sourceStoryTitle = (task as any)._sourceStoryTitle
+                    
+                    return (
+                      <li
+                        key={task._id}
+                        className={`flex flex-col gap-2 text-sm p-2 rounded-md ${
+                          isFromStory 
+                            ? 'bg-muted/50 border border-border' 
+                            : 'bg-background border border-border/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            {isFromStory && sourceStoryTitle && (
+                              <Badge variant="outline" className="text-xs flex-shrink-0 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                From: {truncateText(sourceStoryTitle, 20)}
+                              </Badge>
+                            )}
+                            {isDirectlySelected && !isFromStory && (
+                              <Badge variant="outline" className="text-xs flex-shrink-0 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                Directly Selected
+                              </Badge>
+                            )}
+                            {isDirectlySelected && isFromStory && (
+                              <Badge variant="outline" className="text-xs flex-shrink-0 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                Direct + Story
+                              </Badge>
+                            )}
+                            <span className="truncate font-medium">{task.title}</span>
+                          </div>
+                          <Badge variant="outline" className="flex-shrink-0">
+                            {formatToTitleCase(task.priority)}
+                          </Badge>
+                        </div>
+                        {isFromStory && sourceStoryTitle && (
+                          <div className="text-xs text-muted-foreground pl-0.5">
+                            Story: <span className="font-medium">{sourceStoryTitle}</span>
+                          </div>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </div>

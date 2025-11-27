@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import connectDB from '@/lib/db-config'
 import { User } from '@/models/User'
+import '@/models/CustomRole' // Ensure CustomRole model is registered for populate
 import jwt from 'jsonwebtoken'
 import { normalizeUploadUrl } from '@/lib/file-utils'
 
@@ -36,7 +37,7 @@ export async function GET() {
         
         // Database mode - fetch user from database
         await connectDB()
-        const user = await User.findById(decoded.userId)
+        const user = await User.findById(decoded.userId).populate('customRole', 'name')
         if (user && user.isActive) {
           console.log('User found in database:', user.email)
           userData = {
@@ -45,6 +46,10 @@ export async function GET() {
             lastName: user.lastName,
             email: user.email,
             role: user.role,
+            customRole: user.customRole ? {
+              _id: (user.customRole as any)._id.toString(),
+              name: (user.customRole as any).name
+            } : null,
             organization: user.organization,
             isActive: user.isActive,
             emailVerified: user.emailVerified,
@@ -68,7 +73,7 @@ export async function GET() {
             
             // Database mode - fetch user from database
             await connectDB()
-            const user = await User.findById(decoded.userId)
+            const user = await User.findById(decoded.userId).populate('customRole', 'name')
             if (user && user.isActive) {
               console.log('User found via refresh token:', user.email)
               
@@ -93,6 +98,10 @@ export async function GET() {
                 lastName: user.lastName,
                 email: user.email,
                 role: user.role,
+                customRole: user.customRole ? {
+                  _id: (user.customRole as any)._id.toString(),
+                  name: (user.customRole as any).name
+                } : null,
                 organization: user.organization,
                 isActive: user.isActive,
                 emailVerified: user.emailVerified,
@@ -128,7 +137,7 @@ export async function GET() {
         console.log('Only refresh token available, verifying for user:', decoded.userId)
         
         await connectDB()
-        const user = await User.findById(decoded.userId)
+        const user = await User.findById(decoded.userId).populate('customRole', 'name')
         if (user && user.isActive) {
           console.log('User found via refresh token only:', user.email)
           
@@ -153,6 +162,10 @@ export async function GET() {
             lastName: user.lastName,
             email: user.email,
             role: user.role,
+            customRole: user.customRole ? {
+              _id: (user.customRole as any)._id.toString(),
+              name: (user.customRole as any).name
+            } : null,
             organization: user.organization,
             isActive: user.isActive,
             emailVerified: user.emailVerified,

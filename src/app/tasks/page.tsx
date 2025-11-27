@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { Loader2, CheckCircle } from 'lucide-react'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { PageContent } from '@/components/ui/PageContent'
 import TasksClient from '@/components/tasks/TasksClient'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export default function TasksPage() {
   const router = useRouter()
@@ -13,6 +14,7 @@ export default function TasksPage() {
 
   const [authError, setAuthError] = useState('')
   const [checkingAuth, setCheckingAuth] = useState(true)
+  const successMessage = searchParams.get('success')
 
   const checkAuth = useCallback(async () => {
     try {
@@ -41,6 +43,17 @@ export default function TasksPage() {
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
+
+  useEffect(() => {
+    if (!successMessage) return
+    const timeout = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete('success')
+      const queryString = params.toString()
+      router.replace(queryString ? `/tasks?${queryString}` : '/tasks', { scroll: false })
+    }, 3000)
+    return () => clearTimeout(timeout)
+  }, [successMessage, searchParams, router])
 
   if (checkingAuth) {
     return (
@@ -77,6 +90,14 @@ export default function TasksPage() {
   return (
     <MainLayout>
       <PageContent>
+        {successMessage && (
+          <div className="mb-4">
+            <Alert variant="success">
+              <CheckCircle className="h-4 w-4" />
+              <AlertDescription>{successMessage}</AlertDescription>
+            </Alert>
+          </div>
+        )}
         <TasksClient
           initialTasks={[]}
           initialPagination={{ pageSize: 20, hasMore: false }}

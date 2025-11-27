@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, type ReactElement } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { formatToTitleCase, cn } from '@/lib/utils'
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { Calendar as DateRangeCalendar } from '@/components/ui/calendar'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DndContext,
   DragEndEvent,
@@ -188,37 +189,38 @@ function ColumnDropZone({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Badge className={column.color}>
-            {column.title}
-          </Badge>
-          <span className="text-sm text-muted-foreground">
-            {tasks.length}
-          </span>
+    <div className="h-full flex flex-col border border-dashed border-border/40 dark:border-border/60 hover:border-border/70 dark:hover:border-border rounded-lg bg-background/80 shadow-sm p-3 transition-colors">
+      <div className="space-y-4 flex-1 flex flex-col min-h-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Badge className={column.color}>
+              {column.title}
+            </Badge>
+            <span className="text-sm text-muted-foreground">
+              {tasks.length}
+            </span>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => onCreateTask?.(column.id)}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
         </div>
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={() => onCreateTask?.(column.id)}
+        
+        <SortableContext 
+          items={tasks.map(task => task._id)}
+          strategy={verticalListSortingStrategy}
         >
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
-      
-      <SortableContext 
-        items={tasks.map(task => task._id)}
-        strategy={verticalListSortingStrategy}
-      >
-        <div 
-          ref={setNodeRef}
-          className={`space-y-3 min-h-[400px] max-h-[600px] overflow-y-auto overflow-x-hidden border-2 border-dashed rounded-lg transition-colors p-2 ${
-            isOver 
-              ? 'border-primary bg-primary/5' 
-              : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700'
-          }`}
-        >
+          <div 
+            ref={setNodeRef}
+            className={`space-y-3 min-h-[400px] max-h-[600px] overflow-y-auto overflow-x-hidden border-2 border-dashed rounded-lg transition-colors p-2 flex-1 ${
+              isOver 
+                ? 'border-primary bg-primary/5' 
+                : 'border-border/30 dark:border-border/50 hover:border-border/50 dark:hover:border-border/70'
+            }`}
+          >
           {tasks.length === 0 ? (
             <div className="h-full flex items-center justify-center text-muted-foreground">
              <div className="text-center">
@@ -240,8 +242,9 @@ function ColumnDropZone({
               />
             ))
           )}
-        </div>
-      </SortableContext>
+          </div>
+        </SortableContext>
+      </div>
     </div>
   )
 }
@@ -577,8 +580,10 @@ export default function KanbanPage() {
     const map = new Map<string, TaskOption>()
     tasks.forEach(task => {
       const id = task._id
-      const label = task.taskNumber
-        ? `#${task.taskNumber} - ${task.title}`
+      // Use displayId if available, otherwise fall back to taskNumber, otherwise just title
+      const identifier = task.displayId || (task.taskNumber ? String(task.taskNumber) : null)
+      const label = identifier
+        ? `#${identifier} - ${task.title}`
         : task.title
       map.set(id, { id, label })
     })
@@ -614,6 +619,7 @@ export default function KanbanPage() {
     const matchesAssignedBy = assignedByFilter === 'all' || (createdById && createdById === assignedByFilter)
     const taskIdMatches = taskNumberFilter === 'all' ||
       task._id === taskNumberFilter ||
+      (task.displayId && task.displayId === taskNumberFilter) ||
       (task.taskNumber && String(task.taskNumber) === taskNumberFilter)
     const dueDate = task.dueDate ? new Date(task.dueDate) : null
     const matchesStartDate = !startDateBoundary || (dueDate && dueDate >= startDateBoundary)
@@ -752,13 +758,14 @@ export default function KanbanPage() {
 
   return (
     <MainLayout>
+      <TooltipProvider delayDuration={200}>
       <div className="space-y-8 sm:space-y-10">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Kanban Board</h1>
             <p className="text-sm sm:text-base text-muted-foreground">Visual task management with drag and drop</p>
           </div>
-          <Button onClick={() => router.push('/tasks/create')} className="w-full sm:w-auto">
+          <Button onClick={() => handleCreateTask()} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             New Task
           </Button>
@@ -928,7 +935,8 @@ export default function KanbanPage() {
                   </SelectContent>
                 </Select>
 
-                <div className="flex flex-col gap-2">
+                <div className="border border-dashed border-border/40 dark:border-border/60 hover:border-border/70 dark:hover:border-border rounded-lg bg-background/80 shadow-sm p-0.5 transition-colors">
+                  <div className="flex flex-col gap-2">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -971,6 +979,7 @@ export default function KanbanPage() {
                       Clear dates
                     </Button>
                   </div>
+                </div>
                 </div>
               </div>
             </div>
@@ -1016,7 +1025,7 @@ export default function KanbanPage() {
           </CardContent>
         </Card>
       </div>
-
+      </TooltipProvider>
       {/* Modals */}
       <CreateTaskModal
         isOpen={showCreateTaskModal}
@@ -1026,6 +1035,7 @@ export default function KanbanPage() {
         }}
         projectId={projectFilter === 'all' ? '' : projectFilter}
         defaultStatus={createTaskStatus}
+        stayOnCurrentPage={true}
         onTaskCreated={() => {
           setShowCreateTaskModal(false)
           setCreateTaskStatus(undefined)
@@ -1124,9 +1134,11 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
       <CardContent className="p-4">
         <div className="space-y-3">
           <div className="flex items-start justify-between">
-            <h4 className="font-medium text-foreground text-sm line-clamp-2">
-              {task.title}
-            </h4>
+            <TruncateTooltip text={task.title}>
+              <h4 className="font-medium text-foreground text-sm line-clamp-2">
+                {task.title}
+              </h4>
+            </TruncateTooltip>
             <div className="flex items-center space-x-1">
               <Button 
                 variant="ghost" 
@@ -1200,7 +1212,9 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
           <div className="text-xs text-muted-foreground">
             <div className="flex items-center space-x-1 mb-1">
               <Target className="h-3 w-3" />
+              <TruncateTooltip text={task?.project?.name}>
                 <span className="text-foreground text-sm line-clamp-2">{task?.project?.name}</span>
+              </TruncateTooltip>
             </div>
             {task.dueDate && (
               <div className="flex items-center space-x-1 mb-1">
@@ -1227,23 +1241,25 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
               <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
                 {task?.assignedTo?.firstName[0]}{task?.assignedTo?.lastName[0]}
               </div>
-              <span className="text-xs text-muted-foreground">
-                {task?.assignedTo?.firstName} {task?.assignedTo?.lastName}
-              </span>
+              <TruncateTooltip text={`${task?.assignedTo?.firstName} ${task?.assignedTo?.lastName}`}>
+                <span className="text-xs text-muted-foreground">
+                  {task?.assignedTo?.firstName} {task?.assignedTo?.lastName}
+                </span>
+              </TruncateTooltip>
             </div>
           )}
           
           {task?.labels?.length > 0 && (
             <div className="flex items-center gap-1 overflow-hidden flex-nowrap">
               {task.labels.slice(0, 2).map((label, index) => (
-                <Badge
-                  key={index}
-                  variant="outline"
-                  className="text-xs truncate max-w-[85px] whitespace-nowrap flex-shrink-0"
-                  title={label}
-                >
-                  {label}
-                </Badge>
+                <TruncateTooltip key={`${label}-${index}`} text={label}>
+                  <Badge
+                    variant="outline"
+                    className="text-xs truncate max-w-[85px] whitespace-nowrap flex-shrink-0"
+                  >
+                    {label}
+                  </Badge>
+                </TruncateTooltip>
               ))}
               {task.labels.length > 2 && (
                 <Badge
@@ -1259,5 +1275,28 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+interface TruncateTooltipProps {
+  text?: string | number | null
+  children: ReactElement
+}
+
+function TruncateTooltip({ text, children }: TruncateTooltipProps) {
+  const displayText = text === undefined || text === null ? '' : String(text)
+  if (!displayText.trim()) {
+    return children
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {children}
+      </TooltipTrigger>
+      <TooltipContent side="top" align="start">
+        <p className="max-w-sm break-words">{displayText}</p>
+      </TooltipContent>
+    </Tooltip>
   )
 }

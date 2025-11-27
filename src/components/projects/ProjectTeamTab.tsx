@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -71,6 +71,14 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
   const [memberToRemove, setMemberToRemove] = useState<string | null>(null)
   const [isAdding, setIsAdding] = useState(false)
   const [isRemoving, setIsRemoving] = useState(false)
+  const pageRef = useRef<HTMLDivElement | null>(null)
+  const addMemberSectionRef = useRef<HTMLDivElement | null>(null)
+
+  const scrollToAddMemberSection = () => {
+    if (addMemberSectionRef.current) {
+      addMemberSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
 
   useEffect(() => {
     fetchTeamData()
@@ -161,9 +169,13 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
         onUpdate()
         setTimeout(() => setSuccess(''), 3000)
       } else {
+        setShowRemoveConfirm(false)
+        setMemberToRemove(null)
         setError(data.error || 'Failed to remove team member')
       }
     } catch (err) {
+      setShowRemoveConfirm(false)
+      setMemberToRemove(null)
       setError('Failed to remove team member')
     } finally {
       setIsRemoving(false)
@@ -171,11 +183,23 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
   }
 
   const getMemberRole = (memberId: string) => {
+    // Normalize memberId for comparison
+    const normalizedMemberId = memberId?.toString()
+    
+    // Find the role by matching user IDs in various formats
     const role = projectRoles.find(r => {
+      if (!r || !r.user) return false
+      
       const user = r.user as any
-      const userId = user._doc?._id || user._id
-      return userId === memberId || userId?.toString() === memberId?.toString()
+      // Handle various data structures: _doc, direct _id, or string
+      const userId = user._doc?._id || user._id || user
+      const normalizedUserId = userId?.toString()
+      
+      // Compare normalized IDs
+      return normalizedUserId === normalizedMemberId
     })
+    
+    // Return the exact role as assigned, or default to 'project_member'
     return role?.role || 'project_member'
   }
 
@@ -205,14 +229,34 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
     return colorMap[role] || 'bg-gray-100 text-gray-800'
   }
 
-  const filteredAvailableMembers = memberSearchQuery.trim() === '' 
-    ? [] 
-    : availableMembers.filter(member =>
-        `${member.firstName} ${member.lastName}`.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
-        member.email.toLowerCase().includes(memberSearchQuery.toLowerCase())
-      )
+  const normalizedSearch = memberSearchQuery.trim().toLowerCase()
+  const filteredAvailableMembers = availableMembers.filter(member => {
+    if (!normalizedSearch) return true
+    const fullName = `${member.firstName} ${member.lastName}`.toLowerCase()
+    return fullName.includes(normalizedSearch) || member.email.toLowerCase().includes(normalizedSearch)
+  })
+  useEffect(() => {
+    if (showAddMember) {
+      scrollToAddMemberSection()
+    }
+  }, [showAddMember])
+
+  useEffect(() => {
+    if ((error || success) && pageRef.current) {
+      pageRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [error, success])
+
   
   const selectedMember = availableMembers.find(m => m._id === selectedMemberId)
+
+  const handleOpenAddMember = () => {
+    if (showAddMember) {
+      scrollToAddMemberSection()
+    } else {
+      setShowAddMember(true)
+    }
+  }
 
   if (loading) {
     return (
@@ -226,17 +270,39 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
   }
 
   return (
-    <div className="space-y-6">
+    <div ref={pageRef} className="space-y-6">
       {error && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
+        <Alert variant="destructive" className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 mt-1" />
+            <AlertDescription>{error}</AlertDescription>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            onClick={() => setError('')}
+            aria-label="Dismiss error"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
         </Alert>
       )}
 
       {success && (
-        <Alert variant="success">
-          <AlertDescription>{success}</AlertDescription>
+        <Alert variant="success" className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-2">
+            <AlertDescription>{success}</AlertDescription>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            onClick={() => setSuccess('')}
+            aria-label="Dismiss success"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
         </Alert>
       )}
 
@@ -248,7 +314,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
           </p>
         </div>
         <PermissionGate permission={Permission.PROJECT_MANAGE_TEAM} projectId={projectId}>
-          <Button onClick={() => setShowAddMember(true)}>
+          <Button onClick={handleOpenAddMember}>
             <UserPlus className="h-4 w-4 mr-2" />
             Add Member
           </Button>
@@ -304,7 +370,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                 <Button 
                   variant="outline" 
                   className="mt-4"
-                  onClick={() => setShowAddMember(true)}
+                  onClick={handleOpenAddMember}
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
                   Add First Member
@@ -385,6 +451,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
 
       {/* Add Member Dialog */}
       {showAddMember && (
+        <div ref={addMemberSectionRef}>
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -408,61 +475,43 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Select Member</label>
-              <div className="mt-1 border rounded-md p-2">
-                <Input
-                  value={memberSearchQuery}
-                  onChange={e => setMemberSearchQuery(e.target.value)}
-                  placeholder={selectedMember ? `${selectedMember.firstName} ${selectedMember.lastName}` : 'Type to search team members'}
-                  className="mb-2"
-                />
-                <div className="max-h-40 overflow-y-auto space-y-1">
-                  {memberSearchQuery.trim() === '' ? null : (
-                    filteredAvailableMembers.length === 0 ? (
-                      <div className="text-sm text-muted-foreground p-2">No matching members</div>
-                    ) : (
-                      filteredAvailableMembers.map(member => (
-                        <button
-                          type="button"
-                          key={member._id}
-                          className="w-full text-left p-1 rounded hover:bg-accent"
-                          onClick={() => {
-                            setSelectedMemberId(member._id)
-                            setMemberSearchQuery('') // Clear search after selection
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm">
-                              {member.firstName} {member.lastName} 
-                              <span className="text-muted-foreground"> ({member.email})</span>
-                            </span>
-                            {selectedMemberId === member._id && (
-                              <span className="text-xs text-muted-foreground">Selected</span>
-                            )}
-                          </div>
-                        </button>
-                      ))
-                    )
-                  )}
-                </div>
-                {selectedMember && (
-                  <div className="mt-2">
-                    <span className="inline-flex items-center text-xs bg-muted px-2 py-1 rounded">
-                      <span className="mr-2">{selectedMember.firstName} {selectedMember.lastName}</span>
-                      <button
-                        type="button"
-                        aria-label="Clear selection"
-                        className="text-muted-foreground hover:text-foreground"
-                        onClick={() => {
-                          setSelectedMemberId('')
-                          setMemberSearchQuery('')
-                        }}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
+              <Select
+                value={selectedMemberId || ''}
+                onValueChange={(value) => setSelectedMemberId(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a team member" />
+                </SelectTrigger>
+                <SelectContent className="z-[10050] p-0">
+                  <div className="p-2">
+                    <Input
+                      value={memberSearchQuery}
+                      onChange={(e) => setMemberSearchQuery(e.target.value)}
+                      placeholder="Type to search team members"
+                      className="mb-2"
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                    <div className="max-h-56 overflow-y-auto">
+                      {filteredAvailableMembers.length === 0 ? (
+                        <div className="px-2 py-1 text-sm text-muted-foreground">
+                          {normalizedSearch ? 'No matching members' : 'No members available'}
+                        </div>
+                      ) : (
+                        filteredAvailableMembers.map((member) => (
+                          <SelectItem key={member._id} value={member._id}>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium">
+                                {member.firstName} {member.lastName}
+                              </span>
+                              <span className="text-xs text-muted-foreground">{member.email}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -511,6 +560,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
             </div>
           </CardContent>
         </Card>
+        </div>
       )}
 
       {/* Remove Confirmation Modal */}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -14,12 +14,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Label } from '@/components/ui/label'
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreHorizontal, 
-  Calendar, 
+import {
+  Plus,
+  Search,
+  Filter,
+  MoreHorizontal,
+  Calendar,
   Clock,
   CheckCircle,
   AlertTriangle,
@@ -41,7 +41,8 @@ import {
   Edit,
   Trash2,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  X
 } from 'lucide-react'
 
 interface Sprint {
@@ -102,6 +103,9 @@ export default function SprintsPage() {
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [projectFilter, setProjectFilter] = useState('all')
+  const [projectFilterQuery, setProjectFilterQuery] = useState('')
+  const [projectOptions, setProjectOptions] = useState<Array<{ _id: string; name: string }>>([])
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [success, setSuccess] = useState('')
   const [updatingSprintId, setUpdatingSprintId] = useState<string | null>(null)
@@ -112,7 +116,7 @@ export default function SprintsPage() {
   const [availableSprintsLoading, setAvailableSprintsLoading] = useState(false)
   const [selectedTargetSprintId, setSelectedTargetSprintId] = useState('')
   const [completeError, setCompleteError] = useState('')
-  const [incompleteTasks, setIncompleteTasks] = useState<Array<{ 
+  const [incompleteTasks, setIncompleteTasks] = useState<Array<{
     _id: string
     title: string
     status: string
@@ -148,7 +152,7 @@ export default function SprintsPage() {
   const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me')
-      
+
       if (response.ok) {
         setAuthError('')
         await fetchSprints()
@@ -156,7 +160,7 @@ export default function SprintsPage() {
         const refreshResponse = await fetch('/api/auth/refresh', {
           method: 'POST'
         })
-        
+
         if (refreshResponse.ok) {
           setAuthError('')
           await fetchSprints()
@@ -310,7 +314,7 @@ export default function SprintsPage() {
     }
   }, [])
 
-  const checkSprintForIncompleteTasks = async (sprintId: string): Promise<Array<{ 
+  const checkSprintForIncompleteTasks = async (sprintId: string): Promise<Array<{
     _id: string
     title: string
     status: string
@@ -348,13 +352,13 @@ export default function SprintsPage() {
   const handleSprintLifecycleAction = async (sprintId: string, action: 'start' | 'complete') => {
     if (action === 'complete') {
       const incomplete = await checkSprintForIncompleteTasks(sprintId)
-      
+
       if (incomplete.length > 0) {
         setIncompleteTasks(incomplete)
         setCompletingSprintId(sprintId)
         setCompleteModalOpen(true)
         await loadAvailableSprints(sprintId)
-        
+
         const sprint = sprints.find(s => s._id === sprintId)
         if (sprint) {
           const baseStart = sprint.endDate ? new Date(sprint.endDate) : new Date()
@@ -423,7 +427,7 @@ export default function SprintsPage() {
 
     setSprints(prev => {
       let updated = prev.map(s => (s._id === completingSprintId ? data.data : s))
-      
+
       // If a new sprint was created, add it to the list
       if (newSprintData) {
         // Check if it's not already in the list
@@ -432,7 +436,7 @@ export default function SprintsPage() {
           updated = [newSprintData, ...updated]
         }
       }
-      
+
       return updated
     })
     showSuccess('Sprint completed successfully.')
@@ -479,44 +483,44 @@ export default function SprintsPage() {
       return
     }
 
-      const sprint = sprints.find(s => s._id === completingSprintId)
-      if (!sprint?.project?._id) {
-        setCompleteError('Sprint project information is missing.')
-        return
+    const sprint = sprints.find(s => s._id === completingSprintId)
+    if (!sprint?.project?._id) {
+      setCompleteError('Sprint project information is missing.')
+      return
+    }
+
+    try {
+      setUpdatingSprintId(completingSprintId)
+
+      let teamMemberIds: string[] = []
+      if (sprint.teamMembers && sprint.teamMembers.length > 0) {
+        const fullSprintResponse = await fetch(`/api/sprints/${completingSprintId}`)
+        const fullSprintData = await fullSprintResponse.json()
+        if (fullSprintResponse.ok && fullSprintData.success) {
+          teamMemberIds = (fullSprintData.data?.teamMembers || [])
+            .map((m: any) => m._id || m)
+            .filter(Boolean)
+        } else {
+          teamMemberIds = sprint.teamMembers
+            .map((m: any) => m._id || m)
+            .filter(Boolean)
+        }
       }
 
-      try {
-        setUpdatingSprintId(completingSprintId)
-        
-        let teamMemberIds: string[] = []
-        if (sprint.teamMembers && sprint.teamMembers.length > 0) {
-          const fullSprintResponse = await fetch(`/api/sprints/${completingSprintId}`)
-          const fullSprintData = await fullSprintResponse.json()
-          if (fullSprintResponse.ok && fullSprintData.success) {
-            teamMemberIds = (fullSprintData.data?.teamMembers || [])
-              .map((m: any) => m._id || m)
-              .filter(Boolean)
-          } else {
-            teamMemberIds = sprint.teamMembers
-              .map((m: any) => m._id || m)
-              .filter(Boolean)
-          }
-        }
-
-        const createResponse = await fetch('/api/sprints', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: newSprintForm.name,
-            description: `Auto-created from completion of ${sprint.name}`,
-            project: sprint.project._id,
-            startDate: newSprintForm.startDate,
-            endDate: newSprintForm.endDate,
-            goal: sprint.goal,
-            capacity: Number(newSprintForm.capacity) || sprint.capacity,
-            teamMembers: teamMemberIds
-          })
+      const createResponse = await fetch('/api/sprints', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newSprintForm.name,
+          description: `Auto-created from completion of ${sprint.name}`,
+          project: sprint.project._id,
+          startDate: newSprintForm.startDate,
+          endDate: newSprintForm.endDate,
+          goal: sprint.goal,
+          capacity: Number(newSprintForm.capacity) || sprint.capacity,
+          teamMembers: teamMemberIds
         })
+      })
 
       const createdSprint = await createResponse.json()
       if (!createResponse.ok || !createdSprint.success) {
@@ -531,7 +535,7 @@ export default function SprintsPage() {
       // Fetch full sprint details to get all populated fields
       const fullSprintResponse = await fetch(`/api/sprints/${newSprintId}`)
       const fullSprintData = await fullSprintResponse.json()
-      
+
       let newSprint: Sprint | undefined
       if (fullSprintResponse.ok && fullSprintData.success) {
         newSprint = fullSprintData.data
@@ -577,15 +581,48 @@ export default function SprintsPage() {
     }
   }
 
+  // Load projects from API for filter dropdown
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        const response = await fetch('/api/projects?limit=1000&page=1')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && Array.isArray(data.data)) {
+            const projects = data.data.map((p: any) => ({ _id: p._id, name: p.name }))
+            setProjectOptions(prev => {
+              const combined = new Map<string, { _id: string; name: string }>()
+              prev.forEach(p => combined.set(p._id, p))
+              projects.forEach((p: { _id: string; name: string }) => combined.set(p._id, p))
+              return Array.from(combined.values()).sort((a, b) => a.name.localeCompare(b.name))
+            })
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load projects:', err)
+      }
+    }
+    loadProjects()
+  }, [])
+
+  // Filter project options based on search query
+  const filteredProjectOptions = useMemo(() => {
+    const query = projectFilterQuery.trim().toLowerCase()
+    if (!query) return projectOptions
+    return projectOptions.filter((project) => project.name.toLowerCase().includes(query))
+  }, [projectOptions, projectFilterQuery])
+
   const filteredSprints = sprints.filter(sprint => {
-    const matchesSearch = !searchQuery || 
+    const matchesSearch = !searchQuery ||
       sprint.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       sprint.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       sprint.project.name.toLowerCase().includes(searchQuery.toLowerCase())
-    
+
     const matchesStatus = statusFilter === 'all' || sprint.status === statusFilter
 
-    return matchesSearch && matchesStatus
+    const matchesProject = projectFilter === 'all' || sprint.project._id === projectFilter
+
+    return matchesSearch && matchesStatus && matchesProject
   })
 
   if (loading) {
@@ -676,6 +713,52 @@ export default function SprintsPage() {
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Select value={projectFilter} onValueChange={setProjectFilter}>
+                    <SelectTrigger className="w-full sm:w-40">
+                      <SelectValue placeholder="Project" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div className="p-2">
+                        <div className="relative mb-2">
+                          <Input
+                            value={projectFilterQuery}
+                            onChange={(e) => setProjectFilterQuery(e.target.value)}
+                            placeholder="Search projects"
+                            className="pr-10"
+                            onKeyDown={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                          />
+                          {projectFilterQuery && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setProjectFilterQuery('')
+                                setProjectFilter('all')
+                              }}
+                              className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                              aria-label="Clear project filter"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="max-h-56 overflow-y-auto">
+                          <SelectItem value="all">All Projects</SelectItem>
+                          {filteredProjectOptions.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                          ) : (
+                            filteredProjectOptions.map((project) => (
+                              <SelectItem key={project._id} value={project._id}>
+                                {project.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
@@ -712,167 +795,167 @@ export default function SprintsPage() {
                     const totalStoryPoints = sprint?.progress?.totalStoryPoints ?? 0
 
                     return (
-                    <Card 
-                      key={sprint._id} 
-                      className="hover:shadow-md transition-shadow cursor-pointer overflow-x-hidden"
-                      onClick={() => router.push(`/sprints/${sprint._id}`)}
-                    >
-                      <CardHeader className="p-3 sm:p-6">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="space-y-1 flex-1 min-w-0">
-                            <CardTitle className="text-base sm:text-lg truncate" title={sprint.name}>
-                              {sprint.name}
-                            </CardTitle>
-                            <CardDescription className="line-clamp-2 text-xs sm:text-sm" title={sprint.description || 'No description'}>
-                              {sprint.description || 'No description'}
-                            </CardDescription>
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={(e) => {
-                                e.stopPropagation()
-                                router.push(`/sprints/${sprint._id}`)
-                              }}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Sprint
-                              </DropdownMenuItem>
-                              {/* <DropdownMenuItem onClick={(e) => {
+                      <Card
+                        key={sprint._id}
+                        className="hover:shadow-md transition-shadow cursor-pointer overflow-x-hidden"
+                        onClick={() => router.push(`/sprints/${sprint._id}`)}
+                      >
+                        <CardHeader className="p-3 sm:p-6">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-1 flex-1 min-w-0">
+                              <CardTitle className="text-base sm:text-lg truncate" title={sprint.name}>
+                                {sprint.name}
+                              </CardTitle>
+                              <CardDescription className="line-clamp-2 text-xs sm:text-sm" title={sprint.description || 'No description'}>
+                                {sprint.description || 'No description'}
+                              </CardDescription>
+                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={(e) => {
+                                  e.stopPropagation()
+                                  router.push(`/sprints/${sprint._id}`)
+                                }}>
+                                  <Zap className="h-4 w-4 mr-2" />
+                                  View Sprint
+                                </DropdownMenuItem>
+                                {/* <DropdownMenuItem onClick={(e) => {
                                 e.stopPropagation()
                                 router.push(`/sprints/${sprint._id}?tab=settings`)
                               }}>
                                 <Settings className="h-4 w-4 mr-2" />
                                 Settings
                               </DropdownMenuItem> */}
-                              <DropdownMenuItem onClick={(e) => {
-                                e.stopPropagation()
-                                router.push(`/sprints/${sprint._id}/edit`)
-                              }}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit Sprint
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
+                                <DropdownMenuItem onClick={(e) => {
+                                  e.stopPropagation()
+                                  router.push(`/sprints/${sprint._id}/edit`)
+                                }}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit Sprint
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (confirm('Are you sure you want to delete this sprint? This action cannot be undone.')) {
+                                      handleDeleteSprint(sprint._id)
+                                    }
+                                  }}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete Sprint
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="p-3 sm:p-6 pt-0 space-y-3 sm:space-y-4">
+                          <div className="flex items-center space-x-2">
+                            <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
+                              {getStatusIcon(sprint?.status)}
+                              <span className="ml-1 hidden sm:inline">{formatToTitleCase(sprint?.status)}</span>
+                            </Badge>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs sm:text-sm">
+                              <span className="text-muted-foreground">Progress</span>
+                              <span className="font-medium">{sprint?.progress?.completionPercentage || 0}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
+                              <div
+                                className="bg-blue-600 dark:bg-blue-500 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
+                                style={{
+                                  width: `${sprint?.progress?.completionPercentage || 0}%`,
+                                  minWidth: sprint?.progress?.completionPercentage || 0 > 0 ? '2px' : '0'
+                                }}
+                              />
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {sprint?.progress?.tasksCompleted || 0} of {sprint?.progress?.totalTasks || 0} tasks completed
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs sm:text-sm">
+                              <span className="text-muted-foreground">Story Points</span>
+                              <span className="font-medium">
+                                {storyPointsCompleted} / {totalStoryPoints}
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
+                              <div
+                                className="bg-emerald-500 dark:bg-emerald-400 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
+                                style={{
+                                  width: `${storyPointsPercentage}%`,
+                                  minWidth: storyPointsPercentage > 0 ? '2px' : '0'
+                                }}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between text-xs sm:text-sm">
+                              <span className="text-muted-foreground">Velocity</span>
+                              <span className="font-medium">{sprint?.velocity || 0}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground">
+                            <div className="flex items-center space-x-1">
+                              <Users className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                              <span className="truncate">{sprint?.teamMembers?.length} members</span>
+                            </div>
+                            <div className="flex items-center space-x-1 flex-shrink-0">
+                              <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <span className="whitespace-nowrap">{new Date(sprint?.startDate).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 text-xs sm:text-sm">
+                            <div className="text-muted-foreground truncate">
+                              {new Date(sprint?.startDate).toLocaleDateString()} - {new Date(sprint?.endDate).toLocaleDateString()}
+                            </div>
+                            <div className="text-muted-foreground whitespace-nowrap flex-shrink-0">
+                              {Math.ceil((new Date(sprint?.endDate).getTime() - new Date(sprint?.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            {sprint.status === 'planning' && (
+                              <Button
+                                size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  if (confirm('Are you sure you want to delete this sprint? This action cannot be undone.')) {
-                                    handleDeleteSprint(sprint._id)
-                                  }
+                                  handleSprintLifecycleAction(sprint._id, 'start')
                                 }}
-                                className="text-destructive focus:text-destructive"
+                                disabled={updatingSprintId === sprint._id || !hasTasks}
+                                title={!hasTasks ? 'Add tasks to this sprint before starting it.' : undefined}
                               >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete Sprint
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-3 sm:p-6 pt-0 space-y-3 sm:space-y-4">
-                        <div className="flex items-center space-x-2">
-                          <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
-                            {getStatusIcon(sprint?.status)}
-                            <span className="ml-1 hidden sm:inline">{formatToTitleCase(sprint?.status)}</span>
-                          </Badge>
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-xs sm:text-sm">
-                            <span className="text-muted-foreground">Progress</span>
-                            <span className="font-medium">{sprint?.progress?.completionPercentage || 0}%</span>
+                                <Play className="h-4 w-4 mr-1" />
+                                {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
+                              </Button>
+                            )}
+                            {sprint.status === 'active' && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleSprintLifecycleAction(sprint._id, 'complete')
+                                }}
+                                disabled={updatingSprintId === sprint._id}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                {updatingSprintId === sprint._id ? 'Completing...' : 'Complete Sprint'}
+                              </Button>
+                            )}
                           </div>
-                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
-                            <div 
-                              className="bg-blue-600 dark:bg-blue-500 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
-                              style={{ 
-                                width: `${sprint?.progress?.completionPercentage || 0}%`,
-                                minWidth: sprint?.progress?.completionPercentage || 0 > 0 ? '2px' : '0'
-                              }}
-                            />
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {sprint?.progress?.tasksCompleted || 0} of {sprint?.progress?.totalTasks || 0} tasks completed
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-xs sm:text-sm">
-                            <span className="text-muted-foreground">Story Points</span>
-                            <span className="font-medium">
-                              {storyPointsCompleted} / {totalStoryPoints}
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
-                            <div
-                              className="bg-emerald-500 dark:bg-emerald-400 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
-                              style={{
-                                width: `${storyPointsPercentage}%`,
-                                minWidth: storyPointsPercentage > 0 ? '2px' : '0'
-                              }}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between text-xs sm:text-sm">
-                            <span className="text-muted-foreground">Velocity</span>
-                            <span className="font-medium">{sprint?.velocity || 0}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground">
-                          <div className="flex items-center space-x-1">
-                            <Users className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                            <span className="truncate">{sprint?.teamMembers?.length} members</span>
-                          </div>
-                          <div className="flex items-center space-x-1 flex-shrink-0">
-                            <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                            <span className="whitespace-nowrap">{new Date(sprint?.startDate).toLocaleDateString()}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 text-xs sm:text-sm">
-                          <div className="text-muted-foreground truncate">
-                            {new Date(sprint?.startDate).toLocaleDateString()} - {new Date(sprint?.endDate).toLocaleDateString()}
-                          </div>
-                          <div className="text-muted-foreground whitespace-nowrap flex-shrink-0">
-                            {Math.ceil((new Date(sprint?.endDate).getTime() - new Date(sprint?.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                        {sprint.status === 'planning' && (
-                          <Button
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleSprintLifecycleAction(sprint._id, 'start')
-                            }}
-                            disabled={updatingSprintId === sprint._id || !hasTasks}
-                            title={!hasTasks ? 'Add tasks to this sprint before starting it.' : undefined}
-                          >
-                            <Play className="h-4 w-4 mr-1" />
-                            {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
-                          </Button>
-                        )}
-                          {sprint.status === 'active' && (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleSprintLifecycleAction(sprint._id, 'complete')
-                              }}
-                              disabled={updatingSprintId === sprint._id}
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              {updatingSprintId === sprint._id ? 'Completing...' : 'Complete Sprint'}
-                            </Button>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
+                        </CardContent>
+                      </Card>
                     )
                   })}
                 </div>
@@ -903,149 +986,149 @@ export default function SprintsPage() {
                     const totalStoryPoints = sprint?.progress?.totalStoryPoints ?? 0
 
                     return (
-                    <Card 
-                      key={sprint?._id} 
-                      className="hover:shadow-md transition-shadow cursor-pointer overflow-x-hidden"
-                      onClick={() => router.push(`/sprints/${sprint?._id}`)}
-                    >
-                      <CardContent className="p-3 sm:p-4">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
-                          <div className="flex-1 min-w-0 w-full">
-                            <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2 mb-2">
-                              <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
-                                {getStatusIcon(sprint?.status)}
-                                <span className="ml-1 hidden sm:inline">{formatToTitleCase(sprint?.status)}</span>
-                              </Badge>
-                            </div>
-                            <div className="flex items-start gap-2 mb-2">
-                              <h3 className="font-medium text-sm sm:text-base text-foreground truncate flex-1 min-w-0" title={sprint?.name}>
-                                {sprint?.name}
-                              </h3>
-                            </div>
-                            <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2" title={sprint?.description || 'No description'}>
-                              {sprint?.description || 'No description'}
-                            </p>
-                            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                              <div className="flex items-center space-x-1 min-w-0">
-                                <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                <span 
-                                  className="truncate"
-                                  title={sprint?.project?.name && sprint?.project?.name.length > 10 ? sprint?.project?.name : undefined}
-                                >
-                                  {sprint?.project?.name && sprint?.project?.name.length > 10 ? `${sprint?.project?.name.slice(0, 10)}…` : sprint?.project?.name}
-                                </span>
+                      <Card
+                        key={sprint?._id}
+                        className="hover:shadow-md transition-shadow cursor-pointer overflow-x-hidden"
+                        onClick={() => router.push(`/sprints/${sprint?._id}`)}
+                      >
+                        <CardContent className="p-3 sm:p-4">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
+                            <div className="flex-1 min-w-0 w-full">
+                              <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2 mb-2">
+                                <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
+                                  {getStatusIcon(sprint?.status)}
+                                  <span className="ml-1 hidden sm:inline">{formatToTitleCase(sprint?.status)}</span>
+                                </Badge>
                               </div>
-                              <div className="flex items-center space-x-1 flex-shrink-0">
-                                <Users className="h-3 w-3 sm:h-4 sm:w-4" />
-                                <span className="whitespace-nowrap">{sprint?.teamMembers?.length} members</span>
+                              <div className="flex items-start gap-2 mb-2">
+                                <h3 className="font-medium text-sm sm:text-base text-foreground truncate flex-1 min-w-0" title={sprint?.name}>
+                                  {sprint?.name}
+                                </h3>
                               </div>
-                              <div className="flex items-center space-x-1 min-w-0">
-                                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                <span className="truncate">
-                                  {new Date(sprint?.startDate).toLocaleDateString()} - {new Date(sprint?.endDate).toLocaleDateString()}
-                                </span>
+                              <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2" title={sprint?.description || 'No description'}>
+                                {sprint?.description || 'No description'}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                                <div className="flex items-center space-x-1 min-w-0">
+                                  <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                  <span
+                                    className="truncate"
+                                    title={sprint?.project?.name && sprint?.project?.name.length > 10 ? sprint?.project?.name : undefined}
+                                  >
+                                    {sprint?.project?.name && sprint?.project?.name.length > 10 ? `${sprint?.project?.name.slice(0, 10)}…` : sprint?.project?.name}
+                                  </span>
+                                </div>
+                                <div className="flex items-center space-x-1 flex-shrink-0">
+                                  <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  <span className="whitespace-nowrap">{sprint?.teamMembers?.length} members</span>
+                                </div>
+                                <div className="flex items-center space-x-1 min-w-0">
+                                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                  <span className="truncate">
+                                    {new Date(sprint?.startDate).toLocaleDateString()} - {new Date(sprint?.endDate).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                <div className="flex items-center space-x-1 flex-shrink-0 whitespace-nowrap">
+                                  <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  <span>Velocity: {sprint?.velocity || 0}</span>
+                                </div>
                               </div>
-                              <div className="flex items-center space-x-1 flex-shrink-0 whitespace-nowrap">
-                                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
-                                <span>Velocity: {sprint?.velocity || 0}</span>
-                              </div>
-                            </div>
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {sprint.status === 'planning' && (
-                          <Button
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleSprintLifecycleAction(sprint._id, 'start')
-                            }}
-                            disabled={updatingSprintId === sprint._id || !hasTasks}
-                            title={!hasTasks ? 'Add tasks to this sprint before starting it.' : undefined}
-                          >
-                            <Play className="h-4 w-4 mr-1" />
-                            {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
-                          </Button>
-                        )}
-                        {sprint.status === 'active' && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleSprintLifecycleAction(sprint._id, 'complete')
-                            }}
-                            disabled={updatingSprintId === sprint._id}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            {updatingSprintId === sprint._id ? 'Completing...' : 'Complete Sprint'}
-                          </Button>
-                        )}
-                      </div>
-                          </div>
-                          <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
-                            <div className="text-right sm:text-left">
-                              <div className="text-xs sm:text-sm font-medium text-foreground">{completionPercentage}%</div>
-                              <div className="w-16 sm:w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
-                                <div 
-                                  className="bg-blue-600 dark:bg-blue-500 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
-                                  style={{ 
-                                    width: `${completionPercentage}%`,
-                                    minWidth: completionPercentage > 0 ? '2px' : '0'
-                                  }}
-                                />
-                              </div>
-                              <div className="text-[11px] text-muted-foreground mt-1">
-                                Story Points: {storyPointsCompleted} / {totalStoryPoints}
-                              </div>
-                              <div className="w-16 sm:w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden mt-1">
-                                <div
-                                  className="bg-emerald-500 dark:bg-emerald-400 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
-                                  style={{
-                                    width: `${storyPointsPercentage}%`,
-                                    minWidth: storyPointsPercentage > 0 ? '2px' : '0'
-                                  }}
-                                />
+                              <div className="flex flex-wrap gap-2 mt-3">
+                                {sprint.status === 'planning' && (
+                                  <Button
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleSprintLifecycleAction(sprint._id, 'start')
+                                    }}
+                                    disabled={updatingSprintId === sprint._id || !hasTasks}
+                                    title={!hasTasks ? 'Add tasks to this sprint before starting it.' : undefined}
+                                  >
+                                    <Play className="h-4 w-4 mr-1" />
+                                    {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
+                                  </Button>
+                                )}
+                                {sprint.status === 'active' && (
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleSprintLifecycleAction(sprint._id, 'complete')
+                                    }}
+                                    disabled={updatingSprintId === sprint._id}
+                                  >
+                                    <CheckCircle className="h-4 w-4 mr-1" />
+                                    {updatingSprintId === sprint._id ? 'Completing...' : 'Complete Sprint'}
+                                  </Button>
+                                )}
                               </div>
                             </div>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/sprints/${sprint._id}`)
-                                }}>
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View Sprint
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/sprints/${sprint._id}/edit`)
-                                }}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit Sprint
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  onClick={(e) => {
+                            <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                              <div className="text-right sm:text-left">
+                                <div className="text-xs sm:text-sm font-medium text-foreground">{completionPercentage}%</div>
+                                <div className="w-16 sm:w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
+                                  <div
+                                    className="bg-blue-600 dark:bg-blue-500 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
+                                    style={{
+                                      width: `${completionPercentage}%`,
+                                      minWidth: completionPercentage > 0 ? '2px' : '0'
+                                    }}
+                                  />
+                                </div>
+                                <div className="text-[11px] text-muted-foreground mt-1">
+                                  Story Points: {storyPointsCompleted} / {totalStoryPoints}
+                                </div>
+                                <div className="w-16 sm:w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden mt-1">
+                                  <div
+                                    className="bg-emerald-500 dark:bg-emerald-400 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
+                                    style={{
+                                      width: `${storyPointsPercentage}%`,
+                                      minWidth: storyPointsPercentage > 0 ? '2px' : '0'
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={(e) => {
                                     e.stopPropagation()
-                                    if (confirm('Are you sure you want to delete this sprint? This action cannot be undone.')) {
-                                      handleDeleteSprint(sprint._id)
-                                    }
-                                  }}
-                                  className="text-destructive focus:text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete Sprint
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                                    router.push(`/sprints/${sprint._id}`)
+                                  }}>
+                                    <Zap className="h-4 w-4 mr-2" />
+                                    View Sprint
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={(e) => {
+                                    e.stopPropagation()
+                                    router.push(`/sprints/${sprint._id}/edit`)
+                                  }}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit Sprint
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (confirm('Are you sure you want to delete this sprint? This action cannot be undone.')) {
+                                        handleDeleteSprint(sprint._id)
+                                      }
+                                    }}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete Sprint
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                        </CardContent>
+                      </Card>
                     )
                   })}
                 </div>
@@ -1072,9 +1155,8 @@ export default function SprintsPage() {
           title="Complete Sprint"
           description={
             incompleteTasks.length
-              ? `There are ${incompleteTasks.length} incomplete task${
-                  incompleteTasks.length === 1 ? '' : 's'
-                }. Move them before completing the sprint.`
+              ? `There are ${incompleteTasks.length} incomplete task${incompleteTasks.length === 1 ? '' : 's'
+              }. Move them before completing the sprint.`
               : 'All tasks are completed. You can finish the sprint now.'
           }
           footer={
@@ -1131,7 +1213,7 @@ export default function SprintsPage() {
                       const incompleteSubtasks = getIncompleteSubtasks(task)
                       const hasIncompleteSubtasks = incompleteSubtasks.length > 0
                       const isExpanded = expandedTasks.has(task._id)
-                      
+
                       return (
                         <div key={task._id} className="rounded-md border bg-muted/40 px-3 py-2 space-y-2">
                           <div className="flex items-start justify-between gap-2">
@@ -1196,9 +1278,8 @@ export default function SprintsPage() {
                                         </div>
                                       </div>
                                       <Badge
-                                        className={`${
-                                          TASK_STATUS_BADGE_MAP[subtask.status] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-                                        } text-[10px] flex-shrink-0`}
+                                        className={`${TASK_STATUS_BADGE_MAP[subtask.status] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                                          } text-[10px] flex-shrink-0`}
                                       >
                                         {formatTaskStatusLabel(subtask.status)}
                                       </Badge>

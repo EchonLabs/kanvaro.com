@@ -10,7 +10,7 @@ import { useNotifications } from './useNotifications'
  */
 export function useTimeTrackingNotifications() {
   const { showToast } = useToast()
-  const { notifications, refresh } = useNotifications({
+  const { notifications, refresh, markAsRead } = useNotifications({
     limit: 10,
     unreadOnly: true,
     type: 'time_tracking',
@@ -38,8 +38,14 @@ export function useTimeTrackingNotifications() {
       const message = notification.message || ''
       const hasZeroDuration = /0h\s*0m|\(0h\s*0m\)|\(0h\)|0h\s+0m/i.test(message)
       
-      if (hasZeroDuration && (notification.title.includes('Stopped') || notification.title.includes('Submitted'))) {
+      if (hasZeroDuration && (
+        notification.title.includes('Stopped') || 
+        notification.title.includes('Submitted') || 
+        notification.title.includes('Approval Required')
+      )) {
         // Skip notifications for 0 duration entries
+        // Also mark as read so they don't come back
+        markAsRead(notificationId)
         return
       }
 
@@ -65,8 +71,11 @@ export function useTimeTrackingNotifications() {
         message: notification.message,
         duration: toastType === 'warning' || toastType === 'error' ? 7000 : 5000
       })
+
+      // Mark notification as read after showing toast
+      markAsRead(notificationId)
     })
-  }, [notifications, showToast])
+  }, [notifications, showToast, markAsRead])
 
   // Clean up old processed IDs to prevent memory leak
   useEffect(() => {

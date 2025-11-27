@@ -3,6 +3,7 @@ import connectDB from '@/lib/db-config'
 import { UserInvitation } from '@/models/UserInvitation'
 import { Organization } from '@/models/Organization'
 import { CustomRole } from '@/models/CustomRole'
+import '@/models/User' // Ensure User model is registered for populate('invitedBy')
 
 export async function GET(request: NextRequest) {
   try {

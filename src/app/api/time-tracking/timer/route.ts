@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
-import { ActiveTimer } from '@/models/ActiveTimer'
+import { ActiveTimer, IActiveTimer } from '@/models/ActiveTimer'
 import { TimeEntry } from '@/models/TimeEntry'
 import { TimeTrackingSettings } from '@/models/TimeTrackingSettings'
 import { Project } from '@/models/Project'
@@ -9,6 +9,382 @@ import { Organization } from '@/models/Organization'
 import { applyRoundingRules } from '@/lib/utils'
 import { notificationService } from '@/lib/notification-service'
 import { isNotificationEnabled } from '@/lib/notification-utils'
+
+type EffectiveTimeTrackingSettings = {
+  maxSessionHours?: number
+  allowOvertime?: boolean
+  maxDailyHours?: number
+  maxWeeklyHours?: number
+  requireApproval?: boolean
+  requireDescription?: boolean
+  roundingRules?: {
+    enabled?: boolean
+    increment?: number
+    roundUp?: boolean
+  }
+  notifications?: {
+    onTimerStart?: boolean
+    onTimerStop?: boolean
+    onOvertime?: boolean
+    onApprovalNeeded?: boolean
+    onTimeSubmitted?: boolean
+  }
+}
+
+type StopTimerReason = 'manual' | 'auto_max_session'
+
+const MINUTES_PER_HOUR = 60
+
+const getIdString = (value: any): string | null => {
+  if (!value) return null
+  if (typeof value === 'string') return value
+  if (typeof value === 'object' && value !== null) {
+    if ('_id' in value && value._id) return value._id.toString()
+    if ('id' in value && value.id) return value.id.toString()
+  }
+  return value.toString?.() ?? null
+}
+
+const calculateCurrentDurationMinutes = (timer: IActiveTimer, referenceDate = new Date()) => {
+  const baseDuration = (referenceDate.getTime() - timer.startTime.getTime()) / (1000 * 60)
+  return Math.max(0, baseDuration - (timer.totalPausedDuration || 0))
+}
+
+async function getEffectiveTimeTrackingSettings(
+  organizationId: string | null,
+  projectId?: string | null
+): Promise<EffectiveTimeTrackingSettings | null> {
+  if (!organizationId) return null
+
+  if (projectId) {
+    const projectSettings = await TimeTrackingSettings.findOne({
+      organization: organizationId,
+      project: projectId
+    })
+    if (projectSettings) {
+      const settings = projectSettings.toObject()
+      // Also check project.settings.requireApproval as fallback if not set in TimeTrackingSettings
+      if (settings.requireApproval === undefined || settings.requireApproval === null) {
+        const project = await Project.findById(projectId).select('settings.requireApproval')
+        if (project?.settings?.requireApproval !== undefined) {
+          settings.requireApproval = project.settings.requireApproval
+        }
+      }
+      return settings
+    }
+  }
+
+  const orgSettings = await TimeTrackingSettings.findOne({
+    organization: organizationId,
+    project: null
+  })
+  if (orgSettings) {
+    return orgSettings.toObject()
+  }
+
+  const organization = await Organization.findById(organizationId).select('settings.timeTracking')
+  return organization?.settings?.timeTracking ?? null
+}
+
+interface StopTimerOptions {
+  description?: string
+  category?: string
+  tags?: string[]
+  reason?: StopTimerReason
+  stopSettings?: EffectiveTimeTrackingSettings
+  now?: Date
+}
+
+const buildNotificationPayload = (
+  title: string,
+  message: string,
+  timeEntryId: string,
+  projectUrl: string
+) => ({
+  type: 'time_tracking' as const,
+  title,
+  message,
+  data: {
+    entityType: 'time_entry' as const,
+    entityId: timeEntryId,
+    action: 'updated' as const,
+    priority: 'low' as const,
+    url: projectUrl
+  },
+  sendEmail: false,
+  sendPush: false
+})
+
+async function stopTimerAndBuildResponse(
+  activeTimer: IActiveTimer,
+  options: StopTimerOptions = {}
+): Promise<{ status: number; body: any }> {
+  const organizationId = getIdString(activeTimer.organization)
+  const projectId = getIdString(activeTimer.project)
+
+  if (!organizationId) {
+    return { status: 400, body: { error: 'Invalid organization for timer' } }
+  }
+
+  const stopSettings =
+    options.stopSettings || (await getEffectiveTimeTrackingSettings(organizationId, projectId))
+
+  if (!stopSettings) {
+    return { status: 500, body: { error: 'Time tracking settings not found' } }
+  }
+
+  const now = options.now || new Date()
+  const descriptionSource = options.description ?? activeTimer.description ?? ''
+  const finalDescription =
+    typeof descriptionSource === 'string'
+      ? descriptionSource.trim()
+      : String(descriptionSource).trim()
+  const requireDescription = stopSettings.requireDescription ?? false
+
+  if (requireDescription && !finalDescription) {
+    return { status: 400, body: { error: 'Description is required for time entries' } }
+  }
+
+  const totalDuration = calculateCurrentDurationMinutes(activeTimer, now)
+  let finalDuration = totalDuration
+  if (stopSettings.roundingRules?.enabled) {
+    finalDuration = applyRoundingRules(totalDuration, {
+      enabled: stopSettings.roundingRules.enabled ?? false,
+      increment: stopSettings.roundingRules.increment ?? 15,
+      roundUp: stopSettings.roundingRules.roundUp ?? true
+    })
+  }
+  const hasTimeLogged = finalDuration > 0
+
+  if (!hasTimeLogged) {
+    await ActiveTimer.findByIdAndDelete(activeTimer._id)
+    return {
+      status: 200,
+      body: {
+        message:
+          options.reason === 'auto_max_session'
+            ? 'Timer automatically stopped after reaching max session hours.'
+            : 'Timer stopped. No time was logged (0 minutes).',
+        timeEntry: null,
+        hasTimeLogged: false,
+        duration: 0,
+        notificationsSent: {
+          timerStop: false,
+          overtime: false,
+          approvalNeeded: false,
+          timeSubmitted: false
+        },
+        autoStopped: options.reason === 'auto_max_session',
+        reason: options.reason ?? 'manual'
+      }
+    }
+  }
+
+  const requiresApproval = stopSettings.requireApproval ?? false
+  const category = options.category ?? activeTimer.category
+  const tags = options.tags ?? activeTimer.tags
+  const projectValue = (activeTimer.project as any)?._id ?? activeTimer.project
+  const taskValue = (activeTimer.task as any)?._id ?? activeTimer.task
+
+  const timeEntry = new TimeEntry({
+    user: activeTimer.user,
+    organization: activeTimer.organization,
+    project: projectValue,
+    task: taskValue,
+    description: finalDescription,
+    startTime: activeTimer.startTime,
+    endTime: now,
+    duration: finalDuration,
+    isBillable: activeTimer.isBillable,
+    hourlyRate: activeTimer.hourlyRate,
+    status: 'completed',
+    category,
+    tags,
+    isApproved: !requiresApproval
+  })
+
+  await timeEntry.save()
+  await ActiveTimer.findByIdAndDelete(activeTimer._id)
+
+  const hoursLogged = finalDuration / MINUTES_PER_HOUR
+  const isOvertime =
+    stopSettings.allowOvertime === false &&
+    (hoursLogged > (stopSettings.maxDailyHours || 8) ||
+      hoursLogged > (stopSettings.maxWeeklyHours || 40))
+
+  // Only send notifications if time was actually logged
+  // Notifications should only be sent when timer stops with logged time
+  const project = projectValue ? await Project.findById(projectValue).select('name') : null
+  const projectName = project?.name || 'Unknown Project'
+  const hoursFormatted = `${Math.floor(hoursLogged)}h ${Math.round((hoursLogged % 1) * 60)}m`
+  const projectUrl = '/time-tracking/logs'
+  
+  // Check if the formatted duration is "0h 0m" (even if hasTimeLogged is true due to seconds)
+  // We don't want to spam users with 0h 0m notifications
+  const isZeroDurationDisplay = hoursFormatted === '0h 0m'
+
+  const notificationsSent = {
+    timerStop: false,
+    overtime: false,
+    approvalNeeded: false,
+    timeSubmitted: false
+  }
+
+  // Only send notifications if time was logged (hasTimeLogged is already checked above)
+  // Timer Stop notification - only when timer is stopped
+  const timerStopEnabled = await isNotificationEnabled(
+    organizationId,
+    'onTimerStop',
+    projectValue?.toString()
+  )
+  
+  if (timerStopEnabled && hasTimeLogged && !isZeroDurationDisplay) {
+    await notificationService.createNotification(
+      activeTimer.user.toString(),
+      organizationId,
+      buildNotificationPayload(
+        options.reason === 'auto_max_session' ? 'Timer Auto-Stopped' : 'Timer Stopped',
+        options.reason === 'auto_max_session'
+          ? `Timer auto-stopped for project "${projectName}" after reaching the session limit. Logged ${hoursFormatted}.`
+          : `Timer stopped for project "${projectName}". Logged ${hoursFormatted}.`,
+        timeEntry._id.toString(),
+        projectUrl
+      )
+    )
+    notificationsSent.timerStop = true
+  }
+
+  // Overtime notification - only if overtime detected
+  if (isOvertime && hasTimeLogged) {
+    const overtimeEnabled = await isNotificationEnabled(
+      organizationId,
+      'onOvertime',
+      projectValue?.toString()
+    )
+    if (overtimeEnabled) {
+      await notificationService.createNotification(
+        activeTimer.user.toString(),
+        organizationId,
+        {
+          type: 'time_tracking' as const,
+          title: 'Overtime Alert',
+          message: `Overtime detected: ${hoursFormatted} logged for project "${projectName}". This exceeds the daily/weekly limit.`,
+          data: {
+            entityType: 'time_entry' as const,
+            entityId: timeEntry._id.toString(),
+            action: 'updated' as const,
+            priority: 'high' as const,
+            url: projectUrl
+          },
+          sendEmail: false,
+          sendPush: false
+        }
+      )
+      notificationsSent.overtime = true
+    }
+  }
+
+  // Approval Required notification - only if approval is required AND time was logged
+  if (requiresApproval && hasTimeLogged && !isZeroDurationDisplay) {
+    const approvalNeededEnabled = await isNotificationEnabled(
+      organizationId,
+      'onApprovalNeeded',
+      projectValue?.toString()
+    )
+    if (approvalNeededEnabled) {
+      await notificationService.createNotification(
+        activeTimer.user.toString(),
+        organizationId,
+        {
+          type: 'time_tracking' as const,
+          title: 'Approval Required',
+          message: `Time entry for project "${projectName}" (${hoursFormatted}) requires approval.`,
+          data: {
+            entityType: 'time_entry' as const,
+            entityId: timeEntry._id.toString(),
+            action: 'updated' as const,
+            priority: 'medium' as const,
+            url: projectUrl
+          },
+          sendEmail: false,
+          sendPush: false
+        }
+      )
+      notificationsSent.approvalNeeded = true
+    }
+  }
+
+  // Time Submitted notification - only if no approval required AND time was logged
+  if (!requiresApproval && hasTimeLogged && !isZeroDurationDisplay) {
+    const timeSubmittedEnabled = await isNotificationEnabled(
+      organizationId,
+      'onTimeSubmitted',
+      projectValue?.toString()
+    )
+    if (timeSubmittedEnabled) {
+      await notificationService.createNotification(
+        activeTimer.user.toString(),
+        organizationId,
+        {
+          type: 'time_tracking' as const,
+          title: 'Time Submitted',
+          message: `Time entry for project "${projectName}" (${hoursFormatted}) has been submitted successfully.`,
+          data: {
+            entityType: 'time_entry' as const,
+            entityId: timeEntry._id.toString(),
+            action: 'created' as const,
+            priority: 'low' as const,
+            url: projectUrl
+          },
+          sendEmail: false,
+          sendPush: false
+        }
+      )
+      notificationsSent.timeSubmitted = true
+    }
+  }
+
+  return {
+    status: 200,
+    body: {
+      message:
+        options.reason === 'auto_max_session'
+          ? 'Timer automatically stopped after reaching max session hours.'
+          : 'Timer stopped successfully',
+      timeEntry: timeEntry.toObject(),
+      hasTimeLogged: true,
+      duration: finalDuration,
+      notificationsSent,
+      autoStopped: options.reason === 'auto_max_session',
+      reason: options.reason ?? 'manual'
+    }
+  }
+}
+
+async function enforceMaxSessionLimit(
+  activeTimer: IActiveTimer
+): Promise<{ status: number; body: any } | null> {
+  const organizationId = getIdString(activeTimer.organization)
+  if (!organizationId) return null
+
+  const projectId = getIdString(activeTimer.project)
+  const stopSettings = await getEffectiveTimeTrackingSettings(organizationId, projectId)
+  if (!stopSettings || stopSettings.allowOvertime !== false || !stopSettings.maxSessionHours) {
+    return null
+  }
+
+  const now = new Date()
+  const currentDuration = calculateCurrentDurationMinutes(activeTimer, now)
+  if (currentDuration < stopSettings.maxSessionHours * MINUTES_PER_HOUR) {
+    return null
+  }
+
+  return stopTimerAndBuildResponse(activeTimer, {
+    stopSettings,
+    now,
+    reason: 'auto_max_session'
+  })
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,10 +409,18 @@ console.log('organizationId',organizationId);
       return NextResponse.json({ activeTimer: null })
     }
 
-    // Calculate current duration
-    const now = new Date()
-    const baseDuration = (now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60)
-    const currentDuration = Math.max(0, baseDuration - activeTimer.totalPausedDuration)
+    const autoStopResult = await enforceMaxSessionLimit(activeTimer)
+    if (autoStopResult) {
+      return NextResponse.json(
+        {
+          ...autoStopResult.body,
+          activeTimer: null
+        },
+        { status: autoStopResult.status }
+      )
+    }
+
+    const currentDuration = calculateCurrentDurationMinutes(activeTimer)
 
     return NextResponse.json({
       activeTimer: {
@@ -256,6 +640,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'No active timer found' }, { status: 404 })
     }
 
+    const autoStopResult = await enforceMaxSessionLimit(activeTimer)
+    if (autoStopResult) {
+      return NextResponse.json(autoStopResult.body, { status: autoStopResult.status })
+    }
+
     const now = new Date()
 
     switch (action) {
@@ -275,220 +664,15 @@ export async function PUT(request: NextRequest) {
         activeTimer.pausedAt = undefined
         break
 
-      case 'stop':
-        // Get time tracking settings for rounding
-        let stopSettings = await TimeTrackingSettings.findOne({
-          organization: activeTimer.organization,
-          project: activeTimer.project
-        }) || await TimeTrackingSettings.findOne({
-          organization: activeTimer.organization,
-          project: null
+      case 'stop': {
+        const stopResult = await stopTimerAndBuildResponse(activeTimer, {
+          description,
+          category,
+          tags,
+          reason: 'manual'
         })
-
-        // If no TimeTrackingSettings exist, get from organization
-        if (!stopSettings) {
-          const organization = await Organization.findById(activeTimer.organization)
-          if (organization) {
-            stopSettings = {
-              roundingRules: organization.settings.timeTracking.roundingRules,
-              maxDailyHours: organization.settings.timeTracking.maxDailyHours,
-              maxWeeklyHours: organization.settings.timeTracking.maxWeeklyHours,
-              allowOvertime: organization.settings.timeTracking.allowOvertime,
-              requireApproval: organization.settings.timeTracking.requireApproval,
-              requireDescription: organization.settings.timeTracking.requireDescription
-            } as any
-          }
-        }
-
-        // Validate description if required
-        const finalDescription = description || activeTimer.description
-        const requireDescription = stopSettings?.requireDescription ?? false
-        const hasDescription = finalDescription && typeof finalDescription === 'string' && finalDescription.trim().length > 0
-        
-        if (requireDescription && !hasDescription) {
-          return NextResponse.json({ error: 'Description is required for time entries' }, { status: 400 })
-        }
-
-        // Create time entry
-        const baseDuration = (now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60)
-        const totalDuration = Math.max(0, baseDuration - activeTimer.totalPausedDuration)
-
-        // Apply rounding rules if enabled
-        let finalDuration = totalDuration
-        if (stopSettings?.roundingRules?.enabled) {
-          finalDuration = applyRoundingRules(totalDuration, stopSettings.roundingRules)
-        }
-
-        // Check if time was actually logged (must be > 0)
-        const hasTimeLogged = finalDuration > 0
-
-        // If no time was logged, just delete the timer without creating a time entry
-        if (!hasTimeLogged) {
-          await ActiveTimer.findByIdAndDelete(activeTimer._id)
-          return NextResponse.json({
-            message: 'Timer stopped. No time was logged (0 minutes).',
-            timeEntry: null,
-            hasTimeLogged: false,
-            duration: 0,
-            notificationsSent: {
-              timerStop: false,
-              overtime: false,
-              approvalNeeded: false,
-              timeSubmitted: false
-            }
-          })
-        }
-
-        // Check for overtime
-        const hoursLogged = finalDuration / 60
-        const isOvertime = !stopSettings?.allowOvertime && (
-          hoursLogged > (stopSettings?.maxDailyHours || 8) ||
-          hoursLogged > (stopSettings?.maxWeeklyHours || 40)
-        )
-
-        // Determine status based on approval requirement
-        const requiresApproval = stopSettings?.requireApproval ?? false
-        const entryStatus = requiresApproval ? 'pending' : 'completed'
-
-        const timeEntry = new TimeEntry({
-          user: activeTimer.user,
-          organization: activeTimer.organization,
-          project: activeTimer.project,
-          task: activeTimer.task,
-          description: finalDescription,
-          startTime: activeTimer.startTime,
-          endTime: now,
-          duration: finalDuration,
-          isBillable: activeTimer.isBillable,
-          hourlyRate: activeTimer.hourlyRate,
-          status: entryStatus,
-          category: category || activeTimer.category,
-          tags: tags || activeTimer.tags
-        })
-
-        await timeEntry.save()
-
-        // Delete active timer
-        await ActiveTimer.findByIdAndDelete(activeTimer._id)
-
-        // Send notifications based on settings (only reached if time was logged)
-        const notifications = {
-          timerStop: await isNotificationEnabled(activeTimer.organization.toString(), 'onTimerStop', activeTimer.project?.toString()),
-          overtime: await isNotificationEnabled(activeTimer.organization.toString(), 'onOvertime', activeTimer.project?.toString()),
-          approvalNeeded: await isNotificationEnabled(activeTimer.organization.toString(), 'onApprovalNeeded', activeTimer.project?.toString()),
-          timeSubmitted: await isNotificationEnabled(activeTimer.organization.toString(), 'onTimeSubmitted', activeTimer.project?.toString())
-        }
-
-        const project = await Project.findById(activeTimer.project).select('name')
-        const projectName = project?.name || 'Unknown Project'
-        const hoursFormatted = `${Math.floor(hoursLogged)}h ${Math.round((hoursLogged % 1) * 60)}m`
-
-        const notificationsSent = {
-          timerStop: false,
-          overtime: false,
-          approvalNeeded: false,
-          timeSubmitted: false
-        }
-
-        // Timer stop notification
-        if (notifications.timerStop) {
-          await notificationService.createNotification(
-            activeTimer.user.toString(),
-            activeTimer.organization.toString(),
-            {
-              type: 'time_tracking',
-              title: 'Timer Stopped',
-              message: `Timer stopped for project "${projectName}". Logged ${hoursFormatted}.`,
-              data: {
-                entityType: 'time_entry',
-                entityId: timeEntry._id.toString(),
-                action: 'updated',
-                priority: 'low',
-                url: `/time-tracking/logs`
-              },
-              sendEmail: false,
-              sendPush: false
-            }
-          )
-          notificationsSent.timerStop = true
-        }
-
-        // Overtime notification
-        if (isOvertime && notifications.overtime) {
-          await notificationService.createNotification(
-            activeTimer.user.toString(),
-            activeTimer.organization.toString(),
-            {
-              type: 'time_tracking',
-              title: 'Overtime Alert',
-              message: `Overtime detected: ${hoursFormatted} logged for project "${projectName}". This exceeds the daily/weekly limit.`,
-              data: {
-                entityType: 'time_entry',
-                entityId: timeEntry._id.toString(),
-                action: 'updated',
-                priority: 'high',
-                url: `/time-tracking/logs`
-              },
-              sendEmail: false,
-              sendPush: false
-            }
-          )
-          notificationsSent.overtime = true
-        }
-
-        // Approval needed notification
-        if (requiresApproval && notifications.approvalNeeded) {
-          await notificationService.createNotification(
-            activeTimer.user.toString(),
-            activeTimer.organization.toString(),
-            {
-              type: 'time_tracking',
-              title: 'Approval Required',
-              message: `Time entry for project "${projectName}" (${hoursFormatted}) requires approval.`,
-              data: {
-                entityType: 'time_entry',
-                entityId: timeEntry._id.toString(),
-                action: 'updated',
-                priority: 'medium',
-                url: `/time-tracking/logs`
-              },
-              sendEmail: false,
-              sendPush: false
-            }
-          )
-          notificationsSent.approvalNeeded = true
-        }
-
-        // Time submitted notification (only if not requiring approval, as approval needed covers that case)
-        if (!requiresApproval && notifications.timeSubmitted) {
-          await notificationService.createNotification(
-            activeTimer.user.toString(),
-            activeTimer.organization.toString(),
-            {
-              type: 'time_tracking',
-              title: 'Time Submitted',
-              message: `Time entry for project "${projectName}" (${hoursFormatted}) has been submitted successfully.`,
-              data: {
-                entityType: 'time_entry',
-                entityId: timeEntry._id.toString(),
-                action: 'created',
-                priority: 'low',
-                url: `/time-tracking/logs`
-              },
-              sendEmail: false,
-              sendPush: false
-            }
-          )
-          notificationsSent.timeSubmitted = true
-        }
-
-        return NextResponse.json({
-          message: 'Timer stopped successfully',
-          timeEntry: timeEntry.toObject(),
-          hasTimeLogged,
-          duration: finalDuration,
-          notificationsSent
-        })
+        return NextResponse.json(stopResult.body, { status: stopResult.status })
+      }
 
       case 'update':
         if (description) activeTimer.description = description

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, ArrowLeft, Users } from 'lucide-react'
+import { Badge } from '@/components/ui/Badge'
+import { Loader2, ArrowLeft, Users, X } from 'lucide-react'
 
 interface SprintForm {
   name: string
@@ -48,10 +49,33 @@ export default function EditSprintPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [teamMembers, setTeamMembers] = useState<string[]>([])
+  const [teamMemberQuery, setTeamMemberQuery] = useState('')
+  const [initialTeamMembers, setInitialTeamMembers] = useState<string[] | null>(null)
   const [availableMembers, setAvailableMembers] = useState<TeamMember[]>([])
   const [membersLoading, setMembersLoading] = useState(false)
   const [membersError, setMembersError] = useState('')
   const [calculatedVelocity, setCalculatedVelocity] = useState<number>(0)
+  const [memberLookup, setMemberLookup] = useState<Record<string, TeamMember>>({})
+  const [initialForm, setInitialForm] = useState<SprintForm | null>(null)
+  const [successMessage, setSuccessMessage] = useState('')
+
+  const storeMemberDetails = useCallback((members?: TeamMember[]) => {
+    if (!Array.isArray(members) || members.length === 0) return
+    setMemberLookup((prev) => {
+      const next = { ...prev }
+      members.forEach((member) => {
+        if (member?._id) {
+          next[member._id] = {
+            _id: member._id,
+            firstName: member.firstName,
+            lastName: member.lastName,
+            email: member.email
+          }
+        }
+      })
+      return next
+    })
+  }, [])
 
   const fetchProjectMembers = useCallback(async (projectId?: string) => {
     if (!projectId) {
@@ -67,6 +91,7 @@ export default function EditSprintPage() {
 
       if (res.ok && data.success && data.data?.teamMembers) {
         setAvailableMembers(data.data.teamMembers)
+        storeMemberDetails(data.data.teamMembers)
       } else {
         setAvailableMembers([])
         setMembersError(data.error || 'Failed to load project team members')
@@ -109,17 +134,33 @@ export default function EditSprintPage() {
           setCalculatedVelocity(0)
         }
         
-        setForm({
+        const formattedForm: SprintForm = {
           name: s?.name || '',
           description: s?.description || '',
           status: s?.status || 'planning',
           startDate: s?.startDate ? new Date(s.startDate).toISOString().slice(0, 10) : '',
           endDate: s?.endDate ? new Date(s.endDate).toISOString().slice(0, 10) : '',
           goal: s?.goal || '',
-          capacity: s?.capacity ?? '',
+          capacity:
+            s?.capacity === null || s?.capacity === undefined ? '' : String(s.capacity),
           velocity: '' // Will be calculated, not editable
-        })
-        setTeamMembers(Array.isArray(s?.teamMembers) ? s.teamMembers.map((member: TeamMember) => member._id) : [])
+        }
+        setForm(formattedForm)
+        setInitialForm(formattedForm)
+        const sprintTeamMembers = Array.isArray(s?.teamMembers) ? s.teamMembers : []
+        const sprintMemberIds = sprintTeamMembers
+          .map((member: TeamMember | string) =>
+            typeof member === 'string' ? member : member?._id
+          )
+          .filter((memberId: string | undefined): memberId is string => Boolean(memberId))
+        setTeamMembers(sprintMemberIds)
+        setInitialTeamMembers(sprintMemberIds)
+        storeMemberDetails(
+          sprintTeamMembers.filter(
+            (member: TeamMember | string | null | undefined): member is TeamMember =>
+              typeof member === 'object' && member !== null
+          )
+        )
         await fetchProjectMembers(s?.project?._id)
       } else {
         setError(data.error || 'Failed to load sprint')
@@ -135,7 +176,15 @@ export default function EditSprintPage() {
     if (sprintId) fetchSprint()
   }, [sprintId, fetchSprint])
 
+  useEffect(() => {
+    if (!successMessage) return
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    const timeout = setTimeout(() => setSuccessMessage(''), 4000)
+    return () => clearTimeout(timeout)
+  }, [successMessage])
+
   const handleSave = async () => {
+    if (!hasChanges) return
     try {
       setSaving(true)
       const res = await fetch(`/api/sprints/${sprintId}`, {
@@ -156,7 +205,41 @@ export default function EditSprintPage() {
       })
       const data = await res.json()
       if (data.success) {
-        router.push(`/sprints/${sprintId}`)
+        const updatedSprint = data.data
+        if (updatedSprint) {
+          const updatedForm: SprintForm = {
+            name: updatedSprint?.name || '',
+            description: updatedSprint?.description || '',
+            status: updatedSprint?.status || 'planning',
+            startDate: updatedSprint?.startDate ? new Date(updatedSprint.startDate).toISOString().slice(0, 10) : '',
+            endDate: updatedSprint?.endDate ? new Date(updatedSprint.endDate).toISOString().slice(0, 10) : '',
+            goal: updatedSprint?.goal || '',
+            capacity:
+              updatedSprint?.capacity === null || updatedSprint?.capacity === undefined
+                ? ''
+                : String(updatedSprint.capacity),
+            velocity: ''
+          }
+          setForm(updatedForm)
+          setInitialForm(updatedForm)
+
+          const updatedTeamMembersRaw = Array.isArray(updatedSprint?.teamMembers) ? updatedSprint.teamMembers : []
+          const updatedTeamMemberIds = updatedTeamMembersRaw
+            .map((member: TeamMember | string) =>
+              typeof member === 'string' ? member : member?._id
+            )
+            .filter((memberId: string | undefined): memberId is string => Boolean(memberId))
+          setTeamMembers(updatedTeamMemberIds)
+          setInitialTeamMembers(updatedTeamMemberIds)
+          storeMemberDetails(
+            updatedTeamMembersRaw.filter(
+              (member: TeamMember | string | null | undefined): member is TeamMember =>
+                typeof member === 'object' && member !== null
+            )
+          )
+        }
+        setSuccessMessage('Sprint updated successfully')
+        setError('')
       } else {
         setError(data.error || 'Failed to save sprint')
       }
@@ -166,6 +249,50 @@ export default function EditSprintPage() {
       setSaving(false)
     }
   }
+
+  const filteredTeamOptions = useMemo(() => {
+    const query = teamMemberQuery.trim().toLowerCase()
+    if (!query) return availableMembers
+    return availableMembers.filter((member) => {
+      const fullName = `${member.firstName} ${member.lastName}`.toLowerCase()
+      return (
+        fullName.includes(query) ||
+        (member.email ? member.email.toLowerCase().includes(query) : false)
+      )
+    })
+  }, [availableMembers, teamMembers, teamMemberQuery])
+
+  const isSelectDisabled = membersLoading || availableMembers.length === 0
+
+  const handleRemoveMember = (memberId: string) => {
+    setTeamMembers((prev) => prev.filter((id) => id !== memberId))
+  }
+
+  const normalizeValue = (value: string | number | undefined | null) =>
+    value === '' || value === undefined || value === null ? '' : String(value)
+
+  const hasFormChanges = useMemo(() => {
+    if (!initialForm) return false
+    return (
+      form.name !== initialForm.name ||
+      form.description !== initialForm.description ||
+      form.status !== initialForm.status ||
+      form.startDate !== initialForm.startDate ||
+      form.endDate !== initialForm.endDate ||
+      form.goal !== initialForm.goal ||
+      normalizeValue(form.capacity) !== normalizeValue(initialForm.capacity)
+    )
+  }, [form, initialForm])
+
+  const hasTeamChanges = useMemo(() => {
+    if (!initialTeamMembers) return false
+    if (teamMembers.length !== initialTeamMembers.length) return true
+    const sortedCurrent = [...teamMembers].sort()
+    const sortedInitial = [...initialTeamMembers].sort()
+    return sortedCurrent.some((memberId, index) => memberId !== sortedInitial[index])
+  }, [teamMembers, initialTeamMembers])
+
+  const hasChanges = hasFormChanges || hasTeamChanges
 
   if (loading) {
     return (
@@ -201,6 +328,11 @@ export default function EditSprintPage() {
         <Button variant="ghost" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
+        {successMessage && (
+          <Alert variant="success">
+            <AlertDescription>{successMessage}</AlertDescription>
+          </Alert>
+        )}
         <Card>
           <CardHeader>
             <CardTitle>Edit Sprint</CardTitle>
@@ -275,7 +407,7 @@ export default function EditSprintPage() {
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium flex items-center space-x-2">
                   <Users className="h-4 w-4 text-muted-foreground" />
@@ -293,48 +425,138 @@ export default function EditSprintPage() {
                   <AlertDescription className="text-xs">{membersError}</AlertDescription>
                 </Alert>
               )}
-              {availableMembers.length === 0 && !membersLoading ? (
-                <p className="text-xs text-muted-foreground italic">
-                  No team members available for this sprint&apos;s project.
-                </p>
-              ) : (
-                <div className="max-h-48 overflow-y-auto border rounded-md divide-y divide-border">
-                  {availableMembers.map((member) => {
-                    const memberId = member._id
-                    const isChecked = teamMembers.includes(memberId)
-                    return (
-                      <label
-                        key={memberId}
-                        className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-muted/60 transition-colors"
-                      >
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-medium text-foreground truncate">
-                            {member.firstName} {member.lastName}
-                          </span>
-                          <span className="text-xs text-muted-foreground truncate">{member.email}</span>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() =>
-                            setTeamMembers((prev) =>
-                              prev.includes(memberId)
-                                ? prev.filter((id) => id !== memberId)
-                                : [...prev, memberId]
-                            )
-                          }
-                          className="h-4 w-4"
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Select
+                    value=""
+                    onValueChange={(value) => {
+                      if (!teamMembers.includes(value)) {
+                        setTeamMembers((prev) => [...prev, value])
+                        setTeamMemberQuery('')
+                      }
+                    }}
+                    disabled={isSelectDisabled}
+                  >
+                  <SelectTrigger className="w-full">
+                    <SelectValue
+                      placeholder={
+                        membersLoading
+                          ? 'Loading team members...'
+                          : availableMembers.length === 0
+                            ? 'No team members for this project'
+                            : 'Search team members'
+                      }
+                    />
+                  </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div className="p-2">
+                        <Input
+                          value={teamMemberQuery}
+                          onChange={(e) => setTeamMemberQuery(e.target.value)}
+                          placeholder="Search team members"
+                          className="mb-2"
                         />
-                      </label>
-                    )
-                  })}
+                        <div className="max-h-56 overflow-y-auto">
+                          {membersLoading ? (
+                            <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Loading members...</span>
+                            </div>
+                          ) : availableMembers.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">
+                              No team members available
+                            </div>
+                          ) : filteredTeamOptions.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">
+                              No matching team members
+                            </div>
+                          ) : (
+                            filteredTeamOptions.map((member) => {
+                              const isSelected = teamMembers.includes(member._id)
+                              return (
+                                <SelectItem
+                                  key={member._id}
+                                  value={member._id}
+                                  disabled={isSelected}
+                                  className={isSelected ? 'opacity-50 cursor-not-allowed' : ''}
+                                >
+                                  <div className="flex items-center justify-between w-full">
+                                    <span className="text-sm font-medium truncate">
+                                      {member.firstName} {member.lastName}
+                                    </span>
+                                    {member.email && (
+                                      <span className="text-xs text-muted-foreground ml-2 truncate max-w-[150px]">
+                                        {member.email}
+                                      </span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              )
+                            })
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                  {!membersLoading && availableMembers.length === 0 && (
+                    <p className="text-xs text-muted-foreground italic">
+                      No team members available for this sprint&apos;s project.
+                    </p>
+                  )}
                 </div>
-              )}
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Assigned members ({teamMembers.length})
+                    </p>
+                    {teamMembers.length > 4 && (
+                      <span className="text-[10px] text-muted-foreground">Scroll to view all</span>
+                    )}
+                  </div>
+                  {teamMembers.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic">No members assigned yet.</p>
+                  ) : (
+                    <div className="max-h-40 overflow-y-auto rounded-md border border-dashed bg-muted/20 p-2">
+                      <div className="flex flex-wrap gap-2">
+                        {teamMembers.map((memberId) => {
+                          const member = memberLookup[memberId]
+                          const memberLabel = member
+                            ? `${member.firstName} ${member.lastName}`
+                            : 'Member unavailable'
+                          return (
+                            <Badge
+                              key={memberId}
+                              variant="secondary"
+                              className="flex items-center gap-1 px-3 py-1 text-xs bg-background border"
+                              title={
+                                member
+                                  ? `${member.firstName} ${member.lastName} (${member.email})`
+                                  : undefined
+                              }
+                            >
+                              <span className="truncate max-w-[150px]">{memberLabel}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveMember(memberId)}
+                                className="ml-1 rounded-full p-0.5 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              >
+                                <X className="h-3 w-3" />
+                                <span className="sr-only">Remove {memberLabel}</span>
+                              </button>
+                            </Badge>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => router.push(`/sprints/${sprintId}`)}>Cancel</Button>
-              <Button onClick={handleSave} disabled={saving}>
+              <Button onClick={handleSave} disabled={saving || !hasChanges}>
                 {saving ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>) : 'Save Changes'}
               </Button>
             </div>

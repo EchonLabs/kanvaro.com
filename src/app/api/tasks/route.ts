@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
+import mongoose from 'mongoose'
 import { Task, TASK_STATUS_VALUES, TaskStatus } from '@/models/Task'
 import { Project } from '@/models/Project'
 import { User } from '@/models/User'
@@ -10,6 +11,8 @@ import { notificationService } from '@/lib/notification-service'
 import { cache, invalidateCache } from '@/lib/redis'
 import crypto from 'crypto'
 import { Counter } from '@/models/Counter'
+
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 const TASK_STATUS_SET = new Set<TaskStatus>(TASK_STATUS_VALUES)
 
@@ -209,18 +212,23 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      if (search.length >= 3) {
-        filters.$text = { $search: search };
-      } else {
-        filters.$and = [
-          {
-            $or: [
-              { title: { $regex: search, $options: 'i' } },
-              { description: { $regex: search, $options: 'i' } },
-            ],
-          },
-        ];
+      const trimmedSearch = search.trim()
+      const escapedSearch = escapeRegex(trimmedSearch)
+      const fuzzyRegex = new RegExp(escapedSearch, 'i')
+      const displayIdRegex = new RegExp(`^${escapedSearch}$`, 'i')
+      const orFilters: any[] = [
+        { title: fuzzyRegex },
+        { description: fuzzyRegex },
+        { displayId: trimmedSearch.includes('.') ? displayIdRegex : fuzzyRegex }
+      ]
+
+      const numericValue = Number(trimmedSearch)
+      if (!Number.isNaN(numericValue)) {
+        orFilters.push({ taskNumber: numericValue })
       }
+
+      filters.$and = filters.$and || []
+      filters.$and.push({ $or: orFilters })
     }
 
     if (status) filters.status = status;
@@ -328,6 +336,7 @@ export async function POST(request: NextRequest) {
       type,
       project,
       story,
+      epic,
       parentTask,
       assignedTo,
       storyPoints,
@@ -338,16 +347,7 @@ export async function POST(request: NextRequest) {
       attachments
     } = payload
 
-    // Check if user can create tasks (project-scoped permission)
-    const canCreateTask = await PermissionService.hasPermission(userId, Permission.TASK_CREATE, project)
-    if (!canCreateTask) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions to create tasks' },
-        { status: 403 }
-      )
-    }
-
-    // Validate required fields
+    // Validate required fields first (fail fast)
     if (!title || !project) {
       return NextResponse.json(
         { error: 'Title and project are required' },
@@ -355,12 +355,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Resolve project number and next task number for this project (do this first as we need it)
-    const projectDoc = await Project.findById(project).select('projectNumber organization name')
+    // Fetch project and check permissions in parallel for better performance
+    const [projectDoc, canCreateTask] = await Promise.all([
+      Project.findById(project).select('projectNumber organization name teamMembers createdBy'),
+      PermissionService.hasPermission(userId, Permission.TASK_CREATE, project)
+    ])
+
     if (!projectDoc) {
       return NextResponse.json(
         { error: 'Project not found' },
         { status: 400 }
+      )
+    }
+
+    // Verify user has access to this project (quick check before permission check)
+    const isProjectMember = projectDoc.teamMembers?.some((member: any) => 
+      member.toString() === userId || (typeof member === 'object' && member._id?.toString() === userId)
+    ) || projectDoc.createdBy?.toString() === userId
+
+    if (!canCreateTask && !isProjectMember) {
+      return NextResponse.json(
+        { error: 'Insufficient permissions to create tasks' },
+        { status: 403 }
       )
     }
 
@@ -395,6 +411,7 @@ export async function POST(request: NextRequest) {
 
     // Create task
     const normalizedStory = typeof story === 'string' && story.trim() !== '' ? story.trim() : undefined
+    const normalizedEpic = typeof epic === 'string' && epic.trim() !== '' ? epic.trim() : undefined
     const normalizedParentTask = typeof parentTask === 'string' && parentTask.trim() !== '' ? parentTask.trim() : undefined
     const normalizedAssignedTo = typeof assignedTo === 'string' && assignedTo.trim() !== '' ? assignedTo.trim() : undefined
 
@@ -409,6 +426,7 @@ export async function POST(request: NextRequest) {
       taskNumber,
       displayId,
       story: normalizedStory,
+      epic: normalizedEpic,
       parentTask: normalizedParentTask,
       assignedTo: normalizedAssignedTo,
       createdBy: userId,
@@ -425,17 +443,46 @@ export async function POST(request: NextRequest) {
       position: nextPosition
     })
 
-    await task.save()
+    // Save task and prepare response data in parallel where possible
+    const savePromise = task.save()
 
-    // Populate the created task (do this before cache invalidation to ensure we have the data)
+    // Build minimal populate paths for faster response
+    // Only populate essential fields that are likely to be used immediately
+    const populatePaths: any[] = [
+      { path: 'project', select: '_id name' },
+      { path: 'assignedTo', select: 'firstName lastName email' },
+      { path: 'createdBy', select: 'firstName lastName email' }
+    ]
+
+    // Only populate story/epic if they exist (avoid unnecessary queries)
+    if (normalizedStory) {
+      populatePaths.push({ path: 'story', select: 'title status' })
+    }
+    if (normalizedEpic) {
+      populatePaths.push({ path: 'epic', select: 'title' })
+    }
+    if (normalizedParentTask) {
+      populatePaths.push({ path: 'parentTask', select: 'title' })
+    }
+
+    // Only add sprint if model is registered and task has sprint
+    if (mongoose.models.Sprint && task.sprint) {
+      populatePaths.push({ path: 'sprint', select: 'name status' })
+    }
+
+    // Populate attachments.uploadedBy only if there are attachments
+    if (task.attachments && Array.isArray(task.attachments) && task.attachments.length > 0) {
+      populatePaths.push({ path: 'attachments.uploadedBy', select: 'firstName lastName email' })
+    }
+
+    // Wait for save to complete, then populate
+    await savePromise
+
+    // Use lean() for faster queries - returns plain JS objects instead of Mongoose documents
     const populatedTask = await Task.findById(task._id)
-      .populate('project', '_id name')
-      .populate('assignedTo', 'firstName lastName email')
-      .populate('createdBy', 'firstName lastName email')
-      .populate('story', 'title status')
-      .populate('sprint', 'name status')
-      .populate('parentTask', 'title')
-      .populate('attachments.uploadedBy', 'firstName lastName email')
+      .populate(populatePaths)
+      .lean()
+      .exec()
 
     // Return response immediately to avoid blocking on slow operations
     const responseData = {

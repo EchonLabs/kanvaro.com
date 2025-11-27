@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Story } from '@/models/Story'
+import { Epic } from '@/models/Epic'
 import { authenticateUser } from '@/lib/auth-utils'
 
 export async function GET(
@@ -123,6 +124,15 @@ export async function PUT(
         { error: 'Story not found or unauthorized' },
         { status: 404 }
       )
+    }
+
+    // If this story belongs to an epic, check if epic should be completed
+    // Use the completion service to ensure consistent logic
+    if (story.epic) {
+      const { CompletionService } = await import('@/lib/completion-service')
+      CompletionService.checkEpicCompletion(story.epic.toString()).catch(error => {
+        console.error('Error checking epic completion:', error)
+      })
     }
 
     return NextResponse.json({

@@ -267,6 +267,24 @@ export function OrganizationSettings() {
     }
   }, [organization])
 
+  useEffect(() => {
+    if (message?.type !== 'success') return
+    const timeout = setTimeout(() => setMessage(null), 5000)
+    return () => clearTimeout(timeout)
+  }, [message])
+
+  useEffect(() => {
+    if (registrationMessage?.type !== 'success') return
+    const timeout = setTimeout(() => setRegistrationMessage(null), 5000)
+    return () => clearTimeout(timeout)
+  }, [registrationMessage])
+
+  useEffect(() => {
+    if (timeTrackingMessage?.type !== 'success') return
+    const timeout = setTimeout(() => setTimeTrackingMessage(null), 5000)
+    return () => clearTimeout(timeout)
+  }, [timeTrackingMessage])
+
   const handleSave = async () => {
     if (!validateForm()) {
       return
@@ -789,13 +807,21 @@ export function OrganizationSettings() {
           </div>
 
           {message && (
-            <Alert variant={message.type === 'error' ? 'destructive' : 'default'}>
+            <Alert variant={message.type === 'error' ? 'destructive' : 'default'} className="flex items-start gap-2">
               <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-              <AlertDescription className="text-xs sm:text-sm break-words">{message.text}</AlertDescription>
+              <AlertDescription className="text-xs sm:text-sm break-words flex-1">{message.text}</AlertDescription>
+              <button
+                type="button"
+                onClick={() => setMessage(null)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Dismiss notification"
+              >
+                <X className="h-3 w-3 sm:h-4 sm:w-4" />
+              </button>
             </Alert>
           )}
 
-          <div className="flex justify-end mt-4 sm:mt-6">
+          <div className="flex justify-end mt-6 sm:mt-8">
             <Button onClick={handleSave} disabled={saving || !isFormValid} className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm">
               {saving ? (
                 <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
@@ -845,17 +871,25 @@ export function OrganizationSettings() {
           </div>
 
           {registrationMessage && (
-            <Alert variant={registrationMessage.type === 'error' ? 'destructive' : 'default'}>
+            <Alert variant={registrationMessage.type === 'error' ? 'destructive' : 'default'} className="flex items-start gap-2">
               {registrationMessage.type === 'error' ? (
                 <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
               ) : (
                 <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
               )}
-              <AlertDescription className="text-xs sm:text-sm break-words">{registrationMessage.text}</AlertDescription>
+              <AlertDescription className="text-xs sm:text-sm break-words flex-1">{registrationMessage.text}</AlertDescription>
+              <button
+                type="button"
+                onClick={() => setRegistrationMessage(null)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Dismiss notification"
+              >
+                <X className="h-3 w-3 sm:h-4 sm:w-4" />
+              </button>
             </Alert>
           )}
 
-          <div className="flex justify-end mt-4 sm:mt-6">
+          <div className="flex justify-end mt-6 sm:mt-8">
             <Button 
               onClick={handleSaveRegistrationSettings} 
               disabled={savingRegistration} 
@@ -1301,17 +1335,25 @@ export function OrganizationSettings() {
           )}
 
           {timeTrackingMessage && (
-            <Alert variant={timeTrackingMessage.type === 'error' ? 'destructive' : 'default'}>
+            <Alert variant={timeTrackingMessage.type === 'error' ? 'destructive' : 'default'} className="flex items-start gap-2">
               {timeTrackingMessage.type === 'error' ? (
                 <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
               ) : (
                 <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
               )}
-              <AlertDescription className="text-xs sm:text-sm break-words">{timeTrackingMessage.text}</AlertDescription>
+              <AlertDescription className="text-xs sm:text-sm break-words flex-1">{timeTrackingMessage.text}</AlertDescription>
+              <button
+                type="button"
+                onClick={() => setTimeTrackingMessage(null)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Dismiss notification"
+              >
+                <X className="h-3 w-3 sm:h-4 sm:w-4" />
+              </button>
             </Alert>
           )}
 
-          <div className="flex justify-end mt-4 sm:mt-6">
+          <div className="flex justify-end mt-6 sm:mt-8">
             <Button 
               onClick={handleSaveTimeTrackingSettings} 
               disabled={savingTimeTracking} 

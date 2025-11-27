@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
 import { PasswordStrength } from '@/components/ui/PasswordStrength'
-import { Loader2, CheckCircle } from 'lucide-react'
+import { Loader2, CheckCircle, Eye, EyeOff, Info } from 'lucide-react'
 
 interface InvitationData {
   email: string
@@ -59,6 +59,8 @@ function AcceptInvitationContent() {
   })
 
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   useEffect(() => {
     if (token) {
@@ -380,24 +382,80 @@ function AcceptInvitationContent() {
                 <Label htmlFor="password" className="text-sm font-medium">
                   Password <span className="text-destructive">*</span>
                 </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => handleFieldChange('password', e.target.value)}
-                  onBlur={() => handleFieldBlur('password')}
-                  required
-                  minLength={8}
-                  className={`h-11 ${touched.password && fieldErrors.password ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                  placeholder="Create a strong password"
-                  aria-invalid={touched.password && !!fieldErrors.password}
-                  aria-describedby={touched.password && fieldErrors.password ? 'password-error' : undefined}
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => handleFieldChange('password', e.target.value)}
+                    onBlur={() => handleFieldBlur('password')}
+                    required
+                    minLength={8}
+                    className={`h-11 pr-10 ${touched.password && fieldErrors.password ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                    placeholder="Create a strong password"
+                    aria-invalid={touched.password && !!fieldErrors.password}
+                    aria-describedby={touched.password && fieldErrors.password ? 'password-error' : undefined}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
                 {touched.password && fieldErrors.password && (
                   <p id="password-error" className="text-sm text-destructive mt-1">
                     {fieldErrors.password}
                   </p>
                 )}
+                <div className="mt-2 p-3 bg-muted/50 border border-border rounded-md">
+                  <div className="flex items-start gap-2">
+                    <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-foreground mb-1.5">Password Requirements:</p>
+                      <ul className="text-xs text-muted-foreground space-y-1">
+                        <li className="flex items-center gap-1.5">
+                          <span className={formData.password.length >= 8 ? 'text-green-600 dark:text-green-400' : ''}>
+                            {formData.password.length >= 8 ? '✓' : '•'}
+                          </span>
+                          At least 8 characters long
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <span className={/[a-z]/.test(formData.password) ? 'text-green-600 dark:text-green-400' : ''}>
+                            {/[a-z]/.test(formData.password) ? '✓' : '•'}
+                          </span>
+                          Contains lowercase letter
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <span className={/[A-Z]/.test(formData.password) ? 'text-green-600 dark:text-green-400' : ''}>
+                            {/[A-Z]/.test(formData.password) ? '✓' : '•'}
+                          </span>
+                          Contains uppercase letter
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <span className={/\d/.test(formData.password) ? 'text-green-600 dark:text-green-400' : ''}>
+                            {/\d/.test(formData.password) ? '✓' : '•'}
+                          </span>
+                          Contains number
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <span className={/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? 'text-green-600 dark:text-green-400' : ''}>
+                            {/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? '✓' : '•'}
+                          </span>
+                          Contains special character (!@#$%^&*...)
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
                 <PasswordStrength password={formData.password} />
               </div>
 
@@ -405,19 +463,35 @@ function AcceptInvitationContent() {
                 <Label htmlFor="confirmPassword" className="text-sm font-medium">
                   Confirm Password <span className="text-destructive">*</span>
                 </Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={formData.confirmPassword}
-                  onChange={(e) => handleFieldChange('confirmPassword', e.target.value)}
-                  onBlur={() => handleFieldBlur('confirmPassword')}
-                  required
-                  minLength={8}
-                  className={`h-11 ${touched.confirmPassword && fieldErrors.confirmPassword ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                  placeholder="Confirm your password"
-                  aria-invalid={touched.confirmPassword && !!fieldErrors.confirmPassword}
-                  aria-describedby={touched.confirmPassword && fieldErrors.confirmPassword ? 'confirmPassword-error' : undefined}
-                />
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={formData.confirmPassword}
+                    onChange={(e) => handleFieldChange('confirmPassword', e.target.value)}
+                    onBlur={() => handleFieldBlur('confirmPassword')}
+                    required
+                    minLength={8}
+                    className={`h-11 pr-10 ${touched.confirmPassword && fieldErrors.confirmPassword ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                    placeholder="Confirm your password"
+                    aria-invalid={touched.confirmPassword && !!fieldErrors.confirmPassword}
+                    aria-describedby={touched.confirmPassword && fieldErrors.confirmPassword ? 'confirmPassword-error' : undefined}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
                 {touched.confirmPassword && fieldErrors.confirmPassword && (
                   <p id="confirmPassword-error" className="text-sm text-destructive mt-1">
                     {fieldErrors.confirmPassword}
