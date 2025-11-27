@@ -273,7 +273,44 @@ export default function MembersPage() {
     return matchesSearch && matchesRole && matchesStatus
   })
 
-  const getRoleColor = (role: string) => {
+  // Generate a consistent color for custom roles based on their ID
+  const getCustomRoleColor = (customRoleId: string): string => {
+    // Hash function to convert ID to a number
+    let hash = 0
+    for (let i = 0; i < customRoleId.length; i++) {
+      hash = customRoleId.charCodeAt(i) + ((hash << 5) - hash)
+      hash = hash & hash // Convert to 32-bit integer
+    }
+    
+    // Use absolute value and modulo to get a consistent index
+    const index = Math.abs(hash) % 12
+    
+    // Palette of distinct colors (avoiding red which is for admin)
+    const colorPalette = [
+      'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
+      'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200',
+      'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200',
+      'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
+      'bg-lime-100 text-lime-800 dark:bg-lime-900 dark:text-lime-200',
+      'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+      'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+      'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+      'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200',
+      'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200',
+      'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900 dark:text-fuchsia-200',
+      'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200',
+    ]
+    
+    return colorPalette[index]
+  }
+
+  const getRoleColor = (role: string, customRoleId?: string) => {
+    // If custom role exists, use custom role color
+    if (customRoleId) {
+      return getCustomRoleColor(customRoleId)
+    }
+    
+    // Otherwise, use predefined role colors
     switch (role) {
       case 'admin': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
       case 'project_manager': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
@@ -472,7 +509,7 @@ export default function MembersPage() {
                           </div>
                           <p className="text-xs sm:text-sm text-muted-foreground truncate mb-2" title={member.email}>{member.email}</p>
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge className={`${getRoleColor(member.role)} text-xs flex-shrink-0`}>
+                            <Badge className={`${getRoleColor(member.role, member.customRole?._id)} text-xs flex-shrink-0`}>
                               {getMemberRoleLabel(member)}
                             </Badge>
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -542,7 +579,7 @@ export default function MembersPage() {
                             Invited by {invitation.invitedBy.firstName} {invitation.invitedBy.lastName}
                           </p>
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge className={`${getRoleColor(invitation.role)} text-xs flex-shrink-0`}>
+                            <Badge className={`${getRoleColor(invitation.role, invitation.customRole?._id)} text-xs flex-shrink-0`}>
                               {getInvitationRoleLabel(invitation)}
                             </Badge>
                             <span className="text-xs text-muted-foreground whitespace-nowrap">

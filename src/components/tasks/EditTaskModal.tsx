@@ -99,6 +99,8 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
   const [loadingEpics, setLoadingEpics] = useState(false)
   const [storyQuery, setStoryQuery] = useState('')
   const [epicQuery, setEpicQuery] = useState('')
+  const [assignedToIds, setAssignedToIds] = useState<string[]>([])
+  const [assigneeQuery, setAssigneeQuery] = useState('')
   const [formData, setFormData] = useState<TaskFormData>({
     title: '',
     description: '',
@@ -120,13 +122,14 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
   useEffect(() => {
     if (isOpen && task) {
       // Populate form with task data
+      const assignedToId = task.assignedTo?._id || task.assignedTo || ''
       const initialData: TaskFormData = {
         title: task.title || '',
         description: task.description || '',
         status: (task.status || 'backlog') as SubtaskStatus,
         priority: task.priority || 'medium',
         type: task.type || 'task',
-        assignedTo: task.assignedTo?._id || '',
+        assignedTo: assignedToId,
         dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
         estimatedHours: task.estimatedHours?.toString() || '',
         labels: task.labels?.join(', ') || '',
@@ -135,6 +138,14 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
       }
       setFormData(initialData)
       setInitialFormData(initialData)
+      // Set assignedToIds array - if task has assignees array, use it, otherwise use assignedTo
+      if (task.assignees && Array.isArray(task.assignees) && task.assignees.length > 0) {
+        setAssignedToIds(task.assignees.map((a: any) => a._id || a))
+      } else if (assignedToId) {
+        setAssignedToIds([assignedToId])
+      } else {
+        setAssignedToIds([])
+      }
       
       // Set subtasks if they exist
       const initialSubtasksData: Subtask[] = task.subtasks && Array.isArray(task.subtasks)
@@ -151,15 +162,22 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
       setSubtasks(initialSubtasksData)
       setInitialSubtasks(initialSubtasksData)
       
-      fetchUsers()
-      // Fetch project statuses if project is available
+      // Fetch all data in parallel for better performance
       if (task.project) {
         const projectId = typeof task.project === 'string' ? task.project : task.project._id
         if (projectId) {
-          fetchProjectStatuses(projectId)
-          fetchStories(projectId)
-          fetchEpics(projectId)
+          // Fetch all data in parallel using Promise.all
+          Promise.all([
+            fetchUsers(projectId),
+            fetchProjectStatuses(projectId),
+            fetchStories(projectId),
+            fetchEpics(projectId)
+          ]).catch((error) => {
+            console.error('Error fetching task edit data:', error)
+          })
         }
+      } else {
+        setUsers([])
       }
     }
   }, [isOpen, task])
@@ -189,20 +207,45 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
     }
   }
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (projectId: string) => {
+    if (!projectId) {
+      setUsers([])
+      return
+    }
+    
     setLoadingUsers(true)
     try {
-      const response = await fetch('/api/members')
+      // Use the same approach as CreateTaskModal - fetch project and extract teamMembers
+      const response = await fetch(`/api/projects/${projectId}`)
       const data = await response.json()
       
-      if (data.success && data.data && Array.isArray(data.data.members)) {
-        setUsers(data.data.members)
+      if (response.ok && data.success && data.data) {
+        const members = Array.isArray(data.data.teamMembers) ? data.data.teamMembers : []
+        setUsers(members)
       } else {
-        setUsers([])
+        // Fallback to all members if project endpoint doesn't work
+        const fallbackResponse = await fetch('/api/members')
+        const fallbackData = await fallbackResponse.json()
+        if (fallbackData.success && fallbackData.data && Array.isArray(fallbackData.data.members)) {
+          setUsers(fallbackData.data.members)
+        } else {
+          setUsers([])
+        }
       }
     } catch (error) {
       console.error('Failed to fetch users:', error)
-      setUsers([])
+      // Fallback to all members
+      try {
+        const fallbackResponse = await fetch('/api/members')
+        const fallbackData = await fallbackResponse.json()
+        if (fallbackData.success && fallbackData.data && Array.isArray(fallbackData.data.members)) {
+          setUsers(fallbackData.data.members)
+        } else {
+          setUsers([])
+        }
+      } catch (fallbackError) {
+        setUsers([])
+      }
     } finally {
       setLoadingUsers(false)
     }
@@ -261,6 +304,13 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
     setLoading(true)
     setError('')
 
+    // Validate required fields
+    if (assignedToIds.length === 0) {
+      setError('Please assign this task to at least one team member')
+      setLoading(false)
+      return
+    }
+
     try {
       const preparedSubtasks = subtasks.map(subtask => ({
         _id: subtask._id,
@@ -270,6 +320,15 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
         isCompleted: subtask.status === 'done' ? true : subtask.isCompleted
       }))
 
+      // Handle assignees: if multiple, send assignees array; if single, send assignedTo
+      const assigneesPayload: any = {}
+      if (assignedToIds.length === 1) {
+        assigneesPayload.assignedTo = assignedToIds[0]
+      } else {
+        assigneesPayload.assignedTo = assignedToIds[0] // Backend only supports single for now
+        assigneesPayload.assignees = assignedToIds // Send array for future support
+      }
+
       const response = await fetch(`/api/tasks/${task._id}`, {
         method: 'PUT',
         headers: {
@@ -277,7 +336,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
         },
         body: JSON.stringify({
           ...formData,
-          assignedTo: formData.assignedTo === 'unassigned' ? undefined : formData.assignedTo || undefined,
+          ...assigneesPayload,
           estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined,
           dueDate: formData.dueDate || undefined,
           labels: formData.labels ? formData.labels.split(',').map(label => label.trim()) : [],
@@ -368,6 +427,14 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
       return val
     }
 
+    // Check if assignedToIds have changed
+    const initialAssignedToIds = initialFormData?.assignedTo 
+      ? (task.assignees && Array.isArray(task.assignees) && task.assignees.length > 0
+          ? task.assignees.map((a: any) => a._id || a)
+          : [initialFormData.assignedTo])
+      : []
+    const assignedToIdsChanged = JSON.stringify([...assignedToIds].sort()) !== JSON.stringify([...initialAssignedToIds].sort())
+
     // Check if form data has changed
     const formDataChanged = 
       normalizeString(formData.title) !== normalizeString(initialFormData.title) ||
@@ -375,7 +442,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
       formData.status !== initialFormData.status ||
       formData.priority !== initialFormData.priority ||
       formData.type !== initialFormData.type ||
-      normalizeAssignedTo(formData.assignedTo) !== normalizeAssignedTo(initialFormData.assignedTo) ||
+      assignedToIdsChanged ||
       normalizeNumber(formData.estimatedHours) !== normalizeNumber(initialFormData.estimatedHours) ||
       (formData.dueDate || '') !== (initialFormData.dueDate || '') ||
       normalizeString(formData.labels) !== normalizeString(initialFormData.labels) ||
@@ -438,7 +505,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
 
   // Compute if there are changes and if button should be enabled
   const hasFormChanges = hasChanges()
-  const isButtonDisabled = loading || !formData.title.trim() || !initialFormData || !hasFormChanges
+  const isButtonDisabled = loading || !formData.title.trim() || !initialFormData || !hasFormChanges || assignedToIds.length === 0
 
   if (!isOpen || !task) return null
 
@@ -665,36 +732,103 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
                 </>
               )}
 
-              <div>
-                <label className="text-sm font-medium text-foreground">Assigned To</label>
-                <Select value={formData.assignedTo} onValueChange={(value) => setFormData({...formData, assignedTo: value})}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder={loadingUsers ? "Loading members..." : "Select assignee"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {loadingUsers ? (
-                      <SelectItem value="loading" disabled>
-                        <div className="flex items-center space-x-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span>Loading members...</span>
+              <div className="md:col-span-2">
+                <label className="text-sm font-medium text-foreground">Assigned To *</label>
+                <div className="space-y-2 mt-1">
+                  <Select
+                    value=""
+                    onValueChange={(value) => {
+                      if (!assignedToIds.includes(value)) {
+                        setAssignedToIds(prev => [...prev, value])
+                        setAssigneeQuery('')
+                      }
+                    }}
+                    onOpenChange={(open) => { if (open) setAssigneeQuery(""); }}
+                  >
+                    <SelectTrigger className={assignedToIds.length === 0 ? 'border-destructive' : ''}>
+                      <SelectValue placeholder={loadingUsers ? 'Loading members...' : 'Select team members *'} />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div className="p-2">
+                        <Input
+                          value={assigneeQuery}
+                          onChange={e => setAssigneeQuery(e.target.value)}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          placeholder={loadingUsers ? 'Loading members...' : 'Type to search team members'}
+                          className="mb-2"
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          {loadingUsers ? (
+                            <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Loading members...</span>
+                            </div>
+                          ) : users.length === 0 ? (
+                            <div className="px-2 py-1 text-sm text-muted-foreground">No team members found</div>
+                          ) : (() => {
+                            const q = assigneeQuery.toLowerCase().trim()
+                            const filtered = users.filter(u =>
+                              !q ||
+                              `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
+                              u.email.toLowerCase().includes(q)
+                            )
+
+                            if (filtered.length === 0) {
+                              return (
+                                <div className="px-2 py-1 text-sm text-muted-foreground">No matching members</div>
+                              )
+                            }
+
+                            return filtered.map(user => {
+                              const isSelected = assignedToIds.includes(user._id)
+                              return (
+                                <SelectItem
+                                  key={user._id}
+                                  value={user._id}
+                                  disabled={isSelected}
+                                  className={isSelected ? 'opacity-50 cursor-not-allowed' : ''}
+                                >
+                                  <div className="flex items-center justify-between w-full">
+                                    <span>{user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span></span>
+                                    {isSelected && (
+                                      <span className="text-xs text-muted-foreground ml-2">Selected</span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              )
+                            })
+                          })()}
                         </div>
-                      </SelectItem>
-                    ) : (
-                      Array.isArray(users) && users.length > 0 ? (
-                        users.map((user) => (
-                          <SelectItem key={user._id} value={user._id}>
-                            {user.firstName} {user.lastName}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="no-users" disabled>
-                          No team members found
-                        </SelectItem>
-                      )
-                    )}
-                  </SelectContent>
-                </Select>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                  {assignedToIds.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {assignedToIds.map(id => {
+                        const u = users.find(x => x._id === id);
+                        if (!u) return null;
+                        return (
+                          <Badge
+                            key={id}
+                            variant="secondary"
+                            className="flex items-center gap-1 px-3 py-1 text-xs bg-background border"
+                            title={`${u.firstName} ${u.lastName} (${u.email})`}
+                          >
+                            <span className="truncate max-w-[150px]">{u.firstName} {u.lastName}</span>
+                            <button
+                              type="button"
+                              onClick={() => setAssignedToIds(prev => prev.filter(x => x !== id))}
+                              className="ml-1 rounded-full p-0.5 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                              aria-label={`Remove ${u.firstName} ${u.lastName}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>

@@ -919,18 +919,15 @@ export default function CreateTaskModal({
                     <Select
                       value=""
                       onValueChange={(value) => {
-                        if (value === '__unassigned') {
-                          setAssignedToIds([])
-                          return
-                        }
                         if (!assignedToIds.includes(value)) {
                           setAssignedToIds(prev => [...prev, value])
+                          setAssigneeQuery('')
                         }
                       }}
                       onOpenChange={(open) => { if (open) setAssigneeQuery(""); }}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder={loadingProjectMembers ? 'Loading members...' : 'Select team members'} />
+                      <SelectTrigger className={assignedToIds.length === 0 ? 'border-destructive' : ''}>
+                        <SelectValue placeholder={loadingProjectMembers ? 'Loading members...' : 'Select team members *'} />
                       </SelectTrigger>
                       <SelectContent className="z-[10050] p-0">
                         <div className="p-2">
@@ -948,10 +945,7 @@ export default function CreateTaskModal({
                                 <span>Loading members...</span>
                               </div>
                             ) : projectMembers.length === 0 ? (
-                              <>
-                                <SelectItem value="__unassigned">Unassigned</SelectItem>
-                                <div className="px-2 py-1 text-sm text-muted-foreground">No team members found for this project</div>
-                              </>
+                              <div className="px-2 py-1 text-sm text-muted-foreground">No team members found for this project</div>
                             ) : (
                               (() => {
                                 const q = assigneeQuery.toLowerCase().trim()
@@ -1151,6 +1145,7 @@ export default function CreateTaskModal({
               !(formData.title && formData.title.trim().length > 0) ||
               !(projectId || (selectedProjectId && selectedProjectId.trim().length > 0)) ||
               !(formData.dueDate && formData.dueDate.trim().length > 0) ||
+              assignedToIds.length === 0 ||
               subtasks.some(st => !(st.title && st.title.trim().length > 0))
             }>
               {loading ? (
