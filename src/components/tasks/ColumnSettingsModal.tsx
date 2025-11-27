@@ -152,6 +152,7 @@ export default function ColumnSettingsModal({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [columnToDelete, setColumnToDelete] = useState<number | null>(null)
   const [tasksInColumn, setTasksInColumn] = useState<number>(0)
+  const [taskIdsInColumn, setTaskIdsInColumn] = useState<string[]>([])
   const [migrationColumn, setMigrationColumn] = useState<string>('')
   const [checkingTasks, setCheckingTasks] = useState(false)
   const [migratingTasks, setMigratingTasks] = useState(false)
@@ -288,11 +289,15 @@ export default function ColumnSettingsModal({
       const data = await response.json()
       
       if (data.success && Array.isArray(data.data)) {
-        return data.data.length
+        const ids = data.data.map((task: any) => task._id)
+        setTaskIdsInColumn(ids)
+        return ids.length
       }
+      setTaskIdsInColumn([])
       return 0
     } catch (error) {
       console.error('Error checking tasks:', error)
+      setTaskIdsInColumn([])
       return 0
     }
   }
@@ -304,6 +309,7 @@ export default function ColumnSettingsModal({
     setDeleteConfirmOpen(true)
     setCheckingTasks(true)
     setError('')
+    setTaskIdsInColumn([])
     
     try {
       const taskCount = await checkTasksInColumn(column.key)
@@ -339,13 +345,9 @@ export default function ColumnSettingsModal({
     try {
       // If there are tasks, migrate them first
       if (tasksInColumn > 0 && migrationColumn) {
-        // Get all task IDs in this column
-        const response = await fetch(`/api/tasks?project=${projectId}&status=${column.key}`)
-        const data = await response.json()
-        
-        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-          const taskIds = data.data.map((task: any) => task._id)
-          
+        const taskIds = taskIdsInColumn.length > 0 ? taskIdsInColumn : []
+
+        if (taskIds.length > 0) {
           // Bulk update tasks to new status
           const bulkResponse = await fetch('/api/tasks/bulk', {
             method: 'POST',
@@ -416,49 +418,6 @@ export default function ColumnSettingsModal({
         throw new Error(saveData.error || 'Failed to save column deletion')
       }
 
-      // Final cleanup: Find and migrate any remaining tasks in this project that still have the deleted status
-      // This ensures the status is completely removed from all tasks in the project
-      let finalCleanupCount = 0
-      if (migrationColumn) {
-        try {
-          // Get any remaining tasks with the deleted status in this project
-          const cleanupResponse = await fetch(`/api/tasks?project=${projectId}&status=${column.key}`)
-          const cleanupData = await cleanupResponse.json()
-          
-          if (cleanupData.success && Array.isArray(cleanupData.data) && cleanupData.data.length > 0) {
-            const remainingTaskIds = cleanupData.data.map((task: any) => task._id)
-            finalCleanupCount = remainingTaskIds.length
-            
-            if (remainingTaskIds.length > 0) {
-              // Bulk update remaining tasks to migration column
-              const cleanupBulkResponse = await fetch('/api/tasks/bulk', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  action: 'update',
-                  taskIds: remainingTaskIds,
-                  updates: {
-                    status: migrationColumn
-                  }
-                })
-              })
-
-              const cleanupBulkData = await cleanupBulkResponse.json()
-
-              if (!cleanupBulkResponse.ok || !cleanupBulkData.success) {
-                console.warn('Warning: Some tasks may still have the deleted status:', cleanupBulkData.error)
-                // Don't throw error here, just log warning - the column is already deleted
-              }
-            }
-          }
-        } catch (cleanupError) {
-          console.warn('Warning: Error during final cleanup of deleted status:', cleanupError)
-          // Don't throw error here - the column deletion was successful
-        }
-      }
-
       // Update original columns to match current state
       setOriginalColumns(JSON.parse(JSON.stringify(reorderedColumns)))
       
@@ -467,9 +426,10 @@ export default function ColumnSettingsModal({
       setColumnToDelete(null)
       setTasksInColumn(0)
       setMigrationColumn('')
+      setTaskIdsInColumn([])
       
       // Show success message
-      const totalTasksMoved = tasksInColumn + finalCleanupCount
+      const totalTasksMoved = tasksInColumn
       const successMessage = totalTasksMoved > 0 && migrationColumnTitle
         ? `Column "${column.title}" has been deleted successfully and ${totalTasksMoved} task${totalTasksMoved !== 1 ? 's' : ''} ${totalTasksMoved !== 1 ? 'were' : 'was'} moved to "${migrationColumnTitle}". The status has been completely removed from this project.`
         : `Column "${column.title}" has been deleted successfully. The status has been completely removed from this project.`
@@ -492,6 +452,7 @@ export default function ColumnSettingsModal({
     setColumnToDelete(null)
     setTasksInColumn(0)
     setMigrationColumn('')
+    setTaskIdsInColumn([])
     setError('')
   }
 

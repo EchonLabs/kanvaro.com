@@ -285,9 +285,9 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                   <User className="h-4 w-4" />
                 </div>
               )}
-              <span className="hidden sm:inline ml-0 sm:ml-2 opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
+              {/* <span className="hidden sm:inline ml-0 sm:ml-2 opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
                 {user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email : 'User'}
-              </span>
+              </span> */}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">

@@ -1,3 +1,10 @@
+## [1.9.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.4...v1.9.5) (2025-11-27)
+
+
+### Bug Fixes
+
+* add lateset fix ([c79ef07](https://github.com/EchonLabs/kanvaro.com/commit/c79ef07aef59ef4278b850950163d0e93037dd23))
+
 ## [1.9.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.3...v1.9.4) (2025-11-27)
 
 
