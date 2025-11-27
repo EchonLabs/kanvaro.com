@@ -188,37 +188,38 @@ function ColumnDropZone({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Badge className={column.color}>
-            {column.title}
-          </Badge>
-          <span className="text-sm text-muted-foreground">
-            {tasks.length}
-          </span>
+    <div className="h-full flex flex-col border border-dashed border-border/40 dark:border-border/60 hover:border-border/70 dark:hover:border-border rounded-lg bg-background/80 shadow-sm p-3 transition-colors">
+      <div className="space-y-4 flex-1 flex flex-col min-h-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Badge className={column.color}>
+              {column.title}
+            </Badge>
+            <span className="text-sm text-muted-foreground">
+              {tasks.length}
+            </span>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => onCreateTask?.(column.id)}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
         </div>
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={() => onCreateTask?.(column.id)}
+        
+        <SortableContext 
+          items={tasks.map(task => task._id)}
+          strategy={verticalListSortingStrategy}
         >
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
-      
-      <SortableContext 
-        items={tasks.map(task => task._id)}
-        strategy={verticalListSortingStrategy}
-      >
-        <div 
-          ref={setNodeRef}
-          className={`space-y-3 min-h-[400px] max-h-[600px] overflow-y-auto overflow-x-hidden border-2 border-dashed rounded-lg transition-colors p-2 ${
-            isOver 
-              ? 'border-primary bg-primary/5' 
-              : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700'
-          }`}
-        >
+          <div 
+            ref={setNodeRef}
+            className={`space-y-3 min-h-[400px] max-h-[600px] overflow-y-auto overflow-x-hidden border-2 border-dashed rounded-lg transition-colors p-2 flex-1 ${
+              isOver 
+                ? 'border-primary bg-primary/5' 
+                : 'border-border/30 dark:border-border/50 hover:border-border/50 dark:hover:border-border/70'
+            }`}
+          >
           {tasks.length === 0 ? (
             <div className="h-full flex items-center justify-center text-muted-foreground">
              <div className="text-center">
@@ -240,8 +241,9 @@ function ColumnDropZone({
               />
             ))
           )}
-        </div>
-      </SortableContext>
+          </div>
+        </SortableContext>
+      </div>
     </div>
   )
 }
@@ -847,10 +849,11 @@ export default function KanbanPage() {
                 </Select>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
-                <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Assigned To" />
-                  </SelectTrigger>
+                <div className="border border-dashed border-border/40 dark:border-border/60 hover:border-border/70 dark:hover:border-border rounded-lg bg-background/80 shadow-sm p-0.5 transition-colors">
+                  <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
+                    <SelectTrigger className="w-full border-0 bg-transparent">
+                      <SelectValue placeholder="Assigned To" />
+                    </SelectTrigger>
                   <SelectContent className="z-[10050] p-0">
                     <div className="p-2">
                       <Input
@@ -874,11 +877,13 @@ export default function KanbanPage() {
                     </div>
                   </SelectContent>
                 </Select>
+                </div>
 
-                <Select value={assignedByFilter} onValueChange={setAssignedByFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Assigned By" />
-                  </SelectTrigger>
+                <div className="border border-dashed border-border/40 dark:border-border/60 hover:border-border/70 dark:hover:border-border rounded-lg bg-background/80 shadow-sm p-0.5 transition-colors">
+                  <Select value={assignedByFilter} onValueChange={setAssignedByFilter}>
+                    <SelectTrigger className="w-full border-0 bg-transparent">
+                      <SelectValue placeholder="Assigned By" />
+                    </SelectTrigger>
                   <SelectContent className="z-[10050] p-0">
                     <div className="p-2">
                       <Input
@@ -902,11 +907,13 @@ export default function KanbanPage() {
                     </div>
                   </SelectContent>
                 </Select>
+                </div>
 
-                <Select value={taskNumberFilter} onValueChange={setTaskNumberFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select Task Number" />
-                  </SelectTrigger>
+                <div className="border border-dashed border-border/40 dark:border-border/60 hover:border-border/70 dark:hover:border-border rounded-lg bg-background/80 shadow-sm p-0.5 transition-colors">
+                  <Select value={taskNumberFilter} onValueChange={setTaskNumberFilter}>
+                    <SelectTrigger className="w-full border-0 bg-transparent">
+                      <SelectValue placeholder="Select Task Number" />
+                    </SelectTrigger>
                   <SelectContent className="z-[10050] p-0">
                     <div className="p-2">
                       <Input
@@ -930,8 +937,10 @@ export default function KanbanPage() {
                     </div>
                   </SelectContent>
                 </Select>
+                </div>
 
-                <div className="flex flex-col gap-2">
+                <div className="border border-dashed border-border/40 dark:border-border/60 hover:border-border/70 dark:hover:border-border rounded-lg bg-background/80 shadow-sm p-0.5 transition-colors">
+                  <div className="flex flex-col gap-2">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -974,6 +983,7 @@ export default function KanbanPage() {
                       Clear dates
                     </Button>
                   </div>
+                </div>
                 </div>
               </div>
             </div>

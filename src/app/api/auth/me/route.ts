@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import connectDB from '@/lib/db-config'
 import { User } from '@/models/User'
+import '@/models/CustomRole' // Ensure CustomRole model is registered for populate
 import jwt from 'jsonwebtoken'
 import { normalizeUploadUrl } from '@/lib/file-utils'
 

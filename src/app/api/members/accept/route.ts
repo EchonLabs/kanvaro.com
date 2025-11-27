@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { User } from '@/models/User'
 import { UserInvitation } from '@/models/UserInvitation'
+import '@/models/Organization' // Ensure Organization model is registered for populate
 import { notificationService } from '@/lib/notification-service'
 import bcrypt from 'bcryptjs'
 
