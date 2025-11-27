@@ -42,6 +42,11 @@ interface Task {
     lastName: string
     email: string
   }
+  assignees?: Array<{
+    firstName: string
+    lastName: string
+    email: string
+  }>
   createdBy: {
     firstName: string
     lastName: string
@@ -471,12 +476,33 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                     {task.description || 'No description'}
                   </p>
                   <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                    {task.assignedTo && (
-                      <div className="flex items-center space-x-1">
-                        <User className="h-3 w-3 sm:h-4 sm:w-4" />
-                        <span className="truncate">{task.assignedTo.firstName} {task.assignedTo.lastName}</span>
+                    {(task.assignees && task.assignees.length > 0) || task.assignedTo ? (
+                      <div className="flex items-center space-x-1 flex-wrap gap-1">
+                        <User className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                        {task.assignees && task.assignees.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {task.assignees.map((assignee, idx) => (
+                              <Badge
+                                key={idx}
+                                variant="secondary"
+                                className="text-xs px-2 py-0.5"
+                                title={`${assignee.firstName} ${assignee.lastName} (${assignee.email})`}
+                              >
+                                {assignee.firstName} {assignee.lastName}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : task.assignedTo ? (
+                          <Badge
+                            variant="secondary"
+                            className="text-xs px-2 py-0.5"
+                            title={`${task.assignedTo.firstName} ${task.assignedTo.lastName} (${task.assignedTo.email})`}
+                          >
+                            {task.assignedTo.firstName} {task.assignedTo.lastName}
+                          </Badge>
+                        ) : null}
                       </div>
-                    )}
+                    ) : null}
                     {task.dueDate && (
                       <div className="flex items-center space-x-1">
                         <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />

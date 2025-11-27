@@ -183,11 +183,23 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
   }
 
   const getMemberRole = (memberId: string) => {
+    // Normalize memberId for comparison
+    const normalizedMemberId = memberId?.toString()
+    
+    // Find the role by matching user IDs in various formats
     const role = projectRoles.find(r => {
+      if (!r || !r.user) return false
+      
       const user = r.user as any
-      const userId = user._doc?._id || user._id
-      return userId === memberId || userId?.toString() === memberId?.toString()
+      // Handle various data structures: _doc, direct _id, or string
+      const userId = user._doc?._id || user._id || user
+      const normalizedUserId = userId?.toString()
+      
+      // Compare normalized IDs
+      return normalizedUserId === normalizedMemberId
     })
+    
+    // Return the exact role as assigned, or default to 'project_member'
     return role?.role || 'project_member'
   }
 
