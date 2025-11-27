@@ -276,103 +276,372 @@ export async function POST(request: NextRequest) {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta http-equiv="X-UA-Compatible" content="IE=edge">
             <title>You're Invited to Join ${organizationName}</title>
+            <!--[if mso]>
+            <style type="text/css">
+                body, table, td {font-family: Arial, sans-serif !important;}
+            </style>
+            <![endif]-->
             <style>
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }
                 body {
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                    line-height: 1.6;
-                    color: #333;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                    line-height: 1.7;
+                    color: #1f2937;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    padding: 40px 20px;
+                    -webkit-font-smoothing: antialiased;
+                    -moz-osx-font-smoothing: grayscale;
+                }
+                .email-wrapper {
                     max-width: 600px;
                     margin: 0 auto;
-                    padding: 20px;
-                    background-color: #f8fafc;
+                    background-color: #ffffff;
+                    border-radius: 16px;
+                    overflow: hidden;
+                    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
                 }
-                .container {
-                    background: white;
-                    border-radius: 8px;
-                    padding: 40px;
-                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-                }
-                .header {
+                .header-gradient {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    padding: 48px 40px 32px;
                     text-align: center;
-                    margin-bottom: 30px;
                 }
-                .logo {
-                    width: 60px;
-                    height: 60px;
-                    border-radius: 8px;
-                    margin: 0 auto 20px;
+                .logo-container {
+                    width: 80px;
+                    height: 80px;
+                    margin: 0 auto 24px;
+                    border-radius: 16px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    background: #f8fafc;
-                    border: 1px solid #e5e7eb;
+                    background: rgba(255, 255, 255, 0.2);
+                    backdrop-filter: blur(10px);
+                    border: 2px solid rgba(255, 255, 255, 0.3);
+                    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
                 }
-                .logo img {
+                .logo-container img {
                     max-width: 100%;
                     max-height: 100%;
                     object-fit: contain;
+                    border-radius: 12px;
                 }
                 .logo-fallback {
-                    background: #3b82f6;
-                    color: white;
-                    font-size: 24px;
-                    font-weight: bold;
+                    background: rgba(255, 255, 255, 0.95);
+                    color: #667eea;
+                    font-size: 32px;
+                    font-weight: 700;
                     width: 100%;
                     height: 100%;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    border-radius: 8px;
+                    border-radius: 14px;
                 }
-                .button {
+                .header-title {
+                    color: #ffffff;
+                    font-size: 28px;
+                    font-weight: 700;
+                    margin: 0 0 8px;
+                    letter-spacing: -0.5px;
+                }
+                .header-subtitle {
+                    color: rgba(255, 255, 255, 0.9);
+                    font-size: 16px;
+                    font-weight: 400;
+                    margin: 0;
+                }
+                .content {
+                    padding: 48px 40px;
+                }
+                .welcome-section {
+                    text-align: center;
+                    margin-bottom: 40px;
+                }
+                .welcome-icon {
+                    width: 64px;
+                    height: 64px;
+                    margin: 0 auto 20px;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    border-radius: 16px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 32px;
+                }
+                .welcome-text {
+                    font-size: 18px;
+                    color: #374151;
+                    margin-bottom: 12px;
+                    line-height: 1.6;
+                }
+                .organization-name {
+                    color: #667eea;
+                    font-weight: 700;
+                    font-size: 20px;
+                }
+                .role-badge {
                     display: inline-block;
-                    background: #3b82f6;
-                    color: white;
-                    padding: 12px 24px;
+                    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+                    color: #374151;
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    margin: 8px 0;
+                    border: 1px solid #d1d5db;
+                }
+                .cta-section {
+                    text-align: center;
+                    margin: 40px 0;
+                    padding: 32px;
+                    background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+                    border-radius: 12px;
+                    border: 1px solid #e5e7eb;
+                }
+                .cta-button {
+                    display: inline-block;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: #ffffff !important;
+                    padding: 16px 40px;
                     text-decoration: none;
-                    border-radius: 6px;
+                    border-radius: 12px;
+                    font-weight: 600;
+                    font-size: 16px;
+                    letter-spacing: 0.5px;
+                    box-shadow: 0 4px 14px 0 rgba(102, 126, 234, 0.39);
+                    transition: all 0.3s ease;
+                    margin: 8px 0;
+                }
+                .cta-button:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px 0 rgba(102, 126, 234, 0.5);
+                }
+                .expiry-notice {
+                    background: #fef3c7;
+                    border-left: 4px solid #f59e0b;
+                    padding: 16px 20px;
+                    border-radius: 8px;
+                    margin: 32px 0;
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 12px;
+                }
+                .expiry-icon {
+                    color: #f59e0b;
+                    font-size: 20px;
+                    flex-shrink: 0;
+                    margin-top: 2px;
+                }
+                .expiry-text {
+                    color: #92400e;
+                    font-size: 14px;
                     font-weight: 500;
-                    margin: 20px 0;
+                    line-height: 1.5;
+                }
+                .link-section {
+                    margin: 32px 0;
+                    padding: 20px;
+                    background: #f9fafb;
+                    border-radius: 8px;
+                    border: 1px dashed #d1d5db;
+                }
+                .link-label {
+                    font-size: 12px;
+                    color: #6b7280;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    font-weight: 600;
+                    margin-bottom: 8px;
+                }
+                .link-url {
+                    word-break: break-all;
+                    color: #667eea;
+                    font-size: 13px;
+                    font-family: 'Courier New', monospace;
+                    line-height: 1.6;
+                    text-decoration: none;
+                }
+                .info-grid {
+                    display: grid;
+                    grid-template-columns: 1fr;
+                    gap: 16px;
+                    margin: 32px 0;
+                }
+                .info-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 16px;
+                    background: #f9fafb;
+                    border-radius: 8px;
+                    border: 1px solid #e5e7eb;
+                }
+                .info-icon {
+                    width: 40px;
+                    height: 40px;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    border-radius: 10px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-size: 18px;
+                    flex-shrink: 0;
+                }
+                .info-content {
+                    flex: 1;
+                }
+                .info-label {
+                    font-size: 12px;
+                    color: #6b7280;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    font-weight: 600;
+                    margin-bottom: 4px;
+                }
+                .info-value {
+                    font-size: 15px;
+                    color: #1f2937;
+                    font-weight: 600;
                 }
                 .footer {
-                    margin-top: 30px;
-                    padding-top: 20px;
+                    background: #f9fafb;
+                    padding: 32px 40px;
                     border-top: 1px solid #e5e7eb;
                     text-align: center;
+                }
+                .footer-text {
                     color: #6b7280;
                     font-size: 14px;
+                    line-height: 1.6;
+                    margin: 8px 0;
+                }
+                .footer-inviter {
+                    color: #374151;
+                    font-weight: 600;
+                    margin-top: 16px;
+                }
+                .footer-divider {
+                    height: 1px;
+                    background: #e5e7eb;
+                    margin: 24px 0;
+                }
+                @media only screen and (max-width: 600px) {
+                    body {
+                        padding: 20px 10px;
+                    }
+                    .header-gradient {
+                        padding: 32px 24px 24px;
+                    }
+                    .header-title {
+                        font-size: 24px;
+                    }
+                    .content {
+                        padding: 32px 24px;
+                    }
+                    .cta-section {
+                        padding: 24px;
+                    }
+                    .cta-button {
+                        padding: 14px 32px;
+                        font-size: 15px;
+                    }
+                    .info-grid {
+                        grid-template-columns: 1fr;
+                    }
+                    .footer {
+                        padding: 24px;
+                    }
                 }
             </style>
         </head>
         <body>
-            <div class="container">
-                <div class="header">
-                    <div class="logo">
+            <div class="email-wrapper">
+                <div class="header-gradient">
+                    <div class="logo-container">
                         ${organizationLogo ? 
-                            `<img src="${organizationLogo}" alt="${organizationName} Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;" />` : 
+                            `<img src="${organizationLogo}" alt="${organizationName} Logo" />` : 
                             `<div class="logo-fallback">${organizationName.charAt(0).toUpperCase()}</div>`
                         }
                     </div>
-                    <h1>You're Invited to Join ${organizationName}</h1>
+                    <h1 class="header-title">You're Invited! 🎉</h1>
+                    <p class="header-subtitle">Join ${organizationName} and start collaborating</p>
                 </div>
 
-                <p>You've been invited to join <strong>${organizationName}</strong> as a <strong>${roleDisplayName}</strong>.</p>
-                
-                <p>Click the button below to accept your invitation and set up your account:</p>
+                <div class="content">
+                    <div class="welcome-section">
+                        <div class="welcome-icon">👋</div>
+                        <p class="welcome-text">
+                            You've been invited to join <span class="organization-name">${organizationName}</span>
+                        </p>
+                        <div class="role-badge">${roleDisplayName}</div>
+                    </div>
 
-                <div style="text-align: center;">
-                    <a href="${invitationLink}" class="button">Accept Invitation</a>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-icon">🏢</div>
+                            <div class="info-content">
+                                <div class="info-label">Organization</div>
+                                <div class="info-value">${organizationName}</div>
+                            </div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-icon">👤</div>
+                            <div class="info-content">
+                                <div class="info-label">Your Role</div>
+                                <div class="info-value">${roleDisplayName}</div>
+                            </div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-icon">✉️</div>
+                            <div class="info-content">
+                                <div class="info-label">Invited By</div>
+                                <div class="info-value">${inviterName.firstName} ${inviterName.lastName}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cta-section">
+                        <p style="margin: 0 0 24px; color: #374151; font-size: 16px; font-weight: 500;">
+                            Ready to get started? Click below to accept your invitation and set up your account.
+                        </p>
+                        <a href="${invitationLink}" class="cta-button">Accept Invitation →</a>
+                    </div>
+
+                    <div class="expiry-notice">
+                        <div class="expiry-icon">⏰</div>
+                        <div class="expiry-text">
+                            <strong>Important:</strong> This invitation will expire in 7 days. Please accept it soon to ensure access to your account.
+                        </div>
+                    </div>
+
+                    <div class="link-section">
+                        <div class="link-label">Having trouble with the button?</div>
+                        <div style="margin-top: 8px;">
+                            <a href="${invitationLink}" class="link-url">${invitationLink}</a>
+                        </div>
+                        <p style="margin-top: 12px; font-size: 12px; color: #6b7280;">
+                            Copy and paste this link into your browser if the button above doesn't work.
+                        </p>
+                    </div>
                 </div>
-
-                <p><strong>This invitation will expire in 7 days.</strong></p>
-
-                <p>If you can't click the button above, copy and paste this link into your browser:</p>
-                <p style="word-break: break-all; color: #6b7280; font-size: 14px;">${invitationLink}</p>
 
                 <div class="footer">
-                    <p>This invitation was sent by ${inviterName.firstName} ${inviterName.lastName}</p>
-                    <p>If you have any questions, contact your team administrator</p>
+                    <p class="footer-text">
+                        This invitation was sent by <span class="footer-inviter">${inviterName.firstName} ${inviterName.lastName}</span>
+                    </p>
+                    <div class="footer-divider"></div>
+                    <p class="footer-text">
+                        If you have any questions or didn't expect this invitation, please contact your team administrator.
+                    </p>
+                    <p class="footer-text" style="margin-top: 16px; font-size: 12px; color: #9ca3af;">
+                        This is an automated message. Please do not reply to this email.
+                    </p>
                 </div>
             </div>
         </body>

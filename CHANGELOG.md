@@ -1,3 +1,10 @@
+## [1.9.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.3...v1.9.4) (2025-11-27)
+
+
+### Bug Fixes
+
+* add acpt invitation changes ([a2b53f3](https://github.com/EchonLabs/kanvaro.com/commit/a2b53f308adf5f499185b9a65a8c5612806c4d17))
+
 ## [1.9.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.2...v1.9.3) (2025-11-27)
 
 
