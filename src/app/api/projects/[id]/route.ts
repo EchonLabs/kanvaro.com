@@ -5,6 +5,7 @@ import { Task } from '@/models/Task'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { Types } from 'mongoose'
 
 export async function GET(
   request: NextRequest,
@@ -133,6 +134,32 @@ export async function PUT(
       }
     }
 
+    // Validate client data before building update object
+    if (updateData.clients !== undefined) {
+      if (!Array.isArray(updateData.clients)) {
+        return NextResponse.json(
+          { error: 'clients must be an array of client IDs' },
+          { status: 400 }
+        )
+      }
+      if (updateData.clients.length > 0) {
+        const clientId = updateData.clients[0]
+        if (typeof clientId !== 'string' || !Types.ObjectId.isValid(clientId)) {
+          return NextResponse.json(
+            { error: 'Invalid client ID provided' },
+            { status: 400 }
+          )
+        }
+      }
+    } else if (updateData.client !== undefined) {
+      if (updateData.client && !Types.ObjectId.isValid(updateData.client)) {
+        return NextResponse.json(
+          { error: 'Invalid client ID provided' },
+          { status: 400 }
+        )
+      }
+    }
+
     // Build update object with proper handling for nested fields
     const updateObject: any = { $set: {} }
     
@@ -158,12 +185,13 @@ export async function PUT(
     
     // Handle client (single value, but may come as array from frontend)
     if (updateData.clients !== undefined) {
-      // Frontend sends clients as array, but we store as single client
-      updateObject.$set['client'] = Array.isArray(updateData.clients) && updateData.clients.length > 0 
-        ? updateData.clients[0] 
-        : updateData.clients
+      if (Array.isArray(updateData.clients) && updateData.clients.length > 0) {
+        updateObject.$set['client'] = updateData.clients[0]
+      } else {
+        updateObject.$set['client'] = null
+      }
     } else if (updateData.client !== undefined) {
-      updateObject.$set['client'] = updateData.client
+      updateObject.$set['client'] = updateData.client || null
     }
     
     // Handle tags array

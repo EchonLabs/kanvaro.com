@@ -1,3 +1,18 @@
+## [1.9.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.6...v1.9.7) (2025-11-27)
+
+
+### Bug Fixes
+
+* add changes ([87d462a](https://github.com/EchonLabs/kanvaro.com/commit/87d462addcba3285004e45e3f50b33bcdb7644d7))
+
+## [1.9.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.5...v1.9.6) (2025-11-27)
+
+
+### Bug Fixes
+
+* add changes ([5f5c0c7](https://github.com/EchonLabs/kanvaro.com/commit/5f5c0c720c038275fba8021ab469c83b8478adb0))
+* add mobile responsive issue fixes ([b39de61](https://github.com/EchonLabs/kanvaro.com/commit/b39de61407ccffcffe22be070df4a25d3cecc5c3))
+
 ## [1.9.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.4...v1.9.5) (2025-11-27)
 
 

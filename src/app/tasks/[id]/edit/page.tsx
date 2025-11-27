@@ -703,8 +703,10 @@ export default function EditTaskPage() {
         updateAssignees(() => updatedAssignees)
         setOriginalAssignedToIds(updatedAssignees)
         setSuccess('Task updated successfully')
-        setTimeout(() => setSuccess(''), 4000)
         setError('')
+        setTimeout(() => {
+          router.push('/tasks?success=Task%20updated%20successfully')
+        }, 1200)
       } else {
         setError(data.error || 'Failed to save task')
       }
@@ -814,11 +816,8 @@ export default function EditTaskPage() {
           {(success || error) && (
             <div className="px-6 -mt-4 mb-2 space-y-3">
               {success && (
-                <Alert>
-                  <div className="flex items-center">
-                    <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-                    <AlertDescription>{success}</AlertDescription>
-                  </div>
+                <Alert variant="success">
+                  <AlertDescription>{success}</AlertDescription>
                 </Alert>
               )}
               {!success && error && (

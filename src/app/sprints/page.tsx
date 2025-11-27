@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -41,7 +41,8 @@ import {
   Edit,
   Trash2,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  X
 } from 'lucide-react'
 
 interface Sprint {
@@ -102,6 +103,9 @@ export default function SprintsPage() {
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [projectFilter, setProjectFilter] = useState('all')
+  const [projectFilterQuery, setProjectFilterQuery] = useState('')
+  const [projectOptions, setProjectOptions] = useState<Array<{ _id: string; name: string }>>([])
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [success, setSuccess] = useState('')
   const [updatingSprintId, setUpdatingSprintId] = useState<string | null>(null)
@@ -577,6 +581,37 @@ export default function SprintsPage() {
     }
   }
 
+  // Load projects from API for filter dropdown
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        const response = await fetch('/api/projects?limit=1000&page=1')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && Array.isArray(data.data)) {
+            const projects = data.data.map((p: any) => ({ _id: p._id, name: p.name }))
+            setProjectOptions(prev => {
+              const combined = new Map<string, { _id: string; name: string }>()
+              prev.forEach(p => combined.set(p._id, p))
+              projects.forEach((p: { _id: string; name: string }) => combined.set(p._id, p))
+              return Array.from(combined.values()).sort((a, b) => a.name.localeCompare(b.name))
+            })
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load projects:', err)
+      }
+    }
+    loadProjects()
+  }, [])
+
+  // Filter project options based on search query
+  const filteredProjectOptions = useMemo(() => {
+    const query = projectFilterQuery.trim().toLowerCase()
+    if (!query) return projectOptions
+    return projectOptions.filter((project) => project.name.toLowerCase().includes(query))
+  }, [projectOptions, projectFilterQuery])
+
   const filteredSprints = sprints.filter(sprint => {
     const matchesSearch = !searchQuery ||
       sprint.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -585,7 +620,9 @@ export default function SprintsPage() {
 
     const matchesStatus = statusFilter === 'all' || sprint.status === statusFilter
 
-    return matchesSearch && matchesStatus
+    const matchesProject = projectFilter === 'all' || sprint.project._id === projectFilter
+
+    return matchesSearch && matchesStatus && matchesProject
   })
 
   if (loading) {
@@ -674,6 +711,52 @@ export default function SprintsPage() {
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={projectFilter} onValueChange={setProjectFilter}>
+                    <SelectTrigger className="w-full sm:w-40">
+                      <SelectValue placeholder="Project" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div className="p-2">
+                        <div className="relative mb-2">
+                          <Input
+                            value={projectFilterQuery}
+                            onChange={(e) => setProjectFilterQuery(e.target.value)}
+                            placeholder="Search projects"
+                            className="pr-10"
+                            onKeyDown={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                          />
+                          {projectFilterQuery && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setProjectFilterQuery('')
+                                setProjectFilter('all')
+                              }}
+                              className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                              aria-label="Clear project filter"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="max-h-56 overflow-y-auto">
+                          <SelectItem value="all">All Projects</SelectItem>
+                          {filteredProjectOptions.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                          ) : (
+                            filteredProjectOptions.map((project) => (
+                              <SelectItem key={project._id} value={project._id}>
+                                {project.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </div>
+                      </div>
                     </SelectContent>
                   </Select>
                 </div>
