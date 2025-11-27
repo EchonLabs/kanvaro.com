@@ -26,6 +26,7 @@ interface User {
 interface Epic {
   _id: string
   title: string
+  dueDate?: string
 }
 
 interface Sprint {
@@ -47,6 +48,7 @@ interface Story {
     _id: string
     title?: string
     name?: string
+    dueDate?: string
   }
   sprint?: {
     _id: string
@@ -92,6 +94,8 @@ export default function EditStoryPage() {
   const [projectQuery, setProjectQuery] = useState('')
   const [newCriteria, setNewCriteria] = useState('')
   const [tagsInput, setTagsInput] = useState('')
+  const [selectedEpicDueDate, setSelectedEpicDueDate] = useState<string | null>(null)
+  const [dueDateError, setDueDateError] = useState('')
 
   // Auto-scroll to message when error or success appears
   useEffect(() => {
@@ -103,6 +107,37 @@ export default function EditStoryPage() {
       })
     }
   }, [error, success])
+
+  const formatDateForInput = useCallback((dateString?: string | null): string | null => {
+    if (!dateString) return null
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return null
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }, [])
+
+  const validateDueDate = useCallback((storyDueDate?: string, epicDueDate?: string | null) => {
+    setDueDateError('')
+    if (!storyDueDate || !epicDueDate) {
+      return true
+    }
+
+    const storyDate = new Date(storyDueDate)
+    const epicDate = new Date(epicDueDate)
+    if (isNaN(storyDate.getTime()) || isNaN(epicDate.getTime())) {
+      return true
+    }
+    storyDate.setHours(0, 0, 0, 0)
+    epicDate.setHours(0, 0, 0, 0)
+
+    if (storyDate > epicDate) {
+      setDueDateError('Story Due Date cannot be later than the selected Epic\'s Due Date.')
+      return false
+    }
+    return true
+  }, [])
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -117,9 +152,11 @@ export default function EditStoryPage() {
   }, [])
 
 
-  const fetchEpics = useCallback(async (projectId: string) => {
+  const fetchEpics = useCallback(async (projectId: string, currentEpicId?: string, currentStoryDueDate?: string | null) => {
     if (!projectId) {
       setEpics([])
+      setSelectedEpicDueDate(null)
+      setDueDateError('')
       return
     }
 
@@ -129,14 +166,31 @@ export default function EditStoryPage() {
 
       if (data.success && Array.isArray(data.data)) {
         setEpics(data.data)
+        if (currentEpicId) {
+          const matchedEpic = data.data.find((epic: Epic) => epic._id === currentEpicId)
+          const formattedDueDate = formatDateForInput(matchedEpic?.dueDate)
+          setSelectedEpicDueDate(formattedDueDate)
+          if (currentStoryDueDate && formattedDueDate) {
+            validateDueDate(currentStoryDueDate, formattedDueDate)
+          } else {
+            setDueDateError('')
+          }
+        } else {
+          setSelectedEpicDueDate(null)
+          setDueDateError('')
+        }
       } else {
         setEpics([])
+        setSelectedEpicDueDate(null)
+        setDueDateError('')
       }
     } catch (err) {
       console.error('Failed to fetch epics:', err)
       setEpics([])
+      setSelectedEpicDueDate(null)
+      setDueDateError('')
     }
-  }, [])
+  }, [formatDateForInput, validateDueDate])
 
   const fetchSprints = useCallback(async (projectId: string) => {
     if (!projectId) {
@@ -165,8 +219,14 @@ export default function EditStoryPage() {
       const data = await res.json()
       if (data.success) {
         const storyData = data.data
-        setStory(storyData)
-        setOriginalStory(storyData)
+        const formattedStoryDueDate = formatDateForInput(storyData.dueDate)
+        const storyObject = JSON.parse(JSON.stringify(storyData))
+        const normalizedStory = {
+          ...storyObject,
+          dueDate: formattedStoryDueDate || undefined
+        } as Story
+        setStory(normalizedStory)
+        setOriginalStory(JSON.parse(JSON.stringify(normalizedStory)))
         
         // Set tags input
         setTagsInput(Array.isArray(storyData.tags) ? storyData.tags.join(', ') : '')
@@ -174,8 +234,18 @@ export default function EditStoryPage() {
         // Fetch related data if project exists
         await fetchProjects()
         if (storyData.project?._id) {
-          fetchEpics(storyData.project._id)
+          fetchEpics(storyData.project._id, storyData.epic?._id, storyData.dueDate || null)
           fetchSprints(storyData.project._id)
+        } else {
+          setSelectedEpicDueDate(null)
+          setDueDateError('')
+        }
+        if (storyData.epic?.dueDate) {
+          const formattedDate = formatDateForInput(storyData.epic.dueDate)
+          setSelectedEpicDueDate(formattedDate)
+          if (storyData.dueDate && formattedDate) {
+            validateDueDate(storyData.dueDate, formattedDate)
+          }
         }
       } else {
         setError(data.error || 'Failed to load story')
@@ -185,7 +255,7 @@ export default function EditStoryPage() {
     } finally {
       setLoading(false)
     }
-  }, [storyId, fetchProjects, fetchEpics, fetchSprints])
+  }, [storyId, fetchProjects, fetchEpics, fetchSprints, formatDateForInput, validateDueDate])
 
   useEffect(() => {
     if (storyId) fetchStory()
@@ -217,6 +287,14 @@ export default function EditStoryPage() {
     try {
       setSaving(true)
       setError('')
+      
+      if (story.dueDate && selectedEpicDueDate) {
+        const isValid = validateDueDate(story.dueDate, selectedEpicDueDate)
+        if (!isValid) {
+          setSaving(false)
+          return
+        }
+      }
       
       // Parse tags from comma-separated string
       const tags = tagsInput
@@ -382,10 +460,14 @@ export default function EditStoryPage() {
                       })
                       fetchEpics(value)
                       fetchSprints(value)
+                      setSelectedEpicDueDate(null)
+                      setDueDateError('')
                     } else {
                       setStory({ ...story, project: undefined, epic: undefined, sprint: undefined })
                       setEpics([])
                       setSprints([])
+                      setSelectedEpicDueDate(null)
+                      setDueDateError('')
                     }
                     setProjectQuery('')
                   }}
@@ -425,10 +507,26 @@ export default function EditStoryPage() {
                   onValueChange={(value) => {
                     if (value === 'none') {
                       setStory({ ...story, epic: undefined })
+                      setSelectedEpicDueDate(null)
+                      setDueDateError('')
                     } else {
                       const selectedEpic = epics.find(e => e._id === value)
                       if (selectedEpic) {
-                        setStory({ ...story, epic: { _id: selectedEpic._id, title: selectedEpic.title } })
+                        const formattedDueDate = formatDateForInput(selectedEpic.dueDate)
+                        setSelectedEpicDueDate(formattedDueDate)
+                        if (story.dueDate && formattedDueDate) {
+                          validateDueDate(story.dueDate, formattedDueDate)
+                        } else {
+                          setDueDateError('')
+                        }
+                        setStory({ 
+                          ...story, 
+                          epic: { 
+                            _id: selectedEpic._id, 
+                            title: selectedEpic.title,
+                            dueDate: selectedEpic.dueDate
+                          } 
+                        })
                       }
                     }
                   }}
@@ -527,9 +625,26 @@ export default function EditStoryPage() {
                 <Input
                   type="date"
                   value={story.dueDate || ''}
-                  onChange={(e) => setStory({ ...story, dueDate: e.target.value || undefined })}
-                  className="mt-1"
+                  max={selectedEpicDueDate || undefined}
+                  onChange={(e) => {
+                    const value = e.target.value || undefined
+                    setStory({ ...story, dueDate: value })
+                    if (value && selectedEpicDueDate) {
+                      validateDueDate(value, selectedEpicDueDate)
+                    } else {
+                      setDueDateError('')
+                    }
+                  }}
+                  className={`mt-1 ${dueDateError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                 />
+                {dueDateError && (
+                  <p className="text-sm text-destructive mt-1">{dueDateError}</p>
+                )}
+                {selectedEpicDueDate && !dueDateError && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Epic Due Date: {new Date(selectedEpicDueDate + 'T00:00:00').toLocaleDateString()}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -617,7 +732,7 @@ export default function EditStoryPage() {
 
             <div className="flex justify-end space-x-2 pt-2">
               <Button variant="outline" onClick={() => router.push('/stories')}>Cancel</Button>
-              <Button onClick={handleSave} disabled={saving || !isDirty}>
+              <Button onClick={handleSave} disabled={saving || !isDirty || !!dueDateError}>
                 {saving ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>) : 'Save Changes'}
               </Button>
             </div>

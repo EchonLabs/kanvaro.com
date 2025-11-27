@@ -28,6 +28,11 @@ interface PopulatedTask extends Omit<ITask, 'assignedTo' | 'project'> {
     lastName: string
     email: string
   }
+  assignees?: Array<{
+    firstName: string
+    lastName: string
+    email: string
+  }>
 }
 
 interface SortableTaskProps {
@@ -185,14 +190,34 @@ export default function SortableTask({
             )}
           </div>
           
-          {task.assignedTo && (
-            <div className="flex items-center space-x-2 min-w-0">
-              <div className="w-5 h-5 sm:w-6 sm:h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium flex-shrink-0">
-                {task.assignedTo.firstName[0]}{task.assignedTo.lastName[0]}
-              </div>
-              <span className="text-xs text-muted-foreground truncate">
-                {task.assignedTo.firstName} {task.assignedTo.lastName}
-              </span>
+          {((task.assignees && task.assignees.length > 0) || task.assignedTo) && (
+            <div className="flex items-center flex-wrap gap-1 min-w-0">
+              {task.assignees && task.assignees.length > 0 ? (
+                task.assignees.slice(0, 3).map((assignee, idx) => (
+                  <div key={idx} className="flex items-center space-x-1 min-w-0" title={`${assignee.firstName} ${assignee.lastName} (${assignee.email})`}>
+                    <div className="w-5 h-5 sm:w-6 sm:h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium flex-shrink-0">
+                      {assignee.firstName[0]}{assignee.lastName[0]}
+                    </div>
+                    <span className="text-xs text-muted-foreground truncate hidden sm:inline">
+                      {assignee.firstName} {assignee.lastName}
+                    </span>
+                  </div>
+                ))
+              ) : task.assignedTo ? (
+                <div className="flex items-center space-x-1 min-w-0" title={`${task.assignedTo.firstName} ${task.assignedTo.lastName} (${task.assignedTo.email})`}>
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium flex-shrink-0">
+                    {task.assignedTo.firstName[0]}{task.assignedTo.lastName[0]}
+                  </div>
+                  <span className="text-xs text-muted-foreground truncate hidden sm:inline">
+                    {task.assignedTo.firstName} {task.assignedTo.lastName}
+                  </span>
+                </div>
+              ) : null}
+              {task.assignees && task.assignees.length > 3 && (
+                <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                  +{task.assignees.length - 3}
+                </Badge>
+              )}
             </div>
           )}
 
