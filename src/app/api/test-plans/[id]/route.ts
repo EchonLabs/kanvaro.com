@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db-config'
 import { TestPlan, Project } from '@/models'
+import '@/models/TestCase' // Ensure TestCase model is registered for populate
 // import { getServerSession } from 'next-auth'
 import { authenticateUser } from '@/lib/auth-utils'
 

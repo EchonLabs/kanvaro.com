@@ -369,15 +369,119 @@ export default function ColumnSettingsModal({
         }
       }
 
-      // Remove the column
-      setColumns(columns.filter((_, i) => i !== columnToDelete))
+      // Get migration column title before updating columns state
+      const migrationColumnTitle = tasksInColumn > 0 && migrationColumn 
+        ? columns.find(c => c.key === migrationColumn)?.title || migrationColumn
+        : null
+
+      // Remove the column from local state
+      const updatedColumns = columns.filter((_, i) => i !== columnToDelete)
+      
+      // Update order property for remaining columns
+      const reorderedColumns = updatedColumns.map((col, index) => ({
+        ...col,
+        order: index,
+      }))
+      
+      setColumns(reorderedColumns)
+
+      // Automatically save the changes to persist the deletion
+      if (!projectId || projectId.trim() === '') {
+        throw new Error('Project ID is missing. Cannot save column deletion.')
+      }
+
+      // Ensure columns are sorted by order before saving
+      const sortedColumns = [...reorderedColumns].sort((a, b) => (a.order || 0) - (b.order || 0))
+      
+      const saveResponse = await fetch(`/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          settings: {
+            kanbanStatuses: sortedColumns
+          }
+        })
+      })
+
+      if (!saveResponse.ok) {
+        const errorData = await saveResponse.json().catch(() => ({}))
+        throw new Error(errorData.error || `Failed to save column deletion: ${saveResponse.status}`)
+      }
+
+      const saveData = await saveResponse.json()
+      
+      if (!saveData.success) {
+        throw new Error(saveData.error || 'Failed to save column deletion')
+      }
+
+      // Final cleanup: Find and migrate any remaining tasks in this project that still have the deleted status
+      // This ensures the status is completely removed from all tasks in the project
+      let finalCleanupCount = 0
+      if (migrationColumn) {
+        try {
+          // Get any remaining tasks with the deleted status in this project
+          const cleanupResponse = await fetch(`/api/tasks?project=${projectId}&status=${column.key}`)
+          const cleanupData = await cleanupResponse.json()
+          
+          if (cleanupData.success && Array.isArray(cleanupData.data) && cleanupData.data.length > 0) {
+            const remainingTaskIds = cleanupData.data.map((task: any) => task._id)
+            finalCleanupCount = remainingTaskIds.length
+            
+            if (remainingTaskIds.length > 0) {
+              // Bulk update remaining tasks to migration column
+              const cleanupBulkResponse = await fetch('/api/tasks/bulk', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  action: 'update',
+                  taskIds: remainingTaskIds,
+                  updates: {
+                    status: migrationColumn
+                  }
+                })
+              })
+
+              const cleanupBulkData = await cleanupBulkResponse.json()
+
+              if (!cleanupBulkResponse.ok || !cleanupBulkData.success) {
+                console.warn('Warning: Some tasks may still have the deleted status:', cleanupBulkData.error)
+                // Don't throw error here, just log warning - the column is already deleted
+              }
+            }
+          }
+        } catch (cleanupError) {
+          console.warn('Warning: Error during final cleanup of deleted status:', cleanupError)
+          // Don't throw error here - the column deletion was successful
+        }
+      }
+
+      // Update original columns to match current state
+      setOriginalColumns(JSON.parse(JSON.stringify(reorderedColumns)))
+      
+      // Close the delete confirmation dialog
       setDeleteConfirmOpen(false)
       setColumnToDelete(null)
       setTasksInColumn(0)
       setMigrationColumn('')
+      
+      // Show success message
+      const totalTasksMoved = tasksInColumn + finalCleanupCount
+      const successMessage = totalTasksMoved > 0 && migrationColumnTitle
+        ? `Column "${column.title}" has been deleted successfully and ${totalTasksMoved} task${totalTasksMoved !== 1 ? 's' : ''} ${totalTasksMoved !== 1 ? 'were' : 'was'} moved to "${migrationColumnTitle}". The status has been completely removed from this project.`
+        : `Column "${column.title}" has been deleted successfully. The status has been completely removed from this project.`
+      setSuccess(successMessage)
+      setError('')
+      
+      // Refresh the columns in the parent component
+      onColumnsUpdated()
     } catch (error) {
       console.error('Delete error:', error)
       setError(error instanceof Error ? error.message : 'Failed to delete column')
+      // Don't close the dialog on error so user can retry
     } finally {
       setMigratingTasks(false)
     }

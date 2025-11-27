@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db-config'
 import { ProjectTemplate } from '@/models/ProjectTemplate'
+import '@/models/User' // Ensure User model is registered for populate('createdBy')
 import { authenticateUser } from '@/lib/auth-utils'
 
 export async function GET(req: NextRequest) {

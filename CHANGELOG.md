@@ -1,3 +1,59 @@
+## [1.9.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.3...v1.9.4) (2025-11-27)
+
+
+### Bug Fixes
+
+* add acpt invitation changes ([a2b53f3](https://github.com/EchonLabs/kanvaro.com/commit/a2b53f308adf5f499185b9a65a8c5612806c4d17))
+
+## [1.9.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.2...v1.9.3) (2025-11-27)
+
+
+### Bug Fixes
+
+* add lateset changes ([d1c9f29](https://github.com/EchonLabs/kanvaro.com/commit/d1c9f29c69f87f2455ada9ad16847bac33b4b2f7))
+
+## [1.9.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.1...v1.9.2) (2025-11-26)
+
+
+### Bug Fixes
+
+* add task new changes ([f99f59f](https://github.com/EchonLabs/kanvaro.com/commit/f99f59f755831e7e8a4dd006215d585fd485f8e3))
+
+## [1.9.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.0...v1.9.1) (2025-11-26)
+
+
+### Bug Fixes
+
+* add backlog changes ([0fb7f11](https://github.com/EchonLabs/kanvaro.com/commit/0fb7f11e2442bace7049872500447b331d3b5102))
+
+# [1.9.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.8.0...v1.9.0) (2025-11-26)
+
+
+### Features
+
+* add task bug fixes ([dfcb140](https://github.com/EchonLabs/kanvaro.com/commit/dfcb14073173e3f20f3986478cc694fa5ae564d1))
+
+# [1.8.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.7.0...v1.8.0) (2025-11-26)
+
+
+### Features
+
+* add not approved tasks ([cef9d03](https://github.com/EchonLabs/kanvaro.com/commit/cef9d03010c7213ce347b0280f457642851ce1c8))
+
+# [1.7.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.6.1...v1.7.0) (2025-11-25)
+
+
+### Features
+
+* add fixes ([75bb5ac](https://github.com/EchonLabs/kanvaro.com/commit/75bb5acbbb25251064c446aa0874c94957c59c7d))
+
+## [1.6.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.6.0...v1.6.1) (2025-11-25)
+
+
+### Bug Fixes
+
+* add time log changes ([3dbbb12](https://github.com/EchonLabs/kanvaro.com/commit/3dbbb12215843d69398806f2e2073df265d58272))
+
 # [1.6.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.5.0...v1.6.0) (2025-11-25)
 
 

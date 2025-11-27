@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
+import mongoose from 'mongoose'
 import { Story } from '@/models/Story'
 import { Project } from '@/models/Project'
 import { Epic } from '@/models/Epic'
@@ -51,6 +52,15 @@ export async function GET(request: NextRequest) {
     
     if (sprintId) {
       filters.sprint = sprintId
+    }
+
+    // Ensure Sprint model is registered
+    // The import should register it, but in Next.js HMR we need to ensure it's available
+    if (!mongoose.models.Sprint) {
+      // Force import and registration
+      const SprintModel = require('@/models/Sprint').Sprint
+      // Access the model to ensure it's registered
+      void SprintModel
     }
 
     const stories = await Story.find(filters)
@@ -136,8 +146,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify epic exists if provided
+    let epicDoc = null
     if (epic) {
-      const epicDoc = await Epic.findOne({
+      epicDoc = await Epic.findOne({
         _id: epic,
         project: project
       })
@@ -147,6 +158,23 @@ export async function POST(request: NextRequest) {
           { error: 'Epic not found' },
           { status: 404 }
         )
+      }
+
+      // Validate story dueDate doesn't exceed epic dueDate
+      if (dueDate && epicDoc.dueDate) {
+        const storyDueDate = new Date(dueDate)
+        const epicDueDate = new Date(epicDoc.dueDate)
+        
+        // Reset time to compare only dates
+        storyDueDate.setHours(0, 0, 0, 0)
+        epicDueDate.setHours(0, 0, 0, 0)
+        
+        if (storyDueDate > epicDueDate) {
+          return NextResponse.json(
+            { error: 'Story Due Date cannot be later than the selected Epic\'s Due Date.' },
+            { status: 400 }
+          )
+        }
       }
     }
 
@@ -169,6 +197,12 @@ export async function POST(request: NextRequest) {
     })
 
     await story.save()
+
+    // Ensure Sprint model is registered
+    if (!mongoose.models.Sprint) {
+      const SprintModel = require('@/models/Sprint').Sprint
+      void SprintModel
+    }
 
     // Populate the created story
     const populatedStory = await Story.findById(story._id)

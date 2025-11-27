@@ -59,7 +59,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
             </div>
             <div className="flex sm:justify-end">
               <Badge variant="secondary" className="text-xs">
-                {formatToTitleCase(user?.role) || 'Team Member'}
+                {user?.customRole?.name || formatToTitleCase(user?.role) || 'Team Member'}
               </Badge>
             </div>
           </div>

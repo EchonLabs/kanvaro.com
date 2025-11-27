@@ -16,6 +16,7 @@ interface TimerProps {
   taskId?: string
   description?: string
   requireDescription?: boolean
+  allowOvertime?: boolean
   onTimerUpdate?: (timer: any) => void
 }
 
@@ -34,7 +35,16 @@ interface ActiveTimer {
   maxSessionHours: number
 }
 
-export function Timer({ userId, organizationId, projectId, taskId, description = '', requireDescription = true, onTimerUpdate }: TimerProps) {
+export function Timer({
+  userId,
+  organizationId,
+  projectId,
+  taskId,
+  description = '',
+  requireDescription = true,
+  allowOvertime = true,
+  onTimerUpdate
+}: TimerProps) {
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -58,7 +68,7 @@ export function Timer({ userId, organizationId, projectId, taskId, description =
     } else {
       console.log('Timer/state: activeTimer cleared (null)')
     }
-  }, [activeTimer])
+  }, [activeTimer, allowOvertime])
 
   // Early return if required props are missing
   if (!userId || !organizationId) {
@@ -111,7 +121,7 @@ export function Timer({ userId, organizationId, projectId, taskId, description =
       setDisplayTime(formatTime(runningMinutes))
 
       // Auto-stop when reaching max session
-      if (runningMinutes >= activeTimer.maxSessionHours * 60) {
+      if (!allowOvertime && runningMinutes >= activeTimer.maxSessionHours * 60) {
         console.log('Timer/auto-stop: reached max session, stopping', {
           runningMinutes,
           maxSessionMinutes: activeTimer.maxSessionHours * 60
@@ -126,7 +136,7 @@ export function Timer({ userId, organizationId, projectId, taskId, description =
         intervalRef.current = null
       }
     }
-  }, [activeTimer])
+  }, [activeTimer, allowOvertime])
 
   const loadActiveTimer = useCallback(async () => {
     if (!userId || !organizationId) {

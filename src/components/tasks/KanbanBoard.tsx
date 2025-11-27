@@ -88,8 +88,21 @@ interface Project {
   }
 }
 
-interface KanbanBoardProps {
+export interface KanbanFilters {
+  search?: string
+  status?: string
+  priority?: string
+  type?: string
+  assignedTo?: string
+  createdBy?: string
+  createdAtFrom?: string
+  createdAtTo?: string
+}
+
+export interface KanbanBoardProps {
   projectId: string
+  filters?: KanbanFilters
+  onProjectChange?: (projectId: string) => void
   onCreateTask: () => void
   onEditTask?: (task: PopulatedTask) => void
   onDeleteTask?: (taskId: string) => void
@@ -104,7 +117,7 @@ const defaultColumns = [
   { key: 'done', title: 'Done', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' }
 ]
 
-export default function KanbanBoard({ projectId, onCreateTask, onEditTask, onDeleteTask }: KanbanBoardProps) {
+export default function KanbanBoard({ projectId, filters, onProjectChange, onCreateTask, onEditTask, onDeleteTask }: KanbanBoardProps) {
   const [project, setProject] = useState<Project | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState(projectId)
@@ -125,6 +138,10 @@ export default function KanbanBoard({ projectId, onCreateTask, onEditTask, onDel
       },
     })
   )
+
+  useEffect(() => {
+    setSelectedProjectId(projectId || 'all')
+  }, [projectId])
 
   const fetchProject = useCallback(async () => {
     // Don't fetch a specific project if "All Projects" is selected
@@ -164,13 +181,27 @@ export default function KanbanBoard({ projectId, onCreateTask, onEditTask, onDel
   const fetchTasks = useCallback(async () => {
     try {
       setLoading(true)
-      
-      // Build the API URL based on selected project
-      let apiUrl = '/api/tasks'
+
+      const params = new URLSearchParams()
+
+      if (filters?.search) params.set('search', filters.search)
+      if (filters?.status && filters.status !== 'all') params.set('status', filters.status)
+      if (filters?.priority && filters.priority !== 'all') params.set('priority', filters.priority)
+      if (filters?.type && filters.type !== 'all') params.set('type', filters.type)
+      if (filters?.assignedTo) params.set('assignedTo', filters.assignedTo)
+      if (filters?.createdBy) params.set('createdBy', filters.createdBy)
+      if (filters?.createdAtFrom) params.set('createdAtFrom', filters.createdAtFrom)
+      if (filters?.createdAtTo) params.set('createdAtTo', filters.createdAtTo)
       if (selectedProjectId && selectedProjectId !== 'all') {
-        apiUrl += `?project=${selectedProjectId}`
+        params.set('project', selectedProjectId)
       }
-      
+
+      let apiUrl = '/api/tasks'
+      const queryString = params.toString()
+      if (queryString) {
+        apiUrl += `?${queryString}`
+      }
+
       const response = await fetch(apiUrl)
       const data = await response.json()
       
@@ -185,7 +216,7 @@ export default function KanbanBoard({ projectId, onCreateTask, onEditTask, onDel
     } finally {
       setLoading(false)
     }
-  }, [selectedProjectId])
+  }, [filters, selectedProjectId])
 
   useEffect(() => {
     fetchProject()
@@ -241,6 +272,9 @@ export default function KanbanBoard({ projectId, onCreateTask, onEditTask, onDel
   const handleProjectChange = (newProjectId: string) => {
     setSelectedProjectId(newProjectId)
     setError(null)
+    if (onProjectChange) {
+      onProjectChange(newProjectId)
+    }
   }
 
   const handleDragStart = (event: DragStartEvent) => {
