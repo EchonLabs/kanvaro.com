@@ -7,6 +7,8 @@ export interface ISprintEvent extends Document {
   title: string
   description?: string
   scheduledDate: Date
+  startTime?: string // Time in HH:mm format
+  endTime?: string // Time in HH:mm format
   actualDate?: Date
   duration: number // Duration in minutes
   attendees: mongoose.Types.ObjectId[]
@@ -26,6 +28,18 @@ export interface ISprintEvent extends Document {
   }
   location?: string
   meetingLink?: string
+  attachments?: {
+    name: string
+    url: string
+    size: number
+    type: string
+    uploadedBy: mongoose.Types.ObjectId
+    uploadedAt: Date
+  }[]
+  notificationSettings?: {
+    enabled: boolean
+    reminderTime?: 'none' | '10mins' | '30mins' | '1hour' | '24hours'
+  }
   createdAt: Date
   updatedAt: Date
 }
@@ -59,6 +73,14 @@ const SprintEventSchema = new Schema<ISprintEvent>({
   scheduledDate: {
     type: Date,
     required: true
+  },
+  startTime: {
+    type: String,
+    match: /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/ // HH:mm format
+  },
+  endTime: {
+    type: String,
+    match: /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/ // HH:mm format
   },
   actualDate: Date,
   duration: {
@@ -104,6 +126,22 @@ const SprintEventSchema = new Schema<ISprintEvent>({
   meetingLink: {
     type: String,
     maxlength: 500
+  },
+  attachments: [{
+    name: { type: String, required: true },
+    url: { type: String, required: true },
+    size: { type: Number, required: true },
+    type: { type: String, required: true },
+    uploadedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    uploadedAt: { type: Date, default: Date.now }
+  }],
+  notificationSettings: {
+    enabled: { type: Boolean, default: false },
+    reminderTime: {
+      type: String,
+      enum: ['none', '10mins', '30mins', '1hour', '24hours'],
+      default: 'none'
+    }
   }
 }, {
   timestamps: true
