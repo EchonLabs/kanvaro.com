@@ -1,3 +1,10 @@
+## [1.9.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.6...v1.9.7) (2025-11-27)
+
+
+### Bug Fixes
+
+* add changes ([87d462a](https://github.com/EchonLabs/kanvaro.com/commit/87d462addcba3285004e45e3f50b33bcdb7644d7))
+
 ## [1.9.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.5...v1.9.6) (2025-11-27)
 
 
