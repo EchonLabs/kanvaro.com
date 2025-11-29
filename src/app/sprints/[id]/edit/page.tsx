@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -28,6 +28,11 @@ interface TeamMember {
   firstName: string
   lastName: string
   email: string
+}
+
+interface Project {
+  _id: string
+  name: string
 }
 
 export default function EditSprintPage() {
@@ -58,6 +63,11 @@ export default function EditSprintPage() {
   const [memberLookup, setMemberLookup] = useState<Record<string, TeamMember>>({})
   const [initialForm, setInitialForm] = useState<SprintForm | null>(null)
   const [successMessage, setSuccessMessage] = useState('')
+  const [projectId, setProjectId] = useState<string>('')
+  const [initialProjectId, setInitialProjectId] = useState<string | null>(null)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [projectQuery, setProjectQuery] = useState('')
+  const messageContainerRef = useRef<HTMLDivElement>(null)
 
   const storeMemberDetails = useCallback((members?: TeamMember[]) => {
     if (!Array.isArray(members) || members.length === 0) return
@@ -75,6 +85,20 @@ export default function EditSprintPage() {
       })
       return next
     })
+  }, [])
+
+  const fetchProjects = useCallback(async () => {
+    try {
+      const response = await fetch('/api/projects?limit=1000&page=1')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && Array.isArray(data.data)) {
+          setProjects(data.data)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch projects:', err)
+    }
   }, [])
 
   const fetchProjectMembers = useCallback(async (projectId?: string) => {
@@ -103,7 +127,7 @@ export default function EditSprintPage() {
     } finally {
       setMembersLoading(false)
     }
-  }, [])
+  }, [storeMemberDetails])
 
   const fetchSprint = useCallback(async () => {
     try {
@@ -161,7 +185,10 @@ export default function EditSprintPage() {
               typeof member === 'object' && member !== null
           )
         )
-        await fetchProjectMembers(s?.project?._id)
+        const sprintProjectId = s?.project?._id || ''
+        setProjectId(sprintProjectId)
+        setInitialProjectId(sprintProjectId)
+        await fetchProjectMembers(sprintProjectId)
       } else {
         setError(data.error || 'Failed to load sprint')
       }
@@ -173,15 +200,41 @@ export default function EditSprintPage() {
   }, [sprintId, fetchProjectMembers])
 
   useEffect(() => {
+    fetchProjects()
+  }, [fetchProjects])
+
+  useEffect(() => {
     if (sprintId) fetchSprint()
   }, [sprintId, fetchSprint])
 
   useEffect(() => {
-    if (!successMessage) return
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-    const timeout = setTimeout(() => setSuccessMessage(''), 4000)
-    return () => clearTimeout(timeout)
+    // When project changes (but not on initial load), update team members
+    if (projectId && initialProjectId !== null && projectId !== initialProjectId) {
+      fetchProjectMembers(projectId)
+      // Clear team members when project changes
+      setTeamMembers([])
+    }
+  }, [projectId, initialProjectId, fetchProjectMembers])
+
+  useEffect(() => {
+    if (successMessage && messageContainerRef.current) {
+      // Scroll to the message container when success message appears
+      setTimeout(() => {
+        messageContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 50)
+      const timeout = setTimeout(() => setSuccessMessage(''), 4000)
+      return () => clearTimeout(timeout)
+    }
   }, [successMessage])
+
+  useEffect(() => {
+    if (error && messageContainerRef.current) {
+      // Scroll to the message container when error message appears
+      setTimeout(() => {
+        messageContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 50)
+    }
+  }, [error])
 
   const handleSave = async () => {
     if (!hasChanges) return
@@ -200,6 +253,7 @@ export default function EditSprintPage() {
           capacity: form.capacity === '' ? undefined : Number(form.capacity),
           // Velocity is calculated from completed stories, not sent from form
           velocity: calculatedVelocity,
+          project: projectId,
           teamMembers
         })
       })
@@ -237,6 +291,11 @@ export default function EditSprintPage() {
                 typeof member === 'object' && member !== null
             )
           )
+          
+          // Update project ID if changed
+          const updatedProjectId = updatedSprint?.project?._id || updatedSprint?.project || ''
+          setProjectId(updatedProjectId)
+          setInitialProjectId(updatedProjectId)
         }
         setSuccessMessage('Sprint updated successfully')
         setError('')
@@ -251,9 +310,16 @@ export default function EditSprintPage() {
   }
 
   const filteredTeamOptions = useMemo(() => {
+    // First, exclude already selected members
+    const unselectedMembers = availableMembers.filter(
+      (member) => !teamMembers.includes(member._id)
+    )
+    
+    // Then filter by search query if provided
     const query = teamMemberQuery.trim().toLowerCase()
-    if (!query) return availableMembers
-    return availableMembers.filter((member) => {
+    if (!query) return unselectedMembers
+    
+    return unselectedMembers.filter((member) => {
       const fullName = `${member.firstName} ${member.lastName}`.toLowerCase()
       return (
         fullName.includes(query) ||
@@ -292,7 +358,12 @@ export default function EditSprintPage() {
     return sortedCurrent.some((memberId, index) => memberId !== sortedInitial[index])
   }, [teamMembers, initialTeamMembers])
 
-  const hasChanges = hasFormChanges || hasTeamChanges
+  const hasProjectChanges = useMemo(() => {
+    if (!initialProjectId) return false
+    return projectId !== initialProjectId
+  }, [projectId, initialProjectId])
+
+  const hasChanges = hasFormChanges || hasTeamChanges || hasProjectChanges
 
   if (loading) {
     return (
@@ -328,16 +399,72 @@ export default function EditSprintPage() {
         <Button variant="ghost" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
-        {successMessage && (
-          <Alert variant="success">
-            <AlertDescription>{successMessage}</AlertDescription>
-          </Alert>
-        )}
+        <div ref={messageContainerRef}>
+          {successMessage && (
+            <Alert variant="success">
+              <AlertDescription>{successMessage}</AlertDescription>
+            </Alert>
+          )}
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </div>
         <Card>
           <CardHeader>
             <CardTitle>Edit Sprint</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Project *</label>
+              <Select
+                value={projectId}
+                onValueChange={(value) => {
+                  setProjectId(value)
+                  setTeamMembers([]) // Clear team members when project changes
+                }}
+                onOpenChange={(open) => {
+                  if (open) setProjectQuery('')
+                }}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select a project" />
+                </SelectTrigger>
+                <SelectContent className="z-[10050] p-0">
+                  <div className="p-2">
+                    <Input
+                      value={projectQuery}
+                      onChange={(e) => setProjectQuery(e.target.value)}
+                      placeholder="Search projects"
+                      className="mb-2"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                    <div className="max-h-56 overflow-y-auto">
+                      {projects
+                        .filter((p) =>
+                          !projectQuery.trim() ||
+                          p.name.toLowerCase().includes(projectQuery.toLowerCase())
+                        )
+                        .map((project) => (
+                          <SelectItem key={project._id} value={project._id}>
+                            {project.name}
+                          </SelectItem>
+                        ))}
+                      {projects.filter((p) =>
+                        !projectQuery.trim() ||
+                        p.name.toLowerCase().includes(projectQuery.toLowerCase())
+                      ).length === 0 && (
+                        <div className="px-2 py-1 text-xs text-muted-foreground">
+                          No matching projects
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <label className="text-sm font-medium">Name</label>
               <Input
@@ -471,28 +598,23 @@ export default function EditSprintPage() {
                               No matching team members
                             </div>
                           ) : (
-                            filteredTeamOptions.map((member) => {
-                              const isSelected = teamMembers.includes(member._id)
-                              return (
-                                <SelectItem
-                                  key={member._id}
-                                  value={member._id}
-                                  disabled={isSelected}
-                                  className={isSelected ? 'opacity-50 cursor-not-allowed' : ''}
-                                >
-                                  <div className="flex items-center justify-between w-full">
-                                    <span className="text-sm font-medium truncate">
-                                      {member.firstName} {member.lastName}
+                            filteredTeamOptions.map((member) => (
+                              <SelectItem
+                                key={member._id}
+                                value={member._id}
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="text-sm font-medium truncate">
+                                    {member.firstName} {member.lastName}
+                                  </span>
+                                  {member.email && (
+                                    <span className="text-xs text-muted-foreground ml-2 truncate max-w-[150px]">
+                                      {member.email}
                                     </span>
-                                    {member.email && (
-                                      <span className="text-xs text-muted-foreground ml-2 truncate max-w-[150px]">
-                                        {member.email}
-                                      </span>
-                                    )}
-                                  </div>
-                                </SelectItem>
-                              )
-                            })
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))
                           )}
                         </div>
                       </div>

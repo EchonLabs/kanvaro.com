@@ -234,12 +234,12 @@ export default function ProjectsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'planning': return 'bg-blue-100 text-blue-800'
-      case 'active': return 'bg-green-100 text-green-800'
-      case 'on_hold': return 'bg-yellow-100 text-yellow-800'
-      case 'completed': return 'bg-gray-100 text-gray-800'
-      case 'cancelled': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
+      case 'planning': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
+      case 'on_hold': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900'
+      case 'completed': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
@@ -256,11 +256,11 @@ export default function ProjectsPage() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'low': return 'bg-gray-100 text-gray-800'
-      case 'medium': return 'bg-blue-100 text-blue-800'
-      case 'high': return 'bg-orange-100 text-orange-800'
-      case 'critical': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
+      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900'
+      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
@@ -404,10 +404,10 @@ export default function ProjectsPage() {
                             </div>
                             <div className="flex flex-shrink-0 items-center gap-1.5 flex-wrap">
                               {typeof project.projectNumber !== 'undefined' && (
-                                <Badge variant="outline" className="text-xs">#{project.projectNumber}</Badge>
+                                <Badge variant="outline" className="text-xs hover:bg-transparent dark:hover:bg-transparent">#{project.projectNumber}</Badge>
                               )}
                               {project.isDraft && (
-                                <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-xs">
+                                <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900 text-xs">
                                   Draft
                                 </Badge>
                               )}
@@ -553,10 +553,10 @@ export default function ProjectsPage() {
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 flex-shrink-0">
                               {typeof project.projectNumber !== 'undefined' && (
-                                <Badge variant="outline" className="text-xs">#{project.projectNumber}</Badge>
+                                <Badge variant="outline" className="text-xs hover:bg-transparent dark:hover:bg-transparent">#{project.projectNumber}</Badge>
                               )}
                               {project.isDraft && (
-                                <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-xs">
+                                <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900 text-xs">
                                   Draft
                                 </Badge>
                               )}
