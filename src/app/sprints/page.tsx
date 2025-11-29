@@ -563,11 +563,11 @@ export default function SprintsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'planning': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'active': return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
-      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'planning': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'active': return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900'
+      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
+      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
@@ -856,11 +856,24 @@ export default function SprintsPage() {
                           </div>
                         </CardHeader>
                         <CardContent className="p-3 sm:p-6 pt-0 space-y-3 sm:space-y-4">
-                          <div className="flex items-center space-x-2">
-                            <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
-                              {getStatusIcon(sprint?.status)}
-                              <span className="ml-1 hidden sm:inline">{formatToTitleCase(sprint?.status)}</span>
-                            </Badge>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center space-x-2">
+                              <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
+                                {getStatusIcon(sprint?.status)}
+                                <span className="ml-1 hidden sm:inline">{formatToTitleCase(sprint?.status)}</span>
+                              </Badge>
+                            </div>
+                            {sprint?.project?.name && (
+                              <div className="flex items-center space-x-1 min-w-0">
+                                <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                <span
+                                  className="text-xs sm:text-sm text-muted-foreground truncate"
+                                  title={sprint.project.name}
+                                >
+                                  {sprint.project.name}
+                                </span>
+                              </div>
+                            )}
                           </div>
 
                           <div className="space-y-2">

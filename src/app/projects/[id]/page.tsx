@@ -288,12 +288,12 @@ export default function ProjectDetailPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'planning': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'on_hold': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-      case 'completed': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'planning': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
+      case 'on_hold': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900'
+      case 'completed': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
@@ -390,10 +390,10 @@ export default function ProjectDetailPage() {
                   {project.name}
                 </h1>
                 {typeof project.projectNumber !== 'undefined' && (
-                  <Badge variant="outline" className="flex-shrink-0">#{project.projectNumber}</Badge>
+                  <Badge variant="outline" className="flex-shrink-0 hover:bg-transparent dark:hover:bg-transparent">#{project.projectNumber}</Badge>
                 )}
                 {project.isDraft && (
-                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 flex-shrink-0">
+                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900 flex-shrink-0">
                     Draft
                   </Badge>
                 )}
@@ -880,7 +880,7 @@ export default function ProjectDetailPage() {
                             </p>
                             <p className="text-xs text-muted-foreground">{member.role}</p>
                           </div>
-                          <Badge variant="secondary">Active</Badge>
+                          <Badge variant="secondary" className="hover:bg-secondary dark:hover:bg-secondary">Active</Badge>
                         </div>
                       ))}
                     </div>

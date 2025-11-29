@@ -169,22 +169,22 @@ function ColumnDropZone({
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900'
+      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'bug': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      case 'feature': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'improvement': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'task': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'subtask': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'bug': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      case 'feature': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
+      case 'improvement': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'task': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'subtask': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
@@ -193,7 +193,15 @@ function ColumnDropZone({
       <div className="space-y-4 flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Badge className={column.color}>
+            <Badge className={`${column.color} ${(() => {
+              if (column.color.includes('bg-slate-100')) return 'hover:bg-slate-100 dark:hover:bg-slate-900'
+              if (column.color.includes('bg-gray-100')) return 'hover:bg-gray-100 dark:hover:bg-gray-900'
+              if (column.color.includes('bg-blue-100')) return 'hover:bg-blue-100 dark:hover:bg-blue-900'
+              if (column.color.includes('bg-yellow-100')) return 'hover:bg-yellow-100 dark:hover:bg-yellow-900'
+              if (column.color.includes('bg-purple-100')) return 'hover:bg-purple-100 dark:hover:bg-purple-900'
+              if (column.color.includes('bg-green-100')) return 'hover:bg-green-100 dark:hover:bg-green-900'
+              return ''
+            })()}`}>
               {column.title}
             </Badge>
             <span className="text-sm text-muted-foreground">
@@ -525,22 +533,22 @@ export default function KanbanPage() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900'
+      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'bug': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      case 'feature': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'improvement': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'task': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'subtask': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'bug': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      case 'feature': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
+      case 'improvement': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'task': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'subtask': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
@@ -1255,7 +1263,7 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
                 <TruncateTooltip key={`${label}-${index}`} text={label}>
                   <Badge
                     variant="outline"
-                    className="text-xs truncate max-w-[85px] whitespace-nowrap flex-shrink-0"
+                    className="text-xs truncate max-w-[85px] whitespace-nowrap flex-shrink-0 hover:bg-transparent dark:hover:bg-transparent"
                   >
                     {label}
                   </Badge>
@@ -1264,7 +1272,7 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
               {task.labels.length > 2 && (
                 <Badge
                   variant="outline"
-                  className="text-xs flex-shrink-0"
+                  className="text-xs flex-shrink-0 hover:bg-transparent dark:hover:bg-transparent"
                   title={task.labels.slice(2).join(', ')}
                 >
                   +{task.labels.length - 2}
