@@ -1037,35 +1037,35 @@ export default function BacklogPage() {
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'epic': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-      case 'story': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'task': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'epic': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900'
+      case 'story': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'task': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900'
+      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'backlog': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'todo': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'sprint': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'in_progress': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-      case 'review': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-      case 'testing': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'backlog': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'todo': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'sprint': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'in_progress': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900'
+      case 'review': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900'
+      case 'testing': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900'
+      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
+      case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
+      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
@@ -1526,7 +1526,7 @@ export default function BacklogPage() {
                               {item.epic && (
                                 <Badge
                                   variant="outline"
-                                  className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                                  className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900"
                                 >
                                   {(() => {
                                     if (typeof item.epic === 'string') {
@@ -1540,7 +1540,7 @@ export default function BacklogPage() {
                               {item.sprint && (
                                 <Badge
                                   variant="outline"
-                                  className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                                  className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900"
                                   title={item.sprint.name}
                                 >
                                   {truncateText(item.sprint.name, 18)}
@@ -1828,7 +1828,7 @@ export default function BacklogPage() {
             {currentSprintInfo && (
               <div className="rounded-md border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">Current sprint:</span>{' '}
-                <Badge variant="outline" className="ml-1" title={currentSprintInfo.name}>
+                <Badge variant="outline" className="ml-1 hover:bg-transparent dark:hover:bg-transparent" title={currentSprintInfo.name}>
                   {truncateText(currentSprintInfo.name, 24)}
                 </Badge>
               </div>
@@ -1933,12 +1933,12 @@ export default function BacklogPage() {
                       className="flex items-center justify-between gap-2 text-sm p-2 rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800"
                     >
                       <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 flex-shrink-0">
+                        <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900 flex-shrink-0">
                           Story
                         </Badge>
                         <span className="truncate font-medium">{story.title}</span>
                       </div>
-                      <Badge variant="outline" className="flex-shrink-0">
+                      <Badge variant="outline" className="flex-shrink-0 hover:bg-transparent dark:hover:bg-transparent">
                         {formatToTitleCase(story.priority)}
                       </Badge>
                     </li>
@@ -1981,23 +1981,23 @@ export default function BacklogPage() {
                         <div className="flex items-center justify-between gap-2 flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             {isFromStory && sourceStoryTitle && (
-                              <Badge variant="outline" className="text-xs flex-shrink-0 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                              <Badge variant="outline" className="text-xs flex-shrink-0 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900">
                                 From: {truncateText(sourceStoryTitle, 20)}
                               </Badge>
                             )}
                             {isDirectlySelected && !isFromStory && (
-                              <Badge variant="outline" className="text-xs flex-shrink-0 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                              <Badge variant="outline" className="text-xs flex-shrink-0 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900">
                                 Directly Selected
                               </Badge>
                             )}
                             {isDirectlySelected && isFromStory && (
-                              <Badge variant="outline" className="text-xs flex-shrink-0 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                              <Badge variant="outline" className="text-xs flex-shrink-0 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900">
                                 Direct + Story
                               </Badge>
                             )}
                             <span className="truncate font-medium">{task.title}</span>
                           </div>
-                          <Badge variant="outline" className="flex-shrink-0">
+                          <Badge variant="outline" className="flex-shrink-0 hover:bg-transparent dark:hover:bg-transparent">
                             {formatToTitleCase(task.priority)}
                           </Badge>
                         </div>

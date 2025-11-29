@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogBody } from '@/components/ui/Dialog'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
-import { CalendarIcon } from 'lucide-react'
+import { CalendarIcon, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 
 interface SprintEvent {
@@ -512,7 +512,14 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
             Cancel
           </Button>
           <Button type="submit" form="edit-sprint-event-form" disabled={loading}>
-            {loading ? 'Updating...' : 'Update Event'}
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              'Update Event'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

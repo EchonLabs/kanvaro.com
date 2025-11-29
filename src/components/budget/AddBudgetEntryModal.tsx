@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogBody } from '@/components/ui/Dialog'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
-import { CalendarIcon } from 'lucide-react'
+import { CalendarIcon, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 
 interface AddBudgetEntryModalProps {
@@ -201,7 +201,14 @@ export function AddBudgetEntryModal({ projectId, onClose, onSuccess }: AddBudget
             Cancel
           </Button>
           <Button type="submit" form="add-budget-entry-form" disabled={loading}>
-            {loading ? 'Adding...' : 'Add Budget Entry'}
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              'Add Budget Entry'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

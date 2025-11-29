@@ -926,7 +926,7 @@ export default function CreateTaskModal({
                       }}
                       onOpenChange={(open) => { if (open) setAssigneeQuery(""); }}
                     >
-                      <SelectTrigger className={assignedToIds.length === 0 ? 'border-destructive' : ''}>
+                      <SelectTrigger>
                         <SelectValue placeholder={loadingProjectMembers ? 'Loading members...' : 'Select team members *'} />
                       </SelectTrigger>
                       <SelectContent className="z-[10050] p-0">

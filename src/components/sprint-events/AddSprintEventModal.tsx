@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { FileUploader } from '@/components/ui/FileUploader'
-import { CalendarIcon, X, Link as LinkIcon, AlertCircle } from 'lucide-react'
+import { CalendarIcon, X, Link as LinkIcon, AlertCircle, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -800,7 +800,14 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
             form="create-sprint-event-form" 
             disabled={loading || !isFormValid()}
           >
-            {loading ? 'Creating...' : 'Save'}
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              'Save'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

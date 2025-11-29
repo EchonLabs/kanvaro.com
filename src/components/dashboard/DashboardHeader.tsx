@@ -58,7 +58,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
               Last login: {lastLoginText}
             </div>
             <div className="flex sm:justify-end">
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="text-xs hover:bg-secondary dark:hover:bg-secondary">
                 {user?.customRole?.name || formatToTitleCase(user?.role) || 'Team Member'}
               </Badge>
             </div>
