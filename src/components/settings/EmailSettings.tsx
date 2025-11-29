@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useOrganization } from '@/hooks/useOrganization'
-import { Mail, Send, AlertCircle, CheckCircle, TestTube, XCircle } from 'lucide-react'
+import { Mail, Send, AlertCircle, CheckCircle, TestTube, XCircle, X } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export function EmailSettings() {
@@ -535,13 +535,27 @@ export function EmailSettings() {
           )}
 
           {message && (
-            <Alert variant={message.type === 'error' ? 'destructive' : 'default'}>
-              {message.type === 'error' ? (
-                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-              ) : (
-                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-              )}
-              <AlertDescription className="text-xs sm:text-sm break-words">{message.text}</AlertDescription>
+            <Alert 
+              variant={message.type === 'error' ? 'destructive' : 'default'}
+              className={message.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}
+            >
+              <div className="flex items-start justify-between w-full">
+                <div className="flex items-start gap-2 flex-1 min-w-0">
+                  {message.type === 'error' ? (
+                    <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400" />
+                  )}
+                  <AlertDescription className="text-xs sm:text-sm break-words flex-1">{message.text}</AlertDescription>
+                </div>
+                <button
+                  onClick={() => setMessage(null)}
+                  className="ml-2 flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Close message"
+                >
+                  <X className="h-3 w-3 sm:h-4 sm:w-4" />
+                </button>
+              </div>
             </Alert>
           )}
 

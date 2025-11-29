@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useMemo } from 'react'
-import { Clock, Edit, Trash2, Check, X, Filter, Download } from 'lucide-react'
+import { Clock, Edit, Trash2, Check, X, Filter, Download, Plus, AlertTriangle, FolderOpen, Target, Loader2, Upload, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -11,6 +11,8 @@ import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/Checkbox'
+import { Textarea } from '@/components/ui/textarea'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '@/components/ui/Dialog'
 import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules } from '@/lib/utils'
 import { useFeaturePermissions } from '@/lib/permissions/permission-context'
@@ -91,6 +93,34 @@ export function TimeLogs({
   const activeTickStartRef = useRef<number | null>(null)
   const activeIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const [activeTimerDisplayDuration, setActiveTimerDisplayDuration] = useState<number>(0)
+  const [timeTrackingSettings, setTimeTrackingSettings] = useState<any>(null)
+  const [organizationSettings, setOrganizationSettings] = useState<any>(null)
+  const [projectSettings, setProjectSettings] = useState<any>(null)
+  const [showAddTimeLogModal, setShowAddTimeLogModal] = useState(false)
+  const [projects, setProjects] = useState<any[]>([])
+  const [selectedProjectForLog, setSelectedProjectForLog] = useState('')
+  const [tasks, setTasks] = useState<any[]>([])
+  const [tasksLoading, setTasksLoading] = useState(false)
+  const [selectedTaskForLog, setSelectedTaskForLog] = useState('')
+  const [manualLogData, setManualLogData] = useState({
+    startDate: '',
+    startTime: '',
+    endDate: '',
+    endTime: '',
+    description: '',
+    isBillable: false
+  })
+  const [submittingManualLog, setSubmittingManualLog] = useState(false)
+  const [sessionHoursError, setSessionHoursError] = useState('')
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
+  const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null)
+  const [bulkUploadProgress, setBulkUploadProgress] = useState<{ total: number; processed: number; successful: number; failed: number } | null>(null)
+  const [bulkUploadErrors, setBulkUploadErrors] = useState<Array<{ row: number; error: string }>>([])
+  const [uploadingBulk, setUploadingBulk] = useState(false)
+  const [showErrorAlert, setShowErrorAlert] = useState(true)
+  const [showBulkUploadErrorAlert, setShowBulkUploadErrorAlert] = useState(true)
+  const [showBulkUploadProgressAlert, setShowBulkUploadProgressAlert] = useState(true)
+  const [bulkUploadSuccess, setBulkUploadSuccess] = useState<string | null>(null)
 
   // Resolve auth if props are missing
   useEffect(() => {
@@ -122,6 +152,303 @@ export function TimeLogs({
 
   const { organization } = useOrganization()
   const { canApproveTime } = useFeaturePermissions()
+
+  // Fetch organization settings for application-level allowManualTimeSubmission
+  useEffect(() => {
+    if (organization?.settings?.timeTracking) {
+      setOrganizationSettings(organization.settings.timeTracking)
+    }
+  }, [organization])
+
+  // Fetch time tracking settings (project-specific if projectId provided, otherwise organization-level)
+  useEffect(() => {
+    const fetchTimeTrackingSettings = async () => {
+      if (!resolvedOrgId) return
+
+      try {
+        const params = new URLSearchParams()
+        if (projectId) {
+          params.append('projectId', projectId)
+        }
+        const response = await fetch(`/api/time-tracking/settings?${params}`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.settings) {
+            setTimeTrackingSettings(data.settings)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching time tracking settings:', error)
+      }
+    }
+
+    fetchTimeTrackingSettings()
+  }, [resolvedOrgId, projectId])
+
+  // Fetch project settings if projectId is provided
+  useEffect(() => {
+    const fetchProjectSettings = async () => {
+      if (!projectId || !resolvedOrgId) {
+        setProjectSettings(null)
+        return
+      }
+
+      try {
+        const response = await fetch(`/api/projects/${projectId}`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.project?.settings) {
+            setProjectSettings(data.project.settings)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching project settings:', error)
+      }
+    }
+
+    fetchProjectSettings()
+  }, [projectId, resolvedOrgId])
+
+  // Check if manual time submission is enabled at both levels
+  const canAddManualTimeLog = useMemo(() => {
+    // Application level (organization settings)
+    const orgLevelEnabled = organizationSettings?.allowManualTimeSubmission ?? false
+    
+    // Project level - check project.settings.allowManualTimeSubmission if projectId is provided
+    let projectLevelEnabled = true // Default to true if no project
+    if (projectId) {
+      // If project has its own settings, use that; otherwise use timeTrackingSettings
+      projectLevelEnabled = projectSettings?.allowManualTimeSubmission ?? timeTrackingSettings?.allowManualTimeSubmission ?? true
+    } else {
+      // No project context, use timeTrackingSettings (organization-level)
+      projectLevelEnabled = timeTrackingSettings?.allowManualTimeSubmission ?? true
+    }
+    
+    return orgLevelEnabled && projectLevelEnabled
+  }, [organizationSettings, timeTrackingSettings, projectSettings, projectId])
+
+  // Fetch projects for manual time log modal
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (!resolvedUserId || !resolvedOrgId) return
+      try {
+        const response = await fetch('/api/projects')
+        const data = await response.json()
+        if (data.success && Array.isArray(data.data)) {
+          const filtered = data.data.filter((project: any) => {
+            const allow = project?.settings?.allowTimeTracking
+            if (!allow) return false
+            const createdByMatch = project?.createdBy === resolvedUserId || project?.createdBy?.id === resolvedUserId
+            const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
+            const teamMatch = teamMembers.some((memberId: any) => {
+              if (typeof memberId === 'string') return memberId === resolvedUserId
+              return memberId?._id === resolvedUserId || memberId?.id === resolvedUserId
+            })
+            const members = Array.isArray(project?.members) ? project.members : []
+            const membersMatch = members.some((m: any) => (typeof m === 'string' ? m === resolvedUserId : m?.id === resolvedUserId || m?._id === resolvedUserId))
+            return createdByMatch || teamMatch || membersMatch
+          })
+          setProjects(filtered)
+        }
+      } catch (err) {
+        console.error('Failed to fetch projects:', err)
+      }
+    }
+    if (showAddTimeLogModal) {
+      fetchProjects()
+    }
+  }, [showAddTimeLogModal, resolvedUserId, resolvedOrgId])
+
+  // Fetch tasks when project is selected
+  useEffect(() => {
+    const fetchTasks = async () => {
+      if (!selectedProjectForLog || !resolvedUserId) {
+        setTasks([])
+        setTasksLoading(false)
+        return
+      }
+
+      setTasksLoading(true)
+      try {
+        const response = await fetch(`/api/tasks?project=${selectedProjectForLog}&assignedTo=${resolvedUserId}&limit=200`)
+        const data = await response.json()
+        if (data.success && Array.isArray(data.data)) {
+          const assignedOnly = data.data.filter((t: any) => {
+            const at = t?.assignedTo
+            if (!at) return false
+            if (typeof at === 'string') return at === resolvedUserId
+            return at?._id === resolvedUserId || at?.id === resolvedUserId
+          })
+          setTasks(assignedOnly)
+        } else {
+          setTasks([])
+        }
+      } catch (err) {
+        console.error('Failed to fetch tasks:', err)
+        setTasks([])
+      } finally {
+        setTasksLoading(false)
+      }
+    }
+
+    if (selectedProjectForLog) {
+      fetchTasks()
+    } else {
+      setTasks([])
+      setSelectedTaskForLog('')
+    }
+  }, [selectedProjectForLog, resolvedUserId])
+
+  // Helper function to combine date and time into datetime-local format
+  const combineDateTime = (date: string, time: string): string => {
+    if (!date || !time) return ''
+    return `${date}T${time}`
+  }
+
+  // Validate maxSessionHours and future time when dates/times change
+  const validateSessionHours = useCallback(() => {
+    setSessionHoursError('')
+
+    if (!manualLogData.startDate || !manualLogData.startTime || !manualLogData.endDate || !manualLogData.endTime) {
+      return
+    }
+
+    const startDateTime = combineDateTime(manualLogData.startDate, manualLogData.startTime)
+    const endDateTime = combineDateTime(manualLogData.endDate, manualLogData.endTime)
+
+    if (!startDateTime || !endDateTime) {
+      return
+    }
+
+    const start = new Date(startDateTime)
+    const end = new Date(endDateTime)
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return
+    }
+
+    if (end <= start) {
+      setSessionHoursError('End time must be after start time')
+      return
+    }
+
+    const now = new Date()
+
+    // Check for future time logging
+    if (!timeTrackingSettings?.allowFutureTime) {
+      if (start > now) {
+        setSessionHoursError('Future time not allowed. Please select a time that is today or in the past.')
+        return
+      }
+      if (end > now) {
+        setSessionHoursError('Future time not allowed. Please select a time that is today or in the past.')
+        return
+      }
+    }
+
+    // Check maxSessionHours only when overtime is disabled
+    if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxSessionHours) {
+      const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
+      const durationHours = durationMinutes / 60
+      const maxHours = timeTrackingSettings.maxSessionHours
+
+      if (durationHours > maxHours) {
+        setSessionHoursError(`Session duration (${durationHours.toFixed(2)}h) exceeds maximum allowed (${maxHours}h). Overtime is not allowed.`)
+        return
+      }
+    }
+  }, [manualLogData.startDate, manualLogData.startTime, manualLogData.endDate, manualLogData.endTime, timeTrackingSettings])
+
+  useEffect(() => {
+    validateSessionHours()
+  }, [validateSessionHours])
+
+  const handleSubmitManualLog = async () => {
+    if (!selectedProjectForLog || !resolvedUserId) {
+      setError('Project selection required')
+      return
+    }
+
+    if (!selectedTaskForLog) {
+      setError('Task selection required')
+      return
+    }
+
+    if (timeTrackingSettings?.requireDescription === true && !manualLogData.description.trim()) {
+      setError('Description is required')
+      return
+    }
+
+    if (!manualLogData.startDate || !manualLogData.startTime || !manualLogData.endDate || !manualLogData.endTime) {
+      setError('All date and time fields are required')
+      return
+    }
+
+    const startDateTime = combineDateTime(manualLogData.startDate, manualLogData.startTime)
+    const endDateTime = combineDateTime(manualLogData.endDate, manualLogData.endTime)
+
+    const start = new Date(startDateTime)
+    const end = new Date(endDateTime)
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      setError('Invalid date/time values')
+      return
+    }
+
+    if (end <= start) {
+      setError('End time must be after start time')
+      return
+    }
+
+    if (sessionHoursError) {
+      return
+    }
+
+    setSubmittingManualLog(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/time-tracking/entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: resolvedUserId,
+          organizationId: resolvedOrgId,
+          projectId: selectedProjectForLog,
+          taskId: selectedTaskForLog,
+          description: manualLogData.description || undefined,
+          startTime: startDateTime,
+          endTime: endDateTime,
+          isBillable: manualLogData.isBillable && timeTrackingSettings?.allowBillableTime
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setShowAddTimeLogModal(false)
+        setManualLogData({
+          startDate: '',
+          startTime: '',
+          endDate: '',
+          endTime: '',
+          description: '',
+          isBillable: false
+        })
+        setSelectedProjectForLog('')
+        setSelectedTaskForLog('')
+        setTasks([])
+        loadTimeEntries()
+        onTimeEntryUpdate?.()
+      } else {
+        setError(data.error || 'Failed to create time entry')
+      }
+    } catch (error) {
+      setError('Failed to create time entry')
+    } finally {
+      setSubmittingManualLog(false)
+    }
+  }
 
   // Load time entries
   const formatDuration = (minutes: number) => {
@@ -457,13 +784,489 @@ export function TimeLogs({
     [selectableIds]
   )
 
+  // CSV Template Download
+  const downloadCSVTemplate = () => {
+    const escapeCSV = (value: string): string => {
+      if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+        return `"${value.replace(/"/g, '""')}"`
+      }
+      return value
+    }
+
+    const headers = ['Project Name', 'Task Title', 'Start Date (YYYY-MM-DD)', 'Start Time (HH:MM)', 'End Date (YYYY-MM-DD)', 'End Time (HH:MM)', 'Description', 'Is Billable (true/false)']
+    const exampleRow = ['My Project', 'Task 1', '2024-01-15', '09:00', '2024-01-15', '17:00', 'Worked on feature', '']
+    
+    const csvContent = [
+      headers.map(escapeCSV).join(','),
+      exampleRow.map(escapeCSV).join(',')
+    ].join('\n')
+    
+    // Add BOM for Excel compatibility
+    const bom = '\uFEFF'
+    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', 'time-log-template.csv')
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  // Parse CSV file (handles quoted fields)
+  const parseCSV = (csvText: string): Array<Record<string, string>> => {
+    const lines = csvText.split('\n').filter(line => line.trim())
+    if (lines.length < 2) {
+      throw new Error('CSV file must have at least a header row and one data row')
+    }
+
+    // Simple CSV parser that handles quoted fields
+    const parseCSVLine = (line: string): string[] => {
+      const result: string[] = []
+      let current = ''
+      let inQuotes = false
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i]
+        const nextChar = line[i + 1]
+        
+        if (char === '"') {
+          if (inQuotes && nextChar === '"') {
+            // Escaped quote
+            current += '"'
+            i++
+          } else {
+            // Toggle quote state
+            inQuotes = !inQuotes
+          }
+        } else if (char === ',' && !inQuotes) {
+          // End of field
+          result.push(current.trim())
+          current = ''
+        } else {
+          current += char
+        }
+      }
+      
+      // Add last field
+      result.push(current.trim())
+      return result
+    }
+
+    const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim())
+    const requiredHeaders = ['Project Name', 'Task Title', 'Start Date (YYYY-MM-DD)', 'Start Time (HH:MM)', 'End Date (YYYY-MM-DD)', 'End Time (HH:MM)']
+    
+    // Validate CSV format - check if all required headers are present
+    const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
+    if (missingHeaders.length > 0) {
+      throw new Error(`CSV format error: Missing required columns: ${missingHeaders.join(', ')}. Please download the template for the correct format.`)
+    }
+
+    // Validate that we have data rows
+    if (lines.length === 1) {
+      throw new Error('CSV format error: File contains only headers. Please add at least one data row.')
+    }
+
+    const rows: Array<Record<string, string>> = []
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseCSVLine(lines[i]).map(v => v.replace(/^"|"$/g, '').trim())
+      
+      // Skip completely empty rows
+      if (values.every(v => !v || v === '')) {
+        continue
+      }
+
+      // Validate that row has correct number of columns
+      if (values.length !== headers.length) {
+        throw new Error(`CSV format error: Row ${i + 1} has ${values.length} columns but expected ${headers.length}. Please check for missing commas or extra commas.`)
+      }
+
+      const row: Record<string, string> = {}
+      headers.forEach((header, index) => {
+        row[header] = values[index] || ''
+      })
+      rows.push(row)
+    }
+
+    if (rows.length === 0) {
+      throw new Error('CSV format error: No valid data rows found. Please add at least one row with data.')
+    }
+
+    return rows
+  }
+
+  // Validate CSV row
+  const validateCSVRow = (row: Record<string, string>, rowIndex: number, projectMap: Map<string, string>, taskMap: Map<string, string>): { valid: boolean; error?: string; data?: any } => {
+    const projectName = row['Project Name']?.trim()
+    const taskTitle = row['Task Title']?.trim()
+    const startDate = row['Start Date (YYYY-MM-DD)']?.trim()
+    const startTime = row['Start Time (HH:MM)']?.trim()
+    const endDate = row['End Date (YYYY-MM-DD)']?.trim()
+    const endTime = row['End Time (HH:MM)']?.trim()
+    const description = row['Description']?.trim() || ''
+    const isBillable = row['Is Billable (true/false)']?.trim().toLowerCase()
+
+    // Validate Project Name (required)
+    if (!projectName) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Project Name is required` }
+    }
+
+    // Validate Task Title (required)
+    if (!taskTitle) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Task Title is required` }
+    }
+
+    // Validate Project exists
+    const projectId = projectMap.get(projectName)
+    if (!projectId) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Project "${projectName}" not found` }
+    }
+
+    // Validate Task exists
+    const taskId = taskMap.get(`${projectId}:${taskTitle}`)
+    if (!taskId) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Task "${taskTitle}" not found in project "${projectName}"` }
+    }
+
+    // Validate Start Date (required)
+    if (!startDate) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Start Date is required` }
+    }
+
+    // Validate Start Time (required)
+    if (!startTime) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Start Time is required` }
+    }
+
+    // Validate End Date (required)
+    if (!endDate) {
+      return { valid: false, error: `Row ${rowIndex + 1}: End Date is required` }
+    }
+
+    // Validate End Time (required)
+    if (!endTime) {
+      return { valid: false, error: `Row ${rowIndex + 1}: End Time is required` }
+    }
+
+    // Validate Start Date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+    if (!dateRegex.test(startDate)) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Start Date format must be YYYY-MM-DD (e.g., 2024-01-15)` }
+    }
+
+    // Validate End Date format (YYYY-MM-DD)
+    if (!dateRegex.test(endDate)) {
+      return { valid: false, error: `Row ${rowIndex + 1}: End Date format must be YYYY-MM-DD (e.g., 2024-01-15)` }
+    }
+
+    // Validate Start Time format (HH:MM)
+    const timeRegex = /^\d{2}:\d{2}$/
+    if (!timeRegex.test(startTime)) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Start Time format must be HH:MM (e.g., 09:00)` }
+    }
+
+    // Validate End Time format (HH:MM)
+    if (!timeRegex.test(endTime)) {
+      return { valid: false, error: `Row ${rowIndex + 1}: End Time format must be HH:MM (e.g., 17:00)` }
+    }
+
+    // Validate time values (hours 00-23, minutes 00-59)
+    const [startHour, startMin] = startTime.split(':').map(Number)
+    if (startHour < 0 || startHour > 23 || startMin < 0 || startMin > 59) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Start Time must be between 00:00 and 23:59` }
+    }
+
+    const [endHour, endMin] = endTime.split(':').map(Number)
+    if (endHour < 0 || endHour > 23 || endMin < 0 || endMin > 59) {
+      return { valid: false, error: `Row ${rowIndex + 1}: End Time must be between 00:00 and 23:59` }
+    }
+
+    // Validate date values
+    const startDateTime = `${startDate}T${startTime}`
+    const endDateTime = `${endDate}T${endTime}`
+    const start = new Date(startDateTime)
+    const end = new Date(endDateTime)
+
+    if (isNaN(start.getTime())) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Invalid Start Date/Time values` }
+    }
+
+    if (isNaN(end.getTime())) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Invalid End Date/Time values` }
+    }
+
+    if (end <= start) {
+      return { valid: false, error: `Row ${rowIndex + 1}: End Date/Time must be after Start Date/Time` }
+    }
+
+    // Check if description is required
+    if (timeTrackingSettings?.requireDescription === true && !description) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Description is required` }
+    }
+
+    // Validate Is Billable (optional - only validate if provided)
+    let billable = true // Default to true if not provided
+    if (isBillable && isBillable !== '') {
+      const normalizedBillable = isBillable.toLowerCase().trim()
+      if (normalizedBillable !== 'true' && normalizedBillable !== 'false') {
+        return { valid: false, error: `Row ${rowIndex + 1}: Is Billable must be "true" or "false" (case-insensitive)` }
+      }
+      billable = normalizedBillable === 'true'
+    }
+
+    // Check future time
+    if (!timeTrackingSettings?.allowFutureTime && start > new Date()) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Future time logging not allowed` }
+    }
+
+    // Check past time limit
+    const daysDiff = Math.ceil((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+    if (!timeTrackingSettings?.allowPastTime && daysDiff > (timeTrackingSettings?.pastTimeLimitDays || 30)) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Past time logging not allowed beyond limit` }
+    }
+
+    // Check max session hours
+    const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
+    const durationHours = durationMinutes / 60
+    if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxSessionHours && durationHours > timeTrackingSettings.maxSessionHours) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Session duration exceeds maximum allowed (${timeTrackingSettings.maxSessionHours}h)` }
+    }
+
+    return {
+      valid: true,
+      data: {
+        projectId,
+        taskId,
+        description,
+        startTime: startDateTime,
+        endTime: endDateTime,
+        isBillable: billable && timeTrackingSettings?.allowBillableTime
+      }
+    }
+  }
+
+  // Handle bulk upload
+  const handleBulkUpload = async () => {
+    if (!bulkUploadFile) return
+
+    setUploadingBulk(true)
+    setBulkUploadErrors([])
+    setBulkUploadProgress(null)
+    setError('')
+    setBulkUploadSuccess(null)
+    setShowErrorAlert(true)
+    setShowBulkUploadErrorAlert(true)
+    setShowBulkUploadProgressAlert(true)
+
+    try {
+      // Read CSV file
+      const csvText = await bulkUploadFile.text()
+      const rows = parseCSV(csvText)
+
+      // Build project and task maps
+      const projectMap = new Map<string, string>()
+      const taskMap = new Map<string, string>()
+
+      // Fetch all projects
+      const projectsResponse = await fetch('/api/projects')
+      const projectsData = await projectsResponse.json()
+      if (projectsData.success && Array.isArray(projectsData.data)) {
+        projectsData.data.forEach((project: any) => {
+          projectMap.set(project.name, project._id)
+        })
+      }
+
+      // Fetch tasks for each unique project (fetch all tasks, not just assigned ones)
+      const uniqueProjects = Array.from(new Set(rows.map(row => row['Project Name']?.trim()).filter(Boolean)))
+      for (const projectName of uniqueProjects) {
+        const projectId = projectMap.get(projectName)
+        if (projectId) {
+          try {
+            const tasksResponse = await fetch(`/api/tasks?project=${projectId}&limit=500`)
+            const tasksData = await tasksResponse.json()
+            if (tasksData.success && Array.isArray(tasksData.data)) {
+              tasksData.data.forEach((task: any) => {
+                // Use projectId:taskTitle as key to handle duplicate task titles across projects
+                taskMap.set(`${projectId}:${task.title}`, task._id)
+              })
+            }
+          } catch (err) {
+            console.error(`Failed to fetch tasks for project ${projectName}:`, err)
+          }
+        }
+      }
+
+      // Validate all rows
+      const validatedRows: Array<{ rowIndex: number; data: any }> = []
+      const errors: Array<{ row: number; error: string }> = []
+
+      rows.forEach((row, index) => {
+        const validation = validateCSVRow(row, index, projectMap, taskMap)
+        if (validation.valid && validation.data) {
+          validatedRows.push({ rowIndex: index, data: validation.data })
+        } else {
+          errors.push({ row: index + 2, error: validation.error || 'Unknown error' })
+        }
+      })
+
+      if (errors.length > 0) {
+        setBulkUploadErrors(errors)
+        setShowBulkUploadErrorAlert(true)
+        setUploadingBulk(false)
+        return
+      }
+
+      if (validatedRows.length === 0) {
+        setError('No valid rows to upload')
+        setShowErrorAlert(true)
+        setUploadingBulk(false)
+        return
+      }
+
+      // Upload in batches
+      const batchSize = 10
+      let successful = 0
+      let failed = 0
+      const uploadErrors: Array<{ row: number; error: string }> = []
+
+      setBulkUploadProgress({ total: validatedRows.length, processed: 0, successful: 0, failed: 0 })
+
+      for (let i = 0; i < validatedRows.length; i += batchSize) {
+        const batch = validatedRows.slice(i, i + batchSize)
+        const batchPromises = batch.map(async ({ rowIndex, data }) => {
+          try {
+            const response = await fetch('/api/time-tracking/entries', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: resolvedUserId,
+                organizationId: resolvedOrgId,
+                ...data
+              })
+            })
+
+            const result = await response.json()
+            if (response.ok) {
+              successful++
+            } else {
+              failed++
+              uploadErrors.push({ row: rowIndex + 2, error: result.error || 'Failed to create time entry' })
+            }
+          } catch (err) {
+            failed++
+            uploadErrors.push({ row: rowIndex + 2, error: err instanceof Error ? err.message : 'Unknown error' })
+          }
+        })
+
+        await Promise.all(batchPromises)
+        setBulkUploadProgress({
+          total: validatedRows.length,
+          processed: Math.min(i + batchSize, validatedRows.length),
+          successful,
+          failed
+        })
+      }
+
+      if (uploadErrors.length > 0) {
+        setBulkUploadErrors(uploadErrors)
+        setShowBulkUploadErrorAlert(true)
+      }
+
+      if (successful > 0) {
+        // Reset pagination to page 1 to show newly uploaded entries at the top
+        setPagination(prev => ({ ...prev, page: 1 }))
+        // Refresh the time entries table to show newly uploaded data
+        // Using setTimeout to ensure pagination state is updated first
+        setTimeout(async () => {
+          if (!resolvedUserId || !resolvedOrgId) return
+          setIsLoading(true)
+          setError('')
+
+          try {
+            const params = new URLSearchParams({
+              userId: resolvedUserId,
+              organizationId: resolvedOrgId,
+              page: '1', // Always load page 1 after bulk upload
+              limit: pagination.limit.toString()
+            })
+
+            if (projectId && projectId !== 'undefined' && projectId !== 'null') params.append('projectId', projectId)
+            if (taskId) params.append('taskId', taskId)
+            if (filters.startDate) params.append('startDate', filters.startDate)
+            if (filters.endDate) params.append('endDate', filters.endDate)
+            if (filters.status && filters.status !== 'all') params.append('status', filters.status)
+            if (filters.isBillable && filters.isBillable !== 'all') params.append('isBillable', filters.isBillable)
+            if (filters.isApproved && filters.isApproved !== 'all') params.append('isApproved', filters.isApproved)
+
+            const response = await fetch(`/api/time-tracking/entries?${params}`)
+            const data = await response.json()
+
+            if (response.ok) {
+              setTimeEntries(data.timeEntries)
+              setPagination(data.pagination)
+            } else {
+              setError(data.error || 'Failed to load time entries')
+            }
+          } catch (error) {
+            setError('Failed to load time entries')
+          } finally {
+            setIsLoading(false)
+          }
+        }, 100)
+        
+        onTimeEntryUpdate?.()
+        if (failed === 0) {
+          setBulkUploadSuccess(`Successfully uploaded ${successful} time ${successful === 1 ? 'entry' : 'entries'}. The table will refresh to show the new entries.`)
+          setTimeout(() => {
+            setShowBulkUploadModal(false)
+            setBulkUploadFile(null)
+            setBulkUploadProgress(null)
+            setBulkUploadSuccess(null)
+            setShowBulkUploadErrorAlert(true)
+            setShowBulkUploadProgressAlert(true)
+          }, 3000)
+        } else {
+          setBulkUploadSuccess(`Successfully uploaded ${successful} time ${successful === 1 ? 'entry' : 'entries'}, ${failed} failed. The table will refresh to show the new entries.`)
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to process CSV file')
+      setShowErrorAlert(true)
+    } finally {
+      setUploadingBulk(false)
+    }
+  }
+
   return (
+    <>
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          {/* <Clock className="h-5 w-5" />
-          Time Logs */}
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            {/* <Clock className="h-5 w-5" />
+            Time Logs */}
+          </CardTitle>
+          {canAddManualTimeLog && (
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setShowBulkUploadModal(true)}
+                size="sm"
+                variant="outline"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Bulk Upload
+              </Button>
+              <Button
+                onClick={() => setShowAddTimeLogModal(true)}
+                size="sm"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Time Log
+              </Button>
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {authResolving && (
@@ -472,9 +1275,19 @@ export function TimeLogs({
             <p className="text-muted-foreground mt-2">Loading your time entries...</p>
           </div>
         )}
-        {error && (
+        {error && showErrorAlert && (
           <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription className="flex items-center justify-between">
+              <span>{error}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={() => setShowErrorAlert(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </AlertDescription>
           </Alert>
         )}
 
@@ -586,7 +1399,7 @@ export function TimeLogs({
           ) : (
             <div className="space-y-2">
               {/* Table Header - Hidden on mobile */}
-              <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium ${canApproveTime ? 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px_110px]' : 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px]'}`}>
+              <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium ${canApproveTime ? 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px_110px]' : canAddManualTimeLog ? 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px]' : 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px]'}`}>
                 <div>
                   <Checkbox
                     checked={allSelected}
@@ -714,7 +1527,7 @@ export function TimeLogs({
                   </div>
 
                   {/* Desktop Table View */}
-                  <div className={`hidden md:grid gap-2 p-3 ${canApproveTime ? 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px_110px]' : 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px]'}`}>
+                  <div className={`hidden md:grid gap-2 p-3 ${canApproveTime ? 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px_110px]' : canAddManualTimeLog ? 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px]' : 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px]'}`}>
                     <div className="flex items-center">
                       {!entry.__isActive ? (
                         <Checkbox
@@ -853,5 +1666,482 @@ export function TimeLogs({
         )}
       </CardContent>
     </Card>
+
+    {/* Add Manual Time Log Modal */}
+    <Dialog open={showAddTimeLogModal} onOpenChange={setShowAddTimeLogModal}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add Time Log</DialogTitle>
+          <DialogDescription>
+            Log time manually by selecting start and end times
+          </DialogDescription>
+        </DialogHeader>
+        <DialogBody className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="modal-project">Project *</Label>
+              <Select 
+                value={selectedProjectForLog} 
+                onValueChange={(value) => {
+                  setSelectedProjectForLog(value)
+                  setSelectedTaskForLog('')
+                  setTasks([])
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((project) => (
+                    <SelectItem key={project._id} value={project._id}>
+                      <div className="flex items-center space-x-2">
+                        <FolderOpen className="h-4 w-4 flex-shrink-0" />
+                        <span className="truncate">{project.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="modal-task">Task *</Label>
+              <Select
+                value={selectedTaskForLog}
+                onValueChange={setSelectedTaskForLog}
+                disabled={!selectedProjectForLog || tasksLoading || (!tasksLoading && tasks.length === 0)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={
+                    tasksLoading 
+                      ? 'Loading tasks...' 
+                      : selectedProjectForLog 
+                        ? (tasks.length > 0 ? 'Select a task' : 'No tasks available') 
+                        : 'Select a project first'
+                  } />
+                </SelectTrigger>
+                {tasksLoading && (
+                  <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
+                )}
+                <SelectContent>
+                  {tasksLoading ? (
+                    <div className="flex items-center justify-center p-4">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <span className="text-sm text-muted-foreground">Loading tasks...</span>
+                    </div>
+                  ) : (
+                    tasks.map((task) => {
+                      const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
+                      return (
+                        <SelectItem 
+                          key={task._id} 
+                          value={task._id}
+                          disabled={isBillableDisabled}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <Target className="h-4 w-4 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{task.title}</div>
+                              {isBillableDisabled && (
+                                <div className="text-xs text-muted-foreground">
+                                  Billable time not allowed
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </SelectItem>
+                      )
+                    })
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="start-date">Start Date *</Label>
+              <Input
+                id="start-date"
+                type="date"
+                value={manualLogData.startDate}
+                onChange={(e) => {
+                  setManualLogData(prev => ({ ...prev, startDate: e.target.value }))
+                  setError('')
+                }}
+                disabled={!selectedProjectForLog}
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="start-time">Start Time *</Label>
+              <Input
+                id="start-time"
+                type="time"
+                value={manualLogData.startTime}
+                onChange={(e) => {
+                  setManualLogData(prev => ({ ...prev, startTime: e.target.value }))
+                  setError('')
+                }}
+                disabled={!selectedProjectForLog}
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="end-date">End Date *</Label>
+              <Input
+                id="end-date"
+                type="date"
+                value={manualLogData.endDate}
+                onChange={(e) => {
+                  setManualLogData(prev => ({ ...prev, endDate: e.target.value }))
+                  setError('')
+                }}
+                disabled={!selectedProjectForLog}
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="end-time">End Time *</Label>
+              <Input
+                id="end-time"
+                type="time"
+                value={manualLogData.endTime}
+                onChange={(e) => {
+                  setManualLogData(prev => ({ ...prev, endTime: e.target.value }))
+                  setError('')
+                }}
+                disabled={!selectedProjectForLog}
+                className={`w-full ${sessionHoursError ? 'border-destructive' : ''}`}
+              />
+              {sessionHoursError && (
+                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{sessionHoursError}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="modal-description">
+              Description {timeTrackingSettings?.requireDescription ? '*' : ''}
+            </Label>
+            <Textarea
+              id="modal-description"
+              value={manualLogData.description}
+              onChange={(e) => setManualLogData(prev => ({ ...prev, description: e.target.value }))}
+              placeholder={
+                timeTrackingSettings?.requireDescription 
+                  ? 'What did you work on? (required)' 
+                  : 'What did you work on? (optional)'
+              }
+              rows={3}
+              required={timeTrackingSettings?.requireDescription === true}
+              disabled={!selectedProjectForLog}
+              className="w-full"
+            />
+          </div>
+
+          {timeTrackingSettings?.allowBillableTime && (
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="modal-billable"
+                checked={manualLogData.isBillable}
+                onCheckedChange={(checked) => setManualLogData(prev => ({ ...prev, isBillable: checked as boolean }))}
+              />
+              <Label htmlFor="modal-billable" className="text-sm font-normal cursor-pointer">
+                Mark as billable
+              </Label>
+            </div>
+          )}
+        </DialogBody>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setShowAddTimeLogModal(false)
+              setManualLogData({
+                startDate: '',
+                startTime: '',
+                endDate: '',
+                endTime: '',
+                description: '',
+                isBillable: false
+              })
+              setSelectedProjectForLog('')
+              setSelectedTaskForLog('')
+              setTasks([])
+              setError('')
+              setSessionHoursError('')
+            }}
+            disabled={submittingManualLog}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmitManualLog}
+            disabled={
+              submittingManualLog || 
+              !selectedProjectForLog || 
+              !selectedTaskForLog ||
+              !manualLogData.startDate ||
+              !manualLogData.startTime ||
+              !manualLogData.endDate ||
+              !manualLogData.endTime ||
+              !!sessionHoursError ||
+              (timeTrackingSettings?.requireDescription === true && !manualLogData.description.trim())
+            }
+          >
+            {submittingManualLog ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Logging...
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4 mr-2" />
+                Log Time
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Bulk Upload Modal */}
+    <Dialog open={showBulkUploadModal} onOpenChange={setShowBulkUploadModal}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Bulk Upload Time Logs</DialogTitle>
+          <DialogDescription>
+            Upload multiple time entries using a CSV file. Download the template to see the required format.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogBody className="space-y-4">
+          {error && showErrorAlert && (
+            <Alert variant="destructive">
+              <AlertDescription className="flex items-center justify-between">
+                <span>{error}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={() => setShowErrorAlert(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {bulkUploadSuccess && (
+            <Alert>
+              <AlertDescription className="flex items-center justify-between">
+                <span>{bulkUploadSuccess}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={() => setBulkUploadSuccess(null)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {bulkUploadErrors.length > 0 && showBulkUploadErrorAlert && (
+            <Alert variant="destructive">
+              <AlertDescription>
+                <div className="flex items-start justify-between mb-2">
+                  <div className="font-semibold">Errors found:</div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={() => setShowBulkUploadErrorAlert(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {bulkUploadErrors.map((err, idx) => (
+                    <div key={idx} className="text-sm">
+                      Row {err.row}: {err.error}
+                    </div>
+                  ))}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {bulkUploadProgress && showBulkUploadProgressAlert && (
+            <Alert>
+              <AlertDescription>
+                <div className="flex items-start justify-between mb-2">
+                  <div className="space-y-2 flex-1">
+                    <div className="flex items-center justify-between">
+                      <span>Progress: {bulkUploadProgress.processed} / {bulkUploadProgress.total}</span>
+                      <span>{Math.round((bulkUploadProgress.processed / bulkUploadProgress.total) * 100)}%</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div
+                        className="bg-primary h-2 rounded-full transition-all"
+                        style={{ width: `${(bulkUploadProgress.processed / bulkUploadProgress.total) * 100}%` }}
+                      />
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Successful: {bulkUploadProgress.successful} | Failed: {bulkUploadProgress.failed}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 ml-2"
+                    onClick={() => setShowBulkUploadProgressAlert(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label>CSV File</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={downloadCSVTemplate}
+                disabled={uploadingBulk}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download Template
+              </Button>
+            </div>
+
+            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+              <input
+                type="file"
+                accept=".csv"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    setBulkUploadFile(file)
+                    setError('')
+                    setBulkUploadErrors([])
+                    setBulkUploadSuccess(null)
+                    setShowErrorAlert(true)
+                    setShowBulkUploadErrorAlert(true)
+                  }
+                }}
+                disabled={uploadingBulk}
+                className="hidden"
+                id="bulk-upload-file"
+              />
+              <label
+                htmlFor="bulk-upload-file"
+                className="cursor-pointer flex flex-col items-center gap-2"
+              >
+                <Upload className="h-8 w-8 text-muted-foreground" />
+                <div className="text-sm">
+                  {bulkUploadFile ? (
+                    <span className="font-medium">{bulkUploadFile.name}</span>
+                  ) : (
+                    <>
+                      <span className="font-medium">Click to upload</span> or drag and drop
+                    </>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground">CSV file only</div>
+              </label>
+            </div>
+
+            {bulkUploadFile && (
+              <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                <FileText className="h-4 w-4" />
+                <span className="text-sm flex-1">{bulkUploadFile.name}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setBulkUploadFile(null)
+                    setBulkUploadErrors([])
+                    setError('')
+                  }}
+                  disabled={uploadingBulk}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                <div className="font-semibold mb-1">CSV Format Requirements:</div>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Required columns: Project Name, Task Title, Start Date (YYYY-MM-DD), Start Time (HH:MM), End Date (YYYY-MM-DD), End Time (HH:MM)</li>
+                  <li>Optional columns: Description, Is Billable (true/false - leave empty or use "true"/"false")</li>
+                  <li>Date format: YYYY-MM-DD (e.g., 2024-01-15)</li>
+                  <li>Time format: HH:MM (e.g., 09:00, must be between 00:00 and 23:59)</li>
+                  <li>Projects and tasks must exist in the system</li>
+                  <li>End Date/Time must be after Start Date/Time</li>
+                </ul>
+              </AlertDescription>
+            </Alert>
+          </div>
+        </DialogBody>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setShowBulkUploadModal(false)
+              setBulkUploadFile(null)
+              setBulkUploadErrors([])
+              setBulkUploadProgress(null)
+              setError('')
+              setBulkUploadSuccess(null)
+              setShowErrorAlert(true)
+              setShowBulkUploadErrorAlert(true)
+              setShowBulkUploadProgressAlert(true)
+            }}
+            disabled={uploadingBulk}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleBulkUpload}
+            disabled={!bulkUploadFile || uploadingBulk}
+          >
+            {uploadingBulk ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }

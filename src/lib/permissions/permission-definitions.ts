@@ -326,9 +326,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
   
   [Role.PROJECT_MANAGER]: [
-    // User management (limited)
+    // User management (limited - read only)
     Permission.USER_READ,
-    Permission.USER_INVITE,
     
     // Organization (read only)
     Permission.ORGANIZATION_READ,
@@ -350,9 +349,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TASK_MANAGE_COMMENTS,
     Permission.TASK_MANAGE_ATTACHMENTS,
     
-    // Team (project team only)
+    // Team (project team only - read only)
     Permission.TEAM_READ,
-    Permission.TEAM_INVITE,
     Permission.TEAM_REMOVE,
     Permission.TEAM_VIEW_ACTIVITY,
     
@@ -374,9 +372,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_VIEW,
     Permission.REPORTING_CREATE,
     Permission.REPORTING_EXPORT,
-    
-    // Settings (limited)
-    Permission.SETTINGS_READ,
     
     // Epics
     Permission.EPIC_CREATE,

@@ -33,9 +33,10 @@ interface EditMemberModalProps {
   member: Member
   onClose: () => void
   onUpdate: (memberId: string, updates: any) => void
+  canEditAdminUsers?: boolean
 }
 
-export function EditMemberModal({ member, onClose, onUpdate }: EditMemberModalProps) {
+export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers = false }: EditMemberModalProps) {
   const [formData, setFormData] = useState({
     firstName: member.firstName,
     lastName: member.lastName,
@@ -47,6 +48,11 @@ export function EditMemberModal({ member, onClose, onUpdate }: EditMemberModalPr
   const [error, setError] = useState('')
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([])
   const [rolesLoading, setRolesLoading] = useState(true)
+  
+  // Check if current member is admin or if user is trying to change role to admin
+  const isAdminMember = member.role === 'admin'
+  const isChangingToAdmin = formData.role === 'admin' && member.role !== 'admin'
+  const canChangeRole = !isAdminMember && !isChangingToAdmin || canEditAdminUsers
 
   useEffect(() => {
     fetchCustomRoles()
@@ -76,6 +82,18 @@ export function EditMemberModal({ member, onClose, onUpdate }: EditMemberModalPr
 
     if (!formData.firstName || !formData.lastName) {
       setError('First name and last name are required')
+      return
+    }
+
+    // Prevent role change to admin if user doesn't have permission
+    if (formData.role === 'admin' && !canEditAdminUsers) {
+      setError('You do not have permission to assign or change users to admin role')
+      return
+    }
+
+    // Prevent editing admin users if user doesn't have permission
+    if (isAdminMember && !canEditAdminUsers) {
+      setError('You do not have permission to edit administrator accounts')
       return
     }
 
@@ -183,18 +201,37 @@ export function EditMemberModal({ member, onClose, onUpdate }: EditMemberModalPr
 
             <div className="space-y-2">
               <Label htmlFor="role">System Role</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData(prev => ({ ...prev, role: value }))}>
+              <Select 
+                value={formData.role} 
+                onValueChange={(value) => {
+                  // Prevent changing to admin if user doesn't have permission
+                  if (value === 'admin' && !canEditAdminUsers) {
+                    setError('You do not have permission to assign admin role')
+                    return
+                  }
+                  setFormData(prev => ({ ...prev, role: value }))
+                  setError('') // Clear error when valid selection is made
+                }}
+                disabled={isAdminMember && !canEditAdminUsers}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="admin" disabled={!canEditAdminUsers}>
+                    Admin {!canEditAdminUsers && '(Requires permission)'}
+                  </SelectItem>
                   <SelectItem value="project_manager">Project Manager</SelectItem>
                   <SelectItem value="team_member">Team Member</SelectItem>
                   <SelectItem value="client">Client</SelectItem>
                   <SelectItem value="viewer">Viewer</SelectItem>
                 </SelectContent>
               </Select>
+              {isAdminMember && !canEditAdminUsers && (
+                <p className="text-xs text-destructive">
+                  You do not have permission to edit administrator accounts
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

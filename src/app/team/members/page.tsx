@@ -144,11 +144,12 @@ export default function MembersPage() {
     }
   }
 
-  const handleInviteMember = async (inviteData: any) => {
+  const handleInviteMember = async (inviteData: any): Promise<{ error?: string } | void> => {
     if (!canInviteMembers) {
-      setError('You do not have permission to invite members.')
+      const errorMsg = 'You do not have permission to invite members.'
+      setError(errorMsg)
       setSuccess('')
-      return
+      return { error: errorMsg }
     }
 
     try {
@@ -173,12 +174,18 @@ export default function MembersPage() {
         // Refresh authentication state and then fetch members
         await checkAuth()
         await fetchMembers()
+        // Return void on success
+        return
       } else {
-        setError(data.error || 'Failed to send invitation')
+        const errorMsg = data.error || 'Failed to send invitation'
+        setError(errorMsg)
         setSuccess('')
+        return { error: errorMsg }
       }
     } catch (err) {
-      setError('Failed to send invitation')
+      const errorMsg = 'Failed to send invitation'
+      setError(errorMsg)
+      return { error: errorMsg }
     }
   }
 
@@ -404,12 +411,6 @@ export default function MembersPage() {
             </Button>
           )}
         </div>
-
-      {error && (
-        <Alert variant="destructive" className="break-words">
-          <AlertDescription className="break-words">{error}</AlertDescription>
-        </Alert>
-      )}
 
       {success && (
         <Alert variant="default" className="break-words">
@@ -773,6 +774,7 @@ export default function MembersPage() {
           member={editingMember}
           onClose={() => setEditingMember(null)}
           onUpdate={handleUpdateMember}
+          canEditAdminUsers={canEditAdminMembers}
         />
       )}
       </div>
