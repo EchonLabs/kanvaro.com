@@ -857,7 +857,7 @@ export default function TimerPage() {
         )}
 
         <Tabs defaultValue="timer" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className={`grid w-full ${timeTrackingSettings?.allowManualTimeSubmission ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <TabsTrigger value="timer" className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
               Timer
@@ -1055,7 +1055,7 @@ export default function TimerPage() {
 
           </TabsContent>
 
-          {timeTrackingSettings?.allowManualTimeSubmission && (
+          {/* {timeTrackingSettings?.allowManualTimeSubmission && (
             <TabsContent value="manual" className="space-y-6">
               <Card>
                 <CardHeader>
@@ -1320,7 +1320,7 @@ export default function TimerPage() {
                 </CardContent>
               </Card>
             </TabsContent>
-          )}
+          )} */}
         </Tabs>
 
         {/* Time Logs - Displayed for both timer and manual log tabs */}
