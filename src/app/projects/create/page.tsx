@@ -158,8 +158,20 @@ export default function CreateProjectPage() {
         if (!formData.startDate) {
           errors.startDate = 'Start date is required'
         }
-        if (formData.startDate && formData.endDate && new Date(formData.startDate) > new Date(formData.endDate)) {
-          errors.endDate = 'Start date cannot be after end date'
+        if (formData.startDate && formData.endDate) {
+          const startDate = new Date(formData.startDate)
+          const endDate = new Date(formData.endDate)
+          
+          // Reset time to compare dates only
+          startDate.setHours(0, 0, 0, 0)
+          endDate.setHours(0, 0, 0, 0)
+          
+          if (endDate <= startDate) {
+            errors.endDate = 'End date must be after the start date'
+            if (endDate < startDate) {
+              errors.startDate = 'Start date cannot be after end date'
+            }
+          }
         }
         break
       // Steps 3, 4, 5 are optional - no validation needed
@@ -240,8 +252,20 @@ export default function CreateProjectPage() {
       if (!formData.startDate) {
         errors.startDate = 'Start date is required'
       }
-      if (formData.startDate && formData.endDate && new Date(formData.startDate) > new Date(formData.endDate)) {
-        errors.endDate = 'Start date cannot be after end date'
+      if (formData.startDate && formData.endDate) {
+        const startDate = new Date(formData.startDate)
+        const endDate = new Date(formData.endDate)
+        
+        // Reset time to compare dates only
+        startDate.setHours(0, 0, 0, 0)
+        endDate.setHours(0, 0, 0, 0)
+        
+        if (endDate <= startDate) {
+          errors.endDate = 'End date must be after the start date'
+          if (endDate < startDate) {
+            errors.startDate = 'Start date cannot be after end date'
+          }
+        }
       }
       
       if (Object.keys(errors).length > 0) {
@@ -363,15 +387,35 @@ export default function CreateProjectPage() {
     setValidationErrors(prevErrors => {
       const errors = { ...prevErrors }
       
+      // Clear previous date errors
+      if (errors.startDate && errors.startDate.includes('date')) {
+        delete errors.startDate
+      }
+      if (errors.endDate && errors.endDate.includes('date')) {
+        delete errors.endDate
+      }
+      
       if (formData.startDate && formData.endDate) {
-        if (new Date(formData.startDate) > new Date(formData.endDate)) {
-          errors.endDate = 'Start date cannot be after end date'
-        } else if (errors.endDate && new Date(formData.startDate) <= new Date(formData.endDate)) {
+        const startDate = new Date(formData.startDate)
+        const endDate = new Date(formData.endDate)
+        
+        // Reset time to compare dates only
+        startDate.setHours(0, 0, 0, 0)
+        endDate.setHours(0, 0, 0, 0)
+        
+        // Check if end date is before or equal to start date
+        if (endDate <= startDate) {
+          errors.endDate = 'End date must be after the start date'
+          // Also highlight start date if end date is invalid
+          if (endDate < startDate) {
+            errors.startDate = 'Start date cannot be after end date'
+          }
+        }
+      } else if (formData.endDate && !formData.startDate) {
+        // If end date is set but start date is not, clear end date error (will be validated on submit)
+        if (errors.endDate && errors.endDate.includes('date')) {
           delete errors.endDate
         }
-      } else if (errors.endDate && (!formData.startDate || !formData.endDate)) {
-        // Clear error if one of the dates is cleared
-        delete errors.endDate
       }
       
       return errors
@@ -775,19 +819,25 @@ export default function CreateProjectPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="startDate">Start Date *</Label>
+                  <Label htmlFor="startDate" className="flex items-center gap-1">
+                    Start Date <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="startDate"
                     type="date"
                     value={formData.startDate}
                     onChange={(e) => handleFieldChange('startDate', e.target.value)}
+                    max={formData.endDate || undefined}
                     required
-                    className={validationErrors.startDate ? 'border-red-500' : ''}
+                    className={validationErrors.startDate ? 'border-destructive' : ''}
                   />
                   {validationErrors.startDate && (
-                    <p className="text-sm text-red-600">{validationErrors.startDate}</p>
+                    <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                      <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                      {validationErrors.startDate}
+                    </p>
                   )}
                 </div>
 
@@ -797,12 +847,26 @@ export default function CreateProjectPage() {
                     id="endDate"
                     type="date"
                     value={formData.endDate}
-                    min={formData.startDate || undefined}
+                    min={
+                      formData.startDate 
+                        ? new Date(new Date(formData.startDate).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                        : undefined
+                    }
                     onChange={(e) => handleFieldChange('endDate', e.target.value)}
-                    className={validationErrors.endDate ? 'border-red-500' : ''}
+                    disabled={!formData.startDate}
+                    className={validationErrors.endDate ? 'border-destructive' : ''}
                   />
+                  {!formData.startDate && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                      <Info className="h-3 w-3" />
+                      Please select start date first
+                    </p>
+                  )}
                   {validationErrors.endDate && (
-                    <p className="text-sm text-red-600">{validationErrors.endDate}</p>
+                    <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                      <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                      {validationErrors.endDate}
+                    </p>
                   )}
                 </div>
               </div>
@@ -810,7 +874,14 @@ export default function CreateProjectPage() {
               <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription className="text-sm leading-relaxed">
-                  The project timeline helps with resource planning and deadline tracking.
+                  <div className="space-y-1">
+                    <p>The project timeline helps with resource planning and deadline tracking.</p>
+                    {formData.startDate && formData.endDate && !validationErrors.endDate && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        <span className="font-medium">Project Duration:</span> {new Date(formData.startDate).toLocaleDateString()} to {new Date(formData.endDate).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
                 </AlertDescription>
               </Alert>
             </CardContent>

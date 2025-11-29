@@ -34,7 +34,8 @@ import {
   Trash2,
   Eye,
   Edit,
-  GripVertical
+  GripVertical,
+  X
 } from 'lucide-react'
 import { Permission, PermissionGate } from '@/lib/permissions'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
@@ -98,6 +99,8 @@ export default function StoriesPage() {
   const [stories, setStories] = useState<Story[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false)
   const [success, setSuccess] = useState('')
 
   const [authError, setAuthError] = useState('')
@@ -162,6 +165,23 @@ export default function StoriesPage() {
       return () => clearTimeout(timeout)
     }
   }, [searchParams])
+
+  // Check for success message from query params (after story edit)
+  useEffect(() => {
+    const updated = searchParams.get('updated')
+    if (updated === 'true') {
+      setSuccessMessage('Story updated successfully')
+      setShowSuccessAlert(true)
+      // Clear the query parameter from URL
+      router.replace('/stories', { scroll: false })
+      // Auto-hide after 5 seconds
+      const timer = setTimeout(() => {
+        setShowSuccessAlert(false)
+        setSuccessMessage('')
+      }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams, router])
 
   const fetchStories = async () => {
     try {
@@ -242,8 +262,13 @@ export default function StoriesPage() {
         setStories(stories.filter(p => p._id !== selectedStory._id))
         setShowDeleteConfirmModal(false)
         setSelectedStory(null)
-        setSuccess('Story deleted successfully.')
-        setTimeout(() => setSuccess(''), 4000)
+        setSuccessMessage('Story deleted successfully')
+        setShowSuccessAlert(true)
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+          setShowSuccessAlert(false)
+          setSuccessMessage('')
+        }, 5000)
       } else {
         setError(data.error || 'Failed to delete story')
       }
@@ -492,6 +517,30 @@ export default function StoriesPage() {
                 <TabsTrigger value="list">List View</TabsTrigger>
                 <TabsTrigger value="kanban">Kanban View</TabsTrigger>
               </TabsList>
+              
+              {showSuccessAlert && successMessage && (
+                <Alert className="mt-4 border-green-500 bg-green-50 dark:bg-green-900/20">
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                      <AlertDescription className="text-green-800 dark:text-green-200 flex-1">
+                        {successMessage}
+                      </AlertDescription>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40 ml-auto flex-shrink-0"
+                      onClick={() => {
+                        setShowSuccessAlert(false)
+                        setSuccessMessage('')
+                      }}
+                    >
+                      <X className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    </Button>
+                  </div>
+                </Alert>
+              )}
 
               <TabsContent value="list" className="space-y-4">
                 <div className="space-y-4">

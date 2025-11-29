@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useMemo } from 'react'
-import { Clock, Edit, Trash2, Check, X, Filter, Download, Plus, AlertTriangle, FolderOpen, Target, Loader2, Upload, FileText } from 'lucide-react'
+import { Clock, Edit, Trash2, Check, X, Filter, Download, Plus, AlertTriangle, FolderOpen, Target, Loader2, Upload, FileText, User, Search } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -15,7 +15,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '@/components/ui/Dialog'
 import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules } from '@/lib/utils'
-import { useFeaturePermissions } from '@/lib/permissions/permission-context'
+import { useFeaturePermissions, usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 interface TimeLogsProps {
   userId: string
@@ -80,8 +81,71 @@ export function TimeLogs({
     endDate: '',
     status: '',
     isBillable: '',
-    isApproved: ''
+    isApproved: '',
+    projectId: '',
+    taskId: '',
+    employeeId: ''
   })
+  const [currentUserRole, setCurrentUserRole] = useState<string>('')
+  const [filterProjects, setFilterProjects] = useState<any[]>([])
+  const [filterTasks, setFilterTasks] = useState<any[]>([])
+  const [filterEmployees, setFilterEmployees] = useState<any[]>([])
+  const [filterProjectsLoading, setFilterProjectsLoading] = useState(false)
+  const [filterTasksLoading, setFilterTasksLoading] = useState(false)
+  const [filterEmployeesLoading, setFilterEmployeesLoading] = useState(false)
+  const [projectSearch, setProjectSearch] = useState('')
+  const [taskSearch, setTaskSearch] = useState('')
+  const [employeeSearch, setEmployeeSearch] = useState('')
+  const [statusSearch, setStatusSearch] = useState('')
+
+  // Filtered lists based on search queries
+  const filteredProjects = useMemo(() => {
+    if (!projectSearch.trim()) return filterProjects
+    const searchLower = projectSearch.toLowerCase()
+    return filterProjects.filter(project => 
+      project.name?.toLowerCase().includes(searchLower)
+    )
+  }, [filterProjects, projectSearch])
+
+  const filteredTasks = useMemo(() => {
+    if (!taskSearch.trim()) return filterTasks
+    const searchLower = taskSearch.toLowerCase()
+    return filterTasks.filter(task => 
+      task.title?.toLowerCase().includes(searchLower)
+    )
+  }, [filterTasks, taskSearch])
+
+  const filteredEmployees = useMemo(() => {
+    if (!employeeSearch.trim()) return filterEmployees
+    const searchLower = employeeSearch.toLowerCase()
+    return filterEmployees.filter(employee => {
+      const fullName = `${employee.firstName || ''} ${employee.lastName || ''}`.toLowerCase()
+      const email = employee.email?.toLowerCase() || ''
+      return fullName.includes(searchLower) || email.includes(searchLower)
+    })
+  }, [filterEmployees, employeeSearch])
+
+  const statusOptions = [
+    { value: 'all', label: 'All statuses' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'running', label: 'Running' },
+    { value: 'paused', label: 'Paused' },
+    { value: 'cancelled', label: 'Cancelled' }
+  ]
+
+  const filteredStatusOptions = useMemo(() => {
+    if (!statusSearch.trim()) return statusOptions
+    const searchLower = statusSearch.toLowerCase()
+    return statusOptions.filter(option => 
+      option.label.toLowerCase().includes(searchLower)
+    )
+  }, [statusSearch])
+
+  // Handle status filter change - convert 'all' to empty string
+  const handleStatusFilterChange = (value: string) => {
+    handleFilterChange('status', value === 'all' ? '' : value)
+  }
+
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -152,6 +216,114 @@ export function TimeLogs({
 
   const { organization } = useOrganization()
   const { canApproveTime } = useFeaturePermissions()
+  const { hasPermission } = usePermissions()
+
+  // Check if user can view employee filter using permission
+  const canViewEmployeeFilter = useMemo(() => {
+    return hasPermission(Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ)
+  }, [hasPermission])
+
+  // Fetch current user role
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      try {
+        const response = await fetch('/api/auth/me')
+        if (response.ok) {
+          const userData = await response.json()
+          setCurrentUserRole(userData.role || '')
+        }
+      } catch (error) {
+        console.error('Failed to fetch user role:', error)
+      }
+    }
+    fetchUserRole()
+  }, [])
+
+  // Fetch projects for filter
+  useEffect(() => {
+    const fetchFilterProjects = async () => {
+      if (!resolvedOrgId) return
+      setFilterProjectsLoading(true)
+      try {
+        const response = await fetch('/api/projects?limit=1000')
+        const data = await response.json()
+        if (data.success && Array.isArray(data.data)) {
+          // Filter projects that allow time tracking
+          const filtered = data.data.filter((project: any) => {
+            const allow = project?.settings?.allowTimeTracking
+            if (!allow) return false
+            const createdByMatch = project?.createdBy === resolvedUserId || project?.createdBy?.id === resolvedUserId
+            const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
+            const teamMatch = teamMembers.some((memberId: any) => {
+              if (typeof memberId === 'string') return memberId === resolvedUserId
+              return memberId?._id === resolvedUserId || memberId?.id === resolvedUserId
+            })
+            const members = Array.isArray(project?.members) ? project.members : []
+            const membersMatch = members.some((m: any) => (typeof m === 'string' ? m === resolvedUserId : m?.id === resolvedUserId || m?._id === resolvedUserId))
+            return createdByMatch || teamMatch || membersMatch || canViewEmployeeFilter
+          })
+          setFilterProjects(filtered)
+        }
+      } catch (error) {
+        console.error('Failed to fetch projects for filter:', error)
+      } finally {
+        setFilterProjectsLoading(false)
+      }
+    }
+    fetchFilterProjects()
+  }, [resolvedOrgId, resolvedUserId, canViewEmployeeFilter])
+
+  // Fetch tasks for filter when project is selected
+  useEffect(() => {
+    const fetchFilterTasks = async () => {
+      if (!filters.projectId || !resolvedOrgId) {
+        setFilterTasks([])
+        return
+      }
+      setFilterTasksLoading(true)
+      try {
+        const response = await fetch(`/api/tasks?project=${filters.projectId}&limit=500`)
+        const data = await response.json()
+        if (data.success && Array.isArray(data.data)) {
+          setFilterTasks(data.data)
+        } else {
+          setFilterTasks([])
+        }
+      } catch (error) {
+        console.error('Failed to fetch tasks for filter:', error)
+        setFilterTasks([])
+      } finally {
+        setFilterTasksLoading(false)
+      }
+    }
+    fetchFilterTasks()
+  }, [filters.projectId, resolvedOrgId])
+
+  // Fetch employees for filter (only if user has permission)
+  useEffect(() => {
+    const fetchFilterEmployees = async () => {
+      if (!canViewEmployeeFilter || !resolvedOrgId) {
+        setFilterEmployees([])
+        return
+      }
+      setFilterEmployeesLoading(true)
+      try {
+        const response = await fetch('/api/members')
+        const data = await response.json()
+        if (data.success && Array.isArray(data.data?.members)) {
+          setFilterEmployees(data.data.members)
+        } else {
+          setFilterEmployees([])
+        }
+      } catch (error) {
+        console.error('Failed to fetch employees for filter:', error)
+        setFilterEmployees([])
+      } finally {
+        setFilterEmployeesLoading(false)
+      }
+    }
+    fetchFilterEmployees()
+  }, [canViewEmployeeFilter, resolvedOrgId])
 
   // Fetch organization settings for application-level allowManualTimeSubmission
   useEffect(() => {
@@ -594,8 +766,26 @@ export function TimeLogs({
         limit: pagination.limit.toString()
       })
 
-      if (projectId && projectId !== 'undefined' && projectId !== 'null') params.append('projectId', projectId)
-      if (taskId) params.append('taskId', taskId)
+      // Use filter projectId/taskId if provided, otherwise use props
+      const effectiveProjectId = filters.projectId || (projectId && projectId !== 'undefined' && projectId !== 'null' ? projectId : null)
+      const effectiveTaskId = filters.taskId || taskId || null
+      
+      if (effectiveProjectId) params.append('projectId', effectiveProjectId)
+      if (effectiveTaskId) params.append('taskId', effectiveTaskId)
+      
+      // Employee filter logic:
+      // - If user has permission and filter is set, use filter
+      // - If user has permission but no filter, don't filter by user (show all)
+      // - If user doesn't have permission, always filter by their own userId
+      if (canViewEmployeeFilter) {
+        if (filters.employeeId) {
+          params.append('userId', filters.employeeId)
+        }
+        // If no employee filter and user has permission, show all employees' logs
+      } else {
+        // User doesn't have permission, only show their own logs
+        params.append('userId', resolvedUserId)
+      }
       if (filters.startDate) params.append('startDate', filters.startDate)
       if (filters.endDate) params.append('endDate', filters.endDate)
       if (filters.status && filters.status !== 'all') params.append('status', filters.status)
@@ -616,7 +806,7 @@ export function TimeLogs({
     } finally {
       setIsLoading(false)
     }
-  }, [resolvedUserId, resolvedOrgId, projectId, taskId, pagination.page, pagination.limit, filters])
+  }, [resolvedUserId, resolvedOrgId, projectId, taskId, pagination.page, pagination.limit, filters, canViewEmployeeFilter])
 
   useEffect(() => {
     if (!authResolving) {
@@ -696,7 +886,25 @@ export function TimeLogs({
   }
 
   const handleFilterChange = (key: string, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }))
+    setFilters(prev => {
+      const newFilters = { ...prev, [key]: value }
+      
+      // If project filter changes, clear task filter if task doesn't belong to new project
+      if (key === 'projectId') {
+        if (value && prev.taskId) {
+          // Check if current task belongs to new project
+          const taskBelongsToProject = filterTasks.some(t => t._id === prev.taskId && t.project === value)
+          if (!taskBelongsToProject) {
+            newFilters.taskId = ''
+          }
+        } else if (!value) {
+          // If project is cleared, clear task filter too
+          newFilters.taskId = ''
+        }
+      }
+      
+      return newFilters
+    })
     setPagination(prev => ({ ...prev, page: 1 }))
   }
 
@@ -1191,8 +1399,20 @@ export function TimeLogs({
               limit: pagination.limit.toString()
             })
 
-            if (projectId && projectId !== 'undefined' && projectId !== 'null') params.append('projectId', projectId)
-            if (taskId) params.append('taskId', taskId)
+            const effectiveProjectId = filters.projectId || (projectId && projectId !== 'undefined' && projectId !== 'null' ? projectId : null)
+            const effectiveTaskId = filters.taskId || taskId || null
+            
+            if (effectiveProjectId) params.append('projectId', effectiveProjectId)
+            if (effectiveTaskId) params.append('taskId', effectiveTaskId)
+            
+            if (canViewEmployeeFilter) {
+              if (filters.employeeId) {
+                params.append('userId', filters.employeeId)
+              }
+            } else {
+              params.append('userId', resolvedUserId)
+            }
+            
             if (filters.startDate) params.append('startDate', filters.startDate)
             if (filters.endDate) params.append('endDate', filters.endDate)
             if (filters.status && filters.status !== 'all') params.append('status', filters.status)
@@ -1292,68 +1512,305 @@ export function TimeLogs({
         )}
 
         {/* Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="startDate" className="text-xs sm:text-sm">Start Date</Label>
-            <Input
-              id="startDate"
-              type="date"
-              value={filters.startDate}
-              onChange={(e) => handleFilterChange('startDate', e.target.value)}
-              className="w-full"
-            />
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Label className="text-sm font-medium">Filters</Label>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="endDate" className="text-xs sm:text-sm">End Date</Label>
-            <Input
-              id="endDate"
-              type="date"
-              value={filters.endDate}
-              onChange={(e) => handleFilterChange('endDate', e.target.value)}
-              className="w-full"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="filter-project" className="text-xs sm:text-sm">Project</Label>
+              <Select 
+                value={filters.projectId || 'all'} 
+                onValueChange={(value) => {
+                  handleFilterChange('projectId', value === 'all' ? '' : value)
+                  if (value === 'all') {
+                    handleFilterChange('taskId', '')
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full" id="filter-project">
+                  <SelectValue placeholder="All projects" />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="p-2 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Search projects..."
+                        value={projectSearch}
+                        onChange={(e) => setProjectSearch(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        className="h-8 pl-7 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-[200px] overflow-y-auto">
+                    <SelectItem value="all" onMouseDown={(e) => e.preventDefault()}>
+                      All projects
+                    </SelectItem>
+                    {filterProjectsLoading ? (
+                      <SelectItem value="loading" disabled>
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Loading...
+                        </div>
+                      </SelectItem>
+                    ) : filteredProjects.length === 0 ? (
+                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                        No projects found
+                      </div>
+                    ) : (
+                      filteredProjects.map((project) => (
+                        <SelectItem key={project._id} value={project._id} onMouseDown={(e) => e.preventDefault()}>
+                          <div className="flex items-center gap-2">
+                            <FolderOpen className="h-3 w-3" />
+                            <span className="truncate">{project.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </div>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="filter-task" className="text-xs sm:text-sm">Task</Label>
+              <Select 
+                value={filters.taskId || 'all'} 
+                onValueChange={(value) => handleFilterChange('taskId', value === 'all' ? '' : value)}
+                disabled={!filters.projectId || filterTasksLoading}
+              >
+                <SelectTrigger className="w-full" id="filter-task">
+                  <SelectValue placeholder={
+                    !filters.projectId 
+                      ? 'Select project first' 
+                      : filterTasksLoading 
+                        ? 'Loading...' 
+                        : 'All tasks'
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="p-2 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Search tasks..."
+                        value={taskSearch}
+                        onChange={(e) => setTaskSearch(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        className="h-8 pl-7 text-xs"
+                        disabled={!filters.projectId}
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-[200px] overflow-y-auto">
+                    <SelectItem value="all" onMouseDown={(e) => e.preventDefault()}>
+                      All tasks
+                    </SelectItem>
+                    {filterTasksLoading ? (
+                      <SelectItem value="loading" disabled>
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Loading...
+                        </div>
+                      </SelectItem>
+                    ) : filteredTasks.length === 0 ? (
+                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                        {!filters.projectId ? 'Select a project first' : 'No tasks found'}
+                      </div>
+                    ) : (
+                      filteredTasks.map((task) => (
+                        <SelectItem key={task._id} value={task._id} onMouseDown={(e) => e.preventDefault()}>
+                          <div className="flex items-center gap-2">
+                            <Target className="h-3 w-3" />
+                            <span className="truncate">{task.title}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </div>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {canViewEmployeeFilter && (
+              <div className="space-y-2">
+                <Label htmlFor="filter-employee" className="text-xs sm:text-sm">Employee</Label>
+                <Select 
+                  value={filters.employeeId || 'all'} 
+                  onValueChange={(value) => handleFilterChange('employeeId', value === 'all' ? '' : value)}
+                  disabled={filterEmployeesLoading}
+                >
+                  <SelectTrigger className="w-full" id="filter-employee">
+                    <SelectValue placeholder={
+                      filterEmployeesLoading ? 'Loading...' : 'All employees'
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <div className="p-2 border-b">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search employees..."
+                          value={employeeSearch}
+                          onChange={(e) => setEmployeeSearch(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="h-8 pl-7 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="max-h-[200px] overflow-y-auto">
+                      <SelectItem value="all" onMouseDown={(e) => e.preventDefault()}>
+                        All employees
+                      </SelectItem>
+                      {filterEmployeesLoading ? (
+                        <SelectItem value="loading" disabled>
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Loading...
+                          </div>
+                        </SelectItem>
+                      ) : filteredEmployees.length === 0 ? (
+                        <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                          No employees found
+                        </div>
+                      ) : (
+                        filteredEmployees.map((employee) => (
+                          <SelectItem key={employee._id} value={employee._id} onMouseDown={(e) => e.preventDefault()}>
+                            <div className="flex items-center gap-2">
+                              <User className="h-3 w-3" />
+                              <span className="truncate">
+                                {employee.firstName} {employee.lastName}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="startDate" className="text-xs sm:text-sm">Start Date</Label>
+              <Input
+                id="startDate"
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="endDate" className="text-xs sm:text-sm">End Date</Label>
+              <Input
+                id="endDate"
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="status" className="text-xs sm:text-sm">Status</Label>
+              <Select value={filters.status || 'all'} onValueChange={handleStatusFilterChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="All statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="p-2 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Search status..."
+                        value={statusSearch}
+                        onChange={(e) => setStatusSearch(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        className="h-8 pl-7 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-[200px] overflow-y-auto">
+                    {filteredStatusOptions.length === 0 ? (
+                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                        No status found
+                      </div>
+                    ) : (
+                      filteredStatusOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value} onMouseDown={(e) => e.preventDefault()}>
+                          {option.label}
+                        </SelectItem>
+                      ))
+                    )}
+                  </div>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="isBillable" className="text-xs sm:text-sm">Billable</Label>
+              <Select value={filters.isBillable} onValueChange={(value) => handleFilterChange('isBillable', value)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="true">Billable</SelectItem>
+                  <SelectItem value="false">Non-billable</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="isApproved" className="text-xs sm:text-sm">Approved</Label>
+              <Select value={filters.isApproved} onValueChange={(value) => handleFilterChange('isApproved', value)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="true">Approved</SelectItem>
+                  <SelectItem value="false">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="status" className="text-xs sm:text-sm">Status</Label>
-            <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value)}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="running">Running</SelectItem>
-                <SelectItem value="paused">Paused</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="isBillable" className="text-xs sm:text-sm">Billable</Label>
-            <Select value={filters.isBillable} onValueChange={(value) => handleFilterChange('isBillable', value)}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="All" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="true">Billable</SelectItem>
-                <SelectItem value="false">Non-billable</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="isApproved" className="text-xs sm:text-sm">Approved</Label>
-            <Select value={filters.isApproved} onValueChange={(value) => handleFilterChange('isApproved', value)}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="All" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="true">Approved</SelectItem>
-                <SelectItem value="false">Pending</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+
+          {/* Clear Filters Button */}
+          {(filters.projectId || filters.taskId || filters.employeeId || filters.startDate || filters.endDate || filters.status !== '' || filters.isBillable !== '' || filters.isApproved !== '') && (
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setFilters({
+                    startDate: '',
+                    endDate: '',
+                    status: '',
+                    isBillable: '',
+                    isApproved: '',
+                    projectId: '',
+                    taskId: '',
+                    employeeId: ''
+                  })
+                  // Clear search queries
+                  setProjectSearch('')
+                  setTaskSearch('')
+                  setEmployeeSearch('')
+                  setStatusSearch('')
+                  setPagination(prev => ({ ...prev, page: 1 }))
+                }}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Clear Filters
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Bulk Actions */}

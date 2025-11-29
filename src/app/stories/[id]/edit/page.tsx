@@ -322,9 +322,7 @@ export default function EditStoryPage() {
       
       const data = await res.json()
       if (data.success) {
-        setSuccess('Story updated successfully')
-        setTimeout(() => setSuccess(''), 4000)
-        setOriginalStory(story)
+        router.push('/stories?updated=true')
       } else {
         setError(data.error || 'Failed to save story')
       }

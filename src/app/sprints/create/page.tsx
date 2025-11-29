@@ -37,7 +37,8 @@ export default function CreateSprintPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [selectedProject, setSelectedProject] = useState<any>(null)
-  const [projectQuery, setProjectQuery] = useState("");
+  const [projectQuery, setProjectQuery] = useState("")
+  const [dateError, setDateError] = useState('')
 
   const [formData, setFormData] = useState({
     name: '',
@@ -132,6 +133,12 @@ export default function CreateSprintPage() {
         } else {
           setUsers([])
         }
+        // Clear date error when project changes
+        setDateError('')
+        // Clear dates if they're outside the new project's date range
+        if (formData.startDate || formData.endDate) {
+          validateDates(formData.startDate, formData.endDate, data.data)
+        }
       } else {
         setSelectedProject(null)
         setUsers([])
@@ -143,10 +150,96 @@ export default function CreateSprintPage() {
     }
   }
 
+  // Validate sprint dates
+  const validateDates = (startDate: string, endDate: string, project?: any) => {
+    setDateError('')
+    
+    if (!startDate || !endDate) {
+      return true // Allow empty dates during input
+    }
+
+    if (!project || !project.startDate || !project.endDate) {
+      setDateError('Project dates are not available. Please select a valid project.')
+      return false
+    }
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Reset time to start of day
+
+    const sprintStart = new Date(startDate)
+    sprintStart.setHours(0, 0, 0, 0)
+    
+    const sprintEnd = new Date(endDate)
+    sprintEnd.setHours(0, 0, 0, 0)
+
+    const projectStart = new Date(project.startDate)
+    projectStart.setHours(0, 0, 0, 0)
+    
+    const projectEnd = new Date(project.endDate)
+    projectEnd.setHours(23, 59, 59, 999) // End of day
+
+    // Check if start date is in the past
+    if (sprintStart < today) {
+      setDateError(`Start date: Must be today (${today.toLocaleDateString()}) or a future date.`)
+      return false
+    }
+
+    // Check if start date is before project start
+    if (sprintStart < projectStart) {
+      setDateError(`Start date: Must be on or after project start date (${projectStart.toLocaleDateString()}).`)
+      return false
+    }
+
+    // Check if start date is after project end
+    if (sprintStart > projectEnd) {
+      setDateError(`Start date: Must be on or before project end date (${projectEnd.toLocaleDateString()}).`)
+      return false
+    }
+
+    // Check if end date is in the past
+    if (sprintEnd < today) {
+      setDateError(`End date: Must be today (${today.toLocaleDateString()}) or a future date.`)
+      return false
+    }
+
+    // Check if end date is before project start
+    if (sprintEnd < projectStart) {
+      setDateError(`End date: Must be on or after project start date (${projectStart.toLocaleDateString()}).`)
+      return false
+    }
+
+    // Check if end date is after project end
+    if (sprintEnd > projectEnd) {
+      setDateError(`End date: Must be on or before project end date (${projectEnd.toLocaleDateString()}).`)
+      return false
+    }
+
+    // Check if end date is after start date
+    if (sprintEnd < sprintStart) {
+      setDateError('End date: Must be after the start date.')
+      return false
+    }
+
+    return true
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setDateError('')
+
+    // Validate dates before submission
+    if (!selectedProject) {
+      setError('Please select a project')
+      setLoading(false)
+      return
+    }
+
+    if (!validateDates(formData.startDate, formData.endDate, selectedProject)) {
+      setLoading(false)
+      return
+    }
 
     try {
       const response = await fetch('/api/sprints', {
@@ -192,6 +285,21 @@ export default function CreateSprintPage() {
         }
         // Clear team members selection when project changes
         newData.teamMembers = []
+        // Clear dates when project changes
+        newData.startDate = ''
+        newData.endDate = ''
+        setDateError('')
+      }
+      
+      // Validate dates when they change
+      if (field === 'startDate' || field === 'endDate') {
+        const startDate = field === 'startDate' ? value as string : prev.startDate
+        const endDate = field === 'endDate' ? value as string : prev.endDate
+        if (selectedProject && startDate && endDate) {
+          validateDates(startDate, endDate, selectedProject)
+        } else {
+          setDateError('')
+        }
       }
       
       return newData
@@ -252,6 +360,7 @@ export default function CreateSprintPage() {
           </Alert>
         )}
 
+
         <Card>
           <CardHeader>
             <CardTitle>Sprint Details</CardTitle>
@@ -307,14 +416,56 @@ export default function CreateSprintPage() {
 
                   <div>
                     <label className="text-sm font-medium text-foreground">Start Date *</label>
+                    {selectedProject && (
+                      <div className="mb-2 p-2 bg-muted/50 rounded-md border border-muted">
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium">Project Duration:</span>{' '}
+                          {new Date(selectedProject.startDate).toLocaleDateString()} to{' '}
+                          {new Date(selectedProject.endDate).toLocaleDateString()}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Sprint dates must be within this range and cannot be in the past.
+                        </p>
+                      </div>
+                    )}
                     <Input
                       type="date"
                       value={formData.startDate}
                       onChange={(e) => handleChange('startDate', e.target.value)}
-                      max={formData.endDate || undefined}
+                      min={
+                        selectedProject?.startDate 
+                          ? new Date(Math.max(
+                              new Date(selectedProject.startDate).getTime(),
+                              new Date().setHours(0, 0, 0, 0)
+                            )).toISOString().split('T')[0]
+                          : new Date().toISOString().split('T')[0]
+                      }
+                      max={
+                        selectedProject?.endDate && formData.endDate
+                          ? new Date(Math.min(
+                              new Date(selectedProject.endDate).getTime(),
+                              new Date(formData.endDate).getTime()
+                            )).toISOString().split('T')[0]
+                          : selectedProject?.endDate
+                            ? new Date(selectedProject.endDate).toISOString().split('T')[0]
+                            : undefined
+                      }
                       required
-                      className="w-full"
+                      className={`w-full ${dateError && formData.startDate && dateError.includes('start') ? 'border-destructive' : ''}`}
+                      disabled={!formData.project}
                     />
+                    {!formData.project && (
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Please select a project first to set sprint dates
+                      </p>
+                    )}
+                    {dateError && formData.startDate && dateError.includes('start') && (
+                      <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                        {dateError}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -323,10 +474,52 @@ export default function CreateSprintPage() {
                       type="date"
                       value={formData.endDate}
                       onChange={(e) => handleChange('endDate', e.target.value)}
-                      min={formData.startDate || undefined}
+                      min={
+                        selectedProject?.startDate && formData.startDate
+                          ? new Date(Math.max(
+                              new Date(selectedProject.startDate).getTime(),
+                              new Date(formData.startDate).getTime(),
+                              new Date().setHours(0, 0, 0, 0)
+                            )).toISOString().split('T')[0]
+                          : formData.startDate
+                            ? new Date(Math.max(
+                                new Date(formData.startDate).getTime(),
+                                new Date().setHours(0, 0, 0, 0)
+                              )).toISOString().split('T')[0]
+                            : selectedProject?.startDate
+                              ? new Date(Math.max(
+                                  new Date(selectedProject.startDate).getTime(),
+                                  new Date().setHours(0, 0, 0, 0)
+                                )).toISOString().split('T')[0]
+                              : new Date().toISOString().split('T')[0]
+                      }
+                      max={
+                        selectedProject?.endDate
+                          ? new Date(selectedProject.endDate).toISOString().split('T')[0]
+                          : undefined
+                      }
                       required
-                      className="w-full"
+                      className={`w-full ${dateError && formData.endDate && (dateError.includes('end') || dateError.includes('after')) ? 'border-destructive' : ''}`}
+                      disabled={!formData.project || !formData.startDate}
                     />
+                    {!formData.project && (
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Please select a project first
+                      </p>
+                    )}
+                    {!formData.startDate && formData.project && (
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Please select start date first
+                      </p>
+                    )}
+                    {dateError && formData.endDate && (dateError.includes('end') || dateError.includes('after')) && (
+                      <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                        {dateError}
+                      </p>
+                    )}
                   </div>
                 </div>
 

@@ -49,19 +49,23 @@ export function slugify(text: string): string {
 
 /**
  * Converts text to Title Case
- * Handles snake_case, kebab-case, and regular lowercase text
+ * Handles snake_case, kebab-case, UPPERCASE, and regular lowercase text
  * Examples:
  *   "in_progress" -> "In Progress"
  *   "team_member" -> "Team Member"
- *   "low" -> "Low"
- *   "high" -> "High"
+ *   "PROJECT_MANAGER" -> "Project Manager"
+ *   "project_manager" -> "Project Manager"
+ *   "admin" -> "Admin"
+ *   "ADMIN" -> "Admin"
  */
 export function formatToTitleCase(text: string | undefined | null): string {
   if (!text) return ''
   
+  // Convert to lowercase first, then split and capitalize
   return text
+    .toLowerCase()
     .split(/[_\-\s]+/) // Split on underscore, hyphen, or whitespace
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ')
 }
 
