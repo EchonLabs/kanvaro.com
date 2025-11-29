@@ -4,6 +4,8 @@ import { User } from '@/models/User'
 import { UserInvitation } from '@/models/UserInvitation'
 import '@/models/Organization' // Ensure Organization model is registered for populate
 import { notificationService } from '@/lib/notification-service'
+import { emailService } from '@/lib/email/EmailService'
+import { formatToTitleCase } from '@/lib/utils'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
@@ -67,6 +69,34 @@ export async function POST(request: NextRequest) {
     invitation.isAccepted = true
     invitation.acceptedAt = new Date()
     await invitation.save()
+
+    // Send welcome email to the new user (non-blocking)
+    try {
+      const organizationName = invitation.organization?.name || 'Kanvaro'
+      const roleDisplayName = invitation.roleDisplayName || formatToTitleCase(invitation.role) || 'Team Member'
+      const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/login`
+      
+      const welcomeEmailHtml = emailService.generateWelcomeEmail(
+        user.firstName,
+        user.lastName,
+        user.email,
+        roleDisplayName,
+        organizationName,
+        loginUrl
+      )
+
+      emailService.sendEmail({
+        to: user.email,
+        subject: `Welcome to ${organizationName}! Your Account is Ready 🎉`,
+        html: welcomeEmailHtml
+      }).catch((emailError) => {
+        console.error('Failed to send welcome email (non-blocking):', emailError)
+        // Don't fail the account creation if email fails
+      })
+    } catch (emailError) {
+      console.error('Error preparing welcome email (non-blocking):', emailError)
+      // Don't fail the account creation if email preparation fails
+    }
 
     // Send notification to organization members about new team member
     try {

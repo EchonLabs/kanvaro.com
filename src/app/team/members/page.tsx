@@ -413,21 +413,21 @@ export default function MembersPage() {
         </div>
 
       {success && (
-        <Alert variant="default" className="break-words">
-          <CheckCircle className="h-4 w-4 flex-shrink-0" />
-          <AlertDescription className="break-words">{success}</AlertDescription>
+        <Alert variant="success" className="break-words border-green-500 bg-green-50 dark:bg-green-900/20">
+          <CheckCircle className="h-4 w-4 flex-shrink-0 text-green-600 dark:text-green-400" />
+          <AlertDescription className="break-words text-green-800 dark:text-green-200">{success}</AlertDescription>
         </Alert>
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 overflow-x-hidden">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="members" className="text-xs sm:text-sm min-h-[44px] touch-target">
-            <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5 flex-shrink-0" />
+          <TabsTrigger value="members" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
             <span className="truncate">Members</span>
             <span className="ml-1 flex-shrink-0">({members.length})</span>
           </TabsTrigger>
-          <TabsTrigger value="invitations" className="text-xs sm:text-sm min-h-[44px] touch-target">
-            <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5 flex-shrink-0" />
+          <TabsTrigger value="invitations" className="flex items-center gap-2">
+            <Mail className="h-4 w-4" />
             <span className="hidden sm:inline truncate">Pending Invitations</span>
             <span className="sm:hidden truncate">Invitations</span>
             <span className="ml-1 flex-shrink-0">({pendingInvitations.length})</span>
