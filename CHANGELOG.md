@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.8...v1.10.0) (2025-11-29)
+
+
+### Features
+
+* add time log fixes ([9846423](https://github.com/EchonLabs/kanvaro.com/commit/9846423ae27e4b5ba20a7108f912bc86eed83bc2))
+
 ## [1.9.8](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.7...v1.9.8) (2025-11-29)
 
 
