@@ -17,7 +17,7 @@ interface Role {
 
 interface InviteMemberModalProps {
   onClose: () => void
-  onInvite: (data: any) => void
+  onInvite: (data: any) => Promise<{ error?: string } | void>
 }
 
 export function InviteMemberModal({ onClose, onInvite }: InviteMemberModalProps) {
@@ -29,6 +29,7 @@ export function InviteMemberModal({ onClose, onInvite }: InviteMemberModalProps)
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [emailError, setEmailError] = useState('')
   const [roles, setRoles] = useState<Role[]>([])
   const [rolesLoading, setRolesLoading] = useState(true)
 
@@ -57,9 +58,10 @@ export function InviteMemberModal({ onClose, onInvite }: InviteMemberModalProps)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setEmailError('')
 
     if (!formData.email) {
-      setError('Email is required')
+      setEmailError('Email is required')
       return
     }
 
@@ -70,9 +72,31 @@ export function InviteMemberModal({ onClose, onInvite }: InviteMemberModalProps)
 
     setLoading(true)
     try {
-      await onInvite(formData)
-    } catch (err) {
-      setError('Failed to send invitation')
+      const result = await onInvite(formData)
+      // If onInvite returns an error object
+      if (result && result.error) {
+        const errorMessage = result.error
+        // Check if it's an email-related error
+        if (errorMessage.toLowerCase().includes('email') || 
+            errorMessage.toLowerCase().includes('already exists') ||
+            errorMessage.toLowerCase().includes('already sent') ||
+            errorMessage.toLowerCase().includes('user already')) {
+          setEmailError(errorMessage)
+        } else {
+          setError(errorMessage)
+        }
+      }
+    } catch (err: any) {
+      const errorMessage = err?.message || err?.error || 'Failed to send invitation'
+      // Check if it's an email-related error
+      if (errorMessage.toLowerCase().includes('email') || 
+          errorMessage.toLowerCase().includes('already exists') ||
+          errorMessage.toLowerCase().includes('already sent') ||
+          errorMessage.toLowerCase().includes('user already')) {
+        setEmailError(errorMessage)
+      } else {
+        setError(errorMessage)
+      }
     } finally {
       setLoading(false)
     }
@@ -109,7 +133,17 @@ export function InviteMemberModal({ onClose, onInvite }: InviteMemberModalProps)
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
+                <div className="flex items-center justify-between">
+                  <AlertDescription>{error}</AlertDescription>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 hover:bg-destructive/20"
+                    onClick={() => setError('')}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </Alert>
             )}
 
@@ -119,10 +153,27 @@ export function InviteMemberModal({ onClose, onInvite }: InviteMemberModalProps)
                 id="email"
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                onChange={(e) => {
+                  setFormData(prev => ({ ...prev, email: e.target.value }))
+                  setEmailError('') // Clear email error when user types
+                }}
                 placeholder="colleague@company.com"
                 required
+                className={emailError ? 'border-destructive' : ''}
               />
+              {emailError && (
+                <div className="flex items-center justify-between gap-2 p-2 bg-destructive/10 rounded-md border border-destructive/20">
+                  <p className="text-sm text-destructive flex-1">{emailError}</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 hover:bg-destructive/20 flex-shrink-0"
+                    onClick={() => setEmailError('')}
+                  >
+                    <X className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

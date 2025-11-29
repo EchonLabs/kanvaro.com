@@ -807,13 +807,22 @@ export function OrganizationSettings() {
           </div>
 
           {message && (
-            <Alert variant={message.type === 'error' ? 'destructive' : 'default'} className="flex items-start gap-2">
-              <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-              <AlertDescription className="text-xs sm:text-sm break-words flex-1">{message.text}</AlertDescription>
+            <Alert 
+              variant={message.type === 'error' ? 'destructive' : 'default'}
+              className={`flex items-start gap-2 ${message.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
+            >
+              <div className="flex items-start gap-2 flex-1 min-w-0">
+                {message.type === 'error' ? (
+                  <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5" />
+                ) : (
+                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400" />
+                )}
+                <AlertDescription className="text-xs sm:text-sm break-words flex-1">{message.text}</AlertDescription>
+              </div>
               <button
                 type="button"
                 onClick={() => setMessage(null)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                 aria-label="Dismiss notification"
               >
                 <X className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -871,17 +880,22 @@ export function OrganizationSettings() {
           </div>
 
           {registrationMessage && (
-            <Alert variant={registrationMessage.type === 'error' ? 'destructive' : 'default'} className="flex items-start gap-2">
-              {registrationMessage.type === 'error' ? (
-                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-              ) : (
-                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-              )}
-              <AlertDescription className="text-xs sm:text-sm break-words flex-1">{registrationMessage.text}</AlertDescription>
+            <Alert 
+              variant={registrationMessage.type === 'error' ? 'destructive' : 'default'}
+              className={`flex items-start gap-2 ${registrationMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
+            >
+              <div className="flex items-start gap-2 flex-1 min-w-0">
+                {registrationMessage.type === 'error' ? (
+                  <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5" />
+                ) : (
+                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400" />
+                )}
+                <AlertDescription className="text-xs sm:text-sm break-words flex-1">{registrationMessage.text}</AlertDescription>
+              </div>
               <button
                 type="button"
                 onClick={() => setRegistrationMessage(null)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                 aria-label="Dismiss notification"
               >
                 <X className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -1335,17 +1349,22 @@ export function OrganizationSettings() {
           )}
 
           {timeTrackingMessage && (
-            <Alert variant={timeTrackingMessage.type === 'error' ? 'destructive' : 'default'} className="flex items-start gap-2">
-              {timeTrackingMessage.type === 'error' ? (
-                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-              ) : (
-                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-              )}
-              <AlertDescription className="text-xs sm:text-sm break-words flex-1">{timeTrackingMessage.text}</AlertDescription>
+            <Alert 
+              variant={timeTrackingMessage.type === 'error' ? 'destructive' : 'default'}
+              className={`flex items-start gap-2 ${timeTrackingMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
+            >
+              <div className="flex items-start gap-2 flex-1 min-w-0">
+                {timeTrackingMessage.type === 'error' ? (
+                  <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5" />
+                ) : (
+                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400" />
+                )}
+                <AlertDescription className="text-xs sm:text-sm break-words flex-1">{timeTrackingMessage.text}</AlertDescription>
+              </div>
               <button
                 type="button"
                 onClick={() => setTimeTrackingMessage(null)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                 aria-label="Dismiss notification"
               >
                 <X className="h-3 w-3 sm:h-4 sm:w-4" />

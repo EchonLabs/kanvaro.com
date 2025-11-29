@@ -1836,7 +1836,7 @@ export default function BacklogPage() {
 
             <div>
               <Label className="text-sm font-medium text-foreground">
-                Sprint
+                Sprint <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={selectedSprintId}
