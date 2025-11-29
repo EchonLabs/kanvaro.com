@@ -39,9 +39,9 @@ import {
   Star,
   Layers,
   Eye,
-  Settings,
   Edit,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react'
 
 interface Epic {
@@ -93,6 +93,25 @@ export default function EpicsPage() {
   const [selectedEpic, setSelectedEpic] = useState<Epic | null>(null)
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false)
+
+  // Check for success message from query params
+  useEffect(() => {
+    const updated = searchParams.get('updated')
+    if (updated === 'true') {
+      setSuccessMessage('Epic updated successfully')
+      setShowSuccessAlert(true)
+      // Clear the query parameter from URL
+      router.replace('/epics', { scroll: false })
+      // Auto-hide after 5 seconds
+      const timer = setTimeout(() => {
+        setShowSuccessAlert(false)
+        setSuccessMessage('')
+      }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams, router])
 
   const checkAuth = useCallback(async () => {
     try {
@@ -333,7 +352,30 @@ export default function EpicsPage() {
                 <TabsTrigger value="grid">Grid View</TabsTrigger>
                 <TabsTrigger value="list">List View</TabsTrigger>
               </TabsList>
-             
+              
+              {showSuccessAlert && successMessage && (
+                <Alert className="mt-4 border-green-500 bg-green-50 dark:bg-green-900/20">
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                      <AlertDescription className="text-green-800 dark:text-green-200 flex-1">
+                        {successMessage}
+                      </AlertDescription>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40 ml-auto flex-shrink-0"
+                      onClick={() => {
+                        setShowSuccessAlert(false)
+                        setSuccessMessage('')
+                      }}
+                    >
+                      <X className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    </Button>
+                  </div>
+                </Alert>
+              )}
 
               <TabsContent value="grid" className="space-y-4">
                 <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
@@ -367,13 +409,6 @@ export default function EpicsPage() {
                                 }}>
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Epic
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/epics/${epic._id}?tab=settings`)
-                                }}>
-                                  <Settings className="h-4 w-4 mr-2" />
-                                  Settings
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={(e) => {
                                   e.stopPropagation()
@@ -555,13 +590,6 @@ export default function EpicsPage() {
                                 }}>
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Epic
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/epics/${epic._id}?tab=settings`)
-                                }}>
-                                  <Settings className="h-4 w-4 mr-2" />
-                                  Settings
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={(e) => {
                                   e.stopPropagation()

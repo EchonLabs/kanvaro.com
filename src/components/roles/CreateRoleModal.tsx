@@ -92,7 +92,8 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
       { permission: Permission.TIME_TRACKING_DELETE, label: 'Delete Time Entries', description: 'Delete time tracking entries' },
       { permission: Permission.TIME_TRACKING_APPROVE, label: 'Approve Time', description: 'Approve time entries' },
       { permission: Permission.TIME_TRACKING_EXPORT, label: 'Export Time', description: 'Export time tracking data' },
-      { permission: Permission.TIME_TRACKING_VIEW_ALL, label: 'View All Time', description: 'View all time tracking data' }
+      { permission: Permission.TIME_TRACKING_VIEW_ALL, label: 'View All Time', description: 'View all time tracking data' },
+      { permission: Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ, label: 'Employee Filter Access', description: 'View and filter time logs by employee' }
     ]
   },
   {

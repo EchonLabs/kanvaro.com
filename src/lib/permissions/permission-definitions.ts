@@ -95,6 +95,7 @@ export enum Permission {
   TIME_TRACKING_APPROVE = 'time_tracking:approve',
   TIME_TRACKING_EXPORT = 'time_tracking:export',
   TIME_TRACKING_VIEW_ALL = 'time_tracking:view_all',
+  TIME_TRACKING_EMPLOYEE_FILTER_READ = 'time_tracking:employee_filter:read',
   
   // Financial permissions
   FINANCIAL_READ = 'financial:read',
@@ -248,6 +249,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_APPROVE,
     Permission.TIME_TRACKING_EXPORT,
     Permission.TIME_TRACKING_VIEW_ALL,
+    Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
     
     // Financial
     Permission.FINANCIAL_READ,
@@ -361,6 +363,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_DELETE,
     Permission.TIME_TRACKING_APPROVE,
     Permission.TIME_TRACKING_EXPORT,
+    Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
     
     // Financial (project budget only)
     Permission.FINANCIAL_READ,
