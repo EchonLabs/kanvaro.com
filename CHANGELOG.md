@@ -1,3 +1,24 @@
+## [1.10.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.10.0...v1.10.1) (2025-11-29)
+
+
+### Bug Fixes
+
+* add changes in timeloogs ([0e0e30d](https://github.com/EchonLabs/kanvaro.com/commit/0e0e30d86f18f6e626ab41e19553ba9372515cbc))
+
+# [1.10.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.8...v1.10.0) (2025-11-29)
+
+
+### Features
+
+* add time log fixes ([9846423](https://github.com/EchonLabs/kanvaro.com/commit/9846423ae27e4b5ba20a7108f912bc86eed83bc2))
+
+## [1.9.8](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.7...v1.9.8) (2025-11-29)
+
+
+### Bug Fixes
+
+* add ui fixes ([b2e90f3](https://github.com/EchonLabs/kanvaro.com/commit/b2e90f361bb9ca7238ea4f0fde6f5573bf1bbaf7))
+
 ## [1.9.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.9.6...v1.9.7) (2025-11-27)
 
 

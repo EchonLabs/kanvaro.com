@@ -95,6 +95,7 @@ export enum Permission {
   TIME_TRACKING_APPROVE = 'time_tracking:approve',
   TIME_TRACKING_EXPORT = 'time_tracking:export',
   TIME_TRACKING_VIEW_ALL = 'time_tracking:view_all',
+  TIME_TRACKING_EMPLOYEE_FILTER_READ = 'time_tracking:employee_filter:read',
   
   // Financial permissions
   FINANCIAL_READ = 'financial:read',
@@ -248,6 +249,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_APPROVE,
     Permission.TIME_TRACKING_EXPORT,
     Permission.TIME_TRACKING_VIEW_ALL,
+    Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
     
     // Financial
     Permission.FINANCIAL_READ,
@@ -326,9 +328,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
   
   [Role.PROJECT_MANAGER]: [
-    // User management (limited)
+    // User management (limited - read only)
     Permission.USER_READ,
-    Permission.USER_INVITE,
     
     // Organization (read only)
     Permission.ORGANIZATION_READ,
@@ -350,9 +351,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TASK_MANAGE_COMMENTS,
     Permission.TASK_MANAGE_ATTACHMENTS,
     
-    // Team (project team only)
+    // Team (project team only - read only)
     Permission.TEAM_READ,
-    Permission.TEAM_INVITE,
     Permission.TEAM_REMOVE,
     Permission.TEAM_VIEW_ACTIVITY,
     
@@ -363,6 +363,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_DELETE,
     Permission.TIME_TRACKING_APPROVE,
     Permission.TIME_TRACKING_EXPORT,
+    Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
     
     // Financial (project budget only)
     Permission.FINANCIAL_READ,
@@ -374,9 +375,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_VIEW,
     Permission.REPORTING_CREATE,
     Permission.REPORTING_EXPORT,
-    
-    // Settings (limited)
-    Permission.SETTINGS_READ,
     
     // Epics
     Permission.EPIC_CREATE,

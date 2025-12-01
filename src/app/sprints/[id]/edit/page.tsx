@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/Badge'
-import { Loader2, ArrowLeft, Users, X } from 'lucide-react'
+import { Loader2, ArrowLeft, Users, X, AlertTriangle } from 'lucide-react'
 
 interface SprintForm {
   name: string
@@ -28,6 +28,11 @@ interface TeamMember {
   firstName: string
   lastName: string
   email: string
+}
+
+interface Project {
+  _id: string
+  name: string
 }
 
 export default function EditSprintPage() {
@@ -58,6 +63,13 @@ export default function EditSprintPage() {
   const [memberLookup, setMemberLookup] = useState<Record<string, TeamMember>>({})
   const [initialForm, setInitialForm] = useState<SprintForm | null>(null)
   const [successMessage, setSuccessMessage] = useState('')
+  const [projectId, setProjectId] = useState<string>('')
+  const [initialProjectId, setInitialProjectId] = useState<string | null>(null)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [projectQuery, setProjectQuery] = useState('')
+  const [selectedProject, setSelectedProject] = useState<any>(null)
+  const [dateError, setDateError] = useState('')
+  const messageContainerRef = useRef<HTMLDivElement>(null)
 
   const storeMemberDetails = useCallback((members?: TeamMember[]) => {
     if (!Array.isArray(members) || members.length === 0) return
@@ -77,9 +89,24 @@ export default function EditSprintPage() {
     })
   }, [])
 
+  const fetchProjects = useCallback(async () => {
+    try {
+      const response = await fetch('/api/projects?limit=1000&page=1')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && Array.isArray(data.data)) {
+          setProjects(data.data)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch projects:', err)
+    }
+  }, [])
+
   const fetchProjectMembers = useCallback(async (projectId?: string) => {
     if (!projectId) {
       setAvailableMembers([])
+      setSelectedProject(null)
       return
     }
 
@@ -89,21 +116,99 @@ export default function EditSprintPage() {
       const res = await fetch(`/api/projects/${projectId}`)
       const data = await res.json()
 
-      if (res.ok && data.success && data.data?.teamMembers) {
-        setAvailableMembers(data.data.teamMembers)
-        storeMemberDetails(data.data.teamMembers)
+      if (res.ok && data.success && data.data) {
+        setSelectedProject(data.data)
+        if (data.data?.teamMembers) {
+          setAvailableMembers(data.data.teamMembers)
+          storeMemberDetails(data.data.teamMembers)
+        }
       } else {
         setAvailableMembers([])
+        setSelectedProject(null)
         setMembersError(data.error || 'Failed to load project team members')
       }
     } catch (err) {
       console.error('Failed to fetch project members:', err)
       setMembersError('Failed to load project team members')
       setAvailableMembers([])
+      setSelectedProject(null)
     } finally {
       setMembersLoading(false)
     }
-  }, [])
+  }, [storeMemberDetails])
+
+  // Validate sprint dates
+  const validateDates = (startDate: string, endDate: string, project?: any) => {
+    setDateError('')
+    
+    if (!startDate || !endDate) {
+      return true // Allow empty dates during input
+    }
+
+    if (!project || !project.startDate || !project.endDate) {
+      setDateError('Project dates are not available. Please select a valid project.')
+      return false
+    }
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Reset time to start of day
+
+    const sprintStart = new Date(startDate)
+    sprintStart.setHours(0, 0, 0, 0)
+    
+    const sprintEnd = new Date(endDate)
+    sprintEnd.setHours(0, 0, 0, 0)
+
+    const projectStart = new Date(project.startDate)
+    projectStart.setHours(0, 0, 0, 0)
+    
+    const projectEnd = new Date(project.endDate)
+    projectEnd.setHours(23, 59, 59, 999) // End of day
+
+    // Check if start date is in the past
+    if (sprintStart < today) {
+      setDateError(`Start date: Must be today (${today.toLocaleDateString()}) or a future date.`)
+      return false
+    }
+
+    // Check if start date is before project start
+    if (sprintStart < projectStart) {
+      setDateError(`Start date: Must be on or after project start date (${projectStart.toLocaleDateString()}).`)
+      return false
+    }
+
+    // Check if start date is after project end
+    if (sprintStart > projectEnd) {
+      setDateError(`Start date: Must be on or before project end date (${projectEnd.toLocaleDateString()}).`)
+      return false
+    }
+
+    // Check if end date is in the past
+    if (sprintEnd < today) {
+      setDateError(`End date: Must be today (${today.toLocaleDateString()}) or a future date.`)
+      return false
+    }
+
+    // Check if end date is before project start
+    if (sprintEnd < projectStart) {
+      setDateError(`End date: Must be on or after project start date (${projectStart.toLocaleDateString()}).`)
+      return false
+    }
+
+    // Check if end date is after project end
+    if (sprintEnd > projectEnd) {
+      setDateError(`End date: Must be on or before project end date (${projectEnd.toLocaleDateString()}).`)
+      return false
+    }
+
+    // Check if end date is after start date
+    if (sprintEnd < sprintStart) {
+      setDateError('End date: Must be after the start date.')
+      return false
+    }
+
+    return true
+  }
 
   const fetchSprint = useCallback(async () => {
     try {
@@ -161,7 +266,11 @@ export default function EditSprintPage() {
               typeof member === 'object' && member !== null
           )
         )
-        await fetchProjectMembers(s?.project?._id)
+        const sprintProjectId = s?.project?._id || ''
+        setProjectId(sprintProjectId)
+        setInitialProjectId(sprintProjectId)
+        await fetchProjectMembers(sprintProjectId)
+        // Project details will be set in fetchProjectMembers
       } else {
         setError(data.error || 'Failed to load sprint')
       }
@@ -173,20 +282,69 @@ export default function EditSprintPage() {
   }, [sprintId, fetchProjectMembers])
 
   useEffect(() => {
+    fetchProjects()
+  }, [fetchProjects])
+
+  useEffect(() => {
     if (sprintId) fetchSprint()
   }, [sprintId, fetchSprint])
 
   useEffect(() => {
-    if (!successMessage) return
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-    const timeout = setTimeout(() => setSuccessMessage(''), 4000)
-    return () => clearTimeout(timeout)
+    // When project changes (but not on initial load), update team members
+    if (projectId && initialProjectId !== null && projectId !== initialProjectId) {
+      fetchProjectMembers(projectId)
+      // Clear team members when project changes
+      setTeamMembers([])
+      setDateError('')
+    }
+  }, [projectId, initialProjectId, fetchProjectMembers])
+
+  // Validate dates when project or dates change
+  useEffect(() => {
+    if (selectedProject && form.startDate && form.endDate) {
+      validateDates(form.startDate, form.endDate, selectedProject)
+    } else if (!form.startDate || !form.endDate) {
+      setDateError('')
+    }
+  }, [selectedProject, form.startDate, form.endDate])
+
+  useEffect(() => {
+    if (successMessage && messageContainerRef.current) {
+      // Scroll to the message container when success message appears
+      setTimeout(() => {
+        messageContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 50)
+      const timeout = setTimeout(() => setSuccessMessage(''), 4000)
+      return () => clearTimeout(timeout)
+    }
   }, [successMessage])
+
+  useEffect(() => {
+    if (error && messageContainerRef.current) {
+      // Scroll to the message container when error message appears
+      setTimeout(() => {
+        messageContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 50)
+    }
+  }, [error])
 
   const handleSave = async () => {
     if (!hasChanges) return
+    
+    // Validate dates before saving
+    if (!selectedProject) {
+      setError('Project information is not available. Please refresh the page.')
+      return
+    }
+
+    if (!validateDates(form.startDate, form.endDate, selectedProject)) {
+      return
+    }
+
     try {
       setSaving(true)
+      setError('')
+      setDateError('')
       const res = await fetch(`/api/sprints/${sprintId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -200,6 +358,7 @@ export default function EditSprintPage() {
           capacity: form.capacity === '' ? undefined : Number(form.capacity),
           // Velocity is calculated from completed stories, not sent from form
           velocity: calculatedVelocity,
+          project: projectId,
           teamMembers
         })
       })
@@ -237,6 +396,11 @@ export default function EditSprintPage() {
                 typeof member === 'object' && member !== null
             )
           )
+          
+          // Update project ID if changed
+          const updatedProjectId = updatedSprint?.project?._id || updatedSprint?.project || ''
+          setProjectId(updatedProjectId)
+          setInitialProjectId(updatedProjectId)
         }
         setSuccessMessage('Sprint updated successfully')
         setError('')
@@ -251,9 +415,16 @@ export default function EditSprintPage() {
   }
 
   const filteredTeamOptions = useMemo(() => {
+    // First, exclude already selected members
+    const unselectedMembers = availableMembers.filter(
+      (member) => !teamMembers.includes(member._id)
+    )
+    
+    // Then filter by search query if provided
     const query = teamMemberQuery.trim().toLowerCase()
-    if (!query) return availableMembers
-    return availableMembers.filter((member) => {
+    if (!query) return unselectedMembers
+    
+    return unselectedMembers.filter((member) => {
       const fullName = `${member.firstName} ${member.lastName}`.toLowerCase()
       return (
         fullName.includes(query) ||
@@ -292,7 +463,12 @@ export default function EditSprintPage() {
     return sortedCurrent.some((memberId, index) => memberId !== sortedInitial[index])
   }, [teamMembers, initialTeamMembers])
 
-  const hasChanges = hasFormChanges || hasTeamChanges
+  const hasProjectChanges = useMemo(() => {
+    if (!initialProjectId) return false
+    return projectId !== initialProjectId
+  }, [projectId, initialProjectId])
+
+  const hasChanges = hasFormChanges || hasTeamChanges || hasProjectChanges
 
   if (loading) {
     return (
@@ -328,16 +504,74 @@ export default function EditSprintPage() {
         <Button variant="ghost" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
-        {successMessage && (
-          <Alert variant="success">
-            <AlertDescription>{successMessage}</AlertDescription>
-          </Alert>
-        )}
+        <div ref={messageContainerRef}>
+          {successMessage && (
+            <Alert variant="success">
+              <AlertDescription>{successMessage}</AlertDescription>
+            </Alert>
+          )}
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </div>
         <Card>
           <CardHeader>
             <CardTitle>Edit Sprint</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Project *</label>
+              <Select
+                value={projectId}
+                onValueChange={(value) => {
+                  setProjectId(value)
+                  setTeamMembers([]) // Clear team members when project changes
+                  setDateError('') // Clear date error when project changes
+                  // Project details will be fetched in useEffect
+                }}
+                onOpenChange={(open) => {
+                  if (open) setProjectQuery('')
+                }}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select a project" />
+                </SelectTrigger>
+                <SelectContent className="z-[10050] p-0">
+                  <div className="p-2">
+                    <Input
+                      value={projectQuery}
+                      onChange={(e) => setProjectQuery(e.target.value)}
+                      placeholder="Search projects"
+                      className="mb-2"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                    <div className="max-h-56 overflow-y-auto">
+                      {projects
+                        .filter((p) =>
+                          !projectQuery.trim() ||
+                          p.name.toLowerCase().includes(projectQuery.toLowerCase())
+                        )
+                        .map((project) => (
+                          <SelectItem key={project._id} value={project._id}>
+                            {project.name}
+                          </SelectItem>
+                        ))}
+                      {projects.filter((p) =>
+                        !projectQuery.trim() ||
+                        p.name.toLowerCase().includes(projectQuery.toLowerCase())
+                      ).length === 0 && (
+                        <div className="px-2 py-1 text-xs text-muted-foreground">
+                          No matching projects
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <label className="text-sm font-medium">Name</label>
               <Input
@@ -355,7 +589,7 @@ export default function EditSprintPage() {
                 rows={4}
               />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium">Status</label>
                 <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as SprintForm['status'] })}>
@@ -368,13 +602,117 @@ export default function EditSprintPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <label className="text-sm font-medium">Start Date</label>
-                <Input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="mt-1" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">End Date</label>
-                <Input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className="mt-1" />
+
+              {selectedProject && (
+                <div className="p-3 bg-muted/50 rounded-md border border-muted">
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-medium">Project Duration:</span>{' '}
+                    {new Date(selectedProject.startDate).toLocaleDateString()} to{' '}
+                    {new Date(selectedProject.endDate).toLocaleDateString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Sprint dates must be within this range and cannot be in the past.
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Start Date</label>
+                  <Input
+                    type="date"
+                    value={form.startDate}
+                    onChange={(e) => {
+                      const newStartDate = e.target.value
+                      setForm({ ...form, startDate: newStartDate })
+                      if (selectedProject && newStartDate && form.endDate) {
+                        validateDates(newStartDate, form.endDate, selectedProject)
+                      } else {
+                        setDateError('')
+                      }
+                    }}
+                    min={
+                      selectedProject?.startDate 
+                        ? new Date(Math.max(
+                            new Date(selectedProject.startDate).getTime(),
+                            new Date().setHours(0, 0, 0, 0)
+                          )).toISOString().split('T')[0]
+                        : new Date().toISOString().split('T')[0]
+                    }
+                    max={
+                      selectedProject?.endDate && form.endDate
+                        ? new Date(Math.min(
+                            new Date(selectedProject.endDate).getTime(),
+                            new Date(form.endDate).getTime()
+                          )).toISOString().split('T')[0]
+                        : selectedProject?.endDate
+                          ? new Date(selectedProject.endDate).toISOString().split('T')[0]
+                          : undefined
+                    }
+                    className={`mt-1 ${dateError && form.startDate && dateError.includes('start') ? 'border-destructive' : ''}`}
+                    disabled={!projectId}
+                  />
+                  {dateError && form.startDate && dateError.includes('start') && (
+                    <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                      {dateError}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-sm font-medium">End Date</label>
+                  <Input
+                    type="date"
+                    value={form.endDate}
+                    onChange={(e) => {
+                      const newEndDate = e.target.value
+                      setForm({ ...form, endDate: newEndDate })
+                      if (selectedProject && form.startDate && newEndDate) {
+                        validateDates(form.startDate, newEndDate, selectedProject)
+                      } else {
+                        setDateError('')
+                      }
+                    }}
+                    min={
+                      selectedProject?.startDate && form.startDate
+                        ? new Date(Math.max(
+                            new Date(selectedProject.startDate).getTime(),
+                            new Date(form.startDate).getTime(),
+                            new Date().setHours(0, 0, 0, 0)
+                          )).toISOString().split('T')[0]
+                        : form.startDate
+                          ? new Date(Math.max(
+                              new Date(form.startDate).getTime(),
+                              new Date().setHours(0, 0, 0, 0)
+                            )).toISOString().split('T')[0]
+                          : selectedProject?.startDate
+                            ? new Date(Math.max(
+                                new Date(selectedProject.startDate).getTime(),
+                                new Date().setHours(0, 0, 0, 0)
+                              )).toISOString().split('T')[0]
+                            : new Date().toISOString().split('T')[0]
+                    }
+                    max={
+                      selectedProject?.endDate
+                        ? new Date(selectedProject.endDate).toISOString().split('T')[0]
+                        : undefined
+                    }
+                    className={`mt-1 ${dateError && form.endDate && (dateError.includes('end') || dateError.includes('after')) ? 'border-destructive' : ''}`}
+                    disabled={!projectId || !form.startDate}
+                  />
+                  {!form.startDate && projectId && (
+                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Please select start date first
+                    </p>
+                  )}
+                  {dateError && form.endDate && (dateError.includes('end') || dateError.includes('after')) && (
+                    <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                      {dateError}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
             <div>
@@ -471,28 +809,23 @@ export default function EditSprintPage() {
                               No matching team members
                             </div>
                           ) : (
-                            filteredTeamOptions.map((member) => {
-                              const isSelected = teamMembers.includes(member._id)
-                              return (
-                                <SelectItem
-                                  key={member._id}
-                                  value={member._id}
-                                  disabled={isSelected}
-                                  className={isSelected ? 'opacity-50 cursor-not-allowed' : ''}
-                                >
-                                  <div className="flex items-center justify-between w-full">
-                                    <span className="text-sm font-medium truncate">
-                                      {member.firstName} {member.lastName}
+                            filteredTeamOptions.map((member) => (
+                              <SelectItem
+                                key={member._id}
+                                value={member._id}
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="text-sm font-medium truncate">
+                                    {member.firstName} {member.lastName}
+                                  </span>
+                                  {member.email && (
+                                    <span className="text-xs text-muted-foreground ml-2 truncate max-w-[150px]">
+                                      {member.email}
                                     </span>
-                                    {member.email && (
-                                      <span className="text-xs text-muted-foreground ml-2 truncate max-w-[150px]">
-                                        {member.email}
-                                      </span>
-                                    )}
-                                  </div>
-                                </SelectItem>
-                              )
-                            })
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))
                           )}
                         </div>
                       </div>

@@ -62,7 +62,8 @@ import {
   GripVertical,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
 import EditTaskModal from '@/components/tasks/EditTaskModal'
@@ -169,22 +170,22 @@ function ColumnDropZone({
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900'
+      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'bug': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      case 'feature': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'improvement': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'task': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'subtask': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'bug': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      case 'feature': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
+      case 'improvement': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'task': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'subtask': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
@@ -193,7 +194,15 @@ function ColumnDropZone({
       <div className="space-y-4 flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Badge className={column.color}>
+            <Badge className={`${column.color} ${(() => {
+              if (column.color.includes('bg-slate-100')) return 'hover:bg-slate-100 dark:hover:bg-slate-900'
+              if (column.color.includes('bg-gray-100')) return 'hover:bg-gray-100 dark:hover:bg-gray-900'
+              if (column.color.includes('bg-blue-100')) return 'hover:bg-blue-100 dark:hover:bg-blue-900'
+              if (column.color.includes('bg-yellow-100')) return 'hover:bg-yellow-100 dark:hover:bg-yellow-900'
+              if (column.color.includes('bg-purple-100')) return 'hover:bg-purple-100 dark:hover:bg-purple-900'
+              if (column.color.includes('bg-green-100')) return 'hover:bg-green-100 dark:hover:bg-green-900'
+              return ''
+            })()}`}>
               {column.title}
             </Badge>
             <span className="text-sm text-muted-foreground">
@@ -272,6 +281,9 @@ export default function KanbanPage() {
   const [assignedByOptions, setAssignedByOptions] = useState<PersonOption[]>([])
   const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
   const [assignedByFilterQuery, setAssignedByFilterQuery] = useState('')
+  const [projectFilterQuery, setProjectFilterQuery] = useState('')
+  const [priorityFilterQuery, setPriorityFilterQuery] = useState('')
+  const [typeFilterQuery, setTypeFilterQuery] = useState('')
   const [dateRangeFilter, setDateRangeFilter] = useState<DateRange | undefined>()
   const [taskNumberFilter, setTaskNumberFilter] = useState('all')
   const [taskNumberFilterQuery, setTaskNumberFilterQuery] = useState('')
@@ -525,22 +537,22 @@ export default function KanbanPage() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900'
+      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'bug': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      case 'feature': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'improvement': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'task': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'subtask': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'bug': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      case 'feature': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
+      case 'improvement': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'task': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'subtask': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
@@ -598,6 +610,45 @@ export default function KanbanPage() {
       option.id.toLowerCase().includes(query)
     )
   }, [taskNumberOptions, taskNumberFilterQuery])
+
+  const filteredProjectOptions = useMemo(() => {
+    const query = projectFilterQuery.trim().toLowerCase()
+    if (!query) return projects
+    return projects.filter((project) => project.name.toLowerCase().includes(query))
+  }, [projects, projectFilterQuery])
+
+  const priorityOptions = [
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' },
+    { value: 'critical', label: 'Critical' }
+  ]
+
+  const filteredPriorityOptions = useMemo(() => {
+    const query = priorityFilterQuery.trim().toLowerCase()
+    if (!query) return priorityOptions
+    return priorityOptions.filter((option) =>
+      option.label.toLowerCase().includes(query) ||
+      option.value.toLowerCase().includes(query)
+    )
+  }, [priorityFilterQuery])
+
+  const typeOptions = [
+    { value: 'bug', label: 'Bug' },
+    { value: 'feature', label: 'Feature' },
+    { value: 'improvement', label: 'Improvement' },
+    { value: 'task', label: 'Task' },
+    { value: 'subtask', label: 'Subtask' }
+  ]
+
+  const filteredTypeOptions = useMemo(() => {
+    const query = typeFilterQuery.trim().toLowerCase()
+    if (!query) return typeOptions
+    return typeOptions.filter((option) =>
+      option.label.toLowerCase().includes(query) ||
+      option.value.toLowerCase().includes(query)
+    )
+  }, [typeFilterQuery])
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase()
 
@@ -815,38 +866,138 @@ export default function KanbanPage() {
                   <SelectTrigger className="w-full sm:w-40">
                     <SelectValue placeholder="Project" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Projects</SelectItem>
-                    {projects.map((project) => (
-                      <SelectItem key={project._id} value={project._id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
+                  <SelectContent className="z-[10050] p-0">
+                    <div className="p-2">
+                      <div className="relative mb-2">
+                        <Input
+                          value={projectFilterQuery}
+                          onChange={(e) => setProjectFilterQuery(e.target.value)}
+                          placeholder="Search projects"
+                          className="pr-10"
+                          onKeyDown={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        />
+                        {projectFilterQuery && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setProjectFilterQuery('')
+                              setProjectFilter('all')
+                            }}
+                            className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                            aria-label="Clear project filter"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="max-h-56 overflow-y-auto">
+                        <SelectItem value="all">All Projects</SelectItem>
+                        {filteredProjectOptions.length === 0 ? (
+                          <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                        ) : (
+                          filteredProjectOptions.map((project) => (
+                            <SelectItem key={project._id} value={project._id}>
+                              {project.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </div>
+                    </div>
                   </SelectContent>
                 </Select>
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
                   <SelectTrigger className="w-full sm:w-40">
                     <SelectValue placeholder="Priority" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Priority</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
+                  <SelectContent className="z-[10050] p-0">
+                    <div className="p-2">
+                      <div className="relative mb-2">
+                        <Input
+                          value={priorityFilterQuery}
+                          onChange={(e) => setPriorityFilterQuery(e.target.value)}
+                          placeholder="Search priority"
+                          className="pr-10"
+                          onKeyDown={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        />
+                        {priorityFilterQuery && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setPriorityFilterQuery('')
+                              setPriorityFilter('all')
+                            }}
+                            className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                            aria-label="Clear priority filter"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="max-h-56 overflow-y-auto">
+                        <SelectItem value="all">All Priority</SelectItem>
+                        {filteredPriorityOptions.length === 0 ? (
+                          <div className="px-2 py-1 text-xs text-muted-foreground">No matching priorities</div>
+                        ) : (
+                          filteredPriorityOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))
+                        )}
+                      </div>
+                    </div>
                   </SelectContent>
                 </Select>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
                   <SelectTrigger className="w-full sm:w-40">
                     <SelectValue placeholder="Type" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="bug">Bug</SelectItem>
-                    <SelectItem value="feature">Feature</SelectItem>
-                    <SelectItem value="improvement">Improvement</SelectItem>
-                    <SelectItem value="task">Task</SelectItem>
-                    <SelectItem value="subtask">Subtask</SelectItem>
+                  <SelectContent className="z-[10050] p-0">
+                    <div className="p-2">
+                      <div className="relative mb-2">
+                        <Input
+                          value={typeFilterQuery}
+                          onChange={(e) => setTypeFilterQuery(e.target.value)}
+                          placeholder="Search type"
+                          className="pr-10"
+                          onKeyDown={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        />
+                        {typeFilterQuery && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setTypeFilterQuery('')
+                              setTypeFilter('all')
+                            }}
+                            className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                            aria-label="Clear type filter"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="max-h-56 overflow-y-auto">
+                        <SelectItem value="all">All Types</SelectItem>
+                        {filteredTypeOptions.length === 0 ? (
+                          <div className="px-2 py-1 text-xs text-muted-foreground">No matching types</div>
+                        ) : (
+                          filteredTypeOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))
+                        )}
+                      </div>
+                    </div>
                   </SelectContent>
                 </Select>
               </div>
@@ -857,12 +1008,31 @@ export default function KanbanPage() {
                   </SelectTrigger>
                   <SelectContent className="z-[10050] p-0">
                     <div className="p-2">
-                      <Input
-                        value={assignedToFilterQuery}
-                        onChange={(e) => setAssignedToFilterQuery(e.target.value)}
-                        placeholder="Search assignees"
-                        className="mb-2"
-                      />
+                      <div className="relative mb-2">
+                        <Input
+                          value={assignedToFilterQuery}
+                          onChange={(e) => setAssignedToFilterQuery(e.target.value)}
+                          placeholder="Search assignees"
+                          className="pr-10"
+                          onKeyDown={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        />
+                        {assignedToFilterQuery && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setAssignedToFilterQuery('')
+                              setAssignedToFilter('all')
+                            }}
+                            className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                            aria-label="Clear assignee filter"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                       <div className="max-h-56 overflow-y-auto">
                         <SelectItem value="all">All Assignees</SelectItem>
                         {filteredAssignedToOptions.length === 0 ? (
@@ -885,12 +1055,31 @@ export default function KanbanPage() {
                   </SelectTrigger>
                   <SelectContent className="z-[10050] p-0">
                     <div className="p-2">
-                      <Input
-                        value={assignedByFilterQuery}
-                        onChange={(e) => setAssignedByFilterQuery(e.target.value)}
-                        placeholder="Search creators"
-                        className="mb-2"
-                      />
+                      <div className="relative mb-2">
+                        <Input
+                          value={assignedByFilterQuery}
+                          onChange={(e) => setAssignedByFilterQuery(e.target.value)}
+                          placeholder="Search creators"
+                          className="pr-10"
+                          onKeyDown={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        />
+                        {assignedByFilterQuery && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setAssignedByFilterQuery('')
+                              setAssignedByFilter('all')
+                            }}
+                            className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                            aria-label="Clear creator filter"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                       <div className="max-h-56 overflow-y-auto">
                         <SelectItem value="all">All Creators</SelectItem>
                         {filteredAssignedByOptions.length === 0 ? (
@@ -913,12 +1102,31 @@ export default function KanbanPage() {
                   </SelectTrigger>
                   <SelectContent className="z-[10050] p-0">
                     <div className="p-2">
-                      <Input
-                        value={taskNumberFilterQuery}
-                        onChange={(e) => setTaskNumberFilterQuery(e.target.value)}
-                        placeholder="Search tasks"
-                        className="mb-2"
-                      />
+                      <div className="relative mb-2">
+                        <Input
+                          value={taskNumberFilterQuery}
+                          onChange={(e) => setTaskNumberFilterQuery(e.target.value)}
+                          placeholder="Search tasks"
+                          className="pr-10"
+                          onKeyDown={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        />
+                        {taskNumberFilterQuery && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setTaskNumberFilterQuery('')
+                              setTaskNumberFilter('all')
+                            }}
+                            className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                            aria-label="Clear task filter"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                       <div className="max-h-56 overflow-y-auto">
                         <SelectItem value="all">All Tasks</SelectItem>
                         {filteredTaskNumberOptions.length === 0 ? (
@@ -1255,7 +1463,7 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
                 <TruncateTooltip key={`${label}-${index}`} text={label}>
                   <Badge
                     variant="outline"
-                    className="text-xs truncate max-w-[85px] whitespace-nowrap flex-shrink-0"
+                    className="text-xs truncate max-w-[85px] whitespace-nowrap flex-shrink-0 hover:bg-transparent dark:hover:bg-transparent"
                   >
                     {label}
                   </Badge>
@@ -1264,7 +1472,7 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
               {task.labels.length > 2 && (
                 <Badge
                   variant="outline"
-                  className="text-xs flex-shrink-0"
+                  className="text-xs flex-shrink-0 hover:bg-transparent dark:hover:bg-transparent"
                   title={task.labels.slice(2).join(', ')}
                 >
                   +{task.labels.length - 2}

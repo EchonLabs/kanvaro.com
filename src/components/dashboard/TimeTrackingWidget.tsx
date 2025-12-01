@@ -227,11 +227,14 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
               <span className="font-medium">Description:</span> <span className="truncate">{activeTimer.description}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={activeTimer.isPaused ? 'secondary' : 'default'} className="text-xs flex-shrink-0">
+              <Badge 
+                variant={activeTimer.isPaused ? 'secondary' : 'default'} 
+                className={`text-xs flex-shrink-0 ${activeTimer.isPaused ? 'hover:!bg-secondary dark:hover:!bg-secondary' : 'hover:!bg-primary dark:hover:!bg-primary'}`}
+              >
                 {activeTimer.isPaused ? 'Paused' : 'Running'}
               </Badge>
               {activeTimer.isBillable && (
-                <Badge variant="outline" className="text-xs flex-shrink-0">Billable</Badge>
+                <Badge variant="outline" className="text-xs flex-shrink-0 hover:bg-transparent dark:hover:bg-transparent">Billable</Badge>
               )}
             </div>
           </div>

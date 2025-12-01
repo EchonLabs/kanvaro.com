@@ -39,9 +39,9 @@ import {
   Star,
   Layers,
   Eye,
-  Settings,
   Edit,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react'
 
 interface Epic {
@@ -93,6 +93,25 @@ export default function EpicsPage() {
   const [selectedEpic, setSelectedEpic] = useState<Epic | null>(null)
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false)
+
+  // Check for success message from query params
+  useEffect(() => {
+    const updated = searchParams.get('updated')
+    if (updated === 'true') {
+      setSuccessMessage('Epic updated successfully')
+      setShowSuccessAlert(true)
+      // Clear the query parameter from URL
+      router.replace('/epics', { scroll: false })
+      // Auto-hide after 5 seconds
+      const timer = setTimeout(() => {
+        setShowSuccessAlert(false)
+        setSuccessMessage('')
+      }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams, router])
 
   const checkAuth = useCallback(async () => {
     try {
@@ -181,14 +200,14 @@ export default function EpicsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'backlog': return 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200'
-      case 'todo': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'review': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-      case 'testing': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-      case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'backlog': return 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900'
+      case 'todo': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'review': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900'
+      case 'testing': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900'
+      case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
+      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
@@ -207,11 +226,11 @@ export default function EpicsPage() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900'
+      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
@@ -333,7 +352,30 @@ export default function EpicsPage() {
                 <TabsTrigger value="grid">Grid View</TabsTrigger>
                 <TabsTrigger value="list">List View</TabsTrigger>
               </TabsList>
-             
+              
+              {showSuccessAlert && successMessage && (
+                <Alert className="mt-4 border-green-500 bg-green-50 dark:bg-green-900/20">
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                      <AlertDescription className="text-green-800 dark:text-green-200 flex-1">
+                        {successMessage}
+                      </AlertDescription>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40 ml-auto flex-shrink-0"
+                      onClick={() => {
+                        setShowSuccessAlert(false)
+                        setSuccessMessage('')
+                      }}
+                    >
+                      <X className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    </Button>
+                  </div>
+                </Alert>
+              )}
 
               <TabsContent value="grid" className="space-y-4">
                 <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
@@ -367,13 +409,6 @@ export default function EpicsPage() {
                                 }}>
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Epic
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/epics/${epic._id}?tab=settings`)
-                                }}>
-                                  <Settings className="h-4 w-4 mr-2" />
-                                  Settings
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={(e) => {
                                   e.stopPropagation()
@@ -449,12 +484,12 @@ export default function EpicsPage() {
                         {epic?.tags?.length > 0 && (
                           <div className="flex flex-wrap gap-1">
                             {epic?.tags?.slice(0, 3).map((label, index) => (
-                              <Badge key={index} variant="outline" className="text-xs">
+                              <Badge key={index} variant="outline" className="text-xs hover:bg-transparent dark:hover:bg-transparent">
                                 {label}
                               </Badge>
                             ))}
                             {epic?.tags?.length > 3 && (
-                              <Badge variant="outline" className="text-xs">
+                              <Badge variant="outline" className="text-xs hover:bg-transparent dark:hover:bg-transparent">
                                 +{epic?.tags?.length - 3} more
                               </Badge>
                             )}
@@ -555,13 +590,6 @@ export default function EpicsPage() {
                                 }}>
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Epic
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/epics/${epic._id}?tab=settings`)
-                                }}>
-                                  <Settings className="h-4 w-4 mr-2" />
-                                  Settings
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={(e) => {
                                   e.stopPropagation()

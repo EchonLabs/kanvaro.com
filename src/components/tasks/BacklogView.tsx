@@ -126,22 +126,22 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'low': return 'bg-gray-100 text-gray-800'
-      case 'medium': return 'bg-blue-100 text-blue-800'
-      case 'high': return 'bg-orange-100 text-orange-800'
-      case 'critical': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
+      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900'
+      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'bug': return 'bg-red-100 text-red-800'
-      case 'feature': return 'bg-green-100 text-green-800'
-      case 'improvement': return 'bg-blue-100 text-blue-800'
-      case 'task': return 'bg-gray-100 text-gray-800'
-      case 'subtask': return 'bg-purple-100 text-purple-800'
-      default: return 'bg-gray-100 text-gray-800'
+      case 'bug': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      case 'feature': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
+      case 'improvement': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'task': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      case 'subtask': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
 
@@ -512,7 +512,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
                         {formatToTitleCase(task.type)}
                       </Badge>
                       {task.storyPoints && (
-                        <Badge variant="outline">
+                        <Badge variant="outline" className="hover:bg-transparent dark:hover:bg-transparent">
                           <BarChart3 className="h-3 w-3 mr-1" />
                           {task.storyPoints} pts
                         </Badge>
@@ -544,7 +544,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
                     {task.labels.length > 0 && (
                       <div className="flex items-center space-x-1 mt-2">
                         {task.labels.map((label, labelIndex) => (
-                          <Badge key={labelIndex} variant="outline" className="text-xs">
+                          <Badge key={labelIndex} variant="outline" className="text-xs hover:bg-transparent dark:hover:bg-transparent">
                             {label}
                           </Badge>
                         ))}

@@ -14,8 +14,8 @@ import { Loader2, ArrowLeft } from 'lucide-react'
 interface EpicForm {
   title: string
   description: string
-  // Match Epic model status: backlog | in_progress | completed | cancelled
-  status: 'backlog' | 'in_progress' | 'completed' | 'cancelled'
+  // Match Epic model status: backlog | in_progress | completed | done | cancelled
+  status: 'backlog' | 'in_progress' | 'completed' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   dueDate: string
   estimatedHours: number | string
@@ -52,15 +52,28 @@ export default function EditEpicPage() {
       const data = await res.json()
       if (res.ok && data.success) {
         const e = data.data
+        // Normalize status: 'done' maps to 'completed' for form consistency
+        // Also handle any other status values that might come from the API
+        let normalizedStatus = e?.status || 'backlog'
+        if (normalizedStatus === 'done') {
+          normalizedStatus = 'completed'
+        }
+        // Ensure status is one of the valid form values
+        const validStatuses: EpicForm['status'][] = ['backlog', 'in_progress', 'completed', 'done', 'cancelled']
+        if (!validStatuses.includes(normalizedStatus as EpicForm['status'])) {
+          normalizedStatus = 'backlog'
+        }
+        
         const nextForm: EpicForm = {
           title: e?.title || '',
           description: e?.description || '',
-          status: (e?.status || 'backlog') as EpicForm['status'],
+          status: normalizedStatus as EpicForm['status'],
           priority: (e?.priority || 'medium'),
           dueDate: e?.dueDate ? new Date(e.dueDate).toISOString().slice(0, 10) : '',
           estimatedHours: e?.estimatedHours ?? '',
           labels: Array.isArray(e?.tags) ? e.tags.join(', ') : ''
         }
+        console.log('Fetched epic status:', e?.status, 'Normalized to:', normalizedStatus)
         setForm(nextForm)
         setInitialForm(nextForm)
         if (e?.progress) {
@@ -107,7 +120,7 @@ export default function EditEpicPage() {
       })
       const data = await res.json()
       if (res.ok && data.success) {
-        router.push(`/epics/${epicId}`)
+        router.push('/epics?updated=true')
       } else {
         setError(data?.error || 'Failed to save epic')
       }
@@ -186,11 +199,12 @@ export default function EditEpicPage() {
               <div>
                 <label className="text-sm font-medium">Status</label>
                 <Select
-                  value={form.status}
+                  value={form.status || 'backlog'}
                   onValueChange={(v) => setForm({ ...form, status: v as EpicForm['status'] })}
+                  key={form.status}
                 >
                   <SelectTrigger className="mt-1">
-                    <SelectValue />
+                    <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="backlog">Backlog</SelectItem>

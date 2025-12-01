@@ -247,9 +247,7 @@ function AcceptInvitationContent() {
 
       if (data.success) {
         setSuccess(true)
-        setTimeout(() => {
-          router.push('/login')
-        }, 3000)
+        // Don't auto-redirect - let user click Sign In button manually
       } else {
         setError(data.error || 'Failed to accept invitation')
       }
