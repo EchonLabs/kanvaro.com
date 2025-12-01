@@ -215,6 +215,7 @@ export default function DashboardPage() {
               <RecentTasks
                 tasks={dashboardData?.recentTasks}
                 isLoading={!dashboardData}
+                onTaskUpdate={loadDashboardData}
               />
               <TeamActivity
                 activities={dashboardData?.teamActivity}

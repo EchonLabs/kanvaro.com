@@ -1,16 +1,19 @@
 'use client'
 
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Checkbox'
+import { useToast } from '@/components/ui/Toast'
 import { formatToTitleCase } from '@/lib/utils'
-import { Calendar, User, ArrowRight } from 'lucide-react'
+import { Calendar, User, ArrowRight, CheckCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface RecentTasksProps {
   tasks?: any[]
   isLoading?: boolean
+  onTaskUpdate?: () => void
 }
 
 const getStatusColor = (status: string) => {
@@ -47,8 +50,54 @@ const getPriorityColor = (priority: string) => {
   }
 }
 
-export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
+export function RecentTasks({ tasks, isLoading, onTaskUpdate }: RecentTasksProps) {
   const router = useRouter()
+  const { showToast } = useToast()
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  const handleCheckboxChange = async (taskId: string, checked: boolean) => {
+    setUpdatingTaskId(taskId)
+    try {
+      const newStatus = checked ? 'done' : 'todo'
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      const data = await response.json()
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update task status')
+      }
+
+      // Show success message in header
+      setSuccessMessage('Task updated successfully')
+
+      // Refresh dashboard data if callback is provided
+      if (onTaskUpdate) {
+        onTaskUpdate()
+      }
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccessMessage(null)
+      }, 3000)
+    } catch (error) {
+      console.error('Failed to update task status:', error)
+      // Show error toast
+      showToast({
+        type: 'error',
+        title: 'Failed to update task',
+        message: error instanceof Error ? error.message : 'An error occurred while updating the task status',
+        duration: 5000
+      })
+    } finally {
+      setUpdatingTaskId(null)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -120,21 +169,29 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
   return (
     <Card className="overflow-x-hidden">
       <CardHeader className="p-4 sm:p-6">
-        <div className="flex flex-row items-center justify-between gap-2">
-          <CardTitle className="text-base sm:text-lg truncate">Recent Tasks</CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              router.push('/tasks')
-            }}
-            className="flex-shrink-0"
-          >
-            View All
-            <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1" />
-          </Button>
+        <div className="flex flex-col space-y-1.5">
+          <div className="flex flex-row items-center justify-between gap-2">
+            <CardTitle className="text-base sm:text-lg truncate">Recent Tasks</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                router.push('/tasks')
+              }}
+              className="flex-shrink-0"
+            >
+              View All
+              <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1" />
+            </Button>
+          </div>
+          {successMessage && (
+            <div className="flex items-center gap-2 px-3 py-2 mt-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md text-sm text-green-700 dark:text-green-400 animate-in fade-in slide-in-from-top-1 duration-300">
+              <CheckCircle className="h-4 w-4 flex-shrink-0" />
+              <span className="font-medium">{successMessage}</span>
+            </div>
+          )}
         </div>
       </CardHeader>
       <CardContent className="p-4 sm:p-6 pt-0">
@@ -142,13 +199,15 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
           {tasks.map((task) => (
             <div
               key={task._id}
-              className="flex items-start sm:items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer overflow-x-hidden"
-              onClick={() => router.push(`/tasks/${task._id}`)}
+              className="flex items-start sm:items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors overflow-x-hidden"
             >
               <Checkbox
                 checked={task.status === 'done'}
+                disabled={updatingTaskId === task._id}
                 className="flex-shrink-0 mt-1 sm:mt-0"
-                readOnly
+                onCheckedChange={(checked) => {
+                  handleCheckboxChange(task._id, Boolean(checked))
+                }}
               />
 
               <div className="flex-1 min-w-0">
@@ -191,7 +250,16 @@ export function RecentTasks({ tasks, isLoading }: RecentTasksProps) {
                 </div>
               </div>
 
-              <Button variant="ghost" size="sm" className="flex-shrink-0 hidden sm:inline-flex">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="flex-shrink-0 hidden sm:inline-flex"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  router.push(`/tasks/${task._id}`)
+                }}
+              >
                 View
               </Button>
             </div>
