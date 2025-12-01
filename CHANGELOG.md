@@ -1,3 +1,10 @@
+## [1.10.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.10.2...v1.10.3) (2025-12-01)
+
+
+### Bug Fixes
+
+* add changes in recent tasks ([2d1f6b3](https://github.com/EchonLabs/kanvaro.com/commit/2d1f6b33cc10cdb66e75dd672583f8fbcb6fe4b3))
+
 ## [1.10.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.10.1...v1.10.2) (2025-11-30)
 
 
