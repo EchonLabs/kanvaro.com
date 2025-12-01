@@ -12,12 +12,16 @@ export class CompletionService {
       const story = await Story.findById(storyId)
       if (!story) return
 
-      // Get all tasks for this story
-      const tasks = await Task.find({ story: storyId })
+      // Get all non-archived tasks for this story
+      // Only active tasks should count towards story completion
+      const tasks = await Task.find({ 
+        story: storyId,
+        archived: { $ne: true } // Exclude archived tasks
+      })
       
       if (tasks.length === 0) return
 
-      // Check if all tasks are completed (status = 'done')
+      // Check if all active tasks are completed (status = 'done')
       const allTasksCompleted = tasks.every(task => task.status === 'done')
       
       if (allTasksCompleted && story.status !== 'done') {
@@ -95,13 +99,17 @@ export class CompletionService {
         ? stories.every(story => story.status === 'done')
         : true // If no stories, consider this condition met
 
-      // Get all tasks that belong to stories in this epic
+      // Get all non-archived tasks that belong to stories in this epic
+      // Only active tasks should count towards epic completion
       const storyIds = stories.map(story => story._id)
       const tasksInStories = storyIds.length > 0
-        ? await Task.find({ story: { $in: storyIds } })
+        ? await Task.find({ 
+            story: { $in: storyIds },
+            archived: { $ne: true } // Exclude archived tasks
+          })
         : []
 
-      // Check if all tasks are completed (status = 'done')
+      // Check if all active tasks are completed (status = 'done')
       const allTasksCompleted = tasksInStories.length > 0
         ? tasksInStories.every(task => task.status === 'done')
         : true // If no tasks, consider this condition met

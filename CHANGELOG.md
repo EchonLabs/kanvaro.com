@@ -1,3 +1,10 @@
+## [1.10.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.10.3...v1.10.4) (2025-12-01)
+
+
+### Bug Fixes
+
+* add permission fixes ([ffaf9e9](https://github.com/EchonLabs/kanvaro.com/commit/ffaf9e9e2fbdca7f19b02dfebcdd5c67a2876ad1))
+
 ## [1.10.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.10.2...v1.10.3) (2025-12-01)
 
 

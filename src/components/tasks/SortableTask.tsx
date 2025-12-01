@@ -91,19 +91,19 @@ export default function SortableTask({
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-5 w-5 sm:h-6 sm:w-6 p-0 cursor-grab active:cursor-grabbing"
+                className="h-8 w-8 sm:h-6 sm:w-6 p-0 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 cursor-grab active:cursor-grabbing"
                 {...attributes}
                 {...listeners}
                 onClick={(e) => e.stopPropagation()}
               >
-                <GripVertical className="h-3 w-3" />
+                <GripVertical className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    className="h-5 w-5 sm:h-6 sm:w-6 p-0"
+                    className="h-8 w-8 sm:h-6 sm:w-6 p-0 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
