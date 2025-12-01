@@ -240,7 +240,7 @@ export default function RolesPage() {
                     <Badge variant={role.isSystem ? "secondary" : "outline"}>
                       {role.isSystem ? "System" : "Custom"}
                     </Badge>
-                    <Badge variant="outline">
+                    <Badge variant="outline" className="whitespace-nowrap">
                       <Users className="h-3 w-3 mr-1" />
                       {role.userCount} users
                     </Badge>

@@ -1,10 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { TimeEntry } from '@/models/TimeEntry'
+import { authenticateUser } from '@/lib/auth-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 export async function POST(request: NextRequest) {
   try {
     await connectDB()
+    
+    // Authenticate user
+    const authResult = await authenticateUser()
+    if ('error' in authResult) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { user } = authResult
+    const userId = user.id
+
+    // Check if user has permission to approve time entries
+    const hasPermission = await PermissionService.hasPermission(
+      userId,
+      Permission.TIME_TRACKING_APPROVE
+    )
+
+    if (!hasPermission) {
+      return NextResponse.json(
+        { error: 'You do not have permission to approve time entries' },
+        { status: 403 }
+      )
+    }
     
     const body = await request.json()
     const { timeEntryIds, approvedBy, action } = body
@@ -13,8 +41,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Time entry IDs are required' }, { status: 400 })
     }
 
-    if (!approvedBy) {
-      return NextResponse.json({ error: 'Approver ID is required' }, { status: 400 })
+    // Ensure approvedBy matches the authenticated user
+    if (!approvedBy || approvedBy !== userId) {
+      return NextResponse.json({ error: 'Invalid approver' }, { status: 400 })
     }
 
     if (!action || !['approve', 'reject'].includes(action)) {

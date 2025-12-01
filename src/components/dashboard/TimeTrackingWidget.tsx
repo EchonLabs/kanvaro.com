@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Clock, Play, Pause, Square, TrendingUp, DollarSign } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Timer } from '@/components/time-tracking/Timer'
 import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules } from '@/lib/utils'
@@ -51,6 +52,11 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
   const [timeStats, setTimeStats] = useState<TimeStats | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [displayTime, setDisplayTime] = useState('00:00:00')
+  // Local ticking baseline when running
+  const baseMinutesRef = useRef<number>(0)
+  const tickStartMsRef = useRef<number | null>(null)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const loadActiveTimer = useCallback(async () => {
     try {
@@ -113,14 +119,72 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
     } else {
       loadTimeStats()
     }
+
+    // Refresh active timer every 30 seconds to sync with server
+    const refreshInterval = setInterval(() => {
+      loadActiveTimer()
+    }, 30000)
+
+    return () => {
+      clearInterval(refreshInterval)
+    }
   }, [loadActiveTimer, loadTimeStats, propTimeStats])
 
   // Format duration for active timer - NO rounding (shows actual elapsed time)
   const formatActiveTimerDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60)
-    const mins = Math.floor(minutes % 60)
-    return `${hours}h ${mins}m`
+    const totalSeconds = Math.floor(minutes * 60)
+    const hours = Math.floor(totalSeconds / 3600)
+    const mins = Math.floor((totalSeconds % 3600) / 60)
+    const secs = totalSeconds % 60
+    
+    // Format as HH:MM:SS (e.g., "00:08:43")
+    const paddedHours = String(hours).padStart(2, '0')
+    const paddedMins = String(mins).padStart(2, '0')
+    const paddedSecs = String(secs).padStart(2, '0')
+    
+    return `${paddedHours}:${paddedMins}:${paddedSecs}`
   }
+
+  // Update display time based on server currentDuration; tick only when not paused
+  useEffect(() => {
+    // Clear any previous interval
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+
+    if (!activeTimer) {
+      setDisplayTime('00:00:00')
+      baseMinutesRef.current = 0
+      tickStartMsRef.current = null
+      return
+    }
+
+    // Initialize baseline from server
+    baseMinutesRef.current = activeTimer.currentDuration || 0
+    setDisplayTime(formatActiveTimerDuration(baseMinutesRef.current))
+
+    if (activeTimer.isPaused) {
+      // Do not tick while paused
+      tickStartMsRef.current = null
+      return
+    }
+
+    // Start ticking while running
+    tickStartMsRef.current = Date.now()
+    intervalRef.current = setInterval(() => {
+      const elapsed = (Date.now() - (tickStartMsRef.current as number)) / 60000
+      const runningMinutes = Math.max(0, baseMinutesRef.current + elapsed)
+      setDisplayTime(formatActiveTimerDuration(runningMinutes))
+    }, 1000)
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }
+  }, [activeTimer])
 
   // Format duration for saved time entries - WITH rounding
   const formatDuration = (minutes: number) => {
@@ -135,9 +199,18 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
       })
     }
     
-    const hours = Math.floor(displayMinutes / 60)
-    const mins = Math.floor(displayMinutes % 60)
-    return `${hours}h ${mins}m`
+    const totalSeconds = Math.floor(displayMinutes * 60)
+    const hours = Math.floor(totalSeconds / 3600)
+    const mins = Math.floor((totalSeconds % 3600) / 60)
+    const secs = totalSeconds % 60
+    
+    if (hours > 0) {
+      return `${hours}h ${mins}m ${secs}s`
+    } else if (mins > 0) {
+      return `${mins}m ${secs}s`
+    } else {
+      return `${secs}s`
+    }
   }
 
   const formatCurrency = (amount: number) => {
@@ -182,29 +255,29 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
 
   if (activeTimer) {
     return (
-      <Card className="overflow-x-hidden">
-        <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <Clock className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+      <Card className="overflow-x-hidden border-primary/20">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+            <Clock className="h-5 w-5 text-primary flex-shrink-0" />
             <span className="truncate">Active Timer</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0">
-          <div className="text-center">
-            <div className="text-2xl sm:text-3xl font-mono font-bold text-primary break-words">
-              {formatActiveTimerDuration(activeTimer.currentDuration)}
+        <CardContent className="space-y-4">
+          <div className="text-center py-2">
+            <div className="text-4xl font-mono font-bold text-primary break-words mb-2">
+              {displayTime}
             </div>
-            {activeTimer.hourlyRate && (
-              <div className="text-xs sm:text-sm text-muted-foreground mt-1">
-                <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 inline mr-1" />
+            {activeTimer.hourlyRate != null && activeTimer.hourlyRate > 0 && (
+              <div className="text-sm font-medium text-green-600 dark:text-green-400">
+                <DollarSign className="h-4 w-4 inline mr-1" />
                 <span className="break-words">{formatCurrency((activeTimer.hourlyRate * activeTimer.currentDuration) / 60)}</span>
               </div>
             )}
           </div>
 
-          <div className="space-y-2">
-            <div className="text-xs sm:text-sm break-words">
-              <span className="font-medium">Project:</span>{' '}
+          <div className="border-t pt-4 space-y-2.5">
+            <div className="text-sm break-words">
+              <span className="font-semibold text-foreground">Project:</span>{' '}
               {activeTimer.project?.name ? (
                 <span
                   className={activeTimer.project.name.length > 20 ? 'truncate' : ''}
@@ -219,14 +292,29 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
               )}
             </div>
             {activeTimer.task && (
-              <div className="text-xs sm:text-sm break-words">
-                <span className="font-medium">Task:</span> <span className="truncate">{activeTimer.task.title}</span>
+              <div className="text-sm break-words">
+                <span className="font-semibold text-foreground">Task:</span>{' '}
+                <span className="truncate">{activeTimer.task.title}</span>
               </div>
             )}
-            <div className="text-xs sm:text-sm break-words">
-              <span className="font-medium">Description:</span> <span className="truncate">{activeTimer.description}</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
+            {activeTimer.description && (
+              <div className="text-sm">
+                <span className="font-semibold text-foreground">Description:</span>{' '}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="line-clamp-2 text-muted-foreground cursor-default inline-block max-w-full">
+                        {activeTimer.description}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs break-words">{activeTimer.description}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
               <Badge 
                 variant={activeTimer.isPaused ? 'secondary' : 'default'} 
                 className={`text-xs flex-shrink-0 ${activeTimer.isPaused ? 'hover:!bg-secondary dark:hover:!bg-secondary' : 'hover:!bg-primary dark:hover:!bg-primary'}`}
@@ -293,13 +381,13 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
 
   return (
     <Card className="overflow-x-hidden">
-      <CardHeader className="p-4 sm:p-6">
-        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-          <Clock className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+          <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
           <span className="truncate">Time Tracking</span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0">
+      <CardContent className="space-y-4">
         {error && (
           <Alert variant="destructive">
             <AlertDescription className="text-xs sm:text-sm break-words">{error}</AlertDescription>
