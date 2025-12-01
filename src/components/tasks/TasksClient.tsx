@@ -44,6 +44,7 @@ import { Permission, PermissionGate } from '@/lib/permissions'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { usePermissions } from '@/lib/permissions/permission-context'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { format } from 'date-fns'
 import { DateRange } from 'react-day-picker'
 import { DEFAULT_TASK_STATUS_KEYS, type TaskStatusKey } from '@/constants/taskStatuses'
@@ -1128,7 +1129,7 @@ export default function TasksClient({
                                                                                         }
                                                                                         disabled={statusUpdatingId === task._id}
                                                                                     >
-                                                                                        <SelectTrigger className="h-7 w-[150px] text-xs">
+                                                                                        <SelectTrigger className="h-7 w-full sm:w-[150px] text-xs">
                                                                                             <SelectValue placeholder="Status" />
                                                                                         </SelectTrigger>
                                                                                         <SelectContent className="z-[10050]">
@@ -1150,14 +1151,25 @@ export default function TasksClient({
                                                                                     </Badge>
                                                                                 </div>
                                                                             </div>
-                                                                            <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2" title={task.description}>
-                                                                                {task.description || 'No description'}
-                                                                            </p>
+                                                                            <TooltipProvider>
+                                                                              <Tooltip>
+                                                                                <TooltipTrigger asChild>
+                                                                                  <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
+                                                                                    {task.description || 'No description'}
+                                                                                  </p>
+                                                                                </TooltipTrigger>
+                                                                                {(task.description && task.description.length > 0) && (
+                                                                                  <TooltipContent>
+                                                                                    <p className="max-w-xs break-words">{task.description}</p>
+                                                                                  </TooltipContent>
+                                                                                )}
+                                                                              </Tooltip>
+                                                                            </TooltipProvider>
                                                                             <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                                                                                 <div className="flex items-center space-x-1 min-w-0">
                                                                                     <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                                                                                     <span
-                                                                                        className="truncate max-w-[120px] sm:max-w-none"
+                                                                                        className="truncate max-w-[100px] sm:max-w-[150px] md:max-w-none"
                                                                                         title={task?.project?.name && task.project.name.length > 10 ? task.project.name : undefined}
                                                                                     >
                                                                                         {task?.project?.name && task.project.name.length > 10 ? `${task.project.name.slice(0, 10)}…` : task?.project?.name}

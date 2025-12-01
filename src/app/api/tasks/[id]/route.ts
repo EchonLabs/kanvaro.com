@@ -367,6 +367,13 @@ export async function PUT(
       }
     }
 
+    if (Object.prototype.hasOwnProperty.call(updateData, 'epic')) {
+      if (typeof updateData.epic === 'string') {
+        const trimmed = updateData.epic.trim()
+        updateData.epic = trimmed.length > 0 ? trimmed : undefined
+      }
+    }
+
     // Add optimistic locking with version field
     const currentTask = await Task.findOne({
       _id: taskId,

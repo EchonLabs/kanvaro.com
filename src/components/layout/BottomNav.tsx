@@ -137,16 +137,16 @@ export function BottomNav() {
           <Button
             variant="outline"
             size="sm"
-            className="h-8 w-8 p-0"
+            className="h-11 w-11 p-0 min-h-[44px] min-w-[44px]"
           >
-            <Clock className="h-4 w-4" />
+            <Clock className="h-5 w-5" />
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="h-8 w-8 p-0"
+            className="h-11 w-11 p-0 min-h-[44px] min-w-[44px]"
           >
-            <Bell className="h-4 w-4" />
+            <Bell className="h-5 w-5" />
           </Button>
         </div>
       </div>

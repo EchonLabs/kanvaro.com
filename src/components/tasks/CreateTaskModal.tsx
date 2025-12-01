@@ -535,34 +535,39 @@ export default function CreateTaskModal({
 
       if (data.success) {
         setSuccess('Task created successfully')
+        setError('')
         onTaskCreated()
-        onClose()
-        // Only redirect to tasks page if not staying on current page (e.g., kanban board)
-        if (!stayOnCurrentPage) {
-          setTimeout(() => {
-            router.push('/tasks')
-          }, 300)
-        }
-        // Reset form
-        setFormData({
-          title: '',
-          description: '',
-          priority: 'medium',
-          type: 'task',
-          assignedTo: '',
-          dueDate: '',
-          estimatedHours: '',
-          labels: [],
-          story: '',
-          epic: ''
-        })
-        setSubtasks([])
-        setAssignedToIds([])
-        setAssigneeQuery('')
-        setNewLabel('')
-        if (!projectId) setSelectedProjectId('')
-        setAttachments([])
-        setAttachmentError('')
+        // Show success message briefly before closing
+        setTimeout(() => {
+          // Reset form
+          setFormData({
+            title: '',
+            description: '',
+            priority: 'medium',
+            type: 'task',
+            assignedTo: '',
+            dueDate: '',
+            estimatedHours: '',
+            labels: [],
+            story: '',
+            epic: ''
+          })
+          setSubtasks([])
+          setAssignedToIds([])
+          setAssigneeQuery('')
+          setNewLabel('')
+          if (!projectId) setSelectedProjectId('')
+          setAttachments([])
+          setAttachmentError('')
+          setSuccess('')
+          onClose()
+          // Only redirect to tasks page if not staying on current page (e.g., kanban board)
+          if (!stayOnCurrentPage) {
+            setTimeout(() => {
+              router.push('/tasks')
+            }, 100)
+          }
+        }, 1500)
       } else {
         setError(data.error || 'Failed to create task')
         setLoading(false)
@@ -624,8 +629,19 @@ export default function CreateTaskModal({
         <CardContent className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <form onSubmit={handleSubmit} className="space-y-6" autoComplete="on" id="create-task-form">
             {success && (
-              <Alert variant="success">
-                <AlertDescription>{success}</AlertDescription>
+              <Alert variant="success" className="flex items-center justify-between pr-2">
+                <AlertDescription className="flex-1">{success}</AlertDescription>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40"
+                  onClick={() => {
+                    setSuccess('')
+                    onClose()
+                  }}
+                >
+                  <X className="h-4 w-4 text-green-700 dark:text-green-300" />
+                </Button>
               </Alert>
             )}
             {error && (

@@ -91,6 +91,7 @@ interface TaskFormData {
 export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: EditTaskModalProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [users, setUsers] = useState<User[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [stories, setStories] = useState<Story[]>([])
@@ -162,11 +163,32 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
       setSubtasks(initialSubtasksData)
       setInitialSubtasks(initialSubtasksData)
       
-      // Fetch all data in parallel for better performance
-      if (task.project) {
-        const projectId = typeof task.project === 'string' ? task.project : task.project._id
+      // Get project ID - try from task.project first, otherwise fetch full task data
+      const getProjectId = async () => {
+        let projectId: string | null = null
+        
+        // First, try to get project ID from task object
+        if (task.project) {
+          projectId = typeof task.project === 'string' ? task.project : task.project._id
+        }
+        
+        // If project is not available, fetch full task data from API
+        if (!projectId && task._id) {
+          try {
+            const response = await fetch(`/api/tasks/${task._id}`)
+            const data = await response.json()
+            if (data.success && data.data?.project) {
+              projectId = typeof data.data.project === 'string' 
+                ? data.data.project 
+                : data.data.project._id
+            }
+          } catch (error) {
+            console.error('Failed to fetch task data for project ID:', error)
+          }
+        }
+        
+        // Fetch all data if we have a project ID
         if (projectId) {
-          // Fetch all data in parallel using Promise.all
           Promise.all([
             fetchUsers(projectId),
             fetchProjectStatuses(projectId),
@@ -175,10 +197,14 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
           ]).catch((error) => {
             console.error('Error fetching task edit data:', error)
           })
+        } else {
+          setUsers([])
+          setStories([])
+          setEpics([])
         }
-      } else {
-        setUsers([])
       }
+      
+      getProjectId()
     }
   }, [isOpen, task])
 
@@ -349,14 +375,20 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
       const data = await response.json()
       
       if (data.success) {
-        // Close modal immediately for better UX
-        onClose()
+        setSuccess('Task updated successfully')
+        setError('')
         // Call update callback asynchronously to not block UI
         setTimeout(() => {
           onTaskUpdated()
         }, 0)
+        // Close modal after a short delay to show success message
+        setTimeout(() => {
+          onClose()
+          setSuccess('')
+        }, 1500)
       } else {
         setError(data.error || 'Failed to update task')
+        setSuccess('')
       }
     } catch (error) {
       setError('Failed to update task')
@@ -525,6 +557,22 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
         </CardHeader>
         <CardContent className="flex-1 overflow-y-auto">
           <form onSubmit={handleSubmit} className="space-y-6" id="edit-task-form">
+            {success && (
+              <Alert variant="success" className="flex items-center justify-between pr-2">
+                <AlertDescription className="flex-1">{success}</AlertDescription>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40"
+                  onClick={() => {
+                    setSuccess('')
+                    onClose()
+                  }}
+                >
+                  <X className="h-4 w-4 text-green-700 dark:text-green-300" />
+                </Button>
+              </Alert>
+            )}
             {error && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />

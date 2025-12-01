@@ -40,6 +40,7 @@ import {
 import { Permission, PermissionGate } from '@/lib/permissions'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface Story {
   _id: string
@@ -569,9 +570,20 @@ export default function StoriesPage() {
                                   </Badge>
                                 </div>
                               </div>
-                              <p className="text-sm text-muted-foreground mb-2 line-clamp-2" title={story.description}>
-                                {story.description || 'No description'}
-                              </p>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <p className="text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
+                                      {story.description || 'No description'}
+                                    </p>
+                                  </TooltipTrigger>
+                                  {(story.description && story.description.length > 0) && (
+                                    <TooltipContent>
+                                      <p className="max-w-xs break-words">{story.description}</p>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              </TooltipProvider>
                               <div className="flex items-center space-x-4 text-sm text-muted-foreground min-w-0 flex-wrap">
                                 <div className="flex items-center space-x-1">
                                   <Target className="h-4 w-4" />

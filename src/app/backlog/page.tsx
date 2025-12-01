@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Calendar as DateRangeCalendar } from '@/components/ui/calendar'
 import { cn } from '@/lib/utils'
 import {
@@ -1547,9 +1548,20 @@ export default function BacklogPage() {
                                 </Badge>
                               )}
                             </div>
-                            <p className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">
-                              {item.description || 'No description'}
-                            </p>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
+                                    {item.description || 'No description'}
+                                  </p>
+                                </TooltipTrigger>
+                                {(item.description && item.description.length > 0) && (
+                                  <TooltipContent>
+                                    <p className="max-w-xs break-words">{item.description}</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
                             {item.assignedTo && (
                               <p className="text-xs sm:text-sm text-muted-foreground mb-2">
                                 {item.assignedTo.firstName} {item.assignedTo.lastName}
