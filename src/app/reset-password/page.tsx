@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { OrganizationLogo } from '@/components/ui/OrganizationLogo'
 import { useOrganization } from '@/hooks/useOrganization'
-import { ArrowLeft, Key, Eye, EyeOff, Loader2, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Key, Eye, EyeOff, Loader2, CheckCircle, Info } from 'lucide-react'
 
 export default function ResetPasswordPage() {
   const [newPassword, setNewPassword] = useState('')
@@ -166,6 +166,48 @@ export default function ResetPasswordPage() {
                   </Alert>
                 )}
 
+                {/* Password Requirements Info */}
+                <div className="p-3 bg-muted/50 border border-border rounded-md">
+                  <div className="flex items-start gap-2">
+                    <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-foreground mb-1.5">Password Requirements:</p>
+                      <ul className="text-xs text-muted-foreground space-y-1">
+                        <li className="flex items-center gap-1.5">
+                          <span className={newPassword.length >= 8 ? 'text-green-600 dark:text-green-400' : ''}>
+                            {newPassword.length >= 8 ? '✓' : '•'}
+                          </span>
+                          At least 8 characters long
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <span className={/[a-z]/.test(newPassword) ? 'text-green-600 dark:text-green-400' : ''}>
+                            {/[a-z]/.test(newPassword) ? '✓' : '•'}
+                          </span>
+                          Contains lowercase letter
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <span className={/[A-Z]/.test(newPassword) ? 'text-green-600 dark:text-green-400' : ''}>
+                            {/[A-Z]/.test(newPassword) ? '✓' : '•'}
+                          </span>
+                          Contains uppercase letter
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <span className={/\d/.test(newPassword) ? 'text-green-600 dark:text-green-400' : ''}>
+                            {/\d/.test(newPassword) ? '✓' : '•'}
+                          </span>
+                          Contains number
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <span className={/[!@#$%^&*(),.?":{}|<>]/.test(newPassword) ? 'text-green-600 dark:text-green-400' : ''}>
+                            {/[!@#$%^&*(),.?":{}|<>]/.test(newPassword) ? '✓' : '•'}
+                          </span>
+                          Contains special character (!@#$%^&*...)
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="newPassword">New Password</Label>
                   <div className="relative">
@@ -194,9 +236,6 @@ export default function ResetPasswordPage() {
                       )}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Password must be at least 8 characters long
-                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -227,6 +266,9 @@ export default function ResetPasswordPage() {
                       )}
                     </Button>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Re-enter your password to confirm
+                  </p>
                 </div>
 
                 <Button
