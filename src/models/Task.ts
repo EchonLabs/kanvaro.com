@@ -24,6 +24,7 @@ export interface ITask extends Document {
   taskNumber: number
   displayId: string
   story?: mongoose.Types.ObjectId
+  epic?: mongoose.Types.ObjectId
   parentTask?: mongoose.Types.ObjectId
   assignedTo?: mongoose.Types.ObjectId
   createdBy: mongoose.Types.ObjectId
@@ -136,6 +137,10 @@ const TaskSchema = new Schema<ITask>({
   story: {
     type: Schema.Types.ObjectId,
     ref: 'Story'
+  },
+  epic: {
+    type: Schema.Types.ObjectId,
+    ref: 'Epic'
   },
   parentTask: {
     type: Schema.Types.ObjectId,

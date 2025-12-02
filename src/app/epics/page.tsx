@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { 
   Plus, 
   Search, 
@@ -527,9 +528,20 @@ export default function EpicsPage() {
                                 {epic?.title}
                               </h3>
                             </div>
-                            <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2" title={epic?.description || 'No description'}>
-                              {epic?.description || 'No description'}
-                            </p>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
+                                    {epic?.description || 'No description'}
+                                  </p>
+                                </TooltipTrigger>
+                                {(epic?.description && epic.description.length > 0) && (
+                                  <TooltipContent>
+                                    <p className="max-w-xs break-words">{epic.description}</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
                             <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                               <div className="flex items-center space-x-1 min-w-0">
                                 <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />

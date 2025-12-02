@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Label } from '@/components/ui/label'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Plus,
   Search,
@@ -1018,9 +1019,20 @@ export default function SprintsPage() {
                                   {sprint?.name}
                                 </h3>
                               </div>
-                              <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2" title={sprint?.description || 'No description'}>
-                                {sprint?.description || 'No description'}
-                              </p>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
+                                      {sprint?.description || 'No description'}
+                                    </p>
+                                  </TooltipTrigger>
+                                  {(sprint?.description && sprint.description.length > 0) && (
+                                    <TooltipContent>
+                                      <p className="max-w-xs break-words">{sprint.description}</p>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              </TooltipProvider>
                               <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                                 <div className="flex items-center space-x-1 min-w-0">
                                   <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />

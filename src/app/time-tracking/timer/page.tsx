@@ -893,10 +893,10 @@ export default function TimerPage() {
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a project" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
                         {Array.isArray(projects) && projects.map((project) => (
                           <SelectItem key={project._id} value={project._id}>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2 min-w-0">
                               <FolderOpen className="h-4 w-4 flex-shrink-0" />
                               <span className="truncate">{project.name}</span>
                             </div>
@@ -925,7 +925,7 @@ export default function TimerPage() {
                       {tasksLoading && (
                         <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                       )}
-                      <SelectContent>
+                      <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
                         {tasksLoading ? (
                           <div className="flex items-center justify-center p-4">
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -940,13 +940,13 @@ export default function TimerPage() {
                                 value={task._id}
                                 disabled={isBillableDisabled}
                               >
-                                <div className="flex items-center space-x-2">
+                                <div className="flex items-center space-x-2 min-w-0 w-full">
                                   <Target className="h-4 w-4 flex-shrink-0" />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-medium truncate flex items-center gap-2">
-                                      {task.title}
+                                  <div className="flex-1 min-w-0 overflow-hidden">
+                                    <div className="font-medium truncate flex items-center gap-2 min-w-0">
+                                      <span className="truncate">{task.title}</span>
                                       {task.isBillable && (
-                                        <DollarSign className="h-3 w-3 text-green-600" />
+                                        <DollarSign className="h-3 w-3 text-green-600 flex-shrink-0" />
                                       )}
                                     </div>
                                     <div className="text-xs sm:text-sm text-muted-foreground truncate">
@@ -1078,10 +1078,10 @@ export default function TimerPage() {
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select a project" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
                           {Array.isArray(projects) && projects.map((project) => (
                             <SelectItem key={project._id} value={project._id}>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center space-x-2 min-w-0">
                                 <FolderOpen className="h-4 w-4 flex-shrink-0" />
                                 <span className="truncate">{project.name}</span>
                               </div>
@@ -1110,7 +1110,7 @@ export default function TimerPage() {
                         {tasksLoading && (
                           <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                         )}
-                        <SelectContent>
+                        <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
                           {tasksLoading ? (
                             <div className="flex items-center justify-center p-4">
                               <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -1125,13 +1125,13 @@ export default function TimerPage() {
                                   value={task._id}
                                   disabled={isBillableDisabled}
                                 >
-                                  <div className="flex items-center space-x-2">
+                                  <div className="flex items-center space-x-2 min-w-0 w-full">
                                     <Target className="h-4 w-4 flex-shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                      <div className="font-medium truncate flex items-center gap-2">
-                                        {task.title}
+                                    <div className="flex-1 min-w-0 overflow-hidden">
+                                      <div className="font-medium truncate flex items-center gap-2 min-w-0">
+                                        <span className="truncate">{task.title}</span>
                                         {task.isBillable && (
-                                          <DollarSign className="h-3 w-3 text-green-600" />
+                                          <DollarSign className="h-3 w-3 text-green-600 flex-shrink-0" />
                                         )}
                                       </div>
                                       {isBillableDisabled && (

@@ -535,34 +535,39 @@ export default function CreateTaskModal({
 
       if (data.success) {
         setSuccess('Task created successfully')
+        setError('')
         onTaskCreated()
-        onClose()
-        // Only redirect to tasks page if not staying on current page (e.g., kanban board)
-        if (!stayOnCurrentPage) {
-          setTimeout(() => {
-            router.push('/tasks')
-          }, 300)
-        }
-        // Reset form
-        setFormData({
-          title: '',
-          description: '',
-          priority: 'medium',
-          type: 'task',
-          assignedTo: '',
-          dueDate: '',
-          estimatedHours: '',
-          labels: [],
-          story: '',
-          epic: ''
-        })
-        setSubtasks([])
-        setAssignedToIds([])
-        setAssigneeQuery('')
-        setNewLabel('')
-        if (!projectId) setSelectedProjectId('')
-        setAttachments([])
-        setAttachmentError('')
+        // Show success message briefly before closing
+        setTimeout(() => {
+          // Reset form
+          setFormData({
+            title: '',
+            description: '',
+            priority: 'medium',
+            type: 'task',
+            assignedTo: '',
+            dueDate: '',
+            estimatedHours: '',
+            labels: [],
+            story: '',
+            epic: ''
+          })
+          setSubtasks([])
+          setAssignedToIds([])
+          setAssigneeQuery('')
+          setNewLabel('')
+          if (!projectId) setSelectedProjectId('')
+          setAttachments([])
+          setAttachmentError('')
+          setSuccess('')
+          onClose()
+          // Only redirect to tasks page if not staying on current page (e.g., kanban board)
+          if (!stayOnCurrentPage) {
+            setTimeout(() => {
+              router.push('/tasks')
+            }, 100)
+          }
+        }, 1500)
       } else {
         setError(data.error || 'Failed to create task')
         setLoading(false)
@@ -621,11 +626,22 @@ export default function CreateTaskModal({
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="flex-1 overflow-y-auto">
+        <CardContent className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <form onSubmit={handleSubmit} className="space-y-6" autoComplete="on" id="create-task-form">
             {success && (
-              <Alert variant="success">
-                <AlertDescription>{success}</AlertDescription>
+              <Alert variant="success" className="flex items-center justify-between pr-2">
+                <AlertDescription className="flex-1">{success}</AlertDescription>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40"
+                  onClick={() => {
+                    setSuccess('')
+                    onClose()
+                  }}
+                >
+                  <X className="h-4 w-4 text-green-700 dark:text-green-300" />
+                </Button>
               </Alert>
             )}
             {error && (
@@ -654,15 +670,15 @@ export default function CreateTaskModal({
                   }}
                   onOpenChange={(open) => { if (open) setProjectQuery('') }}
                 >
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="mt-1 w-full">
                     <SelectValue placeholder={loadingProjects ? 'Loading projects...' : 'Select project'} />
                   </SelectTrigger>
-                  <SelectContent className="z-[10050] p-0">
+                  <SelectContent className="z-[10050] p-0 w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
                     {loadingProjects ? (
                       <SelectItem value="loading" disabled>
-                        <div className="flex items-center space-x-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span>Loading projects...</span>
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                          <span className="truncate">Loading projects...</span>
                         </div>
                       </SelectItem>
                     ) : projects.length > 0 ? (
@@ -674,9 +690,11 @@ export default function CreateTaskModal({
                           placeholder="Type to search projects"
                           className="mb-2"
                         />
-                        <div className="max-h-56 overflow-y-auto">
+                        <div className="max-h-56 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                           {(projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase()))).map((p) => (
-                            <SelectItem key={p._id} value={p._id}>{p.name}</SelectItem>
+                            <SelectItem key={p._id} value={p._id}>
+                              <span className="truncate block">{p.name}</span>
+                            </SelectItem>
                           ))}
                           {(projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase()))).length === 0 && (
                             <div className="px-2 py-1 text-sm text-muted-foreground">No matching projects</div>
@@ -801,7 +819,7 @@ export default function CreateTaskModal({
                       <SelectTrigger className="mt-1 w-full">
                         <SelectValue placeholder={loadingStories ? 'Loading stories...' : 'Select a story'} />
                       </SelectTrigger>
-                      <SelectContent className="z-[10050] p-0">
+                      <SelectContent className="z-[10050] p-0 w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
                         <div className="p-2">
                           <Input
                             value={storyQuery}
@@ -810,11 +828,11 @@ export default function CreateTaskModal({
                             placeholder={loadingStories ? 'Loading stories...' : 'Type to search stories'}
                             className="mb-2"
                           />
-                          <div className="max-h-56 overflow-y-auto">
+                          <div className="max-h-56 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                             {loadingStories ? (
                               <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                <span>Loading stories...</span>
+                                <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                                <span className="truncate">Loading stories...</span>
                               </div>
                             ) : (() => {
                               const q = storyQuery.toLowerCase().trim()
@@ -830,7 +848,7 @@ export default function CreateTaskModal({
                               
                               return filtered.map((story) => (
                                 <SelectItem key={story._id} value={story._id}>
-                                  {story.title}
+                                  <span className="truncate block">{story.title}</span>
                                 </SelectItem>
                               ))
                             })()}
@@ -851,7 +869,7 @@ export default function CreateTaskModal({
                       <SelectTrigger className="mt-1 w-full">
                         <SelectValue placeholder={loadingEpics ? 'Loading epics...' : 'Select an epic'} />
                       </SelectTrigger>
-                      <SelectContent className="z-[10050] p-0">
+                      <SelectContent className="z-[10050] p-0 w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
                         <div className="p-2">
                           <Input
                             value={epicQuery}
@@ -860,11 +878,11 @@ export default function CreateTaskModal({
                             placeholder={loadingEpics ? 'Loading epics...' : 'Type to search epics'}
                             className="mb-2"
                           />
-                          <div className="max-h-56 overflow-y-auto">
+                          <div className="max-h-56 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                             {loadingEpics ? (
                               <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                <span>Loading epics...</span>
+                                <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                                <span className="truncate">Loading epics...</span>
                               </div>
                             ) : (() => {
                               const q = epicQuery.toLowerCase().trim()
@@ -900,7 +918,7 @@ export default function CreateTaskModal({
                               
                               return filtered.map((epic) => (
                                 <SelectItem key={epic._id} value={epic._id}>
-                                  {epic.title}
+                                  <span className="truncate block">{epic.title}</span>
                                 </SelectItem>
                               ))
                             })()}
@@ -926,10 +944,10 @@ export default function CreateTaskModal({
                       }}
                       onOpenChange={(open) => { if (open) setAssigneeQuery(""); }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder={loadingProjectMembers ? 'Loading members...' : 'Select team members *'} />
                       </SelectTrigger>
-                      <SelectContent className="z-[10050] p-0">
+                      <SelectContent className="z-[10050] p-0 w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
                         <div className="p-2">
                           <Input
                             value={assigneeQuery}
@@ -938,11 +956,11 @@ export default function CreateTaskModal({
                             placeholder={loadingProjectMembers ? 'Loading members...' : 'Type to search team members'}
                             className="mb-2"
                           />
-                          <div className="max-h-56 overflow-y-auto">
+                          <div className="max-h-56 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                             {loadingProjectMembers ? (
                               <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                <span>Loading members...</span>
+                                <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                                <span className="truncate">Loading members...</span>
                               </div>
                             ) : projectMembers.length === 0 ? (
                               <div className="px-2 py-1 text-sm text-muted-foreground">No team members found for this project</div>
@@ -970,10 +988,10 @@ export default function CreateTaskModal({
                                       disabled={isSelected}
                                       className={isSelected ? 'opacity-50 cursor-not-allowed' : ''}
                                     >
-                                      <div className="flex items-center justify-between w-full">
-                                        <span>{user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span></span>
+                                      <div className="flex items-center justify-between w-full min-w-0">
+                                        <span className="truncate min-w-0">{user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span></span>
                                         {isSelected && (
-                                          <span className="text-xs text-muted-foreground ml-2">Selected</span>
+                                          <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">Selected</span>
                                         )}
                                       </div>
                                     </SelectItem>
