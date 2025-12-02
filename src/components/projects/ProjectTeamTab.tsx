@@ -66,7 +66,6 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
   const [showAddMember, setShowAddMember] = useState(false)
   const [selectedMemberId, setSelectedMemberId] = useState<string>('')
-  const [selectedRole, setSelectedRole] = useState<string>('project_member')
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [memberToRemove, setMemberToRemove] = useState<string | null>(null)
   const [isAdding, setIsAdding] = useState(false)
@@ -108,10 +107,13 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
   }
 
   const handleAddMember = async () => {
-    if (!selectedMemberId) {
+    if (!selectedMemberId || !selectedMember) {
       setError('Please select a member to add')
       return
     }
+
+    // Auto-determine project role based on member's organization role
+    const autoProjectRole = getProjectRoleFromOrganizationRole(selectedMember.role)
 
     try {
       setIsAdding(true)
@@ -124,7 +126,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
         },
         body: JSON.stringify({
           memberId: selectedMemberId,
-          role: selectedRole
+          role: autoProjectRole
         })
       })
 
@@ -134,7 +136,6 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
         setSuccess('Team member added successfully')
         setShowAddMember(false)
         setSelectedMemberId('')
-        setSelectedRole('project_member')
         fetchTeamData()
         onUpdate()
         setTimeout(() => setSuccess(''), 3000)
@@ -227,6 +228,62 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
       'project_tester': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-900'
     }
     return colorMap[role] || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+  }
+
+  // Helper function to format organization role for display in title case
+  const formatOrganizationRole = (role?: string) => {
+    if (!role) return 'No Role'
+    
+    // Normalize role to lowercase for consistent matching
+    const normalizedRole = role.toLowerCase().trim()
+    
+    const roleMap: Record<string, string> = {
+      'admin': 'Admin',
+      'project_manager': 'Project Manager',
+      'team_member': 'Team Member',
+      'member': 'Team Member', // Handle 'member' as alias for 'team_member'
+      'client': 'Client',
+      'viewer': 'Viewer'
+    }
+    
+    // Check exact match first
+    if (roleMap[normalizedRole]) {
+      return roleMap[normalizedRole]
+    }
+    
+    // Fallback: Convert snake_case or kebab-case to Title Case
+    return normalizedRole
+      .split(/[_\s-]+/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ')
+  }
+
+  // Helper function to get organization role color
+  const getOrganizationRoleColor = (role?: string) => {
+    if (!role) return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+    switch (role) {
+      case 'admin': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
+      case 'project_manager': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'team_member': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
+      case 'client': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900'
+      case 'viewer': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
+    }
+  }
+
+  // Map organization role to project role
+  const getProjectRoleFromOrganizationRole = (orgRole?: string): string => {
+    if (!orgRole) return 'project_viewer'
+    
+    const roleMap: Record<string, string> = {
+      'admin': 'project_manager',
+      'project_manager': 'project_manager',
+      'team_member': 'project_viewer',
+      'client': 'project_viewer',
+      'viewer': 'project_viewer'
+    }
+    
+    return roleMap[orgRole] || 'project_viewer'
   }
 
   const normalizedSearch = memberSearchQuery.trim().toLowerCase()
@@ -462,7 +519,6 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                 onClick={() => {
                   setShowAddMember(false)
                   setSelectedMemberId('')
-                  setSelectedRole('project_member')
                   setMemberSearchQuery('')
                   setError('')
                 }}
@@ -514,22 +570,38 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Project Role</label>
-              <Select value={selectedRole} onValueChange={setSelectedRole}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="project_member">Member</SelectItem>
-                  <SelectItem value="project_manager">Project Manager</SelectItem>
-                  <SelectItem value="project_viewer">Viewer</SelectItem>
-                  <SelectItem value="project_qa_lead">QA Lead</SelectItem>
-                  <SelectItem value="project_tester">Tester</SelectItem>
-                  <SelectItem value="project_account_manager">Account Manager</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Selected Member Preview */}
+            {selectedMember && (
+              <>
+                <div className="space-y-2 p-4 border rounded-lg bg-muted/50">
+                  <label className="text-sm font-medium">Selected Member</label>
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium text-foreground">
+                        {selectedMember.firstName} {selectedMember.lastName}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{selectedMember.email}</p>
+                    </div>
+                    <Badge className={getOrganizationRoleColor(selectedMember.role)}>
+                      {formatOrganizationRole(selectedMember.role)}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Project Role Preview */}
+                <div className="space-y-2 p-4 border rounded-lg bg-muted/30">
+                  <label className="text-sm font-medium">Project Role (Auto-assigned)</label>
+                  <div className="flex items-center">
+                    <Badge className={getRoleColor(getProjectRoleFromOrganizationRole(selectedMember.role))}>
+                      {getRoleDisplayName(getProjectRoleFromOrganizationRole(selectedMember.role))}
+                    </Badge>
+                    <p className="text-xs text-muted-foreground ml-3">
+                      Based on organization role: {formatOrganizationRole(selectedMember.role)}
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="flex justify-end gap-2">
               <Button
@@ -537,7 +609,6 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                 onClick={() => {
                   setShowAddMember(false)
                   setSelectedMemberId('')
-                  setSelectedRole('project_member')
                   setMemberSearchQuery('')
                   setError('')
                 }}
