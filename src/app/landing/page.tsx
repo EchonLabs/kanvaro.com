@@ -40,7 +40,8 @@ import {
   ChevronDown,
   BookOpen,
   FileText,
-  MessageCircle
+  MessageCircle,
+  Github
 } from 'lucide-react'
 
 const modules = [
@@ -258,120 +259,144 @@ export default function LandingPage() {
           <div className="flex items-center gap-8">
             <button
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="text-xl font-bold text-slate-900 dark:text-white hover:text-[#7bffde] transition-colors cursor-pointer"
+              className="flex items-center gap-2 text-2xl font-bold cursor-pointer group"
             >
-              Kanvaro
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#7bffde] to-[#7afdea] shadow-lg shadow-[#7bffde]/30 group-hover:shadow-[#7bffde]/50 transition-all duration-300 group-hover:scale-110">
+                <Zap className="h-5 w-5 text-slate-900" />
+              </div>
+              <span className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-[#7bffde] dark:to-white bg-clip-text text-transparent group-hover:from-[#7bffde] group-hover:via-[#7afdea] group-hover:to-[#7bffde] dark:group-hover:from-[#7bffde] dark:group-hover:via-white dark:group-hover:to-[#7bffde] transition-all duration-300">
+            Kanvaro
+          </span>
             </button>
-            <nav className="hidden md:flex items-center gap-6">
+            <nav className="hidden md:flex items-center gap-2">
               {/* Features Dropdown */}
               <DropdownMenu>
-                <DropdownMenuTrigger className="flex items-center gap-1 text-sm font-medium text-slate-700 hover:text-slate-900 dark:text-white/80 dark:hover:text-white transition-colors">
+                <DropdownMenuTrigger className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-slate-700 hover:text-slate-900 dark:text-white/90 dark:hover:text-white transition-all duration-200 hover:bg-slate-100 dark:hover:bg-white/10 group">
                   Features
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuContent align="start" className="w-56 rounded-xl border-slate-200/80 bg-white/95 backdrop-blur-md shadow-xl dark:border-white/20 dark:bg-slate-900/95 dark:backdrop-blur-md p-2">
                   <DropdownMenuItem 
                     onSelect={() => {
                       scrollToSection('unique-features')
                     }}
+                    className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
                   >
-                    <Zap className="mr-2 h-4 w-4" />
-                    Unique Features
+                    <Zap className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">Unique Features</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     onSelect={() => {
                       scrollToSection('key-features')
                     }}
+                    className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
                   >
-                    <ListChecks className="mr-2 h-4 w-4" />
-                    Key Features
+                    <ListChecks className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">Key Features</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     onSelect={() => {
                       scrollToSection('workflows')
                     }}
+                    className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
                   >
-                    <Activity className="mr-2 h-4 w-4" />
-                    Workflows
+                    <Activity className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">Workflows</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               
               {/* Modules Dropdown */}
               <DropdownMenu>
-                <DropdownMenuTrigger className="flex items-center gap-1 text-sm font-medium text-slate-700 hover:text-slate-900 dark:text-white/80 dark:hover:text-white transition-colors">
+                <DropdownMenuTrigger className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-slate-700 hover:text-slate-900 dark:text-white/90 dark:hover:text-white transition-all duration-200 hover:bg-slate-100 dark:hover:bg-white/10 group">
                   Modules
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuContent align="start" className="w-56 rounded-xl border-slate-200/80 bg-white/95 backdrop-blur-md shadow-xl dark:border-white/20 dark:bg-slate-900/95 dark:backdrop-blur-md p-2">
                   <DropdownMenuItem 
                     onSelect={() => {
                       scrollToSection('module-walkthrough')
                     }}
+                    className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
                   >
-                    <Layers className="mr-2 h-4 w-4" />
-                    Module Walkthrough
+                    <Layers className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">Module Walkthrough</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     onSelect={() => {
                       scrollToSection('reporting-analytics')
                     }}
+                    className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
                   >
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    Reports & Analytics
+                    <BarChart3 className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">Reports & Analytics</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     onSelect={() => {
                       scrollToSection('team-collaboration')
                     }}
+                    className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
                   >
-                    <Users className="mr-2 h-4 w-4" />
-                    Team Collaboration
+                    <Users className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">Team Collaboration</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               
               {/* Demo Dropdown */}
               <DropdownMenu>
-                <DropdownMenuTrigger className="flex items-center gap-1 text-sm font-medium text-slate-700 hover:text-slate-900 dark:text-white/80 dark:hover:text-white transition-colors">
+                <DropdownMenuTrigger className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-slate-700 hover:text-slate-900 dark:text-white/90 dark:hover:text-white transition-all duration-200 hover:bg-slate-100 dark:hover:bg-white/10 group">
                   Demo
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuItem onClick={() => setShowVideoModal(true)}>
-                    <Play className="mr-2 h-4 w-4" />
-                    Guided Tour
+                <DropdownMenuContent align="start" className="w-56 rounded-xl border-slate-200/80 bg-white/95 backdrop-blur-md shadow-xl dark:border-white/20 dark:bg-slate-900/95 dark:backdrop-blur-md p-2">
+                  <DropdownMenuItem 
+                    onClick={() => setShowVideoModal(true)}
+                    className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
+                  >
+                    <Play className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">Guided Tour</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleGetStarted}>
-                    <Zap className="mr-2 h-4 w-4" />
-                    Interactive Preview
+                  <DropdownMenuItem 
+                    onClick={handleGetStarted}
+                    className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
+                  >
+                    <Zap className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">Interactive Preview</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     onSelect={(e) => {
                       e.preventDefault()
                       scrollToSection('get-started')
                     }}
+                    className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
                   >
-                    <ArrowRight className="mr-2 h-4 w-4" />
-                    Get Started
+                    <ArrowRight className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">Get Started</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               
               {/* Documentation Dropdown */}
               <DropdownMenu>
-                <DropdownMenuTrigger className="flex items-center gap-1 text-sm font-medium text-slate-700 hover:text-slate-900 dark:text-white/80 dark:hover:text-white transition-colors">
+                <DropdownMenuTrigger className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-slate-700 hover:text-slate-900 dark:text-white/90 dark:hover:text-white transition-all duration-200 hover:bg-slate-100 dark:hover:bg-white/10 group">
                   Documentation
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuItem onClick={() => window.open('/docs/public/installation', '_blank')}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Installation
+                <DropdownMenuContent align="start" className="w-56 rounded-xl border-slate-200/80 bg-white/95 backdrop-blur-md shadow-xl dark:border-white/20 dark:bg-slate-900/95 dark:backdrop-blur-md p-2">
+                  <DropdownMenuItem 
+                    onClick={() => window.open('/docs/public/installation', '_blank')}
+                    className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
+                  >
+                    <FileText className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">Installation</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => window.open('/docs/public/user-guide', '_blank')}>
-                    <BookOpen className="mr-2 h-4 w-4" />
-                    User Guide
+                  <DropdownMenuItem 
+                    onClick={() => window.open('/docs/public/user-guide', '_blank')}
+                    className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
+                  >
+                    <BookOpen className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">User Guide</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -416,23 +441,20 @@ export default function LandingPage() {
               >
                 Login
               </Button>
-              <Button
-                onClick={() => router.push('/workspace')}
-                className="hidden sm:flex h-9 rounded-full bg-[#7bffde] px-6 text-sm font-semibold text-slate-900 hover:bg-[#62f5cf]"
-              >
-                Get Started
-              </Button>
             </div>
           </div>
         </div>
         <div className="relative mx-auto flex max-w-7xl flex-col gap-16 px-6 pt-8 pb-20 lg:flex-row lg:items-center lg:pt-12 lg:pb-32">
           <div className="space-y-10 text-center lg:text-left lg:flex-1">
             <p className="inline-flex items-center gap-2 rounded-full border border-slate-300/60 bg-white/70 px-5 py-2 text-sm uppercase tracking-[0.3em] text-slate-600 dark:border-white/15 dark:bg-white/5 dark:text-white/80">
-              Self-hosted project management platform
+              <Zap className="h-4 w-4 text-[#7bffde]" />
+              All-in-One Project Management Platform
             </p>
             <div className="space-y-8">
-              <h1 className="text-3xl font-semibold leading-tight text-slate-900 sm:text-4xl lg:text-[3rem] xl:text-[3.5rem] dark:text-white">
-                Complete project management platform for <span className="text-[#7afdea]">modern teams</span>
+              <h1 className="text-3xl font-bold leading-tight text-slate-900 sm:text-4xl lg:text-[3rem] xl:text-[3.5rem] dark:text-white">
+                <span className="block">Build, Track &</span>
+                <span className="block mt-1 sm:mt-2 lg:mt-3 xl:mt-4">Deliver With</span>
+                <span className="block mt-1 sm:mt-2 lg:mt-3 xl:mt-4 bg-gradient-to-r from-[#7bffde] to-[#7afdea] bg-clip-text text-transparent">Confidence</span>
               </h1>
               <p className="text-base text-slate-600 sm:text-lg lg:text-base xl:text-lg dark:text-white/80 leading-relaxed">
                 The complete project management solution for modern teams. Agile workflows, time tracking, financial management, and powerful analytics — all in one beautifully designed workspace.
@@ -966,30 +988,30 @@ export default function LandingPage() {
             <div className="inline-flex items-center gap-2 rounded-full bg-[#7bffde]/10 dark:bg-[#7bffde]/20 px-4 py-2 mb-6">
               <Zap className="h-4 w-4 text-[#7bffde]" />
               <span className="text-sm font-semibold text-[#7bffde]">Get Started Today</span>
-            </div>
+        </div>
             <h2 className="text-3xl font-bold text-slate-900 dark:text-white sm:text-4xl lg:text-5xl">
-              Ready to transform your project management?
-            </h2>
+            Ready to transform your project management?
+          </h2>
             <p className="mt-6 text-lg text-slate-600 dark:text-white/90 max-w-2xl mx-auto leading-relaxed">
               Join thousands of teams already using Kanvaro to deliver projects on time, track every hour, and make data-driven decisions.
-            </p>
+          </p>
             <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center">
-              <Button
+            <Button
                 onClick={() => router.push('/workspace')}
-                disabled={ctaLoading}
+              disabled={ctaLoading}
                 className="h-14 rounded-full bg-[#7bffde] px-10 text-base font-bold text-slate-900 shadow-[0_20px_45px_rgba(123,255,222,0.35)] hover:bg-[#68f0cf] hover:shadow-[0_25px_55px_rgba(123,255,222,0.45)] disabled:opacity-70 transition-all dark:text-slate-900"
-              >
+            >
                 Get Started Free
                 <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-              <Button
-                variant="outline"
+            </Button>
+            <Button
+              variant="outline"
                 onClick={() => setShowVideoModal(true)}
                 className="h-14 rounded-full border-2 border-slate-300 bg-white px-10 text-base font-semibold text-slate-900 hover:bg-slate-50 dark:border-white/40 dark:bg-transparent dark:text-white dark:hover:bg-white/20"
-              >
+            >
                 <Play className="mr-2 h-5 w-5" />
                 Watch Demo
-              </Button>
+            </Button>
             </div>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-slate-500 dark:text-white/70">
               <div className="flex items-center gap-2">
@@ -1009,31 +1031,143 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer className="bg-white px-6 py-10 text-sm text-slate-600 dark:bg-[#02040b] dark:text-white/70">
-        <div className="mx-auto max-w-7xl flex flex-col gap-8 border-t border-slate-200 pt-8 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
-          <p>&copy; {new Date().getFullYear()} Kanvaro ProjectOS. All rights reserved.</p>
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <Link href="/about" className="transition hover:text-slate-900 dark:hover:text-white">
-              About
-            </Link>
-            <Link href="/contact" className="transition hover:text-slate-900 dark:hover:text-white">
-              Contact
-            </Link>
-            <Link href="/privacy" className="transition hover:text-slate-900 dark:hover:text-white">
-              Privacy
-            </Link>
-            <div className="flex items-center gap-3">
-              <Link href="mailto:hello@kanvaro.com" className="transition hover:text-slate-900 dark:hover:text-white">
-                <Mail className="h-4 w-4" />
+      <footer className="bg-[#02040b] px-6 py-16 text-sm text-white/80 dark:bg-[#010208]">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-5 mb-12">
+            {/* Company Info */}
+            <div className="lg:col-span-2">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#7bffde] to-[#7afdea] shadow-lg shadow-[#7bffde]/30">
+                  <Zap className="h-5 w-5 text-slate-900" />
+                </div>
+                <span className="text-xl font-bold text-white">Kanvaro</span>
+              </div>
+              <p className="text-sm text-white/70 leading-relaxed max-w-md">
+                The complete project management platform for modern teams. Built for agile workflows, time tracking, and financial management.
+              </p>
+            </div>
+
+            {/* Product Column */}
+            <div>
+              <h3 className="font-semibold text-white mb-4">Product</h3>
+              <ul className="space-y-3">
+                <li>
+                  <Link href="/tasks" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    Task Management
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/projects" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    Projects
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/time-tracking" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    Time Tracking
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/reports" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    Reports & Analytics
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Resources Column */}
+            <div>
+              <h3 className="font-semibold text-white mb-4">Resources</h3>
+              <ul className="space-y-3">
+                <li>
+                  <Link href="/docs/public/user-guide" target="_blank" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    Documentation
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/docs/public/installation" target="_blank" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    Docker Deployment
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/docs/public/user-guide" target="_blank" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    Setup Wizard Guide
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/docs/public/installation" target="_blank" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    Database Setup
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Self-Hosting Column */}
+            <div>
+              <h3 className="font-semibold text-white mb-4">Self-Hosting</h3>
+              <ul className="space-y-3">
+                <li>
+                  <Link href="/docs/public/installation" target="_blank" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    Deployment Guide
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/docs/public/user-guide" target="_blank" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    Setup Wizard
+                  </Link>
+                </li>
+                <li>
+                  <Link href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    GitHub Repository
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/docs/public/installation" target="_blank" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    API Reference
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Bottom Section */}
+          <div className="border-t border-white/10 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-white/60 text-xs">
+              © {new Date().getFullYear()} Kanvaro. All rights reserved.
+            </p>
+            <div className="flex items-center gap-4">
+              <Link 
+                href="https://github.com" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-white/70 hover:text-[#7bffde] transition-colors"
+                aria-label="GitHub"
+              >
+                <Github className="h-5 w-5" />
               </Link>
-              <Link href="tel:+1800123456" className="transition hover:text-slate-900 dark:hover:text-white">
-                <Phone className="h-4 w-4" />
+              <Link 
+                href="https://www.twitter.com" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-white/70 hover:text-[#7bffde] transition-colors"
+                aria-label="Twitter"
+              >
+                <Twitter className="h-5 w-5" />
               </Link>
-              <Link href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer" className="transition hover:text-slate-900 dark:hover:text-white">
-                <Linkedin className="h-4 w-4" />
+              <Link 
+                href="https://www.linkedin.com" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-white/70 hover:text-[#7bffde] transition-colors"
+                aria-label="LinkedIn"
+              >
+                <Linkedin className="h-5 w-5" />
               </Link>
-              <Link href="https://www.twitter.com" target="_blank" rel="noopener noreferrer" className="transition hover:text-slate-900 dark:hover:text-white">
-                <Twitter className="h-4 w-4" />
+              <Link 
+                href="mailto:hello@kanvaro.com" 
+                className="text-white/70 hover:text-[#7bffde] transition-colors"
+                aria-label="Email"
+              >
+                <Mail className="h-5 w-5" />
               </Link>
             </div>
           </div>
