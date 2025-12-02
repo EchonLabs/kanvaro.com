@@ -169,8 +169,8 @@ export default function MembersPage() {
         setError('')
         // Switch to Pending Invitations tab
         setActiveTab('invitations')
-        // Clear success message after 5 seconds
-        setTimeout(() => setSuccess(''), 5000)
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(''), 3000)
         // Refresh authentication state and then fetch members
         await checkAuth()
         await fetchMembers()
@@ -238,7 +238,7 @@ export default function MembersPage() {
       if (data.success) {
         setSuccess('Invitation cancelled successfully!')
         setError('')
-        setTimeout(() => setSuccess(''), 5000)
+        setTimeout(() => setSuccess(''), 3000)
         fetchMembers()
       } else {
         setError(data.error || 'Failed to cancel invitation')

@@ -700,8 +700,12 @@ export async function DELETE(
       )
     }
 
-    // Invalidate tasks cache for this organization
-    await invalidateCache(`tasks:*:org:${organizationId}:*`)
+    // Invalidate tasks cache for this organization (non-blocking)
+    // Don't await to avoid blocking the response
+    invalidateCache(`tasks:*:org:${organizationId}:*`).catch(error => {
+      console.error('Cache invalidation error:', error)
+      // Silently fail - cache will expire naturally
+    })
 
     return NextResponse.json({
       success: true,

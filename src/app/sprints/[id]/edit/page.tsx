@@ -314,7 +314,7 @@ export default function EditSprintPage() {
       setTimeout(() => {
         messageContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 50)
-      const timeout = setTimeout(() => setSuccessMessage(''), 4000)
+      const timeout = setTimeout(() => setSuccessMessage(''), 3000)
       return () => clearTimeout(timeout)
     }
   }, [successMessage])

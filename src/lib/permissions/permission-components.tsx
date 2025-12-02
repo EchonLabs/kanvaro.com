@@ -18,14 +18,15 @@ export function PermissionGate({
   fallback = null, 
   children 
 }: PermissionGateProps) {
-  const { hasPermission, loading } = usePermissions();
+  const { hasPermission, loading, permissions } = usePermissions();
   
   // Show children while loading to prevent content flicker
-  // Once loaded, check permissions and hide if not granted
-  if (loading) {
+  // Also show if permissions haven't been loaded yet (optimistic rendering)
+  if (loading || !permissions) {
     return <>{children}</>;
   }
   
+  // Once loaded, check permissions and hide if not granted
   if (hasPermission(permission, projectId)) {
     return <>{children}</>;
   }
