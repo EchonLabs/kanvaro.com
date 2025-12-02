@@ -1,3 +1,17 @@
+## [1.10.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.10.5...v1.10.6) (2025-12-02)
+
+
+### Bug Fixes
+
+* add changes in task ([d737f81](https://github.com/EchonLabs/kanvaro.com/commit/d737f8188110bc2a2021578ee48cdecae4526504))
+
+## [1.10.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.10.4...v1.10.5) (2025-12-02)
+
+
+### Bug Fixes
+
+* add landing page changes ([957da96](https://github.com/EchonLabs/kanvaro.com/commit/957da96080229254069df1a71cb72a466e869693))
+
 ## [1.10.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.10.3...v1.10.4) (2025-12-01)
 
 

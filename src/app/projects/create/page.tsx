@@ -156,7 +156,7 @@ export default function CreateProjectPage() {
         break
       case 2: // Timeline
         if (!formData.startDate) {
-          errors.startDate = 'Start date is required'
+          errors.startDate = 'Start Date is required'
         }
         if (formData.startDate && formData.endDate) {
           const startDate = new Date(formData.startDate)
@@ -250,7 +250,7 @@ export default function CreateProjectPage() {
       
       // Validate Step 2: Timeline
       if (!formData.startDate) {
-        errors.startDate = 'Start date is required'
+        errors.startDate = 'Start Date is required'
       }
       if (formData.startDate && formData.endDate) {
         const startDate = new Date(formData.startDate)
@@ -367,7 +367,7 @@ export default function CreateProjectPage() {
     
     if (fieldName === 'startDate') {
       if (!value) {
-        errors.startDate = 'Start date is required'
+        errors.startDate = 'Start Date is required'
       } else {
         delete errors.startDate
       }
@@ -470,7 +470,7 @@ export default function CreateProjectPage() {
     setShowMemberSearch(false)
     setMemberSearchQuery('')
     setSuccess('Team member added successfully')
-    setTimeout(() => setSuccess(''), 2000)
+    setTimeout(() => setSuccess(''), 3000)
   }
 
   // Remove team member
@@ -499,7 +499,7 @@ export default function CreateProjectPage() {
     setShowClientSearch(false)
     setClientSearchQuery('')
     setSuccess('Client assigned successfully')
-    setTimeout(() => setSuccess(''), 2000)
+    setTimeout(() => setSuccess(''), 3000)
   }
 
   // Remove client

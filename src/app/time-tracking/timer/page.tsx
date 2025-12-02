@@ -368,12 +368,12 @@ export default function TimerPage() {
       const data = await response.json()
       if (data.success && Array.isArray(data.data)) {
         const effectiveUser = currentUser ?? user
-        const filtered = data.data.filter((project: any) => {
-          const u = effectiveUser
-          if (!u) return false
-          const allow = project?.settings?.allowTimeTracking
-          if (!allow) return false
-          const createdByMatch = project?.createdBy === u.id || project?.createdBy?.id === u.id
+      const filtered = data.data.filter((project: any) => {
+        const u = effectiveUser
+        if (!u) return false
+        const allow = project?.settings?.allowTimeTracking
+        if (allow !== true) return false
+        const createdByMatch = project?.createdBy === u.id || project?.createdBy?.id === u.id
           const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
           const teamMatch = teamMembers.some((memberId: any) => {
             if (typeof memberId === 'string') return memberId === u.id

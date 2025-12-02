@@ -687,7 +687,7 @@ export default function TasksClient({
                 setShowDeleteConfirmModal(false)
                 setSelectedTask(null)
                 setSuccess('Task deleted successfully.')
-                setTimeout(() => setSuccess(''), 4000)
+                setTimeout(() => setSuccess(''), 3000)
             } else {
                 setError(data.error || 'Failed to delete task')
             }

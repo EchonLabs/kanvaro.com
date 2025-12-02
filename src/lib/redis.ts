@@ -62,12 +62,41 @@ export async function cache<T>(
 export async function invalidateCache(pattern: string) {
   try {
     const client = await getRedisClient()
-    const keys = await client.keys(pattern)
     
-    if (keys.length > 0) {
-      await client.del(keys)
+    // Try to use SCAN first (non-blocking, more efficient)
+    // Fall back to KEYS if SCAN is not available
+    try {
+      const keys: string[] = []
+      let cursor = 0
+      
+      do {
+        const result = await client.scan(cursor, {
+          MATCH: pattern,
+          COUNT: 100
+        })
+        cursor = typeof result.cursor === 'string' ? parseInt(result.cursor, 10) : result.cursor
+        keys.push(...(result.keys || []))
+        
+        // Safety limit
+        if (keys.length > 5000) break
+      } while (cursor !== 0)
+      
+      if (keys.length > 0) {
+        // Delete in batches
+        for (let i = 0; i < keys.length; i += 100) {
+          const batch = keys.slice(i, i + 100)
+          await client.del(batch)
+        }
+      }
+    } catch (scanError) {
+      // Fallback to KEYS if SCAN fails (less efficient but works)
+      const keys = await client.keys(pattern)
+      if (keys.length > 0) {
+        await client.del(keys)
+      }
     }
   } catch (error) {
+    // Silently fail - cache will expire naturally
     // console.error('Cache invalidation error:', error)
   }
 }

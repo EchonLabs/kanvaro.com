@@ -140,7 +140,7 @@ export default function OrganizationSettingsPage() {
 
       if (data.success) {
         setSuccess('Organization settings updated successfully!')
-        setTimeout(() => setSuccess(''), 5000)
+        setTimeout(() => setSuccess(''), 3000)
         fetchOrganization()
       } else {
         setError(data.error || 'Failed to update organization settings')
