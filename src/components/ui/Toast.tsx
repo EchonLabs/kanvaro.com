@@ -30,6 +30,9 @@ export function useToast() {
   return context
 }
 
+// Consistent toast duration across the system (3 seconds)
+export const TOAST_DURATION = 3000
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
 
@@ -38,7 +41,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     const newToast: Toast = {
       ...toast,
       id,
-      duration: toast.duration ?? 5000
+      duration: toast.duration ?? TOAST_DURATION
     }
     
     setToasts((prev) => [...prev, newToast])

@@ -691,13 +691,28 @@ export default function CreateTaskPage() {
                           </SelectTrigger>
                           <SelectContent className="z-[10050] p-0">
                             <div className="p-2">
-                              <Input
-                                value={assigneeQuery}
-                                onChange={e => setAssigneeQuery(e.target.value)}
-                                onKeyDown={(e) => e.stopPropagation()}
-                                placeholder={loadingProjectMembers ? 'Loading members...' : 'Type to search team members'}
-                                className="mb-2"
-                              />
+                              <div className="relative mb-2">
+                                <Input
+                                  value={assigneeQuery}
+                                  onChange={e => setAssigneeQuery(e.target.value)}
+                                  onKeyDown={(e) => e.stopPropagation()}
+                                  placeholder={loadingProjectMembers ? 'Loading members...' : 'Type to search team members'}
+                                  className="pr-8"
+                                />
+                                {assigneeQuery && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setAssigneeQuery('')
+                                    }}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded-sm p-0.5"
+                                    aria-label="Clear search"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </div>
                               <div className="max-h-56 overflow-y-auto">
                                 {loadingProjectMembers ? (
                                   <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">

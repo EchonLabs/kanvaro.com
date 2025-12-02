@@ -245,6 +245,7 @@ export function usePermissions() {
     canAccessProject: context.canAccessProject,
     canManageProject: context.canManageProject,
     accessibleProjects: context.permissions?.accessibleProjects || [],
+    permissions: context.permissions,
     loading: context.loading,
     error: context.error
   };
