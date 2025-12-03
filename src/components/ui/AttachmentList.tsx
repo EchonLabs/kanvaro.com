@@ -131,6 +131,7 @@ export function AttachmentList({
               <div className="flex items-center space-x-1">
                 {isImage(attachment.type) && (
                   <Button
+                    type="button"
                     variant="ghost"
                     size="sm"
                     onClick={() => handlePreview(attachment)}
@@ -141,6 +142,7 @@ export function AttachmentList({
                 )}
                 
                 <Button
+                  type="button"
                   variant="ghost"
                   size="sm"
                   onClick={() => handleDownload(attachment)}
@@ -151,6 +153,7 @@ export function AttachmentList({
                 
                 {canDelete && onDelete && (
                   <Button
+                    type="button"
                     variant="ghost"
                     size="sm"
                     onClick={() => onDelete(index)}
@@ -170,6 +173,7 @@ export function AttachmentList({
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
           <div className="relative max-w-4xl max-h-[90vh] p-4">
             <Button
+              type="button"
               variant="ghost"
               size="sm"
               onClick={() => setPreviewUrl(null)}

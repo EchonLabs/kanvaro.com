@@ -21,6 +21,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { PermissionGate } from '@/lib/permissions'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { usePermissions } from '@/lib/permissions/permission-context'
 
 interface TeamMember {
   _id: string
@@ -60,6 +61,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [projectRoles, setProjectRoles] = useState<ProjectRole[]>([])
   const [availableMembers, setAvailableMembers] = useState<TeamMember[]>([])
+  const [organizationRoles, setOrganizationRoles] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -72,6 +74,8 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
   const [isRemoving, setIsRemoving] = useState(false)
   const pageRef = useRef<HTMLDivElement | null>(null)
   const addMemberSectionRef = useRef<HTMLDivElement | null>(null)
+  const { hasPermission } = usePermissions()
+  const canManageOrgRoles = hasPermission(Permission.USER_MANAGE_ROLES)
 
   const scrollToAddMemberSection = () => {
     if (addMemberSectionRef.current) {
@@ -82,6 +86,27 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
   useEffect(() => {
     fetchTeamData()
   }, [projectId])
+
+  // Load organization/system roles for inline role selection
+  useEffect(() => {
+    const loadRoles = async () => {
+      try {
+        const res = await fetch('/api/roles')
+        const data = await res.json()
+        if (data.success && Array.isArray(data.data)) {
+          const allRoles = data.data.map((role: any) => ({
+            id: role._id,
+            name: role.name,
+          }))
+          setOrganizationRoles(allRoles)
+        }
+      } catch (err) {
+        console.error('Failed to load organization roles for project team', err)
+      }
+    }
+
+    loadRoles()
+  }, [])
 
   const fetchTeamData = async () => {
     try {
@@ -180,6 +205,40 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
       setError('Failed to remove team member')
     } finally {
       setIsRemoving(false)
+    }
+  }
+
+  // Inline update of a member's organization role, reflected in users/members collection
+  const handleInlineOrgRoleChange = async (memberId: string, newRole: string) => {
+    if (!memberId || !newRole) return
+
+    try {
+      setError('')
+      const response = await fetch('/api/members', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          memberId,
+          updates: { role: newRole },
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setSuccess('Member role updated successfully')
+        // Refresh team so project roles and org roles are in sync
+        fetchTeamData()
+        onUpdate()
+        setTimeout(() => setSuccess(''), 3000)
+      } else {
+        setError(data.error || 'Failed to update member role')
+      }
+    } catch (err) {
+      console.error('Failed to update member role from project team tab', err)
+      setError('Failed to update member role')
     }
   }
 
@@ -444,13 +503,9 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                 const lastName = memberData.lastName || member.lastName || ''
                 const email = memberData.email || member.email || ''
                 const avatar = memberData.avatar || member.avatar
+                const organizationRole = memberData.role || member.role
                 
-                console.log('Rendering team member:', member)
-                console.log('Member data:', memberData)
-                console.log('Member firstName:', firstName)
-                console.log('Member lastName:', lastName)
-                console.log('Member email:', email)
-                
+               
                 const memberRole = getMemberRole(memberId)
                 
                 return (
@@ -474,9 +529,33 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                       </p>
                       <p className="text-sm text-muted-foreground">{email}</p>
                     </div>
-                    <Badge className={getRoleColor(memberRole)}>
-                      {getRoleDisplayName(memberRole)}
-                    </Badge>
+
+                    <div className="flex items-center gap-2">
+                      <Badge className={getRoleColor(memberRole)}>
+                        {getRoleDisplayName(memberRole)}
+                      </Badge>
+
+                      {/* Organization role selector (Admin / PM / Team Member / Client / Viewer / HR, etc.) */}
+                      {organizationRoles.length > 0 && (
+                        <Select
+                          value={organizationRole || ''}
+                          onValueChange={(value) => handleInlineOrgRoleChange(memberId, value)}
+                          disabled={!canManageOrgRoles}
+                        >
+                          <SelectTrigger className="h-8 w-[150px] text-xs sm:text-sm">
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {organizationRoles.map((role) => (
+                              <SelectItem key={role.id} value={role.id}>
+                                {role.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+
                     <PermissionGate permission={Permission.PROJECT_MANAGE_TEAM} projectId={projectId}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

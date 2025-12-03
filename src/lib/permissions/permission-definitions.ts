@@ -95,6 +95,8 @@ export enum Permission {
   TIME_TRACKING_APPROVE = 'time_tracking:approve',
   TIME_TRACKING_EXPORT = 'time_tracking:export',
   TIME_TRACKING_VIEW_ALL = 'time_tracking:view_all',
+  // View time of users assigned to you (as PM or HR partner)
+  TIME_TRACKING_VIEW_ASSIGNED = 'time_tracking:view_assigned',
   TIME_TRACKING_EMPLOYEE_FILTER_READ = 'time_tracking:employee_filter:read',
   
   // Financial permissions
@@ -176,6 +178,7 @@ export enum Permission {
 export enum Role {
   SUPER_ADMIN = 'super_admin',
   ADMIN = 'admin',
+  HUMAN_RESOURCE = 'human_resource',
   PROJECT_MANAGER = 'project_manager',
   TEAM_MEMBER = 'team_member',
   CLIENT = 'client',
@@ -307,6 +310,139 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.BACKLOG_MANAGE,
 
     // Test management
+    Permission.TEST_SUITE_CREATE,
+    Permission.TEST_SUITE_READ,
+    Permission.TEST_SUITE_UPDATE,
+    Permission.TEST_SUITE_DELETE,
+    Permission.TEST_CASE_CREATE,
+    Permission.TEST_CASE_READ,
+    Permission.TEST_CASE_UPDATE,
+    Permission.TEST_CASE_DELETE,
+    Permission.TEST_PLAN_CREATE,
+    Permission.TEST_PLAN_READ,
+    Permission.TEST_PLAN_UPDATE,
+    Permission.TEST_PLAN_DELETE,
+    Permission.TEST_PLAN_MANAGE,
+    Permission.TEST_EXECUTION_CREATE,
+    Permission.TEST_EXECUTION_READ,
+    Permission.TEST_EXECUTION_UPDATE,
+    Permission.TEST_REPORT_VIEW,
+    Permission.TEST_REPORT_EXPORT,
+  ],
+
+  // Human Resource role - currently has the same permissions as ADMIN.
+  // This can be fine-tuned later as needed.
+  [Role.HUMAN_RESOURCE]: [
+    // User management
+    Permission.USER_CREATE,
+    Permission.USER_READ,
+    Permission.USER_UPDATE,
+    Permission.USER_DELETE,
+    Permission.USER_INVITE,
+    Permission.USER_ACTIVATE,
+    Permission.USER_DEACTIVATE,
+    Permission.USER_MANAGE_ROLES,
+    
+    // Organization
+    Permission.ORGANIZATION_READ,
+    Permission.ORGANIZATION_UPDATE,
+    Permission.ORGANIZATION_MANAGE_SETTINGS,
+    Permission.ORGANIZATION_MANAGE_BILLING,
+    
+    // Projects (can see all projects)
+    Permission.PROJECT_CREATE,
+    Permission.PROJECT_READ,
+    Permission.PROJECT_UPDATE,
+    Permission.PROJECT_DELETE,
+    Permission.PROJECT_MANAGE_TEAM,
+    Permission.PROJECT_MANAGE_BUDGET,
+    Permission.PROJECT_ARCHIVE,
+    Permission.PROJECT_RESTORE,
+    Permission.PROJECT_VIEW_ALL,
+    
+    // Tasks
+    Permission.TASK_CREATE,
+    Permission.TASK_READ,
+    Permission.TASK_UPDATE,
+    Permission.TASK_DELETE,
+    Permission.TASK_ASSIGN,
+    Permission.TASK_CHANGE_STATUS,
+    Permission.TASK_MANAGE_COMMENTS,
+    Permission.TASK_MANAGE_ATTACHMENTS,
+    
+    // Team
+    Permission.TEAM_READ,
+    Permission.TEAM_INVITE,
+    Permission.TEAM_REMOVE,
+    Permission.TEAM_MANAGE_PERMISSIONS,
+    Permission.TEAM_VIEW_ACTIVITY,
+    
+    // Time tracking
+    Permission.TIME_TRACKING_CREATE,
+    Permission.TIME_TRACKING_READ,
+    Permission.TIME_TRACKING_UPDATE,
+    Permission.TIME_TRACKING_DELETE,
+    Permission.TIME_TRACKING_APPROVE,
+    Permission.TIME_TRACKING_EXPORT,
+    Permission.TIME_TRACKING_VIEW_ASSIGNED,
+    Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
+    
+    // Financial
+    Permission.FINANCIAL_READ,
+    Permission.FINANCIAL_MANAGE_BUDGET,
+    Permission.FINANCIAL_CREATE_EXPENSE,
+    Permission.FINANCIAL_APPROVE_EXPENSE,
+    Permission.FINANCIAL_CREATE_INVOICE,
+    Permission.FINANCIAL_SEND_INVOICE,
+    Permission.FINANCIAL_MANAGE_PAYMENTS,
+    
+    // Reporting
+    Permission.REPORTING_VIEW,
+    Permission.REPORTING_CREATE,
+    Permission.REPORTING_EXPORT,
+    Permission.REPORTING_SHARE,
+    
+    // Settings
+    Permission.SETTINGS_READ,
+    Permission.SETTINGS_UPDATE,
+    Permission.SETTINGS_MANAGE_EMAIL,
+    Permission.SETTINGS_MANAGE_DATABASE,
+    Permission.SETTINGS_MANAGE_SECURITY,
+    
+    // Epics
+    Permission.EPIC_CREATE,
+    Permission.EPIC_READ,
+    Permission.EPIC_UPDATE,
+    Permission.EPIC_DELETE,
+    
+    // Sprints
+    Permission.SPRINT_CREATE,
+    Permission.SPRINT_READ,
+    Permission.SPRINT_UPDATE,
+    Permission.SPRINT_DELETE,
+    Permission.SPRINT_MANAGE,
+    
+    // Stories
+    Permission.STORY_CREATE,
+    Permission.STORY_READ,
+    Permission.STORY_UPDATE,
+    Permission.STORY_DELETE,
+    
+    // Calendar
+    Permission.CALENDAR_READ,
+    Permission.CALENDAR_CREATE,
+    Permission.CALENDAR_UPDATE,
+    Permission.CALENDAR_DELETE,
+    
+    // Kanban
+    Permission.KANBAN_READ,
+    Permission.KANBAN_MANAGE,
+    
+    // Backlog
+    Permission.BACKLOG_READ,
+    Permission.BACKLOG_MANAGE,
+    
+    // Test Management
     Permission.TEST_SUITE_CREATE,
     Permission.TEST_SUITE_READ,
     Permission.TEST_SUITE_UPDATE,
@@ -712,6 +848,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.TIME_TRACKING_READ,
     Permission.TIME_TRACKING_APPROVE,
     Permission.TIME_TRACKING_EXPORT,
+    Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
     Permission.FINANCIAL_READ,
     Permission.FINANCIAL_MANAGE_BUDGET,
     Permission.EPIC_CREATE,
@@ -876,6 +1013,7 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.PROJECT_VIEW_ALL,
     Permission.TEAM_INVITE, // Organization-wide permission to invite team members
     Permission.TIME_TRACKING_VIEW_ALL,
+    Permission.TIME_TRACKING_VIEW_ASSIGNED,
     Permission.FINANCIAL_READ,
     Permission.REPORTING_VIEW,
     Permission.REPORTING_CREATE,

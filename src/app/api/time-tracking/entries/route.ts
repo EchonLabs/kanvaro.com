@@ -7,6 +7,13 @@ import { User } from '@/models/User'
 import { Organization } from '@/models/Organization'
 import { Task } from '@/models/Task'
 import { applyRoundingRules } from '@/lib/utils'
+import { cookies } from 'next/headers'
+import jwt from 'jsonwebtoken'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionService } from '@/lib/permissions/permission-service'
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,14 +32,85 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
 
-    if (!userId || !organizationId) {
+    if (!organizationId) {
       return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 })
     }
+    const orgId = organizationId as string
 
-    // Build query
+    // Authenticate viewer from cookies
+    const cookieStore = cookies()
+    const accessToken = cookieStore.get('accessToken')?.value
+    const refreshToken = cookieStore.get('refreshToken')?.value
+
+    if (!accessToken && !refreshToken) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    let viewer: any = null
+    let viewerId: string = ''
+    try {
+      if (accessToken) {
+        const decoded: any = jwt.verify(accessToken, JWT_SECRET)
+        viewer = await User.findById(decoded.userId)
+      }
+    } catch {}
+    if (!viewer && refreshToken) {
+      try {
+        const decoded: any = jwt.verify(refreshToken, JWT_REFRESH_SECRET)
+        viewer = await User.findById(decoded.userId)
+      } catch {}
+    }
+    if (!viewer || !viewer.isActive) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    viewerId = viewer._id.toString()
+
+    // Build base query
     const query: any = {
-      user: userId,
-      organization: organizationId
+      organization: orgId
+    }
+
+    // Determine user scoping based on permissions and partner assignments
+    const hasViewAll = await PermissionService.hasPermission(viewerId, Permission.TIME_TRACKING_VIEW_ALL)
+    const hasViewAssigned = await PermissionService.hasPermission(viewerId, Permission.TIME_TRACKING_VIEW_ASSIGNED)
+
+    if (userId) {
+      // Targeting a specific user
+      const isSelf = userId === viewerId
+      if (!isSelf && !hasViewAll) {
+        if (hasViewAssigned) {
+          const target = await User.findById(userId).select('organization projectManager humanResourcePartner')
+          const sameOrg = target && target.organization && target.organization.toString() === orgId
+          const isAssigned = target && (
+            (target.projectManager && target.projectManager.toString() === viewerId) ||
+            (target.humanResourcePartner && target.humanResourcePartner.toString() === viewerId)
+          )
+          if (!sameOrg || !isAssigned) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+          }
+        } else {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+      }
+      query.user = userId
+    } else {
+      // No explicit user requested
+      if (hasViewAll) {
+        // no user filter
+      } else if (hasViewAssigned) {
+        const assignedUsers = await User.find({
+          organization: orgId,
+          $or: [
+            { projectManager: viewer._id },
+            { humanResourcePartner: viewer._id }
+          ]
+        }).select('_id')
+        const ids = assignedUsers.map((u: any) => u._id.toString())
+        query.user = { $in: ids.length > 0 ? ids : ['__none__'] }
+      } else {
+        // Only own logs
+        query.user = viewerId
+      }
     }
 
     if (projectId) query.project = projectId
@@ -76,6 +154,7 @@ export async function GET(request: NextRequest) {
     const timeEntries = await TimeEntry.find(query)
       .populate('project', 'name')
       .populate({ path: 'task', model: Task, select: 'title' })
+      .populate('user', 'firstName lastName email')
       .populate('approvedBy', 'firstName lastName')
       .sort({ startTime: -1 })
       .skip(skip)
@@ -98,8 +177,14 @@ export async function GET(request: NextRequest) {
         ? { _id: entry.task._id || entry.task, title: null } // Task reference exists but document deleted
         : null
       
+      // Populate user minimal fields for display
+      const user = entry.user && typeof entry.user === 'object' && (entry.user.firstName !== undefined || entry.user.lastName !== undefined)
+        ? { _id: entry.user._id || entry.user, firstName: entry.user.firstName || '', lastName: entry.user.lastName || '' }
+        : { _id: (entry.user && entry.user._id) || entry.user, firstName: '', lastName: '' }
+      
       return {
         ...entry,
+        user,
         project,
         task
       }

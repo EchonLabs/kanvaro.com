@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
@@ -9,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogBody } from '@/components/ui/Dialog'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
-import { CalendarIcon, Loader2 } from 'lucide-react'
+import { CalendarIcon, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react'
 import { format } from 'date-fns'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 interface SprintEvent {
   _id: string
@@ -70,12 +72,36 @@ interface EditSprintEventModalProps {
 }
 
 export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEventModalProps) {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState('')
+  const [error, setError] = useState('')
   const [users, setUsers] = useState<User[]>([])
   const [selectedDate, setSelectedDate] = useState<Date>(new Date(event.scheduledDate))
   const [actualDate, setActualDate] = useState<Date | undefined>(
     event.actualDate ? new Date(event.actualDate) : undefined
   )
+  
+  // Store initial state to compare changes
+  const initialFormData = {
+    title: event.title,
+    description: event.description || '',
+    duration: event.duration,
+    status: event.status,
+    attendees: event.attendees.map(a => (a as any)._id).sort(),
+    location: event.location || '',
+    meetingLink: event.meetingLink || '',
+    outcomes: event.outcomes || {
+      decisions: [],
+      actionItems: [],
+      notes: '',
+      velocity: undefined,
+      capacity: undefined
+    }
+  }
+  const initialSelectedDate = new Date(event.scheduledDate)
+  const initialActualDate = event.actualDate ? new Date(event.actualDate) : undefined
+  
   const [formData, setFormData] = useState({
     title: event.title,
     description: event.description || '',
@@ -138,14 +164,28 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
       })
 
       if (response.ok) {
+        setSuccess('Sprint Event updated successfully')
+        setError('')
+        setLoading(false)
         onSuccess()
+        // Show success message briefly before closing and redirecting
+        setTimeout(() => {
+          setSuccess('')
+          onClose()
+          router.push('/sprint-events?success=updated')
+        }, 2500)
       } else {
-        const error = await response.json()
-        console.error('Error updating sprint event:', error)
+        const errorData = await response.json()
+        const errorMessage = errorData.error || 'Failed to update event'
+        console.error('Error updating sprint event:', errorData)
+        setError(errorMessage)
+        setSuccess('')
+        setLoading(false)
       }
-    } catch (error) {
-      console.error('Error updating sprint event:', error)
-    } finally {
+    } catch (err) {
+      console.error('Error updating sprint event:', err)
+      setError('Failed to update event. Please try again.')
+      setSuccess('')
       setLoading(false)
     }
   }
@@ -243,9 +283,87 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
     }))
   }
 
+  // Check if any changes have been made
+  const hasChanges = () => {
+    // Compare dates
+    const scheduledDateChanged = selectedDate.getTime() !== initialSelectedDate.getTime()
+    const actualDateChanged = 
+      (actualDate === undefined && initialActualDate !== undefined) ||
+      (actualDate !== undefined && initialActualDate === undefined) ||
+      (actualDate && initialActualDate && actualDate.getTime() !== initialActualDate.getTime())
+    
+    if (scheduledDateChanged || actualDateChanged) {
+      return true
+    }
+
+    // Compare form data fields
+    if (
+      formData.title !== initialFormData.title ||
+      formData.description !== initialFormData.description ||
+      formData.duration !== initialFormData.duration ||
+      formData.status !== initialFormData.status ||
+      formData.location !== initialFormData.location ||
+      formData.meetingLink !== initialFormData.meetingLink
+    ) {
+      return true
+    }
+
+    // Compare attendees (order-independent)
+    const currentAttendees = [...formData.attendees].sort()
+    const initialAttendees = [...initialFormData.attendees].sort()
+    if (currentAttendees.length !== initialAttendees.length ||
+        currentAttendees.some((id, index) => id !== initialAttendees[index])) {
+      return true
+    }
+
+    // Compare outcomes
+    const outcomes = formData.outcomes
+    const initialOutcomes = initialFormData.outcomes
+
+    // Compare decisions
+    if (outcomes.decisions.length !== initialOutcomes.decisions.length ||
+        outcomes.decisions.some((d, i) => d !== initialOutcomes.decisions[i])) {
+      return true
+    }
+
+    // Compare notes
+    if (outcomes.notes !== initialOutcomes.notes) {
+      return true
+    }
+
+    // Compare velocity and capacity
+    if (outcomes.velocity !== initialOutcomes.velocity ||
+        outcomes.capacity !== initialOutcomes.capacity) {
+      return true
+    }
+
+    // Compare action items
+    if (outcomes.actionItems.length !== initialOutcomes.actionItems.length) {
+      return true
+    }
+    
+    for (let i = 0; i < outcomes.actionItems.length; i++) {
+      const item = outcomes.actionItems[i]
+      const initialItem = initialOutcomes.actionItems[i]
+      if (
+        item.description !== initialItem.description ||
+        item.assignedTo !== initialItem.assignedTo ||
+        item.dueDate !== initialItem.dueDate ||
+        item.status !== initialItem.status
+      ) {
+        return true
+      }
+    }
+
+    return false
+  }
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh]">
+      <DialogContent 
+        className="sm:max-w-[700px] max-h-[90vh]"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Edit Sprint Event</DialogTitle>
           <DialogDescription>
@@ -255,6 +373,31 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
 
         <DialogBody>
           <form onSubmit={handleSubmit} className="space-y-4" id="edit-sprint-event-form">
+            {success && (
+              <Alert variant="success" className="flex items-center justify-between pr-2">
+                <AlertDescription className="flex-1 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  {success}
+                </AlertDescription>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40"
+                  onClick={() => {
+                    setSuccess('')
+                    onClose()
+                  }}
+                >
+                  <X className="h-4 w-4 text-green-700 dark:text-green-300" />
+                </Button>
+              </Alert>
+            )}
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="title">Event Title *</Label>
@@ -511,7 +654,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" form="edit-sprint-event-form" disabled={loading}>
+          <Button type="submit" form="edit-sprint-event-form" disabled={loading || !hasChanges()}>
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

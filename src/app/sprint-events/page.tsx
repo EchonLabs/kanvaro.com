@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useDebounce } from '@/hooks/useDebounce'
 import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -9,6 +10,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { Alert, AlertDescription } from '@/components/ui/Alert'
 import { 
   Calendar, 
   Clock, 
@@ -22,7 +24,9 @@ import {
   Edit,
   Trash2,
   Eye,
-  MoreVertical
+  MoreVertical,
+  X,
+  AlertCircle
 } from 'lucide-react'
 import { AddSprintEventModal } from '@/components/sprint-events/AddSprintEventModal'
 import { EditSprintEventModal } from '@/components/sprint-events/EditSprintEventModal'
@@ -90,6 +94,7 @@ interface Project {
 export default function SprintEventsPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, isLoading: authLoading, isAuthenticated } = useAuth()
   const projectId = params.id as string
   const [events, setEvents] = useState<SprintEvent[]>([])
@@ -100,9 +105,81 @@ export default function SprintEventsPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterProject, setFilterProject] = useState('all')
   const [projectQuery, setProjectQuery] = useState('')
+  
+  // Debounced search (300ms delay)
+  const debouncedSearchTerm = useDebounce(searchTerm, 300)
+  
+  // Request cancellation
+  const abortControllerRef = useRef<AbortController | null>(null)
+  
+  // Simple cache for API responses (2 minute TTL)
+  const cacheRef = useRef<{
+    events?: { data: SprintEvent[]; timestamp: number }
+    projects?: { data: Project[]; timestamp: number }
+  }>({})
+  const CACHE_DURATION = 2 * 60 * 1000 // 2 minutes
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingEvent, setEditingEvent] = useState<SprintEvent | null>(null)
+  const [success, setSuccess] = useState('')
+  const [error, setError] = useState('')
+
+  // Define fetch functions BEFORE useEffect that uses them
+  const fetchProjects = useCallback(async (signal?: AbortSignal) => {
+    // Check cache first
+    const cached = cacheRef.current.projects
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      setProjects(cached.data)
+      return
+    }
+    
+    try {
+      const response = await fetch('/api/projects', { signal })
+      if (signal?.aborted) return
+      
+      if (response.ok) {
+        const data = await response.json()
+        const projectsData = data.projects || []
+        setProjects(projectsData)
+        // Update cache
+        cacheRef.current.projects = { data: projectsData, timestamp: Date.now() }
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
+      console.error('Error fetching projects:', error)
+    }
+  }, [])
+
+  const fetchSprintEvents = useCallback(async (signal?: AbortSignal) => {
+    try {
+      setLoading(true)
+      const url = projectId ? `/api/sprint-events?projectId=${projectId}` : '/api/sprint-events'
+      
+      // Check cache first
+      const cacheKey = projectId || 'all'
+      const cached = cacheRef.current.events
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        setEvents(cached.data)
+        setLoading(false)
+        return
+      }
+      
+      const response = await fetch(url, { signal })
+      if (signal?.aborted) return
+      
+      if (response.ok) {
+        const data = await response.json()
+        setEvents(data)
+        // Update cache
+        cacheRef.current.events = { data, timestamp: Date.now() }
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
+      console.error('Error fetching sprint events:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [projectId])
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -112,41 +189,56 @@ export default function SprintEventsPage() {
   }, [authLoading, isAuthenticated, router])
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchSprintEvents()
+    if (!isAuthenticated) return
+    
+    // Cancel any pending requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      }
+    
+    abortControllerRef.current = new AbortController()
+    const signal = abortControllerRef.current.signal
+    
+    // Fetch data in parallel
+    const fetchAllData = async () => {
+      const promises: Promise<void>[] = [fetchSprintEvents(signal)]
       if (!projectId) {
-        fetchProjects()
+        promises.push(fetchProjects(signal))
       }
-    }
-  }, [projectId, isAuthenticated])
-
-  const fetchProjects = async () => {
-    try {
-      const response = await fetch('/api/projects')
-      if (response.ok) {
-        const data = await response.json()
-        setProjects(data.projects || [])
+      await Promise.all(promises)
       }
-    } catch (error) {
-      console.error('Error fetching projects:', error)
+    
+    fetchAllData()
+    
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
     }
   }
+  }, [projectId, isAuthenticated, fetchSprintEvents, fetchProjects])
 
-  const fetchSprintEvents = async () => {
-    try {
-      setLoading(true)
-      const url = projectId ? `/api/sprint-events?projectId=${projectId}` : '/api/sprint-events'
-      const response = await fetch(url)
-      if (response.ok) {
-        const data = await response.json()
-        setEvents(data)
-      }
-    } catch (error) {
-      console.error('Error fetching sprint events:', error)
-    } finally {
-      setLoading(false)
+  // Check for success/error messages from URL query parameters
+  useEffect(() => {
+    const successParam = searchParams?.get('success')
+    const errorParam = searchParams?.get('error')
+    
+    if (successParam === 'created') {
+      setSuccess('Sprint Event created successfully')
+      router.replace('/sprint-events', { scroll: false })
+      const timer = setTimeout(() => setSuccess(''), 5000)
+      return () => clearTimeout(timer)
+    } else if (successParam === 'updated') {
+      setSuccess('Sprint Event updated successfully')
+      router.replace('/sprint-events', { scroll: false })
+      const timer = setTimeout(() => setSuccess(''), 5000)
+      return () => clearTimeout(timer)
+    } else if (errorParam) {
+      setError(decodeURIComponent(errorParam))
+      router.replace('/sprint-events', { scroll: false })
+      const timer = setTimeout(() => setError(''), 5000)
+      return () => clearTimeout(timer)
     }
-  }
+  }, [searchParams, router])
 
   const handleEventAdded = () => {
     fetchSprintEvents()
@@ -248,15 +340,19 @@ export default function SprintEventsPage() {
     return dateStr
   }
 
-  const filteredEvents = events.filter(event => {
-    const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         event.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  // Optimized filtering with memoization and debouncing
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => {
+      const matchesSearch = !debouncedSearchTerm.trim() || 
+                           event.title.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                           event.description?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
     const matchesType = filterType === 'all' || event.eventType === filterType
     const matchesStatus = filterStatus === 'all' || event.status === filterStatus
     const matchesProject = filterProject === 'all' || event.project._id === filterProject
     
     return matchesSearch && matchesType && matchesStatus && matchesProject
   })
+  }, [events, debouncedSearchTerm, filterType, filterStatus, filterProject])
 
   if (authLoading) {
     return (
@@ -311,6 +407,47 @@ export default function SprintEventsPage() {
             Create Event
           </Button>
         </div>
+
+        {/* Success/Error Messages */}
+        {(success || error) && (
+          <Alert 
+            variant={success ? "success" : "destructive"}
+            className="flex items-center justify-between pr-2"
+          >
+            <AlertDescription className="flex-1 flex items-center gap-2">
+              {success ? (
+                <>
+                  <CheckCircle className="h-4 w-4" />
+                  {success}
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-4 w-4" />
+                  {error}
+                </>
+              )}
+            </AlertDescription>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-6 w-6 p-0 ${
+                success 
+                  ? "hover:bg-green-100 dark:hover:bg-green-900/40" 
+                  : "hover:bg-red-100 dark:hover:bg-red-900/40"
+              }`}
+              onClick={() => {
+                setSuccess('')
+                setError('')
+              }}
+            >
+              <X className={`h-4 w-4 ${
+                success 
+                  ? "text-green-700 dark:text-green-300" 
+                  : "text-red-700 dark:text-red-300"
+              }`} />
+            </Button>
+          </Alert>
+        )}
 
         {/* Filters */}
         <Card>
@@ -426,7 +563,11 @@ export default function SprintEventsPage() {
                 <TabsContent value="grid" className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredEvents.map((event) => (
-                      <Card key={event._id} className="hover:shadow-md transition-shadow">
+                      <Card 
+                        key={event._id} 
+                        className="hover:shadow-md transition-shadow cursor-pointer"
+                        onClick={() => router.push(`/sprint-events/${event._id}`)}
+                      >
                         <CardContent className="p-6">
                           <div className="space-y-4">
                             <div className="flex items-start justify-between">
@@ -441,7 +582,12 @@ export default function SprintEventsPage() {
                               </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -495,7 +641,11 @@ export default function SprintEventsPage() {
                 <TabsContent value="list" className="space-y-4">
                   <div className="space-y-4">
                     {filteredEvents.map((event) => (
-              <Card key={event._id} className="hover:shadow-md transition-shadow">
+              <Card 
+                key={event._id} 
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => router.push(`/sprint-events/${event._id}`)}
+              >
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4 flex-1 min-w-0">
@@ -521,7 +671,12 @@ export default function SprintEventsPage() {
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

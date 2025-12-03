@@ -46,6 +46,20 @@ interface Member {
   isActive: boolean
   createdAt: string
   lastLogin?: string
+  projectManager?: {
+    _id: string
+    firstName: string
+    lastName: string
+    email: string
+    role: string
+  }
+  humanResourcePartner?: {
+    _id: string
+    firstName: string
+    lastName: string
+    email: string
+    role: string
+  }
 }
 
 interface PendingInvitation {
@@ -87,6 +101,30 @@ export default function MembersPage() {
   const canInviteMembers = hasPermission(Permission.TEAM_INVITE) || hasPermission(Permission.USER_INVITE)
   const canEditMembers = hasPermission(Permission.USER_UPDATE)
   const canEditAdminMembers = hasPermission(Permission.USER_MANAGE_ROLES)
+  const [organizationRoles, setOrganizationRoles] = useState<Array<{ id: string; name: string }>>([])
+
+  // Load available organization (system) roles from the central roles API
+  useEffect(() => {
+    const loadRoles = async () => {
+      try {
+        const res = await fetch('/api/roles')
+        const data = await res.json()
+        if (data.success && Array.isArray(data.data)) {
+          const systemRoles = data.data
+            .filter((role: any) => role.isSystem)
+            .map((role: any) => ({
+              id: role._id,
+              name: role.name,
+            }))
+          setOrganizationRoles(systemRoles)
+        }
+      } catch (err) {
+        console.error('Failed to load organization roles', err)
+      }
+    }
+
+    loadRoles()
+  }, [])
 
   const checkAuth = useCallback(async () => {
     try {
@@ -283,6 +321,22 @@ export default function MembersPage() {
 
     return matchesSearch && matchesRole && matchesStatus
   })
+
+  const handleInlineRoleChange = async (member: Member, newRole: string) => {
+    if (newRole === member.role) return
+
+    // Prevent assigning admin role without proper permission
+    if (newRole === 'admin' && !canEditAdminMembers) {
+      setError('You do not have permission to assign admin role.')
+      setSuccess('')
+      return
+    }
+
+    await handleUpdateMember(member._id, { role: newRole })
+    // Optional inline success message
+    setSuccess('Member role updated successfully.')
+    setTimeout(() => setSuccess(''), 3000)
+  }
 
   // Generate a consistent color for custom roles based on their ID
   const getCustomRoleColor = (customRoleId: string): string => {
@@ -534,12 +588,43 @@ export default function MembersPage() {
                             </p>
                           </div>
                           <div className="w-full space-y-2">
-                            <Badge className={`${getRoleColor(member.role, member.customRole?._id)} text-xs sm:text-sm w-full justify-center py-1.5`}>
-                              {getMemberRoleLabel(member)}
-                            </Badge>
+                            <div className="flex items-center justify-center">
+                              {/* <Badge className={`${getRoleColor(member.role, member.customRole?._id)} text-xs sm:text-sm flex-shrink-0`}>
+                                {getMemberRoleLabel(member)}
+                              </Badge> */}
+                              {organizationRoles.length > 0 && (
+                                <Select
+                                  value={member.role}
+                                  onValueChange={(value) => handleInlineRoleChange(member, value)}
+                                  disabled={!canEditMemberRecord(member)}
+                                >
+                                  <SelectTrigger className="h-8 w-[140px] text-xs sm:text-sm">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {organizationRoles.map((role) => (
+                                      <SelectItem key={role.id} value={role.id}>
+                                        {role.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            </div>
                             <p className="text-xs text-muted-foreground">
                               Joined {new Date(member.createdAt).toLocaleDateString()}
                             </p>
+                            {/* Project Manager / HR partner info */}
+                            {member.role !== 'admin' && (!member.projectManager || !member.humanResourcePartner) && (
+                              <p className="text-xs text-amber-600 dark:text-amber-300">
+                                Project Manager and Human Resource Partner pending
+                              </p>
+                            )}
+                            {member.role !== 'admin' && member.projectManager && member.humanResourcePartner && (
+                              <p className="text-xs text-muted-foreground">
+                                PM: {member.projectManager.firstName} {member.projectManager.lastName} • HR: {member.humanResourcePartner.firstName} {member.humanResourcePartner.lastName}
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 w-full pt-2 border-t">
                             <Button
@@ -600,9 +685,38 @@ export default function MembersPage() {
                             <Badge className={`${getRoleColor(member.role, member.customRole?._id)} text-xs flex-shrink-0`}>
                               {getMemberRoleLabel(member)}
                             </Badge>
+                            {organizationRoles.length > 0 && (
+                              <Select
+                                value={member.role}
+                                onValueChange={(value) => handleInlineRoleChange(member, value)}
+                                disabled={!canEditMemberRecord(member)}
+                              >
+                                <SelectTrigger className="h-8 w-[140px] text-xs sm:text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {organizationRoles.map((role) => (
+                                    <SelectItem key={role.id} value={role.id}>
+                                      {role.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
                               Joined {new Date(member.createdAt).toLocaleDateString()}
                             </span>
+                            {/* Project Manager / HR partner info */}
+                            {member.role !== 'admin' && (!member.projectManager || !member.humanResourcePartner) && (
+                              <p className="text-xs text-amber-600 dark:text-amber-300 w-full">
+                                Project Manager and Human Resource Partner pending
+                              </p>
+                            )}
+                            {member.role !== 'admin' && member.projectManager && member.humanResourcePartner && (
+                              <p className="text-xs text-muted-foreground w-full">
+                                PM: {member.projectManager.firstName} {member.projectManager.lastName} • HR: {member.humanResourcePartner.firstName} {member.humanResourcePartner.lastName}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
