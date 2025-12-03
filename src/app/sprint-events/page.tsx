@@ -194,7 +194,7 @@ export default function SprintEventsPage() {
     // Cancel any pending requests
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
-    }
+      }
     
     abortControllerRef.current = new AbortController()
     const signal = abortControllerRef.current.signal
@@ -206,15 +206,15 @@ export default function SprintEventsPage() {
         promises.push(fetchProjects(signal))
       }
       await Promise.all(promises)
-    }
+      }
     
     fetchAllData()
     
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
-      }
     }
+  }
   }, [projectId, isAuthenticated, fetchSprintEvents, fetchProjects])
 
   // Check for success/error messages from URL query parameters
@@ -346,12 +346,12 @@ export default function SprintEventsPage() {
       const matchesSearch = !debouncedSearchTerm.trim() || 
                            event.title.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
                            event.description?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
-      const matchesType = filterType === 'all' || event.eventType === filterType
-      const matchesStatus = filterStatus === 'all' || event.status === filterStatus
-      const matchesProject = filterProject === 'all' || event.project._id === filterProject
-      
-      return matchesSearch && matchesType && matchesStatus && matchesProject
-    })
+    const matchesType = filterType === 'all' || event.eventType === filterType
+    const matchesStatus = filterStatus === 'all' || event.status === filterStatus
+    const matchesProject = filterProject === 'all' || event.project._id === filterProject
+    
+    return matchesSearch && matchesType && matchesStatus && matchesProject
+  })
   }, [events, debouncedSearchTerm, filterType, filterStatus, filterProject])
 
   if (authLoading) {

@@ -158,10 +158,10 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
   }, [])
 
   const fetchSprints = useCallback(async (projId: string, signal?: AbortSignal) => {
-    if (!projId) {
-      setSprints([])
-      return
-    }
+      if (!projId) {
+        setSprints([])
+        return
+      }
     
     // Check cache first
     const cached = cacheRef.current.sprints
@@ -383,8 +383,8 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
         if (selectedDateOnly.getTime() === today.getTime() && selectedDateTime < now) {
           setTimeError('Start time cannot be in the past')
           return
-        }
       }
+    }
       
       if (end <= start) {
         setTimeError('End time must be greater than start time')
@@ -448,7 +448,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
           // Use uploadedByName from API when available, otherwise fall back to a generic label
           uploadedBy: data.uploadedByName || 'Attachment',
           uploadedAt: data.uploadedAt || new Date().toISOString()
-        }
+      }
       ])
     } catch (error) {
       console.error('Error uploading file:', error)
@@ -730,8 +730,8 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     if (!debouncedAttendeeQuery.trim()) return users
     const query = debouncedAttendeeQuery.toLowerCase()
     return users.filter((u: User) => {
-      const fullName = `${u.firstName} ${u.lastName}`.toLowerCase()
-      return fullName.includes(query) || u.email.toLowerCase().includes(query)
+    const fullName = `${u.firstName} ${u.lastName}`.toLowerCase()
+    return fullName.includes(query) || u.email.toLowerCase().includes(query)
     })
   }, [users, debouncedAttendeeQuery])
 
@@ -946,12 +946,12 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="status">Status *</Label>
-                  <Input
+                        <Input
                     id="status"
                     value="Scheduled"
                     disabled
                     className="bg-muted"
-                  />
+                        />
                   <input type="hidden" value={formData.status} />
                 </div>
               </div>

@@ -7,6 +7,9 @@ export interface IUser extends Document {
   password: string
   role: 'admin' | 'human_resource' | 'project_manager' | 'team_member' | 'client' | 'viewer' | 'account_manager' | 'qa_engineer' | 'tester'
   customRole?: mongoose.Types.ObjectId
+  // Organization-level partners
+  projectManager?: mongoose.Types.ObjectId
+  humanResourcePartner?: mongoose.Types.ObjectId
   organization: mongoose.Types.ObjectId
   isActive: boolean
   avatar?: string
@@ -56,6 +59,9 @@ const UserSchema = new Schema<IUser>({
     default: 'team_member'
   },
   customRole: { type: Schema.Types.ObjectId, ref: 'CustomRole' },
+  // Organization-level partners
+  projectManager: { type: Schema.Types.ObjectId, ref: 'User' },
+  humanResourcePartner: { type: Schema.Types.ObjectId, ref: 'User' },
   organization: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
   isActive: { type: Boolean, default: true },
   avatar: String,

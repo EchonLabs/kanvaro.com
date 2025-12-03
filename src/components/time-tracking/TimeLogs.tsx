@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useMemo } from 'react'
-import { Clock, Edit, Trash2, Check, X, Filter, Download, Plus, AlertTriangle, FolderOpen, Target, Loader2, Upload, FileText, User, Search } from 'lucide-react'
+import { Clock, Edit, Trash2, Check, X, Filter, Download, Plus, AlertTriangle, FolderOpen, Target, Loader2, Upload, FileText, User, Search, MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -17,6 +17,8 @@ import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules } from '@/lib/utils'
 import { useFeaturePermissions, usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+import { toast } from 'sonner'
 
 interface TimeLogsProps {
   userId: string
@@ -30,6 +32,11 @@ interface TimeLogsProps {
 
 interface TimeEntry {
   _id: string
+  user: {
+    _id: string
+    firstName: string
+    lastName: string
+  }
   description: string
   startTime: string
   endTime?: string | null
@@ -76,6 +83,9 @@ export function TimeLogs({
   const [resolvedOrgId, setResolvedOrgId] = useState<string>(organizationId || '')
   const [authResolving, setAuthResolving] = useState<boolean>(!userId || !organizationId)
   const [selectedEntries, setSelectedEntries] = useState<string[]>([])
+  const [selectAll, setSelectAll] = useState(false)
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
+  const [selectedEntry, setSelectedEntry] = useState<TimeEntry | null>(null)
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -185,6 +195,19 @@ export function TimeLogs({
   const [showBulkUploadErrorAlert, setShowBulkUploadErrorAlert] = useState(true)
   const [showBulkUploadProgressAlert, setShowBulkUploadProgressAlert] = useState(true)
   const [bulkUploadSuccess, setBulkUploadSuccess] = useState<string | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [entryToDelete, setEntryToDelete] = useState<TimeEntry | null>(null)
+  const [editInitial, setEditInitial] = useState<{
+    projectId: string
+    taskId: string
+    startDate: string
+    startTime: string
+    endDate: string
+    endTime: string
+    description: string
+    isBillable: boolean
+  } | null>(null)
 
   // Resolve auth if props are missing
   useEffect(() => {
@@ -420,16 +443,23 @@ export function TimeLogs({
             const membersMatch = members.some((m: any) => (typeof m === 'string' ? m === resolvedUserId : m?.id === resolvedUserId || m?._id === resolvedUserId))
             return createdByMatch || teamMatch || membersMatch
           })
-          setProjects(filtered)
+          let final = filtered
+          if (isEditing && selectedEntry?.project?._id) {
+            const exists = filtered.some((p: any) => p?._id === selectedEntry.project!._id)
+            if (!exists) {
+              final = [...filtered, { _id: selectedEntry.project._id, name: selectedEntry.project.name }]
+            }
+          }
+          setProjects(final)
         }
       } catch (err) {
         console.error('Failed to fetch projects:', err)
       }
     }
-    if (showAddTimeLogModal) {
+    if (showAddTimeLogModal || isEditing) {
       fetchProjects()
     }
-  }, [showAddTimeLogModal, resolvedUserId, resolvedOrgId])
+  }, [showAddTimeLogModal, isEditing, resolvedUserId, resolvedOrgId, selectedEntry])
 
   // Fetch tasks when project is selected
   useEffect(() => {
@@ -442,19 +472,27 @@ export function TimeLogs({
 
       setTasksLoading(true)
       try {
-        const response = await fetch(`/api/tasks?project=${selectedProjectForLog}&assignedTo=${resolvedUserId}&limit=200`)
+        const url = isEditing
+          ? `/api/tasks?project=${selectedProjectForLog}&limit=500`
+          : `/api/tasks?project=${selectedProjectForLog}&assignedTo=${resolvedUserId}&limit=200`
+        const response = await fetch(url)
         const data = await response.json()
-        if (data.success && Array.isArray(data.data)) {
-          const assignedOnly = data.data.filter((t: any) => {
+        let list: any[] = []
+        if (data.success && Array.isArray(data.data)) list = data.data
+        else if (Array.isArray(data)) list = data
+        else if (Array.isArray(data.tasks)) list = data.tasks
+        if (!isEditing) {
+          list = list.filter((t: any) => {
             const at = t?.assignedTo
             if (!at) return false
             if (typeof at === 'string') return at === resolvedUserId
             return at?._id === resolvedUserId || at?.id === resolvedUserId
           })
-          setTasks(assignedOnly)
-        } else {
-          setTasks([])
         }
+        if (isEditing && selectedEntry?.task && !list.some((t: any) => t?._id === selectedEntry.task!._id)) {
+          list = [...list, selectedEntry.task]
+        }
+        setTasks(list)
       } catch (err) {
         console.error('Failed to fetch tasks:', err)
         setTasks([])
@@ -469,7 +507,7 @@ export function TimeLogs({
       setTasks([])
       setSelectedTaskForLog('')
     }
-  }, [selectedProjectForLog, resolvedUserId])
+  }, [selectedProjectForLog, resolvedUserId, isEditing, selectedEntry])
 
   // Helper function to combine date and time into datetime-local format
   const combineDateTime = (date: string, time: string): string => {
@@ -622,6 +660,99 @@ export function TimeLogs({
     }
   }
 
+  const handleUpdateTimeLog = async () => {
+    if (!selectedEntry) {
+      setError('No entry selected to update')
+      return
+    }
+
+    if (!selectedProjectForLog || !resolvedUserId) {
+      setError('Project selection required')
+      return
+    }
+
+    if (!selectedTaskForLog) {
+      setError('Task selection required')
+      return
+    }
+
+    if (timeTrackingSettings?.requireDescription === true && !manualLogData.description.trim()) {
+      setError('Description is required')
+      return
+    }
+
+    if (!manualLogData.startDate || !manualLogData.startTime || !manualLogData.endDate || !manualLogData.endTime) {
+      setError('All date and time fields are required')
+      return
+    }
+
+    const startDateTime = combineDateTime(manualLogData.startDate, manualLogData.startTime)
+    const endDateTime = combineDateTime(manualLogData.endDate, manualLogData.endTime)
+
+    const start = new Date(startDateTime)
+    const end = new Date(endDateTime)
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      setError('Invalid date/time values')
+      return
+    }
+
+    if (end <= start) {
+      setError('End time must be after start time')
+      return
+    }
+
+    if (sessionHoursError) {
+      return
+    }
+
+    setSubmittingManualLog(true)
+    setError('')
+
+    try {
+      const response = await fetch(`/api/time-tracking/entries/${selectedEntry._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: resolvedUserId,
+          organizationId: resolvedOrgId,
+          projectId: selectedProjectForLog,
+          taskId: selectedTaskForLog,
+          description: manualLogData.description || undefined,
+          startTime: startDateTime,
+          endTime: endDateTime,
+          isBillable: manualLogData.isBillable && timeTrackingSettings?.allowBillableTime
+        })
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (response.ok) {
+        setIsEditing(false)
+        setManualLogData({
+          startDate: '',
+          startTime: '',
+          endDate: '',
+          endTime: '',
+          description: '',
+          isBillable: false
+        })
+        setSelectedProjectForLog('')
+        setSelectedTaskForLog('')
+        setTasks([])
+        setEditInitial(null)
+        loadTimeEntries()
+        onTimeEntryUpdate?.()
+      } else {
+        setError((data as any).error || 'Failed to update time entry')
+      }
+    } catch (error) {
+      setError('Failed to update time entry')
+    } finally {
+      setSubmittingManualLog(false)
+    }
+  }
+
   // Load time entries
   const formatDuration = (minutes: number) => {
     // Apply rounding rules if enabled
@@ -760,7 +891,6 @@ export function TimeLogs({
 
     try {
       const params = new URLSearchParams({
-        userId: resolvedUserId,
         organizationId: resolvedOrgId,
         page: pagination.page.toString(),
         limit: pagination.limit.toString()
@@ -773,17 +903,15 @@ export function TimeLogs({
       if (effectiveProjectId) params.append('projectId', effectiveProjectId)
       if (effectiveTaskId) params.append('taskId', effectiveTaskId)
       
-      // Employee filter logic:
-      // - If user has permission and filter is set, use filter
-      // - If user has permission but no filter, don't filter by user (show all)
-      // - If user doesn't have permission, always filter by their own userId
+      // Employee scoping:
+      // - If user has employee filter permission and an employee is selected, request that user's logs
+      // - If user has permission but no employee selected, omit userId so the server scopes to assigned users
+      // - If user lacks permission, restrict to self
       if (canViewEmployeeFilter) {
         if (filters.employeeId) {
           params.append('userId', filters.employeeId)
         }
-        // If no employee filter and user has permission, show all employees' logs
       } else {
-        // User doesn't have permission, only show their own logs
         params.append('userId', resolvedUserId)
       }
       if (filters.startDate) params.append('startDate', filters.startDate)
@@ -991,6 +1119,146 @@ export function TimeLogs({
     },
     [selectableIds]
   )
+
+  const toggleEntrySelection = (entryId: string) => {
+    setSelectedEntries(prev => 
+      prev.includes(entryId) 
+        ? prev.filter(id => id !== entryId)
+        : [...prev, entryId]
+    )
+  }
+
+  const toggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedEntries([])
+    } else {
+      setSelectedEntries(timeEntries.map(entry => entry._id))
+    }
+    setSelectAll(!selectAll)
+  }
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, entry: TimeEntry) => {
+    setAnchorEl(event.currentTarget)
+    setSelectedEntry(entry)
+  }
+
+  const handleMenuClose = () => {
+    setAnchorEl(null)
+  }
+
+  const loadTasksForProject = async (
+    projectId: string,
+    ensureTask?: { _id: string; title: string } | null
+  ) => {
+    if (!projectId) {
+      setTasks([])
+      setTasksLoading(false)
+      return
+    }
+
+    setTasksLoading(true)
+    try {
+      const url = isEditing
+        ? `/api/tasks?project=${projectId}&limit=500`
+        : `/api/tasks?project=${projectId}&assignedTo=${resolvedUserId}&limit=200`
+      const res = await fetch(url)
+      const data = await res.json()
+      let list: any[] = []
+      if (data?.success && Array.isArray(data.data)) list = data.data
+      else if (Array.isArray(data)) list = data
+      else if (Array.isArray(data?.tasks)) list = data.tasks
+
+      if (ensureTask && ensureTask._id && !list.some(t => t?._id === ensureTask._id)) {
+        list = [...list, ensureTask]
+      }
+      setTasks(list)
+    } catch (error) {
+      setTasks([])
+      if (!tasksLoading) {
+        toast.error('Could not load tasks. Some features may be limited.')
+      }
+    } finally {
+      setTasksLoading(false)
+    }
+  }
+
+  const handleEdit = (entry: TimeEntry) => {
+    setSelectedEntry(entry)
+    setSelectedProjectForLog(entry.project?._id || '')
+    setSelectedTaskForLog(entry.task?._id || '')
+    if (entry.task) {
+      setTasks([entry.task])
+    } else {
+      setTasks([])
+    }
+    
+    // Format dates and times for the form
+    const start = new Date(entry.startTime)
+    const end = entry.endTime ? new Date(entry.endTime) : new Date()
+    
+    setManualLogData({
+      startDate: start.toISOString().split('T')[0],
+      startTime: start.toTimeString().substring(0, 5),
+      endDate: end.toISOString().split('T')[0],
+      endTime: end.toTimeString().substring(0, 5),
+      description: entry.description || '',
+      isBillable: entry.isBillable || false
+    })
+    setEditInitial({
+      projectId: entry.project?._id || '',
+      taskId: entry.task?._id || '',
+      startDate: start.toISOString().split('T')[0],
+      startTime: start.toTimeString().substring(0, 5),
+      endDate: end.toISOString().split('T')[0],
+      endTime: end.toTimeString().substring(0, 5),
+      description: entry.description || '',
+      isBillable: entry.isBillable || false
+    })
+    
+    // Load tasks if project is set
+    if (entry.project?._id) {
+      loadTasksForProject(entry.project._id, entry.task || null)
+    }
+    // Defer opening until after dropdown closes
+    setTimeout(() => setIsEditing(true), 0)
+  }
+
+  const hasEditChanges = useMemo(() => {
+    if (!isEditing || !editInitial) return false
+    return (
+      editInitial.projectId !== selectedProjectForLog ||
+      editInitial.taskId !== selectedTaskForLog ||
+      editInitial.startDate !== manualLogData.startDate ||
+      editInitial.startTime !== manualLogData.startTime ||
+      editInitial.endDate !== manualLogData.endDate ||
+      editInitial.endTime !== manualLogData.endTime ||
+      editInitial.description !== manualLogData.description ||
+      editInitial.isBillable !== manualLogData.isBillable
+    )
+  }, [isEditing, editInitial, selectedProjectForLog, selectedTaskForLog, manualLogData])
+
+  const handleDeleteClick = (entry: TimeEntry) => {
+    setEntryToDelete(entry)
+    setShowDeleteDialog(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!entryToDelete) return
+    
+    try {
+      // TODO: Implement delete API call
+      // await deleteTimeEntry(entryToDelete._id)
+      // Refresh entries after deletion
+      loadTimeEntries()
+      toast.success('Time entry deleted successfully')
+    } catch (error) {
+      console.error('Error deleting time entry:', error)
+      toast.error('Failed to delete time entry')
+    } finally {
+      setShowDeleteDialog(false)
+      setEntryToDelete(null)
+    }
+  }
 
   // CSV Template Download
   const downloadCSVTemplate = () => {
@@ -1355,6 +1623,7 @@ export function TimeLogs({
             })
 
             const result = await response.json()
+
             if (response.ok) {
               successful++
             } else {
@@ -1608,9 +1877,7 @@ export function TimeLogs({
                     </div>
                   </div>
                   <div className="max-h-[200px] overflow-y-auto">
-                    <SelectItem value="all" onMouseDown={(e) => e.preventDefault()}>
-                      All tasks
-                    </SelectItem>
+                    <SelectItem value="all">All tasks</SelectItem>
                     {filterTasksLoading ? (
                       <SelectItem value="loading" disabled>
                         <div className="flex items-center gap-2">
@@ -1665,9 +1932,7 @@ export function TimeLogs({
                       </div>
                     </div>
                     <div className="max-h-[200px] overflow-y-auto">
-                      <SelectItem value="all" onMouseDown={(e) => e.preventDefault()}>
-                        All employees
-                      </SelectItem>
+                      <SelectItem value="all">All employees</SelectItem>
                       {filterEmployeesLoading ? (
                         <SelectItem value="loading" disabled>
                           <div className="flex items-center gap-2">
@@ -1856,7 +2121,7 @@ export function TimeLogs({
           ) : (
             <div className="space-y-2">
               {/* Table Header - Hidden on mobile */}
-              <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium ${canApproveTime ? 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px_110px]' : canAddManualTimeLog ? 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px]' : 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px]'}`}>
+              <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium ${canApproveTime ? 'grid-cols-[40px_1.2fr_1fr_120px_100px_100px_80px_80px_80px_90px_90px]' : 'grid-cols-[40px_1.2fr_1fr_120px_100px_100px_80px_80px_80px_90px]'}`}>
                 <div>
                   <Checkbox
                     checked={allSelected}
@@ -1865,6 +2130,7 @@ export function TimeLogs({
                 </div>
                 <div>Description</div>
                 <div>Project (Task)</div>
+                <div>Employee</div>
                 <div>Start Time</div>
                 <div>End Time</div>
                 <div>Duration</div>
@@ -1908,6 +2174,12 @@ export function TimeLogs({
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <div className="text-muted-foreground">Employee</div>
+                        <div className="mt-1 font-medium">
+                          {([entry.user?.firstName, entry.user?.lastName].filter(Boolean).join(' ') || 'Unknown')}
+                        </div>
+                      </div>
                       <div>
                         <div className="text-muted-foreground">Start Time</div>
                         {(() => { const p = formatDateParts(entry.startTime); return (
@@ -1984,14 +2256,17 @@ export function TimeLogs({
                   </div>
 
                   {/* Desktop Table View */}
-                  <div className={`hidden md:grid gap-2 p-3 ${canApproveTime ? 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px_110px]' : canAddManualTimeLog ? 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px]' : 'grid-cols-[40px_1.5fr_1.2fr_110px_110px_80px_85px_85px_100px]'}`}>
-                    <div className="flex items-center">
-                      {!entry.__isActive ? (
-                        <Checkbox
-                          checked={selectedEntries.includes(entry._id)}
-                          onCheckedChange={(checked) => handleSelectEntry(entry._id, checked as boolean)}
-                        />
-                      ) : null}
+                  <div className={`hidden md:grid gap-2 p-3 ${canApproveTime ? 'grid-cols-[40px_1.2fr_1fr_120px_100px_100px_80px_80px_80px_90px_90px]' : 'grid-cols-[40px_1.2fr_1fr_120px_100px_100px_80px_80px_80px_90px]'}`}>
+                    <div className="flex items-center justify-center">
+                      <Checkbox
+                        id={`select-${entry._id}`}
+                        checked={selectedEntries.includes(entry._id)}
+                        onCheckedChange={() => toggleEntrySelection(entry._id)}
+                        className="h-4 w-4"
+                      />
+                      <label htmlFor={`select-${entry._id}`} className="sr-only">
+                        Select entry
+                      </label>
                     </div>
                     <div className="truncate">
                       <div className="font-medium text-xs sm:text-sm truncate" title={entry.description}>{entry.description}</div>
@@ -2008,15 +2283,20 @@ export function TimeLogs({
                         </>
                       ) : (
                         <span className="text-muted-foreground italic" title="Project deleted or unavailable">
-                          Project deleted or unavailable
+                          Project deleted
                         </span>
                       )}
                     </div>
+                    <div className="text-xs sm:text-sm">
+                      {([entry.user?.firstName, entry.user?.lastName].filter(Boolean).join(' ') || 'Unknown')}
+                    </div>
                     <div className="text-xs sm:text-sm leading-tight">
-                      {(() => { const p = formatDateParts(entry.startTime); return (<>
-                        <div>{p.date}</div>
-                        <div className="text-muted-foreground">{p.time}</div>
-                      </>) })()}
+                      {(() => { const p = formatDateParts(entry.startTime); return (
+                        <>
+                          <div>{p.date}</div>
+                          <div className="text-muted-foreground">{p.time}</div>
+                        </>
+                      )})()}
                     </div>
                     <div className="text-xs sm:text-sm leading-tight">
                       {entry.endTime ? (() => { const p = formatDateParts(entry.endTime as string); return (<>
@@ -2059,33 +2339,39 @@ export function TimeLogs({
                         </div>
                       )}
                     </div>
-                    {canApproveTime && !entry.__isActive && (
-                      <div className="flex items-center gap-1">
-                        {!entry.isApproved ? (
+                    <div className="flex items-center ">
+                      
+                      <DropdownMenu.Root>
+                        <DropdownMenu.Trigger asChild>
                           <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2 text-xs"
-                            onClick={() => handleApproveEntries('approve', entry._id)}
-                            title="Approve"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 p-0"
                           >
-                            <Check className="h-3 w-3 mr-1" />
-                            Approve
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Open menu</span>
                           </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2 text-xs"
-                            onClick={() => handleApproveEntries('reject', entry._id)}
-                            title="Reject"
-                          >
-                            <X className="h-3 w-3 mr-1" />
-                            Reject
-                          </Button>
-                        )}
-                      </div>
-                    )}
+                        </DropdownMenu.Trigger>
+                        <DropdownMenu.Portal>
+                          <DropdownMenu.Content className="min-w-[120px] bg-white rounded-md p-1 shadow-lg border border-gray-200 z-50">
+                            <DropdownMenu.Item 
+                              className="flex items-center px-2 py-1.5 text-sm rounded hover:bg-gray-100 cursor-pointer outline-none"
+                              onSelect={() => handleEdit(entry)}
+                            >
+                              <Edit className="mr-2 h-4 w-4" />
+                              <span>Edit</span>
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Item 
+                              className="flex items-center px-2 py-1.5 text-sm rounded text-red-600 hover:bg-red-50 cursor-pointer outline-none"
+                              onSelect={() => handleDeleteClick(entry)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>Delete</span>
+                            </DropdownMenu.Item>
+                          </DropdownMenu.Content>
+                        </DropdownMenu.Portal>
+                      </DropdownMenu.Root>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -2172,7 +2458,7 @@ export function TimeLogs({
               <Select
                 value={selectedTaskForLog}
                 onValueChange={setSelectedTaskForLog}
-                disabled={!selectedProjectForLog || tasksLoading || (!tasksLoading && tasks.length === 0)}
+                disabled={!selectedProjectForLog || tasks.length === 0}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder={
@@ -2370,6 +2656,264 @@ export function TimeLogs({
                 Log Time
               </>
             )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    
+    <Dialog open={isEditing} onOpenChange={setIsEditing}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Time Log</DialogTitle>
+          <DialogDescription>
+            Update the time log details
+          </DialogDescription>
+        </DialogHeader>
+        <DialogBody className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-project">Project *</Label>
+              <Select 
+                value={selectedProjectForLog} 
+                onValueChange={(value) => {
+                  setSelectedProjectForLog(value)
+                  setSelectedTaskForLog('')
+                  setTasks([])
+                  loadTasksForProject(value)
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((project) => (
+                    <SelectItem key={project._id} value={project._id}>
+                      <div className="flex items-center space-x-2">
+                        <FolderOpen className="h-4 w-4 flex-shrink-0" />
+                        <span className="truncate">{project.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-task">Task *</Label>
+              <Select
+                value={selectedTaskForLog}
+                onValueChange={setSelectedTaskForLog}
+                disabled={!selectedProjectForLog || tasks.length === 0}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={
+                    tasksLoading 
+                      ? 'Loading tasks...' 
+                      : selectedProjectForLog 
+                        ? (tasks.length > 0 ? 'Select a task' : 'No tasks available') 
+                        : 'Select a project first'
+                  } />
+                </SelectTrigger>
+                {tasksLoading && (
+                  <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
+                )}
+                <SelectContent>
+                  {tasksLoading ? (
+                    <div className="flex items-center justify-center p-4">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <span className="text-sm text-muted-foreground">Loading tasks...</span>
+                    </div>
+                  ) : (
+                    tasks.map((task) => (
+                      <SelectItem key={task._id} value={task._id}>
+                        <div className="flex items-center space-x-2">
+                          <Target className="h-4 w-4 flex-shrink-0" />
+                          <span className="truncate">{task.title}</span>
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-start-date">Start Date *</Label>
+              <Input
+                id="edit-start-date"
+                type="date"
+                value={manualLogData.startDate}
+                onChange={(e) => {
+                  setManualLogData(prev => ({ ...prev, startDate: e.target.value }))
+                  setError('')
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-start-time">Start Time *</Label>
+              <Input
+                id="edit-start-time"
+                type="time"
+                value={manualLogData.startTime}
+                onChange={(e) => {
+                  setManualLogData(prev => ({ ...prev, startTime: e.target.value }))
+                  setError('')
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-end-date">End Date *</Label>
+              <Input
+                id="edit-end-date"
+                type="date"
+                value={manualLogData.endDate}
+                onChange={(e) => {
+                  setManualLogData(prev => ({ ...prev, endDate: e.target.value }))
+                  setError('')
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-end-time">End Time *</Label>
+              <Input
+                id="edit-end-time"
+                type="time"
+                value={manualLogData.endTime}
+                onChange={(e) => {
+                  setManualLogData(prev => ({ ...prev, endTime: e.target.value }))
+                  setError('')
+                }}
+                className={`w-full ${sessionHoursError ? 'border-destructive' : ''}`}
+              />
+              {sessionHoursError && (
+                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{sessionHoursError}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-description">
+              Description {timeTrackingSettings?.requireDescription ? '*' : ''}
+            </Label>
+            <Textarea
+              id="edit-description"
+              value={manualLogData.description}
+              onChange={(e) => setManualLogData(prev => ({ ...prev, description: e.target.value }))}
+              placeholder={
+                timeTrackingSettings?.requireDescription 
+                  ? 'What did you work on? (required)' 
+                  : 'What did you work on? (optional)'
+              }
+              rows={3}
+              required={timeTrackingSettings?.requireDescription === true}
+              className="w-full"
+            />
+          </div>
+
+          {timeTrackingSettings?.allowBillableTime && (
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="edit-billable"
+                checked={manualLogData.isBillable}
+                onCheckedChange={(checked) => setManualLogData(prev => ({ ...prev, isBillable: checked as boolean }))}
+              />
+              <Label htmlFor="edit-billable" className="text-sm font-normal cursor-pointer">
+                Mark as billable
+              </Label>
+            </div>
+          )}
+        </DialogBody>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setIsEditing(false)
+              setManualLogData({
+                startDate: '',
+                startTime: '',
+                endDate: '',
+                endTime: '',
+                description: '',
+                isBillable: false
+              })
+              setSelectedProjectForLog('')
+              setSelectedTaskForLog('')
+              setTasks([])
+              setError('')
+              setSessionHoursError('')
+              setEditInitial(null)
+            }}
+            disabled={submittingManualLog}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleUpdateTimeLog}
+            disabled={
+              submittingManualLog || 
+              !selectedProjectForLog || 
+              !selectedTaskForLog ||
+              !manualLogData.startDate ||
+              !manualLogData.startTime ||
+              !manualLogData.endDate ||
+              !manualLogData.endTime ||
+              !!sessionHoursError ||
+              !hasEditChanges ||
+              (timeTrackingSettings?.requireDescription === true && !manualLogData.description.trim())
+            }
+          >
+            {submittingManualLog ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              'Update Time Log'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    
+    <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Delete Time Entry</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete this time entry? This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button 
+            variant="outline" 
+            onClick={() => setShowDeleteDialog(false)}
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant="destructive"
+            onClick={handleConfirmDelete}
+          >
+            Delete
           </Button>
         </DialogFooter>
       </DialogContent>

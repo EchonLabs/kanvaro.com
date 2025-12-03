@@ -95,6 +95,8 @@ export enum Permission {
   TIME_TRACKING_APPROVE = 'time_tracking:approve',
   TIME_TRACKING_EXPORT = 'time_tracking:export',
   TIME_TRACKING_VIEW_ALL = 'time_tracking:view_all',
+  // View time of users assigned to you (as PM or HR partner)
+  TIME_TRACKING_VIEW_ASSIGNED = 'time_tracking:view_assigned',
   TIME_TRACKING_EMPLOYEE_FILTER_READ = 'time_tracking:employee_filter:read',
   
   // Financial permissions
@@ -382,7 +384,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_DELETE,
     Permission.TIME_TRACKING_APPROVE,
     Permission.TIME_TRACKING_EXPORT,
-    Permission.TIME_TRACKING_VIEW_ALL,
+    Permission.TIME_TRACKING_VIEW_ASSIGNED,
     Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
     
     // Financial
@@ -846,6 +848,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.TIME_TRACKING_READ,
     Permission.TIME_TRACKING_APPROVE,
     Permission.TIME_TRACKING_EXPORT,
+    Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
     Permission.FINANCIAL_READ,
     Permission.FINANCIAL_MANAGE_BUDGET,
     Permission.EPIC_CREATE,
@@ -1010,6 +1013,7 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.PROJECT_VIEW_ALL,
     Permission.TEAM_INVITE, // Organization-wide permission to invite team members
     Permission.TIME_TRACKING_VIEW_ALL,
+    Permission.TIME_TRACKING_VIEW_ASSIGNED,
     Permission.FINANCIAL_READ,
     Permission.REPORTING_VIEW,
     Permission.REPORTING_CREATE,

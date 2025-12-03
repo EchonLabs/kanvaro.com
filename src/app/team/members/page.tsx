@@ -46,6 +46,20 @@ interface Member {
   isActive: boolean
   createdAt: string
   lastLogin?: string
+  projectManager?: {
+    _id: string
+    firstName: string
+    lastName: string
+    email: string
+    role: string
+  }
+  humanResourcePartner?: {
+    _id: string
+    firstName: string
+    lastName: string
+    email: string
+    role: string
+  }
 }
 
 interface PendingInvitation {
@@ -574,10 +588,10 @@ export default function MembersPage() {
                             </p>
                           </div>
                           <div className="w-full space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Badge className={`${getRoleColor(member.role, member.customRole?._id)} text-xs sm:text-sm flex-shrink-0`}>
+                            <div className="flex items-center justify-center">
+                              {/* <Badge className={`${getRoleColor(member.role, member.customRole?._id)} text-xs sm:text-sm flex-shrink-0`}>
                                 {getMemberRoleLabel(member)}
-                              </Badge>
+                              </Badge> */}
                               {organizationRoles.length > 0 && (
                                 <Select
                                   value={member.role}
@@ -600,6 +614,17 @@ export default function MembersPage() {
                             <p className="text-xs text-muted-foreground">
                               Joined {new Date(member.createdAt).toLocaleDateString()}
                             </p>
+                            {/* Project Manager / HR partner info */}
+                            {member.role !== 'admin' && (!member.projectManager || !member.humanResourcePartner) && (
+                              <p className="text-xs text-amber-600 dark:text-amber-300">
+                                Project Manager and Human Resource Partner pending
+                              </p>
+                            )}
+                            {member.role !== 'admin' && member.projectManager && member.humanResourcePartner && (
+                              <p className="text-xs text-muted-foreground">
+                                PM: {member.projectManager.firstName} {member.projectManager.lastName} • HR: {member.humanResourcePartner.firstName} {member.humanResourcePartner.lastName}
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 w-full pt-2 border-t">
                             <Button
@@ -681,6 +706,17 @@ export default function MembersPage() {
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
                               Joined {new Date(member.createdAt).toLocaleDateString()}
                             </span>
+                            {/* Project Manager / HR partner info */}
+                            {member.role !== 'admin' && (!member.projectManager || !member.humanResourcePartner) && (
+                              <p className="text-xs text-amber-600 dark:text-amber-300 w-full">
+                                Project Manager and Human Resource Partner pending
+                              </p>
+                            )}
+                            {member.role !== 'admin' && member.projectManager && member.humanResourcePartner && (
+                              <p className="text-xs text-muted-foreground w-full">
+                                PM: {member.projectManager.firstName} {member.projectManager.lastName} • HR: {member.humanResourcePartner.firstName} {member.humanResourcePartner.lastName}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
