@@ -5,7 +5,7 @@ export interface IUser extends Document {
   lastName: string
   email: string
   password: string
-  role: 'admin' | 'project_manager' | 'team_member' | 'client' | 'viewer' | 'account_manager' | 'qa_engineer' | 'tester'
+  role: 'admin' | 'human_resource' | 'project_manager' | 'team_member' | 'client' | 'viewer' | 'account_manager' | 'qa_engineer' | 'tester'
   customRole?: mongoose.Types.ObjectId
   organization: mongoose.Types.ObjectId
   isActive: boolean
@@ -52,7 +52,7 @@ const UserSchema = new Schema<IUser>({
   password: { type: String, required: true },
   role: { 
     type: String, 
-    enum: ['admin', 'project_manager', 'team_member', 'client', 'viewer', 'account_manager', 'qa_engineer', 'tester'],
+    enum: ['admin', 'human_resource', 'project_manager', 'team_member', 'client', 'viewer', 'account_manager', 'qa_engineer', 'tester'],
     default: 'team_member'
   },
   customRole: { type: Schema.Types.ObjectId, ref: 'CustomRole' },
