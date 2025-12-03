@@ -1,3 +1,11 @@
+## [1.10.8](https://github.com/EchonLabs/kanvaro.com/compare/v1.10.7...v1.10.8) (2025-12-03)
+
+
+### Bug Fixes
+
+* add changes according to events ([bc2ccad](https://github.com/EchonLabs/kanvaro.com/commit/bc2ccad18dd6ae27042be23eef2b5ea00a1a42d1))
+* add new changes ([694f99f](https://github.com/EchonLabs/kanvaro.com/commit/694f99f2bf96834727d7cf5597ece041bf86ecde))
+
 ## [1.10.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.10.6...v1.10.7) (2025-12-02)
 
 
