@@ -21,19 +21,7 @@ export async function POST(request: NextRequest) {
     const { user } = authResult
     const userId = user.id
 
-    // Check if user has permission to approve time entries
-    const hasPermission = await PermissionService.hasPermission(
-      userId,
-      Permission.TIME_TRACKING_APPROVE
-    )
-
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'You do not have permission to approve time entries' },
-        { status: 403 }
-      )
-    }
-    
+    // Parse body first to determine projects involved
     const body = await request.json()
     const { timeEntryIds, approvedBy, action } = body
 
@@ -41,8 +29,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Time entry IDs are required' }, { status: 400 })
     }
 
+    // Only check that the logged-in user has TIME_TRACKING_APPROVE permission globally
+    const perms = await PermissionService.getUserPermissions(userId)
+    const canApprove = perms.globalPermissions.includes(Permission.TIME_TRACKING_APPROVE)
+    if (!canApprove) {
+      return NextResponse.json(
+        { error: 'You do not have permission to approve time entries' },
+        { status: 403 }
+      )
+    }
     // Ensure approvedBy matches the authenticated user
-    if (!approvedBy || approvedBy !== userId) {
+    if (!approvedBy || approvedBy.toString() !== userId.toString()) {
       return NextResponse.json({ error: 'Invalid approver' }, { status: 400 })
     }
 
