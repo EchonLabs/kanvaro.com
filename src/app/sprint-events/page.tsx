@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { MainLayout } from '@/components/layout/MainLayout'
-import { Alert, AlertDescription } from '@/components/ui/Alert'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Calendar, 
   Clock, 

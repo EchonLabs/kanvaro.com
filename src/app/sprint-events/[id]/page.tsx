@@ -489,7 +489,7 @@ export default function SprintEventDetailsPage() {
                                     <Users className="h-3 w-3" />
                                     <span>
                                       {typeof item.assignedTo === 'object' && item.assignedTo !== null
-                                        ? `${item.assignedTo.firstName || ''} ${item.assignedTo.lastName || ''}`.trim() || 'Unassigned'
+                                        ? `${(item.assignedTo as unknown as { firstName?: string; lastName?: string }).firstName || ''} ${(item.assignedTo as unknown as { firstName?: string; lastName?: string }).lastName || ''}`.trim() || 'Unassigned'
                                         : item.assignedTo || 'Unassigned'}
                                     </span>
                                   </div>
