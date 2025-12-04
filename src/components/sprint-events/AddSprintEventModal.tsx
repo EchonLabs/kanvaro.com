@@ -13,7 +13,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { FileUploader } from '@/components/ui/FileUploader'
 import { AttachmentList } from '@/components/ui/AttachmentList'
-import { CalendarIcon, X, Link as LinkIcon, AlertCircle, Loader2, CheckCircle } from 'lucide-react'
+import { CalendarIcon, X, Link as LinkIcon, AlertCircle, Loader2, CheckCircle, Repeat } from 'lucide-react'
 import { format } from 'date-fns'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -107,9 +107,21 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     attendees: [] as string[],
     location: '',
     meetingLink: '',
+    // Recurrence settings
+    recurrence: {
+      type: 'none' as 'none' | 'daily' | 'weekly' | 'monthly',
+      interval: 1,
+      endDate: undefined as Date | undefined,
+      daysOfWeek: [] as number[],
+      dayOfMonth: undefined as number | undefined,
+      occurrences: undefined as number | undefined
+    },
     notificationSettings: {
-      enabled: false,
-      reminderTime: 'none' as 'none' | '10mins' | '30mins' | '1hour' | '24hours'
+      enabled: true,
+      reminderTime: '1hour' as 'none' | '10mins' | '30mins' | '1hour' | '24hours',
+      emailReminder1Day: true,
+      notificationReminder1Hour: true,
+      notificationReminder5Min: true
     }
   })
 
@@ -621,7 +633,22 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
           location: formData.location || undefined,
           meetingLink: formData.meetingLink || undefined,
           attachments: attachments.length > 0 ? attachments : undefined,
-          notificationSettings: formData.notificationSettings.enabled ? formData.notificationSettings : undefined
+          // Recurrence settings
+          recurrence: formData.recurrence.type !== 'none' ? {
+            type: formData.recurrence.type,
+            interval: formData.recurrence.interval,
+            endDate: formData.recurrence.endDate?.toISOString(),
+            daysOfWeek: formData.recurrence.type === 'weekly' ? formData.recurrence.daysOfWeek : undefined,
+            dayOfMonth: formData.recurrence.type === 'monthly' ? formData.recurrence.dayOfMonth : undefined,
+            occurrences: formData.recurrence.occurrences
+          } : undefined,
+          notificationSettings: formData.notificationSettings.enabled ? {
+            enabled: true,
+            reminderTime: formData.notificationSettings.reminderTime,
+            emailReminder1Day: formData.notificationSettings.emailReminder1Day,
+            notificationReminder1Hour: formData.notificationSettings.notificationReminder1Hour,
+            notificationReminder5Min: formData.notificationSettings.notificationReminder5Min
+          } : undefined
         })
       })
 
@@ -993,6 +1020,150 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
               </div>
             </div>
 
+            {/* (3.5) Recurrence Settings */}
+            <div className="space-y-4 mt-8">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Repeat className="h-4 w-4" />
+                Recurrence
+              </h3>
+              <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                <div className="space-y-2">
+                  <Label htmlFor="recurrenceType">Repeat</Label>
+                  <Select 
+                    value={formData.recurrence.type} 
+                    onValueChange={(value) => handleInputChange('recurrence.type', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Does not repeat" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Does not repeat</SelectItem>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {formData.recurrence.type !== 'none' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="recurrenceInterval">
+                          Repeat every
+                        </Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            id="recurrenceInterval"
+                            type="number"
+                            min="1"
+                            max="30"
+                            value={formData.recurrence.interval}
+                            onChange={(e) => handleInputChange('recurrence.interval', parseInt(e.target.value) || 1)}
+                            className="w-20"
+                          />
+                          <span className="text-sm text-muted-foreground">
+                            {formData.recurrence.type === 'daily' && 'day(s)'}
+                            {formData.recurrence.type === 'weekly' && 'week(s)'}
+                            {formData.recurrence.type === 'monthly' && 'month(s)'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="recurrenceEndDate">End Date (Optional)</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-start text-left font-normal">
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {formData.recurrence.endDate 
+                                ? format(formData.recurrence.endDate, 'PPP') 
+                                : 'No end date'}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={formData.recurrence.endDate}
+                              onSelect={(date) => handleInputChange('recurrence.endDate', date)}
+                              disabled={(date) => {
+                                if (!selectedDate) return false
+                                return date < selectedDate
+                              }}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+
+                    {formData.recurrence.type === 'weekly' && (
+                      <div className="space-y-2">
+                        <Label>Repeat on</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                            <Button
+                              key={day}
+                              type="button"
+                              variant={formData.recurrence.daysOfWeek.includes(index) ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => {
+                                const currentDays = formData.recurrence.daysOfWeek
+                                const newDays = currentDays.includes(index)
+                                  ? currentDays.filter(d => d !== index)
+                                  : [...currentDays, index]
+                                handleInputChange('recurrence.daysOfWeek', newDays)
+                              }}
+                              className="w-12"
+                            >
+                              {day}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {formData.recurrence.type === 'monthly' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="dayOfMonth">Day of month</Label>
+                        <Select 
+                          value={formData.recurrence.dayOfMonth?.toString() || ''} 
+                          onValueChange={(value) => handleInputChange('recurrence.dayOfMonth', parseInt(value))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select day" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                              <SelectItem key={day} value={day.toString()}>
+                                {day}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="occurrences">Max occurrences (Optional)</Label>
+                      <Input
+                        id="occurrences"
+                        type="number"
+                        min="1"
+                        max="365"
+                        placeholder="Unlimited"
+                        value={formData.recurrence.occurrences || ''}
+                        onChange={(e) => handleInputChange('recurrence.occurrences', e.target.value ? parseInt(e.target.value) : undefined)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Leave empty for unlimited occurrences (until end date)
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
             {/* (4) Attendees */}
             <div className="space-y-4 mt-8">
               <h3 className="text-sm font-semibold">Attendees</h3>
@@ -1067,31 +1238,69 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
             {/* (7) Notification Settings */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Notification Settings (Optional)</h3>
-              <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Notification & Reminder Settings</h3>
+              <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
                 <label className="flex items-center space-x-2">
                   <Checkbox
                     checked={formData.notificationSettings.enabled}
                     onCheckedChange={(checked) => handleInputChange('notificationSettings.enabled', checked)}
                   />
-                  <span className="text-sm">Enable notifications</span>
+                  <span className="text-sm font-medium">Enable reminders</span>
                 </label>
+                
                 {formData.notificationSettings.enabled && (
-                  <Select 
-                    value={formData.notificationSettings.reminderTime} 
-                    onValueChange={(value) => handleInputChange('notificationSettings.reminderTime', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="10mins">10 mins before</SelectItem>
-                      <SelectItem value="30mins">30 mins before</SelectItem>
-                      <SelectItem value="1hour">1 hour before</SelectItem>
-                      <SelectItem value="24hours">24 hours before</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-4 ml-6">
+                    {/* Email Reminders */}
+                    <div className="space-y-2">
+                      <span className="text-sm font-medium text-muted-foreground">Email Reminders</span>
+                      <label className="flex items-center space-x-2">
+                        <Checkbox
+                          checked={formData.notificationSettings.emailReminder1Day}
+                          onCheckedChange={(checked) => handleInputChange('notificationSettings.emailReminder1Day', checked)}
+                        />
+                        <span className="text-sm">1 day before at 8:00 AM</span>
+                      </label>
+                    </div>
+
+                    {/* In-app Notifications */}
+                    <div className="space-y-2">
+                      <span className="text-sm font-medium text-muted-foreground">In-app Notifications</span>
+                      <label className="flex items-center space-x-2">
+                        <Checkbox
+                          checked={formData.notificationSettings.notificationReminder1Hour}
+                          onCheckedChange={(checked) => handleInputChange('notificationSettings.notificationReminder1Hour', checked)}
+                        />
+                        <span className="text-sm">1 hour before the event</span>
+                      </label>
+                      <label className="flex items-center space-x-2">
+                        <Checkbox
+                          checked={formData.notificationSettings.notificationReminder5Min}
+                          onCheckedChange={(checked) => handleInputChange('notificationSettings.notificationReminder5Min', checked)}
+                        />
+                        <span className="text-sm">5 minutes before the event</span>
+                      </label>
+                    </div>
+
+                    {/* Legacy reminder time selector */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Additional Reminder</Label>
+                      <Select 
+                        value={formData.notificationSettings.reminderTime} 
+                        onValueChange={(value) => handleInputChange('notificationSettings.reminderTime', value)}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="10mins">10 mins before</SelectItem>
+                          <SelectItem value="30mins">30 mins before</SelectItem>
+                          <SelectItem value="1hour">1 hour before</SelectItem>
+                          <SelectItem value="24hours">24 hours before</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

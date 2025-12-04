@@ -16,7 +16,10 @@ import {
   Target,
   Loader2,
   Plus,
-  AlertTriangle
+  AlertTriangle,
+  Users,
+  Video,
+  Repeat
 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -46,6 +49,35 @@ interface Task {
   updatedAt: string
 }
 
+interface SprintEvent {
+  _id: string
+  title: string
+  description?: string
+  eventType: 'planning' | 'review' | 'retrospective' | 'daily_standup' | 'demo' | 'other'
+  scheduledDate: string
+  startTime?: string
+  endTime?: string
+  duration: number
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
+  facilitator?: {
+    firstName: string
+    lastName: string
+    email: string
+  }
+  attendees?: Array<{
+    firstName: string
+    lastName: string
+    email: string
+  }>
+  location?: string
+  meetingLink?: string
+  isRecurringSeries?: boolean
+  sprint?: {
+    _id: string
+    name: string
+  }
+}
+
 interface CalendarViewProps {
   projectId: string
   onCreateTask: () => void
@@ -54,37 +86,55 @@ interface CalendarViewProps {
 export default function CalendarView({ projectId, onCreateTask }: CalendarViewProps) {
   const router = useRouter()
   const [tasks, setTasks] = useState<Task[]>([])
+  const [sprintEvents, setSprintEvents] = useState<SprintEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [view, setView] = useState<'month' | 'week' | 'day'>('month')
 
   useEffect(() => {
-    fetchTasks()
+    fetchData()
   }, [projectId])
 
-  const fetchTasks = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true)
       setError('')
-      const url = projectId === 'all' ? '/api/tasks' : `/api/tasks?project=${projectId}`
-      const response = await fetch(url)
-      const data = await response.json()
+      
+      // Fetch both tasks and sprint events in parallel
+      const [tasksResponse, eventsResponse] = await Promise.all([
+        fetch(projectId === 'all' ? '/api/tasks' : `/api/tasks?project=${projectId}`),
+        fetch(projectId === 'all' ? '/api/sprint-events' : `/api/sprint-events?projectId=${projectId}`)
+      ])
+      
+      const tasksData = await tasksResponse.json()
+      const eventsData = await eventsResponse.json()
 
-      if (data.success) {
-        setTasks(data.data)
+      if (tasksData.success) {
+        setTasks(tasksData.data)
       } else {
-        setError(data.error || 'Failed to fetch tasks')
+        setError(tasksData.error || 'Failed to fetch tasks')
+      }
+      
+      // Sprint events API returns array directly
+      if (Array.isArray(eventsData)) {
+        setSprintEvents(eventsData)
+      } else if (eventsData.data) {
+        setSprintEvents(eventsData.data)
       }
     } catch (err) {
-      setError('Failed to fetch tasks')
+      setError('Failed to fetch data')
     } finally {
       setLoading(false)
     }
   }
 
+  const fetchTasks = async () => {
+    fetchData()
+  }
+
   const refreshTasks = () => {
-    fetchTasks()
+    fetchData()
   }
 
   const getPriorityColor = (priority: string) => {
@@ -115,6 +165,34 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
       const taskDate = new Date(task.dueDate)
       return taskDate.toDateString() === date.toDateString()
     })
+  }
+
+  const getEventsForDate = (date: Date) => {
+    return sprintEvents.filter(event => {
+      const eventDate = new Date(event.scheduledDate)
+      return eventDate.toDateString() === date.toDateString()
+    })
+  }
+
+  const getEventTypeColor = (eventType: string) => {
+    switch (eventType) {
+      case 'planning': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+      case 'review': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+      case 'retrospective': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+      case 'daily_standup': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+      case 'demo': return 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+    }
+  }
+
+  const getEventStatusColor = (status: string) => {
+    switch (status) {
+      case 'scheduled': return 'border-l-blue-500'
+      case 'in_progress': return 'border-l-yellow-500'
+      case 'completed': return 'border-l-green-500'
+      case 'cancelled': return 'border-l-red-500'
+      default: return 'border-l-gray-500'
+    }
   }
 
   const getDaysInMonth = (date: Date) => {
@@ -318,7 +396,12 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                     {day}
                   </div>
                 ))}
-                {getDaysInMonth(currentDate).map((date, index) => (
+                {getDaysInMonth(currentDate).map((date, index) => {
+                  const dayTasks = date ? getTasksForDate(date) : []
+                  const dayEvents = date ? getEventsForDate(date) : []
+                  const totalItems = dayTasks.length + dayEvents.length
+                  
+                  return (
                   <div
                     key={index}
                     className={`min-h-[100px] p-2 border border-border ${date ? 'bg-background' : 'bg-muted/30'
@@ -331,14 +414,41 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                             }`}>
                             {date.getDate()}
                           </span>
-                          {getTasksForDate(date).length > 0 && (
+                          {totalItems > 0 && (
                             <Badge variant="secondary" className="text-xs">
-                              {getTasksForDate(date).length}
+                              {totalItems}
                             </Badge>
                           )}
                         </div>
                         <div className="space-y-1">
-                          {getTasksForDate(date).slice(0, 3).map(task => (
+                          {/* Sprint Events */}
+                          {dayEvents.slice(0, 2).map(event => (
+                            <Tooltip key={event._id}>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className={`text-xs p-1 rounded bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/30 dark:to-indigo-900/30 border border-purple-200 dark:border-purple-800 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${getEventStatusColor(event.status)} border-l-2`}
+                                  onClick={() => router.push(`/sprint-events/${event._id}`)}
+                                >
+                                  <div className="font-medium truncate flex items-center gap-1">
+                                    <Video className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                                    {event.title}
+                                    {event.isRecurringSeries && <Repeat className="h-2.5 w-2.5 text-muted-foreground" />}
+                                  </div>
+                                  <div className="text-[10px] text-muted-foreground">
+                                    {event.startTime || 'All day'} • {formatToTitleCase(event.eventType.replace('_', ' '))}
+                                  </div>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="font-medium">{event.title}</p>
+                                <p className="text-xs">{formatToTitleCase(event.eventType.replace('_', ' '))}</p>
+                                {event.startTime && <p className="text-xs">{event.startTime} - {event.endTime || 'TBD'}</p>}
+                                {event.attendees && <p className="text-xs">{event.attendees.length} attendee(s)</p>}
+                              </TooltipContent>
+                            </Tooltip>
+                          ))}
+                          {/* Tasks */}
+                          {dayTasks.slice(0, dayEvents.length > 0 ? 1 : 3).map(task => (
                             <Tooltip key={task._id}>
                               <TooltipTrigger asChild>
                                 <div
@@ -361,16 +471,16 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                               </TooltipContent>
                             </Tooltip>
                           ))}
-                          {getTasksForDate(date).length > 3 && (
+                          {totalItems > 3 && (
                             <div className="text-xs text-muted-foreground">
-                              +{getTasksForDate(date).length - 3} more
+                              +{totalItems - (dayEvents.length > 0 ? dayEvents.slice(0, 2).length + dayTasks.slice(0, 1).length : dayTasks.slice(0, 3).length)} more
                             </div>
                           )}
                         </div>
                       </>
                     )}
                   </div>
-                ))}
+                )})}
               </div>
             </CardContent>
           </Card>
@@ -396,20 +506,69 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-7 gap-1">
-                {getWeekDays(currentDate).map((date, index) => (
+                {getWeekDays(currentDate).map((date, index) => {
+                  const dayTasks = getTasksForDate(date)
+                  const dayEvents = getEventsForDate(date)
+                  const totalItems = dayTasks.length + dayEvents.length
+                  
+                  return (
                   <div key={index} className="min-h-[200px] p-2 border border-border">
                     <div className="flex items-center justify-between mb-2">
                       <span className={`text-sm font-medium ${isToday(date) ? 'text-primary' : 'text-foreground'
                         }`}>
                         {date.toLocaleDateString('en-US', { weekday: 'short' })}
                       </span>
-                      <span className={`text-sm ${isToday(date) ? 'text-primary font-medium' : 'text-muted-foreground'
-                        }`}>
-                        {date.getDate()}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        {totalItems > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            {totalItems}
+                          </Badge>
+                        )}
+                        <span className={`text-sm ${isToday(date) ? 'text-primary font-medium' : 'text-muted-foreground'
+                          }`}>
+                          {date.getDate()}
+                        </span>
+                      </div>
                     </div>
                     <div className="space-y-1">
-                      {getTasksForDate(date).map(task => (
+                      {/* Sprint Events */}
+                      {dayEvents.map(event => (
+                        <Tooltip key={event._id}>
+                          <TooltipTrigger asChild>
+                            <div
+                              className={`text-xs p-2 rounded bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/30 dark:to-indigo-900/30 border border-purple-200 dark:border-purple-800 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${getEventStatusColor(event.status)} border-l-2`}
+                              onClick={() => router.push(`/sprint-events/${event._id}`)}
+                            >
+                              <div className="font-medium truncate flex items-center gap-1">
+                                <Video className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                                {event.title}
+                                {event.isRecurringSeries && <Repeat className="h-2.5 w-2.5 text-muted-foreground" />}
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] text-muted-foreground">
+                                  {event.startTime || 'All day'}
+                                </span>
+                                <Badge className={`text-[10px] ${getEventTypeColor(event.eventType)}`}>
+                                  {formatToTitleCase(event.eventType.replace('_', ' '))}
+                                </Badge>
+                              </div>
+                              {event.attendees && event.attendees.length > 0 && (
+                                <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
+                                  <Users className="h-2.5 w-2.5" />
+                                  {event.attendees.length} attendee(s)
+                                </div>
+                              )}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="font-medium">{event.title}</p>
+                            <p className="text-xs">{formatToTitleCase(event.eventType.replace('_', ' '))}</p>
+                            {event.startTime && <p className="text-xs">{event.startTime} - {event.endTime || 'TBD'}</p>}
+                          </TooltipContent>
+                        </Tooltip>
+                      ))}
+                      {/* Tasks */}
+                      {dayTasks.map(task => (
                         <Tooltip key={task._id}>
                           <TooltipTrigger asChild>
                             <div
@@ -434,7 +593,7 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                       ))}
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             </CardContent>
           </Card>
@@ -460,18 +619,87 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 gap-4">
-                {getDayHours().map(hour => (
+                {getDayHours().map(hour => {
+                  const hourTasks = getTasksForDate(currentDate).filter(task => {
+                    if (!task.dueDate) return false
+                    const taskDate = new Date(task.dueDate)
+                    const taskHour = taskDate.getHours()
+                    return taskHour === hour
+                  })
+                  
+                  const hourEvents = getEventsForDate(currentDate).filter(event => {
+                    if (!event.startTime) return hour === 9 // Default to 9 AM for all-day events
+                    const [eventHour] = event.startTime.split(':').map(Number)
+                    return eventHour === hour
+                  })
+                  
+                  return (
                   <div key={hour} className="flex items-start space-x-4 p-3 border border-border rounded-lg">
                     <div className="w-16 text-sm text-muted-foreground">
                       {hour === 0 ? '12:00 AM' : hour < 12 ? `${hour}:00 AM` : hour === 12 ? '12:00 PM' : `${hour - 12}:00 PM`}
                     </div>
                     <div className="flex-1 space-y-2">
-                      {getTasksForDate(currentDate).filter(task => {
-                        if (!task.dueDate) return false
-                        const taskDate = new Date(task.dueDate)
-                        const taskHour = taskDate.getHours()
-                        return taskHour === hour
-                      }).map(task => (
+                      {/* Sprint Events for this hour */}
+                      {hourEvents.map(event => (
+                        <div
+                          key={event._id}
+                          className={`p-3 rounded bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/30 dark:to-indigo-900/30 border border-purple-200 dark:border-purple-800 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${getEventStatusColor(event.status)} border-l-4`}
+                          onClick={() => router.push(`/sprint-events/${event._id}`)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Video className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                            <span className="font-medium">{event.title}</span>
+                            {event.isRecurringSeries && <Repeat className="h-3 w-3 text-muted-foreground" />}
+                            <Badge className={`text-xs ${getEventTypeColor(event.eventType)}`}>
+                              {formatToTitleCase(event.eventType.replace('_', ' '))}
+                            </Badge>
+                          </div>
+                          {event.description && (
+                            <div className="text-sm text-muted-foreground mt-1">{event.description}</div>
+                          )}
+                          <div className="flex items-center flex-wrap gap-3 mt-2 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              <span>{event.startTime || 'All day'}{event.endTime ? ` - ${event.endTime}` : ''}</span>
+                            </div>
+                            {event.duration && (
+                              <span>({event.duration} min)</span>
+                            )}
+                            {event.attendees && event.attendees.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                <span>{event.attendees.length} attendee(s)</span>
+                              </div>
+                            )}
+                            {event.location && (
+                              <div className="flex items-center gap-1">
+                                <Target className="h-3 w-3" />
+                                <span>{event.location}</span>
+                              </div>
+                            )}
+                            {event.facilitator && (
+                              <div className="flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                <span>{event.facilitator.firstName} {event.facilitator.lastName}</span>
+                              </div>
+                            )}
+                          </div>
+                          {event.meetingLink && (
+                            <a 
+                              href={event.meetingLink} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 mt-2 text-xs text-purple-600 dark:text-purple-400 hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Video className="h-3 w-3" />
+                              Join Meeting
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                      {/* Tasks for this hour */}
+                      {hourTasks.map(task => (
                         <div
                           key={task._id}
                           className="p-3 rounded bg-card border shadow-sm cursor-pointer hover:shadow-md transition-shadow"
@@ -497,7 +725,7 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                       ))}
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             </CardContent>
           </Card>
