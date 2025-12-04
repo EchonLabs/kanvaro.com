@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.10.9...v1.11.0) (2025-12-04)
+
+
+### Features
+
+* add sprint event changes ([a44efda](https://github.com/EchonLabs/kanvaro.com/commit/a44efda56113a5ebafc98c1a9a43d5791b0bf2b3))
+
 ## [1.10.9](https://github.com/EchonLabs/kanvaro.com/compare/v1.10.8...v1.10.9) (2025-12-03)
 
 
