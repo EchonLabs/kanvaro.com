@@ -74,7 +74,27 @@ export async function POST(request: NextRequest) {
     try {
       const organizationName = invitation.organization?.name || 'Kanvaro'
       const roleDisplayName = invitation.roleDisplayName || formatToTitleCase(invitation.role) || 'Team Member'
-      const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/login`
+      
+      // Get base URL from request headers (same as invite route)
+      let baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      const forwardedHost = request.headers.get('x-forwarded-host')
+      const host = request.headers.get('host')
+      const forwardedProto = request.headers.get('x-forwarded-proto')
+      
+      if (forwardedHost || host) {
+        const protocol = forwardedProto || (request.url.startsWith('https') ? 'https' : 'http')
+        let hostValue = forwardedHost || host || ''
+        
+        // Clean up host (remove any protocol prefix, remove trailing slash, remove port if default)
+        hostValue = hostValue.replace(/^https?:\/\//, '').replace(/\/$/, '')
+        // Remove default ports
+        hostValue = hostValue.replace(/^(.+):80$/, '$1')
+        hostValue = hostValue.replace(/^(.+):443$/, '$1')
+        
+        baseUrl = `${protocol}://${hostValue}`
+      }
+      
+      const loginUrl = `${baseUrl}/login`
       
       const welcomeEmailHtml = emailService.generateWelcomeEmail(
         user.firstName,
