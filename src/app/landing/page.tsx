@@ -46,42 +46,42 @@ import {
 
 const modules = [
   {
-    icon: <ListChecks className="h-6 w-6 text-[#7bffde]" />,
+    icon: <ListChecks className="h-6 w-6 text-emerald-600 dark:text-[#7bffde]" />,
     name: 'Tasks & Agile Workspace',
     description: 'Kanban boards, backlog management, sprints, user stories, and epics. Full agile support with customizable workflows.',
     badge: 'Agile-ready',
     route: '/tasks'
   },
   {
-    icon: <Layers className="h-6 w-6 text-[#a0a7ff]" />,
+    icon: <Layers className="h-6 w-6 text-blue-600 dark:text-[#a0a7ff]" />,
     name: 'Projects & Portfolio',
     description: 'Create projects with templates, manage epics, track dependencies, and visualize roadmaps with Gantt charts.',
     badge: 'Portfolio view',
     route: '/projects'
   },
   {
-    icon: <Users className="h-6 w-6 text-[#ffc7ff]" />,
+    icon: <Users className="h-6 w-6 text-purple-600 dark:text-[#ffc7ff]" />,
     name: 'Team & Permissions',
     description: 'Invite team members, assign roles, manage permissions, and control access with granular role-based security.',
     badge: 'Role-based',
     route: '/team/members'
   },
   {
-    icon: <Watch className="h-6 w-6 text-[#9effff]" />,
+    icon: <Watch className="h-6 w-6 text-cyan-600 dark:text-[#9effff]" />,
     name: 'Time Tracking & Logs',
     description: 'Track billable hours, monitor capacity, approve time entries, and generate comprehensive time reports.',
     badge: 'Billable-ready',
     route: '/time-tracking'
   },
   {
-    icon: <BarChart3 className="h-6 w-6 text-[#ffdd8f]" />,
+    icon: <BarChart3 className="h-6 w-6 text-amber-600 dark:text-[#ffdd8f]" />,
     name: 'Reports & Analytics',
     description: 'Financial reports, team performance, project analytics, Gantt charts, and executive dashboards with real-time insights.',
     badge: 'Real-time',
     route: '/reports'
   },
   {
-    icon: <Activity className="h-6 w-6 text-[#9fc5ff]" />,
+    icon: <Activity className="h-6 w-6 text-indigo-600 dark:text-[#9fc5ff]" />,
     name: 'Test Management',
     description: 'Manage test suites, create test cases, plan executions, and generate comprehensive test reports for quality assurance.',
     badge: 'QA-focused',
@@ -121,38 +121,62 @@ const showcases = [
   {
     name: 'Tasks & Backlog',
     metric: 'Multi-view',
-    detail: 'Kanban boards, backlog, my tasks, user stories, and epics. Full agile workflow support with sprint planning.',
-    route: '/tasks'
+    detail: 'Comprehensive task management with Kanban boards, backlog grooming, my tasks view, user stories, and epics. Full agile workflow support with sprint planning and velocity tracking.',
+    route: '/modules/tasks',
+    icon: <ListChecks className="h-6 w-6" />,
+    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    iconBg: 'bg-emerald-50 dark:bg-emerald-900/30',
+    submodules: ['Kanban Board', 'Backlog', 'My Tasks', 'User Stories', 'Epics', 'Sprint Planning']
   },
   {
     name: 'Projects & Epics',
     metric: 'Portfolio',
-    detail: 'Project templates, epic management, Gantt charts, dependencies, and comprehensive project analytics.',
-    route: '/projects'
+    detail: 'Create and manage projects with customizable templates, epic management, Gantt chart visualization, dependency tracking, and comprehensive project analytics for informed decision-making.',
+    route: '/modules/projects',
+    icon: <Layers className="h-6 w-6" />,
+    iconColor: 'text-blue-600 dark:text-blue-400',
+    iconBg: 'bg-blue-50 dark:bg-blue-900/30',
+    submodules: ['Project Templates', 'Epic Management', 'Gantt Charts', 'Dependencies', 'Analytics']
   },
   {
     name: 'Team Management',
     metric: 'Role-based',
-    detail: 'Member invitations, custom roles, granular permissions, and team activity tracking with audit logs.',
-    route: '/team/members'
+    detail: 'Invite team members via email, create custom roles with granular permissions, track team activity in real-time, and maintain comprehensive audit logs for compliance and security.',
+    route: '/modules/team',
+    icon: <Users className="h-6 w-6" />,
+    iconColor: 'text-purple-600 dark:text-purple-400',
+    iconBg: 'bg-purple-50 dark:bg-purple-900/30',
+    submodules: ['Team Members', 'Roles & Permissions', 'Invitations', 'Activity Logs', 'Audit Trail']
   },
   {
     name: 'Time Tracking',
     metric: 'Billable-ready',
-    detail: 'Live timer, manual logs, approval workflows, capacity monitoring, and detailed time reports with export.',
-    route: '/time-tracking'
+    detail: 'Track time with live timers or manual entries, implement approval workflows, monitor team capacity, generate detailed time reports, and export data for invoicing and payroll.',
+    route: '/modules/time-tracking',
+    icon: <Watch className="h-6 w-6" />,
+    iconColor: 'text-cyan-600 dark:text-cyan-400',
+    iconBg: 'bg-cyan-50 dark:bg-cyan-900/30',
+    submodules: ['Live Timer', 'Time Logs', 'Approvals', 'Capacity Planning', 'Time Reports']
   },
   {
     name: 'Reports & Analytics',
     metric: 'Real-time',
-    detail: 'Financial reports, team performance, project Gantt charts, burn-up/down, and executive dashboards.',
-    route: '/reports'
+    detail: 'Access comprehensive financial reports, team performance dashboards, project Gantt charts, burn-up/down charts, velocity metrics, and executive-level analytics for strategic planning.',
+    route: '/modules/reports',
+    icon: <BarChart3 className="h-6 w-6" />,
+    iconColor: 'text-indigo-600 dark:text-indigo-400',
+    iconBg: 'bg-indigo-50 dark:bg-indigo-900/30',
+    submodules: ['Financial Reports', 'Team Performance', 'Gantt Charts', 'Burndown', 'Executive Dashboard']
   },
   {
     name: 'Test Management',
     metric: 'QA Suite',
-    detail: 'Test suites, test cases, execution plans, test reports, and quality metrics for comprehensive QA workflows.',
-    route: '/test-management'
+    detail: 'Organize test suites, create detailed test cases, plan and execute test runs, generate quality reports, and track metrics to ensure comprehensive quality assurance coverage.',
+    route: '/modules/test-management',
+    icon: <Activity className="h-6 w-6" />,
+    iconColor: 'text-rose-600 dark:text-rose-400',
+    iconBg: 'bg-rose-50 dark:bg-rose-900/30',
+    submodules: ['Test Suites', 'Test Cases', 'Execution Plans', 'Test Reports', 'Quality Metrics']
   }
 ]
 
@@ -229,13 +253,14 @@ export default function LandingPage() {
       setTimeout(() => {
         const element = document.getElementById(sectionId)
         if (element) {
-          const headerOffset = 100
-          const elementPosition = element.getBoundingClientRect().top
-          const offsetPosition = elementPosition + window.pageYOffset - headerOffset
+          // Get the element's position and scroll with proper offset
+          const headerOffset = 80
+          const elementPosition = element.getBoundingClientRect().top + window.scrollY
+          const offsetPosition = elementPosition - headerOffset
 
           // Use window.scrollTo with smooth behavior
           window.scrollTo({
-            top: Math.max(0, offsetPosition), // Ensure we don't scroll to negative position
+            top: Math.max(0, offsetPosition),
             behavior: 'smooth'
           })
           
@@ -245,7 +270,7 @@ export default function LandingPage() {
             document.documentElement.style.overflow = ''
           }, 500)
         }
-      }, 250) // Delay to ensure dropdown menu closes completely
+      }, 150) // Reduced delay for better responsiveness
     })
   }
 
@@ -264,7 +289,7 @@ export default function LandingPage() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#7bffde] to-[#7afdea] shadow-lg shadow-[#7bffde]/30 group-hover:shadow-[#7bffde]/50 transition-all duration-300 group-hover:scale-110">
                 <Zap className="h-5 w-5 text-slate-900" />
               </div>
-              <span className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-[#7bffde] dark:to-white bg-clip-text text-transparent group-hover:from-[#7bffde] group-hover:via-[#7afdea] group-hover:to-[#7bffde] dark:group-hover:from-[#7bffde] dark:group-hover:via-white dark:group-hover:to-[#7bffde] transition-all duration-300">
+              <span className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-[#7bffde] dark:to-white bg-clip-text text-transparent group-hover:from-[#0f766e] group-hover:via-[#14b8a6] group-hover:to-[#0f766e] dark:group-hover:from-[#7bffde] dark:group-hover:via-white dark:group-hover:to-[#7bffde] transition-all duration-300">
             Kanvaro
           </span>
             </button>
@@ -385,14 +410,14 @@ export default function LandingPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56 rounded-xl border-slate-200/80 bg-white/95 backdrop-blur-md shadow-xl dark:border-white/20 dark:bg-slate-900/95 dark:backdrop-blur-md p-2">
                   <DropdownMenuItem 
-                    onClick={() => window.open('/docs/public/installation', '_blank')}
+                    onClick={() => window.open('/docs/public/self-hosting/docker-deployment', '_blank')}
                     className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
                   >
                     <FileText className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
                     <span className="font-medium">Installation</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem 
-                    onClick={() => window.open('/docs/public/user-guide', '_blank')}
+                    onClick={() => window.open('/docs/public/concepts/features', '_blank')}
                     className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
                   >
                     <BookOpen className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
@@ -437,24 +462,30 @@ export default function LandingPage() {
               <Button
                 variant="ghost"
                 onClick={() => router.push('/login')}
-                className="hidden sm:flex text-sm font-medium"
+                className="hidden sm:flex text-sm font-medium hover:bg-slate-100 dark:hover:bg-[#7bffde]/20 dark:hover:text-[#7bffde]"
               >
                 Login
+              </Button>
+              <Button
+                onClick={() => router.push('/setup')}
+                className="h-10 rounded-full bg-[#0d9488] dark:bg-[#7bffde] px-6 text-sm font-semibold text-white dark:text-slate-900 hover:bg-[#0f766e] dark:hover:bg-[#5ce8c5] transition-all shadow-md"
+              >
+                Get Started
               </Button>
             </div>
           </div>
         </div>
-        <div className="relative mx-auto flex max-w-7xl flex-col gap-16 px-6 pt-8 pb-20 lg:flex-row lg:items-center lg:pt-12 lg:pb-32">
+        <div className="relative mx-auto flex max-w-7xl flex-col gap-16 px-6 pt-20 pb-20 lg:flex-row lg:items-center lg:pt-24 lg:pb-32">
           <div className="space-y-10 text-center lg:text-left lg:flex-1">
             <p className="inline-flex items-center gap-2 rounded-full border border-slate-300/60 bg-white/70 px-5 py-2 text-sm uppercase tracking-[0.3em] text-slate-600 dark:border-white/15 dark:bg-white/5 dark:text-white/80">
-              <Zap className="h-4 w-4 text-[#7bffde]" />
+              <Zap className="h-4 w-4 text-[#0d9488] dark:text-[#7bffde]" />
               All-in-One Project Management Platform
             </p>
             <div className="space-y-8">
-              <h1 className="text-3xl font-bold leading-tight text-slate-900 sm:text-4xl lg:text-[3rem] xl:text-[3.5rem] dark:text-white">
+              <h1 className="text-2xl font-bold leading-tight text-slate-900 sm:text-3xl lg:text-[2.5rem] xl:text-[3rem] dark:text-white">
                 <span className="block">Build, Track &</span>
                 <span className="block mt-1 sm:mt-2 lg:mt-3 xl:mt-4">Deliver With</span>
-                <span className="block mt-1 sm:mt-2 lg:mt-3 xl:mt-4 bg-gradient-to-r from-[#7bffde] to-[#7afdea] bg-clip-text text-transparent">Confidence</span>
+                <span className="block mt-1 sm:mt-2 lg:mt-3 xl:mt-4 bg-gradient-to-r from-[#0d9488] to-[#14b8a6] dark:from-[#7bffde] dark:to-[#7afdea] bg-clip-text text-transparent">Confidence</span>
               </h1>
               <p className="text-base text-slate-600 sm:text-lg lg:text-base xl:text-lg dark:text-white/80 leading-relaxed">
                 The complete project management solution for modern teams. Agile workflows, time tracking, financial management, and powerful analytics — all in one beautifully designed workspace.
@@ -462,9 +493,9 @@ export default function LandingPage() {
             </div>
             <div className="flex flex-col gap-4 sm:flex-row sm:justify-center lg:justify-start">
               <Button
-                onClick={() => router.push('/workspace')}
+                onClick={() => router.push('/setup')}
                 disabled={ctaLoading}
-                className="h-14 rounded-full bg-[#7bffde] px-10 text-base font-semibold text-slate-900 shadow-[0_20px_45px_rgba(123,255,222,0.35)] transition hover:-translate-y-1 hover:bg-[#62f5cf] disabled:opacity-70"
+                className="h-14 rounded-full bg-[#0d9488] dark:bg-[#7bffde] px-10 text-base font-semibold text-white dark:text-slate-900 shadow-[0_20px_45px_rgba(13,148,136,0.35)] dark:shadow-[0_20px_45px_rgba(123,255,222,0.35)] transition hover:-translate-y-1 hover:bg-[#0f766e] dark:hover:bg-[#62f5cf] disabled:opacity-70"
               >
                 {ctaLoading ? (
                   <>
@@ -564,7 +595,7 @@ export default function LandingPage() {
       {/* Unique Features Section */}
       <section id="unique-features" className="bg-[#f7f9ff] px-6 py-20 text-slate-900 dark:bg-[#040714] dark:text-white sm:py-28">
         <div className="mx-auto max-w-5xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#68ffde]">
+          <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#68ffde]">
             Unique Features
           </p>
           <h2 className="mt-4 text-3xl font-semibold sm:text-4xl">
@@ -578,33 +609,33 @@ export default function LandingPage() {
           {[
             {
               title: 'Self-Hosted',
-              description: 'Complete control over your data with Docker-based deployment. Host on your own infrastructure.',
-              icon: <Shield className="h-6 w-6 text-[#7bffde]" />,
-              color: 'from-[#7bffde]/10 to-[#7bffde]/5'
+              description: 'Complete control over your data with Docker-based deployment. Host on your own infrastructure with full data sovereignty. No third-party access, complete privacy, and compliance with your organization\'s security policies.',
+              icon: <Shield className="h-6 w-6 text-[#0d9488] dark:text-[#7bffde]" />,
+              color: 'from-[#0d9488]/10 to-[#0d9488]/5 dark:from-[#7bffde]/10 dark:to-[#7bffde]/5'
             },
             {
               title: 'Open Source',
-              description: 'Fully open-source with community-driven development. Customize and extend to fit your needs.',
-              icon: <Zap className="h-6 w-6 text-[#a0a7ff]" />,
-              color: 'from-[#a0a7ff]/10 to-[#a0a7ff]/5'
+              description: 'Fully open-source with community-driven development. Customize and extend to fit your needs. Any organization can configure the system and create their admin account as the first step to get started.',
+              icon: <Zap className="h-6 w-6 text-[#6366f1]" />,
+              color: 'from-[#6366f1]/10 to-[#6366f1]/5'
             },
             {
               title: 'Modern Stack',
-              description: 'Built with Next.js, Node.js, and MongoDB. Fast, scalable, and built for the modern web.',
-              icon: <Activity className="h-6 w-6 text-[#ffc7ff]" />,
-              color: 'from-[#ffc7ff]/10 to-[#ffc7ff]/5'
+              description: 'Built with Next.js, Node.js, and MongoDB for a fast, scalable, and modern experience. Enjoy real-time updates, server-side rendering, and a responsive UI that works seamlessly across all devices.',
+              icon: <Activity className="h-6 w-6 text-[#d946ef]" />,
+              color: 'from-[#d946ef]/10 to-[#d946ef]/5'
             },
             {
               title: 'Scalable',
-              description: 'Designed to grow with your team and project complexity. From startups to enterprises.',
-              icon: <TrendingUp className="h-6 w-6 text-[#9effff]" />,
-              color: 'from-[#9effff]/10 to-[#9effff]/5'
+              description: 'Designed to grow with your team and project complexity from startups to enterprises. Handle thousands of tasks, multiple projects, and large teams without performance degradation.',
+              icon: <TrendingUp className="h-6 w-6 text-[#06b6d4]" />,
+              color: 'from-[#06b6d4]/10 to-[#06b6d4]/5'
             },
             {
               title: 'Customizable',
-              description: 'Flexible architecture for custom workflows and integrations. Adapt to your processes.',
-              icon: <Layers className="h-6 w-6 text-[#ffdd8f]" />,
-              color: 'from-[#ffdd8f]/10 to-[#ffdd8f]/5'
+              description: 'Flexible architecture for custom workflows, integrations, and branding. Adapt the system to match your existing processes, create custom fields, and integrate with your favorite tools.',
+              icon: <Layers className="h-6 w-6 text-[#f59e0b]" />,
+              color: 'from-[#f59e0b]/10 to-[#f59e0b]/5'
             }
           ].map((feature, idx) => (
             <div
@@ -613,10 +644,10 @@ export default function LandingPage() {
             >
               <div className={`absolute inset-0 rounded-[24px] bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-100 transition-opacity duration-300 dark:opacity-20`} />
               <div className="relative z-10">
-                <div className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${feature.color} mb-5 group-hover:scale-110 transition-transform duration-300 dark:opacity-80`}>
+                <div className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${feature.color} mb-5 group-hover:scale-110 transition-transform duration-300`}>
                   {feature.icon}
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3 group-hover:text-[#7bffde] transition-colors">{feature.title}</h3>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3 group-hover:text-[#0d9488] dark:group-hover:text-[#7bffde] transition-colors">{feature.title}</h3>
                 <p className="text-sm text-slate-600 dark:text-white/80 leading-relaxed">{feature.description}</p>
               </div>
             </div>
@@ -627,7 +658,7 @@ export default function LandingPage() {
       {/* Key Features Section */}
       <section id="key-features" className="bg-gradient-to-b from-[#eef2ff] to-[#f9fbff] px-6 py-20 dark:from-[#050c1d] dark:to-[#030714] sm:py-28">
         <div className="mx-auto max-w-6xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#7bffde]">Key Features</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#7bffde]">Key Features</p>
           <h2 className="mt-4 text-3xl font-semibold sm:text-4xl lg:text-5xl">
             Core Project Management Features
           </h2>
@@ -662,6 +693,22 @@ export default function LandingPage() {
               features: ['Role-Based Access', 'Team Invitations', 'Activity Tracking', 'Audit Logs']
             },
             { 
+              name: 'Invoicing & Billing Capabilities', 
+              description: 'Generate professional invoices, track payments, manage billing cycles, and automate financial workflows.',
+              icon: <FileText className="h-6 w-6" />,
+              iconColor: 'text-rose-600 dark:text-rose-400',
+              iconBg: 'bg-rose-50 dark:bg-rose-900/30',
+              features: ['Invoice Generation', 'Payment Tracking', 'Billing Automation', 'Financial Reports']
+            },
+            { 
+              name: 'File Management & Document Sharing', 
+              description: 'Upload, organize, and share files securely. Attach documents to tasks, projects, and collaborate in real-time.',
+              icon: <Layers className="h-6 w-6" />,
+              iconColor: 'text-amber-600 dark:text-amber-400',
+              iconBg: 'bg-amber-50 dark:bg-amber-900/30',
+              features: ['File Uploads', 'Document Sharing', 'Version Control', 'Secure Storage']
+            },
+            { 
               name: 'Time Tracking & Reporting', 
               description: 'Track billable hours with built-in timers, approval workflows, and comprehensive time reports.',
               icon: <Watch className="h-6 w-6" />,
@@ -675,7 +722,7 @@ export default function LandingPage() {
               icon: <TrendingUp className="h-6 w-6" />,
               iconColor: 'text-orange-600 dark:text-orange-400',
               iconBg: 'bg-orange-50 dark:bg-orange-900/30',
-              features: ['Budget Tracking', 'Invoicing', 'Expense Management', 'ROI Analytics']
+              features: ['Budget Tracking', 'Cost Centers', 'Expense Management', 'ROI Analytics']
             },
             { 
               name: 'Reports & Analytics', 
@@ -697,7 +744,7 @@ export default function LandingPage() {
                     {feature.icon}
                   </div>
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2 group-hover:text-[#7bffde] transition-colors">{feature.name}</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2 group-hover:text-[#0d9488] dark:group-hover:text-[#7bffde] transition-colors">{feature.name}</h3>
                 <p className="text-sm text-slate-600 dark:text-white/80 mb-4 leading-relaxed">{feature.description}</p>
                 <div className="flex flex-wrap gap-2">
                   {feature.features.map((feat, i) => (
@@ -720,7 +767,7 @@ export default function LandingPage() {
       <section id="workflows" className="bg-gradient-to-b from-[#f9fbff] to-[#eef2ff] px-6 py-20 dark:from-[#030714] dark:to-[#050c1d] sm:py-28">
         <div className="mx-auto max-w-6xl">
           <div className="text-center mb-12">
-            <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#7bffde]">Workflows</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#7bffde]">Workflows</p>
             <h2 className="mt-4 text-3xl font-semibold sm:text-4xl lg:text-5xl">
               Streamlined Project Workflows
             </h2>
@@ -796,25 +843,16 @@ export default function LandingPage() {
       {/* Module Walkthrough Section */}
       <section id="module-walkthrough" className="bg-[#eef3ff] px-6 py-20 dark:bg-[#030611] sm:py-28">
         <div className="mx-auto max-w-6xl">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between mb-12">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#8adfff]">
-                Module Walkthrough
-              </p>
-              <h2 className="mt-3 text-3xl font-semibold sm:text-4xl">
-                Explore all system modules
-              </h2>
-              <p className="mt-4 text-slate-600 dark:text-white/80">
-                Discover each module's capabilities, submodules, and features. Click to explore detailed module information.
-              </p>
-            </div>
-            <Button
-              onClick={handleGetStarted}
-              disabled={ctaLoading}
-              className="h-12 rounded-full bg-slate-900 px-8 text-white hover:bg-slate-800 disabled:opacity-70 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
-            >
-              {ctaLoading ? 'Loading...' : 'Start Interactive Demo'}
-            </Button>
+          <div className="text-center mb-12">
+            <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#8adfff]">
+              Module Walkthrough
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold sm:text-4xl">
+              Explore all system modules
+            </h2>
+            <p className="mt-4 text-slate-600 dark:text-white/80 max-w-3xl mx-auto">
+              Discover each module's capabilities, submodules, and features. Click any module to explore detailed information, screenshots, and workflows.
+            </p>
           </div>
           <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {showcases.map(showcase => {
@@ -825,7 +863,7 @@ export default function LandingPage() {
                 'Team Management': 'members',
                 'Time Tracking': 'timeLogs',
                 'Reports & Analytics': 'reports',
-                'Test Management': 'reports' // Using reports image as placeholder
+                'Test Management': 'reports'
               }
               const imageKey = imageKeyMap[showcase.name]
               const imageUrl = imageKey ? images.showcaseImages?.[imageKey] : null
@@ -836,19 +874,40 @@ export default function LandingPage() {
                   className="group rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_25px_55px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_35px_65px_rgba(15,23,42,0.15)] dark:border-white/20 dark:bg-gradient-to-br dark:from-[#0f1329] dark:via-[#151c3d] dark:to-[#0a1f3b] dark:shadow-[0_25px_55px_rgba(0,0,0,0.6)] dark:hover:border-[#7bffde]/40 cursor-pointer"
                   onClick={() => showcase.route && router.push(showcase.route)}
                 >
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-semibold text-slate-900 dark:text-white group-hover:text-[#7bffde] transition-colors">{showcase.name}</h3>
-                    <span className="rounded-full bg-[#7bffde]/20 dark:bg-[#7bffde]/30 px-3 py-1 text-xs font-semibold text-[#2bbfa1] dark:text-[#7bffde]">{showcase.metric}</span>
-                  </div>
-                  <p className="mt-3 text-sm text-slate-600 dark:text-white/80 leading-relaxed">{showcase.detail}</p>
-                  {imageUrl ? (
-                    <div className="mt-6 relative aspect-[16/10] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 group-hover:border-[#7bffde]/50 transition-all duration-300 shadow-lg hover:shadow-xl">
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
-                      <div className="absolute top-4 right-4 z-20 bg-[#7bffde]/90 backdrop-blur-sm rounded-lg px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span className="text-xs font-semibold text-slate-900 flex items-center gap-1">
-                          Explore <ArrowRight className="h-3 w-3" />
-                        </span>
+                  {/* Module Header with Icon */}
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${showcase.iconBg} shadow-md group-hover:scale-110 transition-transform duration-300`}>
+                      <div className={showcase.iconColor}>
+                        {showcase.icon}
                       </div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-semibold text-slate-900 dark:text-white group-hover:text-[#0d9488] dark:group-hover:text-[#7bffde] transition-colors">{showcase.name}</h3>
+                        <span className="rounded-full bg-[#0d9488]/10 dark:bg-[#7bffde]/20 px-3 py-1 text-xs font-semibold text-[#0d9488] dark:text-[#7bffde]">{showcase.metric}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Module Description */}
+                  <p className="text-sm text-slate-600 dark:text-white/80 leading-relaxed mb-4">{showcase.detail}</p>
+
+                  {/* Submodules */}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {showcase.submodules.map((submodule, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-white/10 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-white/80"
+                      >
+                        {submodule}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Module Preview Image */}
+                  {imageUrl ? (
+                    <div className="relative aspect-[16/10] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 group-hover:border-[#0d9488]/50 dark:group-hover:border-[#7bffde]/50 transition-all duration-300 shadow-lg hover:shadow-xl">
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
                       <Image
                         src={imageUrl}
                         alt={showcase.name}
@@ -858,23 +917,17 @@ export default function LandingPage() {
                       />
                     </div>
                   ) : (
-                    <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-xs uppercase tracking-[0.4em] text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-white/40">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-xs uppercase tracking-[0.4em] text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-white/40">
                       Module Preview
                     </div>
                   )}
+
+                  {/* Click to Explore CTA */}
                   <div className="mt-6 pt-4 border-t border-slate-200 dark:border-white/10">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-[#7bffde]">
-                        <span>Click to Explore</span>
-                        <ArrowRight className="h-4 w-4" />
-                      </div>
-                      <span className="text-xs text-slate-500 dark:text-white/60">
-                        View details →
-                      </span>
-                    </div>
-                    <p className="mt-2 text-xs text-slate-500 dark:text-white/60">
-                      Module overview • Submodules • Key features • Screenshots
-                    </p>
+                    <button className="w-full flex items-center justify-center gap-2 rounded-full bg-[#0d9488]/10 dark:bg-[#7bffde]/20 py-3 text-sm font-semibold text-[#0d9488] dark:text-[#7bffde] hover:bg-[#0d9488]/20 dark:hover:bg-[#7bffde]/30 transition-colors group-hover:bg-[#0d9488] group-hover:text-white dark:group-hover:bg-[#7bffde] dark:group-hover:text-slate-900">
+                      <span>Click to Explore</span>
+                      <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    </button>
                   </div>
                 </div>
               )
@@ -886,7 +939,7 @@ export default function LandingPage() {
       <section id="reporting-analytics" className="bg-gradient-to-b from-[#f2f6ff] to-[#eef3ff] px-6 py-20 dark:from-[#050a1c] dark:to-[#030610] sm:py-28">
         <div className="mx-auto max-w-6xl">
           <div className="text-center mb-12">
-            <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#7bffde]">
+            <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#7bffde]">
               Comprehensive Reporting & Analytics
             </p>
             <h2 className="mt-4 text-3xl font-semibold sm:text-4xl">
@@ -902,29 +955,29 @@ export default function LandingPage() {
               { 
                 name: 'Financial Reports', 
                 desc: 'Budget tracking, expenses, invoicing, and financial analytics with cost center breakdowns',
-                icon: <TrendingUp className="h-5 w-5 text-[#7bffde]" />
+                icon: <TrendingUp className="h-5 w-5 text-[#0d9488] dark:text-[#7bffde]" />
               },
               { 
                 name: 'Team Reports', 
                 desc: 'Performance metrics, workload analysis, team productivity, and utilization dashboards',
-                icon: <Users className="h-5 w-5 text-[#a0a7ff]" />
+                icon: <Users className="h-5 w-5 text-[#6366f1]" />
               },
               { 
                 name: 'Project Reports', 
                 desc: 'Gantt charts, progress tracking, project health dashboards, and milestone analytics',
-                icon: <Layers className="h-5 w-5 text-[#ffc7ff]" />
+                icon: <Layers className="h-5 w-5 text-[#d946ef]" />
               },
               { 
                 name: 'Time Reports', 
                 desc: 'Billable hours, capacity planning, utilization analytics, and time entry approvals',
-                icon: <Watch className="h-5 w-5 text-[#9effff]" />
+                icon: <Watch className="h-5 w-5 text-[#06b6d4]" />
               }
             ].map((report, idx) => (
               <div
                 key={report.name}
                 className="group rounded-[24px] border border-slate-200 bg-white p-6 shadow-[0_15px_35px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(15,23,42,0.12)] dark:border-white/20 dark:bg-gradient-to-br dark:from-[#0f1329] dark:via-[#151c3d] dark:to-[#0a1f3b] dark:shadow-[0_20px_45px_rgba(0,0,0,0.6)]"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#7bffde]/10 dark:bg-[#7bffde]/20 mb-4 group-hover:bg-[#7bffde]/20 dark:group-hover:bg-[#7bffde]/30 transition-colors">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0d9488]/10 dark:bg-[#7bffde]/20 mb-4 group-hover:bg-[#0d9488]/20 dark:group-hover:bg-[#7bffde]/30 transition-colors">
                   {report.icon}
                 </div>
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{report.name}</h3>
@@ -938,7 +991,7 @@ export default function LandingPage() {
       <section id="team-collaboration" className="bg-[#f7f9ff] px-6 py-20 dark:bg-[#040714] sm:py-28">
         <div className="mx-auto max-w-6xl">
           <div className="text-center mb-12">
-            <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#7bffde]">
+            <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#7bffde]">
               Team Collaboration
             </p>
             <h2 className="mt-4 text-3xl font-semibold sm:text-4xl">
@@ -952,17 +1005,17 @@ export default function LandingPage() {
           <div className="grid gap-6 md:grid-cols-3">
             {[
               {
-                icon: <Users className="h-6 w-6 text-[#7bffde]" />,
+                icon: <Users className="h-6 w-6 text-[#0d9488] dark:text-[#7bffde]" />,
                 title: 'Team Invitations',
                 description: 'Invite team members via email, assign roles, and manage access with granular permissions.'
               },
               {
-                icon: <Shield className="h-6 w-6 text-[#a0a7ff]" />,
+                icon: <Shield className="h-6 w-6 text-[#6366f1]" />,
                 title: 'Role-Based Access',
                 description: 'Custom roles with fine-grained permissions. Control who can view, edit, or manage projects and tasks.'
               },
               {
-                icon: <Activity className="h-6 w-6 text-[#ffc7ff]" />,
+                icon: <Activity className="h-6 w-6 text-[#d946ef]" />,
                 title: 'Activity Tracking',
                 description: 'Real-time activity feeds, notifications, and audit logs to keep everyone informed and accountable.'
               }
@@ -985,46 +1038,46 @@ export default function LandingPage() {
       <section id="get-started" className="bg-gradient-to-b from-[#eef2ff] to-[#f4f6fb] px-6 py-20 dark:from-[#030611] dark:to-[#040714] sm:py-28">
         <div className="mx-auto max-w-5xl">
           <div className="rounded-[40px] border border-slate-200 bg-gradient-to-br from-white via-[#f6f7fb] to-[#eef2ff] p-12 text-center shadow-[0_30px_70px_rgba(15,23,42,0.12)] dark:border-white/10 dark:bg-gradient-to-br dark:from-[#0f1329] dark:via-[#151c3d] dark:to-[#0a1f3b] dark:shadow-[0_35px_75px_rgba(3,7,17,0.85)]">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#7bffde]/10 dark:bg-[#7bffde]/20 px-4 py-2 mb-6">
-              <Zap className="h-4 w-4 text-[#7bffde]" />
-              <span className="text-sm font-semibold text-[#7bffde]">Get Started Today</span>
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#0d9488]/10 dark:bg-[#7bffde]/20 px-4 py-2 mb-6">
+              <Zap className="h-4 w-4 text-[#0d9488] dark:text-[#7bffde]" />
+              <span className="text-sm font-semibold text-[#0d9488] dark:text-[#7bffde]">Get Started Today</span>
         </div>
             <h2 className="text-3xl font-bold text-slate-900 dark:text-white sm:text-4xl lg:text-5xl">
             Ready to transform your project management?
           </h2>
             <p className="mt-6 text-lg text-slate-600 dark:text-white/90 max-w-2xl mx-auto leading-relaxed">
-              Join thousands of teams already using Kanvaro to deliver projects on time, track every hour, and make data-driven decisions.
+              Explore Kanvaro without signing up. Take a guided tour to discover all features, or chat with our team for personalized assistance.
           </p>
             <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center">
             <Button
-                onClick={() => router.push('/workspace')}
+                onClick={() => setShowVideoModal(true)}
               disabled={ctaLoading}
-                className="h-14 rounded-full bg-[#7bffde] px-10 text-base font-bold text-slate-900 shadow-[0_20px_45px_rgba(123,255,222,0.35)] hover:bg-[#68f0cf] hover:shadow-[0_25px_55px_rgba(123,255,222,0.45)] disabled:opacity-70 transition-all dark:text-slate-900"
+                className="h-14 rounded-full bg-[#0d9488] dark:bg-[#7bffde] px-10 text-base font-bold text-white dark:text-slate-900 shadow-[0_20px_45px_rgba(13,148,136,0.35)] dark:shadow-[0_20px_45px_rgba(123,255,222,0.35)] hover:bg-[#0f766e] dark:hover:bg-[#68f0cf] hover:shadow-[0_25px_55px_rgba(13,148,136,0.45)] dark:hover:shadow-[0_25px_55px_rgba(123,255,222,0.45)] disabled:opacity-70 transition-all"
             >
-                Get Started Free
-                <ArrowRight className="ml-2 h-5 w-5" />
+                <Play className="mr-2 h-5 w-5" />
+                Start the Guided Tour
             </Button>
             <Button
               variant="outline"
-                onClick={() => setShowVideoModal(true)}
+                onClick={() => window.open('mailto:team@kanvaro.com?subject=Product%20Inquiry', '_blank')}
                 className="h-14 rounded-full border-2 border-slate-300 bg-white px-10 text-base font-semibold text-slate-900 hover:bg-slate-50 dark:border-white/40 dark:bg-transparent dark:text-white dark:hover:bg-white/20"
             >
-                <Play className="mr-2 h-5 w-5" />
-                Watch Demo
+                <MessageCircle className="mr-2 h-5 w-5" />
+                Chat with the Team
             </Button>
             </div>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-slate-500 dark:text-white/70">
               <div className="flex items-center gap-2">
                 <Shield className="h-4 w-4" />
-                <span>No credit card required</span>
+                <span>No signup required to explore</span>
               </div>
               <div className="flex items-center gap-2">
                 <Zap className="h-4 w-4" />
-                <span>Free forever for small teams</span>
+                <span>Open source & self-hosted</span>
               </div>
               <div className="flex items-center gap-2">
                 <Layers className="h-4 w-4" />
-                <span>Self-hosting available</span>
+                <span>Full control over your data</span>
               </div>
             </div>
           </div>
@@ -1035,7 +1088,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl">
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-5 mb-12">
             {/* Company Info */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 lg:pl-4">
               <div className="flex items-center gap-2 mb-4">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#7bffde] to-[#7afdea] shadow-lg shadow-[#7bffde]/30">
                   <Zap className="h-5 w-5 text-slate-900" />
@@ -1043,8 +1096,25 @@ export default function LandingPage() {
                 <span className="text-xl font-bold text-white">Kanvaro</span>
               </div>
               <p className="text-sm text-white/70 leading-relaxed max-w-md">
-                The complete project management platform for modern teams. Built for agile workflows, time tracking, and financial management.
+                The complete open-source project management platform for modern teams. Self-hosted, customizable, and built for agile workflows, time tracking, and financial management. Deploy on your infrastructure with full data control.
               </p>
+            </div>
+
+            {/* Company Column */}
+            <div>
+              <h3 className="font-semibold text-white mb-4">Company</h3>
+              <ul className="space-y-3">
+                <li>
+                  <Link href="/about" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    About
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/contact" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    Contact
+                  </Link>
+                </li>
+              </ul>
             </div>
 
             {/* Product Column */}
@@ -1052,23 +1122,13 @@ export default function LandingPage() {
               <h3 className="font-semibold text-white mb-4">Product</h3>
               <ul className="space-y-3">
                 <li>
-                  <Link href="/tasks" className="text-white/70 hover:text-[#7bffde] transition-colors">
-                    Task Management
+                  <Link href="/roadmap" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    Roadmap
                   </Link>
                 </li>
                 <li>
-                  <Link href="/projects" className="text-white/70 hover:text-[#7bffde] transition-colors">
-                    Projects
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/time-tracking" className="text-white/70 hover:text-[#7bffde] transition-colors">
-                    Time Tracking
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/reports" className="text-white/70 hover:text-[#7bffde] transition-colors">
-                    Reports & Analytics
+                  <Link href="/feedback" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    Feedback
                   </Link>
                 </li>
               </ul>
@@ -1079,50 +1139,13 @@ export default function LandingPage() {
               <h3 className="font-semibold text-white mb-4">Resources</h3>
               <ul className="space-y-3">
                 <li>
-                  <Link href="/docs/public/user-guide" target="_blank" className="text-white/70 hover:text-[#7bffde] transition-colors">
-                    Documentation
+                  <Link href="/blog" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    Blogs
                   </Link>
                 </li>
                 <li>
-                  <Link href="/docs/public/installation" target="_blank" className="text-white/70 hover:text-[#7bffde] transition-colors">
-                    Docker Deployment
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/docs/public/user-guide" target="_blank" className="text-white/70 hover:text-[#7bffde] transition-colors">
-                    Setup Wizard Guide
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/docs/public/installation" target="_blank" className="text-white/70 hover:text-[#7bffde] transition-colors">
-                    Database Setup
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            {/* Self-Hosting Column */}
-            <div>
-              <h3 className="font-semibold text-white mb-4">Self-Hosting</h3>
-              <ul className="space-y-3">
-                <li>
-                  <Link href="/docs/public/installation" target="_blank" className="text-white/70 hover:text-[#7bffde] transition-colors">
-                    Deployment Guide
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/docs/public/user-guide" target="_blank" className="text-white/70 hover:text-[#7bffde] transition-colors">
-                    Setup Wizard
-                  </Link>
-                </li>
-                <li>
-                  <Link href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-white/70 hover:text-[#7bffde] transition-colors">
-                    GitHub Repository
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/docs/public/installation" target="_blank" className="text-white/70 hover:text-[#7bffde] transition-colors">
-                    API Reference
+                  <Link href="/docs/public/concepts/features" target="_blank" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                    User Guide
                   </Link>
                 </li>
               </ul>
@@ -1130,13 +1153,13 @@ export default function LandingPage() {
           </div>
 
           {/* Bottom Section */}
-          <div className="border-t border-white/10 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-white/60 text-xs">
+          <div className="border-t border-white/10 pt-8 flex flex-col items-center gap-4">
+            <p className="text-white/60 text-xs text-center">
               © {new Date().getFullYear()} Kanvaro. All rights reserved.
             </p>
             <div className="flex items-center gap-4">
               <Link 
-                href="https://github.com" 
+                href="https://github.com/kanvaro" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="text-white/70 hover:text-[#7bffde] transition-colors"
@@ -1145,7 +1168,7 @@ export default function LandingPage() {
                 <Github className="h-5 w-5" />
               </Link>
               <Link 
-                href="https://www.twitter.com" 
+                href="https://twitter.com/kanvaro" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="text-white/70 hover:text-[#7bffde] transition-colors"
@@ -1154,7 +1177,7 @@ export default function LandingPage() {
                 <Twitter className="h-5 w-5" />
               </Link>
               <Link 
-                href="https://www.linkedin.com" 
+                href="https://linkedin.com/company/kanvaro" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="text-white/70 hover:text-[#7bffde] transition-colors"

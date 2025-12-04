@@ -65,10 +65,12 @@ export async function GET(request: NextRequest) {
       filters.isActive = false
     }
 
-    // Get members with custom role information
+    // Get members with custom role and partner information
     const members = await User.find(filters)
       .select('-password')
       .populate('customRole', 'name description')
+      .populate('projectManager', 'firstName lastName email role')
+      .populate('humanResourcePartner', 'firstName lastName email role')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)

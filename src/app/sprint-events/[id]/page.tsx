@@ -421,7 +421,7 @@ export default function SprintEventDetailsPage() {
                       href={event.meetingLink} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-primary hover:underline"
+                      className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
                     >
                       {event.meetingLink}
                     </a>
@@ -440,6 +440,98 @@ export default function SprintEventDetailsPage() {
                   <div className="prose max-w-none">
                     <p className="whitespace-pre-wrap">{event.description}</p>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Event Outcomes */}
+            {event.outcomes && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Event Outcomes</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Decisions Made */}
+                  {event.outcomes.decisions && event.outcomes.decisions.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        Decisions Made
+                      </h4>
+                      <ul className="space-y-2">
+                        {event.outcomes.decisions.map((decision, index) => (
+                          decision.trim() && (
+                            <li key={index} className="flex items-start gap-2">
+                              <span className="text-muted-foreground mt-1">•</span>
+                              <span className="flex-1">{decision}</span>
+                            </li>
+                          )
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Action Items */}
+                  {event.outcomes.actionItems && event.outcomes.actionItems.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Target className="h-4 w-4" />
+                        Action Items
+                      </h4>
+                      <div className="space-y-3">
+                        {event.outcomes.actionItems.map((item, index) => (
+                          item.description.trim() && (
+                            <div key={index} className="border rounded-md p-3 space-y-2">
+                              <p className="font-medium">{item.description}</p>
+                              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                                {item.assignedTo && (
+                                  <div className="flex items-center gap-1">
+                                    <Users className="h-3 w-3" />
+                                    <span>
+                                      {typeof item.assignedTo === 'object' && item.assignedTo !== null
+                                        ? `${(item.assignedTo as unknown as { firstName?: string; lastName?: string }).firstName || ''} ${(item.assignedTo as unknown as { firstName?: string; lastName?: string }).lastName || ''}`.trim() || 'Unassigned'
+                                        : item.assignedTo || 'Unassigned'}
+                                    </span>
+                                  </div>
+                                )}
+                                {item.dueDate && (
+                                  <div className="flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    <span>Due {format(new Date(item.dueDate), 'MMM dd, yyyy')}</span>
+                                  </div>
+                                )}
+                                {item.status && (
+                                  <Badge variant={item.status === 'completed' ? 'outline' : 'secondary'}>
+                                    {item.status === 'completed' ? 'Completed' : item.status === 'in_progress' ? 'In Progress' : 'Pending'}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  {event.outcomes.notes && event.outcomes.notes.trim() && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Notes
+                      </h4>
+                      <div className="prose max-w-none">
+                        <p className="whitespace-pre-wrap text-sm">{event.outcomes.notes}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Show message if no outcomes */}
+                  {(!event.outcomes.decisions || event.outcomes.decisions.length === 0) &&
+                   (!event.outcomes.actionItems || event.outcomes.actionItems.length === 0) &&
+                   (!event.outcomes.notes || !event.outcomes.notes.trim()) && (
+                    <p className="text-sm text-muted-foreground">No outcomes recorded yet.</p>
+                  )}
                 </CardContent>
               </Card>
             )}

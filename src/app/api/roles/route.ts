@@ -3,7 +3,7 @@ import connectDB from '@/lib/db-config'
 import { authenticateUser } from '@/lib/auth-utils'
 import { CustomRole } from '@/models/CustomRole'
 import { User } from '@/models/User'
-import { Permission } from '@/lib/permissions/permission-definitions'
+import { Permission, Role, ROLE_PERMISSIONS } from '@/lib/permissions/permission-definitions'
 
 /**
  * Get predefined system role names
@@ -15,7 +15,8 @@ function getPredefinedRoleNames(): string[] {
     'Project Manager',
     'Team Member',
     'Client',
-    'Viewer'
+    'Viewer',
+    'Human Resource'
   ]
 }
 
@@ -34,16 +35,25 @@ export async function GET(req: NextRequest) {
     // Get system roles (predefined)
     const systemRoles = [
       {
-        _id: 'admin',
+        _id: Role.ADMIN,
         name: 'Administrator',
         description: 'Full access to all features and settings',
-        permissions: Object.values(Permission),
+        permissions: ROLE_PERMISSIONS[Role.ADMIN],
         isSystem: true,
         userCount: 1,
         createdAt: new Date().toISOString()
       },
       {
-        _id: 'project_manager',
+        _id: Role.HUMAN_RESOURCE,
+        name: 'Human Resource',
+        description: 'Manages people operations and HR processes',
+        permissions: ROLE_PERMISSIONS[Role.HUMAN_RESOURCE],
+        isSystem: true,
+        userCount: 0,
+        createdAt: new Date().toISOString()
+      },
+      {
+        _id: Role.PROJECT_MANAGER,
         name: 'Project Manager',
         description: 'Can manage projects and assign tasks to team members',
         permissions: [
@@ -62,7 +72,7 @@ export async function GET(req: NextRequest) {
         createdAt: new Date().toISOString()
       },
       {
-        _id: 'team_member',
+        _id: Role.TEAM_MEMBER,
         name: 'Team Member',
         description: 'Can work on assigned tasks and projects',
         permissions: [
@@ -79,7 +89,7 @@ export async function GET(req: NextRequest) {
         createdAt: new Date().toISOString()
       },
       {
-        _id: 'client',
+        _id: Role.CLIENT,
         name: 'Client',
         description: 'Read-only access to assigned projects',
         permissions: [
@@ -92,7 +102,7 @@ export async function GET(req: NextRequest) {
         createdAt: new Date().toISOString()
       },
       {
-        _id: 'viewer',
+        _id: Role.VIEWER,
         name: 'Viewer',
         description: 'Read-only access to assigned content',
         permissions: [
