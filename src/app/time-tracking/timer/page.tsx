@@ -1332,6 +1332,7 @@ export default function TimerPage() {
             taskId={selectedTask || undefined}
             refreshKey={timeLogsRefreshKey}
             liveActiveTimer={liveActiveTimer}
+            showSelectionAndApproval={false}
           />
         )}
       </div>

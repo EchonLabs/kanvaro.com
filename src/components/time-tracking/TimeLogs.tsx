@@ -19,6 +19,7 @@ import { useFeaturePermissions, usePermissions } from '@/lib/permissions/permiss
 import { Permission } from '@/lib/permissions/permission-definitions'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { toast } from 'sonner'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface TimeLogsProps {
   userId: string
@@ -28,6 +29,7 @@ interface TimeLogsProps {
   onTimeEntryUpdate?: () => void
   refreshKey?: number
   liveActiveTimer?: ActiveTimerPayload | null
+  showSelectionAndApproval?: boolean // Default true - controls checkbox selection and approval flow
 }
 
 interface TimeEntry {
@@ -74,7 +76,8 @@ export function TimeLogs({
   taskId,
   onTimeEntryUpdate,
   refreshKey = 0,
-  liveActiveTimer
+  liveActiveTimer,
+  showSelectionAndApproval = true
 }: TimeLogsProps) {
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -1737,22 +1740,22 @@ export function TimeLogs({
             Time Logs */}
           </CardTitle>
           {canAddManualTimeLog && (
-            <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 w-full xs:w-auto">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <Button
                 onClick={() => setShowBulkUploadModal(true)}
                 size="sm"
                 variant="outline"
-                className="w-full xs:w-auto sm:w-auto justify-center h-9 sm:h-10 text-xs sm:text-sm"
+                className="h-8 sm:h-8 px-3 text-xs justify-start w-full sm:w-auto"
               >
-                <Upload className="h-4 w-4 mr-2 flex-shrink-0" />
+                <Upload className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                 <span className="whitespace-nowrap">Bulk Upload</span>
               </Button>
               <Button
                 onClick={() => setShowAddTimeLogModal(true)}
                 size="sm"
-                className="w-full xs:w-auto sm:w-auto justify-center h-9 sm:h-10 text-xs sm:text-sm"
+                className="h-8 sm:h-8 px-3 text-xs justify-start w-full sm:w-auto"
               >
-                <Plus className="h-4 w-4 mr-2 flex-shrink-0" />
+                <Plus className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                 <span className="whitespace-nowrap">Add Time Log</span>
               </Button>
             </div>
@@ -2034,23 +2037,25 @@ export function TimeLogs({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5 sm:space-y-2 min-w-0">
-              <Label htmlFor="isApproved" className="text-xs sm:text-sm font-medium">Approved</Label>
-              <Select value={filters.isApproved} onValueChange={(value) => handleFilterChange('isApproved', value)}>
-                <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
-                  <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="true">Approved</SelectItem>
-                  <SelectItem value="false">Pending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {showSelectionAndApproval && (
+              <div className="space-y-1.5 sm:space-y-2 min-w-0">
+                <Label htmlFor="isApproved" className="text-xs sm:text-sm font-medium">Approved</Label>
+                <Select value={filters.isApproved} onValueChange={(value) => handleFilterChange('isApproved', value)}>
+                  <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="true">Approved</SelectItem>
+                    <SelectItem value="false">Pending</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           {/* Clear Filters Button */}
-          {(filters.projectId || filters.taskId || filters.employeeId || filters.startDate || filters.endDate || filters.status !== '' || filters.isBillable !== '' || filters.isApproved !== '') && (
+          {(filters.projectId || filters.taskId || filters.employeeId || filters.startDate || filters.endDate || filters.status !== '' || filters.isBillable !== '' || (showSelectionAndApproval && filters.isApproved !== '')) && (
             <div className="flex justify-start sm:justify-end pt-2">
               <Button
                 variant="outline"
@@ -2083,7 +2088,7 @@ export function TimeLogs({
         </div>
 
         {/* Bulk Actions */}
-        {selectedEntries.length > 0 && (
+        {showSelectionAndApproval && selectedEntries.length > 0 && (
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 sm:p-4 bg-muted rounded-lg w-full overflow-x-hidden">
             <span className="text-xs sm:text-sm text-muted-foreground flex-1 min-w-0 break-words">
               {selectedEntries.length} {selectedEntries.length === 1 ? 'entry' : 'entries'} selected
@@ -2125,13 +2130,21 @@ export function TimeLogs({
           ) : (
             <div className="space-y-2 w-full overflow-x-hidden">
               {/* Table Header - Hidden on mobile */}
-              <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium overflow-x-auto ${canApproveTime ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]' : 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)]'}`}>
-                <div>
-                  <Checkbox
-                    checked={allSelected}
-                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
-                  />
-                </div>
+              <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium overflow-x-auto ${
+                showSelectionAndApproval && canApproveTime 
+                  ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]' 
+                  : showSelectionAndApproval
+                    ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]'
+                    : 'grid-cols-[minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)]'
+              }`}>
+                {showSelectionAndApproval && (
+                  <div>
+                    <Checkbox
+                      checked={allSelected}
+                      onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                    />
+                  </div>
+                )}
                 <div>Description</div>
                 <div>Project (Task)</div>
                 <div>Employee</div>
@@ -2140,8 +2153,8 @@ export function TimeLogs({
                 <div>Duration</div>
                 <div>Status</div>
                 <div>Billable</div>
-                <div>Approval</div>
-                {canApproveTime && <div>Actions</div>}
+                {showSelectionAndApproval && <div>Approval</div>}
+                <div>Actions</div>
               </div>
 
               {/* Table Rows */}
@@ -2151,7 +2164,7 @@ export function TimeLogs({
                   <div className="md:hidden p-3 space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
-                        {!entry.__isActive && (
+                        {showSelectionAndApproval && !entry.__isActive && (
                           <Checkbox
                             checked={selectedEntries.includes(entry._id)}
                             onCheckedChange={(checked) => handleSelectEntry(entry._id, checked as boolean)}
@@ -2160,20 +2173,34 @@ export function TimeLogs({
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm truncate" title={entry.description}>{entry.description}</div>
-                          <div className="text-xs text-muted-foreground truncate mt-1">
-                            {entry?.project?.name ? (
-                              <>
-                                <span className="text-foreground">{entry.project.name}</span>
-                                {entry?.task?.title ? (
-                                  <span className="text-muted-foreground"> • {entry.task.title}</span>
-                                ) : entry.task ? (
-                                  <span className="text-muted-foreground italic"> • Task deleted</span>
-                                ) : null}
-                              </>
-                            ) : (
-                              <span className="text-muted-foreground italic">Project deleted or unavailable</span>
-                            )}
-                          </div>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="text-xs text-muted-foreground truncate mt-1 cursor-default">
+                                  {entry?.project?.name ? (
+                                    <>
+                                      <span className="text-foreground">{entry.project.name}</span>
+                                      {entry?.task?.title ? (
+                                        <span className="text-muted-foreground"> ({entry.task.title})</span>
+                                      ) : entry.task ? (
+                                        <span className="text-muted-foreground italic"> (Task deleted)</span>
+                                      ) : null}
+                                    </>
+                                  ) : (
+                                    <span className="text-muted-foreground italic">Project deleted or unavailable</span>
+                                  )}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>
+                                  {entry?.project?.name 
+                                    ? `${entry.project.name}${entry?.task?.title ? `(${entry.task.title})` : entry.task ? '(Task deleted)' : ''}`
+                                    : 'Project deleted or unavailable'
+                                  }
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       </div>
                     </div>
@@ -2220,18 +2247,20 @@ export function TimeLogs({
                         {entry.isBillable ? 'Billable' : 'Non-billable'}
                       </Badge>
                     </div>
-                    <div>
-                      <div className="text-muted-foreground">Approval</div>
-                      <div className="mt-1">
-                        <Badge 
-                          variant={entry.isApproved ? 'default' : 'secondary'} 
-                          className="text-xs"
-                        >
-                          {entry.isApproved ? 'Approved' : 'Pending'}
-                        </Badge>
+                    {showSelectionAndApproval && (
+                      <div>
+                        <div className="text-muted-foreground">Approval</div>
+                        <div className="mt-1">
+                          <Badge 
+                            variant={entry.isApproved ? 'default' : 'secondary'} 
+                            className="text-xs"
+                          >
+                            {entry.isApproved ? 'Approved' : 'Pending'}
+                          </Badge>
+                        </div>
                       </div>
-                    </div>
-                    {canApproveTime && !entry.__isActive && (
+                    )}
+                    {showSelectionAndApproval && canApproveTime && !entry.__isActive && (
                       <div>
                         <div className="text-muted-foreground">Actions</div>
                         <div className="mt-1 flex gap-1">
@@ -2260,37 +2289,59 @@ export function TimeLogs({
                   </div>
 
                   {/* Desktop Table View */}
-                  <div className={`hidden md:grid gap-2 p-3 overflow-x-auto ${canApproveTime ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]' : 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)]'}`}>
-                    <div className="flex items-center justify-center">
-                      <Checkbox
-                        id={`select-${entry._id}`}
-                        checked={selectedEntries.includes(entry._id)}
-                        onCheckedChange={() => toggleEntrySelection(entry._id)}
-                        className="h-4 w-4"
-                      />
-                      <label htmlFor={`select-${entry._id}`} className="sr-only">
-                        Select entry
-                      </label>
-                    </div>
+                  <div className={`hidden md:grid gap-2 p-3 overflow-x-auto ${
+                    showSelectionAndApproval && canApproveTime 
+                      ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]' 
+                      : showSelectionAndApproval
+                        ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]'
+                        : 'grid-cols-[minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)]'
+                  }`}>
+                    {showSelectionAndApproval && (
+                      <div className="flex items-center justify-center">
+                        <Checkbox
+                          id={`select-${entry._id}`}
+                          checked={selectedEntries.includes(entry._id)}
+                          onCheckedChange={() => toggleEntrySelection(entry._id)}
+                          className="h-4 w-4"
+                        />
+                        <label htmlFor={`select-${entry._id}`} className="sr-only">
+                          Select entry
+                        </label>
+                      </div>
+                    )}
                     <div className="truncate">
                       <div className="font-medium text-xs sm:text-sm truncate" title={entry.description}>{entry.description}</div>
                     </div>
-                    <div className="text-xs sm:text-sm truncate">
-                      {entry?.project?.name ? (
-                        <>
-                          <span title={entry.project.name} className="text-foreground">{entry.project.name}</span>
-                          {entry?.task?.title ? (
-                            <span className="text-muted-foreground"> ({entry.task.title})</span>
-                          ) : entry.task ? (
-                            <span className="text-muted-foreground italic"> (Task deleted)</span>
-                          ) : null}
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground italic" title="Project deleted or unavailable">
-                          Project deleted
-                        </span>
-                      )}
-                    </div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="text-xs sm:text-sm truncate cursor-default">
+                            {entry?.project?.name ? (
+                              <>
+                                <span className="text-foreground">{entry.project.name}</span>
+                                {entry?.task?.title ? (
+                                  <span className="text-muted-foreground"> ({entry.task.title})</span>
+                                ) : entry.task ? (
+                                  <span className="text-muted-foreground italic"> (Task deleted)</span>
+                                ) : null}
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground italic">
+                                Project deleted
+                              </span>
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>
+                            {entry?.project?.name 
+                              ? `${entry.project.name}${entry?.task?.title ? `(${entry.task.title})` : entry.task ? '(Task deleted)' : ''}`
+                              : 'Project deleted or unavailable'
+                            }
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     <div className="text-xs sm:text-sm">
                       {([entry.user?.firstName, entry.user?.lastName].filter(Boolean).join(' ') || 'Unknown')}
                     </div>
@@ -2330,21 +2381,22 @@ export function TimeLogs({
                         {entry.isBillable ? 'Yes' : 'No'}
                       </Badge>
                     </div>
-                    <div>
-                      <Badge 
-                        variant={entry.isApproved ? 'default' : 'secondary'} 
-                        className="text-xs"
-                      >
-                        {entry.isApproved ? 'Approved' : 'Pending'}
-                      </Badge>
-                      {entry.approvedBy && (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          by {entry.approvedBy.firstName} {entry.approvedBy.lastName}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center ">
-                      
+                    {showSelectionAndApproval && (
+                      <div>
+                        <Badge 
+                          variant={entry.isApproved ? 'default' : 'secondary'} 
+                          className="text-xs"
+                        >
+                          {entry.isApproved ? 'Approved' : 'Pending'}
+                        </Badge>
+                        {entry.approvedBy && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            by {entry.approvedBy.firstName} {entry.approvedBy.lastName}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex items-center">
                       <DropdownMenu.Root>
                         <DropdownMenu.Trigger asChild>
                           <Button

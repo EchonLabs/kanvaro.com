@@ -234,12 +234,43 @@ export default function LandingPage() {
     if (ctaLoading) return
     setCtaLoading(true)
     try {
-      router.push('/workspace')
+      // Interactive preview - redirect to setup page for exploration without signup
+      router.push('/setup')
     } catch (error) {
-      router.push('/workspace')
+      router.push('/setup')
     } finally {
       setCtaLoading(false)
     }
+  }
+
+  const startGuidedTour = () => {
+    // Close video modal if open
+    setShowVideoModal(false)
+    
+    // Scroll to first section and highlight it
+    const sections = [
+      'unique-features',
+      'key-features',
+      'workflows',
+      'module-walkthrough',
+      'reporting-analytics',
+      'team-collaboration'
+    ]
+    
+    let currentIndex = 0
+    
+    const scrollToNext = () => {
+      if (currentIndex < sections.length) {
+        scrollToSection(sections[currentIndex])
+        currentIndex++
+        if (currentIndex < sections.length) {
+          setTimeout(scrollToNext, 3000) // Wait 3 seconds before next section
+        }
+      }
+    }
+    
+    // Start the tour
+    scrollToNext()
   }
 
   const scrollToSection = (sectionId: string) => {
@@ -389,16 +420,6 @@ export default function LandingPage() {
                     <Zap className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
                     <span className="font-medium">Interactive Preview</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onSelect={(e) => {
-                      e.preventDefault()
-                      scrollToSection('get-started')
-                    }}
-                    className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
-                  >
-                    <ArrowRight className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
-                    <span className="font-medium">Get Started</span>
-                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               
@@ -465,12 +486,6 @@ export default function LandingPage() {
                 className="hidden sm:flex text-sm font-medium hover:bg-slate-100 dark:hover:bg-[#7bffde]/20 dark:hover:text-[#7bffde]"
               >
                 Login
-              </Button>
-              <Button
-                onClick={() => router.push('/setup')}
-                className="h-10 rounded-full bg-[#0d9488] dark:bg-[#7bffde] px-6 text-sm font-semibold text-white dark:text-slate-900 hover:bg-[#0f766e] dark:hover:bg-[#5ce8c5] transition-all shadow-md"
-              >
-                Get Started
               </Button>
             </div>
           </div>
@@ -598,7 +613,7 @@ export default function LandingPage() {
           <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#68ffde]">
             Unique Features
           </p>
-          <h2 className="mt-4 text-3xl font-semibold sm:text-4xl">
+          <h2 className="mt-4 text-4xl font-semibold sm:text-5xl">
             What makes Kanvaro different
           </h2>
           <p className="mt-4 text-slate-600 dark:text-white/80">
@@ -659,7 +674,7 @@ export default function LandingPage() {
       <section id="key-features" className="bg-gradient-to-b from-[#eef2ff] to-[#f9fbff] px-6 py-20 dark:from-[#050c1d] dark:to-[#030714] sm:py-28">
         <div className="mx-auto max-w-6xl text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#7bffde]">Key Features</p>
-          <h2 className="mt-4 text-3xl font-semibold sm:text-4xl lg:text-5xl">
+          <h2 className="mt-4 text-4xl font-semibold sm:text-5xl lg:text-6xl">
             Core Project Management Features
           </h2>
           <p className="mt-4 text-lg text-slate-600 dark:text-white/70 max-w-3xl mx-auto">
@@ -768,7 +783,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl">
           <div className="text-center mb-12">
             <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#7bffde]">Workflows</p>
-            <h2 className="mt-4 text-3xl font-semibold sm:text-4xl lg:text-5xl">
+            <h2 className="mt-4 text-4xl font-semibold sm:text-5xl lg:text-6xl">
               Streamlined Project Workflows
             </h2>
             <p className="mt-4 text-lg text-slate-600 dark:text-white/70 max-w-3xl mx-auto">
@@ -847,7 +862,7 @@ export default function LandingPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#8adfff]">
               Module Walkthrough
             </p>
-            <h2 className="mt-3 text-3xl font-semibold sm:text-4xl">
+            <h2 className="mt-3 text-4xl font-semibold sm:text-5xl">
               Explore all system modules
             </h2>
             <p className="mt-4 text-slate-600 dark:text-white/80 max-w-3xl mx-auto">
@@ -882,7 +897,7 @@ export default function LandingPage() {
                       </div>
                     </div>
                     <div className="flex-1">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-xl font-semibold text-slate-900 dark:text-white group-hover:text-[#0d9488] dark:group-hover:text-[#7bffde] transition-colors">{showcase.name}</h3>
                         <span className="rounded-full bg-[#0d9488]/10 dark:bg-[#7bffde]/20 px-3 py-1 text-xs font-semibold text-[#0d9488] dark:text-[#7bffde]">{showcase.metric}</span>
                       </div>
@@ -924,7 +939,7 @@ export default function LandingPage() {
 
                   {/* Click to Explore CTA */}
                   <div className="mt-6 pt-4 border-t border-slate-200 dark:border-white/10">
-                    <button className="w-full flex items-center justify-center gap-2 rounded-full bg-[#0d9488]/10 dark:bg-[#7bffde]/20 py-3 text-sm font-semibold text-[#0d9488] dark:text-[#7bffde] hover:bg-[#0d9488]/20 dark:hover:bg-[#7bffde]/30 transition-colors group-hover:bg-[#0d9488] group-hover:text-white dark:group-hover:bg-[#7bffde] dark:group-hover:text-slate-900">
+                    <button className="w-full flex items-center justify-center gap-2 rounded-full bg-[#0d9488]/10 dark:bg-[#7bffde]/20 py-3 text-sm font-semibold text-[#0d9488] dark:text-[#7bffde] hover:bg-[#0d9488] hover:text-white dark:hover:bg-[#7bffde] dark:hover:text-slate-900 transition-colors">
                       <span>Click to Explore</span>
                       <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                     </button>
@@ -942,7 +957,7 @@ export default function LandingPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#7bffde]">
               Comprehensive Reporting & Analytics
             </p>
-            <h2 className="mt-4 text-3xl font-semibold sm:text-4xl">
+            <h2 className="mt-4 text-4xl font-semibold sm:text-5xl">
               Real-time insights for data-driven decisions
             </h2>
             <p className="mt-4 text-slate-600 dark:text-white/80 max-w-3xl mx-auto">
@@ -994,7 +1009,7 @@ export default function LandingPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#7bffde]">
               Team Collaboration
             </p>
-            <h2 className="mt-4 text-3xl font-semibold sm:text-4xl">
+            <h2 className="mt-4 text-4xl font-semibold sm:text-5xl">
               Invite your team and collaborate seamlessly
             </h2>
             <p className="mt-4 text-slate-600 dark:text-white/80 max-w-3xl mx-auto">
@@ -1022,7 +1037,7 @@ export default function LandingPage() {
             ].map((feature, idx) => (
               <div
                 key={feature.title}
-                className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-[0_20px_40px_rgba(15,23,42,0.08)] dark:border-white/20 dark:bg-gradient-to-br dark:from-[#0f1329] dark:via-[#151c3d] dark:to-[#0a1f3b] dark:shadow-[0_25px_55px_rgba(0,0,0,0.6)]"
+                className="group rounded-[28px] border border-slate-200 bg-white p-8 shadow-[0_20px_40px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_30px_60px_rgba(15,23,42,0.15)] hover:border-[#7bffde]/30 dark:border-white/20 dark:bg-gradient-to-br dark:from-[#0f1329] dark:via-[#151c3d] dark:to-[#0a1f3b] dark:shadow-[0_25px_55px_rgba(0,0,0,0.6)] dark:hover:border-[#7bffde]/40 dark:hover:shadow-[0_35px_65px_rgba(123,255,222,0.2)]"
               >
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 dark:bg-white/10 mb-6">
                   {feature.icon}
@@ -1050,7 +1065,7 @@ export default function LandingPage() {
           </p>
             <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center">
             <Button
-                onClick={() => setShowVideoModal(true)}
+                onClick={startGuidedTour}
               disabled={ctaLoading}
                 className="h-14 rounded-full bg-[#0d9488] dark:bg-[#7bffde] px-10 text-base font-bold text-white dark:text-slate-900 shadow-[0_20px_45px_rgba(13,148,136,0.35)] dark:shadow-[0_20px_45px_rgba(123,255,222,0.35)] hover:bg-[#0f766e] dark:hover:bg-[#68f0cf] hover:shadow-[0_25px_55px_rgba(13,148,136,0.45)] dark:hover:shadow-[0_25px_55px_rgba(123,255,222,0.45)] disabled:opacity-70 transition-all"
             >
@@ -1059,7 +1074,11 @@ export default function LandingPage() {
             </Button>
             <Button
               variant="outline"
-                onClick={() => window.open('mailto:team@kanvaro.com?subject=Product%20Inquiry', '_blank')}
+                onClick={() => {
+                  // Open chat widget or contact form
+                  // For now, opening contact page - can be replaced with chat widget integration
+                  router.push('/contact')
+                }}
                 className="h-14 rounded-full border-2 border-slate-300 bg-white px-10 text-base font-semibold text-slate-900 hover:bg-slate-50 dark:border-white/40 dark:bg-transparent dark:text-white dark:hover:bg-white/20"
             >
                 <MessageCircle className="mr-2 h-5 w-5" />
@@ -1084,11 +1103,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer className="bg-[#02040b] px-6 py-16 text-sm text-white/80 dark:bg-[#010208]">
+      <footer className="bg-[#02040b] px-4 sm:px-6 py-12 sm:py-16 text-sm text-white/80 dark:bg-[#010208]">
         <div className="mx-auto max-w-7xl">
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-5 mb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 sm:gap-6 lg:gap-8 mb-8 sm:mb-12">
             {/* Company Info */}
-            <div className="lg:col-span-2 lg:pl-4">
+            <div className="sm:col-span-2 lg:col-span-2 lg:pl-4">
               <div className="flex items-center gap-2 mb-4">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#7bffde] to-[#7afdea] shadow-lg shadow-[#7bffde]/30">
                   <Zap className="h-5 w-5 text-slate-900" />
@@ -1101,16 +1120,16 @@ export default function LandingPage() {
             </div>
 
             {/* Company Column */}
-            <div>
-              <h3 className="font-semibold text-white mb-4">Company</h3>
+            <div className="mt-6 sm:mt-0">
+              <h3 className="font-semibold text-white mb-4 text-base">Company</h3>
               <ul className="space-y-3">
                 <li>
-                  <Link href="/about" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                  <Link href="/about" className="text-white/70 hover:text-[#7bffde] transition-colors text-sm">
                     About
                   </Link>
                 </li>
                 <li>
-                  <Link href="/contact" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                  <Link href="/contact" className="text-white/70 hover:text-[#7bffde] transition-colors text-sm">
                     Contact
                   </Link>
                 </li>
@@ -1118,16 +1137,16 @@ export default function LandingPage() {
             </div>
 
             {/* Product Column */}
-            <div>
-              <h3 className="font-semibold text-white mb-4">Product</h3>
+            <div className="mt-6 sm:mt-0">
+              <h3 className="font-semibold text-white mb-4 text-base">Product</h3>
               <ul className="space-y-3">
                 <li>
-                  <Link href="/roadmap" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                  <Link href="/roadmap" className="text-white/70 hover:text-[#7bffde] transition-colors text-sm">
                     Roadmap
                   </Link>
                 </li>
                 <li>
-                  <Link href="/feedback" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                  <Link href="/feedback" className="text-white/70 hover:text-[#7bffde] transition-colors text-sm">
                     Feedback
                   </Link>
                 </li>
@@ -1135,16 +1154,16 @@ export default function LandingPage() {
             </div>
 
             {/* Resources Column */}
-            <div>
-              <h3 className="font-semibold text-white mb-4">Resources</h3>
+            <div className="mt-6 sm:mt-0">
+              <h3 className="font-semibold text-white mb-4 text-base">Resources</h3>
               <ul className="space-y-3">
                 <li>
-                  <Link href="/blog" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                  <Link href="/blog" className="text-white/70 hover:text-[#7bffde] transition-colors text-sm">
                     Blogs
                   </Link>
                 </li>
                 <li>
-                  <Link href="/docs/public/concepts/features" target="_blank" className="text-white/70 hover:text-[#7bffde] transition-colors">
+                  <Link href="https://docs.kanvaro.com" target="_blank" rel="noopener noreferrer" className="text-white/70 hover:text-[#7bffde] transition-colors text-sm">
                     User Guide
                   </Link>
                 </li>
@@ -1153,13 +1172,13 @@ export default function LandingPage() {
           </div>
 
           {/* Bottom Section */}
-          <div className="border-t border-white/10 pt-8 flex flex-col items-center gap-4">
-            <p className="text-white/60 text-xs text-center">
+          <div className="border-t border-white/10 pt-6 sm:pt-8 flex flex-col items-center gap-4">
+            <p className="text-white/60 text-xs text-center px-4">
               © {new Date().getFullYear()} Kanvaro. All rights reserved.
             </p>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 sm:gap-4 flex-wrap justify-center">
               <Link 
-                href="https://github.com/kanvaro" 
+                href="https://github.com/EchonLabs/kanvaro.com" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="text-white/70 hover:text-[#7bffde] transition-colors"
@@ -1168,16 +1187,16 @@ export default function LandingPage() {
                 <Github className="h-5 w-5" />
               </Link>
               <Link 
-                href="https://twitter.com/kanvaro" 
+                href="https://x.com/kanvaro" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="text-white/70 hover:text-[#7bffde] transition-colors"
-                aria-label="Twitter"
+                aria-label="Twitter/X"
               >
                 <Twitter className="h-5 w-5" />
               </Link>
               <Link 
-                href="https://linkedin.com/company/kanvaro" 
+                href="https://www.linkedin.com/company/kanvaro" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="text-white/70 hover:text-[#7bffde] transition-colors"
