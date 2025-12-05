@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, KeyboardEvent, ClipboardEvent } from 'react'
+import { useState, useRef, useEffect, KeyboardEvent, ClipboardEvent, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -11,7 +11,7 @@ import { OrganizationLogo } from '@/components/ui/OrganizationLogo'
 import { useOrganization } from '@/hooks/useOrganization'
 import { ArrowLeft, Shield, Loader2, X, CheckCircle2, RefreshCw } from 'lucide-react'
 
-export default function VerifyOtpPage() {
+function VerifyOtpContent() {
   const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', ''])
@@ -343,5 +343,20 @@ export default function VerifyOtpPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function VerifyOtpPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    }>
+      <VerifyOtpContent />
+    </Suspense>
   )
 }
