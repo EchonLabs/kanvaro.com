@@ -1,3 +1,10 @@
+## [1.11.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.11.1...v1.11.2) (2025-12-05)
+
+
+### Bug Fixes
+
+* add task ([6d31406](https://github.com/EchonLabs/kanvaro.com/commit/6d31406b07afc78a1c894ca075fb8bfd0ba418d5))
+
 ## [1.11.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.11.0...v1.11.1) (2025-12-05)
 
 
