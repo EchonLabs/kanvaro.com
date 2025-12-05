@@ -1,3 +1,10 @@
+## [1.11.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.11.2...v1.11.3) (2025-12-05)
+
+
+### Bug Fixes
+
+* fix bugs in otp page ([5d41072](https://github.com/EchonLabs/kanvaro.com/commit/5d41072f2902a30feb884b72a9e281e0b5076b10))
+
 ## [1.11.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.11.1...v1.11.2) (2025-12-05)
 
 
