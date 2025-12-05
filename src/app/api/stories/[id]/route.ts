@@ -3,6 +3,8 @@ import connectDB from '@/lib/db-config'
 import { Story } from '@/models/Story'
 import { Epic } from '@/models/Epic'
 import { authenticateUser } from '@/lib/auth-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 export async function GET(
   request: NextRequest,
@@ -26,10 +28,25 @@ export async function GET(
     const organizationId = user.organization
     const storyId = params.id
 
-    // Find story (allow any organization member to view)
-    const story = await Story.findOne({
+    // Check if user has permission to view all stories
+    const hasStoryViewAll = await PermissionService.hasPermission(
+      userId,
+      Permission.STORY_VIEW_ALL
+    );
+
+    // Build query - if user has STORY_VIEW_ALL, they can view any story
+    const storyQuery: any = {
       _id: storyId,
-    })
+    };
+    
+    if (!hasStoryViewAll) {
+      storyQuery.$or = [
+        { createdBy: userId },
+        { assignedTo: userId }
+      ];
+    }
+
+    const story = await Story.findOne(storyQuery)
       .populate('project', 'name')
       .populate({
         path: 'epic',

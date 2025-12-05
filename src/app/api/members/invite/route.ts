@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine if role is a custom role (ObjectId) or system role (enum value)
-    const systemRoles = ['admin', 'project_manager', 'team_member', 'client', 'viewer']
+    const systemRoles = ['admin', 'project_manager', 'team_member', 'client', 'viewer', 'human_resource']
     let invitationRole: string = 'team_member' // Default role
     let customRoleId: mongoose.Types.ObjectId | undefined = undefined
     let roleDisplayName: string = 'Team Member' // For email template
@@ -125,7 +125,8 @@ export async function POST(request: NextRequest) {
         'project_manager': 'Project Manager',
         'team_member': 'Team Member',
         'client': 'Client',
-        'viewer': 'Viewer'
+        'viewer': 'Viewer',
+        'human_resource': 'Human Resource'
       }
       roleDisplayName = roleNameMap[role] || role
     } else {

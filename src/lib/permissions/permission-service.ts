@@ -139,7 +139,19 @@ export class PermissionService {
   static async canAccessProject(userId: string, projectId: string): Promise<boolean> {
     const userPermissions = await this.getUserPermissions(userId);
     
-    // Admin can access all projects
+    // Check if user has PROJECT_VIEW_ALL permission (allows viewing all projects)
+    if (userPermissions.globalPermissions.includes(Permission.PROJECT_VIEW_ALL)) {
+      // Verify the project belongs to the user's organization
+      const user = await User.findById(userId);
+      if (user) {
+        const project = await Project.findById(projectId);
+        if (project && user.organization.toString() === project.organization.toString()) {
+          return true;
+        }
+      }
+    }
+    
+    // Admin and Super Admin can access all projects (backward compatibility)
     if (userPermissions.userRole === Role.ADMIN || userPermissions.userRole === Role.SUPER_ADMIN) {
       return true;
     }
@@ -155,10 +167,28 @@ export class PermissionService {
   static async getAccessibleProjects(userId: string): Promise<string[]> {
     const userPermissions = await this.getUserPermissions(userId);
     
-    // Admin can access all projects
+    // Check if user has PROJECT_VIEW_ALL permission (allows viewing all projects)
+    if (userPermissions.globalPermissions.includes(Permission.PROJECT_VIEW_ALL)) {
+      const user = await User.findById(userId);
+      if (user) {
+        const allProjects = await Project.find({ 
+          organization: user.organization,
+          is_deleted: { $ne: true }
+        }).select('_id');
+        return allProjects.map(p => p._id.toString());
+      }
+    }
+    
+    // Admin and Super Admin can access all projects (backward compatibility)
     if (userPermissions.userRole === Role.ADMIN || userPermissions.userRole === Role.SUPER_ADMIN) {
-      const allProjects = await Project.find({}).select('_id');
-      return allProjects.map(p => p._id.toString());
+      const user = await User.findById(userId);
+      if (user) {
+        const allProjects = await Project.find({ 
+          organization: user.organization,
+          is_deleted: { $ne: true }
+        }).select('_id');
+        return allProjects.map(p => p._id.toString());
+      }
     }
     
     // Return projects where user has access

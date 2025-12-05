@@ -3,6 +3,8 @@ import connectDB from '@/lib/db-config'
 import { Epic } from '@/models/Epic'
 import { Story } from '@/models/Story'
 import { authenticateUser } from '@/lib/auth-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,6 +21,12 @@ export async function GET(request: NextRequest) {
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
+
+    // Check if user has permission to view all epics
+    const hasEpicViewAll = await PermissionService.hasPermission(
+      userId,
+      Permission.EPIC_VIEW_ALL
+    );
 
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
@@ -44,10 +52,13 @@ export async function GET(request: NextRequest) {
 
     const PAGE_SIZE = Math.min(limit, 100)
 
-    // Get epics created by the user (similar to sprints). You can re-add assignedTo if desired.
-    const epicQuery = {
+    // Get epics - if user has EPIC_VIEW_ALL, show all epics; otherwise only their own
+    const epicQuery: any = {
       ...filters,
-      createdBy: userId,
+    }
+    
+    if (!hasEpicViewAll) {
+      epicQuery.createdBy = userId
     }
 
     const epics = await Epic.find(epicQuery)
