@@ -5,6 +5,8 @@ import { Task } from '@/models/Task'
 import { TimeEntry } from '@/models/TimeEntry'
 import { User } from '@/models/User'
 import { authenticateUser } from '@/lib/auth-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,6 +24,12 @@ export async function GET(request: NextRequest) {
     const userId = user.id
     const organizationId = user.organization
 
+    // Check if user has "view all" permissions
+    const [hasProjectViewAll, hasTaskViewAll] = await Promise.all([
+      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
+      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL)
+    ])
+
     // Get date ranges
     const now = new Date()
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -37,7 +45,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Get projects where user is creator or team member (for user-specific views)
-    const userProjectsQuery = {
+    // If user has PROJECT_VIEW_ALL, use projectsQuery instead
+    const userProjectsQuery = hasProjectViewAll ? projectsQuery : {
       organization: organizationId,
       is_deleted: { $ne: true },
       $or: [
@@ -53,7 +62,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Get tasks assigned to or created by the user (for user-specific views)
-    const userTasksQuery = {
+    // If user has TASK_VIEW_ALL, use tasksQuery instead
+    const userTasksQuery = hasTaskViewAll ? tasksQuery : {
       organization: organizationId,
       is_deleted: { $ne: true },
       $or: [
@@ -142,7 +152,7 @@ export async function GET(request: NextRequest) {
         .limit(5),
 
       // Get team activity (last 10 activities)
-      getTeamActivity(organizationId, userId)
+      getTeamActivity(organizationId, userId, hasProjectViewAll, hasTaskViewAll)
     ])
 
     // Calculate project progress
@@ -339,29 +349,44 @@ async function getLastMonthStats(organizationId: string, startOfLastMonth: Date,
   }
 }
 
-async function getTeamActivity(organizationId: string, userId: string) {
+async function getTeamActivity(
+  organizationId: string, 
+  userId: string, 
+  hasProjectViewAll: boolean = false,
+  hasTaskViewAll: boolean = false
+) {
+  // Build queries based on permissions
+  const taskQuery: any = {
+    organization: organizationId
+  }
+  if (!hasTaskViewAll) {
+    taskQuery.$or = [
+      { assignedTo: userId },
+      { createdBy: userId }
+    ]
+  }
+
+  const projectQuery: any = {
+    organization: organizationId,
+    is_deleted: { $ne: true }
+  }
+  if (!hasProjectViewAll) {
+    projectQuery.$or = [
+      { createdBy: userId },
+      { teamMembers: userId }
+    ]
+  }
+
   // Get recent activities from tasks, projects, and time entries
   const [taskActivities, projectActivities, timeActivities] = await Promise.all([
-    Task.find({
-      organization: organizationId,
-      $or: [
-        { assignedTo: userId },
-        { createdBy: userId }
-      ]
-    })
+    Task.find(taskQuery)
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
       .populate('project', 'name')
       .sort({ updatedAt: -1 })
       .limit(5),
 
-    Project.find({
-      organization: organizationId,
-      $or: [
-        { createdBy: userId },
-        { teamMembers: userId }
-      ]
-    })
+    Project.find(projectQuery)
       .populate('createdBy', 'firstName lastName email')
       .populate('teamMembers', 'firstName lastName email')
       .sort({ updatedAt: -1 })
