@@ -1,3 +1,13 @@
+## [1.11.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.11.3...v1.11.4) (2025-12-05)
+
+
+### Bug Fixes
+
+* add changes in landing page ([ade6c52](https://github.com/EchonLabs/kanvaro.com/commit/ade6c52980ca483c44e0d1ebc47c0d399dcebfc3))
+* add csv changes ([fa6ffed](https://github.com/EchonLabs/kanvaro.com/commit/fa6ffed5bf4199cfc8a928a35253190963f46a21))
+* add time tracing changes ([5c71ca7](https://github.com/EchonLabs/kanvaro.com/commit/5c71ca76a31f6488535bc5199e785cb049b39b7a))
+* time report fixes ([65cafa4](https://github.com/EchonLabs/kanvaro.com/commit/65cafa44c4a2815b47cbf291baa944bdfdb2d564))
+
 ## [1.11.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.11.2...v1.11.3) (2025-12-05)
 
 
