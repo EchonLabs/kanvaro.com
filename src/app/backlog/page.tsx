@@ -1073,8 +1073,8 @@ export default function BacklogPage() {
   const filteredAndSortedItems = backlogItems
     .filter(item => {
       const matchesSearch = !searchQuery || 
-        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (item.project?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
       
       const matchesType = typeFilter === 'all' || item.type === typeFilter
