@@ -77,7 +77,51 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
       { permission: Permission.TASK_ASSIGN, label: 'Assign Tasks', description: 'Assign tasks to users' },
       { permission: Permission.TASK_CHANGE_STATUS, label: 'Change Status', description: 'Change task status' },
       { permission: Permission.TASK_MANAGE_COMMENTS, label: 'Manage Comments', description: 'Manage task comments' },
-      { permission: Permission.TASK_MANAGE_ATTACHMENTS, label: 'Manage Attachments', description: 'Manage task attachments' }
+      { permission: Permission.TASK_MANAGE_ATTACHMENTS, label: 'Manage Attachments', description: 'Manage task attachments' },
+      { permission: Permission.TASK_VIEW_ALL, label: 'View All Tasks', description: 'View all tasks created or assigned to anyone' },
+      { permission: Permission.TASK_EDIT_ALL, label: 'Edit All Tasks', description: 'Edit all tasks created or assigned to anyone' },
+      { permission: Permission.TASK_DELETE_ALL, label: 'Delete All Tasks', description: 'Delete all tasks created or assigned to anyone' }
+    ]
+  },
+  {
+    category: PermissionCategory.STORY,
+    permissions: [
+      { permission: Permission.STORY_CREATE, label: 'Create Stories', description: 'Create new user stories' },
+      { permission: Permission.STORY_READ, label: 'View Stories', description: 'View user story information' },
+      { permission: Permission.STORY_UPDATE, label: 'Edit Stories', description: 'Edit user story details' },
+      { permission: Permission.STORY_DELETE, label: 'Delete Stories', description: 'Delete user stories' },
+      { permission: Permission.STORY_VIEW_ALL, label: 'View All Stories', description: 'View all user stories created or assigned to anyone' }
+    ]
+  },
+  {
+    category: PermissionCategory.SPRINT,
+    permissions: [
+      { permission: Permission.SPRINT_CREATE, label: 'Create Sprints', description: 'Create new sprints' },
+      { permission: Permission.SPRINT_READ, label: 'View Sprints', description: 'View sprint information' },
+      { permission: Permission.SPRINT_UPDATE, label: 'Edit Sprints', description: 'Edit sprint details' },
+      { permission: Permission.SPRINT_DELETE, label: 'Delete Sprints', description: 'Delete sprints' },
+      { permission: Permission.SPRINT_MANAGE, label: 'Manage Sprints', description: 'Manage sprint settings' },
+      { permission: Permission.SPRINT_VIEW_ALL, label: 'View All Sprints', description: 'View all sprints created or assigned to anyone' }
+    ]
+  },
+  {
+    category: PermissionCategory.EPIC,
+    permissions: [
+      { permission: Permission.EPIC_CREATE, label: 'Create Epics', description: 'Create new epics' },
+      { permission: Permission.EPIC_READ, label: 'View Epics', description: 'View epic information' },
+      { permission: Permission.EPIC_UPDATE, label: 'Edit Epics', description: 'Edit epic details' },
+      { permission: Permission.EPIC_DELETE, label: 'Delete Epics', description: 'Delete epics' },
+      { permission: Permission.EPIC_VIEW_ALL, label: 'View All Epics', description: 'View all epics created or assigned to anyone' }
+    ]
+  },
+  {
+    category: PermissionCategory.CALENDAR,
+    permissions: [
+      { permission: Permission.CALENDAR_READ, label: 'View Calendar', description: 'View calendar events' },
+      { permission: Permission.CALENDAR_CREATE, label: 'Create Events', description: 'Create calendar events' },
+      { permission: Permission.CALENDAR_UPDATE, label: 'Edit Events', description: 'Edit calendar events' },
+      { permission: Permission.CALENDAR_DELETE, label: 'Delete Events', description: 'Delete calendar events' },
+      { permission: Permission.SPRINT_EVENT_VIEW_ALL, label: 'View All Sprint Events', description: 'View all sprint events created or assigned to anyone' }
     ]
   },
   {

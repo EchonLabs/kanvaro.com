@@ -3,6 +3,8 @@ import connectDB from '@/lib/db-config'
 import { Epic } from '@/models/Epic'
 import { Story } from '@/models/Story'
 import { authenticateUser } from '@/lib/auth-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 export async function GET(
   request: NextRequest,
@@ -24,8 +26,23 @@ export async function GET(
     const organizationId = user.organization
     const epicId = params.id
 
-    // Fetch epic by id only (visibility/auth policy relaxed for GET by id)
-    const epic = await Epic.findById(epicId)
+    // Check if user has permission to view all epics
+    const hasEpicViewAll = await PermissionService.hasPermission(
+      userId,
+      Permission.EPIC_VIEW_ALL
+    );
+
+    // Build query - if user has EPIC_VIEW_ALL, they can view any epic
+    const epicQuery: any = { _id: epicId };
+    
+    if (!hasEpicViewAll) {
+      epicQuery.$or = [
+        { createdBy: userId },
+        { assignedTo: userId }
+      ];
+    }
+
+    const epic = await Epic.findOne(epicQuery)
       .populate('project', 'name')
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')

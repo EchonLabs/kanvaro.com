@@ -31,6 +31,7 @@ import { InviteMemberModal } from '@/components/members/InviteMemberModal'
 import { EditMemberModal } from '@/components/members/EditMemberModal'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 
 interface Member {
   _id: string
@@ -102,6 +103,9 @@ export default function MembersPage() {
   const canEditMembers = hasPermission(Permission.USER_UPDATE)
   const canEditAdminMembers = hasPermission(Permission.USER_MANAGE_ROLES)
   const [organizationRoles, setOrganizationRoles] = useState<Array<{ id: string; name: string }>>([])
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
+  const [memberToRemove, setMemberToRemove] = useState<Member | null>(null)
+  const [removingMember, setRemovingMember] = useState(false)
 
   // Load available organization (system) roles from the central roles API
   useEffect(() => {
@@ -286,25 +290,38 @@ export default function MembersPage() {
     }
   }
 
-  const handleRemoveMember = async (memberId: string) => {
-    if (!confirm('Are you sure you want to remove this member?')) {
-      return
-    }
+  const handleRemoveMemberClick = (member: Member) => {
+    // Extra guard: do not allow removing admins from here
+    if (member.role === 'admin') return
+    setMemberToRemove(member)
+    setShowRemoveConfirm(true)
+  }
+
+  const confirmRemoveMember = async () => {
+    if (!memberToRemove) return
 
     try {
-      const response = await fetch(`/api/members?memberId=${memberId}`, {
+      setRemovingMember(true)
+      const response = await fetch(`/api/members?memberId=${memberToRemove._id}`, {
         method: 'DELETE'
       })
 
       const data = await response.json()
 
       if (data.success) {
-        fetchMembers()
+        setSuccess('Member removed successfully')
+        setError('')
+        await fetchMembers()
+        setTimeout(() => setSuccess(''), 3000)
       } else {
         setError(data.error || 'Failed to remove member')
       }
     } catch (err) {
       setError('Failed to remove member')
+    } finally {
+      setRemovingMember(false)
+      setShowRemoveConfirm(false)
+      setMemberToRemove(null)
     }
   }
 
@@ -644,7 +661,7 @@ export default function MembersPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleRemoveMember(member._id)}
+                              onClick={() => handleRemoveMemberClick(member)}
                               disabled={member.role === 'admin'}
                               className="flex-1 text-xs sm:text-sm min-h-[36px]"
                             >
@@ -738,7 +755,7 @@ export default function MembersPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleRemoveMember(member._id)}
+                          onClick={() => handleRemoveMemberClick(member)}
                           disabled={member.role === 'admin'}
                           className="flex-1 sm:flex-initial text-xs sm:text-sm min-h-[44px] touch-target"
                         >
@@ -891,6 +908,25 @@ export default function MembersPage() {
           canEditAdminUsers={canEditAdminMembers}
         />
       )}
+      <ConfirmationModal
+        isOpen={showRemoveConfirm}
+        onClose={() => {
+          if (removingMember) return
+          setShowRemoveConfirm(false)
+          setMemberToRemove(null)
+        }}
+        onConfirm={confirmRemoveMember}
+        title="Remove member"
+        description={
+          memberToRemove
+            ? `Are you sure you want to remove ${memberToRemove.firstName} ${memberToRemove.lastName}? They will be deactivated and removed from the team.`
+            : 'Are you sure you want to remove this member?'
+        }
+        confirmText="Remove"
+        cancelText="Cancel"
+        variant="destructive"
+        isLoading={removingMember}
+      />
       </div>
     </MainLayout>
   )

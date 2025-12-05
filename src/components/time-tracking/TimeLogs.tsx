@@ -1729,50 +1729,53 @@ export function TimeLogs({
 
   return (
     <>
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
+    <Card className="w-full overflow-x-hidden">
+      <CardHeader className="pb-3 sm:pb-4 px-3 sm:px-4 lg:px-6 pt-4 sm:pt-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg min-w-0">
             {/* <Clock className="h-5 w-5" />
             Time Logs */}
           </CardTitle>
           {canAddManualTimeLog && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 w-full xs:w-auto">
               <Button
                 onClick={() => setShowBulkUploadModal(true)}
                 size="sm"
                 variant="outline"
+                className="w-full xs:w-auto sm:w-auto justify-center h-9 sm:h-10 text-xs sm:text-sm"
               >
-                <Upload className="h-4 w-4 mr-2" />
-                Bulk Upload
+                <Upload className="h-4 w-4 mr-2 flex-shrink-0" />
+                <span className="whitespace-nowrap">Bulk Upload</span>
               </Button>
               <Button
                 onClick={() => setShowAddTimeLogModal(true)}
                 size="sm"
+                className="w-full xs:w-auto sm:w-auto justify-center h-9 sm:h-10 text-xs sm:text-sm"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Time Log
+                <Plus className="h-4 w-4 mr-2 flex-shrink-0" />
+                <span className="whitespace-nowrap">Add Time Log</span>
               </Button>
             </div>
           )}
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 p-3 sm:p-4 lg:p-6 pt-2 sm:pt-4 overflow-x-hidden">
         {authResolving && (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="text-muted-foreground mt-2">Loading your time entries...</p>
+            <p className="text-muted-foreground mt-2 text-sm">Loading your time entries...</p>
           </div>
         )}
         {error && showErrorAlert && (
-          <Alert variant="destructive">
-            <AlertDescription className="flex items-center justify-between">
-              <span>{error}</span>
+          <Alert variant="destructive" className="w-full">
+            <AlertDescription className="flex items-center justify-between gap-2">
+              <span className="text-xs sm:text-sm break-words flex-1">{error}</span>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 w-6 p-0"
+                className="h-6 w-6 p-0 flex-shrink-0"
                 onClick={() => setShowErrorAlert(false)}
+                aria-label="Dismiss error"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -1781,14 +1784,14 @@ export function TimeLogs({
         )}
 
         {/* Filters */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <Label className="text-sm font-medium">Filters</Label>
+        <div className="space-y-3 sm:space-y-4 w-full overflow-x-hidden">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <Label className="text-sm font-medium whitespace-nowrap">Filters</Label>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="filter-project" className="text-xs sm:text-sm">Project</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 w-full">
+            <div className="space-y-1.5 sm:space-y-2 min-w-0">
+              <Label htmlFor="filter-project" className="text-xs sm:text-sm font-medium">Project</Label>
               <Select 
                 value={filters.projectId || 'all'} 
                 onValueChange={(value) => {
@@ -1798,7 +1801,7 @@ export function TimeLogs({
                   }
                 }}
               >
-                <SelectTrigger className="w-full" id="filter-project">
+                <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-project">
                   <SelectValue placeholder="All projects" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1845,14 +1848,14 @@ export function TimeLogs({
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="filter-task" className="text-xs sm:text-sm">Task</Label>
+            <div className="space-y-1.5 sm:space-y-2 min-w-0">
+              <Label htmlFor="filter-task" className="text-xs sm:text-sm font-medium">Task</Label>
               <Select 
                 value={filters.taskId || 'all'} 
                 onValueChange={(value) => handleFilterChange('taskId', value === 'all' ? '' : value)}
                 disabled={!filters.projectId || filterTasksLoading}
               >
-                <SelectTrigger className="w-full" id="filter-task">
+                <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-task">
                   <SelectValue placeholder={
                     !filters.projectId 
                       ? 'Select project first' 
@@ -1905,14 +1908,14 @@ export function TimeLogs({
             </div>
 
             {canViewEmployeeFilter && (
-              <div className="space-y-2">
-                <Label htmlFor="filter-employee" className="text-xs sm:text-sm">Employee</Label>
+              <div className="space-y-1.5 sm:space-y-2 min-w-0">
+                <Label htmlFor="filter-employee" className="text-xs sm:text-sm font-medium">Employee</Label>
                 <Select 
                   value={filters.employeeId || 'all'} 
                   onValueChange={(value) => handleFilterChange('employeeId', value === 'all' ? '' : value)}
                   disabled={filterEmployeesLoading}
                 >
-                  <SelectTrigger className="w-full" id="filter-employee">
+                  <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-employee">
                     <SelectValue placeholder={
                       filterEmployeesLoading ? 'Loading...' : 'All employees'
                     } />
@@ -1962,30 +1965,30 @@ export function TimeLogs({
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="startDate" className="text-xs sm:text-sm">Start Date</Label>
+            <div className="space-y-1.5 sm:space-y-2 min-w-0">
+              <Label htmlFor="startDate" className="text-xs sm:text-sm font-medium">Start Date</Label>
               <Input
                 id="startDate"
                 type="date"
                 value={filters.startDate}
                 onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                className="w-full"
+                className="w-full h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="endDate" className="text-xs sm:text-sm">End Date</Label>
+            <div className="space-y-1.5 sm:space-y-2 min-w-0">
+              <Label htmlFor="endDate" className="text-xs sm:text-sm font-medium">End Date</Label>
               <Input
                 id="endDate"
                 type="date"
                 value={filters.endDate}
                 onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                className="w-full"
+                className="w-full h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="status" className="text-xs sm:text-sm">Status</Label>
+            <div className="space-y-1.5 sm:space-y-2 min-w-0">
+              <Label htmlFor="status" className="text-xs sm:text-sm font-medium">Status</Label>
               <Select value={filters.status || 'all'} onValueChange={handleStatusFilterChange}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2018,10 +2021,10 @@ export function TimeLogs({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="isBillable" className="text-xs sm:text-sm">Billable</Label>
+            <div className="space-y-1.5 sm:space-y-2 min-w-0">
+              <Label htmlFor="isBillable" className="text-xs sm:text-sm font-medium">Billable</Label>
               <Select value={filters.isBillable} onValueChange={(value) => handleFilterChange('isBillable', value)}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
                   <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2031,10 +2034,10 @@ export function TimeLogs({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="isApproved" className="text-xs sm:text-sm">Approved</Label>
+            <div className="space-y-1.5 sm:space-y-2 min-w-0">
+              <Label htmlFor="isApproved" className="text-xs sm:text-sm font-medium">Approved</Label>
               <Select value={filters.isApproved} onValueChange={(value) => handleFilterChange('isApproved', value)}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
                   <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2048,7 +2051,7 @@ export function TimeLogs({
 
           {/* Clear Filters Button */}
           {(filters.projectId || filters.taskId || filters.employeeId || filters.startDate || filters.endDate || filters.status !== '' || filters.isBillable !== '' || filters.isApproved !== '') && (
-            <div className="flex justify-end">
+            <div className="flex justify-start sm:justify-end pt-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -2070,6 +2073,7 @@ export function TimeLogs({
                   setStatusSearch('')
                   setPagination(prev => ({ ...prev, page: 1 }))
                 }}
+                className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
               >
                 <X className="h-4 w-4 mr-2" />
                 Clear Filters
@@ -2080,26 +2084,26 @@ export function TimeLogs({
 
         {/* Bulk Actions */}
         {selectedEntries.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 p-3 bg-muted rounded-lg">
-            <span className="text-xs sm:text-sm text-muted-foreground flex-1">
-              {selectedEntries.length} entries selected
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 sm:p-4 bg-muted rounded-lg w-full overflow-x-hidden">
+            <span className="text-xs sm:text-sm text-muted-foreground flex-1 min-w-0 break-words">
+              {selectedEntries.length} {selectedEntries.length === 1 ? 'entry' : 'entries'} selected
             </span>
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <Button
                 size="sm"
                 onClick={() => handleApproveEntries('approve')}
-                className="h-8 flex-1 sm:flex-initial"
+                className="h-9 sm:h-10 flex-1 sm:flex-initial text-xs sm:text-sm min-w-[100px]"
               >
-                <Check className="h-4 w-4 mr-1" />
+                <Check className="h-4 w-4 mr-1.5 sm:mr-2" />
                 Approve
               </Button>
               <Button
                 size="sm"
                 variant="destructive"
                 onClick={() => handleApproveEntries('reject')}
-                className="h-8 flex-1 sm:flex-initial"
+                className="h-9 sm:h-10 flex-1 sm:flex-initial text-xs sm:text-sm min-w-[100px]"
               >
-                <X className="h-4 w-4 mr-1" />
+                <X className="h-4 w-4 mr-1.5 sm:mr-2" />
                 Reject
               </Button>
             </div>
@@ -2107,11 +2111,11 @@ export function TimeLogs({
         )}
 
         {/* Time Entries Table */}
-        <div className="space-y-2">
+        <div className="space-y-2 w-full overflow-x-hidden">
           {isLoading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="text-muted-foreground mt-2">Loading time entries...</p>
+              <p className="text-muted-foreground mt-2 text-sm">Loading time entries...</p>
             </div>
           ) : displayedEntries.length === 0 ? (
             <div className="text-center py-8">
@@ -2119,9 +2123,9 @@ export function TimeLogs({
               <p className="text-sm sm:text-base text-muted-foreground">No time entries found</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 w-full overflow-x-hidden">
               {/* Table Header - Hidden on mobile */}
-              <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium ${canApproveTime ? 'grid-cols-[40px_1.2fr_1fr_120px_100px_100px_80px_80px_80px_90px_90px]' : 'grid-cols-[40px_1.2fr_1fr_120px_100px_100px_80px_80px_80px_90px]'}`}>
+              <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium overflow-x-auto ${canApproveTime ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]' : 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)]'}`}>
                 <div>
                   <Checkbox
                     checked={allSelected}
@@ -2256,7 +2260,7 @@ export function TimeLogs({
                   </div>
 
                   {/* Desktop Table View */}
-                  <div className={`hidden md:grid gap-2 p-3 ${canApproveTime ? 'grid-cols-[40px_1.2fr_1fr_120px_100px_100px_80px_80px_80px_90px_90px]' : 'grid-cols-[40px_1.2fr_1fr_120px_100px_100px_80px_80px_80px_90px]'}`}>
+                  <div className={`hidden md:grid gap-2 p-3 overflow-x-auto ${canApproveTime ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]' : 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)]'}`}>
                     <div className="flex items-center justify-center">
                       <Checkbox
                         id={`select-${entry._id}`}
@@ -2353,16 +2357,16 @@ export function TimeLogs({
                           </Button>
                         </DropdownMenu.Trigger>
                         <DropdownMenu.Portal>
-                          <DropdownMenu.Content className="min-w-[120px] bg-white rounded-md p-1 shadow-lg border border-gray-200 z-50">
+                          <DropdownMenu.Content className="min-w-[120px] bg-popover dark:bg-popover rounded-md p-1 shadow-lg border border-border dark:border-border z-50">
                             <DropdownMenu.Item 
-                              className="flex items-center px-2 py-1.5 text-sm rounded hover:bg-gray-100 cursor-pointer outline-none"
+                              className="flex items-center px-2 py-1.5 text-sm rounded hover:bg-accent dark:hover:bg-accent hover:text-accent-foreground dark:hover:text-accent-foreground cursor-pointer outline-none text-foreground dark:text-foreground"
                               onSelect={() => handleEdit(entry)}
                             >
                               <Edit className="mr-2 h-4 w-4" />
                               <span>Edit</span>
                             </DropdownMenu.Item>
                             <DropdownMenu.Item 
-                              className="flex items-center px-2 py-1.5 text-sm rounded text-red-600 hover:bg-red-50 cursor-pointer outline-none"
+                              className="flex items-center px-2 py-1.5 text-sm rounded text-destructive dark:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 cursor-pointer outline-none"
                               onSelect={() => handleDeleteClick(entry)}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />

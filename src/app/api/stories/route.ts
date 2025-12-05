@@ -7,6 +7,8 @@ import { Epic } from '@/models/Epic'
 import { User } from '@/models/User'
 import { Sprint } from '@/models/Sprint'
 import { authenticateUser } from '@/lib/auth-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,6 +26,12 @@ export async function GET(request: NextRequest) {
     const userId = user.id
     const organizationId = user.organization
 
+    // Check if user has permission to view all stories
+    const hasStoryViewAll = await PermissionService.hasPermission(
+      userId,
+      Permission.STORY_VIEW_ALL
+    );
+
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('projectId')
     const epicId = searchParams.get('epicId')
@@ -33,6 +41,14 @@ export async function GET(request: NextRequest) {
 
     // Build filters
     const filters: any = {}
+    
+    // If user doesn't have STORY_VIEW_ALL, restrict to stories they created or are assigned to
+    if (!hasStoryViewAll) {
+      filters.$or = [
+        { createdBy: userId },
+        { assignedTo: userId }
+      ]
+    }
     
     if (projectId) {
       filters.project = projectId

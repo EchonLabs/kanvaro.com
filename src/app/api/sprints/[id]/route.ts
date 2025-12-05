@@ -3,6 +3,8 @@ import connectDB from '@/lib/db-config'
 import { Sprint } from '@/models/Sprint'
 import { Task } from '@/models/Task'
 import { authenticateUser } from '@/lib/auth-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 export async function GET(
   request: NextRequest,
@@ -26,8 +28,20 @@ export async function GET(
     const organizationId = user.organization
     const sprintId = params.id
 
-    // Fetch sprint by id only (visibility/auth policy relaxed for GET by id)
-    const sprint = await Sprint.findById(sprintId)
+    // Check if user has permission to view all sprints
+    const hasSprintViewAll = await PermissionService.hasPermission(
+      userId,
+      Permission.SPRINT_VIEW_ALL
+    );
+
+    // Build query - if user has SPRINT_VIEW_ALL, they can view any sprint
+    const sprintQuery: any = { _id: sprintId };
+    
+    if (!hasSprintViewAll) {
+      sprintQuery.createdBy = userId;
+    }
+
+    const sprint = await Sprint.findOne(sprintQuery)
       .populate('project', 'name')
       .populate('createdBy', 'firstName lastName email')
       .populate('teamMembers', 'firstName lastName email')
