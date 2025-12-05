@@ -35,7 +35,8 @@ import {
   Eye,
   Edit,
   GripVertical,
-  X
+  X,
+  Layers
 } from 'lucide-react'
 import { Permission, PermissionGate } from '@/lib/permissions'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
@@ -615,18 +616,26 @@ export default function StoriesPage() {
                                 </div>
                                 {story.epic && (
                                   <div className="flex items-center space-x-1 min-w-0">
-                                    <Zap className="h-4 w-4 flex-shrink-0" />
-                                    <span
-                                      className="truncate"
-                                      title={story.epic.name && story.epic.name.length > 10 ? story.epic.name : undefined}
-                                    >
-                                      {story.epic.name && story.epic.name.length > 10 ? `${story.epic.name.slice(0, 10)}…` : story.epic.name}
-                                    </span>
+                                    <Layers className="h-4 w-4 flex-shrink-0" />
+                                    {(() => {
+                                      const epicName = (story.epic as any).name || (story.epic as any).title || ''
+                                      if (!epicName) return null
+                                      const isLong = epicName.length > 10
+                                      const display = isLong ? `${epicName.slice(0, 10)}…` : epicName
+                                      return (
+                                        <span
+                                          className="truncate"
+                                          title={isLong ? epicName : undefined}
+                                        >
+                                          {display}
+                                        </span>
+                                      )
+                                    })()}
                                   </div>
                                 )}
                                 {story.sprint && (
                                   <div className="flex items-center space-x-1 min-w-0">
-                                    <Calendar className="h-4 w-4 flex-shrink-0" />
+                                    <Zap className="h-4 w-4 flex-shrink-0" />
                                     <span
                                       className="truncate"
                                       title={story.sprint.name && story.sprint.name.length > 10 ? story.sprint.name : undefined}

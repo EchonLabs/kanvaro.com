@@ -90,7 +90,9 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
   }>({})
   const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
   
-  const [timeError, setTimeError] = useState('')
+  // Separate error messages for start and end time
+  const [startTimeError, setStartTimeError] = useState('')
+  const [endTimeError, setEndTimeError] = useState('')
   const [dateError, setDateError] = useState('')
   const [selectedSprint, setSelectedSprint] = useState<Sprint | null>(null)
   
@@ -118,7 +120,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     },
     notificationSettings: {
       enabled: true,
-      reminderTime: '1hour' as 'none' | '10mins' | '30mins' | '1hour' | '24hours',
+      reminderTime: 'none' as 'none' | '10mins' | '30mins' | '1hour' | '24hours',
       emailReminder1Day: true,
       notificationReminder1Hour: true,
       notificationReminder5Min: true
@@ -220,7 +222,17 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
       
       if (response.ok) {
         const data = await response.json()
-        const members = data.data?.members || data.members || []
+        // Handle different response structures
+        let members = []
+        if (data.success && data.data && data.data.members) {
+          members = data.data.members
+        } else if (data.data && Array.isArray(data.data)) {
+          members = data.data
+        } else if (data.members && Array.isArray(data.members)) {
+          members = data.members
+        } else if (Array.isArray(data)) {
+          members = data
+        }
         const usersData = Array.isArray(members) ? members : []
         setUsers(usersData)
         // Update cache
@@ -374,55 +386,56 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
   // Validate end time is after start time and prevent past times
   useEffect(() => {
+    // Clear previous errors
+    setStartTimeError('')
+    setEndTimeError('')
+
+    // Both start and end provided
     if (formData.startTime && formData.endTime) {
       const [startHours, startMinutes] = formData.startTime.split(':').map(Number)
       const [endHours, endMinutes] = formData.endTime.split(':').map(Number)
       const start = startHours * 60 + startMinutes
       const end = endHours * 60 + endMinutes
-      
-      // Check if date is selected and validate against current time
+
+      // Validate start time is not in the past when date is today
       if (selectedDate) {
         const now = new Date()
-        const selectedDateTime = new Date(selectedDate)
-        selectedDateTime.setHours(startHours, startMinutes, 0, 0)
-        
-        // If selected date is today, check if time is in the past
         const today = new Date()
         today.setHours(0, 0, 0, 0)
         const selectedDateOnly = new Date(selectedDate)
         selectedDateOnly.setHours(0, 0, 0, 0)
-        
-        if (selectedDateOnly.getTime() === today.getTime() && selectedDateTime < now) {
-          setTimeError('Start time cannot be in the past')
-          return
+
+        if (selectedDateOnly.getTime() === today.getTime()) {
+          const selectedDateTime = new Date(selectedDate)
+          selectedDateTime.setHours(startHours, startMinutes, 0, 0)
+          if (selectedDateTime < now) {
+            setStartTimeError('Start time cannot be in the past')
+            return
+          }
+        }
       }
-    }
-      
+
+      // Validate end > start
       if (end <= start) {
-        setTimeError('End time must be greater than start time')
-      } else {
-        setTimeError('')
+        setEndTimeError('End time must be greater than start time')
       }
     } else if (formData.startTime && selectedDate) {
-      // Validate start time alone if date is selected
+      // Only start time provided: validate against "now" when date is today
       const [startHours, startMinutes] = formData.startTime.split(':').map(Number)
       const now = new Date()
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const selectedDateOnly = new Date(selectedDate)
       selectedDateOnly.setHours(0, 0, 0, 0)
-      
+
       if (selectedDateOnly.getTime() === today.getTime()) {
         const selectedDateTime = new Date(selectedDate)
         selectedDateTime.setHours(startHours, startMinutes, 0, 0)
         if (selectedDateTime < now) {
-          setTimeError('Start time cannot be in the past')
+          setStartTimeError('Start time cannot be in the past')
           return
         }
       }
-      setTimeError('')
-    } else {
-      setTimeError('')
     }
   }, [formData.startTime, formData.endTime, selectedDate])
 
@@ -532,7 +545,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
   }
 
   const calculateDuration = () => {
-    if (formData.startTime && formData.endTime && !timeError) {
+    if (formData.startTime && formData.endTime && !startTimeError && !endTimeError) {
       const [startHours, startMinutes] = formData.startTime.split(':').map(Number)
       const [endHours, endMinutes] = formData.endTime.split(':').map(Number)
       const start = startHours * 60 + startMinutes
@@ -544,7 +557,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
         setFormData(prev => ({ ...prev, duration: 0 }))
       }
     } else {
-      // Reset duration if times are not both provided
+      // Reset duration if times are not both provided or there are errors
       setFormData(prev => ({ ...prev, duration: 0 }))
     }
   }
@@ -567,7 +580,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
   // Get the calculated duration display value
   const getDurationDisplay = () => {
-    if (formData.startTime && formData.endTime && !timeError && formData.duration > 0) {
+    if (formData.startTime && formData.endTime && !startTimeError && !endTimeError && formData.duration > 0) {
       return formatDuration(formData.duration)
     }
     return 'Enter start and end time to calculate'
@@ -575,7 +588,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
   useEffect(() => {
     calculateDuration()
-  }, [formData.startTime, formData.endTime, timeError])
+  }, [formData.startTime, formData.endTime, startTimeError, endTimeError])
 
   // Check if form is valid
   const isFormValid = () => {
@@ -591,7 +604,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     // If both times are provided, they must be valid (no timeError) and duration must be > 0
     const hasValidTime = 
       (!formData.startTime && !formData.endTime) || // Both empty is OK (optional)
-      (formData.startTime && formData.endTime && !timeError && formData.duration > 0) // Both filled and valid
+      (formData.startTime && formData.endTime && !startTimeError && !endTimeError && formData.duration > 0) // Both filled and valid
     
     // Check date validation - date must be valid if selected
     const hasValidDate = !dateError || (selectedDate && (!selectedSprint || validateDate(selectedDate)))
@@ -764,7 +777,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] flex flex-col max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Create Sprint Event</DialogTitle>
           <DialogDescription>
@@ -772,7 +785,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
           </DialogDescription>
         </DialogHeader>
 
-        <DialogBody>
+        <DialogBody className="flex-1 overflow-y-auto px-4 sm:px-6">
           <form onSubmit={handleSubmit} className="space-y-6" id="create-sprint-event-form">
             {success && (
               <Alert variant="success" className="flex items-center justify-between pr-2">
@@ -991,6 +1004,12 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                     value={formData.startTime}
                     onChange={(e) => handleInputChange('startTime', e.target.value)}
                   />
+                  {startTimeError && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{startTimeError}</AlertDescription>
+                    </Alert>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="endTime">End Time</Label>
@@ -1000,10 +1019,10 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                     value={formData.endTime}
                     onChange={(e) => handleInputChange('endTime', e.target.value)}
                   />
-                  {timeError && (
+                  {endTimeError && (
                     <Alert variant="destructive" className="mt-2">
                       <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>{timeError}</AlertDescription>
+                      <AlertDescription>{endTimeError}</AlertDescription>
                     </Alert>
                   )}
                 </div>
@@ -1189,7 +1208,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                   {filteredUsers.length === 0 && users.length > 0 && (
                     <div className="px-2 py-1 text-sm text-muted-foreground">No matching attendees</div>
                   )}
-                  {users.length === 0 && (projectId || formData.projectId) && (
+                  {users.length === 0 && (
                     <div className="px-2 py-1 text-sm text-muted-foreground">No attendees available</div>
                   )}
                 </div>
