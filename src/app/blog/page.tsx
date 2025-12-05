@@ -120,6 +120,10 @@ export default function BlogPage() {
   const [mounted, setMounted] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All')
+  const [email, setEmail] = useState('')
+  const [emailError, setEmailError] = useState('')
+  const [isSubscribing, setIsSubscribing] = useState(false)
+  const [subscribeSuccess, setSubscribeSuccess] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -132,6 +136,41 @@ export default function BlogPage() {
     const matchesCategory = selectedCategory === 'All' || post.category === selectedCategory
     return matchesSearch && matchesCategory
   })
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setEmailError('')
+    
+    if (!email.trim()) {
+      setEmailError('Email is required')
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      setEmailError('Please enter a valid email address')
+      return
+    }
+
+    setIsSubscribing(true)
+    try {
+      // In production, this would call an API to subscribe the email
+      // For now, simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // Check if already subscribed (simulated)
+      // In production, check against database
+      setSubscribeSuccess(true)
+      setEmail('')
+      
+      // Hide success message after 5 seconds
+      setTimeout(() => setSubscribeSuccess(false), 5000)
+    } catch (error) {
+      setEmailError('Failed to subscribe. Please try again.')
+    } finally {
+      setIsSubscribing(false)
+    }
+  }
 
   const featuredPosts = blogPosts.filter(post => post.featured)
 
@@ -338,8 +377,8 @@ export default function BlogPage() {
                     <span className="text-xs text-slate-500 dark:text-white/60">
                       {new Date(post.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
-                    <span className="flex items-center gap-1 text-sm font-medium text-[#0d9488] dark:text-[#7bffde]">
-                      Read more <ArrowRight className="h-4 w-4" />
+                    <span className="flex items-center gap-1 text-sm font-medium text-[#0d9488] dark:text-[#7bffde] group-hover:gap-2 transition-all">
+                      Read more <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                     </span>
                   </div>
                 </article>
@@ -357,16 +396,42 @@ export default function BlogPage() {
             <p className="text-white/80 mb-8 max-w-xl mx-auto">
               Get the latest articles, tips, and updates delivered straight to your inbox.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="flex-1 rounded-full border border-white/20 bg-white/10 px-6 py-3 text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-white/30"
-              />
-              <Button className="rounded-full bg-white text-[#0d9488] hover:bg-white/90 px-8">
-                Subscribe
-              </Button>
-            </div>
+            <form onSubmit={handleSubscribe} className="max-w-md mx-auto">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value)
+                      setEmailError('')
+                    }}
+                    placeholder="Enter your email"
+                    className={`w-full rounded-full border px-6 py-3 text-white placeholder:text-white/60 focus:outline-none focus:ring-2 ${
+                      emailError 
+                        ? 'border-red-300 bg-red-500/20 focus:ring-red-300' 
+                        : 'border-white/20 bg-white/10 focus:ring-white/30'
+                    }`}
+                    disabled={isSubscribing}
+                  />
+                  {emailError && (
+                    <p className="mt-2 text-sm text-red-200 text-left px-6">{emailError}</p>
+                  )}
+                </div>
+                <Button 
+                  type="submit"
+                  disabled={isSubscribing}
+                  className="rounded-full bg-white text-[#0d9488] hover:bg-white/90 px-8 disabled:opacity-50"
+                >
+                  {isSubscribing ? 'Subscribing...' : 'Subscribe'}
+                </Button>
+              </div>
+              {subscribeSuccess && (
+                <div className="mt-4 rounded-full bg-white/20 backdrop-blur-sm px-6 py-3 text-white text-sm">
+                  ✓ Successfully subscribed! Check your inbox for confirmation.
+                </div>
+              )}
+            </form>
           </div>
         </div>
       </section>

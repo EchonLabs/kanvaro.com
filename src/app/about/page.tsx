@@ -117,9 +117,9 @@ export default function AboutPage() {
                 { icon: <Globe className="h-8 w-8 text-[#d946ef]" />, title: 'Global Teams', desc: 'Built for distributed work' },
                 { icon: <Heart className="h-8 w-8 text-[#f43f5e]" />, title: 'Community', desc: 'Powered by our users' }
               ].map((item) => (
-                <div key={item.title} className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-[#0f1329]">
+                <div key={item.title} className="group rounded-2xl border border-slate-200 bg-white p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-lg hover:border-[#7bffde]/30 dark:border-white/10 dark:bg-[#0f1329] dark:hover:border-[#7bffde]/40 dark:hover:shadow-[0_20px_40px_rgba(123,255,222,0.15)]">
                   {item.icon}
-                  <h3 className="mt-4 font-bold">{item.title}</h3>
+                  <h3 className="mt-4 font-bold group-hover:text-[#0d9488] dark:group-hover:text-[#7bffde] transition-colors">{item.title}</h3>
                   <p className="mt-2 text-sm text-slate-600 dark:text-white/70">{item.desc}</p>
                 </div>
               ))}
@@ -150,11 +150,11 @@ export default function AboutPage() {
                 description: 'Your data belongs to you. Self-host on your infrastructure and maintain complete control over your information.'
               }
             ].map((value) => (
-              <div key={value.title} className="text-center p-8 rounded-3xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#0f1329]">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white dark:bg-white/10 mb-6">
+              <div key={value.title} className="group text-center p-8 rounded-3xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#0f1329] transition-all duration-300 hover:-translate-y-2 hover:shadow-lg hover:border-[#7bffde]/30 dark:hover:border-[#7bffde]/40 dark:hover:shadow-[0_20px_40px_rgba(123,255,222,0.15)]">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white dark:bg-white/10 mb-6 group-hover:scale-110 transition-transform">
                   {value.icon}
                 </div>
-                <h3 className="text-xl font-bold mb-4">{value.title}</h3>
+                <h3 className="text-xl font-bold mb-4 group-hover:text-[#0d9488] dark:group-hover:text-[#7bffde] transition-colors">{value.title}</h3>
                 <p className="text-slate-600 dark:text-white/70 leading-relaxed">{value.description}</p>
               </div>
             ))}
@@ -171,7 +171,7 @@ export default function AboutPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
-              onClick={() => window.open('https://github.com/kanvaro', '_blank')}
+              onClick={() => window.open('https://github.com/EchonLabs/kanvaro.com', '_blank')}
               className="h-12 rounded-full bg-slate-900 dark:bg-white px-8 text-white dark:text-slate-900"
             >
               View on GitHub
