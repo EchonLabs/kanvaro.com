@@ -146,6 +146,9 @@ export default function TasksClient({
 
     const [tasks, setTasks] = useState<Task[]>(initialTasks)
     const [pagination, setPagination] = useState(initialPagination)
+    const [currentPage, setCurrentPage] = useState(1)
+    const [pageSize, setPageSize] = useState(10)
+    const [totalCount, setTotalCount] = useState(0)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [success, setSuccess] = useState('')
@@ -405,9 +408,6 @@ export default function TasksClient({
     const fetchTasks = useCallback(async (reset = false) => {
         try {
             setLoading(true)
-            if (reset) {
-                setPagination({ nextCursor: null })
-            }
             const params = new URLSearchParams()
 
             // Use debounced search only (searchQuery is for input, debouncedSearch for API)
@@ -432,8 +432,9 @@ export default function TasksClient({
                 params.set('createdAtTo', dateRangeFilter.to.toISOString().split('T')[0])
             }
 
-            if (pagination.nextCursor && !reset) params.set('after', pagination.nextCursor)
-            params.set('limit', '20')
+            // Use page-based pagination instead of cursor
+            params.set('page', reset ? '1' : currentPage.toString())
+            params.set('limit', pageSize.toString())
 
             const response = await fetch(`/api/tasks?${params?.toString()}`)
 
@@ -451,12 +452,11 @@ export default function TasksClient({
 
             if (data.success) {
                 setError('')
+                setTasks(data.data)
+                setTotalCount(data.pagination?.total || data.data.length)
                 if (reset) {
-                    setTasks(data.data)
-                } else {
-                    setTasks(prev => [...prev, ...data.data])
+                    setCurrentPage(1)
                 }
-                setPagination(data.pagination)
             } else {
                 setError(data.error || 'Failed to fetch tasks')
             }
@@ -474,7 +474,8 @@ export default function TasksClient({
         assignedToFilter,
         createdByFilter,
         dateRangeFilter,
-        pagination.nextCursor,
+        currentPage,
+        pageSize,
         canViewAllTasks,
         router
     ])
@@ -569,6 +570,13 @@ export default function TasksClient({
         dateRangeFilter,
         fetchTasks
     ])
+
+    // Fetch when pagination changes
+    useEffect(() => {
+        if (filtersInitializedRef.current) {
+            fetchTasks(false)
+        }
+    }, [currentPage, pageSize, fetchTasks])
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -666,11 +674,16 @@ export default function TasksClient({
         setShowCreateTaskModal(false)
     }
 
-    const loadMore = () => {
-        if (pagination.nextCursor && !loading) {
-            fetchTasks(false)
-        }
+    const handlePageChange = (newPage: number) => {
+        setCurrentPage(newPage)
     }
+
+    const handlePageSizeChange = (newSize: number) => {
+        setPageSize(newSize)
+        setCurrentPage(1) // Reset to first page when changing page size
+    }
+
+    const totalPages = Math.ceil(totalCount / pageSize)
 
 
     const handleDeleteTask = async () => {
@@ -1260,22 +1273,47 @@ export default function TasksClient({
                                                 )
                                             )}
                                         </div>
-                                        {pagination.nextCursor && tasks.length > 0 && (
-                                            <div className="flex justify-center mt-4">
-                                                <Button
-                                                    onClick={loadMore}
-                                                    disabled={loading}
-                                                    variant="outline"
-                                                >
-                                                    {loading ? (
-                                                        <>
-                                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                                            Loading...
-                                                        </>
-                                                    ) : (
-                                                        'Load More'
-                                                    )}
-                                                </Button>
+                                        {/* Pagination Controls */}
+                                        {tasks.length > 0 && (
+                                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
+                                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                    <span>Items per page:</span>
+                                                    <Select value={pageSize.toString()} onValueChange={(value) => handlePageSizeChange(parseInt(value))}>
+                                                        <SelectTrigger className="w-20 h-8">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="10">10</SelectItem>
+                                                            <SelectItem value="20">20</SelectItem>
+                                                            <SelectItem value="50">50</SelectItem>
+                                                            <SelectItem value="100">100</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <span>
+                                                        Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Button
+                                                        onClick={() => handlePageChange(currentPage - 1)}
+                                                        disabled={currentPage === 1 || loading}
+                                                        variant="outline"
+                                                        size="sm"
+                                                    >
+                                                        Previous
+                                                    </Button>
+                                                    <span className="text-sm text-muted-foreground px-2">
+                                                        Page {currentPage} of {totalPages || 1}
+                                                    </span>
+                                                    <Button
+                                                        onClick={() => handlePageChange(currentPage + 1)}
+                                                        disabled={currentPage >= totalPages || loading}
+                                                        variant="outline"
+                                                        size="sm"
+                                                    >
+                                                        Next
+                                                    </Button>
+                                                </div>
                                             </div>
                                         )}
                                     </div>

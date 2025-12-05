@@ -291,8 +291,8 @@ export default function MembersPage() {
   }
 
   const handleRemoveMemberClick = (member: Member) => {
-    // Extra guard: do not allow removing admins from here
-    if (member.role === 'admin') return
+    // Extra guard: do not allow removing admins or HR from here
+    if (member.role === 'admin' || member.role === 'human_resource') return
     setMemberToRemove(member)
     setShowRemoveConfirm(true)
   }
@@ -457,7 +457,7 @@ export default function MembersPage() {
   }
 
   const canEditMemberRecord = (member: Member) => {
-    if (member.role === 'admin') {
+    if (member.role === 'admin' || member.role === 'human_resource') {
       return canEditAdminMembers
     }
     return canEditMembers
@@ -606,38 +606,20 @@ export default function MembersPage() {
                           </div>
                           <div className="w-full space-y-2">
                             <div className="flex items-center justify-center">
-                              {/* <Badge className={`${getRoleColor(member.role, member.customRole?._id)} text-xs sm:text-sm flex-shrink-0`}>
+                              <Badge className={`${getRoleColor(member.role, member.customRole?._id)} text-xs sm:text-sm flex-shrink-0`}>
                                 {getMemberRoleLabel(member)}
-                              </Badge> */}
-                              {organizationRoles.length > 0 && (
-                                <Select
-                                  value={member.role}
-                                  onValueChange={(value) => handleInlineRoleChange(member, value)}
-                                  disabled={!canEditMemberRecord(member)}
-                                >
-                                  <SelectTrigger className="h-8 w-[140px] text-xs sm:text-sm">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {organizationRoles.map((role) => (
-                                      <SelectItem key={role.id} value={role.id}>
-                                        {role.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              )}
+                              </Badge>
                             </div>
                             <p className="text-xs text-muted-foreground">
                               Joined {new Date(member.createdAt).toLocaleDateString()}
                             </p>
-                            {/* Project Manager / HR partner info */}
-                            {member.role !== 'admin' && (!member.projectManager || !member.humanResourcePartner) && (
+                            {/* Project Manager / HR partner info - only show for non-admin and non-HR roles */}
+                            {member.role !== 'admin' && member.role !== 'human_resource' && (!member.projectManager || !member.humanResourcePartner) && (
                               <p className="text-xs text-amber-600 dark:text-amber-300">
                                 Project Manager and Human Resource Partner pending
                               </p>
                             )}
-                            {member.role !== 'admin' && member.projectManager && member.humanResourcePartner && (
+                            {member.role !== 'admin' && member.role !== 'human_resource' && member.projectManager && member.humanResourcePartner && (
                               <p className="text-xs text-muted-foreground">
                                 PM: {member.projectManager.firstName} {member.projectManager.lastName} • HR: {member.humanResourcePartner.firstName} {member.humanResourcePartner.lastName}
                               </p>
@@ -662,7 +644,7 @@ export default function MembersPage() {
                               variant="outline"
                               size="sm"
                               onClick={() => handleRemoveMemberClick(member)}
-                              disabled={member.role === 'admin'}
+                              disabled={member.role === 'admin' || member.role === 'human_resource' || !member.isActive}
                               className="flex-1 text-xs sm:text-sm min-h-[36px]"
                             >
                               Remove
@@ -702,34 +684,16 @@ export default function MembersPage() {
                             <Badge className={`${getRoleColor(member.role, member.customRole?._id)} text-xs flex-shrink-0`}>
                               {getMemberRoleLabel(member)}
                             </Badge>
-                            {organizationRoles.length > 0 && (
-                              <Select
-                                value={member.role}
-                                onValueChange={(value) => handleInlineRoleChange(member, value)}
-                                disabled={!canEditMemberRecord(member)}
-                              >
-                                <SelectTrigger className="h-8 w-[140px] text-xs sm:text-sm">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {organizationRoles.map((role) => (
-                                    <SelectItem key={role.id} value={role.id}>
-                                      {role.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            )}
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
                               Joined {new Date(member.createdAt).toLocaleDateString()}
                             </span>
-                            {/* Project Manager / HR partner info */}
-                            {member.role !== 'admin' && (!member.projectManager || !member.humanResourcePartner) && (
+                            {/* Project Manager / HR partner info - only show for non-admin and non-HR roles */}
+                            {member.role !== 'admin' && member.role !== 'human_resource' && (!member.projectManager || !member.humanResourcePartner) && (
                               <p className="text-xs text-amber-600 dark:text-amber-300 w-full">
                                 Project Manager and Human Resource Partner pending
                               </p>
                             )}
-                            {member.role !== 'admin' && member.projectManager && member.humanResourcePartner && (
+                            {member.role !== 'admin' && member.role !== 'human_resource' && member.projectManager && member.humanResourcePartner && (
                               <p className="text-xs text-muted-foreground w-full">
                                 PM: {member.projectManager.firstName} {member.projectManager.lastName} • HR: {member.humanResourcePartner.firstName} {member.humanResourcePartner.lastName}
                               </p>
@@ -756,7 +720,7 @@ export default function MembersPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleRemoveMemberClick(member)}
-                          disabled={member.role === 'admin'}
+                          disabled={member.role === 'admin' || member.role === 'human_resource' || !member.isActive}
                           className="flex-1 sm:flex-initial text-xs sm:text-sm min-h-[44px] touch-target"
                         >
                           Remove

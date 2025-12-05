@@ -153,14 +153,10 @@ export default function CreateSprintPage() {
   // Validate sprint dates
   const validateDates = (startDate: string, endDate: string, project?: any) => {
     setDateError('')
-    
-    if (!startDate || !endDate) {
-      return true // Allow empty dates during input
-    }
 
-    if (!project || !project.startDate || !project.endDate) {
-      setDateError('Project dates are not available. Please select a valid project.')
-      return false
+    if (!startDate || !endDate) {
+      // Allow empty dates during typing; submit handler will still require them
+      return true
     }
 
     const today = new Date()
@@ -168,56 +164,48 @@ export default function CreateSprintPage() {
 
     const sprintStart = new Date(startDate)
     sprintStart.setHours(0, 0, 0, 0)
-    
+
     const sprintEnd = new Date(endDate)
     sprintEnd.setHours(0, 0, 0, 0)
 
-    const projectStart = new Date(project.startDate)
-    projectStart.setHours(0, 0, 0, 0)
-    
-    const projectEnd = new Date(project.endDate)
-    projectEnd.setHours(23, 59, 59, 999) // End of day
-
-    // Check if start date is in the past
+    // Basic validation independent of project dates
     if (sprintStart < today) {
       setDateError(`Start date: Must be today (${today.toLocaleDateString()}) or a future date.`)
       return false
     }
 
-    // Check if start date is before project start
-    if (sprintStart < projectStart) {
-      setDateError(`Start date: Must be on or after project start date (${projectStart.toLocaleDateString()}).`)
-      return false
-    }
-
-    // Check if start date is after project end
-    if (sprintStart > projectEnd) {
-      setDateError(`Start date: Must be on or before project end date (${projectEnd.toLocaleDateString()}).`)
-      return false
-    }
-
-    // Check if end date is in the past
-    if (sprintEnd < today) {
-      setDateError(`End date: Must be today (${today.toLocaleDateString()}) or a future date.`)
-      return false
-    }
-
-    // Check if end date is before project start
-    if (sprintEnd < projectStart) {
-      setDateError(`End date: Must be on or after project start date (${projectStart.toLocaleDateString()}).`)
-      return false
-    }
-
-    // Check if end date is after project end
-    if (sprintEnd > projectEnd) {
-      setDateError(`End date: Must be on or before project end date (${projectEnd.toLocaleDateString()}).`)
-      return false
-    }
-
-    // Check if end date is after start date
     if (sprintEnd < sprintStart) {
       setDateError('End date: Must be after the start date.')
       return false
+    }
+
+    // If project has valid dates, also enforce sprint within project range
+    if (project && project.startDate && project.endDate) {
+      const projectStart = new Date(project.startDate)
+      projectStart.setHours(0, 0, 0, 0)
+
+      const projectEnd = new Date(project.endDate)
+      projectEnd.setHours(23, 59, 59, 999) // End of day
+
+      if (sprintStart < projectStart) {
+        setDateError(`Start date: Must be on or after project start date (${projectStart.toLocaleDateString()}).`)
+        return false
+      }
+
+      if (sprintStart > projectEnd) {
+        setDateError(`Start date: Must be on or before project end date (${projectEnd.toLocaleDateString()}).`)
+        return false
+      }
+
+      if (sprintEnd < projectStart) {
+        setDateError(`End date: Must be on or after project start date (${projectStart.toLocaleDateString()}).`)
+        return false
+      }
+
+      if (sprintEnd > projectEnd) {
+        setDateError(`End date: Must be on or before project end date (${projectEnd.toLocaleDateString()}).`)
+        return false
+      }
     }
 
     return true
