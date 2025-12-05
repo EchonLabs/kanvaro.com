@@ -4,6 +4,8 @@ import { Sprint } from '@/models/Sprint'
 import { Task } from '@/models/Task'
 import { Story } from '@/models/Story'
 import { authenticateUser } from '@/lib/auth-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { Permission } from '@/lib/permissions/permission-definitions'
  
 export async function GET(request: NextRequest) {
   try {
@@ -21,6 +23,12 @@ export async function GET(request: NextRequest) {
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
+
+    // Check if user has permission to view all sprints
+    const hasSprintViewAll = await PermissionService.hasPermission(
+      userId,
+      Permission.SPRINT_VIEW_ALL
+    );
 
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
@@ -44,10 +52,13 @@ export async function GET(request: NextRequest) {
       filters.status = status
     }
 
-    // Query sprints created by the user (like "My Sprints"). Optionally scope by project.
+    // Query sprints - if user has SPRINT_VIEW_ALL, show all sprints; otherwise only their own
     const sprintQueryFilters: any = {
       ...filters,
-      createdBy: userId,
+    }
+    
+    if (!hasSprintViewAll) {
+      sprintQueryFilters.createdBy = userId
     }
     const projectFilter = searchParams.get('project')
     if (projectFilter) {

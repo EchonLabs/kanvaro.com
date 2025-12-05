@@ -1,3 +1,32 @@
+## [1.11.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.11.2...v1.11.3) (2025-12-05)
+
+
+### Bug Fixes
+
+* fix bugs in otp page ([5d41072](https://github.com/EchonLabs/kanvaro.com/commit/5d41072f2902a30feb884b72a9e281e0b5076b10))
+
+## [1.11.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.11.1...v1.11.2) (2025-12-05)
+
+
+### Bug Fixes
+
+* add task ([6d31406](https://github.com/EchonLabs/kanvaro.com/commit/6d31406b07afc78a1c894ca075fb8bfd0ba418d5))
+
+## [1.11.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.11.0...v1.11.1) (2025-12-05)
+
+
+### Bug Fixes
+
+* add changes in invitation ([7da111e](https://github.com/EchonLabs/kanvaro.com/commit/7da111eeb58cc038918c97f47704ef4c0ee0d29a))
+* add fixes for permission ([58dd9d4](https://github.com/EchonLabs/kanvaro.com/commit/58dd9d48fc8cc2b5fda39a32cd673f96d0d51d19))
+
+# [1.11.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.10.9...v1.11.0) (2025-12-04)
+
+
+### Features
+
+* add sprint event changes ([a44efda](https://github.com/EchonLabs/kanvaro.com/commit/a44efda56113a5ebafc98c1a9a43d5791b0bf2b3))
+
 ## [1.10.9](https://github.com/EchonLabs/kanvaro.com/compare/v1.10.8...v1.10.9) (2025-12-03)
 
 

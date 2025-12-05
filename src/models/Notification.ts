@@ -3,13 +3,13 @@ import mongoose, { Schema, Document } from 'mongoose'
 export interface INotification extends Document {
   user: mongoose.Types.ObjectId
   organization: mongoose.Types.ObjectId
-  type: 'task' | 'project' | 'team' | 'system' | 'budget' | 'deadline' | 'reminder' | 'invitation' | 'time_tracking'
+  type: 'task' | 'project' | 'team' | 'system' | 'budget' | 'deadline' | 'reminder' | 'invitation' | 'time_tracking' | 'sprint_event'
   title: string
   message: string
   data?: {
-    entityType?: 'task' | 'project' | 'epic' | 'sprint' | 'story' | 'user' | 'budget' | 'time_entry'
+    entityType?: 'task' | 'project' | 'epic' | 'sprint' | 'story' | 'user' | 'budget' | 'time_entry' | 'sprint_event'
     entityId?: mongoose.Types.ObjectId
-    action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'completed' | 'overdue' | 'reminder'
+    action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'completed' | 'overdue' | 'reminder' | 'upcoming'
     priority?: 'low' | 'medium' | 'high' | 'critical'
     url?: string
     metadata?: Record<string, any>
@@ -32,7 +32,7 @@ const NotificationSchema = new Schema<INotification>({
   organization: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
   type: { 
     type: String, 
-    enum: ['task', 'project', 'team', 'system', 'budget', 'deadline', 'reminder', 'invitation', 'time_tracking'],
+    enum: ['task', 'project', 'team', 'system', 'budget', 'deadline', 'reminder', 'invitation', 'time_tracking', 'sprint_event'],
     required: true 
   },
   title: { type: String, required: true },
@@ -40,12 +40,12 @@ const NotificationSchema = new Schema<INotification>({
   data: {
     entityType: { 
       type: String, 
-      enum: ['task', 'project', 'epic', 'sprint', 'story', 'user', 'budget', 'time_entry']
+      enum: ['task', 'project', 'epic', 'sprint', 'story', 'user', 'budget', 'time_entry', 'sprint_event']
     },
     entityId: { type: Schema.Types.ObjectId },
     action: { 
       type: String, 
-      enum: ['created', 'updated', 'deleted', 'assigned', 'completed', 'overdue', 'reminder']
+      enum: ['created', 'updated', 'deleted', 'assigned', 'completed', 'overdue', 'reminder', 'upcoming']
     },
     priority: { 
       type: String, 

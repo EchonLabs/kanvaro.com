@@ -116,7 +116,7 @@ export class PushNotificationService {
    * Generate push notification payload from notification
    */
   generatePayload(notification: INotification): PushNotificationPayload {
-    const icons = {
+    const icons: Record<string, string> = {
       task: '/icons/task.png',
       project: '/icons/project.png',
       team: '/icons/team.png',
@@ -125,7 +125,8 @@ export class PushNotificationService {
       deadline: '/icons/deadline.png',
       reminder: '/icons/reminder.png',
       invitation: '/icons/invitation.png',
-      time_tracking: '/icons/time-tracking.png'
+      time_tracking: '/icons/time-tracking.png',
+      sprint_event: '/icons/sprint-event.png'
     }
 
     const priority = notification.data?.priority || 'medium'
