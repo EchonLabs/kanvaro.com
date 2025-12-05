@@ -1740,22 +1740,22 @@ export function TimeLogs({
             Time Logs */}
           </CardTitle>
           {canAddManualTimeLog && (
-            <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 w-full xs:w-auto">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <Button
                 onClick={() => setShowBulkUploadModal(true)}
                 size="sm"
                 variant="outline"
-                className="w-full xs:w-auto sm:w-auto justify-center h-9 sm:h-10 text-xs sm:text-sm"
+                className="h-8 sm:h-8 px-3 text-xs justify-start w-full sm:w-auto"
               >
-                <Upload className="h-4 w-4 mr-2 flex-shrink-0" />
+                <Upload className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                 <span className="whitespace-nowrap">Bulk Upload</span>
               </Button>
               <Button
                 onClick={() => setShowAddTimeLogModal(true)}
                 size="sm"
-                className="w-full xs:w-auto sm:w-auto justify-center h-9 sm:h-10 text-xs sm:text-sm"
+                className="h-8 sm:h-8 px-3 text-xs justify-start w-full sm:w-auto"
               >
-                <Plus className="h-4 w-4 mr-2 flex-shrink-0" />
+                <Plus className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                 <span className="whitespace-nowrap">Add Time Log</span>
               </Button>
             </div>
