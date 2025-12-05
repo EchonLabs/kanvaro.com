@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     })
 
-    // Try to send email to hello@kanvaro.com
+    // Try to send email to kanvaro@echonlabs.com
     const emailHtml = `
       <!DOCTYPE html>
       <html>
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     try {
       await emailService.sendEmail({
-        to: 'hello@kanvaro.com',
+        to: 'kanvaro@echonlabs.com',
         subject: `Contact Form: ${subject}`,
         html: emailHtml
       })

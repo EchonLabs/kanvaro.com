@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     })
 
-    // Try to send email to feedback@kanvaro.com
+    // Try to send email to kanvaro@echonlabs.com
     const emailHtml = `
       <!DOCTYPE html>
       <html>
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     try {
       await emailService.sendEmail({
-        to: 'feedback@kanvaro.com',
+        to: 'kanvaro@echonlabs.com',
         subject: `Feedback [${category}]: ${title}`,
         html: emailHtml
       })

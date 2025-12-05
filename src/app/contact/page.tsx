@@ -245,7 +245,7 @@ export default function ContactPage() {
                 <h2 className="text-2xl font-bold mb-6">Other Ways to Reach Us</h2>
                 <div className="space-y-6">
                   <a
-                    href="mailto:hello@kanvaro.com"
+                    href="mailto:kanvaro@echonlabs.com"
                     className="flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                   >
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#0d9488]/10 dark:bg-[#7bffde]/20">
@@ -253,7 +253,7 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <p className="font-medium">Email</p>
-                      <p className="text-sm text-slate-600 dark:text-white/70">hello@kanvaro.com</p>
+                      <p className="text-sm text-slate-600 dark:text-white/70">kanvaro@echonlabs.com</p>
                     </div>
                   </a>
                   <a
