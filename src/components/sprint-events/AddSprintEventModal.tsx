@@ -120,7 +120,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     },
     notificationSettings: {
       enabled: true,
-      reminderTime: '1hour' as 'none' | '10mins' | '30mins' | '1hour' | '24hours',
+      reminderTime: 'none' as 'none' | '10mins' | '30mins' | '1hour' | '24hours',
       emailReminder1Day: true,
       notificationReminder1Hour: true,
       notificationReminder5Min: true
