@@ -1,3 +1,11 @@
+## [1.11.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.11.0...v1.11.1) (2025-12-05)
+
+
+### Bug Fixes
+
+* add changes in invitation ([7da111e](https://github.com/EchonLabs/kanvaro.com/commit/7da111eeb58cc038918c97f47704ef4c0ee0d29a))
+* add fixes for permission ([58dd9d4](https://github.com/EchonLabs/kanvaro.com/commit/58dd9d48fc8cc2b5fda39a32cd673f96d0d51d19))
+
 # [1.11.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.10.9...v1.11.0) (2025-12-04)
 
 
