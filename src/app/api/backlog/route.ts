@@ -261,6 +261,8 @@ export async function GET(request: NextRequest) {
     const organizationId = user.organization
 
     const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
     const search = searchParams.get('search') || ''
     const type = searchParams.get('type') || '' // optional: 'task' | 'story' | 'epic'
 
@@ -333,7 +335,7 @@ export async function GET(request: NextRequest) {
         : Promise.resolve([])
     ])
 
-    const data = [
+    const allItems = [
       ...tasks.map(task => ({
         ...task.toObject(),
         type: 'task'
@@ -348,9 +350,24 @@ export async function GET(request: NextRequest) {
       }))
     ]
 
+    // Sort by createdAt descending (newest first)
+    allItems.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+    // Apply pagination
+    const total = allItems.length
+    const startIndex = (page - 1) * limit
+    const endIndex = startIndex + limit
+    const paginatedData = allItems.slice(startIndex, endIndex)
+
     return NextResponse.json({
       success: true,
-      data
+      data: paginatedData,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
     })
   } catch (error) {
     console.error('Get backlog error:', error)

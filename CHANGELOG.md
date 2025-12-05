@@ -1,3 +1,10 @@
+## [1.11.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.11.6...v1.11.7) (2025-12-05)
+
+
+### Bug Fixes
+
+* add pagination ([3825dd8](https://github.com/EchonLabs/kanvaro.com/commit/3825dd8a4b86a3a1f1fec35f8ef5d54188a577bb))
+
 ## [1.11.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.11.5...v1.11.6) (2025-12-05)
 
 
