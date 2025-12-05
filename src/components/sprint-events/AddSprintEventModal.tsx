@@ -222,7 +222,17 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
       
       if (response.ok) {
         const data = await response.json()
-        const members = data.data?.members || data.members || []
+        // Handle different response structures
+        let members = []
+        if (data.success && data.data && data.data.members) {
+          members = data.data.members
+        } else if (data.data && Array.isArray(data.data)) {
+          members = data.data
+        } else if (data.members && Array.isArray(data.members)) {
+          members = data.members
+        } else if (Array.isArray(data)) {
+          members = data
+        }
         const usersData = Array.isArray(members) ? members : []
         setUsers(usersData)
         // Update cache
@@ -767,7 +777,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] flex flex-col max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Create Sprint Event</DialogTitle>
           <DialogDescription>
@@ -775,7 +785,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
           </DialogDescription>
         </DialogHeader>
 
-        <DialogBody>
+        <DialogBody className="flex-1 overflow-y-auto px-4 sm:px-6">
           <form onSubmit={handleSubmit} className="space-y-6" id="create-sprint-event-form">
             {success && (
               <Alert variant="success" className="flex items-center justify-between pr-2">
@@ -1198,7 +1208,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                   {filteredUsers.length === 0 && users.length > 0 && (
                     <div className="px-2 py-1 text-sm text-muted-foreground">No matching attendees</div>
                   )}
-                  {users.length === 0 && (projectId || formData.projectId) && (
+                  {users.length === 0 && (
                     <div className="px-2 py-1 text-sm text-muted-foreground">No attendees available</div>
                   )}
                 </div>

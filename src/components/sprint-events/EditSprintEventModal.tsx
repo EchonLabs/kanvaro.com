@@ -10,9 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogBody } from '@/components/ui/Dialog'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
-import { CalendarIcon, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react'
+import { CalendarIcon, Loader2, CheckCircle, AlertCircle, X, UserPlus } from 'lucide-react'
 import { format } from 'date-fns'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/Badge'
+import { Checkbox } from '@/components/ui/Checkbox'
 
 interface SprintEvent {
   _id: string
@@ -77,6 +79,9 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
   const [users, setUsers] = useState<User[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(true)
+  const [showAddAttendees, setShowAddAttendees] = useState(false)
+  const [attendeeSearchQuery, setAttendeeSearchQuery] = useState('')
   const [selectedDate, setSelectedDate] = useState<Date>(new Date(event.scheduledDate))
   const [actualDate, setActualDate] = useState<Date | undefined>(
     event.actualDate ? new Date(event.actualDate) : undefined
@@ -125,13 +130,35 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch(`/api/members?projectId=${event.project._id}`)
+      setLoadingUsers(true)
+      const response = await fetch('/api/members?limit=1000')
       if (response.ok) {
         const data = await response.json()
-        setUsers(data.members || [])
+        // Handle different response structures
+        let members = []
+        if (data.success && data.data && data.data.members) {
+          members = data.data.members
+        } else if (data.data && Array.isArray(data.data)) {
+          members = data.data
+        } else if (data.members && Array.isArray(data.members)) {
+          members = data.members
+        } else if (Array.isArray(data)) {
+          members = data
+        }
+        setUsers(Array.isArray(members) ? members : [])
+      } else {
+        // Fallback to /api/users
+        const fallbackResponse = await fetch('/api/users')
+        if (fallbackResponse.ok) {
+          const usersData = await fallbackResponse.json()
+          setUsers(Array.isArray(usersData) ? usersData : [])
+        }
       }
     } catch (error) {
       console.error('Error fetching users:', error)
+      setUsers([])
+    } finally {
+      setLoadingUsers(false)
     }
   }
 
@@ -173,7 +200,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
           setSuccess('')
           onClose()
           router.push('/sprint-events?success=updated')
-        }, 2500)
+        }, 3000)
       } else {
         const errorData = await response.json()
         const errorMessage = errorData.error || 'Failed to update event'
@@ -214,6 +241,29 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
         ? prev.attendees.filter(id => id !== userId)
         : [...prev.attendees, userId]
     }))
+  }
+
+  const removeAttendee = (userId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      attendees: prev.attendees.filter(id => id !== userId)
+    }))
+  }
+
+  const getSelectedAttendees = () => {
+    return users.filter(user => formData.attendees.includes(user._id))
+  }
+
+  const getAvailableAttendees = () => {
+    const query = attendeeSearchQuery.toLowerCase()
+    return users.filter(user => {
+      const isNotSelected = !formData.attendees.includes(user._id)
+      const matchesSearch = !query || 
+        user.firstName.toLowerCase().includes(query) ||
+        user.lastName.toLowerCase().includes(query) ||
+        user.email.toLowerCase().includes(query)
+      return isNotSelected && matchesSearch
+    })
   }
 
   const addDecision = () => {
@@ -361,7 +411,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent 
-        className="sm:max-w-[700px] max-h-[90vh]"
+        className="sm:max-w-[700px] max-h-[90vh] flex flex-col overflow-hidden"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader>
@@ -371,7 +421,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
           </DialogDescription>
         </DialogHeader>
 
-        <DialogBody>
+        <DialogBody className="flex-1 overflow-y-auto px-4 sm:px-6">
           <form onSubmit={handleSubmit} className="space-y-4" id="edit-sprint-event-form">
             {success && (
               <Alert variant="success" className="flex items-center justify-between pr-2">
@@ -512,22 +562,81 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
           </div>
 
           <div className="space-y-2">
-            <Label>Attendees</Label>
-            <div className="max-h-32 overflow-y-auto border rounded-md p-2 space-y-1">
-              {users.map((user) => (
-                <label key={user._id} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.attendees.includes(user._id)}
-                    onChange={() => handleAttendeeToggle(user._id)}
-                    className="rounded"
-                  />
-                  <span className="text-sm">
-                    {user.firstName} {user.lastName} ({user.email})
-                  </span>
-                </label>
-              ))}
+            <div className="flex items-center justify-between">
+              <Label>Attendees</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddAttendees(!showAddAttendees)}
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Add Attendees
+              </Button>
             </div>
+            
+            {/* Selected Attendees as Chips */}
+            {loadingUsers ? (
+              <div className="border rounded-md p-4 flex items-center justify-center">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <span className="text-sm text-muted-foreground">Loading attendees...</span>
+              </div>
+            ) : getSelectedAttendees().length > 0 ? (
+              <div className="border rounded-md p-3 flex flex-wrap gap-2">
+                {getSelectedAttendees().map((user) => (
+                  <Badge key={user._id} variant="secondary" className="flex items-center gap-2 px-3 py-1">
+                    <span className="text-sm">
+                      {user.firstName} {user.lastName}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttendee(user._id)}
+                      className="hover:bg-secondary-foreground/20 rounded-full p-0.5"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <div className="border rounded-md p-4 text-center">
+                <p className="text-sm text-muted-foreground">No attendees selected</p>
+                <p className="text-xs text-muted-foreground mt-1">Click "Add Attendees" to select participants</p>
+              </div>
+            )}
+
+            {/* Add Attendees Section */}
+            {showAddAttendees && !loadingUsers && (
+              <div className="border rounded-md p-3 space-y-2">
+                <Input
+                  placeholder="Search attendees..."
+                  value={attendeeSearchQuery}
+                  onChange={(e) => setAttendeeSearchQuery(e.target.value)}
+                  className="mb-2"
+                />
+                <div className="max-h-48 overflow-y-auto space-y-1">
+                  {getAvailableAttendees().length > 0 ? (
+                    getAvailableAttendees().map((user) => (
+                      <label key={user._id} className="flex items-center space-x-2 p-2 hover:bg-muted rounded cursor-pointer">
+                        <Checkbox
+                          checked={false}
+                          onCheckedChange={() => handleAttendeeToggle(user._id)}
+                        />
+                        <span className="text-sm flex-1">
+                          {user.firstName} {user.lastName} <span className="text-muted-foreground">({user.email})</span>
+                        </span>
+                      </label>
+                    ))
+                  ) : (
+                    <div className="text-center py-3">
+                      <p className="text-sm text-muted-foreground">
+                        {attendeeSearchQuery ? 'No matching attendees found' : 'All available attendees have been added'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Event Outcomes */}
