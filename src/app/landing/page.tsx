@@ -1205,7 +1205,7 @@ export default function LandingPage() {
                 <Linkedin className="h-5 w-5" />
               </Link>
               <Link 
-                href="mailto:hello@kanvaro.com" 
+                href="mailto:kanvaro@echonlabs.com" 
                 className="text-white/70 hover:text-[#7bffde] transition-colors"
                 aria-label="Email"
               >
