@@ -156,7 +156,7 @@ export default function FeedbackPage() {
       </section>
 
       {/* Feedback Form */}
-      <section className="px-6 pb-20">
+      <section className="px-6 pt-12 pb-20">
         <div className="mx-auto max-w-2xl">
           {submitted ? (
             <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center dark:border-white/10 dark:bg-[#0f1329]">
@@ -175,7 +175,7 @@ export default function FeedbackPage() {
               </Button>
             </div>
           ) : (
-            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-lg dark:border-white/10 dark:bg-[#0f1329]">
+            <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-lg dark:border-white/10 dark:bg-[#0f1329]">
               <h2 className="text-2xl font-bold mb-6">Submit Feedback</h2>
               
               {/* Category Selection */}
@@ -237,7 +237,7 @@ export default function FeedbackPage() {
                   />
                 </div>
 
-                <div>
+                <div className="mb-6">
                   <label className="block text-sm font-medium mb-2">Email (optional)</label>
                   <input
                     type="email"
@@ -249,11 +249,12 @@ export default function FeedbackPage() {
                   />
                 </div>
 
-                <Button
-                  type="submit"
-                  disabled={!selectedCategory || isSubmitting}
-                  className="w-full h-12 rounded-xl bg-[#0d9488] dark:bg-[#7bffde] text-white dark:text-slate-900 hover:bg-[#0f766e] dark:hover:bg-[#5ce8c5] disabled:opacity-50"
-                >
+                <div className="mt-10">
+                  <Button
+                    type="submit"
+                    disabled={!selectedCategory || isSubmitting}
+                    className="w-full h-12 rounded-xl bg-[#0d9488] dark:bg-[#7bffde] text-white dark:text-slate-900 hover:bg-[#0f766e] dark:hover:bg-[#5ce8c5] disabled:opacity-50"
+                  >
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -265,27 +266,28 @@ export default function FeedbackPage() {
                       Submit Feedback
                     </>
                   )}
-                </Button>
+                  </Button>
+                </div>
               </form>
             </div>
           )}
 
           {/* Alternative Options */}
-          <div className="mt-8 text-center">
+          <div className="mt-12 text-center">
             <p className="text-sm text-slate-500 dark:text-white/60 mb-4">
               You can also submit feedback via:
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Button
                 variant="outline"
-                onClick={() => window.open('https://github.com/kanvaro/issues', '_blank')}
+                onClick={() => window.open('https://github.com/EchonLabs/kanvaro.com/issues', '_blank')}
                 className="rounded-full"
               >
                 GitHub Issues
               </Button>
               <Button
                 variant="outline"
-                onClick={() => window.open('https://github.com/kanvaro/discussions', '_blank')}
+                onClick={() => window.open('https://github.com/EchonLabs/kanvaro.com/discussions', '_blank')}
                 className="rounded-full"
               >
                 GitHub Discussions

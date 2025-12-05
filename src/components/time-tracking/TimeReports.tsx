@@ -72,6 +72,27 @@ interface ReportData {
     totalCost: number
     entryCount: number
   }>
+  detailedEntries?: Array<{
+    _id: string
+    userId: string
+    userName: string
+    userEmail: string
+    projectId: string
+    projectName: string
+    projectCurrency: string
+    taskId: string
+    taskTitle: string
+    date: string
+    startTime: string
+    endTime: string
+    duration: number
+    hourlyRate: number
+    cost: number
+    notes: string
+    isBillable: boolean
+    approvedBy: string
+    approvedByName: string
+  }>
 }
 
 export function TimeReports({ userId, organizationId, projectId }: TimeReportsProps) {
@@ -79,6 +100,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [orgCurrency, setOrgCurrency] = useState<string>('USD')
   const [projects, setProjects] = useState<Array<{ _id: string; name: string }>>([])
   const [users, setUsers] = useState<Array<{ _id: string; firstName: string; lastName: string; email: string }>>([])
   const [projectFilterQuery, setProjectFilterQuery] = useState('')
@@ -87,7 +109,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
-    reportType: 'summary',
+    reportType: 'detailed', // Default to detailed entries view
     projectId: projectId || 'all',
     assignedTo: userId || 'all',
     assignedBy: 'all'
@@ -121,6 +143,11 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
         } else {
           setReportData(data)
         }
+        
+        // Set organization currency from API response
+        if (data.organizationCurrency) {
+          setOrgCurrency(data.organizationCurrency)
+        }
       } else {
         setError(data?.error || 'Failed to load report')
       }
@@ -134,6 +161,13 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   useEffect(() => {
     loadReport()
   }, [loadReport])
+
+  // Load organization currency and debug
+  useEffect(() => {
+    if (organization?.currency) {
+      setOrgCurrency(organization.currency)
+    }
+  }, [organization, orgCurrency])
 
   // Load projects and users for filters
   useEffect(() => {
@@ -210,18 +244,81 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     return `${hours}h ${mins}m`
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount)
+  const formatCurrency = (amount: number, currencyCode?: string) => {
+    const code = currencyCode || orgCurrency
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: code
+      }).format(amount)
+    } catch (error) {
+      // Fallback if currency code is invalid
+      return `${code} ${amount.toFixed(2)}`
+    }
   }
+
+  // Simple currency conversion rates (you can replace with real-time API later)
+  const getCurrencyConversionRate = (fromCurrency: string, toCurrency: string): number => {
+    if (fromCurrency === toCurrency) return 1
+    
+    // Base rates to USD (approximate rates, should be fetched from API in production)
+    const ratesToUSD: Record<string, number> = {
+      'USD': 1,
+      'EUR': 1.09,
+      'GBP': 1.27,
+      'INR': 0.012,
+      'LKR': 0.0034,
+      'AUD': 0.66,
+      'CAD': 0.73,
+      'JPY': 0.0067,
+      'CNY': 0.14
+    }
+    
+    const fromRate = ratesToUSD[fromCurrency] || 1
+    const toRate = ratesToUSD[toCurrency] || 1
+    
+    // Convert from source currency to USD, then to target currency
+    return fromRate / toRate
+  }
+
+  // Calculate summary statistics from detailed entries with currency conversion
+  const summaryStats = useMemo(() => {
+    if (!reportData?.detailedEntries || reportData.detailedEntries.length === 0) {
+      return {
+        totalEntries: 0,
+        totalDuration: 0,
+        totalCost: 0,
+        billableDuration: 0
+      }
+    }
+
+    return reportData.detailedEntries.reduce((acc, entry) => {
+      acc.totalEntries += 1
+      acc.totalDuration += entry.duration
+      
+      // Convert cost to organization currency
+      const conversionRate = getCurrencyConversionRate(entry.projectCurrency, orgCurrency)
+      const convertedCost = entry.cost * conversionRate
+      acc.totalCost += convertedCost
+      
+      if (entry.isBillable) {
+        acc.billableDuration += entry.duration
+      }
+      return acc
+    }, {
+      totalEntries: 0,
+      totalDuration: 0,
+      totalCost: 0,
+      billableDuration: 0
+    })
+  }, [reportData?.detailedEntries, orgCurrency])
 
   const handleExport = async () => {
     try {
+      // Always export detailed entries format
       const params = new URLSearchParams({
         organizationId,
-        reportType: filters.reportType,
+        reportType: 'detailed',
         format: 'csv'
       })
 
@@ -238,7 +335,8 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `time-report-${new Date().toISOString().split('T')[0]}.csv`
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+        a.download = `All_time_log_${timestamp}.csv`
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
@@ -394,21 +492,6 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="reportType">Report Type</Label>
-              <Select value={filters.reportType} onValueChange={(value) => setFilters(prev => ({ ...prev, reportType: value }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="summary">Summary</SelectItem>
-                  <SelectItem value="byUser">By User</SelectItem>
-                  <SelectItem value="byProject">By Project</SelectItem>
-                  <SelectItem value="byTask">By Task</SelectItem>
-                  <SelectItem value="billable">Billable Time</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
           <div className="flex justify-end">
             <Button onClick={handleExport}>
@@ -419,8 +502,8 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
         </CardContent>
       </Card>
 
-      {/* Summary Report */}
-      {reportData && filters.reportType === 'summary' && reportData.summary && (
+      {/* Summary Widgets */}
+      {reportData && filters.reportType === 'detailed' && reportData.detailedEntries && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-6">
@@ -428,7 +511,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 <Clock className="h-8 w-8 text-primary" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-muted-foreground">Total Time</p>
-                  <p className="text-2xl font-bold">{formatDuration(reportData.summary.totalDuration || 0)}</p>
+                  <p className="text-2xl font-bold">{formatDuration(summaryStats.totalDuration)}</p>
                 </div>
               </div>
             </CardContent>
@@ -440,7 +523,10 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 <DollarSign className="h-8 w-8 text-green-600" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-muted-foreground">Total Cost</p>
-                  <p className="text-2xl font-bold">{formatCurrency(reportData.summary.totalCost || 0)}</p>
+                  <p className="text-2xl font-bold">{(() => {
+                    const formatted = formatCurrency(summaryStats.totalCost, orgCurrency);
+                    return formatted;
+                  })()}</p>
                 </div>
               </div>
             </CardContent>
@@ -452,7 +538,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 <TrendingUp className="h-8 w-8 text-blue-600" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-muted-foreground">Billable Time</p>
-                  <p className="text-2xl font-bold">{formatDuration(reportData.summary.billableDuration || 0)}</p>
+                  <p className="text-2xl font-bold">{formatDuration(summaryStats.billableDuration)}</p>
                 </div>
               </div>
             </CardContent>
@@ -464,7 +550,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 <Users className="h-8 w-8 text-purple-600" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-muted-foreground">Total Entries</p>
-                  <p className="text-2xl font-bold">{reportData.summary.totalEntries || 0}</p>
+                  <p className="text-2xl font-bold">{summaryStats.totalEntries}</p>
                 </div>
               </div>
             </CardContent>
@@ -472,105 +558,131 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
         </div>
       )}
 
-      {/* User Report */}
-      {reportData && filters.reportType === 'byUser' && reportData.userReport && (
+      {/* Detailed Entries Report - Always shown */}
+      {reportData && filters.reportType === 'detailed' && reportData.detailedEntries && (
         <Card>
           <CardHeader>
-            <CardTitle>Time by User</CardTitle>
+            <CardTitle>Approved Time Entries</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {reportData.userReport.map((user) => (
-                <div key={user.userId} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <div className="font-medium">{user.userName}</div>
-                    <div className="text-sm text-muted-foreground">{user.userEmail}</div>
+            {reportData.detailedEntries.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No approved time entries found for the selected filters.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <div className="min-w-full">
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block">
+                    <div className="grid grid-cols-12 gap-4 p-4 border-b font-semibold text-sm text-muted-foreground">
+                      <div className="col-span-2">Employee</div>
+                      <div className="col-span-2">Project (Task)</div>
+                      <div className="col-span-1">Date</div>
+                      <div className="col-span-1">Start</div>
+                      <div className="col-span-1">End</div>
+                      <div className="col-span-1">Duration</div>
+                      <div className="col-span-1">Cost</div>
+                      <div className="col-span-1">Billable</div>
+                      <div className="col-span-2">Notes</div>
+                    </div>
+                    {reportData.detailedEntries.map((entry) => (
+                      <div key={entry._id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-muted/50">
+                        <div className="col-span-2">
+                          <div className="font-medium text-sm">{entry.userName}</div>
+                          <div className="text-xs text-muted-foreground">{entry.userEmail}</div>
+                        </div>
+                        <div className="col-span-2">
+                          <div className="font-medium text-sm">{entry.projectName}</div>
+                          {entry.taskTitle && (
+                            <div className="text-xs text-muted-foreground">{entry.taskTitle}</div>
+                          )}
+                        </div>
+                        <div className="col-span-1 text-sm">
+                          {new Date(entry.date).toLocaleDateString()}
+                        </div>
+                        <div className="col-span-1 text-sm">
+                          {entry.startTime ? new Date(entry.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                        </div>
+                        <div className="col-span-1 text-sm">
+                          {entry.endTime ? new Date(entry.endTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                        </div>
+                        <div className="col-span-1 text-sm font-medium">
+                          {formatDuration(entry.duration)}
+                        </div>
+                        <div className="col-span-1 text-sm font-medium">
+                          {formatCurrency(entry.cost, entry.projectCurrency)}
+                        </div>
+                        <div className="col-span-1">
+                          {entry.isBillable ? (
+                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
+                              Yes
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">No</Badge>
+                          )}
+                        </div>
+                        <div className="col-span-2 text-sm text-muted-foreground truncate" title={entry.notes}>
+                          {entry.notes || '-'}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="text-right">
-                    <div className="font-medium">{formatDuration(user.totalDuration)}</div>
-                    <div className="text-sm text-muted-foreground">{formatCurrency(user.totalCost)}</div>
+
+                  {/* Mobile Card View */}
+                  <div className="md:hidden space-y-4">
+                    {reportData.detailedEntries.map((entry) => (
+                      <div key={entry._id} className="border rounded-lg p-4 space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium">{entry.userName}</div>
+                            <div className="text-xs text-muted-foreground">{entry.userEmail}</div>
+                          </div>
+                          {entry.isBillable && (
+                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
+                              Billable
+                            </Badge>
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-medium text-sm">{entry.projectName}</div>
+                          {entry.taskTitle && (
+                            <div className="text-xs text-muted-foreground">{entry.taskTitle}</div>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Date: </span>
+                            <span>{new Date(entry.date).toLocaleDateString()}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Duration: </span>
+                            <span className="font-medium">{formatDuration(entry.duration)}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Start: </span>
+                            <span>{entry.startTime ? new Date(entry.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Cost: </span>
+                            <span className="font-medium">{formatCurrency(entry.cost, entry.projectCurrency)}</span>
+                          </div>
+                        </div>
+                        {entry.notes && (
+                          <div className="text-sm text-muted-foreground">
+                            <span className="font-medium">Notes: </span>
+                            {entry.notes}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Project Report */}
-      {reportData && filters.reportType === 'byProject' && reportData.projectReport && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Time by Project</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {reportData.projectReport.map((project) => (
-                <div key={project.projectId} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <div className="font-medium">{project.projectName}</div>
-                    <div className="text-sm text-muted-foreground">{project.entryCount} entries</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-medium">{formatDuration(project.totalDuration)}</div>
-                    <div className="text-sm text-muted-foreground">{formatCurrency(project.totalCost)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Task Report */}
-      {reportData && filters.reportType === 'byTask' && reportData.taskReport && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Time by Task</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {reportData.taskReport.map((task) => (
-                <div key={task.taskId} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <div className="font-medium">{task.taskTitle}</div>
-                    <div className="text-sm text-muted-foreground">{task.entryCount} entries</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-medium">{formatDuration(task.totalDuration)}</div>
-                    <div className="text-sm text-muted-foreground">{formatCurrency(task.totalCost)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Billable Report */}
-      {reportData && filters.reportType === 'billable' && reportData.billableReport && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Billable Time Report</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {reportData.billableReport.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <div className="font-medium">{item.userName}</div>
-                    <div className="text-sm text-muted-foreground">{item.projectName}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-medium">{formatDuration(item.totalDuration)}</div>
-                    <div className="text-sm text-muted-foreground">{formatCurrency(item.totalCost)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }
