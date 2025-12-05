@@ -47,7 +47,8 @@ export async function GET(request: NextRequest) {
         'project_manager': 'Project Manager',
         'team_member': 'Team Member',
         'client': 'Client',
-        'viewer': 'Viewer'
+        'viewer': 'Viewer',
+        'human_resource': 'Human Resource'
       }
       roleDisplayName = roleNameMap[invitation.role] || invitation.role
     }

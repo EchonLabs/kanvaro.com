@@ -4,7 +4,7 @@ export interface IUserInvitation extends Document {
   email: string
   organization: mongoose.Types.ObjectId
   invitedBy: mongoose.Types.ObjectId
-  role: 'admin' | 'project_manager' | 'team_member' | 'client' | 'viewer'
+  role: 'admin' | 'project_manager' | 'team_member' | 'client' | 'viewer' | 'human_resource'
   customRole?: mongoose.Types.ObjectId
   token: string
   expiresAt: Date
@@ -36,7 +36,7 @@ const UserInvitationSchema = new Schema<IUserInvitation>({
   },
   role: {
     type: String,
-    enum: ['admin', 'project_manager', 'team_member', 'client', 'viewer'],
+    enum: ['admin', 'project_manager', 'team_member', 'client', 'viewer', 'human_resource'],
     required: false,
     default: 'team_member'
   },

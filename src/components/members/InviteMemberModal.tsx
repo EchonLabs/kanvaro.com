@@ -132,18 +132,16 @@ export function InviteMemberModal({ onClose, onInvite }: InviteMemberModalProps)
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <Alert variant="destructive">
-                <div className="flex items-center justify-between">
-                  <AlertDescription>{error}</AlertDescription>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 hover:bg-destructive/20"
-                    onClick={() => setError('')}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
+              <Alert variant="destructive" className="flex items-start justify-between gap-3 pr-2">
+                <AlertDescription className="flex-1">{error}</AlertDescription>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-destructive/20 flex-shrink-0"
+                  onClick={() => setError('')}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </Alert>
             )}
 

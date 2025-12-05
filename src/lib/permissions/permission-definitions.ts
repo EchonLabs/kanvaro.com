@@ -1086,6 +1086,13 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.ORGANIZATION_MANAGE_BILLING,
     Permission.PROJECT_CREATE, // Project creation is a global permission
     Permission.PROJECT_VIEW_ALL,
+    Permission.TASK_VIEW_ALL,
+    Permission.TASK_EDIT_ALL,
+    Permission.TASK_DELETE_ALL,
+    Permission.STORY_VIEW_ALL,
+    Permission.SPRINT_VIEW_ALL,
+    Permission.EPIC_VIEW_ALL,
+    Permission.SPRINT_EVENT_VIEW_ALL,
     Permission.TEAM_INVITE, // Organization-wide permission to invite team members
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_VIEW_ASSIGNED,

@@ -33,87 +33,65 @@ export async function GET(req: NextRequest) {
     }
 
     // Get system roles (predefined)
-    const systemRoles = [
+    const systemRolesData = [
       {
         _id: Role.ADMIN,
         name: 'Administrator',
         description: 'Full access to all features and settings',
         permissions: ROLE_PERMISSIONS[Role.ADMIN],
-        isSystem: true,
-        userCount: 1,
-        createdAt: new Date().toISOString()
+        isSystem: true
       },
       {
         _id: Role.HUMAN_RESOURCE,
         name: 'Human Resource',
         description: 'Manages people operations and HR processes',
         permissions: ROLE_PERMISSIONS[Role.HUMAN_RESOURCE],
-        isSystem: true,
-        userCount: 0,
-        createdAt: new Date().toISOString()
+        isSystem: true
       },
       {
         _id: Role.PROJECT_MANAGER,
         name: 'Project Manager',
-        description: 'Can manage projects and assign tasks to team members',
-        permissions: [
-          'project:create',
-          'project:read',
-          'project:update',
-          'task:create',
-          'task:read',
-          'task:update',
-          'task:delete',
-          'team:read',
-          'reports:read'
-        ],
-        isSystem: true,
-        userCount: 0,
-        createdAt: new Date().toISOString()
+        description: 'Full access to all features and settings',
+        permissions: ROLE_PERMISSIONS[Role.PROJECT_MANAGER],
+        isSystem: true
       },
       {
         _id: Role.TEAM_MEMBER,
         name: 'Team Member',
         description: 'Can work on assigned tasks and projects',
-        permissions: [
-          'project:read',
-          'task:create',
-          'task:read',
-          'task:update',
-          'time:create',
-          'time:read',
-          'time:update'
-        ],
-        isSystem: true,
-        userCount: 0,
-        createdAt: new Date().toISOString()
+        permissions: ROLE_PERMISSIONS[Role.TEAM_MEMBER],
+        isSystem: true
       },
       {
         _id: Role.CLIENT,
         name: 'Client',
         description: 'Read-only access to assigned projects',
-        permissions: [
-          'project:read',
-          'task:read',
-          'reports:read'
-        ],
-        isSystem: true,
-        userCount: 0,
-        createdAt: new Date().toISOString()
+        permissions: ROLE_PERMISSIONS[Role.CLIENT],
+        isSystem: true
       },
       {
         _id: Role.VIEWER,
         name: 'Viewer',
         description: 'Read-only access to assigned content',
-        permissions: [
-          'project:read',
-          'task:read'
-        ],
-        isSystem: true,
-        userCount: 0,
-        createdAt: new Date().toISOString()
+        permissions: ROLE_PERMISSIONS[Role.VIEWER],
+        isSystem: true
       }
     ]
+
+    // Get user counts for system roles
+    const systemRoles = await Promise.all(
+      systemRolesData.map(async (role) => {
+        const userCount = await User.countDocuments({ 
+          role: role._id,
+          organization: authResult.user.organization 
+        })
+        return {
+          ...role,
+          userCount,
+          createdAt: new Date().toISOString()
+        }
+      })
+    )
 
     // Get custom roles from database
     const customRoles = await CustomRole.find({ 
