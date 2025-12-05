@@ -123,6 +123,8 @@ export default function SprintEventsPage() {
   const [editingEvent, setEditingEvent] = useState<SprintEvent | null>(null)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   // Define fetch functions BEFORE useEffect that uses them
   const fetchProjects = useCallback(async (signal?: AbortSignal) => {
@@ -343,16 +345,32 @@ export default function SprintEventsPage() {
   // Optimized filtering with memoization and debouncing
   const filteredEvents = useMemo(() => {
     return events.filter(event => {
-      const matchesSearch = !debouncedSearchTerm.trim() || 
-                           event.title.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-                           event.description?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
-    const matchesType = filterType === 'all' || event.eventType === filterType
-    const matchesStatus = filterStatus === 'all' || event.status === filterStatus
-    const matchesProject = filterProject === 'all' || event.project._id === filterProject
-    
-    return matchesSearch && matchesType && matchesStatus && matchesProject
-  })
+      const matchesSearch =
+        !debouncedSearchTerm.trim() ||
+        event.title.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        event.description?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+
+      const matchesType = filterType === 'all' || event.eventType === filterType
+      const matchesStatus = filterStatus === 'all' || event.status === filterStatus
+      const matchesProject = filterProject === 'all' || event.project._id === filterProject
+
+      return matchesSearch && matchesType && matchesStatus && matchesProject
+    })
   }, [events, debouncedSearchTerm, filterType, filterStatus, filterProject])
+
+  // Pagination derived data
+  const totalCount = filteredEvents.length
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+
+  const paginatedEvents = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize
+    return filteredEvents.slice(startIndex, startIndex + pageSize)
+  }, [filteredEvents, currentPage, pageSize])
+
+  // Reset page when filters/search change so we don't get empty pages
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [debouncedSearchTerm, filterType, filterStatus, filterProject])
 
   if (authLoading) {
     return (
@@ -562,7 +580,7 @@ export default function SprintEventsPage() {
 
                 <TabsContent value="grid" className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredEvents.map((event) => (
+                    {paginatedEvents.map((event) => (
                       <Card 
                         key={event._id} 
                         className="hover:shadow-md transition-shadow cursor-pointer"
@@ -640,7 +658,7 @@ export default function SprintEventsPage() {
 
                 <TabsContent value="list" className="space-y-4">
                   <div className="space-y-4">
-                    {filteredEvents.map((event) => (
+                    {paginatedEvents.map((event) => (
               <Card 
                 key={event._id} 
                 className="hover:shadow-md transition-shadow cursor-pointer"
@@ -706,6 +724,57 @@ export default function SprintEventsPage() {
                   </div>
                 </TabsContent>
               </Tabs>
+
+              {/* Pagination Controls */}
+              {totalCount > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Items per page:</span>
+                    <Select
+                      value={pageSize.toString()}
+                      onValueChange={(value) => {
+                        const newSize = parseInt(value)
+                        setPageSize(newSize)
+                        setCurrentPage(1)
+                      }}
+                    >
+                      <SelectTrigger className="w-20 h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span>
+                      Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1 || loading}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground px-2">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage >= totalPages || loading}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

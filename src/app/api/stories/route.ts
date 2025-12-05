@@ -33,6 +33,8 @@ export async function GET(request: NextRequest) {
     );
 
     const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
     const projectId = searchParams.get('projectId')
     const epicId = searchParams.get('epicId')
     const status = searchParams.get('status')
@@ -79,6 +81,8 @@ export async function GET(request: NextRequest) {
       void SprintModel
     }
 
+    const PAGE_SIZE = Math.min(limit, 100)
+    
     const stories = await Story.find(filters)
       .populate('project', 'name')
       .populate('epic', 'title')
@@ -86,10 +90,20 @@ export async function GET(request: NextRequest) {
       .populate('assignedTo', 'firstName lastName email')
       .populate('sprint', 'name')
       .sort({ createdAt: -1 })
+      .skip((page - 1) * PAGE_SIZE)
+      .limit(PAGE_SIZE)
+
+    const total = await Story.countDocuments(filters)
 
     return NextResponse.json({
       success: true,
-      data: stories
+      data: stories,
+      pagination: {
+        page,
+        limit: PAGE_SIZE,
+        total,
+        totalPages: Math.ceil(total / PAGE_SIZE)
+      }
     })
 
   } catch (error) {

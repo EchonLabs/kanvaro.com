@@ -120,6 +120,9 @@ export default function StoriesPage() {
   const [projectOptions, setProjectOptions] = useState<ProjectSummary[]>([])
   const [epicOptions, setEpicOptions] = useState<EpicSummary[]>([])
   const [sprintOptions, setSprintOptions] = useState<SprintSummary[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [totalCount, setTotalCount] = useState(0)
 
   const checkAuth = useCallback(async () => {
     try {
@@ -167,6 +170,13 @@ export default function StoriesPage() {
     }
   }, [searchParams])
 
+  // Fetch when pagination changes (after initial load)
+  useEffect(() => {
+    if (!loading && !authError) {
+      fetchStories()
+    }
+  }, [currentPage, pageSize])
+
   // Check for success message from query params (after story edit)
   useEffect(() => {
     const updated = searchParams.get('updated')
@@ -187,11 +197,16 @@ export default function StoriesPage() {
   const fetchStories = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/stories')
+      const params = new URLSearchParams()
+      params.set('page', currentPage.toString())
+      params.set('limit', pageSize.toString())
+      
+      const response = await fetch(`/api/stories?${params.toString()}`)
       const data = await response.json()
 
       if (data.success) {
         setStories(data.data)
+        setTotalCount(data.pagination?.total || data.data.length)
       } else {
         setError(data.error || 'Failed to fetch stories')
       }
@@ -818,6 +833,53 @@ export default function StoriesPage() {
                 </div>
               </TabsContent>
             </Tabs>
+
+            {/* Pagination Controls */}
+            {filteredStories.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Items per page:</span>
+                  <Select value={pageSize.toString()} onValueChange={(value) => {
+                    setPageSize(parseInt(value))
+                    setCurrentPage(1)
+                  }}>
+                    <SelectTrigger className="w-20 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span>
+                    Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={currentPage === 1 || loading}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground px-2">
+                    Page {currentPage} of {Math.ceil(totalCount / pageSize) || 1}
+                  </span>
+                  <Button
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={currentPage >= Math.ceil(totalCount / pageSize) || loading}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

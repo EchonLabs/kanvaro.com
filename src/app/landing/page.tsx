@@ -324,7 +324,7 @@ export default function LandingPage() {
             Kanvaro
           </span>
             </button>
-            <nav className="hidden md:flex items-center gap-2">
+            <nav className="flex items-center gap-2 overflow-x-auto md:overflow-visible">
               {/* Features Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-slate-700 hover:text-slate-900 dark:text-white/90 dark:hover:text-white transition-all duration-200 hover:bg-slate-100 dark:hover:bg-white/10 group">
