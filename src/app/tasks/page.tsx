@@ -100,7 +100,7 @@ export default function TasksPage() {
         )}
         <TasksClient
           initialTasks={[]}
-          initialPagination={{ pageSize: 20, hasMore: false }}
+          initialPagination={{ pageSize: 10, hasMore: false }}
           initialFilters={initialFilters}
         />
       </PageContent>

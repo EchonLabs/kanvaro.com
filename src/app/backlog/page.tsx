@@ -157,6 +157,9 @@ export default function BacklogPage() {
   const [assignedByFilter, setAssignedByFilter] = useState('all')
   const [dateRangeFilter, setDateRangeFilter] = useState<DateRange | undefined>()
   const [projectFilterQuery, setProjectFilterQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [totalCount, setTotalCount] = useState(0)
   const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
   const [assignedByFilterQuery, setAssignedByFilterQuery] = useState('')
   const startDateBoundary = useMemo(() => {
@@ -209,6 +212,13 @@ export default function BacklogPage() {
     checkAuth()
   }, [checkAuth])
 
+  // Fetch when pagination changes (after initial load)
+  useEffect(() => {
+    if (!loading && !authError) {
+      fetchBacklogItems()
+    }
+  }, [currentPage, pageSize])
+
   useEffect(() => {
     const successParam = searchParams?.get('success')
     if (successParam === 'story-created') {
@@ -221,7 +231,11 @@ export default function BacklogPage() {
   const fetchBacklogItems = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/backlog')
+      const params = new URLSearchParams()
+      params.set('page', currentPage.toString())
+      params.set('limit', pageSize.toString())
+      
+      const response = await fetch(`/api/backlog?${params.toString()}`)
       const data = await response.json()
 
       if (data.success) {
@@ -231,6 +245,7 @@ export default function BacklogPage() {
           labels: Array.isArray(item.labels) ? item.labels : []
         })) as BacklogItem[]
         setBacklogItems(normalized)
+        setTotalCount(data.pagination?.total || normalized.length)
 
         const projectMap = new Map<string, ProjectSummary>()
         const assignedToMap = new Map<string, UserSummary>()
@@ -2097,6 +2112,57 @@ export default function BacklogPage() {
             </div>
           </div>
         </ResponsiveDialog>
+
+        {/* Pagination Controls */}
+        {filteredAndSortedItems.length > 0 && (
+          <Card className="mt-6">
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Items per page:</span>
+                  <Select value={pageSize.toString()} onValueChange={(value) => {
+                    setPageSize(parseInt(value))
+                    setCurrentPage(1)
+                  }}>
+                    <SelectTrigger className="w-20 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span>
+                    Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={currentPage === 1 || loading}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground px-2">
+                    Page {currentPage} of {Math.ceil(totalCount / pageSize) || 1}
+                  </span>
+                  <Button
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={currentPage >= Math.ceil(totalCount / pageSize) || loading}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </MainLayout>
   )

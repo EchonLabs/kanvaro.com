@@ -531,28 +531,14 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Badge className={getRoleColor(memberRole)}>
-                        {getRoleDisplayName(memberRole)}
-                      </Badge>
+                      {/* Project role badge */}
+                      
 
-                      {/* Organization role selector (Admin / PM / Team Member / Client / Viewer / HR, etc.) */}
-                      {organizationRoles.length > 0 && (
-                        <Select
-                          value={organizationRole || ''}
-                          onValueChange={(value) => handleInlineOrgRoleChange(memberId, value)}
-                          disabled={!canManageOrgRoles}
-                        >
-                          <SelectTrigger className="h-8 w-[150px] text-xs sm:text-sm">
-                            <SelectValue placeholder="Select role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {organizationRoles.map((role) => (
-                              <SelectItem key={role.id} value={role.id}>
-                                {role.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      {/* Organization role badge (read-only) */}
+                      {organizationRole && (
+                        <Badge className={getOrganizationRoleColor(organizationRole)}>
+                          {formatOrganizationRole(organizationRole)}
+                        </Badge>
                       )}
                     </div>
 

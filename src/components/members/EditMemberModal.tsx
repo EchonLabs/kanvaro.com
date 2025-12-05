@@ -75,9 +75,9 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
   const [hrPartners, setHrPartners] = useState<PartnerOption[]>([])
   const [partnersLoading, setPartnersLoading] = useState(false)
   
-  // Check if current member is admin or if user is trying to change role to admin
-  const isAdminMember = member.role === 'admin'
-  const isChangingToAdmin = formData.role === 'admin' && member.role !== 'admin'
+  // Check if current member is admin/HR or if user is trying to change role to admin/HR
+  const isAdminMember = member.role === 'admin' || member.role === 'human_resource'
+  const isChangingToAdmin = (formData.role === 'admin' || formData.role === 'human_resource') && (member.role !== 'admin' && member.role !== 'human_resource')
   const canChangeRole = !isAdminMember && !isChangingToAdmin || canEditAdminUsers
 
   useEffect(() => {
@@ -267,9 +267,9 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
               <Select 
                 value={formData.role} 
                 onValueChange={(value) => {
-                  // Prevent changing to admin if user doesn't have permission
-                  if (value === 'admin' && !canEditAdminUsers) {
-                    setError('You do not have permission to assign admin role')
+                  // Prevent changing to admin or HR if user doesn't have permission
+                  if ((value === 'admin' || value === 'human_resource') && !canEditAdminUsers) {
+                    setError('You do not have permission to assign admin or HR role')
                     return
                   }
                   setFormData(prev => ({ ...prev, role: value }))
@@ -285,6 +285,9 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
                     Admin {!canEditAdminUsers && '(Requires permission)'}
                   </SelectItem>
                   <SelectItem value="project_manager">Project Manager</SelectItem>
+                  <SelectItem value="human_resource" disabled={!canEditAdminUsers}>
+                    Human Resource {!canEditAdminUsers && '(Requires permission)'}
+                  </SelectItem>
                   <SelectItem value="team_member">Team Member</SelectItem>
                   <SelectItem value="client">Client</SelectItem>
                   <SelectItem value="viewer">Viewer</SelectItem>
@@ -327,26 +330,27 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
               </p>
             </div>
 
-            {/* Project Manager partner */}
-            <div className="space-y-2">
-              <Label htmlFor="projectManager">Project Manager</Label>
-              <Select
-                value={formData.projectManagerId || ''}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, projectManagerId: value }))}
-                disabled={partnersLoading}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a project manager" />
-                </SelectTrigger>
-                <SelectContent>
-                  {partnersLoading ? (
-                    <SelectItem value="loading" disabled>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Loading project managers...
-                    </SelectItem>
-                  ) : (
-                    projectManagers.map(pm => (
-                      <SelectItem key={pm._id} value={pm._id}>
+            {/* Project Manager partner - hide for admin and HR roles */}
+            {formData.role !== 'admin' && formData.role !== 'human_resource' && (
+              <div className="space-y-2">
+                <Label htmlFor="projectManager">Project Manager</Label>
+                <Select
+                  value={formData.projectManagerId || ''}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, projectManagerId: value }))}
+                  disabled={partnersLoading}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a project manager" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {partnersLoading ? (
+                      <SelectItem value="loading" disabled>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Loading project managers...
+                      </SelectItem>
+                    ) : (
+                      projectManagers.map(pm => (
+                        <SelectItem key={pm._id} value={pm._id}>
                         {pm.firstName} {pm.lastName} ({pm.email})
                       </SelectItem>
                     ))
@@ -356,38 +360,41 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
               <p className="text-xs text-muted-foreground">
                 Assign a project manager responsible for this member&apos;s work.
               </p>
-            </div>
+              </div>
+            )}
 
-            {/* Human Resource partner */}
-            <div className="space-y-2">
-              <Label htmlFor="humanResourcePartner">Human Resource Partner</Label>
-              <Select
-                value={formData.humanResourcePartnerId || ''}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, humanResourcePartnerId: value }))}
-                disabled={partnersLoading}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a human resource partner" />
-                </SelectTrigger>
-                <SelectContent>
-                  {partnersLoading ? (
-                    <SelectItem value="loading" disabled>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Loading HR partners...
-                    </SelectItem>
-                  ) : (
-                    hrPartners.map(hr => (
-                      <SelectItem key={hr._id} value={hr._id}>
-                        {hr.firstName} {hr.lastName} ({hr.email})
+            {/* Human Resource partner - hide for admin and HR roles */}
+            {formData.role !== 'admin' && formData.role !== 'human_resource' && (
+              <div className="space-y-2">
+                <Label htmlFor="humanResourcePartner">Human Resource Partner</Label>
+                <Select
+                  value={formData.humanResourcePartnerId || ''}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, humanResourcePartnerId: value }))}
+                  disabled={partnersLoading}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a human resource partner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {partnersLoading ? (
+                      <SelectItem value="loading" disabled>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Loading HR partners...
                       </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Assign a human resource partner for onboarding, feedback, and HR support.
-              </p>
-            </div>
+                    ) : (
+                      hrPartners.map(hr => (
+                        <SelectItem key={hr._id} value={hr._id}>
+                          {hr.firstName} {hr.lastName} ({hr.email})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Assign a human resource partner for onboarding, feedback, and HR support.
+                </p>
+              </div>
+            )}
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="space-y-0.5 flex-1 min-w-0">
