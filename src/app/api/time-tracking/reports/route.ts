@@ -410,7 +410,7 @@ async function getDetailedEntriesReport(query: any, format: string) {
   
   // Fetch organization to get currency
   const organization = await Organization.findById(query.organization).lean()
-  const currency = organization?.currency || 'USD'
+  const currency = (organization as any)?.currency || 'USD'
   
   const entries = await TimeEntry.find(approvedQuery)
     .populate('user', 'firstName lastName email')
@@ -504,13 +504,12 @@ async function getDetailedEntriesReport(query: any, format: string) {
         endTimeStr, // End Time
         durationStr, // Total Hours
         e.cost > 0 ? `${e.projectCurrency}${Math.round(e.cost)}` : `${e.projectCurrency}0`, // Earnings (using project currency)
-        e.cost.toFixed(2), // Cost (numeric value)
         'Approved' // Status (all entries are approved)
       ]
     })
 
     const csv = buildCsv(
-      ['Id', 'Task', 'Employee', 'Start Time', 'End Time', 'Total Hours', 'Earnings', 'Cost', 'Status'],
+      ['Id', 'Task', 'Employee', 'Start Time', 'End Time', 'Total Hours', 'Earnings', 'Status'],
       rows
     )
     
