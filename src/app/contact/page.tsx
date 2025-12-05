@@ -139,7 +139,7 @@ export default function ContactPage() {
       </section>
 
       {/* Contact Section */}
-      <section className="px-6 pb-20">
+      <section className="px-6 pt-12 pb-20">
         <div className="mx-auto max-w-6xl">
           <div className="grid gap-12 lg:grid-cols-2">
             {/* Contact Form */}
@@ -245,7 +245,7 @@ export default function ContactPage() {
                 <h2 className="text-2xl font-bold mb-6">Other Ways to Reach Us</h2>
                 <div className="space-y-6">
                   <a
-                    href="mailto:hello@kanvaro.com"
+                    href="mailto:kanvaro@echonlabs.com"
                     className="flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                   >
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#0d9488]/10 dark:bg-[#7bffde]/20">
@@ -253,11 +253,11 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <p className="font-medium">Email</p>
-                      <p className="text-sm text-slate-600 dark:text-white/70">hello@kanvaro.com</p>
+                      <p className="text-sm text-slate-600 dark:text-white/70">kanvaro@echonlabs.com</p>
                     </div>
                   </a>
                   <a
-                    href="https://github.com/kanvaro"
+                    href="https://github.com/EchonLabs/kanvaro.com"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
@@ -267,11 +267,11 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <p className="font-medium">GitHub</p>
-                      <p className="text-sm text-slate-600 dark:text-white/70">github.com/kanvaro</p>
+                      <p className="text-sm text-slate-600 dark:text-white/70">github.com/EchonLabs/kanvaro.com</p>
                     </div>
                   </a>
                   <a
-                    href="https://twitter.com/kanvaro"
+                    href="https://x.com/kanvaro"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
@@ -280,12 +280,12 @@ export default function ContactPage() {
                       <Twitter className="h-6 w-6 text-blue-500" />
                     </div>
                     <div>
-                      <p className="font-medium">Twitter</p>
+                      <p className="font-medium">Twitter/X</p>
                       <p className="text-sm text-slate-600 dark:text-white/70">@kanvaro</p>
                     </div>
                   </a>
                   <a
-                    href="https://linkedin.com/company/kanvaro"
+                    href="https://www.linkedin.com/company/kanvaro"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
@@ -308,7 +308,7 @@ export default function ContactPage() {
                   Join our community on GitHub Discussions for help, feature requests, and connecting with other users.
                 </p>
                 <Button
-                  onClick={() => window.open('https://github.com/kanvaro/discussions', '_blank')}
+                  onClick={() => window.open('https://github.com/EchonLabs/kanvaro.com/discussions', '_blank')}
                   className="rounded-full bg-white text-[#0d9488] hover:bg-white/90"
                 >
                   Join Discussions

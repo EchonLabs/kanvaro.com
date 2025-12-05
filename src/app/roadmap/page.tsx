@@ -179,7 +179,7 @@ export default function RoadmapPage() {
                 <div key={quarter.quarter} className="relative">
                   {/* Timeline connector */}
                   {idx < roadmapItems.length - 1 && (
-                    <div className="absolute left-6 top-16 bottom-0 w-0.5 bg-slate-200 dark:bg-white/10 hidden md:block" />
+                    <div className="absolute left-6 top-20 bottom-[-3rem] w-0.5 bg-gradient-to-b from-slate-200 via-slate-300 to-slate-200 dark:from-white/10 dark:via-white/20 dark:to-white/10 hidden md:block" />
                   )}
                   
                   <div className="flex flex-col md:flex-row gap-6">
@@ -246,8 +246,8 @@ export default function RoadmapPage() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => window.open('https://github.com/kanvaro/discussions', '_blank')}
-                className="rounded-full border-white/30 text-white hover:bg-white/10 px-8"
+                onClick={() => window.open('https://github.com/EchonLabs/kanvaro.com/discussions', '_blank')}
+                className="rounded-full border-white/30 bg-white/5 text-white hover:bg-white hover:text-[#0d9488] dark:hover:text-slate-900 px-8 font-semibold"
               >
                 Join Discussion
               </Button>
