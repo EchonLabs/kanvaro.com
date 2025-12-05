@@ -5,6 +5,7 @@ import { Sprint } from '@/models/Sprint'
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasPermission } from '@/lib/permissions/permission-utils'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionService } from '@/lib/permissions/permission-service'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -15,7 +16,26 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ error: authResult.error }, { status: authResult.status })
     }
 
-    const sprintEvent = await SprintEvent.findById(params.id)
+    const { user } = authResult
+    const userId = user.id
+
+    // Check if user has permission to view all sprint events
+    const hasSprintEventViewAll = await PermissionService.hasPermission(
+      userId,
+      Permission.SPRINT_EVENT_VIEW_ALL
+    );
+
+    // Build query - if user has SPRINT_EVENT_VIEW_ALL, they can view any event
+    const eventQuery: any = { _id: params.id };
+    
+    if (!hasSprintEventViewAll) {
+      eventQuery.$or = [
+        { facilitator: userId },
+        { attendees: userId }
+      ];
+    }
+
+    const sprintEvent = await SprintEvent.findOne(eventQuery)
       .populate('sprint', 'name status')
       .populate('project', 'name')
       .populate('facilitator', 'firstName lastName email')
@@ -26,7 +46,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
 
     // Check if user has access to this project
-    const hasAccess = await hasPermission(authResult.user.id, Permission.PROJECT_READ, sprintEvent.project._id.toString())
+    const hasAccess = await hasPermission(userId, Permission.PROJECT_READ, sprintEvent.project._id.toString())
     if (!hasAccess) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }

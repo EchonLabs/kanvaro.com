@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine if role is a custom role (ObjectId) or system role (enum value)
-    const systemRoles = ['admin', 'project_manager', 'team_member', 'client', 'viewer']
+    const systemRoles = ['admin', 'project_manager', 'team_member', 'client', 'viewer', 'human_resource']
     let invitationRole: string = 'team_member' // Default role
     let customRoleId: mongoose.Types.ObjectId | undefined = undefined
     let roleDisplayName: string = 'Team Member' // For email template
@@ -125,7 +125,8 @@ export async function POST(request: NextRequest) {
         'project_manager': 'Project Manager',
         'team_member': 'Team Member',
         'client': 'Client',
-        'viewer': 'Viewer'
+        'viewer': 'Viewer',
+        'human_resource': 'Human Resource'
       }
       roleDisplayName = roleNameMap[role] || role
     } else {
@@ -290,21 +291,23 @@ export async function POST(request: NextRequest) {
                     box-sizing: border-box;
                 }
                 body {
+                    margin: 0;
+                    padding: 24px 16px;
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
                     line-height: 1.7;
-                    color: #1f2937;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    padding: 40px 20px;
+                    color: #111827;
+                    background-color: #f3f4f6;
                     -webkit-font-smoothing: antialiased;
                     -moz-osx-font-smoothing: grayscale;
                 }
                 .email-wrapper {
-                    max-width: 600px;
+                    width: 100%;
+                    max-width: 640px;
                     margin: 0 auto;
                     background-color: #ffffff;
                     border-radius: 16px;
                     overflow: hidden;
-                    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+                    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
                 }
                 .header-gradient {
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { OrganizationLogo } from '@/components/ui/OrganizationLogo'
 import { useOrganization } from '@/hooks/useOrganization'
-import { ArrowLeft, Key, Eye, EyeOff, Loader2, CheckCircle, Info } from 'lucide-react'
+import { ArrowLeft, Key, Eye, EyeOff, Loader2, CheckCircle, Info, X } from 'lucide-react'
 
 export default function ResetPasswordPage() {
   const [newPassword, setNewPassword] = useState('')
@@ -161,8 +161,16 @@ export default function ResetPasswordPage() {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
+                  <Alert variant="destructive" className="relative">
+                    <AlertDescription className="pr-8">{error}</AlertDescription>
+                    <button
+                      type="button"
+                      onClick={() => setError('')}
+                      className="absolute top-2 right-2 p-1 rounded-md hover:bg-destructive/20 transition-colors"
+                      aria-label="Dismiss error"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
                   </Alert>
                 )}
 

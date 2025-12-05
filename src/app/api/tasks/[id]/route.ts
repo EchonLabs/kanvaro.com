@@ -9,6 +9,8 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { CompletionService } from '@/lib/completion-service'
 import { notificationService } from '@/lib/notification-service'
 import { invalidateCache } from '@/lib/redis'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 const TASK_STATUS_SET = new Set<TaskStatus>(TASK_STATUS_VALUES)
 
@@ -220,15 +222,26 @@ export async function GET(
     const organizationId = user.organization
     const taskId = params.id
 
-    // Find task where user is assigned or creator
-    const task = await Task.findOne({
+    // Check if user has permission to view all tasks
+    const [hasTaskViewAll, hasProjectViewAll] = await Promise.all([
+      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL),
+      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL)
+    ]);
+
+    // Build query - if user has TASK_VIEW_ALL or PROJECT_VIEW_ALL, they can view any task
+    const taskQuery: any = {
       _id: taskId,
-      organization: organizationId,
-      $or: [
+      organization: organizationId
+    };
+    
+    if (!hasTaskViewAll && !hasProjectViewAll) {
+      taskQuery.$or = [
         { assignedTo: userId },
         { createdBy: userId }
-      ]
-    })
+      ];
+    }
+
+    const task = await Task.findOne(taskQuery)
       .populate([
         { path: 'project', select: '_id name' },
         { path: 'assignedTo', select: 'firstName lastName email' },
@@ -374,15 +387,26 @@ export async function PUT(
       }
     }
 
-    // Add optimistic locking with version field
-    const currentTask = await Task.findOne({
+    // Check if user has permission to edit all tasks
+    const [hasTaskEditAll, hasProjectViewAll] = await Promise.all([
+      PermissionService.hasPermission(userId, Permission.TASK_EDIT_ALL),
+      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL)
+    ]);
+
+    // Build query - if user has TASK_EDIT_ALL or PROJECT_VIEW_ALL, they can edit any task
+    const taskQuery: any = {
       _id: taskId,
-      organization: organizationId,
-      $or: [
+      organization: organizationId
+    };
+    
+    if (!hasTaskEditAll && !hasProjectViewAll) {
+      taskQuery.$or = [
         { assignedTo: userId },
         { createdBy: userId }
-      ]
-    })
+      ];
+    }
+
+    const currentTask = await Task.findOne(taskQuery)
     if (!currentTask) {
       console.warn('[Task PUT] Task not found or unauthorized', { taskId, userId })
     } else {
@@ -443,15 +467,20 @@ export async function PUT(
 
     // Find and update task with concurrency protection
     // Use lean() for faster query - returns plain object instead of Mongoose document
+    const updateQuery: any = {
+      _id: taskId,
+      organization: organizationId
+    };
+    
+    if (!hasTaskEditAll && !hasProjectViewAll) {
+      updateQuery.$or = [
+        { assignedTo: userId },
+        { createdBy: userId }
+      ];
+    }
+
     const taskResult = await Task.findOneAndUpdate(
-      {
-        _id: taskId,
-        organization: organizationId,
-        $or: [
-          { assignedTo: userId },
-          { createdBy: userId }
-        ]
-      },
+      updateQuery,
       { ...updateData, updatedAt: new Date() },
       { new: true }
     )
@@ -686,12 +715,23 @@ export async function DELETE(
     const organizationId = user.organization
     const taskId = params.id
 
-    // Find and delete task (only creator can delete)
-    const task = await Task.findOneAndDelete({
+    // Check if user has permission to delete all tasks
+    const [hasTaskDeleteAll, hasProjectViewAll] = await Promise.all([
+      PermissionService.hasPermission(userId, Permission.TASK_DELETE_ALL),
+      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL)
+    ]);
+
+    // Build query - if user has TASK_DELETE_ALL or PROJECT_VIEW_ALL, they can delete any task
+    const deleteQuery: any = {
       _id: taskId,
-      organization: organizationId,
-      createdBy: userId
-    })
+      organization: organizationId
+    };
+    
+    if (!hasTaskDeleteAll && !hasProjectViewAll) {
+      deleteQuery.createdBy = userId;
+    }
+
+    const task = await Task.findOneAndDelete(deleteQuery)
 
     if (!task) {
       return NextResponse.json(

@@ -36,9 +36,31 @@ export interface ISprintEvent extends Document {
     uploadedBy: mongoose.Types.ObjectId
     uploadedAt: Date
   }[]
+  // Recurrence settings
+  recurrence?: {
+    type: 'none' | 'daily' | 'weekly' | 'monthly'
+    interval: number // e.g., every 1 day, every 2 weeks
+    endDate?: Date // When recurrence ends
+    daysOfWeek?: number[] // 0 = Sunday, 1 = Monday, etc. (for weekly)
+    dayOfMonth?: number // Day of month for monthly recurrence
+    occurrences?: number // Maximum number of occurrences
+  }
+  // Parent event for recurring series
+  parentEventId?: mongoose.Types.ObjectId
+  // Flag to indicate if this is a recurring series parent
+  isRecurringSeries?: boolean
   notificationSettings?: {
     enabled: boolean
     reminderTime?: 'none' | '10mins' | '30mins' | '1hour' | '24hours'
+    emailReminder1Day?: boolean // Send email 1 day before at 8 AM
+    notificationReminder1Hour?: boolean // Send notification 1 hour before
+    notificationReminder5Min?: boolean // Send notification 5 minutes before
+  }
+  // Track which reminders have been sent
+  remindersSent?: {
+    email1Day?: boolean
+    notification1Hour?: boolean
+    notification5Min?: boolean
   }
   createdAt: Date
   updatedAt: Date
@@ -135,13 +157,42 @@ const SprintEventSchema = new Schema<ISprintEvent>({
     uploadedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     uploadedAt: { type: Date, default: Date.now }
   }],
+  // Recurrence settings
+  recurrence: {
+    type: {
+      type: String,
+      enum: ['none', 'daily', 'weekly', 'monthly'],
+      default: 'none'
+    },
+    interval: { type: Number, default: 1, min: 1 },
+    endDate: { type: Date },
+    daysOfWeek: [{ type: Number, min: 0, max: 6 }], // 0 = Sunday, 6 = Saturday
+    dayOfMonth: { type: Number, min: 1, max: 31 },
+    occurrences: { type: Number, min: 1 }
+  },
+  // Parent event for recurring series
+  parentEventId: {
+    type: Schema.Types.ObjectId,
+    ref: 'SprintEvent'
+  },
+  // Flag to indicate if this is a recurring series parent
+  isRecurringSeries: { type: Boolean, default: false },
   notificationSettings: {
     enabled: { type: Boolean, default: false },
     reminderTime: {
       type: String,
       enum: ['none', '10mins', '30mins', '1hour', '24hours'],
       default: 'none'
-    }
+    },
+    emailReminder1Day: { type: Boolean, default: true },
+    notificationReminder1Hour: { type: Boolean, default: true },
+    notificationReminder5Min: { type: Boolean, default: true }
+  },
+  // Track which reminders have been sent
+  remindersSent: {
+    email1Day: { type: Boolean, default: false },
+    notification1Hour: { type: Boolean, default: false },
+    notification5Min: { type: Boolean, default: false }
   }
 }, {
   timestamps: true
@@ -153,5 +204,18 @@ SprintEventSchema.index({ project: 1, scheduledDate: 1 })
 SprintEventSchema.index({ facilitator: 1 })
 SprintEventSchema.index({ status: 1 })
 SprintEventSchema.index({ scheduledDate: 1 })
+SprintEventSchema.index({ parentEventId: 1 })
+SprintEventSchema.index({ 'recurrence.type': 1 })
+// Index for reminder processing - find events needing reminders
+SprintEventSchema.index({ 
+  scheduledDate: 1, 
+  status: 1, 
+  'remindersSent.email1Day': 1 
+})
+SprintEventSchema.index({ 
+  scheduledDate: 1, 
+  status: 1, 
+  'remindersSent.notification1Hour': 1 
+})
 
 export const SprintEvent = mongoose.models.SprintEvent || mongoose.model<ISprintEvent>('SprintEvent', SprintEventSchema)

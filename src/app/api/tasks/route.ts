@@ -181,19 +181,19 @@ export async function GET(request: NextRequest) {
     const PAGE_SIZE = Math.min(limit, 100);
     const sort = { createdAt: -1 as const };
 
-    const canViewAllTasks = await PermissionService.hasPermission(
-      userId,
-      Permission.PROJECT_VIEW_ALL
-    );
+    const [canViewAllTasks, hasTaskViewAll] = await Promise.all([
+      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
+      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL)
+    ]);
     const filters: any = {
       organization: organizationId,
       archived: false,
     };
 
     // Build the base filter for user permissions
-    // If user can view all tasks, allow additional filters like assignedTo and createdBy
+    // If user has TASK_VIEW_ALL or PROJECT_VIEW_ALL, they can view all tasks
     // Otherwise, restrict to tasks assigned to or created by the user
-    if (!canViewAllTasks) {
+    if (!canViewAllTasks && !hasTaskViewAll) {
       const userFilters: any[] = [{ assignedTo: userId }, { createdBy: userId }];
       
       // If assignedTo filter is provided and it's the current user, use it
