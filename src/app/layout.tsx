@@ -37,7 +37,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} min-h-screen overflow-x-hidden antialiased`} suppressHydrationWarning>
+      <body className={`${inter.className} h-screen overflow-hidden antialiased`} suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

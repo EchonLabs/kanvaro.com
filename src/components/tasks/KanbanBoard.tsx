@@ -109,8 +109,8 @@ export interface KanbanBoardProps {
 }
 
 const defaultColumns = [
-  { key: 'backlog', title: 'Backlog', color: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200' },
-  { key: 'todo', title: 'To Do', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' },
+  { key: 'backlog', title: 'Backlog', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
+  { key: 'todo', title: 'To Do', color: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200' },
   { key: 'in_progress', title: 'In Progress', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
   { key: 'review', title: 'Review', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
   { key: 'testing', title: 'Testing', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
@@ -244,28 +244,28 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
   const getPriorityColor = (priority: string) => {
     switch (priority.toLowerCase()) {
       case 'high':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-800'
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
       case 'medium':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-200 dark:hover:bg-yellow-800'
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
       case 'low':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-800'
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
     }
   }
 
   const getTypeColor = (type: string) => {
     switch (type.toLowerCase()) {
       case 'bug':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-800'
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
       case 'feature':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800'
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
       case 'task':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
       case 'story':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-800'
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-800'
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
     }
   }
 

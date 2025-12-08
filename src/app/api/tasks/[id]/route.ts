@@ -434,6 +434,16 @@ export async function PUT(
       )
     }
 
+    // When adding task to sprint, only change status to 'todo' if currently 'backlog'
+    if (Object.prototype.hasOwnProperty.call(updateData, 'sprint') && updateData.sprint) {
+      if (Object.prototype.hasOwnProperty.call(updateData, 'status')) {
+        // Only apply status change if current status is 'backlog'
+        if (currentTask.status !== 'backlog' && updateData.status === 'todo') {
+          delete updateData.status // Don't change status if not backlog
+        }
+      }
+    }
+
     // If task status is changing to 'todo', update all sub-tasks to 'todo'
     if (updateData.status === 'todo' && currentTask.status !== 'todo') {
       // Use existing subtasks from currentTask if subtasks are not being updated in this request
@@ -596,6 +606,13 @@ export async function PUT(
         if (updateData.status === 'done' && currentTask.status !== 'done') {
           CompletionService.handleTaskStatusChange(taskId).catch(error => {
             console.error('Error in completion service:', error)
+          })
+        }
+
+        // Check if task with epic is being added to sprint - update epic to in_progress
+        if (Object.prototype.hasOwnProperty.call(updateData, 'sprint') && updateData.sprint && task.epic) {
+          CompletionService.updateEpicStatusOnTaskAddedToSprint(taskId).catch(error => {
+            console.error('Error updating epic status on sprint assignment:', error)
           })
         }
 

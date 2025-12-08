@@ -128,6 +128,7 @@ export default function TimerPage() {
   })
   const [submittingManualLog, setSubmittingManualLog] = useState(false)
   const [sessionHoursError, setSessionHoursError] = useState('')
+  const [activeTab, setActiveTab] = useState<'timer' | 'manual'>('timer')
 
   // Helper function to combine date and time into datetime-local format
   const combineDateTime = (date: string, time: string): string => {
@@ -856,7 +857,7 @@ export default function TimerPage() {
           </Alert>
         )}
 
-        <Tabs defaultValue="timer" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'timer' | 'manual')} className="space-y-6">
           <TabsList className={`grid w-full ${timeTrackingSettings?.allowManualTimeSubmission ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <TabsTrigger value="timer" className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
@@ -1333,6 +1334,7 @@ export default function TimerPage() {
             refreshKey={timeLogsRefreshKey}
             liveActiveTimer={liveActiveTimer}
             showSelectionAndApproval={false}
+            showManualLogButtons={activeTab === 'manual'}
           />
         )}
       </div>
