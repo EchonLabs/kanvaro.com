@@ -30,6 +30,7 @@ interface TimeLogsProps {
   refreshKey?: number
   liveActiveTimer?: ActiveTimerPayload | null
   showSelectionAndApproval?: boolean // Default true - controls checkbox selection and approval flow
+  showManualLogButtons?: boolean // Default false - controls Bulk Upload and Add Time Log buttons
 }
 
 interface TimeEntry {
@@ -77,7 +78,8 @@ export function TimeLogs({
   onTimeEntryUpdate,
   refreshKey = 0,
   liveActiveTimer,
-  showSelectionAndApproval = true
+  showSelectionAndApproval = true,
+  showManualLogButtons = false
 }: TimeLogsProps) {
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -576,6 +578,33 @@ export function TimeLogs({
     validateSessionHours()
   }, [validateSessionHours])
 
+  // Calculate duration for display
+  const calculatedDuration = useMemo(() => {
+    if (!manualLogData.startDate || !manualLogData.startTime || !manualLogData.endDate || !manualLogData.endTime) {
+      return null
+    }
+
+    const startDateTime = combineDateTime(manualLogData.startDate, manualLogData.startTime)
+    const endDateTime = combineDateTime(manualLogData.endDate, manualLogData.endTime)
+
+    if (!startDateTime || !endDateTime) {
+      return null
+    }
+
+    const start = new Date(startDateTime)
+    const end = new Date(endDateTime)
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) {
+      return null
+    }
+
+    const durationMinutes = Math.floor((end.getTime() - start.getTime()) / (1000 * 60))
+    const hours = Math.floor(durationMinutes / 60)
+    const minutes = durationMinutes % 60
+
+    return { hours, minutes, totalMinutes: durationMinutes }
+  }, [manualLogData.startDate, manualLogData.startTime, manualLogData.endDate, manualLogData.endTime])
+
   const handleSubmitManualLog = async () => {
     if (!selectedProjectForLog || !resolvedUserId) {
       setError('Project selection required')
@@ -927,7 +956,9 @@ export function TimeLogs({
       const data = await response.json()
 
       if (response.ok) {
-        setTimeEntries(data.timeEntries)
+        // Handle both data.data and data.timeEntries for backward compatibility
+        const entries = data.data || data.timeEntries || []
+        setTimeEntries(Array.isArray(entries) ? entries : [])
         setPagination(data.pagination)
       } else {
         setError(data.error || 'Failed to load time entries')
@@ -1074,7 +1105,9 @@ export function TimeLogs({
   }, [activeTimerEntry, activeTimerDisplayDuration, projectId, taskId, passesStatusFilter, passesDateFilters])
 
   const displayedEntries = useMemo(() => {
-    const entries = timeEntries.filter(entry => passesDateFilters(entry.startTime))
+    // Ensure timeEntries is always an array to prevent undefined errors
+    const safeEntries = Array.isArray(timeEntries) ? timeEntries : []
+    const entries = safeEntries.filter(entry => passesDateFilters(entry.startTime))
     if (activeTimerDisplay) {
       return [activeTimerDisplay, ...entries]
     }
@@ -1695,7 +1728,9 @@ export function TimeLogs({
             const data = await response.json()
 
             if (response.ok) {
-              setTimeEntries(data.timeEntries)
+              // Handle both data.data and data.timeEntries for backward compatibility
+              const entries = data.data || data.timeEntries || []
+              setTimeEntries(Array.isArray(entries) ? entries : [])
               setPagination(data.pagination)
             } else {
               setError(data.error || 'Failed to load time entries')
@@ -1739,7 +1774,7 @@ export function TimeLogs({
             {/* <Clock className="h-5 w-5" />
             Time Logs */}
           </CardTitle>
-          {canAddManualTimeLog && (
+          {canAddManualTimeLog && showManualLogButtons && (
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <Button
                 onClick={() => setShowBulkUploadModal(true)}
@@ -2468,7 +2503,7 @@ export function TimeLogs({
 
     {/* Add Manual Time Log Modal */}
     <Dialog open={showAddTimeLogModal} onOpenChange={setShowAddTimeLogModal}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Add Time Log</DialogTitle>
           <DialogDescription>
@@ -2631,6 +2666,26 @@ export function TimeLogs({
             </div>
           </div>
 
+          {/* Duration Display */}
+          {calculatedDuration && (
+            <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50 border border-border">
+              <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-foreground">
+                  Duration: {calculatedDuration.hours}h {calculatedDuration.minutes}m
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
+                  {timeTrackingSettings?.maxSessionHours && !sessionHoursError && (
+                    <span className="ml-1">
+                      (Max: {timeTrackingSettings.maxSessionHours}h)
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="modal-description">
               Description {timeTrackingSettings?.requireDescription ? '*' : ''}
@@ -2719,7 +2774,7 @@ export function TimeLogs({
 
     
     <Dialog open={isEditing} onOpenChange={setIsEditing}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Edit Time Log</DialogTitle>
           <DialogDescription>
@@ -2865,6 +2920,26 @@ export function TimeLogs({
             </div>
           </div>
 
+          {/* Duration Display */}
+          {calculatedDuration && (
+            <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50 border border-border">
+              <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-foreground">
+                  Duration: {calculatedDuration.hours}h {calculatedDuration.minutes}m
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
+                  {timeTrackingSettings?.maxSessionHours && !sessionHoursError && (
+                    <span className="ml-1">
+                      (Max: {timeTrackingSettings.maxSessionHours}h)
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="edit-description">
               Description {timeTrackingSettings?.requireDescription ? '*' : ''}
@@ -2977,7 +3052,7 @@ export function TimeLogs({
 
     {/* Bulk Upload Modal */}
     <Dialog open={showBulkUploadModal} onOpenChange={setShowBulkUploadModal}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Bulk Upload Time Logs</DialogTitle>
           <DialogDescription>

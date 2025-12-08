@@ -138,8 +138,9 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
       return
     }
 
-    // For non-admin roles, require both partners
-    if (formData.role !== 'admin') {
+    // For non-admin and non-HR roles, require both partners
+    // Admin and HR roles don't need partners assigned since they ARE the managers
+    if (formData.role !== 'admin' && formData.role !== 'human_resource') {
       if (!formData.projectManagerId || !formData.humanResourcePartnerId) {
         setError('Project Manager and Human Resource Partner are required for this role')
         return
@@ -232,9 +233,9 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
                 type="email"
                 value={member.email}
                 disabled
-                className="bg-gray-50 w-full"
+                className="bg-muted text-muted-foreground w-full cursor-not-allowed"
               />
-              <p className="text-xs text-gray-500">Email cannot be changed</p>
+              <p className="text-xs text-muted-foreground">Email cannot be changed</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -272,7 +273,18 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
                     setError('You do not have permission to assign admin or HR role')
                     return
                   }
-                  setFormData(prev => ({ ...prev, role: value }))
+                  // Clear partner assignments when changing to admin or HR roles
+                  // since these roles don't need partners
+                  if (value === 'admin' || value === 'human_resource') {
+                    setFormData(prev => ({ 
+                      ...prev, 
+                      role: value,
+                      projectManagerId: '',
+                      humanResourcePartnerId: ''
+                    }))
+                  } else {
+                    setFormData(prev => ({ ...prev, role: value }))
+                  }
                   setError('') // Clear error when valid selection is made
                 }}
                 disabled={isAdminMember && !canEditAdminUsers}
@@ -399,7 +411,7 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="space-y-0.5 flex-1 min-w-0">
                 <Label htmlFor="isActive">Active Status</Label>
-                <p className="text-xs sm:text-sm text-gray-500">
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   {formData.isActive ? 'Member can access the system' : 'Member cannot access the system'}
                 </p>
               </div>

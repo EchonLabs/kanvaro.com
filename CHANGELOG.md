@@ -1,3 +1,10 @@
+## [1.12.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.12.0...v1.12.1) (2025-12-08)
+
+
+### Bug Fixes
+
+* add bug fixes in sprint ([3607856](https://github.com/EchonLabs/kanvaro.com/commit/36078566970135e128db633d2a3dbb547c1f5ffb))
+
 # [1.12.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.11.7...v1.12.0) (2025-12-05)
 
 

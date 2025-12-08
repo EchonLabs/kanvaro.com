@@ -708,7 +708,8 @@ export default function BacklogPage() {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              sprint: selectedSprintId
+              sprint: selectedSprintId,
+              status: 'in_progress'  // Set story to in_progress when added to sprint
             })
           })
 
@@ -1291,14 +1292,24 @@ export default function BacklogPage() {
                       <SelectItem value="dueDate">Due Date</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                    className="w-full sm:w-auto"
-                  >
-                    {sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                          className="w-full sm:w-auto"
+                          aria-label={sortOrder === 'asc' ? 'Click to sort descending' : 'Click to sort ascending'}
+                        >
+                          {sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{sortOrder === 'asc' ? 'Click to sort descending' : 'Click to sort ascending'}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
                   <Select value={projectFilterValue} onValueChange={setProjectFilterValue}>
