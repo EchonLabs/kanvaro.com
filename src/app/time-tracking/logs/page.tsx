@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { TimeLogs } from '@/components/time-tracking/TimeLogs'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
 import { Clock, Loader2 } from 'lucide-react'
 
 export default function TimeLogsPage() {
@@ -88,20 +86,11 @@ export default function TimeLogsPage() {
           <p className="text-muted-foreground">Review and manage your time entries</p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Time Logs
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <TimeLogs
-              userId={user._id}
-              organizationId={user.organization}
-            />
-          </CardContent>
-        </Card>
+        <TimeLogs
+          userId={user._id}
+          organizationId={user.organization}
+          showManualLogButtons={true}
+        />
       </div>
     </MainLayout>
   )

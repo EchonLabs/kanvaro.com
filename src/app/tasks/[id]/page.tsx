@@ -435,6 +435,42 @@ export default function TaskDetailPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Attachments Section */}
+            {task.attachments && task.attachments.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Paperclip className="h-4 w-4" />
+                    <span>Attachments</span>
+                  </CardTitle>
+                  <CardDescription>{task.attachments.length} {task.attachments.length === 1 ? 'file' : 'files'}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <AttachmentList
+                    attachments={attachmentListItems}
+                    onDownload={(attachment) => {
+                      // Open in new tab if it's a viewable file (PDF, images, etc.)
+                      const viewableTypes = ['application/pdf', 'image/', 'text/'];
+                      const isViewable = viewableTypes.some(type => attachment.type.startsWith(type));
+                      
+                      if (isViewable) {
+                        window.open(attachment.url, '_blank');
+                      } else {
+                        // Download the file
+                        const link = document.createElement('a');
+                        link.href = attachment.url;
+                        link.download = attachment.name;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }
+                    }}
+                    canDelete={false}
+                  />
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           <div className="space-y-6">
@@ -574,22 +610,6 @@ export default function TaskDetailPage() {
                 </CardContent>
               </Card>
             )}
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Paperclip className="h-4 w-4" />
-                  <span>Attachments</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {attachmentListItems.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No attachments uploaded.</p>
-                ) : (
-                  <AttachmentList attachments={attachmentListItems} canDelete={false} />
-                )}
-              </CardContent>
-            </Card>
 
             <Card>
               <CardHeader>

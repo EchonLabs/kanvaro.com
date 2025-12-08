@@ -93,6 +93,7 @@ export default function TeamReportsPage() {
   const [reportData, setReportData] = useState<TeamReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
+  const [organizationRoles, setOrganizationRoles] = useState<Array<{ id: string; name: string; isSystem?: boolean }>>([])
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     department: 'all',
@@ -105,6 +106,29 @@ export default function TeamReportsPage() {
     sortOrder: 'desc'
   })
   const [showFilters, setShowFilters] = useState(false)
+
+  // Load available roles from the API
+  useEffect(() => {
+    const loadRoles = async () => {
+      try {
+        const res = await fetch('/api/roles')
+        const data = await res.json()
+        if (data.success && Array.isArray(data.data)) {
+          // Load all roles (system and custom)
+          const allRoles = data.data.map((role: any) => ({
+            id: role._id,
+            name: role.name,
+            isSystem: role.isSystem
+          }))
+          setOrganizationRoles(allRoles)
+        }
+      } catch (err) {
+        console.error('Failed to load organization roles', err)
+      }
+    }
+
+    loadRoles()
+  }, [])
 
   useEffect(() => {
     fetchTeamReports()
@@ -291,11 +315,11 @@ export default function TeamReportsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Roles</SelectItem>
-                    <SelectItem value="developer">Developer</SelectItem>
-                    <SelectItem value="designer">Designer</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="analyst">Analyst</SelectItem>
-                    <SelectItem value="lead">Lead</SelectItem>
+                    {organizationRoles.map((role) => (
+                      <SelectItem key={role.id} value={role.name.toLowerCase().replace(/\s+/g, '_')}>
+                        {role.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

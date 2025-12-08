@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -71,6 +72,7 @@ interface Story {
 }
 
 export default function BacklogView({ projectId, onCreateTask }: BacklogViewProps) {
+  const router = useRouter()
   const [tasks, setTasks] = useState<Task[]>([])
   const [stories, setStories] = useState<Story[]>([])
   const [loading, setLoading] = useState(true)
@@ -495,7 +497,11 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
       {/* Backlog Items */}
       <div className="space-y-4">
         {filteredAndSortedTasks.map((task, index) => (
-          <Card key={task._id} className="hover:shadow-md transition-shadow">
+          <Card 
+            key={task._id} 
+            className="hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => router.push(`/tasks/${task._id}`)}
+          >
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4 flex-1">
@@ -552,7 +558,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
                     )}
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
                   <Select 
                     value={task.status} 
                     onValueChange={(value) => handleStatusChange(task._id, value)}

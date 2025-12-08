@@ -185,17 +185,24 @@ export function EditRoleModal({ isOpen, onClose, onRoleUpdated, role }: EditRole
     description: '',
     permissions: [] as string[]
   })
+  const [originalData, setOriginalData] = useState({
+    name: '',
+    description: '',
+    permissions: [] as string[]
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [expandedCategories, setExpandedCategories] = useState<Set<PermissionCategory>>(new Set())
 
   useEffect(() => {
     if (isOpen && role) {
-      setFormData({
+      const initialData = {
         name: role.name,
         description: role.description,
         permissions: role.permissions
-      })
+      }
+      setFormData(initialData)
+      setOriginalData(initialData)
       setError('')
       setExpandedCategories(new Set())
     }
@@ -286,6 +293,20 @@ export function EditRoleModal({ isOpen, onClose, onRoleUpdated, role }: EditRole
         permissions: Array.from(new Set([...prev.permissions, ...categoryPermissions]))
       }))
     }
+  }
+
+  // Check if form data has changed from original
+  const hasChanges = () => {
+    if (formData.name !== originalData.name) return true
+    if (formData.description !== originalData.description) return true
+    
+    // Check if permissions have changed
+    if (formData.permissions.length !== originalData.permissions.length) return true
+    
+    const sortedFormPerms = [...formData.permissions].sort()
+    const sortedOriginalPerms = [...originalData.permissions].sort()
+    
+    return !sortedFormPerms.every((perm, index) => perm === sortedOriginalPerms[index])
   }
 
   if (!isOpen || !role) return null
@@ -424,7 +445,7 @@ export function EditRoleModal({ isOpen, onClose, onRoleUpdated, role }: EditRole
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" form="edit-role-form" disabled={loading}>
+            <Button type="submit" form="edit-role-form" disabled={loading || !hasChanges()}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

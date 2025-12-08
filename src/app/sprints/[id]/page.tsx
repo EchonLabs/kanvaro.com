@@ -919,7 +919,8 @@ export default function SprintDetailPage() {
                     {sprintTasks.map(task => (
                       <div
                         key={task._id}
-                        className={`rounded-lg border bg-background p-3 sm:p-4 space-y-3 ${task.archived ? 'border-dashed opacity-90' : ''
+                        onClick={() => router.push(`/tasks/${task._id}`)}
+                        className={`rounded-lg border bg-background p-3 sm:p-4 space-y-3 cursor-pointer hover:shadow-md transition-shadow ${task.archived ? 'border-dashed opacity-90' : ''
                           }`}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -962,7 +963,7 @@ export default function SprintDetailPage() {
                         </div>
 
                         {!task.movedToSprint && (
-                          <div className="space-y-1">
+                          <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
                             <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                               value={task.status}

@@ -11,6 +11,7 @@ import { OrganizationLogo } from '@/components/ui/OrganizationLogo'
 import { GlobalSearch } from '@/components/search/GlobalSearch'
 import { useNotifications } from '@/hooks/useNotifications'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -122,15 +123,24 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
     <>
     <header className="flex h-14 lg:h-16 items-center border-b bg-background px-3 sm:px-4">
       {/* Mobile Menu Button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={onMobileMenuToggle}
-        className="lg:hidden h-9 w-9 mr-2"
-        title="Toggle Menu"
-      >
-        <Menu className="h-4 w-4" />
-      </Button>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onMobileMenuToggle}
+              className="lg:hidden h-9 w-9 mr-2"
+              aria-label="Toggle Menu"
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Toggle Menu</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
       {/* Global Search - Full Width */}
       <div className="flex-1">
@@ -144,49 +154,82 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
       <div className="flex items-center space-x-1 sm:space-x-2 ml-2 sm:ml-4">
         {/* Theme Toggle Buttons - Hidden on mobile */}
         {mounted && (
-          <div className="hidden md:flex items-center border rounded-md">
-            <Button
-              variant={theme === 'light' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setTheme('light')}
-              className="h-8 px-3 rounded-r-none border-r"
-              title="Light Mode"
-            >
-              <Sun className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={theme === 'dark' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setTheme('dark')}
-              className="h-8 px-3 rounded-none border-r"
-              title="Dark Mode"
-            >
-              <Moon className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={theme === 'system' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setTheme('system')}
-              className="h-8 px-3 rounded-l-none"
-              title="System Theme"
-            >
-              <Monitor className="h-4 w-4" />
-            </Button>
-          </div>
+          <TooltipProvider>
+            <div className="hidden md:flex items-center border rounded-md">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={theme === 'light' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setTheme('light')}
+                    className="h-8 px-3 rounded-r-none border-r"
+                    aria-label="Light Mode"
+                  >
+                    <Sun className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Light Mode</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={theme === 'dark' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setTheme('dark')}
+                    className="h-8 px-3 rounded-none border-r"
+                    aria-label="Dark Mode"
+                  >
+                    <Moon className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Dark Mode</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={theme === 'system' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setTheme('system')}
+                    className="h-8 px-3 rounded-l-none"
+                    aria-label="System Theme"
+                  >
+                    <Monitor className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>System Theme</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         )}
 
         {/* Notifications */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative h-9 w-9" title="Notifications">
-              <Bell className="h-4 w-4" />
-              {unreadCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">
-                  {unreadCount}
-                </Badge>
-              )}
-            </Button>
-          </PopoverTrigger>
+        <TooltipProvider>
+          <Popover>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative h-9 w-9" aria-label="Notifications">
+                    <Bell className="h-4 w-4" />
+                    {unreadCount > 0 && (
+                      <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">
+                        {unreadCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Notifications {unreadCount > 0 && `(${unreadCount} unread)`}</p>
+              </TooltipContent>
+            </Tooltip>
           <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80" align="end">
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
@@ -260,6 +303,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
             </div>
           </PopoverContent>
         </Popover>
+        </TooltipProvider>
 
         {/* User Profile Menu */}
         <DropdownMenu>
