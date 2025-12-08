@@ -168,11 +168,11 @@ export default function CreateStoryPage() {
     return `${year}-${month}-${day}`
   }
 
-  const validateDueDate = (storyDueDate: string, epicDueDate?: string) => {
+  const validateDueDate = (storyDueDate: string, epicDueDate?: string): boolean => {
     setDueDateError('')
     
     if (!storyDueDate) {
-      return
+      return true
     }
 
     if (epicDueDate) {
@@ -217,6 +217,13 @@ export default function CreateStoryPage() {
     setLoading(true)
     setError('')
     setDueDateError('')
+
+    // Validate epic field - REQUIRED
+    if (!formData.epic || formData.epic === 'none') {
+      setError('Please select an epic for this story')
+      setLoading(false)
+      return
+    }
 
     // Validate dueDate before submission
     if (formData.dueDate && selectedEpicDueDate) {
@@ -330,9 +337,11 @@ export default function CreateStoryPage() {
     return (
       !!formData.title.trim() &&
       !!formData.project &&
+      !!formData.epic &&
+      formData.epic !== 'none' &&
       !!formData.dueDate
-    );
-  };
+    )
+  }
 
   if (authError) {
     return (
@@ -425,16 +434,17 @@ export default function CreateStoryPage() {
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-foreground">Epic</label>
+                    <label className="text-sm font-medium text-foreground">Epic *</label>
                     <Select
                       value={formData.epic}
                       onValueChange={(value) => handleChange('epic', value)}
                       onOpenChange={open => {
                         if (open) setEpicQuery('')
                       }}
+                      disabled={!formData.project}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select an epic" />
+                        <SelectValue placeholder={!formData.project ? "Select project first" : "Select an epic"} />
                       </SelectTrigger>
                       <SelectContent className="z-[10050] p-0">
                         {Array.isArray(epics) && epics.length > 0 ? (
@@ -468,10 +478,18 @@ export default function CreateStoryPage() {
                             </div>
                           </div>
                         ) : (
-                          <SelectItem value="none">No Epic</SelectItem>
+                          <div className="px-2 py-1 text-sm text-muted-foreground">
+                            No epics available. Please create an epic first.
+                          </div>
                         )}
                       </SelectContent>
                     </Select>
+                    {!formData.project && (
+                      <p className="text-xs text-muted-foreground mt-1">Select a project to view available epics</p>
+                    )}
+                    {formData.project && epics.length === 0 && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">⚠️ No epics found for this project. Please create an epic before creating a story.</p>
+                    )}
                   </div>
 
                   <div>

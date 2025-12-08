@@ -288,6 +288,13 @@ export default function EditStoryPage() {
       setSaving(true)
       setError('')
       
+      // Validate epic is selected - REQUIRED
+      if (!story.epic?._id) {
+        setError('Please select an epic for this story')
+        setSaving(false)
+        return
+      }
+      
       if (story.dueDate && selectedEpicDueDate) {
         const isValid = validateDueDate(story.dueDate, selectedEpicDueDate)
         if (!isValid) {
@@ -499,33 +506,27 @@ export default function EditStoryPage() {
               </div>
 
               <div>
-                <label className="text-sm font-medium">Epic</label>
+                <label className="text-sm font-medium">Epic *</label>
                 <Select
-                  value={story.epic?._id || 'none'}
+                  value={story.epic?._id || ''}
                   onValueChange={(value) => {
-                    if (value === 'none') {
-                      setStory({ ...story, epic: undefined })
-                      setSelectedEpicDueDate(null)
-                      setDueDateError('')
-                    } else {
-                      const selectedEpic = epics.find(e => e._id === value)
-                      if (selectedEpic) {
-                        const formattedDueDate = formatDateForInput(selectedEpic.dueDate)
-                        setSelectedEpicDueDate(formattedDueDate)
-                        if (story.dueDate && formattedDueDate) {
-                          validateDueDate(story.dueDate, formattedDueDate)
-                        } else {
-                          setDueDateError('')
-                        }
-                        setStory({ 
-                          ...story, 
-                          epic: { 
-                            _id: selectedEpic._id, 
-                            title: selectedEpic.title,
-                            dueDate: selectedEpic.dueDate
-                          } 
-                        })
+                    const selectedEpic = epics.find(e => e._id === value)
+                    if (selectedEpic) {
+                      const formattedDueDate = formatDateForInput(selectedEpic.dueDate)
+                      setSelectedEpicDueDate(formattedDueDate)
+                      if (story.dueDate && formattedDueDate) {
+                        validateDueDate(story.dueDate, formattedDueDate)
+                      } else {
+                        setDueDateError('')
                       }
+                      setStory({ 
+                        ...story, 
+                        epic: { 
+                          _id: selectedEpic._id, 
+                          title: selectedEpic.title,
+                          dueDate: selectedEpic.dueDate
+                        } 
+                      })
                     }
                   }}
                   disabled={!story.project}
@@ -535,7 +536,9 @@ export default function EditStoryPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {epics.length === 0 ? (
-                      <SelectItem value="none">No Epic</SelectItem>
+                      <div className="px-2 py-1 text-sm text-muted-foreground">
+                        No epics available. Please create an epic first.
+                      </div>
                     ) : (
                       <>
                         {epics.map((epic) => (
@@ -547,6 +550,9 @@ export default function EditStoryPage() {
                     )}
                   </SelectContent>
                 </Select>
+                {story.project && epics.length === 0 && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">⚠️ No epics found for this project. Please create an epic first.</p>
+                )}
               </div>
 
               <div>
@@ -730,7 +736,7 @@ export default function EditStoryPage() {
 
             <div className="flex justify-end space-x-2 pt-2">
               <Button variant="outline" onClick={() => router.push('/stories')}>Cancel</Button>
-              <Button onClick={handleSave} disabled={saving || !isDirty || !!dueDateError}>
+              <Button onClick={handleSave} disabled={saving || !isDirty || !!dueDateError || !story?.epic?._id}>
                 {saving ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>) : 'Save Changes'}
               </Button>
             </div>
