@@ -227,12 +227,12 @@ export default function SprintEventsPage() {
     if (successParam === 'created') {
       setSuccess('Sprint Event created successfully')
       router.replace('/sprint-events', { scroll: false })
-      const timer = setTimeout(() => setSuccess(''), 5000)
+      const timer = setTimeout(() => setSuccess(''), 3000)
       return () => clearTimeout(timer)
     } else if (successParam === 'updated') {
       setSuccess('Sprint Event updated successfully')
       router.replace('/sprint-events', { scroll: false })
-      const timer = setTimeout(() => setSuccess(''), 5000)
+      const timer = setTimeout(() => setSuccess(''), 3000)
       return () => clearTimeout(timer)
     } else if (errorParam) {
       setError(decodeURIComponent(errorParam))
@@ -610,17 +610,26 @@ export default function SprintEventsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => router.push(`/sprint-events/${event._id}`)}>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation()
+                            router.push(`/sprint-events/${event._id}`)
+                          }}>
                             <Eye className="h-4 w-4 mr-2" />
                             View Event
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setEditingEvent(event)}>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation()
+                            setEditingEvent(event)
+                          }}>
                             <Edit className="h-4 w-4 mr-2" />
                             Edit Event
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
-                            onClick={() => handleEventDeleted(event._id)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleEventDeleted(event._id)
+                            }}
                             className="text-destructive"
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
@@ -699,17 +708,26 @@ export default function SprintEventsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => router.push(`/sprint-events/${event._id}`)}>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation()
+                          router.push(`/sprint-events/${event._id}`)
+                        }}>
                           <Eye className="h-4 w-4 mr-2" />
                           View Event
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setEditingEvent(event)}>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingEvent(event)
+                        }}>
                           <Edit className="h-4 w-4 mr-2" />
                           Edit Event
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
-                          onClick={() => handleEventDeleted(event._id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleEventDeleted(event._id)
+                          }}
                           className="text-destructive"
                         >
                           <Trash2 className="h-4 w-4 mr-2" />

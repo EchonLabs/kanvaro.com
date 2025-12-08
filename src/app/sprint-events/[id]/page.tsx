@@ -159,6 +159,15 @@ export default function SprintEventDetailsPage() {
     }
   }
 
+  const formatMeetingLink = (link: string) => {
+    // If the link already has a protocol, return it as is
+    if (link.match(/^https?:\/\//i)) {
+      return link
+    }
+    // Otherwise, prepend https://
+    return `https://${link}`
+  }
+
   const getEventTypeIcon = (eventType: string) => {
     switch (eventType) {
       case 'planning':
@@ -192,7 +201,10 @@ export default function SprintEventDetailsPage() {
     } as const
     
     return (
-      <Badge variant={variants[status as keyof typeof variants] || 'secondary'}>
+      <Badge 
+        variant={variants[status as keyof typeof variants] || 'secondary'} 
+        className="pointer-events-none"
+      >
         {labels[status as keyof typeof labels] || status}
       </Badge>
     )
@@ -218,7 +230,10 @@ export default function SprintEventDetailsPage() {
     }
     
     return (
-      <Badge variant="outline" className={`${colors[eventType as keyof typeof colors] || 'bg-gray-500'} text-white border-0`}>
+      <Badge 
+        variant="outline" 
+        className={`${colors[eventType as keyof typeof colors] || 'bg-gray-500'} text-white border-0 pointer-events-none`}
+      >
         {labels[eventType as keyof typeof labels] || eventType}
       </Badge>
     )
@@ -348,7 +363,6 @@ export default function SprintEventDetailsPage() {
                 <div className="flex items-center gap-2">
                   {getEventTypeIcon(event.eventType)}
                   {getEventTypeBadge(event.eventType)}
-                  {getStatusBadge(event.status)}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -366,9 +380,9 @@ export default function SprintEventDetailsPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Created At</p>
+                    <p className="text-sm text-muted-foreground">Created Date(Time)</p>
                     <p className="font-medium">
-                      {format(new Date(event.createdAt), 'MMM dd, yyyy HH:mm')}
+                      {format(new Date(event.createdAt), 'MMM dd, yyyy')} ({format(new Date(event.createdAt), 'HH:mm')})
                     </p>
                   </div>
                 </div>
@@ -418,7 +432,7 @@ export default function SprintEventDetailsPage() {
                   <div className="flex items-center space-x-2">
                     <LinkIcon className="h-4 w-4 text-muted-foreground" />
                     <a 
-                      href={event.meetingLink} 
+                      href={formatMeetingLink(event.meetingLink)} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
