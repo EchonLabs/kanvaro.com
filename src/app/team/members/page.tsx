@@ -102,25 +102,25 @@ export default function MembersPage() {
   const canInviteMembers = hasPermission(Permission.TEAM_INVITE) || hasPermission(Permission.USER_INVITE)
   const canEditMembers = hasPermission(Permission.USER_UPDATE)
   const canEditAdminMembers = hasPermission(Permission.USER_MANAGE_ROLES)
-  const [organizationRoles, setOrganizationRoles] = useState<Array<{ id: string; name: string }>>([])
+  const [organizationRoles, setOrganizationRoles] = useState<Array<{ id: string; name: string; isSystem?: boolean }>>([])
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [memberToRemove, setMemberToRemove] = useState<Member | null>(null)
   const [removingMember, setRemovingMember] = useState(false)
 
-  // Load available organization (system) roles from the central roles API
+  // Load available organization roles (both system and custom) from the central roles API
   useEffect(() => {
     const loadRoles = async () => {
       try {
         const res = await fetch('/api/roles')
         const data = await res.json()
         if (data.success && Array.isArray(data.data)) {
-          const systemRoles = data.data
-            .filter((role: any) => role.isSystem)
-            .map((role: any) => ({
-              id: role._id,
-              name: role.name,
-            }))
-          setOrganizationRoles(systemRoles)
+          // Load all roles (system and custom)
+          const allRoles = data.data.map((role: any) => ({
+            id: role._id,
+            name: role.name,
+            isSystem: role.isSystem
+          }))
+          setOrganizationRoles(allRoles)
         }
       } catch (err) {
         console.error('Failed to load organization roles', err)
@@ -546,11 +546,11 @@ export default function MembersPage() {
                       </SelectTrigger>
                       <SelectContent className="z-[10050]">
                         <SelectItem value="all">All Roles</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="project_manager">Project Manager</SelectItem>
-                        <SelectItem value="team_member">Team Member</SelectItem>
-                        <SelectItem value="client">Client</SelectItem>
-                        <SelectItem value="viewer">Viewer</SelectItem>
+                        {organizationRoles.map((role) => (
+                          <SelectItem key={role.id} value={role.name.toLowerCase().replace(/\s+/g, '_')}>
+                            {formatToTitleCase(role.name)}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>

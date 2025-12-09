@@ -123,6 +123,8 @@ export default function RolesPage() {
     setSelectedRole(null)
     setSuccess('Role updated successfully')
     setError('')
+    // Scroll to top to show success message
+    window.scrollTo({ top: 0, behavior: 'smooth' })
     setTimeout(() => setSuccess(''), 3000)
   }
 

@@ -106,7 +106,26 @@ export async function GET(request: NextRequest) {
           ]
         }).select('_id')
         const ids = assignedUsers.map((u: any) => u._id.toString())
-        query.user = { $in: ids.length > 0 ? ids : ['__none__'] }
+        
+        // If no assigned users, return empty results immediately
+        if (ids.length === 0) {
+          return NextResponse.json({
+            success: true,
+            data: [],
+            pagination: {
+              page,
+              limit,
+              total: 0,
+              totalPages: 0
+            },
+            summary: {
+              totalDuration: 0,
+              totalCost: 0
+            }
+          })
+        }
+        
+        query.user = { $in: ids }
       } else {
         // Only own logs
         query.user = viewerId

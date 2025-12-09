@@ -103,16 +103,19 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   const [orgCurrency, setOrgCurrency] = useState<string>('USD')
   const [projects, setProjects] = useState<Array<{ _id: string; name: string }>>([])
   const [users, setUsers] = useState<Array<{ _id: string; firstName: string; lastName: string; email: string }>>([])
+  const [tasks, setTasks] = useState<Array<{ _id: string; title: string }>>([])
   const [projectFilterQuery, setProjectFilterQuery] = useState('')
   const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
   const [assignedByFilterQuery, setAssignedByFilterQuery] = useState('')
+  const [taskFilterQuery, setTaskFilterQuery] = useState('')
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
     reportType: 'detailed', // Default to detailed entries view
     projectId: projectId || 'all',
     assignedTo: userId || 'all',
-    assignedBy: 'all'
+    assignedBy: 'all',
+    taskId: 'all'
   })
 
   const loadReport = useCallback(async () => {
@@ -128,6 +131,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       if (filters.projectId && filters.projectId !== 'all') params.append('projectId', filters.projectId)
       if (filters.assignedTo && filters.assignedTo !== 'all') params.append('userId', filters.assignedTo)
       if (filters.assignedBy && filters.assignedBy !== 'all') params.append('assignedBy', filters.assignedBy)
+      if (filters.taskId && filters.taskId !== 'all') params.append('taskId', filters.taskId)
       if (filters.startDate) params.append('startDate', filters.startDate)
       if (filters.endDate) params.append('endDate', filters.endDate)
 
@@ -203,6 +207,38 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     loadFilterData()
   }, [organizationId])
 
+  // Load tasks based on selected project
+  useEffect(() => {
+    const loadTasks = async () => {
+      try {
+        let tasksUrl = `/api/tasks?limit=1000&page=1`
+        
+        // If a specific project is selected, filter tasks by that project
+        if (filters.projectId && filters.projectId !== 'all') {
+          tasksUrl += `&project=${filters.projectId}`
+        }
+
+        const tasksRes = await fetch(tasksUrl)
+        if (tasksRes.ok) {
+          const tasksData = await tasksRes.json()
+          if (tasksData.success && Array.isArray(tasksData.data)) {
+            setTasks(tasksData.data.map((t: any) => ({ _id: t._id, title: t.title })))
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load tasks:', error)
+      }
+    }
+
+    loadTasks()
+  }, [filters.projectId])
+
+  // Reset task filter when project changes
+  useEffect(() => {
+    setFilters(prev => ({ ...prev, taskId: 'all' }))
+    setTaskFilterQuery('')
+  }, [filters.projectId])
+
   const filteredProjectOptions = useMemo(() => {
     const query = projectFilterQuery.trim().toLowerCase()
     if (!query) return projects
@@ -226,6 +262,12 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       user.email.toLowerCase().includes(query)
     )
   }, [users, assignedByFilterQuery])
+
+  const filteredTaskOptions = useMemo(() => {
+    const query = taskFilterQuery.trim().toLowerCase()
+    if (!query) return tasks
+    return tasks.filter((task) => task.title.toLowerCase().includes(query))
+  }, [tasks, taskFilterQuery])
 
   const formatDuration = (minutes: number) => {
     // Apply rounding rules if enabled
@@ -325,6 +367,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       if (filters.projectId && filters.projectId !== 'all') params.append('projectId', filters.projectId)
       if (filters.assignedTo && filters.assignedTo !== 'all') params.append('userId', filters.assignedTo)
       if (filters.assignedBy && filters.assignedBy !== 'all') params.append('assignedBy', filters.assignedBy)
+      if (filters.taskId && filters.taskId !== 'all') params.append('taskId', filters.taskId)
       if (filters.startDate) params.append('startDate', filters.startDate)
       if (filters.endDate) params.append('endDate', filters.endDate)
 
@@ -420,6 +463,41 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                         filteredProjectOptions.map((project) => (
                           <SelectItem key={project._id} value={project._id}>
                             {project.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="taskId">Task</Label>
+              <Select value={filters.taskId} onValueChange={(value) => { setFilters(prev => ({ ...prev, taskId: value })); setTaskFilterQuery(''); }}>
+                <SelectTrigger>
+                  <SelectValue placeholder={filters.projectId === 'all' ? 'All Tasks' : 'Select Task'} />
+                </SelectTrigger>
+                <SelectContent className="p-0">
+                  <div className="p-2">
+                    <Input
+                      value={taskFilterQuery}
+                      onChange={(e) => setTaskFilterQuery(e.target.value)}
+                      placeholder="Search tasks"
+                      className="mb-2"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                    <div className="max-h-56 overflow-y-auto">
+                      {/* Only show "All Tasks" option when no project is selected */}
+                      {filters.projectId === 'all' && <SelectItem value="all">All Tasks</SelectItem>}
+                      {filteredTaskOptions.length === 0 ? (
+                        <div className="px-2 py-1 text-xs text-muted-foreground">
+                          {filters.projectId === 'all' ? 'No tasks found' : 'No tasks in this project'}
+                        </div>
+                      ) : (
+                        filteredTaskOptions.map((task) => (
+                          <SelectItem key={task._id} value={task._id}>
+                            {task.title}
                           </SelectItem>
                         ))
                       )}

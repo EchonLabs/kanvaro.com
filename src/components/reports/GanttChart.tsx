@@ -36,13 +36,21 @@ export function GanttChart({
   const [selectedTask, setSelectedTask] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+  // Ensure dates are Date objects
+  const safeStartDate = startDate instanceof Date ? startDate : new Date(startDate)
+  const safeEndDate = endDate instanceof Date ? endDate : new Date(endDate)
+
+  const totalDays = Math.ceil((safeEndDate.getTime() - safeStartDate.getTime()) / (1000 * 60 * 60 * 24))
   const dayWidth = 30 * zoom
   const totalWidth = totalDays * dayWidth
 
   const getTaskPosition = (task: GanttTask) => {
-    const daysFromStart = Math.floor((task.start.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-    const taskDuration = Math.ceil((task.end.getTime() - task.start.getTime()) / (1000 * 60 * 60 * 24))
+    // Ensure task dates are Date objects
+    const taskStart = task.start instanceof Date ? task.start : new Date(task.start)
+    const taskEnd = task.end instanceof Date ? task.end : new Date(task.end)
+    
+    const daysFromStart = Math.floor((taskStart.getTime() - safeStartDate.getTime()) / (1000 * 60 * 60 * 24))
+    const taskDuration = Math.ceil((taskEnd.getTime() - taskStart.getTime()) / (1000 * 60 * 60 * 24))
     
     return {
       left: daysFromStart * dayWidth,
@@ -81,9 +89,9 @@ export function GanttChart({
 
   const generateTimeline = () => {
     const timeline = []
-    const currentDate = new Date(startDate)
+    const currentDate = new Date(safeStartDate)
     
-    while (currentDate <= endDate) {
+    while (currentDate <= safeEndDate) {
       timeline.push(new Date(currentDate))
       currentDate.setDate(currentDate.getDate() + 1)
     }
@@ -206,7 +214,11 @@ export function GanttChart({
                           )}
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {Math.ceil((task.end.getTime() - task.start.getTime()) / (1000 * 60 * 60 * 24))}d
+                            {(() => {
+                              const taskStart = task.start instanceof Date ? task.start : new Date(task.start)
+                              const taskEnd = task.end instanceof Date ? task.end : new Date(task.end)
+                              return Math.ceil((taskEnd.getTime() - taskStart.getTime()) / (1000 * 60 * 60 * 24))
+                            })()}d
                           </div>
                         </div>
                       </div>

@@ -1,3 +1,17 @@
+## [1.12.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.12.1...v1.12.2) (2025-12-08)
+
+
+### Bug Fixes
+
+* add changes in gantt chart ([485feeb](https://github.com/EchonLabs/kanvaro.com/commit/485feebab3ae94cfb56e091028d175e32b9251ee))
+
+## [1.12.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.12.0...v1.12.1) (2025-12-08)
+
+
+### Bug Fixes
+
+* add bug fixes in sprint ([3607856](https://github.com/EchonLabs/kanvaro.com/commit/36078566970135e128db633d2a3dbb547c1f5ffb))
+
 # [1.12.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.11.7...v1.12.0) (2025-12-05)
 
 

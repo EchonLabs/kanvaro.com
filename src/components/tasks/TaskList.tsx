@@ -455,7 +455,11 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
 
       <div className="space-y-4">
         {filteredTasks.map((task) => (
-          <Card key={task._id} className="hover:shadow-md transition-shadow">
+          <Card 
+            key={task._id} 
+            className="hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => handleViewTask(task)}
+          >
             <CardContent className="p-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex-1 min-w-0 w-full">
@@ -532,7 +536,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                     </div>
                   )}
                 </div>
-                <div className="flex items-center space-x-2 flex-shrink-0 w-full sm:w-auto">
+                <div className="flex items-center space-x-2 flex-shrink-0 w-full sm:w-auto" onClick={(e) => e.stopPropagation()}>
                   <Select 
                     value={task.status} 
                     onValueChange={(value) => handleStatusChange(task._id, value)}

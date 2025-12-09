@@ -1,17 +1,18 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { Input } from '@/components/ui/Input'
 import { formatToTitleCase } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { 
-  Target, 
-  Play, 
-  AlertTriangle, 
-  CheckCircle, 
+import {
+  Target,
+  Play,
+  AlertTriangle,
+  CheckCircle,
   XCircle,
   User,
   Calendar,
@@ -109,8 +110,8 @@ export interface KanbanBoardProps {
 }
 
 const defaultColumns = [
-  { key: 'backlog', title: 'Backlog', color: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200' },
-  { key: 'todo', title: 'To Do', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' },
+  { key: 'backlog', title: 'Backlog', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
+  { key: 'todo', title: 'To Do', color: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200' },
   { key: 'in_progress', title: 'In Progress', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
   { key: 'review', title: 'Review', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
   { key: 'testing', title: 'Testing', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
@@ -128,6 +129,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
   const [showColumnSettings, setShowColumnSettings] = useState(false)
   const [createTaskStatus, setCreateTaskStatus] = useState<string | undefined>(undefined)
+  const [projectSearchQuery, setProjectSearchQuery] = useState('')
 
   const router = useRouter()
 
@@ -143,17 +145,23 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
     setSelectedProjectId(projectId || 'all')
   }, [projectId])
 
+  const filteredProjects = useMemo(() => {
+    const query = projectSearchQuery.trim().toLowerCase()
+    if (!query) return projects
+    return projects.filter((project) => project.name.toLowerCase().includes(query))
+  }, [projects, projectSearchQuery])
+
   const fetchProject = useCallback(async () => {
     // Don't fetch a specific project if "All Projects" is selected
     if (selectedProjectId === 'all') {
       setProject(null)
       return
     }
-    
+
     try {
       const response = await fetch(`/api/projects/${selectedProjectId}`)
       const data = await response.json()
-      
+
       if (data.success) {
         setProject(data.data)
       } else {
@@ -169,7 +177,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
     try {
       const response = await fetch('/api/projects')
       const data = await response.json()
-      
+
       if (data.success) {
         setProjects(data.data)
       }
@@ -204,7 +212,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
 
       const response = await fetch(apiUrl)
       const data = await response.json()
-      
+
       if (data.success) {
         setTasks(data.data)
       } else {
@@ -244,33 +252,34 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
   const getPriorityColor = (priority: string) => {
     switch (priority.toLowerCase()) {
       case 'high':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-800'
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
       case 'medium':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-200 dark:hover:bg-yellow-800'
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
       case 'low':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-800'
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
     }
   }
 
   const getTypeColor = (type: string) => {
     switch (type.toLowerCase()) {
       case 'bug':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-800'
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
       case 'feature':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800'
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
       case 'task':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
       case 'story':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-800'
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-800'
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
     }
   }
 
   const handleProjectChange = (newProjectId: string) => {
     setSelectedProjectId(newProjectId)
+    setProjectSearchQuery('')
     setError(null)
     if (onProjectChange) {
       onProjectChange(newProjectId)
@@ -301,7 +310,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
     // Determine the new status based on the drop target
     let newStatus = activeTask.status
     const columns = getColumns()
-    
+
     // Check if dropped directly on a column (empty column drop)
     if (typeof overId === 'string' && columns.some(col => col.key === overId)) {
       newStatus = overId as any
@@ -325,11 +334,11 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
       const columnTasks = getTasksByStatus(newStatus)
       const oldIndex = columnTasks.findIndex(task => task._id === activeId)
       const newIndex = columnTasks.findIndex(task => task._id === overId)
-      
+
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
         const reorderedTasks = arrayMove(columnTasks, oldIndex, newIndex)
         const orderedTaskIds = reorderedTasks.map(task => task._id)
-        
+
         try {
           const response = await fetch('/api/tasks/reorder', {
             method: 'POST',
@@ -373,9 +382,9 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
         })
 
         const data = await response.json()
-        
+
         if (data.success) {
-          setTasks(tasks.map(task => 
+          setTasks(tasks.map(task =>
             task._id === activeId ? { ...task, status: newStatus } as PopulatedTask : task
           ))
         }
@@ -428,18 +437,34 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
             <SelectTrigger className="w-full sm:w-[200px]">
               <SelectValue placeholder="Select project" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Projects</SelectItem>
-              {projects.map((project) => (
-                <SelectItem key={project._id} value={project._id}>
-                  {project.name}
-                </SelectItem>
-              ))}
+            <SelectContent className="p-0">
+              <div className="p-2">
+                <Input
+                  value={projectSearchQuery}
+                  onChange={(e) => setProjectSearchQuery(e.target.value)}
+                  placeholder="Search projects"
+                  className="mb-2"
+                  onKeyDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                />
+                <div className="max-h-56 overflow-y-auto">
+                  <SelectItem value="all">All Projects</SelectItem>
+                  {filteredProjects.length === 0 ? (
+                    <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                  ) : (
+                    filteredProjects.map((project) => (
+                      <SelectItem key={project._id} value={project._id}>
+                        {project.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </div>
+              </div>
             </SelectContent>
           </Select>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:ml-auto">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => setShowColumnSettings(true)}
               disabled={selectedProjectId === 'all'}
@@ -450,7 +475,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
               <span className="hidden sm:inline">Manage Columns</span>
               <span className="sm:hidden">Columns</span>
             </Button>
-            <Button 
+            <Button
               onClick={() => handleCreateTask()}
               disabled={selectedProjectId === 'all'}
               title={selectedProjectId === 'all' ? 'Please select a specific project to create tasks' : 'Add a new task'}
@@ -477,44 +502,44 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
         onDragEnd={handleDragEnd}
       >
         <div className="overflow-x-auto overflow-y-hidden -mx-4 px-4 sm:mx-0 sm:px-0">
-          <div 
+          <div
             className="grid gap-4 sm:gap-6 min-w-max sm:min-w-0"
             style={{
               gridTemplateColumns: `repeat(${getColumns().length}, minmax(320px, 1fr))`,
             }}
           >
-          {getColumns().map((column) => {
-            const columnTasks = getTasksByStatus(column.key)
-            
-            return (
-              <VirtualizedColumn
-                key={column.key}
-                column={{
-                  key: column.key,
-                  title: column.title,
-                  color: column.color || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                }}
-                tasks={columnTasks}
-                onCreateTask={handleCreateTask}
-                getPriorityColor={getPriorityColor}
-                getTypeColor={getTypeColor}
-                onTaskClick={(task) => {
-                  // Navigate to task detail page
-                  router.push(`/tasks/${task._id}`)
-                }}
-                onEditTask={onEditTask}
-                onDeleteTask={onDeleteTask}
-              />
-            )
-          })}
+            {getColumns().map((column) => {
+              const columnTasks = getTasksByStatus(column.key)
+
+              return (
+                <VirtualizedColumn
+                  key={column.key}
+                  column={{
+                    key: column.key,
+                    title: column.title,
+                    color: column.color || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                  }}
+                  tasks={columnTasks}
+                  onCreateTask={handleCreateTask}
+                  getPriorityColor={getPriorityColor}
+                  getTypeColor={getTypeColor}
+                  onTaskClick={(task) => {
+                    // Navigate to task detail page
+                    router.push(`/tasks/${task._id}`)
+                  }}
+                  onEditTask={onEditTask}
+                  onDeleteTask={onDeleteTask}
+                />
+              )
+            })}
           </div>
         </div>
-        
+
         <DragOverlay>
           {activeTask ? (
-            <SortableTask 
+            <SortableTask
               task={activeTask}
-              onClick={() => {}}
+              onClick={() => { }}
               getPriorityColor={getPriorityColor}
               getTypeColor={getTypeColor}
               isDragOverlay

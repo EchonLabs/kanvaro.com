@@ -166,6 +166,12 @@ export default function ProjectDetailPage() {
       deadlineReminders: false,
     },
   })
+  const [globalTimeTrackingSettings, setGlobalTimeTrackingSettings] = useState<{
+    allowTimeTracking: boolean
+    allowManualTimeSubmission: boolean
+    requireApproval: boolean
+    allowBillableTime: boolean
+  } | null>(null)
   const [statusForm, setStatusForm] = useState<Project['status']>('planning')
   const [priorityForm, setPriorityForm] = useState<Project['priority']>('medium')
   const [settingsSuccess, setSettingsSuccess] = useState('')
@@ -177,6 +183,7 @@ export default function ProjectDetailPage() {
     if (projectId) {
       fetchProject()
       fetchTasks()
+      fetchGlobalTimeTrackingSettings()
     }
   }, [projectId])
 
@@ -184,11 +191,17 @@ export default function ProjectDetailPage() {
     if (project) {
       setStatusForm(project.status)
       setPriorityForm(project.priority)
+      
+      // Respect global settings - if global is OFF, project must be OFF too
+      const allowTimeTracking = (project.settings?.allowTimeTracking ?? false) && (globalTimeTrackingSettings?.allowTimeTracking ?? true)
+      const allowManualTimeSubmission = (project.settings?.allowManualTimeSubmission ?? false) && (globalTimeTrackingSettings?.allowManualTimeSubmission ?? true)
+      const requireApproval = (project.settings?.requireApproval ?? false) && (globalTimeTrackingSettings?.requireApproval ?? true)
+      
       setSettingsForm({
-        allowTimeTracking: project.settings?.allowTimeTracking ?? false,
-        allowManualTimeSubmission: project.settings?.allowManualTimeSubmission ?? false,
+        allowTimeTracking,
+        allowManualTimeSubmission,
         allowExpenseTracking: project.settings?.allowExpenseTracking ?? false,
-        requireApproval: project.settings?.requireApproval ?? false,
+        requireApproval,
         notifications: {
           taskUpdates: project.settings?.notifications?.taskUpdates ?? false,
           budgetAlerts: project.settings?.notifications?.budgetAlerts ?? false,
@@ -196,7 +209,7 @@ export default function ProjectDetailPage() {
         },
       })
     }
-  }, [project])
+  }, [project, globalTimeTrackingSettings])
 
   useEffect(() => {
     return () => {
@@ -224,16 +237,22 @@ export default function ProjectDetailPage() {
     setSettingsSuccess('')
 
     try {
+      // Ensure project settings respect global settings
+      const finalSettings = {
+        ...settingsForm,
+        allowTimeTracking: settingsForm.allowTimeTracking && (globalTimeTrackingSettings?.allowTimeTracking ?? true),
+        allowManualTimeSubmission: settingsForm.allowManualTimeSubmission && (globalTimeTrackingSettings?.allowManualTimeSubmission ?? true),
+        requireApproval: settingsForm.requireApproval && (globalTimeTrackingSettings?.requireApproval ?? true),
+        notifications: { ...settingsForm.notifications },
+      }
+      
       const response = await fetch(`/api/projects/${projectId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          settings: {
-            ...settingsForm,
-            notifications: { ...settingsForm.notifications },
-          },
+          settings: finalSettings,
           status: statusForm,
           priority: priorityForm,
         }),
@@ -283,6 +302,24 @@ export default function ProjectDetailPage() {
       }
     } catch (error) {
       console.error('Error fetching tasks:', error)
+    }
+  }
+
+  const fetchGlobalTimeTrackingSettings = async () => {
+    try {
+      const response = await fetch('/api/time-tracking/settings')
+      const data = await response.json()
+      
+      if (data.success && data.data) {
+        setGlobalTimeTrackingSettings({
+          allowTimeTracking: data.data.allowTimeTracking ?? true,
+          allowManualTimeSubmission: data.data.allowManualTimeSubmission ?? true,
+          requireApproval: data.data.requireApproval ?? false,
+          allowBillableTime: data.data.allowBillableTime ?? true,
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching global time tracking settings:', error)
     }
   }
 
@@ -663,10 +700,10 @@ export default function ProjectDetailPage() {
                       <Edit className="mr-2 h-4 w-4" />
                       Edit Project
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setShowCreateTaskModal(true)}>
+                    {/* <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setShowCreateTaskModal(true)}>
                       <Plus className="mr-2 h-4 w-4" />
                       Add Task
-                    </Button>
+                    </Button> */}
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -921,13 +958,21 @@ export default function ProjectDetailPage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center justify-between gap-4">
-                      <div>
+                      <div className="flex-1">
                         <Label htmlFor="allow-time-tracking">Allow Time Tracking</Label>
-                        <p className="text-sm text-muted-foreground">Enable time tracking for this project</p>
+                        <p className="text-sm text-muted-foreground">
+                          Enable time tracking for this project
+                          {globalTimeTrackingSettings && !globalTimeTrackingSettings.allowTimeTracking && (
+                            <span className="block text-xs text-amber-600 dark:text-amber-400 mt-1">
+                              ⚠️ Disabled globally in Application Settings
+                            </span>
+                          )}
+                        </p>
                       </div>
                       <Switch
                         id="allow-time-tracking"
-                        checked={settingsForm.allowTimeTracking}
+                        checked={settingsForm.allowTimeTracking && (globalTimeTrackingSettings?.allowTimeTracking ?? true)}
+                        disabled={!globalTimeTrackingSettings?.allowTimeTracking}
                         onCheckedChange={(checked) =>
                           setSettingsForm((prev) => ({
                             ...prev,
@@ -941,13 +986,21 @@ export default function ProjectDetailPage() {
                     {settingsForm.allowTimeTracking && (
                       <div className="ml-0 pl-4 border-l-2 border-muted">
                         <div className="flex items-center justify-between gap-4">
-                          <div>
+                          <div className="flex-1">
                             <Label htmlFor="allow-manual-time-submission">Allow Manual Time Submission</Label>
-                            <p className="text-sm text-muted-foreground">Allow team members to submit time entries manually</p>
+                            <p className="text-sm text-muted-foreground">
+                              Allow team members to submit time entries manually
+                              {globalTimeTrackingSettings && !globalTimeTrackingSettings.allowManualTimeSubmission && (
+                                <span className="block text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                  ⚠️ Disabled globally in Application Settings
+                                </span>
+                              )}
+                            </p>
                           </div>
                           <Switch
                             id="allow-manual-time-submission"
-                            checked={settingsForm.allowManualTimeSubmission}
+                            checked={settingsForm.allowManualTimeSubmission && (globalTimeTrackingSettings?.allowManualTimeSubmission ?? true)}
+                            disabled={!globalTimeTrackingSettings?.allowManualTimeSubmission}
                             onCheckedChange={(checked) =>
                               setSettingsForm((prev) => ({
                                 ...prev,
@@ -977,13 +1030,21 @@ export default function ProjectDetailPage() {
                     </div>
 
                     <div className="flex items-center justify-between gap-4">
-                      <div>
+                      <div className="flex-1">
                         <Label htmlFor="require-approval">Require Approval</Label>
-                        <p className="text-sm text-muted-foreground">Require approval for time entries and expenses</p>
+                        <p className="text-sm text-muted-foreground">
+                          Require approval for time entries and expenses
+                          {globalTimeTrackingSettings && !globalTimeTrackingSettings.requireApproval && (
+                            <span className="block text-xs text-amber-600 dark:text-amber-400 mt-1">
+                              ⚠️ Disabled globally in Application Settings
+                            </span>
+                          )}
+                        </p>
                       </div>
                       <Switch
                         id="require-approval"
-                        checked={settingsForm.requireApproval}
+                        checked={settingsForm.requireApproval && (globalTimeTrackingSettings?.requireApproval ?? true)}
+                        disabled={!globalTimeTrackingSettings?.requireApproval}
                         onCheckedChange={(checked) =>
                           setSettingsForm((prev) => ({
                             ...prev,

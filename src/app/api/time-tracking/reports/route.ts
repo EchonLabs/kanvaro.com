@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
     const projectId = searchParams.get('projectId')
     const userId = searchParams.get('userId')
     const assignedBy = searchParams.get('assignedBy')
+    const taskId = searchParams.get('taskId')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const reportType = searchParams.get('reportType') || 'summary'
@@ -64,6 +65,7 @@ export async function GET(request: NextRequest) {
     if (projectId) baseQuery.project = projectId
     if (userId) baseQuery.user = userId
     if (assignedBy) baseQuery.approvedBy = assignedBy
+    if (taskId) baseQuery.task = taskId
 
     switch (reportType) {
       case 'summary':
