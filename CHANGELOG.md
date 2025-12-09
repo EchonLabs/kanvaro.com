@@ -1,3 +1,10 @@
+## [1.12.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.12.2...v1.12.3) (2025-12-09)
+
+
+### Bug Fixes
+
+* add layout issue ([50de3d8](https://github.com/EchonLabs/kanvaro.com/commit/50de3d88bf3ef652e0d2c0557baea7b76ce1ddb9))
+
 ## [1.12.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.12.1...v1.12.2) (2025-12-08)
 
 
