@@ -1557,21 +1557,29 @@ export default function BacklogPage() {
                                 >
                                   {(() => {
                                     if (typeof item.epic === 'string') {
-                                      return 'Epic'
+                                      return formatToTitleCase('Epic')
                                     }
                                     const epicObj = item.epic as { _id: string; name?: string; title?: string }
-                                    return epicObj.title || epicObj.name || 'Epic'
+                                    return formatToTitleCase(epicObj.title || epicObj.name || 'Epic')
                                   })()}
                                 </Badge>
                               )}
                               {item.sprint && (
-                                <Badge
-                                  variant="outline"
-                                  className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900"
-                                  title={item.sprint.name}
-                                >
-                                  {truncateText(item.sprint.name, 18)}
-                                </Badge>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge
+                                        variant="outline"
+                                        className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900 cursor-default"
+                                      >
+                                        {truncateText(formatToTitleCase(item.sprint.name), 18)}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>{formatToTitleCase(item.sprint.name)}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               )}
                             </div>
                             <TooltipProvider>
@@ -1865,9 +1873,9 @@ export default function BacklogPage() {
 
             {currentSprintInfo && (
               <div className="rounded-md border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">Current sprint:</span>{' '}
-                <Badge variant="outline" className="ml-1 hover:bg-transparent dark:hover:bg-transparent" title={currentSprintInfo.name}>
-                  {truncateText(currentSprintInfo.name, 24)}
+                <span className="font-medium text-foreground">{formatToTitleCase('Current Sprint')}:</span>{' '}
+                <Badge variant="outline" className="ml-1 hover:bg-transparent dark:hover:bg-transparent" title={formatToTitleCase(currentSprintInfo.name)}>
+                  {truncateText(formatToTitleCase(currentSprintInfo.name), 24)}
                 </Badge>
               </div>
             )}
@@ -1972,7 +1980,7 @@ export default function BacklogPage() {
                     >
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900 flex-shrink-0">
-                          Story
+                          {formatToTitleCase('Story')}
                         </Badge>
                         <span className="truncate font-medium">{story.title}</span>
                       </div>
@@ -2020,17 +2028,17 @@ export default function BacklogPage() {
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             {isFromStory && sourceStoryTitle && (
                               <Badge variant="outline" className="text-xs flex-shrink-0 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900">
-                                From: {truncateText(sourceStoryTitle, 20)}
+                                {formatToTitleCase('From')}: {truncateText(formatToTitleCase(sourceStoryTitle), 20)}
                               </Badge>
                             )}
                             {isDirectlySelected && !isFromStory && (
                               <Badge variant="outline" className="text-xs flex-shrink-0 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900">
-                                Directly Selected
+                                {formatToTitleCase('Directly Selected')}
                               </Badge>
                             )}
                             {isDirectlySelected && isFromStory && (
                               <Badge variant="outline" className="text-xs flex-shrink-0 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900">
-                                Direct + Story
+                                {formatToTitleCase('Direct + Story')}
                               </Badge>
                             )}
                             <span className="truncate font-medium">{task.title}</span>
@@ -2041,7 +2049,7 @@ export default function BacklogPage() {
                         </div>
                         {isFromStory && sourceStoryTitle && (
                           <div className="text-xs text-muted-foreground pl-0.5">
-                            Story: <span className="font-medium">{sourceStoryTitle}</span>
+                            {formatToTitleCase('Story')}: <span className="font-medium">{formatToTitleCase(sourceStoryTitle)}</span>
                           </div>
                         )}
                       </li>
