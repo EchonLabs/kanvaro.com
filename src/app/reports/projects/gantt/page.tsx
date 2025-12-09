@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { PageWrapper } from '@/components/layout/PageWrapper'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -29,21 +29,24 @@ export default function GanttReportPage() {
   const [projects, setProjects] = useState<any[]>([])
   const [sprints, setSprints] = useState<any[]>([])
   const [assignees, setAssignees] = useState<any[]>([])
+  const [projectSearchQuery, setProjectSearchQuery] = useState('')
+  const [sprintSearchQuery, setSprintSearchQuery] = useState('')
+  const [assigneeSearchQuery, setAssigneeSearchQuery] = useState('')
   const router = useRouter()
+
+  useEffect(() => {
+    loadFilterOptions()
+  }, [])
 
   useEffect(() => {
     loadGanttData()
   }, [filters])
 
-  useEffect(() => {
-    loadFilterOptions()
-  }, [filters.project])
-
   const loadGanttData = async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      
+
       if (filters.project) params.append('projectId', filters.project)
       if (filters.sprint) params.append('sprintId', filters.sprint)
       if (filters.assignee) params.append('assigneeId', filters.assignee)
@@ -74,18 +77,6 @@ export default function GanttReportPage() {
         setProjects(projectsArray)
       }
 
-      // Load sprints if project is selected
-      if (filters.project) {
-        const sprintsResponse = await fetch(`/api/sprints?project=${filters.project}`)
-        if (sprintsResponse.ok) {
-          const sprintsData = await sprintsResponse.json()
-          const sprintsArray = Array.isArray(sprintsData)
-            ? sprintsData
-            : (sprintsData?.data && Array.isArray(sprintsData.data) ? sprintsData.data : [])
-          setSprints(sprintsArray)
-        }
-      }
-
       // Load assignees
       const assigneesResponse = await fetch('/api/members')
       if (assigneesResponse.ok) {
@@ -99,6 +90,24 @@ export default function GanttReportPage() {
       console.error('Failed to load filter options:', error)
     }
   }
+
+  const filteredProjects = useMemo(() => {
+    const query = projectSearchQuery.trim().toLowerCase()
+    if (!query) return projects
+    return projects.filter((project) => project.name.toLowerCase().includes(query))
+  }, [projects, projectSearchQuery])
+
+  const filteredSprints = useMemo(() => {
+    const query = sprintSearchQuery.trim().toLowerCase()
+    if (!query) return sprints
+    return sprints.filter((sprint) => sprint.name.toLowerCase().includes(query))
+  }, [sprints, sprintSearchQuery])
+
+  const filteredAssignees = useMemo(() => {
+    const query = assigneeSearchQuery.trim().toLowerCase()
+    if (!query) return assignees
+    return assignees.filter((assignee) => assignee.name.toLowerCase().includes(query))
+  }, [assignees, assigneeSearchQuery])
 
   const handleTaskClick = (task: GanttTask) => {
     // Navigate to task detail page
@@ -117,11 +126,52 @@ export default function GanttReportPage() {
     window.location.href = `/api/reports/gantt/export?${params.toString()}`
   }
 
-  const handleFilterChange = (key: string, value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value
-    }))
+  const handleFilterChange = async (key: string, value: string) => {
+    if (key === 'project') {
+      // Reset sprint filter when project changes
+      setFilters(prev => ({
+        ...prev,
+        project: value,
+        sprint: ''
+      }))
+      setProjectSearchQuery('')
+      setSprintSearchQuery('')
+
+      // Reload sprints for the new project
+      if (value) {
+        try {
+          const sprintsResponse = await fetch(`/api/sprints?project=${value}`)
+          if (sprintsResponse.ok) {
+            const sprintsData = await sprintsResponse.json()
+            const sprintsArray = Array.isArray(sprintsData)
+              ? sprintsData
+              : (sprintsData?.data && Array.isArray(sprintsData.data) ? sprintsData.data : [])
+            setSprints(sprintsArray)
+          }
+        } catch (error) {
+          console.error('Failed to load sprints:', error)
+        }
+      } else {
+        setSprints([])
+      }
+    } else if (key === 'sprint') {
+      setFilters(prev => ({
+        ...prev,
+        [key]: value
+      }))
+      setSprintSearchQuery('')
+    } else if (key === 'assignee') {
+      setFilters(prev => ({
+        ...prev,
+        [key]: value
+      }))
+      setAssigneeSearchQuery('')
+    } else {
+      setFilters(prev => ({
+        ...prev,
+        [key]: value
+      }))
+    }
   }
 
   if (loading) {
@@ -141,138 +191,186 @@ export default function GanttReportPage() {
     <MainLayout>
       <PageWrapper>
         <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Gantt Chart</h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            Visualize project timelines and dependencies
-          </p>
-        </div>
-        <Button onClick={handleExport} className="flex items-center gap-2 w-full sm:w-auto">
-          <Download className="h-4 w-4" />
-          Export
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <Filter className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-            Filters
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="project" className="text-xs sm:text-sm">Project</Label>
-              <Select
-                value={filters.project || ALL_PROJECTS}
-                onValueChange={(value) => handleFilterChange('project', value === ALL_PROJECTS ? '' : value)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="All projects" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_PROJECTS}>All projects</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project._id} value={project._id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="sprint" className="text-xs sm:text-sm">Sprint</Label>
-              <Select
-                value={filters.sprint || ALL_SPRINTS}
-                onValueChange={(value) => handleFilterChange('sprint', value === ALL_SPRINTS ? '' : value)}
-                disabled={!filters.project}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="All sprints" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_SPRINTS}>All sprints</SelectItem>
-                  {sprints.map((sprint) => (
-                    <SelectItem key={sprint._id} value={sprint._id}>
-                      {sprint.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="assignee" className="text-xs sm:text-sm">Assignee</Label>
-              <Select
-                value={filters.assignee || ALL_ASSIGNEES}
-                onValueChange={(value) => handleFilterChange('assignee', value === ALL_ASSIGNEES ? '' : value)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="All assignees" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_ASSIGNEES}>All assignees</SelectItem>
-                  {assignees.map((assignee) => (
-                    <SelectItem key={assignee._id} value={assignee._id}>
-                      {assignee.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="startDate" className="text-xs sm:text-sm">Start Date</Label>
-              <Input
-                id="startDate"
-                type="date"
-                value={filters.startDate}
-                onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                className="w-full"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="endDate" className="text-xs sm:text-sm">End Date</Label>
-              <Input
-                id="endDate"
-                type="date"
-                value={filters.endDate}
-                onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                className="w-full"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Gantt Chart */}
-      {ganttData && ganttData.tasks.length > 0 ? (
-        <div className="overflow-x-auto">
-          <GanttChart
-            tasks={ganttData.tasks}
-            startDate={ganttData.startDate}
-            endDate={ganttData.endDate}
-            onTaskClick={handleTaskClick}
-          />
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="flex items-center justify-center h-64">
-            <div className="text-center px-4">
-              <Calendar className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-base sm:text-lg font-semibold mb-2">No tasks found</h3>
-              <p className="text-sm sm:text-base text-muted-foreground">
-                Try adjusting your filters or create some tasks to see the Gantt chart.
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Gantt Chart</h1>
+              <p className="text-sm sm:text-base text-muted-foreground mt-1">
+                Visualize project timelines and dependencies
               </p>
             </div>
-          </CardContent>
-        </Card>
-      )}
+            <Button onClick={handleExport} className="flex items-center gap-2 w-full sm:w-auto">
+              <Download className="h-4 w-4" />
+              Export
+            </Button>
+          </div>
+
+          {/* Filters */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <Filter className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                Filters
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="project" className="text-xs sm:text-sm">Project</Label>
+                  <Select
+                    value={filters.project || ALL_PROJECTS}
+                    onValueChange={(value) => handleFilterChange('project', value === ALL_PROJECTS ? '' : value)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All projects" />
+                    </SelectTrigger>
+                    <SelectContent className="p-0">
+                      <div className="p-2">
+                        <Input
+                          value={projectSearchQuery}
+                          onChange={(e) => setProjectSearchQuery(e.target.value)}
+                          placeholder="Search projects"
+                          className="mb-2"
+                          onKeyDown={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          <SelectItem value={ALL_PROJECTS}>All projects</SelectItem>
+                          {filteredProjects.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                          ) : (
+                            filteredProjects.map((project) => (
+                              <SelectItem key={project._id} value={project._id}>
+                                {project.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="sprint" className="text-xs sm:text-sm">Sprint</Label>
+                  <Select
+                    value={filters.sprint || ALL_SPRINTS}
+                    onValueChange={(value) => handleFilterChange('sprint', value === ALL_SPRINTS ? '' : value)}
+                    disabled={!filters.project}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All sprints" />
+                    </SelectTrigger>
+                    <SelectContent className="p-0">
+                      <div className="p-2">
+                        <Input
+                          value={sprintSearchQuery}
+                          onChange={(e) => setSprintSearchQuery(e.target.value)}
+                          placeholder="Search sprints"
+                          className="mb-2"
+                          onKeyDown={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          <SelectItem value={ALL_SPRINTS}>All sprints</SelectItem>
+                          {filteredSprints.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching sprints</div>
+                          ) : (
+                            filteredSprints.map((sprint) => (
+                              <SelectItem key={sprint._id} value={sprint._id}>
+                                {sprint.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="assignee" className="text-xs sm:text-sm">Assignee</Label>
+                  <Select
+                    value={filters.assignee || ALL_ASSIGNEES}
+                    onValueChange={(value) => handleFilterChange('assignee', value === ALL_ASSIGNEES ? '' : value)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All assignees" />
+                    </SelectTrigger>
+                    <SelectContent className="p-0">
+                      <div className="p-2">
+                        <Input
+                          value={assigneeSearchQuery}
+                          onChange={(e) => setAssigneeSearchQuery(e.target.value)}
+                          placeholder="Search assignees"
+                          className="mb-2"
+                          onKeyDown={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          <SelectItem value={ALL_ASSIGNEES}>All assignees</SelectItem>
+                          {filteredAssignees.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching assignees</div>
+                          ) : (
+                            filteredAssignees.map((assignee) => (
+                              <SelectItem key={assignee._id} value={assignee._id}>
+                                {assignee.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="startDate" className="text-xs sm:text-sm">Start Date</Label>
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={filters.startDate}
+                    onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="endDate" className="text-xs sm:text-sm">End Date</Label>
+                  <Input
+                    id="endDate"
+                    type="date"
+                    value={filters.endDate}
+                    onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Gantt Chart */}
+          {ganttData && ganttData.tasks.length > 0 ? (
+            <div className="overflow-x-auto">
+              <GanttChart
+                tasks={ganttData.tasks}
+                startDate={ganttData.startDate}
+                endDate={ganttData.endDate}
+                onTaskClick={handleTaskClick}
+              />
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="flex items-center justify-center h-64">
+                <div className="text-center px-4">
+                  <Calendar className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-base sm:text-lg font-semibold mb-2">No tasks found</h3>
+                  <p className="text-sm sm:text-base text-muted-foreground">
+                    Try adjusting your filters or create some tasks to see the Gantt chart.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </PageWrapper>
     </MainLayout>
