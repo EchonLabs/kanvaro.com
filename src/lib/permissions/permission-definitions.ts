@@ -403,6 +403,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_APPROVE,
     Permission.TIME_TRACKING_EXPORT,
     Permission.TIME_TRACKING_VIEW_ASSIGNED,
+    Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
     
     // Financial
