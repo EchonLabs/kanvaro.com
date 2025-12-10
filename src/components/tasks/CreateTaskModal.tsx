@@ -331,7 +331,8 @@ export default function CreateTaskModal({
         estimatedHours: '',
         labels: [],
         story: '',
-        epic: ''
+        epic: '',
+        isBillable: false // Add missing required property
       })
       setSubtasks([])
       setAssignedToIds([])
@@ -555,7 +556,8 @@ export default function CreateTaskModal({
             estimatedHours: '',
             labels: [],
             story: '',
-            epic: ''
+            epic: '',
+            isBillable: false, // Fix: Provide required field missing from TaskFormData
           })
           setSubtasks([])
           setAssignedToIds([])

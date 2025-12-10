@@ -123,6 +123,13 @@ interface Task {
   }>
 }
 
+type SuggestionItem = {
+  _id: string
+  name?: string
+  displayId?: string
+  title?: string
+}
+
 export default function TaskDetailPage() {
   const router = useRouter()
   const params = useParams()
@@ -317,15 +324,19 @@ export default function TaskDetailPage() {
     )
   }, [router, task?.comments])
 
-  const filteredSuggestions = useMemo(() => {
+  const filteredSuggestions = useMemo<SuggestionItem[]>(() => {
     const q = suggestionQuery.trim().toLowerCase()
     if (!suggestionMode) return []
     if (suggestionMode === 'mention') {
-      return mentionsList.filter(m => m.name.toLowerCase().includes(q)).slice(0, 6)
+      return mentionsList
+        .filter(m => m.name.toLowerCase().includes(q))
+        .slice(0, 6)
+        .map(m => ({ _id: m._id, name: m.name }))
     }
     return issuesList
       .filter(i => (i.displayId || '').toLowerCase().includes(q) || (i.title || '').toLowerCase().includes(q))
       .slice(0, 6)
+      .map(i => ({ _id: i._id, displayId: i.displayId, title: i.title }))
   }, [suggestionMode, suggestionQuery, mentionsList, issuesList])
 
   const replaceActiveToken = (replacement: string) => {
