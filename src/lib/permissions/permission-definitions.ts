@@ -106,6 +106,7 @@ export enum Permission {
   // Financial permissions
   FINANCIAL_READ = 'financial:read',
   FINANCIAL_MANAGE_BUDGET = 'financial:manage_budget',
+  BUDGET_HANDLING = 'financial:budget_handling',
   FINANCIAL_CREATE_EXPENSE = 'financial:create_expense',
   FINANCIAL_APPROVE_EXPENSE = 'financial:approve_expense',
   FINANCIAL_CREATE_INVOICE = 'financial:create_invoice',
@@ -271,6 +272,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Financial
     Permission.FINANCIAL_READ,
     Permission.FINANCIAL_MANAGE_BUDGET,
+    Permission.BUDGET_HANDLING,
     Permission.FINANCIAL_CREATE_EXPENSE,
     Permission.FINANCIAL_APPROVE_EXPENSE,
     Permission.FINANCIAL_CREATE_INVOICE,
@@ -412,6 +414,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Financial
     Permission.FINANCIAL_READ,
     Permission.FINANCIAL_MANAGE_BUDGET,
+    Permission.BUDGET_HANDLING,
     Permission.FINANCIAL_CREATE_EXPENSE,
     Permission.FINANCIAL_APPROVE_EXPENSE,
     Permission.FINANCIAL_CREATE_INVOICE,
@@ -1103,6 +1106,7 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.TIME_TRACKING_VIEW_ASSIGNED,
     Permission.TIME_TRACKING_VIEW_ALL_TIMER, // View all active timers in organization
     Permission.FINANCIAL_READ,
+    Permission.BUDGET_HANDLING,
     Permission.REPORTING_VIEW,
     Permission.REPORTING_CREATE,
     Permission.REPORTING_EXPORT,

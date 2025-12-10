@@ -18,6 +18,7 @@ export interface ITask extends Document {
   description: string
   status: TaskStatus
   priority: 'low' | 'medium' | 'high' | 'critical'
+  isBillable?: boolean
   type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
   organization: mongoose.Types.ObjectId
   project: mongoose.Types.ObjectId
@@ -55,6 +56,14 @@ export interface ITask extends Document {
   subtasks: ITaskSubtask[]
   archived: boolean
   position: number
+  comments?: Array<{
+    _id?: mongoose.Types.ObjectId
+    content: string
+    author: mongoose.Types.ObjectId
+    mentions?: mongoose.Types.ObjectId[]
+    linkedIssues?: mongoose.Types.ObjectId[]
+    createdAt: Date
+  }>
   linkedTestCase?: mongoose.Types.ObjectId
   foundInVersion?: string
   testExecutionId?: mongoose.Types.ObjectId
@@ -109,6 +118,10 @@ const TaskSchema = new Schema<ITask>({
     type: String,
     enum: ['low', 'medium', 'high', 'critical'],
     default: 'medium'
+  },
+  isBillable: {
+    type: Boolean,
+    default: true
   },
   type: {
     type: String,
@@ -212,6 +225,13 @@ const TaskSchema = new Schema<ITask>({
     default: []
   },
   archived: { type: Boolean, default: false },
+  comments: [{
+    content: { type: String, required: true, trim: true, maxlength: 2000 },
+    author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    mentions: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    linkedIssues: [{ type: Schema.Types.ObjectId, ref: 'Task' }],
+    createdAt: { type: Date, default: Date.now }
+  }],
   linkedTestCase: {
     type: Schema.Types.ObjectId,
     ref: 'TestCase'

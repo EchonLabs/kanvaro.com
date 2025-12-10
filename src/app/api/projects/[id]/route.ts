@@ -193,6 +193,11 @@ export async function PUT(
     if (updateData.budget !== undefined) {
       updateObject.$set['budget'] = updateData.budget
     }
+
+    // Handle billable default toggle
+    if (updateData.isBillableByDefault !== undefined) {
+      updateObject.$set['isBillableByDefault'] = !!updateData.isBillableByDefault
+    }
     
     // Handle teamMembers array
     if (updateData.teamMembers !== undefined) {

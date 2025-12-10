@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { X, Loader2 } from 'lucide-react'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 
 interface Member {
   _id: string
@@ -35,6 +36,7 @@ interface Member {
     email: string
     role: string
   }
+  hourlyRate?: number
 }
 
 interface CustomRole {
@@ -57,16 +59,24 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
     role: member.role,
     customRoleId: member.customRole?._id || '',
     isActive: member.isActive,
+    hourlyRate: member.hourlyRate || '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([])
   const [rolesLoading, setRolesLoading] = useState(true)
-  
+  const { currencySymbol } = useOrgCurrency()
+
   // Check if current member is admin/HR or if user is trying to change role to admin/HR
   const isAdminMember = member.role === 'admin' || member.role === 'human_resource'
   const isChangingToAdmin = (formData.role === 'admin' || formData.role === 'human_resource') && (member.role !== 'admin' && member.role !== 'human_resource')
   const canChangeRole = !isAdminMember && !isChangingToAdmin || canEditAdminUsers
+
+  // Check for budget handling permission
+  // Ideally this would come from a permission check, for now we assume HR and Admin can edit rates
+  // or if passed as a prop. For now we'll allow editing if the user can open this modal, 
+  // but the backend should enforce permission.
+  // We can add a permission check here if we have access to the current user's permissions context.
 
   useEffect(() => {
     fetchCustomRoles()
@@ -120,6 +130,7 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
         lastName: formData.lastName,
         role: formData.role,
         isActive: formData.isActive,
+        hourlyRate: formData.hourlyRate ? Number(formData.hourlyRate) : undefined,
       })
 
       // Update custom role if changed
@@ -147,7 +158,7 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
   }
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
@@ -216,8 +227,8 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
 
             <div className="space-y-2">
               <Label htmlFor="role">System Role</Label>
-              <Select 
-                value={formData.role} 
+              <Select
+                value={formData.role}
                 onValueChange={(value) => {
                   // Prevent changing to admin or HR if user doesn't have permission
                   if ((value === 'admin' || value === 'human_resource') && !canEditAdminUsers) {
@@ -254,8 +265,8 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
 
             <div className="space-y-2">
               <Label htmlFor="customRole">Custom Role (Optional)</Label>
-              <Select 
-                value={formData.customRoleId || '__NO_CUSTOM_ROLE__'} 
+              <Select
+                value={formData.customRoleId || '__NO_CUSTOM_ROLE__'}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, customRoleId: value === '__NO_CUSTOM_ROLE__' ? '' : value }))}
               >
                 <SelectTrigger className="w-full">
@@ -269,16 +280,34 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
                       Loading roles...
                     </SelectItem>
                   ) : (
-                    customRoles.map((role) => (
-                      <SelectItem key={role._id} value={role._id}>
-                        {role.name}
-                      </SelectItem>
-                    ))
+                    <div className="max-h-60 overflow-y-auto">
+                      {customRoles.map((role) => (
+                        <SelectItem key={role._id} value={role._id}>
+                          {role.name}
+                        </SelectItem>
+                      ))}
+                    </div>
                   )}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
                 Custom roles provide additional permissions beyond the system role
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="hourlyRate">Default Hourly Rate ({currencySymbol})</Label>
+              <Input
+                id="hourlyRate"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={formData.hourlyRate}
+                onChange={(e) => setFormData(prev => ({ ...prev, hourlyRate: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                This rate will be used as the default for new projects
               </p>
             </div>
 

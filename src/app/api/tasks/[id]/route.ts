@@ -246,6 +246,7 @@ export async function GET(
         { path: 'project', select: '_id name' },
         { path: 'assignedTo', select: 'firstName lastName email' },
         { path: 'createdBy', select: 'firstName lastName email' },
+        { path: 'comments.author', select: 'firstName lastName email' },
         {
           path: 'story',
           select: 'title status epic',
@@ -328,6 +329,10 @@ export async function PUT(
 
     if (Object.prototype.hasOwnProperty.call(updateData, 'attachments')) {
       updateData.attachments = sanitizeAttachments(updateData.attachments, userId)
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'isBillable')) {
+      updateData.isBillable = !!updateData.isBillable
     }
 
     if (Object.prototype.hasOwnProperty.call(updateData, 'storyPoints')) {

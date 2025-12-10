@@ -347,7 +347,8 @@ export async function POST(request: NextRequest) {
       estimatedHours,
       labels,
       subtasks,
-      attachments
+      attachments,
+      isBillable
     } = payload
 
     // Validate required fields first (fail fast)
@@ -360,7 +361,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch project and check permissions in parallel for better performance
     const [projectDoc, canCreateTask] = await Promise.all([
-      Project.findById(project).select('projectNumber organization name teamMembers createdBy'),
+      Project.findById(project).select('projectNumber organization name teamMembers createdBy isBillableByDefault'),
       PermissionService.hasPermission(userId, Permission.TASK_CREATE, project)
     ])
 
@@ -443,7 +444,10 @@ export async function POST(request: NextRequest) {
       labels: sanitizeLabels(labels),
       subtasks: sanitizeSubtasks(subtasks),
       attachments: sanitizeAttachments(attachments, userId),
-      position: nextPosition
+      position: nextPosition,
+      isBillable: typeof isBillable === 'boolean'
+        ? isBillable
+        : (projectDoc as any)?.isBillableByDefault ?? true
     })
 
     // Save task and prepare response data in parallel where possible

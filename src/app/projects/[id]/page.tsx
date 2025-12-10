@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -64,6 +64,7 @@ import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { TestSuiteForm } from '@/components/test-management/TestSuiteForm'
 import { TestCaseForm } from '@/components/test-management/TestCaseForm'
 import { ProjectTeamTab } from '@/components/projects/ProjectTeamTab'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 
 interface Project {
   _id: string
@@ -83,6 +84,7 @@ interface Project {
 
       materials: number
       overhead: number
+      external: number
     }
   }
   createdBy: {
@@ -161,6 +163,7 @@ export default function ProjectDetailPage() {
   const activeTab = searchParams.get('tab') || 'overview'
   const { organization } = useOrganization()
   const orgCurrency = organization?.currency || 'USD'
+  const { formatCurrency } = useOrgCurrency()
 
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
@@ -208,6 +211,10 @@ export default function ProjectDetailPage() {
   const settingsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [expenseSuccess, setExpenseSuccess] = useState('')
   const expenseSuccessTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const totalExpenses = useMemo(
+    () => expenses.reduce((sum, exp) => sum + (exp.fullAmount || 0), 0),
+    [expenses]
+  )
 
   useEffect(() => {
     if (projectId) {
@@ -694,19 +701,19 @@ export default function ProjectDetailPage() {
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-muted-foreground">Total Budget</span>
                           <span className="text-sm font-semibold text-foreground">
-                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.total)}
+                            {formatCurrency(project.budget.total, orgCurrency)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-muted-foreground">Spent</span>
                           <span className="text-sm text-foreground">
-                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.spent)}
+                            {formatCurrency(project.budget.spent, orgCurrency)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-muted-foreground">Remaining</span>
                           <span className="text-sm text-foreground">
-                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.total - project.budget.spent)}
+                            {formatCurrency(project.budget.total - project.budget.spent, orgCurrency)}
                           </span>
                         </div>
                       </div>
@@ -715,15 +722,44 @@ export default function ProjectDetailPage() {
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
                             <span>Materials</span>
-                            <span>{new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.categories.materials || 0)}</span>
-                          </div>
-                          <div className="flex items-center justify-between text-sm">
-                            <span>Materials</span>
-                            <span>{new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.categories.materials)}</span>
+                            <span>{formatCurrency(project.budget.categories.materials || 0, orgCurrency)}</span>
                           </div>
                           <div className="flex items-center justify-between text-sm">
                             <span>Overhead</span>
-                            <span>{new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.categories.overhead)}</span>
+                            <span>{formatCurrency(project.budget.categories.overhead || 0, orgCurrency)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span>External</span>
+                            <span>{formatCurrency(project.budget.categories.external || 0, orgCurrency)}</span>
+                          </div>
+                        </div>
+                        <div className="pt-3 border-t">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-muted-foreground">Expenses</span>
+                            <span className="text-sm font-semibold">
+                              {formatCurrency(totalExpenses || 0, orgCurrency)}
+                            </span>
+                          </div>
+                          <div className="mt-2 space-y-2">
+                            {(expenses || []).slice(0, 3).map((expense) => (
+                              <div
+                                key={expense._id}
+                                className="flex items-center justify-between text-sm text-muted-foreground"
+                              >
+                                <span className="truncate max-w-[65%]" title={expense.name || 'Expense'}>
+                                  {expense.name || 'Expense'}
+                                </span>
+                                <span>{formatCurrency(expense.fullAmount || 0, orgCurrency)}</span>
+                              </div>
+                            ))}
+                            {(!expenses || expenses.length === 0) && (
+                              <div className="text-sm text-muted-foreground">No expenses added yet</div>
+                            )}
+                            {expenses && expenses.length > 3 && (
+                              <div className="text-xs text-muted-foreground">
+                                + {expenses.length - 3} more expense{expenses.length - 3 === 1 ? '' : 's'}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

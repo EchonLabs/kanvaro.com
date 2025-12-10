@@ -170,7 +170,8 @@ export async function POST(request: NextRequest) {
       customFields,
       attachments,
       externalLinks,
-      isDraft
+      isDraft,
+      isBillableByDefault
     } = requestBody
     
     // Debug: Log externalLinks to see what we're receiving
@@ -255,6 +256,7 @@ export async function POST(request: NextRequest) {
         description,
         status: status || 'planning',
         isDraft: isDraft || false,
+        isBillableByDefault: isBillableByDefault !== undefined ? Boolean(isBillableByDefault) : true,
         is_deleted: false, // Ensure new projects are not deleted
         organization: organizationId,
         createdBy: userId,

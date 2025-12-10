@@ -6,9 +6,14 @@ export interface IProject extends Document {
   status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   isDraft: boolean
+  isBillableByDefault: boolean
   organization: mongoose.Types.ObjectId
   createdBy: mongoose.Types.ObjectId
   teamMembers: mongoose.Types.ObjectId[]
+  memberRates?: Array<{
+    user: mongoose.Types.ObjectId
+    hourlyRate: number
+  }>
   client?: mongoose.Types.ObjectId
   projectNumber: number
   // Project-specific roles for team members
@@ -97,6 +102,11 @@ const ProjectSchema = new Schema<IProject>({
   createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   projectNumber: { type: Number, required: true },
   teamMembers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+  isBillableByDefault: { type: Boolean, default: true },
+  memberRates: [{
+    user: { type: Schema.Types.ObjectId, ref: 'User' },
+    hourlyRate: Number
+  }],
   client: { type: Schema.Types.ObjectId, ref: 'User' },
   // Project-specific roles
   projectRoles: [{
@@ -120,6 +130,7 @@ const ProjectSchema = new Schema<IProject>({
       overhead: { type: Number, default: 0 },
       external: { type: Number, default: 0 }
     },
+    defaultHourlyRate: { type: Number, default: 0 },
     lastUpdated: { type: Date, default: Date.now },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User' }
   },
