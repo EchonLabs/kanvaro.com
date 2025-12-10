@@ -47,12 +47,7 @@ export interface ITask extends Document {
     uploadedBy: mongoose.Types.ObjectId
     uploadedAt: Date
   }[]
-  comments: {
-    content: string
-    author: mongoose.Types.ObjectId
-    createdAt: Date
-    updatedAt: Date
-  }[]
+
   subtasks: ITaskSubtask[]
   archived: boolean
   position: number
@@ -213,12 +208,6 @@ const TaskSchema = new Schema<ITask>({
     type: { type: String, required: true },
     uploadedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     uploadedAt: { type: Date, default: Date.now }
-  }],
-  comments: [{
-    content: { type: String, required: true, maxlength: 1000 },
-    author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
   }],
   subtasks: {
     type: [SubtaskSchema],
