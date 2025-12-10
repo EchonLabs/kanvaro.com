@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -25,6 +26,7 @@ interface TestPlan {
 }
 
 export default function TestPlansPage() {
+  const { setItems } = useBreadcrumb()
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [testPlanDialogOpen, setTestPlanDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -35,6 +37,14 @@ export default function TestPlansPage() {
   const [testPlans, setTestPlans] = useState<TestPlan[]>([])
   const [plansLoading, setPlansLoading] = useState(false)
   const [refreshCounter, setRefreshCounter] = useState(0)
+
+  useEffect(() => {
+    // Set breadcrumb
+    setItems([
+      { label: 'Test Management', href: '/test-management' },
+      { label: 'Test Plans' }
+    ])
+  }, [setItems])
 
   // Helper to fetch the first available project id when none is selected
   const getFirstProjectId = async (): Promise<string | null> => {

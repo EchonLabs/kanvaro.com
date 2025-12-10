@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef, ChangeEvent } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -235,6 +236,7 @@ export default function EditTaskPage() {
   const router = useRouter()
   const params = useParams()
   const taskId = params.id as string
+  const { setItems } = useBreadcrumb()
 
   const [task, setTask] = useState<TaskFormState | null>(null)
   const [originalTask, setOriginalTask] = useState<TaskFormState | null>(null)
@@ -276,6 +278,12 @@ export default function EditTaskPage() {
   }, [setTask])
 
   const fetchTask = useCallback(async () => {
+    // Set breadcrumb
+    setItems([
+      { label: 'Tasks', href: '/tasks' },
+      { label: 'Edit Task' }
+    ])
+    
     try {
       setLoading(true)
       const res = await fetch(`/api/tasks/${taskId}`)

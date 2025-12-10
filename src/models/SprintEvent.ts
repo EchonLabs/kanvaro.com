@@ -54,7 +54,7 @@ export interface ISprintEvent extends Document {
     reminderTime?: 'none' | '10mins' | '30mins' | '1hour' | '24hours'
     emailReminder1Day?: boolean // Send email 1 day before at 8 AM
     notificationReminder1Hour?: boolean // Send notification 1 hour before
-    notificationReminder5Min?: boolean // Send notification 5 minutes before
+    notificationReminder15Min?: boolean // Send notification 15 minutes before
   }
   // Track which reminders have been sent
   remindersSent?: {
@@ -186,13 +186,13 @@ const SprintEventSchema = new Schema<ISprintEvent>({
     },
     emailReminder1Day: { type: Boolean, default: true },
     notificationReminder1Hour: { type: Boolean, default: true },
-    notificationReminder5Min: { type: Boolean, default: true }
+    notificationReminder15Min: { type: Boolean, default: true }
   },
   // Track which reminders have been sent
   remindersSent: {
     email1Day: { type: Boolean, default: false },
     notification1Hour: { type: Boolean, default: false },
-    notification5Min: { type: Boolean, default: false }
+    notification15Min: { type: Boolean, default: false }
   }
 }, {
   timestamps: true

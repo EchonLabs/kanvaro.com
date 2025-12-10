@@ -43,13 +43,6 @@ interface CustomRole {
   description: string
 }
 
-interface PartnerOption {
-  _id: string
-  firstName: string
-  lastName: string
-  email: string
-}
-
 interface EditMemberModalProps {
   member: Member
   onClose: () => void
@@ -64,16 +57,11 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
     role: member.role,
     customRoleId: member.customRole?._id || '',
     isActive: member.isActive,
-    projectManagerId: member.projectManager?._id || '',
-    humanResourcePartnerId: member.humanResourcePartner?._id || '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([])
   const [rolesLoading, setRolesLoading] = useState(true)
-  const [projectManagers, setProjectManagers] = useState<PartnerOption[]>([])
-  const [hrPartners, setHrPartners] = useState<PartnerOption[]>([])
-  const [partnersLoading, setPartnersLoading] = useState(false)
   
   // Check if current member is admin/HR or if user is trying to change role to admin/HR
   const isAdminMember = member.role === 'admin' || member.role === 'human_resource'
@@ -82,7 +70,6 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
 
   useEffect(() => {
     fetchCustomRoles()
-    fetchPartnerCandidates()
   }, [])
 
   const fetchCustomRoles = async () => {
@@ -103,31 +90,6 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
     }
   }
 
-  const fetchPartnerCandidates = async () => {
-    try {
-      setPartnersLoading(true)
-
-      const [pmRes, hrRes] = await Promise.all([
-        fetch('/api/members?role=project_manager&status=active&limit=1000'),
-        fetch('/api/members?role=human_resource&status=active&limit=1000')
-      ])
-
-      const pmData = await pmRes.json()
-      const hrData = await hrRes.json()
-
-      if (pmData.success && pmData.data?.members) {
-        setProjectManagers(pmData.data.members)
-      }
-
-      if (hrData.success && hrData.data?.members) {
-        setHrPartners(hrData.data.members)
-      }
-    } catch (err) {
-      console.error('Failed to fetch partner candidates:', err)
-    } finally {
-      setPartnersLoading(false)
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -136,15 +98,6 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
     if (!formData.firstName || !formData.lastName) {
       setError('First name and last name are required')
       return
-    }
-
-    // For non-admin and non-HR roles, require both partners
-    // Admin and HR roles don't need partners assigned since they ARE the managers
-    if (formData.role !== 'admin' && formData.role !== 'human_resource') {
-      if (!formData.projectManagerId || !formData.humanResourcePartnerId) {
-        setError('Project Manager and Human Resource Partner are required for this role')
-        return
-      }
     }
 
     // Prevent role change to admin if user doesn't have permission
@@ -167,8 +120,6 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
         lastName: formData.lastName,
         role: formData.role,
         isActive: formData.isActive,
-        projectManager: formData.projectManagerId || null,
-        humanResourcePartner: formData.humanResourcePartnerId || null
       })
 
       // Update custom role if changed
@@ -273,18 +224,7 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
                     setError('You do not have permission to assign admin or HR role')
                     return
                   }
-                  // Clear partner assignments when changing to admin or HR roles
-                  // since these roles don't need partners
-                  if (value === 'admin' || value === 'human_resource') {
-                    setFormData(prev => ({ 
-                      ...prev, 
-                      role: value,
-                      projectManagerId: '',
-                      humanResourcePartnerId: ''
-                    }))
-                  } else {
-                    setFormData(prev => ({ ...prev, role: value }))
-                  }
+                  setFormData(prev => ({ ...prev, role: value }))
                   setError('') // Clear error when valid selection is made
                 }}
                 disabled={isAdminMember && !canEditAdminUsers}
@@ -342,71 +282,6 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
               </p>
             </div>
 
-            {/* Project Manager partner - hide for admin and HR roles */}
-            {formData.role !== 'admin' && formData.role !== 'human_resource' && (
-              <div className="space-y-2">
-                <Label htmlFor="projectManager">Project Manager</Label>
-                <Select
-                  value={formData.projectManagerId || ''}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, projectManagerId: value }))}
-                  disabled={partnersLoading}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a project manager" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {partnersLoading ? (
-                      <SelectItem value="loading" disabled>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        Loading project managers...
-                      </SelectItem>
-                    ) : (
-                      projectManagers.map(pm => (
-                        <SelectItem key={pm._id} value={pm._id}>
-                        {pm.firstName} {pm.lastName} ({pm.email})
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Assign a project manager responsible for this member&apos;s work.
-              </p>
-              </div>
-            )}
-
-            {/* Human Resource partner - hide for admin and HR roles */}
-            {formData.role !== 'admin' && formData.role !== 'human_resource' && (
-              <div className="space-y-2">
-                <Label htmlFor="humanResourcePartner">Human Resource Partner</Label>
-                <Select
-                  value={formData.humanResourcePartnerId || ''}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, humanResourcePartnerId: value }))}
-                  disabled={partnersLoading}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a human resource partner" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {partnersLoading ? (
-                      <SelectItem value="loading" disabled>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        Loading HR partners...
-                      </SelectItem>
-                    ) : (
-                      hrPartners.map(hr => (
-                        <SelectItem key={hr._id} value={hr._id}>
-                          {hr.firstName} {hr.lastName} ({hr.email})
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Assign a human resource partner for onboarding, feedback, and HR support.
-                </p>
-              </div>
-            )}
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="space-y-0.5 flex-1 min-w-0">

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { 
   ArrowLeft,
   Calendar,
@@ -106,6 +107,7 @@ export default function TaskDetailPage() {
   const router = useRouter()
   const params = useParams()
   const taskId = params.id as string
+  const { setItems } = useBreadcrumb()
   
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
@@ -147,6 +149,14 @@ export default function TaskDetailPage() {
   }, [router, taskId])
 
   useEffect(() => {
+    // Set breadcrumb immediately on mount
+    setItems([
+      { label: 'Tasks', href: '/tasks' },
+      { label: 'View Task' }
+    ])
+  }, [setItems])
+
+  useEffect(() => {
     checkAuth()
   }, [checkAuth])
 
@@ -158,6 +168,11 @@ export default function TaskDetailPage() {
 
       if (data.success) {
         setTask(data.data)
+        // Ensure breadcrumb is set
+        setItems([
+          { label: 'Tasks', href: '/tasks' },
+          { label: 'View Task' }
+        ])
       } else {
         setError(data.error || 'Failed to fetch task')
       }
@@ -282,9 +297,9 @@ export default function TaskDetailPage() {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <p className="text-destructive mb-4">{error || 'Task not found'}</p>
-            <Button onClick={() => router.push('/tasks')}>
+            <Button onClick={() => router.back()}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Tasks
+              Back
             </Button>
           </div>
         </div>

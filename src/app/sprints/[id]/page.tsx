@@ -34,7 +34,9 @@ import {
   List,
   PauseCircle,
   Gauge,
-  Zap
+  Zap,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react'
 
 interface Sprint {
@@ -195,6 +197,20 @@ export default function SprintDetailPage() {
   const [availableSprintsLoading, setAvailableSprintsLoading] = useState(false)
   const [selectedTargetSprintId, setSelectedTargetSprintId] = useState('')
   const [completeError, setCompleteError] = useState('')
+  const [incompleteTasks, setIncompleteTasks] = useState<Array<{
+    _id: string
+    title: string
+    status: string
+    subtasks?: Array<{
+      _id?: string
+      title: string
+      description?: string
+      status: string
+      isCompleted: boolean
+    }>
+  }>>([])
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
   const [newSprintForm, setNewSprintForm] = useState({
     name: '',
     startDate: '',
@@ -264,7 +280,74 @@ export default function SprintDetailPage() {
     [projectStatusOptions]
   )
 
-  const incompleteTasks = useMemo(
+  const toggleTaskExpansion = (taskId: string) => {
+    setExpandedTasks(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(taskId)) {
+        newSet.delete(taskId)
+      } else {
+        newSet.add(taskId)
+      }
+      return newSet
+    })
+  }
+
+  const getIncompleteSubtasks = (task: typeof incompleteTasks[0]) => {
+    if (!task.subtasks || !Array.isArray(task.subtasks)) return []
+    return task.subtasks.filter((subtask: any) => {
+      const status = subtask.status || 'backlog'
+      return status !== 'done' && status !== 'completed' && !subtask.isCompleted
+    })
+  }
+
+  const TASK_STATUS_BADGE_MAP: Record<string, string> = {
+    backlog: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200',
+    todo: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+    in_progress: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+    review: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+    testing: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+    blocked: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+    done: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+    completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+    cancelled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+  }
+
+  const checkSprintForIncompleteTasks = async (sprintId: string): Promise<Array<{
+    _id: string
+    title: string
+    status: string
+    subtasks?: Array<{
+      _id?: string
+      title: string
+      description?: string
+      status: string
+      isCompleted: boolean
+    }>
+  }>> => {
+    try {
+      const response = await fetch(`/api/sprints/${sprintId}`)
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        return []
+      }
+
+      const tasks = data.data?.tasks || []
+      return tasks
+        .filter((task: any) => !['done', 'completed'].includes(task.status))
+        .map((task: any) => ({
+          _id: task._id,
+          title: task.title,
+          status: task.status,
+          subtasks: Array.isArray(task.subtasks) ? task.subtasks : []
+        }))
+    } catch (err) {
+      console.error('Failed to check sprint tasks:', err)
+      return []
+    }
+  }
+
+  const incompleteTasksList = useMemo(
     () => sprintTasks.filter(task => !['done', 'completed'].includes(task.status)),
     [sprintTasks]
   )
@@ -314,11 +397,16 @@ export default function SprintDetailPage() {
   const isCompleteConfirmDisabled = useMemo(() => {
     if (completingSprint) return true
     if (!incompleteTasks.length) return false
+
+    // If no tasks are selected, allow completion (will move all to backlog)
+    if (selectedTaskIds.size === 0) return false
+
+    // If tasks are selected, require destination selection
     if (completionMode === 'existing') {
       return !selectedTargetSprintId
     }
     return !newSprintForm.name || !newSprintForm.startDate || !newSprintForm.endDate
-  }, [completingSprint, incompleteTasks.length, completionMode, selectedTargetSprintId, newSprintForm])
+  }, [completingSprint, incompleteTasks.length, completionMode, selectedTargetSprintId, newSprintForm, selectedTaskIds.size])
 
   const fetchSprint = useCallback(async (options?: { silent?: boolean }) => {
     try {
@@ -378,7 +466,7 @@ export default function SprintDetailPage() {
     checkAuth()
   }, [checkAuth])
 
-  const loadAvailableSprints = useCallback(async () => {
+  const loadAvailableSprints = useCallback(async (excludeSprintId: string) => {
     try {
       setAvailableSprintsLoading(true)
       const response = await fetch('/api/sprints?limit=200')
@@ -391,7 +479,7 @@ export default function SprintDetailPage() {
       const sprintList: SprintOption[] = Array.isArray(data.data) ? data.data : []
       const filtered = sprintList.filter(
         sprintOption =>
-          sprintOption._id !== sprintId && ['planning', 'active'].includes(sprintOption.status)
+          sprintOption._id !== excludeSprintId && ['planning', 'active'].includes(sprintOption.status)
       )
 
       setAvailableSprints(filtered)
@@ -402,30 +490,19 @@ export default function SprintDetailPage() {
     } finally {
       setAvailableSprintsLoading(false)
     }
-  }, [sprintId])
+  }, [])
 
   useEffect(() => {
-    if (!completeModalOpen) return
-
-    setCompleteError('')
-    setCompletionMode('existing')
-    setSelectedTargetSprintId('')
-
-    const baseStart = sprint?.endDate ? new Date(sprint.endDate) : new Date()
-    const startDate = formatDateInputValue(baseStart)
-    const endDateObj = new Date(baseStart)
-    endDateObj.setDate(endDateObj.getDate() + 14)
-    const endDate = formatDateInputValue(endDateObj)
-
-    setNewSprintForm({
-      name: sprint ? `${sprint.name} - Next Sprint` : '',
-      startDate,
-      endDate,
-      capacity: sprint?.capacity ? String(sprint.capacity) : ''
-    })
-
-    loadAvailableSprints()
-  }, [completeModalOpen, sprint, loadAvailableSprints])
+    if (!completeModalOpen) {
+      setCompleteError('')
+      setSelectedTargetSprintId('')
+      setCompletionMode('existing')
+      setIncompleteTasks([])
+      setSelectedTaskIds(new Set())
+      setExpandedTasks(new Set())
+      return
+    }
+  }, [completeModalOpen])
 
   const handleDelete = async () => {
     try {
@@ -464,30 +541,104 @@ export default function SprintDetailPage() {
     }
   }
 
-  const finalizeCompleteSprint = async (targetSprintId?: string) => {
+  const finalizeCompleteSprint = async (targetSprintId?: string, newSprintData?: Sprint) => {
     const options: RequestInit = { method: 'POST' }
-    if (targetSprintId) {
+    if (targetSprintId || selectedTaskIds.size > 0) {
       options.headers = { 'Content-Type': 'application/json' }
-      options.body = JSON.stringify({ targetSprintId })
+      options.body = JSON.stringify({
+        targetSprintId,
+        selectedTaskIds: Array.from(selectedTaskIds)
+      })
     }
 
     const res = await fetch(`/api/sprints/${sprintId}/complete`, options)
     const data = await res.json().catch(() => ({}))
 
     if (!res.ok || !data.success) {
+      // If there are incomplete subtasks, format the error message
+      if (data.incompleteSubtasks && Array.isArray(data.incompleteSubtasks)) {
+        const taskList = data.incompleteSubtasks
+          .map((item: any) => `"${item.taskTitle}" (${item.incompleteSubtasks.length} incomplete)`)
+          .join(', ')
+        throw new Error(`Cannot complete sprint. Tasks with incomplete sub-tasks: ${taskList}`)
+      }
       throw new Error(data.error || 'Failed to complete sprint')
     }
 
     setSuccessMessage('Sprint completed successfully.')
     setCompleteModalOpen(false)
+    setIncompleteTasks([])
+    setSelectedTaskIds(new Set())
+    setSelectedTargetSprintId('')
+    setCompleteError('')
+    setExpandedTasks(new Set())
     await fetchSprint({ silent: true })
   }
 
   const handleCompleteSprintClick = async () => {
     if (!sprint) return
 
-    if (incompleteTasks.length > 0) {
+    const incomplete = await checkSprintForIncompleteTasks(sprintId)
+
+    if (incomplete.length > 0) {
+      setIncompleteTasks(incomplete)
+      // Initialize all tasks as selected by default
+      setSelectedTaskIds(new Set(incomplete.map(task => task._id)))
       setCompleteModalOpen(true)
+      await loadAvailableSprints(sprintId)
+
+      const baseStart = sprint.endDate ? new Date(sprint.endDate) : new Date()
+      const startDate = formatDateInputValue(baseStart)
+      const endDateObj = new Date(baseStart)
+      endDateObj.setDate(endDateObj.getDate() + 14)
+      const endDate = formatDateInputValue(endDateObj)
+
+      // Determine next sprint number
+      const currentSprintName = sprint.name
+      const sprintNumberMatch = currentSprintName.match(/Sprint (\d+)/)
+      let nextSprintNumber = 1
+
+      if (sprintNumberMatch) {
+        nextSprintNumber = parseInt(sprintNumberMatch[1]) + 1
+      } else {
+        // If current sprint doesn't follow "Sprint X" pattern, get total count
+        try {
+          const countResponse = await fetch('/api/sprints?countOnly=true')
+          const countData = await countResponse.json()
+          if (countData.success) {
+            nextSprintNumber = countData.count + 1
+          }
+        } catch (err) {
+          console.error('Failed to get sprint count:', err)
+        }
+      }
+
+      const nextSprintName = `Sprint ${nextSprintNumber}`
+
+      // Check if next sprint already exists
+      const allSprintsResponse = await fetch('/api/sprints?limit=200')
+      const allSprintsData = await allSprintsResponse.json()
+
+      if (allSprintsData.success) {
+        const allSprintsList = allSprintsData.data || []
+        const nextSprint = allSprintsList.find((s: Sprint) => s.name === nextSprintName)
+
+        if (nextSprint && ['planning', 'active'].includes(nextSprint.status)) {
+          // Next sprint exists - auto-select it
+          setSelectedTargetSprintId(nextSprint._id)
+          setCompletionMode('existing')
+        } else {
+          // Next sprint doesn't exist - pre-fill create form
+          setCompletionMode('new')
+        }
+      }
+
+      setNewSprintForm({
+        name: nextSprintName,
+        startDate,
+        endDate,
+        capacity: sprint.capacity ? String(sprint.capacity) : ''
+      })
       return
     }
 
@@ -507,6 +658,19 @@ export default function SprintDetailPage() {
       try {
         setCompletingSprint(true)
         await finalizeCompleteSprint()
+      } catch (err) {
+        setCompleteError(err instanceof Error ? err.message : 'Failed to complete sprint')
+      } finally {
+        setCompletingSprint(false)
+      }
+      return
+    }
+
+    // If no tasks are selected, move all to backlog
+    if (selectedTaskIds.size === 0) {
+      try {
+        setCompletingSprint(true)
+        await finalizeCompleteSprint() // No targetSprintId means move all to backlog
       } catch (err) {
         setCompleteError(err instanceof Error ? err.message : 'Failed to complete sprint')
       } finally {
@@ -543,6 +707,22 @@ export default function SprintDetailPage() {
 
     try {
       setCompletingSprint(true)
+
+      let teamMemberIds: string[] = []
+      if (sprint.teamMembers && sprint.teamMembers.length > 0) {
+        const fullSprintResponse = await fetch(`/api/sprints/${sprintId}`)
+        const fullSprintData = await fullSprintResponse.json()
+        if (fullSprintResponse.ok && fullSprintData.success) {
+          teamMemberIds = (fullSprintData.data?.teamMembers || [])
+            .map((m: any) => m._id || m)
+            .filter(Boolean)
+        } else {
+          teamMemberIds = sprint.teamMembers
+            .map((m: any) => m._id || m)
+            .filter(Boolean)
+        }
+      }
+
       const createResponse = await fetch('/api/sprints', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -554,7 +734,7 @@ export default function SprintDetailPage() {
           endDate: newSprintForm.endDate,
           goal: sprint.goal,
           capacity: Number(newSprintForm.capacity) || sprint.capacity,
-          teamMembers: sprint.teamMembers?.map(member => member._id) || []
+          teamMembers: teamMemberIds
         })
       })
 
@@ -568,7 +748,19 @@ export default function SprintDetailPage() {
         throw new Error('New sprint ID missing in response')
       }
 
-      await finalizeCompleteSprint(newSprintId)
+      // Fetch full sprint details to get all populated fields
+      const fullSprintResponse = await fetch(`/api/sprints/${newSprintId}`)
+      const fullSprintData = await fullSprintResponse.json()
+
+      let newSprint: Sprint | undefined
+      if (fullSprintResponse.ok && fullSprintData.success) {
+        newSprint = fullSprintData.data
+      } else {
+        // Fallback to the created sprint data if fetch fails
+        newSprint = createdSprint.data
+      }
+
+      await finalizeCompleteSprint(newSprintId, newSprint)
     } catch (err) {
       setCompleteError(err instanceof Error ? err.message : 'Failed to create sprint')
     } finally {
@@ -1126,6 +1318,9 @@ export default function SprintDetailPage() {
               setCompleteError('')
               setSelectedTargetSprintId('')
               setCompletionMode('existing')
+              setIncompleteTasks([])
+              setSelectedTaskIds(new Set())
+              setExpandedTasks(new Set())
               return
             }
             setCompleteModalOpen(true)
@@ -1146,22 +1341,41 @@ export default function SprintDetailPage() {
               >
                 Cancel
               </Button>
-              <Button
-                onClick={handleCompleteModalConfirm}
-                disabled={isCompleteConfirmDisabled}
-              >
-                {completingSprint ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Complete Sprint
-                  </>
-                )}
-              </Button>
+              {incompleteTasks.length > 0 && selectedTaskIds.size === 0 ? (
+                <Button
+                  onClick={handleCompleteModalConfirm}
+                  disabled={completingSprint}
+                >
+                  {completingSprint ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Move Tasks to Backlog and Complete Sprint
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleCompleteModalConfirm}
+                  disabled={isCompleteConfirmDisabled}
+                >
+                  {completingSprint ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Complete Sprint
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           }
         >
@@ -1175,133 +1389,255 @@ export default function SprintDetailPage() {
             {incompleteTasks.length > 0 ? (
               <div className="space-y-3">
                 <div>
-                  <Label className="text-sm font-medium text-foreground">
-                    Incomplete Tasks
-                  </Label>
-                  <div className="mt-2 space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {incompleteTasks.map(task => (
-                      <div key={task._id} className="rounded-md border bg-muted/40 px-3 py-2">
-                        <p className="text-sm font-medium truncate" title={task.title}>
-                          {task.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Current status: {formatTaskStatusLabel(task.status)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant={completionMode === 'existing' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      setCompletionMode('existing')
-                      setSelectedTargetSprintId('')
-                      setCompleteError('')
-                    }}
-                  >
-                    Move to Existing Sprint
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={completionMode === 'new' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      setCompletionMode('new')
-                      setCompleteError('')
-                    }}
-                  >
-                    Create New Sprint
-                  </Button>
-                </div>
-
-                {completionMode === 'existing' ? (
-                  <div className="space-y-2">
-                    <Label className="text-sm text-foreground">Select Sprint</Label>
-                    <Select
-                      value={selectedTargetSprintId}
-                      onValueChange={(value) => setSelectedTargetSprintId(value)}
-                      disabled={availableSprintsLoading || availableSprints.length === 0}
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-sm font-medium text-foreground">
+                      Incomplete Tasks
+                    </Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (selectedTaskIds.size === incompleteTasks.length) {
+                          // Deselect all
+                          setSelectedTaskIds(new Set())
+                        } else {
+                          // Select all
+                          setSelectedTaskIds(new Set(incompleteTasks.map(t => t._id)))
+                        }
+                      }}
+                      className="h-7 text-xs"
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder={availableSprintsLoading ? 'Loading...' : 'Choose sprint'} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableSprintsLoading ? (
-                          <div className="px-2 py-1 text-sm text-muted-foreground">
-                            Loading sprints...
-                          </div>
-                        ) : availableSprints.length === 0 ? (
-                          <div className="px-2 py-1 text-sm text-muted-foreground">
-                            No planning or active sprints available. Create a new sprint instead.
-                          </div>
-                        ) : (
-                          availableSprints.map(option => (
-                            <SelectItem key={option._id} value={option._id}>
-                              <div className="flex flex-col">
-                                <span className="font-medium">{option.name}</span>
-                                {option.project?.name && (
-                                  <span className="text-xs text-muted-foreground">
-                                    Project: {option.project.name}
-                                  </span>
+                      {selectedTaskIds.size === incompleteTasks.length ? 'Deselect All' : 'Select All'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Select tasks to move to the next sprint. Unselected tasks will return to backlog.
+                  </p>
+                  <div className="mt-2 space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {incompleteTasks.map(task => {
+                      const incompleteSubtasks = getIncompleteSubtasks(task)
+                      const hasIncompleteSubtasks = incompleteSubtasks.length > 0
+                      const isExpanded = expandedTasks.has(task._id)
+                      const isSelected = selectedTaskIds.has(task._id)
+
+                      return (
+                        <div key={task._id} className={`rounded-md border px-3 py-2 space-y-2 transition-colors ${isSelected ? 'bg-muted/40 border-primary/30' : 'bg-muted/20 border-muted'
+                          }`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  const newSelected = new Set(selectedTaskIds)
+                                  if (e.target.checked) {
+                                    newSelected.add(task._id)
+                                  } else {
+                                    newSelected.delete(task._id)
+                                  }
+                                  setSelectedTaskIds(newSelected)
+                                }}
+                                className="rounded flex-shrink-0 cursor-pointer"
+                              />
+                              {hasIncompleteSubtasks && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    toggleTaskExpansion(task._id)
+                                  }}
+                                  className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-all hover:scale-110 active:scale-95 p-0.5 rounded hover:bg-muted/50"
+                                  aria-label={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
+                                  title={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4 transition-transform" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4 transition-transform" />
+                                  )}
+                                </button>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate" title={task.title}>
+                                  {task.title}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Current status: {formatTaskStatusLabel(task.status)}
+                                </p>
+                                {hasIncompleteSubtasks && (
+                                  <p className="text-xs font-medium text-orange-600 dark:text-orange-400 mt-1">
+                                    {incompleteSubtasks.length} incomplete sub-task{incompleteSubtasks.length === 1 ? '' : 's'}
+                                  </p>
                                 )}
                               </div>
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                            </div>
+                          </div>
+
+                          {isExpanded && hasIncompleteSubtasks && (
+                            <div className="ml-6 space-y-2 border-l-2 border-primary/20 dark:border-primary/30 pl-3 pt-1 overflow-hidden transition-all duration-300 ease-in-out">
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                                Incomplete Sub-tasks
+                              </p>
+                              <div className="space-y-2">
+                                {incompleteSubtasks.map((subtask: any, index: number) => (
+                                  <div
+                                    key={subtask._id || `subtask-${index}`}
+                                    className="rounded-md border p-2.5 space-y-1.5 transition-all hover:shadow-sm bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800"
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex items-start gap-2 flex-1 min-w-0">
+                                        <AlertTriangle className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-xs font-medium text-foreground" title={subtask.title}>
+                                            {subtask.title}
+                                          </p>
+                                          {subtask.description && (
+                                            <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                                              {subtask.description}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <Badge
+                                        className={`${TASK_STATUS_BADGE_MAP[subtask.status] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                                          } text-[10px] flex-shrink-0`}
+                                      >
+                                        {formatTaskStatusLabel(subtask.status)}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
+                </div>
+
+                {selectedTaskIds.size === 0 ? (
+                  // No tasks selected - show "Move to Backlog" option
+                   
+                    <p className="text-xs text-muted-foreground">
+                      All incomplete tasks will be moved to the backlog.
+                    </p>
                 ) : (
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      <Label className="text-sm text-foreground">Sprint Name</Label>
-                      <Input
-                        value={newSprintForm.name}
-                        onChange={(event) =>
-                          setNewSprintForm(prev => ({ ...prev, name: event.target.value }))
-                        }
-                        placeholder="Sprint name"
-                      />
+                  // Some tasks selected - show existing/new sprint options
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant={completionMode === 'existing' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => {
+                          setCompletionMode('existing')
+                          setSelectedTargetSprintId('')
+                          setCompleteError('')
+                        }}
+                      >
+                        Move to Next Sprint
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={completionMode === 'new' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => {
+                          setCompletionMode('new')
+                          setCompleteError('')
+                        }}
+                      >
+                        Create New Sprint
+                      </Button>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-sm text-foreground">Start Date</Label>
-                        <Input
-                          type="date"
-                          value={newSprintForm.startDate}
-                          onChange={(event) =>
-                            setNewSprintForm(prev => ({ ...prev, startDate: event.target.value }))
-                          }
-                        />
+
+                    {completionMode === 'existing' ? (
+                      <div className="space-y-2">
+                        <Label className="text-sm text-foreground">Select Sprint</Label>
+                        <Select
+                          value={selectedTargetSprintId}
+                          onValueChange={(value) => setSelectedTargetSprintId(value)}
+                          disabled={availableSprintsLoading || availableSprints.length === 0}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder={availableSprintsLoading ? 'Loading...' : 'Choose sprint'} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableSprintsLoading ? (
+                              <div className="px-2 py-1 text-sm text-muted-foreground">
+                                Loading sprints...
+                              </div>
+                            ) : availableSprints.length === 0 ? (
+                              <div className="px-2 py-1 text-sm text-muted-foreground">
+                                No planning or active sprints available. Create a new sprint instead.
+                              </div>
+                            ) : (
+                              availableSprints.map(option => (
+                                <SelectItem key={option._id} value={option._id}>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{option.name}</span>
+                                    {option.project?.name && (
+                                      <span className="text-xs text-muted-foreground">
+                                        Project: {option.project.name}
+                                      </span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <div className="space-y-1">
-                        <Label className="text-sm text-foreground">End Date</Label>
-                        <Input
-                          type="date"
-                          value={newSprintForm.endDate}
-                          onChange={(event) =>
-                            setNewSprintForm(prev => ({ ...prev, endDate: event.target.value }))
-                          }
-                        />
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <Label className="text-sm text-foreground">Sprint Name</Label>
+                          <Input
+                            value={newSprintForm.name}
+                            onChange={(event) =>
+                              setNewSprintForm(prev => ({ ...prev, name: event.target.value }))
+                            }
+                            placeholder="Sprint name"
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-sm text-foreground">Start Date</Label>
+                            <Input
+                              type="date"
+                              value={newSprintForm.startDate}
+                              onChange={(event) =>
+                                setNewSprintForm(prev => ({ ...prev, startDate: event.target.value }))
+                              }
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-sm text-foreground">End Date</Label>
+                            <Input
+                              type="date"
+                              value={newSprintForm.endDate}
+                              onChange={(event) =>
+                                setNewSprintForm(prev => ({ ...prev, endDate: event.target.value }))
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-sm text-foreground">Capacity (hours)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={newSprintForm.capacity}
+                            onChange={(event) =>
+                              setNewSprintForm(prev => ({ ...prev, capacity: event.target.value }))
+                            }
+                            placeholder="Team capacity"
+                          />
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-sm text-foreground">Capacity (hours)</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={newSprintForm.capacity}
-                        onChange={(event) =>
-                          setNewSprintForm(prev => ({ ...prev, capacity: event.target.value }))
-                        }
-                        placeholder="Team capacity"
-                      />
-                    </div>
-                  </div>
+                    )}
+                  </>
                 )}
               </div>
             ) : (

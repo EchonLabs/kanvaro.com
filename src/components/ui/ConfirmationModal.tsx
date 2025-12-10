@@ -82,10 +82,14 @@ export function ConfirmationModal({
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         className={cn(
-          "w-full max-w-md flex flex-col max-h-[90vh] bg-card text-card-foreground shadow-2xl transition-all duration-200 ease-out",
+          "w-full max-w-md flex flex-col max-h-[90vh] bg-card text-card-foreground shadow-2xl transition-all duration-200 ease-out pointer-events-auto",
           isDestructive && 'border-destructive/60 bg-red-50 text-red-900 dark:bg-red-900 dark:text-red-100'
         )}
-        onClick={event => event.stopPropagation()}
+        onClick={event => {
+          event.stopPropagation()
+          event.preventDefault()
+        }}
+        onMouseDown={event => event.stopPropagation()}
       >
         <CardHeader className="flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -110,15 +114,25 @@ export function ConfirmationModal({
             <Button
               ref={initialButtonRef}
               variant="outline"
-              onClick={onClose}
+              onClick={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+                onClose()
+              }}
               disabled={isLoading}
+              className="pointer-events-auto"
             >
               {cancelText}
             </Button>
             <Button
               variant={isDestructive ? 'destructive' : 'default'}
-              onClick={onConfirm}
+              onClick={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+                onConfirm()
+              }}
               disabled={isLoading}
+              className="pointer-events-auto"
             >
               {isLoading ? 'Processing...' : confirmText}
             </Button>

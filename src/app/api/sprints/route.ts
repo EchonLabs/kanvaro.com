@@ -65,6 +65,16 @@ export async function GET(request: NextRequest) {
       sprintQueryFilters.project = projectFilter
     }
 
+    // Check if only count is requested
+    const countOnly = searchParams.get('countOnly') === 'true'
+    if (countOnly) {
+      const total = await Sprint.countDocuments(sprintQueryFilters)
+      return NextResponse.json({
+        success: true,
+        count: total
+      })
+    }
+
     const PAGE_SIZE = Math.min(limit, 100)
 
     // Fetch sprints

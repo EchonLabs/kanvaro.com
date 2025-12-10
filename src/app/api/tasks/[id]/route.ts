@@ -387,6 +387,16 @@ export async function PUT(
       }
     }
 
+    // Normalize sprint field - handle null, undefined, empty string
+    if (Object.prototype.hasOwnProperty.call(updateData, 'sprint')) {
+      if (updateData.sprint === null || updateData.sprint === undefined || updateData.sprint === '') {
+        updateData.sprint = null
+      } else if (typeof updateData.sprint === 'string') {
+        const trimmed = updateData.sprint.trim()
+        updateData.sprint = trimmed.length > 0 ? trimmed : null
+      }
+    }
+
     // Check if user has permission to edit all tasks
     const [hasTaskEditAll, hasProjectViewAll] = await Promise.all([
       PermissionService.hasPermission(userId, Permission.TASK_EDIT_ALL),
@@ -548,15 +558,29 @@ export async function PUT(
       try {
         // Synchronize sprint tasks array if sprint changed
         if (Object.prototype.hasOwnProperty.call(updateData, 'sprint')) {
-          const newSprintId = updateData.sprint
+          // Normalize newSprintId - null/undefined/empty means moving to backlog
+          const newSprintId = (updateData.sprint === null || updateData.sprint === undefined || updateData.sprint === '') 
+            ? null 
+            : updateData.sprint
           const oldSprintId = currentTask.sprint
 
           const updates: Promise<unknown>[] = []
 
-          if (oldSprintId && (!newSprintId || oldSprintId.toString() !== newSprintId)) {
+          // Get old sprint ID as string for comparison
+          const oldSprintIdStr = oldSprintId 
+            ? (typeof oldSprintId === 'object' && oldSprintId !== null && '_id' in oldSprintId
+                ? String(oldSprintId._id)
+                : String(oldSprintId))
+            : null
+          
+          // Get new sprint ID as string for comparison
+          const newSprintIdStr = newSprintId ? String(newSprintId) : null
+
+          // Remove task from old sprint if it exists and is different from new sprint
+          if (oldSprintIdStr && oldSprintIdStr !== newSprintIdStr) {
             updates.push(
               Sprint.findByIdAndUpdate(
-                oldSprintId,
+                oldSprintIdStr,
                 { $pull: { tasks: taskIdStr } },
                 { new: false }
               ).exec().catch(error => {
@@ -565,8 +589,9 @@ export async function PUT(
             )
           }
 
-          if (newSprintId) {
-            const sprintDocResult = await Sprint.findById(newSprintId).select('_id project').lean()
+          // Add task to new sprint if provided (not null/undefined/empty)
+          if (newSprintIdStr) {
+            const sprintDocResult = await Sprint.findById(newSprintIdStr).select('_id project').lean()
             const sprintDocResultTyped = Array.isArray(sprintDocResult) ? sprintDocResult[0] : sprintDocResult
             if (sprintDocResultTyped) {
               const sprintDoc: LeanSprint = sprintDocResultTyped as LeanSprint
@@ -580,7 +605,7 @@ export async function PUT(
               }
               updates.push(
                 Sprint.findByIdAndUpdate(
-                  newSprintId,
+                  newSprintIdStr,
                   { $addToSet: { tasks: taskIdStr } },
                   { new: false }
                 ).exec().catch(error => {
@@ -588,7 +613,7 @@ export async function PUT(
                 })
               )
             } else {
-              console.warn(`Sprint ${newSprintId} not found when updating task ${taskId}`)
+              console.warn(`Sprint ${newSprintIdStr} not found when updating task ${taskId}`)
             }
           }
 

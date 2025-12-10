@@ -68,10 +68,26 @@ export async function GET(
       totalTasks
     }
 
+    const projectData = project.toObject()
+    
+    // Ensure externalLinks always exists with proper structure
+    if (!projectData.externalLinks) {
+      projectData.externalLinks = {
+        figma: [],
+        documentation: []
+      }
+    } else {
+      // Ensure arrays exist even if undefined
+      projectData.externalLinks = {
+        figma: Array.isArray(projectData.externalLinks.figma) ? projectData.externalLinks.figma : [],
+        documentation: Array.isArray(projectData.externalLinks.documentation) ? projectData.externalLinks.documentation : []
+      }
+    }
+    
     return NextResponse.json({
       success: true,
       data: {
-        ...project.toObject(),
+        ...projectData,
         progress
       }
     })
@@ -246,6 +262,32 @@ export async function PUT(
       }
     }
     
+    // Handle attachments array
+    if (updateData.attachments !== undefined) {
+      updateObject.$set['attachments'] = updateData.attachments.map((att: any) => ({
+        name: att.name,
+        url: att.url,
+        size: att.size,
+        type: att.type,
+        uploadedBy: att.uploadedById || att.uploadedBy || userId,
+        uploadedAt: att.uploadedAt ? new Date(att.uploadedAt) : new Date()
+      }))
+    }
+    
+    // Handle externalLinks object
+    if (updateData.externalLinks !== undefined) {
+      const processedExternalLinks = {
+        figma: Array.isArray(updateData.externalLinks.figma) 
+          ? updateData.externalLinks.figma.filter((link: string) => link && link.trim()).map((link: string) => link.trim())
+          : [],
+        documentation: Array.isArray(updateData.externalLinks.documentation) 
+          ? updateData.externalLinks.documentation.filter((link: string) => link && link.trim()).map((link: string) => link.trim())
+          : []
+      }
+      updateObject.$set['externalLinks'] = processedExternalLinks
+      console.log('Updating externalLinks:', JSON.stringify(processedExternalLinks, null, 2))
+    }
+    
     // Add other top-level fields to $set (excluding fields already handled above)
     const excludedKeys = [
       'settings', 
@@ -259,7 +301,9 @@ export async function PUT(
       'customFields',
       'startDate',
       'endDate',
-      'isDraft'
+      'isDraft',
+      'attachments',
+      'externalLinks'
     ] // Already handled above
     Object.keys(updateData).forEach(key => {
       if (!excludedKeys.includes(key) && updateData[key] !== undefined) {

@@ -170,6 +170,7 @@ export async function GET(request: NextRequest) {
     const priority = searchParams.get('priority') || '';
     const type = searchParams.get('type') || '';
     const project = searchParams.get('project') || '';
+    const story = searchParams.get('story') || '';
     const assignedTo = searchParams.get('assignedTo') || '';
     const createdBy = searchParams.get('createdBy') || '';
     const dueDateFrom = searchParams.get('dueDateFrom') || '';
@@ -235,6 +236,7 @@ export async function GET(request: NextRequest) {
     if (priority) filters.priority = priority;
     if (type) filters.type = type;
     if (project) filters.project = project;
+    if (story) filters.story = story;
 
     // Date range filters
     if (dueDateFrom || dueDateTo) {

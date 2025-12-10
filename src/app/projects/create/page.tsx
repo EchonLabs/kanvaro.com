@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/Progress'
 import { useCurrencies } from '@/hooks/useCurrencies'
+import { useOrganization } from '@/hooks/useOrganization'
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -32,7 +33,14 @@ import {
   User,
   Mail,
   Shield,
-  UserPlus
+  UserPlus,
+  Paperclip,
+  Link as LinkIcon,
+  Upload,
+  File,
+  Image,
+  Trash2,
+  ExternalLink
 } from 'lucide-react'
 
 interface ProjectFormData {
@@ -52,7 +60,6 @@ interface ProjectFormData {
     total: number
     currency: string
     categories: {
-      labor: number
       materials: number
       overhead: number
     }
@@ -78,11 +85,30 @@ interface ProjectFormData {
   // Tags and Custom Fields
   tags: string[]
   customFields: Record<string, any>
+  
+  // Attachments
+  attachments: Array<{
+    name: string
+    url: string
+    size: number
+    type: string
+    uploadedAt: string
+    uploadedByName?: string
+    uploadedById?: string
+  }>
+  
+  // External Links
+  externalLinks: {
+    figma: string[]
+    documentation: string[]
+  }
 }
 
 export default function CreateProjectPage() {
   const router = useRouter()
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay, error: currenciesError } = useCurrencies(true)
+  const { organization } = useOrganization()
+  const orgCurrency = organization?.currency || 'USD'
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -94,6 +120,13 @@ export default function CreateProjectPage() {
   const [showMemberSearch, setShowMemberSearch] = useState(false)
   const [showClientSearch, setShowClientSearch] = useState(false)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
+  const [attachmentError, setAttachmentError] = useState('')
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
+  const [currentUser, setCurrentUser] = useState<{ firstName: string; lastName: string; email: string; id: string } | null>(null)
+  const [newFigmaLink, setNewFigmaLink] = useState('')
+  const [newDocLink, setNewDocLink] = useState('')
+  const [isDragging, setIsDragging] = useState(false)
   
   // Edit mode state
   const searchParams = useSearchParams()
@@ -110,9 +143,8 @@ export default function CreateProjectPage() {
     endDate: '',
     budget: {
       total: 0,
-      currency: 'USD',
+      currency: orgCurrency,
       categories: {
-        labor: 0,
         materials: 0,
         overhead: 0
       }
@@ -131,7 +163,12 @@ export default function CreateProjectPage() {
       }
     },
     tags: [],
-    customFields: {}
+    customFields: {},
+    attachments: [],
+    externalLinks: {
+      figma: [],
+      documentation: []
+    }
   })
   const [budgetTotalInput, setBudgetTotalInput] = useState('0')
 
@@ -140,8 +177,9 @@ export default function CreateProjectPage() {
     { id: 2, title: 'Timeline', description: 'Start and end dates' },
     { id: 3, title: 'Budget', description: 'Budget allocation and categories' },
     { id: 4, title: 'Team', description: 'Team members and clients' },
-    { id: 5, title: 'Settings', description: 'Project settings and preferences' },
-    { id: 6, title: 'Review', description: 'Review and create project' }
+    { id: 5, title: 'Attachments', description: 'Upload files and add external links' },
+    { id: 6, title: 'Settings', description: 'Project settings and preferences' },
+    { id: 7, title: 'Review', description: 'Review and create project' }
   ]
 
   // Validate current step before proceeding
@@ -307,6 +345,19 @@ export default function CreateProjectPage() {
         delete payload.clients
       }
 
+      // Ensure externalLinks structure is correct before sending
+      if (!payload.externalLinks) {
+        payload.externalLinks = {
+          figma: [],
+          documentation: []
+        }
+      } else {
+        payload.externalLinks = {
+          figma: Array.isArray(payload.externalLinks.figma) ? payload.externalLinks.figma : [],
+          documentation: Array.isArray(payload.externalLinks.documentation) ? payload.externalLinks.documentation : []
+        }
+      }
+
       const response = await fetch(url, {
         method,
         headers: {
@@ -431,6 +482,140 @@ export default function CreateProjectPage() {
       }
     }
   }, [validationErrors, error])
+
+  // Fetch current user for attachment uploads
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await fetch('/api/auth/me')
+        if (response.ok) {
+          const data = await response.json()
+          // API returns user data directly, not wrapped in { success: true, user: ... }
+          if (data && (data.id || data._id || data.email)) {
+            setCurrentUser({
+              firstName: data.firstName || '',
+              lastName: data.lastName || '',
+              email: data.email || '',
+              id: data.id || data._id || ''
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch current user:', error)
+      }
+    }
+    fetchCurrentUser()
+  }, [])
+
+  // Helper function to get or fetch current user
+  const getCurrentUser = async () => {
+    if (currentUser) return currentUser
+    
+    try {
+      const response = await fetch('/api/auth/me')
+      if (!response.ok) {
+        console.error('Failed to fetch user, status:', response.status)
+        return null
+      }
+      
+      const data = await response.json()
+      
+      // API returns user data directly: { id, firstName, lastName, email, ... }
+      if (data && (data.id || data._id || data.email)) {
+        const user = {
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          email: data.email || '',
+          id: data.id || data._id || ''
+        }
+        setCurrentUser(user)
+        return user
+      }
+      
+      console.error('Invalid user data structure:', data)
+      return null
+    } catch (error) {
+      console.error('Failed to fetch current user:', error)
+      return null
+    }
+  }
+
+  // Handle file upload
+  const handleFileUpload = async (file: File) => {
+    if (!file) return
+
+    try {
+      setAttachmentError('')
+      setIsUploadingAttachment(true)
+
+      // Try to get user, but don't block upload if it fails
+      let user = currentUser
+      if (!user) {
+        user = await getCurrentUser()
+      }
+
+      const formDataUpload = new FormData()
+      formDataUpload.append('attachment', file)
+      
+      // Use user info if available, otherwise let the API handle it
+      if (user) {
+        const displayName = `${user.firstName} ${user.lastName}`.trim() || user.email
+        if (displayName) {
+          formDataUpload.append('uploadedByName', displayName)
+        }
+      }
+
+      const response = await fetch('/api/uploads/attachments', {
+        method: 'POST',
+        body: formDataUpload
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        let errorData
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { error: errorText || 'Failed to upload attachment' }
+        }
+        throw new Error(errorData.error || 'Failed to upload attachment')
+      }
+
+      const uploadResult = await response.json()
+      if (!uploadResult?.success) {
+        throw new Error(uploadResult.error || 'Failed to upload attachment')
+      }
+
+      const attachmentData = uploadResult.data
+      const displayName = user 
+        ? `${user.firstName} ${user.lastName}`.trim() || user.email
+        : attachmentData.uploadedByName || 'User'
+      
+      setFormData(prev => ({
+        ...prev,
+        attachments: [
+          ...prev.attachments,
+          {
+            name: attachmentData.name,
+            url: attachmentData.url,
+            size: attachmentData.size,
+            type: attachmentData.type,
+            uploadedAt: attachmentData.uploadedAt,
+            uploadedByName: attachmentData.uploadedByName || displayName,
+            uploadedById: user?.id || ''
+          }
+        ]
+      }))
+      setSuccess('File uploaded successfully')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to upload attachment'
+      setAttachmentError(errorMessage)
+      console.error('Upload error:', err)
+    } finally {
+      setIsUploadingAttachment(false)
+    }
+  }
 
   // Fetch available team members
   const fetchAvailableMembers = async () => {
@@ -592,11 +777,13 @@ export default function CreateProjectPage() {
           projectNumber: project.projectNumber,
           startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
           endDate: project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : '',
-          budget: project.budget || {
+          budget: project.budget ? {
+            ...project.budget,
+            currency: orgCurrency // Use organization currency instead of project currency
+          } : {
             total: 0,
-            currency: 'USD',
+            currency: orgCurrency,
             categories: {
-              labor: 0,
               materials: 0,
               overhead: 0
             }
@@ -615,7 +802,12 @@ export default function CreateProjectPage() {
             }
           },
           tags: project.tags || [],
-          customFields: project.customFields || {}
+          customFields: project.customFields || {},
+          attachments: project.attachments || [],
+          externalLinks: project.externalLinks || {
+            figma: [],
+            documentation: []
+          }
         })
         setBudgetTotalInput(
           typeof project.budget?.total === 'number' && !Number.isNaN(project.budget.total)
@@ -712,13 +904,14 @@ export default function CreateProjectPage() {
           setCurrentStep(targetStep)
         }
       }}>
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="1">Basic</TabsTrigger>
           <TabsTrigger value="2">Timeline</TabsTrigger>
           <TabsTrigger value="3">Budget</TabsTrigger>
           <TabsTrigger value="4">Team</TabsTrigger>
-          <TabsTrigger value="5">Settings</TabsTrigger>
-          <TabsTrigger value="6">Review</TabsTrigger>
+          <TabsTrigger value="5">Attachments</TabsTrigger>
+          <TabsTrigger value="6">Settings</TabsTrigger>
+          <TabsTrigger value="7">Review</TabsTrigger>
         </TabsList>
 
         {/* Step 1: Basic Information */}
@@ -923,37 +1116,27 @@ export default function CreateProjectPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="currency">Currency</Label>
-                  {currenciesError && (
-                    <div className="text-red-500 text-sm">Error loading currencies: {currenciesError}</div>
-                  )}
-                  <Select value={formData.budget.currency} onValueChange={(value) => setFormData(prev => ({ 
-                    ...prev, 
-                    budget: { ...prev.budget, currency: value }
-                  }))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60">
-                      {currenciesLoading ? (
-                        <SelectItem value="loading" disabled>Loading currencies...</SelectItem>
-                      ) : currencies.length === 0 ? (
-                        <SelectItem value="none" disabled>No currencies available</SelectItem>
+                  <div className="text-sm text-muted-foreground p-2 border rounded-md bg-muted">
+                    {organization?.currency ? (
+                      currencies.find(c => c.code === organization.currency) ? (
+                        formatCurrencyDisplay(currencies.find(c => c.code === organization.currency)!)
                       ) : (
-                        currencies.map((currency) => (
-                          <SelectItem key={currency.code} value={currency.code}>
-                            {formatCurrencyDisplay(currency)}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+                        organization.currency
+                      )
+                    ) : (
+                      'USD'
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Currency is set in Organization Settings
+                  </p>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <h4 className="font-medium">Budget Categories</h4>
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
+                  {/* <div className="space-y-2">
                     <Label htmlFor="labor">Labor</Label>
                     <Input
                       id="labor"
@@ -968,7 +1151,7 @@ export default function CreateProjectPage() {
                       }))}
                       placeholder="0.00"
                     />
-                  </div>
+                  </div> */}
 
                   <div className="space-y-2">
                     <Label htmlFor="materials">Materials</Label>
@@ -1254,8 +1437,385 @@ export default function CreateProjectPage() {
           </Card>
         </TabsContent>
 
-        {/* Step 5: Settings */}
+        {/* Step 5: Attachments */}
         <TabsContent value="5" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Paperclip className="h-5 w-5" />
+                Attachments & External Links
+              </CardTitle>
+              <CardDescription>
+                Upload project files and add external links (Figma, documentation, etc.)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* File Attachments Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-medium">File Attachments</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => attachmentInputRef.current?.click()}
+                    disabled={isUploadingAttachment}
+                  >
+                    {isUploadingAttachment ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload File
+                      </>
+                    )}
+                  </Button>
+                  <input
+                    ref={attachmentInputRef}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md,.jpg,.jpeg,.png,.gif,.svg,.webp,.zip,.rar,.7z"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      e.target.value = ''
+                      await handleFileUpload(file)
+                    }}
+                  />
+                </div>
+
+                {/* Drag and Drop Zone */}
+                <div
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                    isDragging
+                      ? 'border-primary bg-primary/5'
+                      : 'border-muted hover:border-primary/50'
+                  }`}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setIsDragging(true)
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setIsDragging(false)
+                  }}
+                  onDrop={async (e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setIsDragging(false)
+
+                    const files = Array.from(e.dataTransfer.files)
+                    const validFiles = files.filter(file => {
+                      const extension = file.name.split('.').pop()?.toLowerCase()
+                      const validExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'md', 'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'zip', 'rar', '7z']
+                      return extension && validExtensions.includes(extension)
+                    })
+
+                    if (validFiles.length === 0) {
+                      setAttachmentError('Please drop valid files (PDF, Word, Excel, PowerPoint, Text, CSV, Markdown, Images, or Archives)')
+                      return
+                    }
+
+                    // Upload files one by one
+                    for (const file of validFiles) {
+                      await handleFileUpload(file)
+                    }
+                  }}
+                >
+                  <Upload className={`h-12 w-12 mx-auto mb-4 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <p className="text-sm font-medium mb-2">
+                    {isDragging ? 'Drop files here' : 'Drag and drop files here'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    or click the Upload File button above
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Supports: PDF, Word, Excel, PowerPoint, Text, CSV, Markdown, Images, ZIP, RAR, 7Z (Max 25MB)
+                  </p>
+                </div>
+
+                {attachmentError && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>{attachmentError}</AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Allowed File Types Info */}
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p className="font-medium">Allowed file formats:</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="font-medium">Documents:</p>
+                      <p className="text-xs">PDF, Word (.doc, .docx), Excel (.xls, .xlsx), PowerPoint (.ppt, .pptx), Text (.txt), CSV, Markdown (.md), ZIP, RAR, 7Z</p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Images:</p>
+                      <p className="text-xs">JPEG (.jpg, .jpeg), PNG, GIF, SVG, WebP</p>
+                    </div>
+                  </div>
+                  <p className="text-xs mt-2">Maximum file size: 25MB</p>
+                </div>
+
+                {/* Attachments List */}
+                {formData.attachments.length > 0 ? (
+                  <div className="space-y-2">
+                    {formData.attachments.map((attachment, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
+                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                          {attachment.type.startsWith('image/') ? (
+                            <Image className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                          ) : (
+                            <File className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{attachment.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {(attachment.size / 1024).toFixed(2)} KB • {attachment.uploadedByName}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(attachment.url, '_blank')}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                attachments: prev.attachments.filter((_, i) => i !== index)
+                              }))
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center">
+                    <Paperclip className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">No attachments uploaded yet</p>
+                  </div>
+                )}
+              </div>
+
+              {/* External Links Section */}
+              <div className="space-y-4 pt-4 border-t">
+                <Label className="text-base font-medium">External Links</Label>
+
+                {/* Figma Links */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <LinkIcon className="h-4 w-4" />
+                    Figma Links
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="https://www.figma.com/file/..."
+                      value={newFigmaLink}
+                      onChange={(e) => setNewFigmaLink(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newFigmaLink.trim()) {
+                          e.preventDefault()
+                          const link = newFigmaLink.trim()
+                          // Ensure URL has protocol to prevent relative URL navigation
+                          const formattedLink = link.startsWith('http://') || link.startsWith('https://') 
+                            ? link 
+                            : `https://${link}`
+                          setFormData(prev => ({
+                            ...prev,
+                            externalLinks: {
+                              ...prev.externalLinks,
+                              figma: [...prev.externalLinks.figma, formattedLink]
+                            }
+                          }))
+                          setNewFigmaLink('')
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (newFigmaLink.trim()) {
+                          const link = newFigmaLink.trim()
+                          // Ensure URL has protocol to prevent relative URL navigation
+                          const formattedLink = link.startsWith('http://') || link.startsWith('https://') 
+                            ? link 
+                            : `https://${link}`
+                          setFormData(prev => ({
+                            ...prev,
+                            externalLinks: {
+                              ...prev.externalLinks,
+                              figma: [...prev.externalLinks.figma, formattedLink]
+                            }
+                          }))
+                          setNewFigmaLink('')
+                        }
+                      }}
+                      disabled={!newFigmaLink.trim()}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {formData.externalLinks.figma.length > 0 && (
+                    <div className="space-y-1">
+                      {formData.externalLinks.figma.map((link, index) => {
+                        // Ensure URL has protocol for proper external link handling
+                        const formattedLink = link.startsWith('http://') || link.startsWith('https://') 
+                          ? link 
+                          : `https://${link}`
+                        return (
+                          <div key={index} className="flex items-center justify-between p-2 border rounded-lg bg-muted/50">
+                            <a
+                              href={formattedLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-primary hover:underline flex-1 truncate"
+                            >
+                              {link}
+                            </a>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                externalLinks: {
+                                  ...prev.externalLinks,
+                                  figma: prev.externalLinks.figma.filter((_, i) => i !== index)
+                                }
+                              }))
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Documentation Links */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <LinkIcon className="h-4 w-4" />
+                    Documentation URLs
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="https://docs.example.com/..."
+                      value={newDocLink}
+                      onChange={(e) => setNewDocLink(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newDocLink.trim()) {
+                          e.preventDefault()
+                          const link = newDocLink.trim()
+                          // Ensure URL has protocol to prevent relative URL navigation
+                          const formattedLink = link.startsWith('http://') || link.startsWith('https://') 
+                            ? link 
+                            : `https://${link}`
+                          setFormData(prev => ({
+                            ...prev,
+                            externalLinks: {
+                              ...prev.externalLinks,
+                              documentation: [...prev.externalLinks.documentation, formattedLink]
+                            }
+                          }))
+                          setNewDocLink('')
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (newDocLink.trim()) {
+                          const link = newDocLink.trim()
+                          // Ensure URL has protocol to prevent relative URL navigation
+                          const formattedLink = link.startsWith('http://') || link.startsWith('https://') 
+                            ? link 
+                            : `https://${link}`
+                          setFormData(prev => ({
+                            ...prev,
+                            externalLinks: {
+                              ...prev.externalLinks,
+                              documentation: [...prev.externalLinks.documentation, formattedLink]
+                            }
+                          }))
+                          setNewDocLink('')
+                        }
+                      }}
+                      disabled={!newDocLink.trim()}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {formData.externalLinks.documentation.length > 0 && (
+                    <div className="space-y-1">
+                      {formData.externalLinks.documentation.map((link, index) => {
+                        // Ensure URL has protocol for proper external link handling
+                        const formattedLink = link.startsWith('http://') || link.startsWith('https://') 
+                          ? link 
+                          : `https://${link}`
+                        return (
+                          <div key={index} className="flex items-center justify-between p-2 border rounded-lg bg-muted/50">
+                            <a
+                              href={formattedLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-primary hover:underline flex-1 truncate"
+                            >
+                              {link}
+                            </a>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                externalLinks: {
+                                  ...prev.externalLinks,
+                                  documentation: prev.externalLinks.documentation.filter((_, i) => i !== index)
+                                }
+                              }))
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Step 6: Settings */}
+        <TabsContent value="6" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Project Settings</CardTitle>
@@ -1333,8 +1893,8 @@ export default function CreateProjectPage() {
           </Card>
         </TabsContent>
 
-        {/* Step 6: Review */}
-        <TabsContent value="6" className="space-y-6">
+        {/* Step 7: Review */}
+        <TabsContent value="7" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-3">
             {/* Project Overview */}
             <div className="lg:col-span-2 space-y-6">
@@ -1429,10 +1989,7 @@ export default function CreateProjectPage() {
                           <span className="text-sm font-medium text-muted-foreground">Total Budget</span>
                           <span className="text-sm text-foreground font-semibold">{formData.budget.currency} {formData.budget.total.toLocaleString()}</span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-muted-foreground">Labor</span>
-                          <span className="text-sm text-foreground">{formData.budget.currency} {formData.budget.categories.labor.toLocaleString()}</span>
-                        </div>
+                       
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-muted-foreground">Materials</span>
                           <span className="text-sm text-foreground">{formData.budget.currency} {formData.budget.categories.materials.toLocaleString()}</span>
@@ -1445,16 +2002,16 @@ export default function CreateProjectPage() {
                       <div className="space-y-2">
                         <div className="text-sm text-muted-foreground">Budget Distribution</div>
                         <div className="space-y-2">
-                          <div className="flex items-center justify-between text-xs">
+                          {/* <div className="flex items-center justify-between text-xs">
                             <span>Labor</span>
                             <span>{formData.budget.total > 0 ? Math.round((formData.budget.categories.labor / formData.budget.total) * 100) : 0}%</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
+                          </div> */}
+                          {/* <div className="w-full bg-gray-200 rounded-full h-2">
                             <div 
                               className="bg-blue-500 h-2 rounded-full"
                               style={{ width: `${formData.budget.total > 0 ? (formData.budget.categories.labor / formData.budget.total) * 100 : 0}%` }}
                             />
-                          </div>
+                          </div> */}
                         </div>
                       </div>
                     </div>
@@ -1662,7 +2219,7 @@ export default function CreateProjectPage() {
                     variant="ghost" 
                     size="sm" 
                     className="w-full justify-start"
-                    onClick={() => setCurrentStep(5)}
+                    onClick={() => setCurrentStep(6)}
                   >
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Back to Settings

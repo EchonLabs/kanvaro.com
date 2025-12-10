@@ -25,7 +25,6 @@ export interface IProject extends Document {
     spent: number
     currency: string
     categories: {
-      labor: number
       materials: number
       overhead: number
       external: number
@@ -61,6 +60,10 @@ export interface IProject extends Document {
     uploadedBy: mongoose.Types.ObjectId
     uploadedAt: Date
   }[]
+  externalLinks?: {
+    figma?: string[]
+    documentation?: string[]
+  }
   // Test management - versions array
   versions: {
     name: string
@@ -113,7 +116,6 @@ const ProjectSchema = new Schema<IProject>({
     spent: { type: Number, default: 0 },
     currency: { type: String, default: 'USD' },
     categories: {
-      labor: { type: Number, default: 0 },
       materials: { type: Number, default: 0 },
       overhead: { type: Number, default: 0 },
       external: { type: Number, default: 0 }
@@ -149,6 +151,10 @@ const ProjectSchema = new Schema<IProject>({
     uploadedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     uploadedAt: { type: Date, default: Date.now }
   }],
+  externalLinks: {
+    figma: { type: [String], default: [] },
+    documentation: { type: [String], default: [] }
+  },
   // Test management - versions array
   versions: [{
     name: { type: String, required: true, trim: true, maxlength: 200 },
@@ -161,7 +167,8 @@ const ProjectSchema = new Schema<IProject>({
   }],
   archived: { type: Boolean, default: false }
 }, {
-  timestamps: true
+  timestamps: true,
+  minimize: false // Prevent Mongoose from removing empty objects
 })
 
 // Indexes

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { PageWrapper } from '@/components/layout/PageWrapper'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -14,6 +15,7 @@ import { Calendar, Filter, Download } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 export default function GanttReportPage() {
+  const { setItems } = useBreadcrumb()
   const [ganttData, setGanttData] = useState<GanttData | null>(null)
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
@@ -33,6 +35,15 @@ export default function GanttReportPage() {
   const [sprintSearchQuery, setSprintSearchQuery] = useState('')
   const [assigneeSearchQuery, setAssigneeSearchQuery] = useState('')
   const router = useRouter()
+
+  useEffect(() => {
+    // Set breadcrumb
+    setItems([
+      { label: 'Reports', href: '/reports' },
+      { label: 'Project Reports', href: '/reports/project-reports' },
+      { label: 'Gantt Report' }
+    ])
+  }, [setItems])
 
   useEffect(() => {
     loadFilterOptions()
@@ -376,3 +387,4 @@ export default function GanttReportPage() {
     </MainLayout>
   )
 }
+

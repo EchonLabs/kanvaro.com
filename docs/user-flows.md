@@ -163,7 +163,7 @@ This document outlines the key user flows and workflows in Kanvaro, designed for
 #### Budget Setup & Tracking Flow
 ```
 1. Admin sets up project budget
-2. Defines budget categories (labor, materials, overhead)
+2. Defines budget categories (materials, overhead)
 3. Allocates budget across categories
 4. Sets up budget alerts and limits
 5. Team tracks expenses against budget

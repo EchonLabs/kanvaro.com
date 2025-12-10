@@ -350,13 +350,13 @@ export async function POST(req: NextRequest) {
       reminderTime: notificationSettings.reminderTime ?? '1hour',
       emailReminder1Day: notificationSettings.emailReminder1Day ?? true,
       notificationReminder1Hour: notificationSettings.notificationReminder1Hour ?? true,
-      notificationReminder5Min: notificationSettings.notificationReminder5Min ?? true
+      notificationReminder15Min: notificationSettings.notificationReminder15Min ?? true
     } : {
       enabled: true,
       reminderTime: '1hour',
       emailReminder1Day: true,
       notificationReminder1Hour: true,
-      notificationReminder5Min: true
+      notificationReminder15Min: true
     }
 
     // Handle recurring events

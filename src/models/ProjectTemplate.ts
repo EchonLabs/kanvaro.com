@@ -18,7 +18,6 @@ export interface IProjectTemplate extends Document {
       total: number
       currency: string
       categories: {
-        labor: number
         materials: number
         overhead: number
         external: number
@@ -130,7 +129,6 @@ const ProjectTemplateSchema = new Schema<IProjectTemplate>({
       total: Number,
       currency: { type: String, default: 'USD' },
       categories: {
-        labor: { type: Number, default: 0 },
         materials: { type: Number, default: 0 },
         overhead: { type: Number, default: 0 },
         external: { type: Number, default: 0 }

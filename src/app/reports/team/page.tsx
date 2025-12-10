@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { PageWrapper } from '@/components/layout/PageWrapper'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -90,6 +91,7 @@ interface FilterState {
 }
 
 export default function TeamReportsPage() {
+  const { setItems } = useBreadcrumb()
   const [reportData, setReportData] = useState<TeamReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
@@ -106,6 +108,14 @@ export default function TeamReportsPage() {
     sortOrder: 'desc'
   })
   const [showFilters, setShowFilters] = useState(false)
+
+  useEffect(() => {
+    // Set breadcrumb
+    setItems([
+      { label: 'Reports', href: '/reports' },
+      { label: 'Team Reports' }
+    ])
+  }, [setItems])
 
   // Load available roles from the API
   useEffect(() => {

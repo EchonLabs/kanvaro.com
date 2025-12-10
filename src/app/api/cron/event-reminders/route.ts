@@ -11,7 +11,7 @@ async function sendReminderEmail(
   event: any,
   attendees: any[],
   projectName: string,
-  reminderType: '1day' | '1hour' | '5min'
+  reminderType: '1day' | '1hour' | '15min'
 ) {
   try {
     const emailService = EmailService.getInstance()
@@ -26,13 +26,13 @@ async function sendReminderEmail(
     const reminderText = {
       '1day': 'Tomorrow',
       '1hour': 'In 1 hour',
-      '5min': 'In 5 minutes'
+      '15min': 'In 15 minutes'
     }[reminderType]
     
     const urgencyColor = {
       '1day': '#3b82f6', // blue
       '1hour': '#f59e0b', // amber
-      '5min': '#ef4444'  // red
+      '15min': '#ef4444'  // red
     }[reminderType]
 
     const emailPromises = attendees.map(async (attendee: any) => {
@@ -136,12 +136,12 @@ async function createReminderNotifications(
   event: any,
   attendees: any[],
   projectName: string,
-  reminderType: '1hour' | '5min'
+  reminderType: '1hour' | '15min'
 ) {
   try {
     const reminderText = {
       '1hour': 'in 1 hour',
-      '5min': 'in 5 minutes'
+      '15min': 'in 15 minutes'
     }[reminderType]
 
     const notifications = attendees.map((attendee: any) => ({
@@ -154,7 +154,7 @@ async function createReminderNotifications(
         entityType: 'sprint_event',
         entityId: event._id,
         action: 'upcoming',
-        priority: reminderType === '5min' ? 'high' : 'medium',
+        priority: reminderType === '15min' ? 'high' : 'medium',
         url: `/sprint-events/${event._id}`,
         metadata: {
           projectName,
@@ -196,7 +196,7 @@ export async function GET(req: NextRequest) {
     const results = {
       email1Day: 0,
       notification1Hour: 0,
-      notification5Min: 0,
+      notification15Min: 0,
       errors: [] as string[]
     }
 
@@ -279,23 +279,23 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 3. Process 5-minute notification reminders
-    const fiveMinFromNow = new Date(now.getTime() + 5 * 60 * 1000)
-    const eventsIn5Min = await SprintEvent.find({
+    // 3. Process 15-minute notification reminders
+    const fifteenMinFromNow = new Date(now.getTime() + 15 * 60 * 1000)
+    const eventsIn15Min = await SprintEvent.find({
       scheduledDate: {
-        $gte: new Date(fiveMinFromNow.getTime() - 2 * 60 * 1000), // 2 min buffer
-        $lte: new Date(fiveMinFromNow.getTime() + 2 * 60 * 1000)
+        $gte: new Date(fifteenMinFromNow.getTime() - 5 * 60 * 1000), // 5 min buffer
+        $lte: new Date(fifteenMinFromNow.getTime() + 5 * 60 * 1000)
       },
       status: { $in: ['scheduled', 'in_progress'] },
-      'notificationSettings.notificationReminder5Min': true,
-      'remindersSent.notification5Min': { $ne: true }
+      'notificationSettings.notificationReminder15Min': true,
+      'remindersSent.notification15Min': { $ne: true }
     })
       .populate('project', 'name organization')
       .populate('attendees', '_id firstName lastName email organization')
 
-    for (const event of eventsIn5Min) {
+    for (const event of eventsIn15Min) {
       try {
-        // Check if start time matches (within the 5 min window)
+        // Check if start time matches (within the 15 min window)
         if (event.startTime) {
           const [hours, minutes] = event.startTime.split(':').map(Number)
           const eventDateTime = new Date(event.scheduledDate)
@@ -304,21 +304,21 @@ export async function GET(req: NextRequest) {
           const diffMs = eventDateTime.getTime() - now.getTime()
           const diffMins = diffMs / (60 * 1000)
           
-          // Only trigger if event is 3-7 minutes away
-          if (diffMins < 3 || diffMins > 7) continue
+          // Only trigger if event is 10-20 minutes away
+          if (diffMins < 10 || diffMins > 20) continue
         }
 
         const projectName = (event.project as any)?.name || 'Unknown Project'
-        await createReminderNotifications(event, event.attendees, projectName, '5min')
+        await createReminderNotifications(event, event.attendees, projectName, '15min')
         
         // Mark reminder as sent
         await SprintEvent.updateOne(
           { _id: event._id },
-          { $set: { 'remindersSent.notification5Min': true } }
+          { $set: { 'remindersSent.notification15Min': true } }
         )
-        results.notification5Min++
+        results.notification15Min++
       } catch (err) {
-        results.errors.push(`Failed to send 5-min notification for event ${event._id}`)
+        results.errors.push(`Failed to send 15-min notification for event ${event._id}`)
       }
     }
 

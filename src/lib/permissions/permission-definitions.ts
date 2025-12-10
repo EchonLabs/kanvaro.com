@@ -101,6 +101,7 @@ export enum Permission {
   // View time of users assigned to you (as PM or HR partner)
   TIME_TRACKING_VIEW_ASSIGNED = 'time_tracking:view_assigned',
   TIME_TRACKING_EMPLOYEE_FILTER_READ = 'time_tracking:employee_filter:read',
+  TIME_TRACKING_VIEW_ALL_TIMER = 'time_tracking:view_all_timer',
   
   // Financial permissions
   FINANCIAL_READ = 'financial:read',
@@ -265,6 +266,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_EXPORT,
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
+    Permission.TIME_TRACKING_VIEW_ALL_TIMER,
     
     // Financial
     Permission.FINANCIAL_READ,
@@ -405,6 +407,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_VIEW_ASSIGNED,
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
+    Permission.TIME_TRACKING_VIEW_ALL_TIMER,
     
     // Financial
     Permission.FINANCIAL_READ,
@@ -539,6 +542,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_EXPORT,
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
+    Permission.TIME_TRACKING_VIEW_ALL_TIMER,
     
     // Financial
     Permission.FINANCIAL_READ,
@@ -1097,6 +1101,7 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.TEAM_INVITE, // Organization-wide permission to invite team members
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_VIEW_ASSIGNED,
+    Permission.TIME_TRACKING_VIEW_ALL_TIMER, // View all active timers in organization
     Permission.FINANCIAL_READ,
     Permission.REPORTING_VIEW,
     Permission.REPORTING_CREATE,

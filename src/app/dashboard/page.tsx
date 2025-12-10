@@ -10,9 +10,12 @@ import { RecentTasks } from '@/components/dashboard/RecentTasks'
 import { TeamActivity } from '@/components/dashboard/TeamActivity'
 import { QuickActions } from '@/components/dashboard/QuickActions'
 import { TimeTrackingWidget } from '@/components/dashboard/TimeTrackingWidget'
+import { ActiveTimersWidget } from '@/components/dashboard/ActiveTimersWidget'
+import { NotificationsWidget } from '@/components/dashboard/NotificationsWidget'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { PageContent } from '@/components/ui/PageContent'
+import { usePermissionContext } from '@/lib/permissions/permission-context'
 
 interface DashboardData {
   stats: {
@@ -50,6 +53,7 @@ export default function DashboardPage() {
   const [authError, setAuthError] = useState('')
   const [dataError, setDataError] = useState('')
   const router = useRouter()
+  const { loading: permissionsLoading, error: permissionsError, permissions } = usePermissionContext()
 
   const loadDashboardData = useCallback(async () => {
     try {
@@ -135,6 +139,30 @@ export default function DashboardPage() {
     return () => clearInterval(interval)
   }, [checkAuth])
 
+  // Wait for permissions to load before showing dashboard
+  // Only show loading if permissions are actually being fetched (not just initialized)
+  if (permissionsLoading && !permissions) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading permissions...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (permissionsError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <p className="text-sm text-destructive">Failed to load permissions</p>
+          <p className="text-xs text-muted-foreground mt-1">{permissionsError}</p>
+        </div>
+      </div>
+    )
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -208,6 +236,7 @@ export default function DashboardPage() {
                 changes={dashboardData?.changes}
                 isLoading={!dashboardData}
               />
+              <NotificationsWidget />
               <RecentProjects
                 projects={dashboardData?.recentProjects}
                 isLoading={!dashboardData}
@@ -230,6 +259,9 @@ export default function DashboardPage() {
                   organizationId={user.organization}
                   timeStats={dashboardData?.timeStats}
                 />
+              )}
+              {user.organization && (
+                <ActiveTimersWidget organizationId={user.organization} />
               )}
               <QuickActions />
             </div>

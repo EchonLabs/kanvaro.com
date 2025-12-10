@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -78,6 +79,7 @@ export default function EditStoryPage() {
   const router = useRouter()
   const params = useParams()
   const storyId = params.id as string
+  const { setItems } = useBreadcrumb()
   
   const [story, setStory] = useState<Story | null>(null)
   const [originalStory, setOriginalStory] = useState<Story | null>(null)
@@ -213,6 +215,12 @@ export default function EditStoryPage() {
   }, [])
 
   const fetchStory = useCallback(async () => {
+    // Set breadcrumb
+    setItems([
+      { label: 'Stories', href: '/stories' },
+      { label: 'Edit Story' }
+    ])
+    
     try {
       setLoading(true)
       const res = await fetch(`/api/stories/${storyId}`)

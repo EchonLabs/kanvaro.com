@@ -12,10 +12,7 @@ export interface IBurnRate extends Document {
   budgetRemaining: number // Remaining budget after this burn
   forecastedCompletion?: Date // Forecasted project completion based on current burn rate
   categories: {
-    labor: {
-      planned: number
-      actual: number
-    }
+   
     materials: {
       planned: number
       actual: number
@@ -81,10 +78,7 @@ const BurnRateSchema = new Schema<IBurnRate>({
   },
   forecastedCompletion: Date,
   categories: {
-    labor: {
-      planned: { type: Number, default: 0 },
-      actual: { type: Number, default: 0 }
-    },
+   
     materials: {
       planned: { type: Number, default: 0 },
       actual: { type: Number, default: 0 }

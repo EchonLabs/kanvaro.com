@@ -3,6 +3,7 @@ import connectDB from '@/lib/db-config'
 import { Project } from '@/models/Project'
 import { Task } from '@/models/Task'
 import { User } from '@/models/User'
+import { Organization } from '@/models/Organization'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -153,6 +154,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const requestBody = await request.json()
     const {
       name,
       description,
@@ -166,8 +168,13 @@ export async function POST(request: NextRequest) {
       settings,
       tags,
       customFields,
+      attachments,
+      externalLinks,
       isDraft
-    } = await request.json()
+    } = requestBody
+    
+    // Debug: Log externalLinks to see what we're receiving
+    console.log('Received externalLinks:', JSON.stringify(externalLinks, null, 2))
 
     // Validate required fields (only if not a draft)
     if (!isDraft && (!name || !startDate)) {
@@ -216,6 +223,10 @@ export async function POST(request: NextRequest) {
 
     // Create a promise for the project creation to handle concurrent requests
     const createProjectPromise = (async () => {
+      // Get organization currency
+      const organization = await Organization.findById(organizationId)
+      const orgCurrency = organization?.currency || 'USD'
+      
       // Generate sequential project number for this organization
       const counter = await Counter.findOneAndUpdate(
         { scope: 'project', organization: organizationId },
@@ -223,6 +234,20 @@ export async function POST(request: NextRequest) {
         { new: true, upsert: true }
       )
       const projectNumber = counter.seq
+
+      // Process externalLinks first
+      const processedExternalLinks = {
+        figma: Array.isArray(externalLinks?.figma) 
+          ? externalLinks.figma.filter((link: string) => link && link.trim()).map((link: string) => link.trim())
+          : [],
+        documentation: Array.isArray(externalLinks?.documentation) 
+          ? externalLinks.documentation.filter((link: string) => link && link.trim()).map((link: string) => link.trim())
+          : []
+      }
+      
+      // Debug: Log what we received
+      console.log('Received externalLinks:', JSON.stringify(externalLinks, null, 2))
+      console.log('Processed externalLinks:', JSON.stringify(processedExternalLinks, null, 2))
 
       // Create project
       const project = new Project({
@@ -241,9 +266,8 @@ export async function POST(request: NextRequest) {
         budget: budget ? {
           total: budget.total || 0,
           spent: 0,
-          currency: budget.currency || 'USD',
+          currency: orgCurrency, // Use organization currency instead of project currency
           categories: {
-            labor: budget.categories?.labor || 0,
             materials: budget.categories?.materials || 0,
             overhead: budget.categories?.overhead || 0
           }
@@ -260,11 +284,36 @@ export async function POST(request: NextRequest) {
           }
         },
         tags: tags || [],
-        customFields: customFields || {}
+        customFields: customFields || {},
+        attachments: attachments ? attachments.map((att: any) => ({
+          name: att.name,
+          url: att.url,
+          size: att.size,
+          type: att.type,
+          uploadedBy: userId,
+          uploadedAt: att.uploadedAt ? new Date(att.uploadedAt) : new Date()
+        })) : [],
+        externalLinks: processedExternalLinks
       })
+      
+      // Set externalLinks explicitly to ensure it's saved (in case constructor didn't set it)
+      project.externalLinks = processedExternalLinks
+      
+      // Debug: Log what we're about to save
+      console.log('Received externalLinks:', JSON.stringify(externalLinks, null, 2))
+      console.log('Processed externalLinks:', JSON.stringify(processedExternalLinks, null, 2))
+      console.log('Project externalLinks before save:', JSON.stringify(project.externalLinks, null, 2))
+
+      // Explicitly mark externalLinks as modified to ensure it's saved
+      project.markModified('externalLinks')
+      project.markModified('externalLinks.figma')
+      project.markModified('externalLinks.documentation')
 
       // Save and populate in one operation
       await project.save()
+      
+      // Reload the project to verify what was saved
+      const savedProject = await Project.findById(project._id).lean()
       await project.populate([
         { path: 'createdBy', select: 'firstName lastName email' },
         { path: 'teamMembers', select: 'firstName lastName email' },

@@ -323,7 +323,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     return fromRate / toRate
   }
 
-  // Calculate summary statistics from detailed entries with currency conversion
+  // Calculate summary statistics from detailed entries - just sum costs without conversion
   const summaryStats = useMemo(() => {
     if (!reportData?.detailedEntries || reportData.detailedEntries.length === 0) {
       return {
@@ -338,10 +338,8 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       acc.totalEntries += 1
       acc.totalDuration += entry.duration
       
-      // Convert cost to organization currency
-      const conversionRate = getCurrencyConversionRate(entry.projectCurrency, orgCurrency)
-      const convertedCost = entry.cost * conversionRate
-      acc.totalCost += convertedCost
+      // Just sum the costs - no currency conversion
+      acc.totalCost += entry.cost
       
       if (entry.isBillable) {
         acc.billableDuration += entry.duration
@@ -353,7 +351,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       totalCost: 0,
       billableDuration: 0
     })
-  }, [reportData?.detailedEntries, orgCurrency])
+  }, [reportData?.detailedEntries])
 
   const handleExport = async () => {
     try {
