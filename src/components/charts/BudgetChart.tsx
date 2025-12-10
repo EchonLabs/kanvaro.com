@@ -19,6 +19,7 @@ import {
   Line
 } from 'recharts'
 import { PieChart as PieChartIcon, BarChart3, TrendingUp, DollarSign } from 'lucide-react'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 
 interface BudgetData {
   category: string
@@ -37,15 +38,10 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'
 export function BudgetChart({ data, title = "Budget Breakdown", description }: BudgetChartProps) {
   const [chartType, setChartType] = useState<'pie' | 'bar' | 'line'>('pie')
   const [showLegend, setShowLegend] = useState(true)
+  const { formatCurrency } = useOrgCurrency()
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value)
-  }
+  const formatBudget = (value: number) =>
+    formatCurrency(value, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -54,7 +50,7 @@ export function BudgetChart({ data, title = "Budget Breakdown", description }: B
         <div className="bg-background border rounded-lg shadow-lg p-3">
           <p className="font-medium">{data.category}</p>
           <p className="text-sm" style={{ color: data.color }}>
-            {formatCurrency(data.amount)}
+            {formatBudget(data.amount)}
           </p>
           <p className="text-xs text-muted-foreground">
             {((data.amount / data.totalAmount) * 100).toFixed(1)}% of total
@@ -103,7 +99,7 @@ export function BudgetChart({ data, title = "Budget Breakdown", description }: B
               tick={{ fontSize: 12 }}
             />
             <YAxis 
-              tickFormatter={formatCurrency}
+              tickFormatter={formatBudget}
               tick={{ fontSize: 12 }}
             />
             <Tooltip content={<CustomTooltip />} />
@@ -125,7 +121,7 @@ export function BudgetChart({ data, title = "Budget Breakdown", description }: B
               tick={{ fontSize: 12 }}
             />
             <YAxis 
-              tickFormatter={formatCurrency}
+              tickFormatter={formatBudget}
               tick={{ fontSize: 12 }}
             />
             <Tooltip content={<CustomTooltip />} />
@@ -212,7 +208,7 @@ export function BudgetChart({ data, title = "Budget Breakdown", description }: B
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
               <div className="text-center">
                 <p className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(totalAmount)}
+                  {formatBudget(totalAmount)}
                 </p>
                 <p className="text-xs text-muted-foreground">Total Budget</p>
               </div>
@@ -224,7 +220,7 @@ export function BudgetChart({ data, title = "Budget Breakdown", description }: B
               </div>
               <div className="text-center">
                 <p className="text-2xl font-bold text-purple-600">
-                  {formatCurrency(maxCategory.amount)}
+                  {formatBudget(maxCategory.amount)}
                 </p>
                 <p className="text-xs text-muted-foreground">Max Amount</p>
               </div>
@@ -245,7 +241,7 @@ export function BudgetChart({ data, title = "Budget Breakdown", description }: B
                     <span className="capitalize">{item.category}</span>
                   </div>
                   <div className="text-right">
-                    <span className="font-medium">{formatCurrency(item.amount)}</span>
+                  <span className="font-medium">{formatBudget(item.amount)}</span>
                     <span className="text-muted-foreground ml-2">
                       ({((item.amount / totalAmount) * 100).toFixed(1)}%)
                     </span>

@@ -4,7 +4,7 @@ export interface IBudgetEntry extends Document {
   project: mongoose.Types.ObjectId
   amount: number
   currency: string
-  category: 'labor' | 'materials' | 'overhead' | 'external' | 'other'
+  category:  'materials' | 'overhead' | 'external' | 'other'
   description: string
   billingReference?: string // Quotation number, invoice number, etc.
   addedBy: mongoose.Types.ObjectId
@@ -38,7 +38,7 @@ const BudgetEntrySchema = new Schema<IBudgetEntry>({
   },
   category: {
     type: String,
-    enum: ['labor', 'materials', 'overhead', 'external', 'other'],
+    enum: [ 'materials', 'overhead', 'external', 'other'],
     required: true
   },
   description: {

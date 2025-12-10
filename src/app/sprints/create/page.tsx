@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { 
+import {
   ArrowLeft,
   Save,
   Loader2,
@@ -54,7 +54,7 @@ export default function CreateSprintPage() {
   const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me')
-      
+
       if (response.ok) {
         setAuthError('')
         await Promise.all([fetchProjects(), fetchUsers()])
@@ -62,7 +62,7 @@ export default function CreateSprintPage() {
         const refreshResponse = await fetch('/api/auth/refresh', {
           method: 'POST'
         })
-        
+
         if (refreshResponse.ok) {
           setAuthError('')
           await Promise.all([fetchProjects(), fetchUsers()])
@@ -87,6 +87,33 @@ export default function CreateSprintPage() {
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
+
+  // Fetch sprint count and auto-generate sprint name
+  useEffect(() => {
+    const fetchSprintCount = async () => {
+      try {
+        const response = await fetch('/api/sprints?countOnly=true')
+        const data = await response.json()
+
+        if (data.success && typeof data.count === 'number') {
+          const nextSprintNumber = data.count + 1
+          setFormData(prev => ({
+            ...prev,
+            name: `Sprint ${nextSprintNumber}`
+          }))
+        }
+      } catch (err) {
+        console.error('Failed to fetch sprint count:', err)
+        // Fallback to generic name
+        setFormData(prev => ({
+          ...prev,
+          name: 'Sprint 1'
+        }))
+      }
+    }
+
+    fetchSprintCount()
+  }, [])
 
   const fetchProjects = async () => {
     try {
@@ -262,7 +289,7 @@ export default function CreateSprintPage() {
         ...prev,
         [field]: value
       }
-      
+
       // If project is changed, fetch project details and filter team members
       if (field === 'project' && typeof value === 'string') {
         if (value) {
@@ -278,7 +305,7 @@ export default function CreateSprintPage() {
         newData.endDate = ''
         setDateError('')
       }
-      
+
       // Validate dates when they change
       if (field === 'startDate' || field === 'endDate') {
         const startDate = field === 'startDate' ? value as string : prev.startDate
@@ -289,7 +316,7 @@ export default function CreateSprintPage() {
           setDateError('')
         }
       }
-      
+
       return newData
     })
   }
@@ -305,10 +332,10 @@ export default function CreateSprintPage() {
 
   // Check if all required fields are filled
   const isFormValid = () => {
-    return formData.name.trim() !== '' && 
-           formData.project !== '' && 
-           formData.startDate !== '' && 
-           formData.endDate !== ''
+    return formData.name.trim() !== '' &&
+      formData.project !== '' &&
+      formData.startDate !== '' &&
+      formData.endDate !== ''
   }
 
   if (authError) {
@@ -374,7 +401,7 @@ export default function CreateSprintPage() {
                     <Select
                       value={formData.project}
                       onValueChange={(value) => handleChange('project', value)}
-                      onOpenChange={open => { if(open) setProjectQuery(""); }}
+                      onOpenChange={open => { if (open) setProjectQuery(""); }}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a project" />
@@ -421,19 +448,19 @@ export default function CreateSprintPage() {
                       value={formData.startDate}
                       onChange={(e) => handleChange('startDate', e.target.value)}
                       min={
-                        selectedProject?.startDate 
+                        selectedProject?.startDate
                           ? new Date(Math.max(
-                              new Date(selectedProject.startDate).getTime(),
-                              new Date().setHours(0, 0, 0, 0)
-                            )).toISOString().split('T')[0]
+                            new Date(selectedProject.startDate).getTime(),
+                            new Date().setHours(0, 0, 0, 0)
+                          )).toISOString().split('T')[0]
                           : new Date().toISOString().split('T')[0]
                       }
                       max={
                         selectedProject?.endDate && formData.endDate
                           ? new Date(Math.min(
-                              new Date(selectedProject.endDate).getTime(),
-                              new Date(formData.endDate).getTime()
-                            )).toISOString().split('T')[0]
+                            new Date(selectedProject.endDate).getTime(),
+                            new Date(formData.endDate).getTime()
+                          )).toISOString().split('T')[0]
                           : selectedProject?.endDate
                             ? new Date(selectedProject.endDate).toISOString().split('T')[0]
                             : undefined
@@ -465,20 +492,20 @@ export default function CreateSprintPage() {
                       min={
                         selectedProject?.startDate && formData.startDate
                           ? new Date(Math.max(
-                              new Date(selectedProject.startDate).getTime(),
+                            new Date(selectedProject.startDate).getTime(),
+                            new Date(formData.startDate).getTime(),
+                            new Date().setHours(0, 0, 0, 0)
+                          )).toISOString().split('T')[0]
+                          : formData.startDate
+                            ? new Date(Math.max(
                               new Date(formData.startDate).getTime(),
                               new Date().setHours(0, 0, 0, 0)
                             )).toISOString().split('T')[0]
-                          : formData.startDate
-                            ? new Date(Math.max(
-                                new Date(formData.startDate).getTime(),
-                                new Date().setHours(0, 0, 0, 0)
-                              )).toISOString().split('T')[0]
                             : selectedProject?.startDate
                               ? new Date(Math.max(
-                                  new Date(selectedProject.startDate).getTime(),
-                                  new Date().setHours(0, 0, 0, 0)
-                                )).toISOString().split('T')[0]
+                                new Date(selectedProject.startDate).getTime(),
+                                new Date().setHours(0, 0, 0, 0)
+                              )).toISOString().split('T')[0]
                               : new Date().toISOString().split('T')[0]
                       }
                       max={

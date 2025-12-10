@@ -243,21 +243,13 @@ export function GlobalSearch({ className, placeholder = "Search projects, tasks,
             </p>
           )}
           
-          <div className="flex items-center space-x-2 mt-1">
-            <span className="text-xs text-muted-foreground">
-              Score: {Math.round(result.score)}
-            </span>
-            {result.metadata.project && (
-              <span className="text-xs text-muted-foreground">
-                Project: {result.metadata.project}
-              </span>
-            )}
-            {result.metadata.assignee && (
+          {result.metadata.assignee && (
+            <div className="flex items-center space-x-2 mt-1">
               <span className="text-xs text-muted-foreground">
                 Assignee: {result.metadata.assignee}
               </span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
         
         <ArrowRight className="h-4 w-4 text-muted-foreground" />

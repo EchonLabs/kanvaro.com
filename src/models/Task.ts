@@ -18,6 +18,7 @@ export interface ITask extends Document {
   description: string
   status: TaskStatus
   priority: 'low' | 'medium' | 'high' | 'critical'
+  isBillable?: boolean
   type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
   organization: mongoose.Types.ObjectId
   project: mongoose.Types.ObjectId
@@ -33,6 +34,7 @@ export interface ITask extends Document {
   estimatedHours?: number
   actualHours?: number
   sprint?: mongoose.Types.ObjectId
+  movedFromSprint?: mongoose.Types.ObjectId
   startDate?: Date
   completedAt?: Date
   labels: string[]
@@ -45,15 +47,18 @@ export interface ITask extends Document {
     uploadedBy: mongoose.Types.ObjectId
     uploadedAt: Date
   }[]
-  comments: {
-    content: string
-    author: mongoose.Types.ObjectId
-    createdAt: Date
-    updatedAt: Date
-  }[]
+
   subtasks: ITaskSubtask[]
   archived: boolean
   position: number
+  comments?: Array<{
+    _id?: mongoose.Types.ObjectId
+    content: string
+    author: mongoose.Types.ObjectId
+    mentions?: mongoose.Types.ObjectId[]
+    linkedIssues?: mongoose.Types.ObjectId[]
+    createdAt: Date
+  }>
   linkedTestCase?: mongoose.Types.ObjectId
   foundInVersion?: string
   testExecutionId?: mongoose.Types.ObjectId
@@ -108,6 +113,10 @@ const TaskSchema = new Schema<ITask>({
     type: String,
     enum: ['low', 'medium', 'high', 'critical'],
     default: 'medium'
+  },
+  isBillable: {
+    type: Boolean,
+    default: true
   },
   type: {
     type: String,
@@ -177,6 +186,10 @@ const TaskSchema = new Schema<ITask>({
     type: Schema.Types.ObjectId,
     ref: 'Sprint'
   },
+  movedFromSprint: {
+    type: Schema.Types.ObjectId,
+    ref: 'Sprint'
+  },
   startDate: Date,
   completedAt: Date,
   labels: [{
@@ -196,17 +209,18 @@ const TaskSchema = new Schema<ITask>({
     uploadedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     uploadedAt: { type: Date, default: Date.now }
   }],
-  comments: [{
-    content: { type: String, required: true, maxlength: 1000 },
-    author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
-  }],
   subtasks: {
     type: [SubtaskSchema],
     default: []
   },
   archived: { type: Boolean, default: false },
+  comments: [{
+    content: { type: String, required: true, trim: true, maxlength: 2000 },
+    author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    mentions: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    linkedIssues: [{ type: Schema.Types.ObjectId, ref: 'Task' }],
+    createdAt: { type: Date, default: Date.now }
+  }],
   linkedTestCase: {
     type: Schema.Types.ObjectId,
     ref: 'TestCase'

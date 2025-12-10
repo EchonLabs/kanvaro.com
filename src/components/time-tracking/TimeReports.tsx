@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules } from '@/lib/utils'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 
 interface TimeReportsProps {
   userId?: string
@@ -97,6 +98,7 @@ interface ReportData {
 
 export function TimeReports({ userId, organizationId, projectId }: TimeReportsProps) {
   const { organization } = useOrganization()
+  const { formatCurrency } = useOrgCurrency()
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -286,19 +288,6 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     return `${hours}h ${mins}m`
   }
 
-  const formatCurrency = (amount: number, currencyCode?: string) => {
-    const code = currencyCode || orgCurrency
-    try {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: code
-      }).format(amount)
-    } catch (error) {
-      // Fallback if currency code is invalid
-      return `${code} ${amount.toFixed(2)}`
-    }
-  }
-
   // Simple currency conversion rates (you can replace with real-time API later)
   const getCurrencyConversionRate = (fromCurrency: string, toCurrency: string): number => {
     if (fromCurrency === toCurrency) return 1
@@ -323,7 +312,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     return fromRate / toRate
   }
 
-  // Calculate summary statistics from detailed entries with currency conversion
+  // Calculate summary statistics from detailed entries - just sum costs without conversion
   const summaryStats = useMemo(() => {
     if (!reportData?.detailedEntries || reportData.detailedEntries.length === 0) {
       return {
@@ -338,10 +327,8 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       acc.totalEntries += 1
       acc.totalDuration += entry.duration
       
-      // Convert cost to organization currency
-      const conversionRate = getCurrencyConversionRate(entry.projectCurrency, orgCurrency)
-      const convertedCost = entry.cost * conversionRate
-      acc.totalCost += convertedCost
+      // Just sum the costs - no currency conversion
+      acc.totalCost += entry.cost
       
       if (entry.isBillable) {
         acc.billableDuration += entry.duration
@@ -353,7 +340,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       totalCost: 0,
       billableDuration: 0
     })
-  }, [reportData?.detailedEntries, orgCurrency])
+  }, [reportData?.detailedEntries])
 
   const handleExport = async () => {
     try {
@@ -688,7 +675,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                           {formatDuration(entry.duration)}
                         </div>
                         <div className="col-span-1 text-sm font-medium">
-                          {formatCurrency(entry.cost, entry.projectCurrency)}
+                          {formatCurrency(entry.cost, orgCurrency)}
                         </div>
                         <div className="col-span-1">
                           {entry.isBillable ? (
@@ -742,7 +729,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                           </div>
                           <div>
                             <span className="text-muted-foreground">Cost: </span>
-                            <span className="font-medium">{formatCurrency(entry.cost, entry.projectCurrency)}</span>
+                            <span className="font-medium">{formatCurrency(entry.cost, orgCurrency)}</span>
                           </div>
                         </div>
                         {entry.notes && (

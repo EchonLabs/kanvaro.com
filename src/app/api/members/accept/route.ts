@@ -7,6 +7,7 @@ import { notificationService } from '@/lib/notification-service'
 import { emailService } from '@/lib/email/EmailService'
 import { formatToTitleCase } from '@/lib/utils'
 import bcrypt from 'bcryptjs'
+import { generateAvatarImage } from '@/lib/avatar-generator'
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,9 +46,12 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 12)
 
     // Create user
+    const userFirstName = firstName || invitation.firstName || ''
+    const userLastName = lastName || invitation.lastName || ''
+    
     const userData: any = {
-      firstName: firstName || invitation.firstName || '',
-      lastName: lastName || invitation.lastName || '',
+      firstName: userFirstName,
+      lastName: userLastName,
       email: invitation.email,
       password: hashedPassword,
       role: invitation.role,
@@ -62,8 +66,21 @@ export async function POST(request: NextRequest) {
     }
 
     const user = new User(userData)
-
     await user.save()
+
+    // Generate and save avatar image
+    try {
+      const avatarUrl = await generateAvatarImage(
+        user._id.toString(),
+        userFirstName,
+        userLastName
+      )
+      user.avatar = avatarUrl
+      await user.save()
+    } catch (avatarError) {
+      console.error('Failed to generate avatar (non-blocking):', avatarError)
+      // Don't fail user creation if avatar generation fails
+    }
 
     // Mark invitation as accepted
     invitation.isAccepted = true

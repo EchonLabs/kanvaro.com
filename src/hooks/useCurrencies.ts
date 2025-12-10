@@ -23,7 +23,8 @@ const fallbackCurrencies: Currency[] = [
   { _id: 'aud', code: 'AUD', name: 'Australian Dollar', symbol: 'A$', country: 'Australia', isActive: true, isMajor: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { _id: 'nzd', code: 'NZD', name: 'New Zealand Dollar', symbol: 'NZ$', country: 'New Zealand', isActive: true, isMajor: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { _id: 'cny', code: 'CNY', name: 'Chinese Yuan', symbol: '¥', country: 'China', isActive: true, isMajor: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { _id: 'inr', code: 'INR', name: 'Indian Rupee', symbol: '₹', country: 'India', isActive: true, isMajor: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+  { _id: 'inr', code: 'INR', name: 'Indian Rupee', symbol: '₹', country: 'India', isActive: true, isMajor: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { _id: 'mxn', code: 'MXN', name: 'Mexican Peso', symbol: '$', country: 'Mexico', isActive: true, isMajor: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
 ]
 
 export function useCurrencies(majorOnly: boolean = false) {

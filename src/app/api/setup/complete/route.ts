@@ -260,6 +260,24 @@ export async function POST(request: NextRequest) {
       { upsert: true, new: true, runValidators: true }
     )
     console.log('Admin user upserted successfully:', adminUser._id)
+
+    // Generate and save avatar image if user doesn't have one
+    if (!adminUser.avatar) {
+      try {
+        const { generateAvatarImage } = await import('@/lib/avatar-generator')
+        const avatarUrl = await generateAvatarImage(
+          adminUser._id.toString(),
+          adminUser.firstName,
+          adminUser.lastName
+        )
+        adminUser.avatar = avatarUrl
+        await adminUser.save()
+        console.log('Avatar generated for admin user')
+      } catch (avatarError) {
+        console.error('Failed to generate avatar for admin user (non-blocking):', avatarError)
+        // Don't fail setup if avatar generation fails
+      }
+    }
     
     // Seed currencies if not already seeded
     console.log('Checking if currencies need to be seeded...')

@@ -17,6 +17,7 @@ function SignInForm() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const router = useRouter()
@@ -78,15 +79,43 @@ function SignInForm() {
       const data = await response.json()
 
       if (response.ok && data.success) {
-        router.push('/dashboard')
+        console.log('Login successful, loading permissions...')
+        // Login successful, now load permissions before redirecting
+        setIsLoading(false)
+        setIsLoadingPermissions(true)
+        
+        try {
+          // Fetch permissions to ensure they're loaded before redirecting
+          const permissionsResponse = await fetch('/api/auth/permissions', {
+            method: 'GET',
+            credentials: 'include'
+          })
+          
+          if (permissionsResponse.ok) {
+            console.log('Permissions loaded successfully, redirecting to dashboard')
+            // Permissions loaded, now redirect to dashboard
+            router.push('/dashboard')
+          } else {
+            console.error('Failed to load permissions:', permissionsResponse.status)
+            // Even if permissions fail, redirect to dashboard (it will handle loading there)
+            router.push('/dashboard')
+          }
+        } catch (permError) {
+          console.error('Error loading permissions:', permError)
+          // Even if permissions fail, redirect to dashboard (it will handle loading there)
+          router.push('/dashboard')
+        } finally {
+          setIsLoadingPermissions(false)
+        }
       } else {
         setError(data.error || 'Login failed. Please try again.')
+        setIsLoading(false)
       }
     } catch (error) {
       console.error('Login failed:', error)
       setError('Login failed. Please check your connection and try again.')
-    } finally {
       setIsLoading(false)
+      setIsLoadingPermissions(false)
     }
   }
 
@@ -151,7 +180,7 @@ function SignInForm() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="admin@kanvaro.com"
                     required
-                    disabled={isLoading}
+                    disabled={isLoading || isLoadingPermissions}
                     className="w-full"
                   />
                 </div>
@@ -166,7 +195,7 @@ function SignInForm() {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
                       required
-                      disabled={isLoading}
+                      disabled={isLoading || isLoadingPermissions}
                       className="w-full pr-10"
                     />
                     <Button
@@ -175,7 +204,7 @@ function SignInForm() {
                       size="sm"
                       className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                       onClick={() => setShowPassword(!showPassword)}
-                      disabled={isLoading}
+                      disabled={isLoading || isLoadingPermissions}
                     >
                       {showPassword ? (
                         <EyeOff className="h-4 w-4" />
@@ -189,9 +218,14 @@ function SignInForm() {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={isLoading}
+                  disabled={isLoading || isLoadingPermissions}
                 >
-                  {isLoading ? (
+                  {isLoadingPermissions ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Signing in...
@@ -206,7 +240,7 @@ function SignInForm() {
                     type="button"
                     onClick={() => router.push('/forgot-password')}
                     className="text-sm text-primary hover:underline"
-                    disabled={isLoading}
+                    disabled={isLoading || isLoadingPermissions}
                   >
                     Forgot your password?
                   </button>

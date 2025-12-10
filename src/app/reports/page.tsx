@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { PageWrapper } from '@/components/layout/PageWrapper'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -63,9 +64,17 @@ interface ReportData {
 export default function ReportsPage() {
   const params = useParams()
   const projectId = params.id as string
+  const { setItems } = useBreadcrumb()
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
+
+  useEffect(() => {
+    // Set breadcrumb
+    setItems([
+      { label: 'Reports' }
+    ])
+  }, [setItems])
 
   useEffect(() => {
     if (projectId) {

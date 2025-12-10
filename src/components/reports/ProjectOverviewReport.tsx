@@ -4,13 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/Badge'
 import { Progress } from '@/components/ui/Progress'
 import { Button } from '@/components/ui/Button'
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -18,11 +18,11 @@ import {
   LineChart,
   Line
 } from 'recharts'
-import { 
-  FolderOpen, 
-  CheckCircle, 
-  Clock, 
-  DollarSign, 
+import {
+  FolderOpen,
+  CheckCircle,
+  Clock,
+  DollarSign,
   TrendingUp,
   Users,
   Calendar,
@@ -85,7 +85,25 @@ interface ProjectOverviewReportProps {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8']
 
+import { useOrganization } from '@/hooks/useOrganization'
+
+// ... existing imports
+
 export function ProjectOverviewReport({ projects, summary, trends, filters }: ProjectOverviewReportProps) {
+  const { organization } = useOrganization()
+  const currency = organization?.currency || 'USD'
+
+  const formatCurrency = (amount: number) => {
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency
+      }).format(amount)
+    } catch (e) {
+      return `${currency} ${amount.toLocaleString()}`
+    }
+  }
+
   // Prepare data for charts
   const statusData = [
     { name: 'Active', value: summary.activeProjects, color: '#00C49F' },
@@ -148,7 +166,7 @@ export function ProjectOverviewReport({ projects, summary, trends, filters }: Pr
               {trends.budgetUtilization.toFixed(1)}%
             </div>
             <p className="text-xs text-muted-foreground mt-1 break-words">
-              ${summary.totalSpent.toLocaleString()} of ${summary.totalBudget.toLocaleString()}
+              {formatCurrency(summary.totalSpent)} of {formatCurrency(summary.totalBudget)}
             </p>
             <Progress value={trends.budgetUtilization} className="mt-2" />
           </CardContent>

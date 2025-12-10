@@ -16,6 +16,7 @@ export interface IUser extends Document {
   timezone: string
   language: string
   billingRate?: number
+  hourlyRate?: number
   currency: string
   lastLogin?: Date
   emailVerified: boolean
@@ -68,6 +69,7 @@ const UserSchema = new Schema<IUser>({
   timezone: { type: String, default: 'UTC' },
   language: { type: String, default: 'en' },
   billingRate: Number,
+  hourlyRate: Number,
   currency: { type: String, default: 'USD' },
   lastLogin: Date,
   emailVerified: { type: Boolean, default: false },

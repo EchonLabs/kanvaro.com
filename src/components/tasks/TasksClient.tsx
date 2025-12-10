@@ -1118,7 +1118,23 @@ export default function TasksClient({
                                                                 transform: `translateY(${virtualRow.start}px)`,
                                                             }}
                                                         >
-                                                            <Card className="hover:shadow-md transition-shadow m-2">
+                                                            <Card 
+                                                                className="hover:shadow-md transition-shadow m-2 cursor-pointer"
+                                                                onClick={(e) => {
+                                                                    // Don't navigate if clicking on select, dropdown, or buttons
+                                                                    const target = e.target as HTMLElement
+                                                                    if (
+                                                                        target.closest('button') ||
+                                                                        target.closest('[role="combobox"]') ||
+                                                                        target.closest('[role="menuitem"]') ||
+                                                                        target.closest('.dropdown-menu') ||
+                                                                        target.closest('[data-radix-popper-content-wrapper]')
+                                                                    ) {
+                                                                        return
+                                                                    }
+                                                                    router.push(`/tasks/${task._id}`)
+                                                                }}
+                                                            >
                                                                 <CardContent className="p-3 sm:p-4">
                                                                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
                                                                         <div className="flex-1 min-w-0 w-full">
@@ -1141,6 +1157,7 @@ export default function TasksClient({
                                                                                             handleInlineStatusChange(task, value as Task['status'])
                                                                                         }
                                                                                         disabled={statusUpdatingId === task._id}
+                                                                                        //onClick={(e) => e.stopPropagation()}
                                                                                     >
                                                                                         <SelectTrigger className="h-7 w-full sm:w-[150px] text-xs">
                                                                                             <SelectValue placeholder="Status" />
