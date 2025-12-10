@@ -18,6 +18,7 @@ import {
   AreaChart
 } from 'recharts'
 import { TrendingUp, TrendingDown, BarChart3, Activity } from 'lucide-react'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 
 interface BurnRateData {
   date: string
@@ -39,21 +40,15 @@ export function BurnRateChart({ data, title = "Burn Rate Analysis", description 
   const [chartType, setChartType] = useState<'line' | 'bar' | 'area'>('line')
   const [showVelocity, setShowVelocity] = useState(true)
   const [showUtilization, setShowUtilization] = useState(false)
+  const { formatCurrency } = useOrgCurrency()
+  const formatBudget = (value: number) =>
+    formatCurrency(value, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', { 
       month: 'short', 
       day: 'numeric' 
     })
-  }
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value)
   }
 
   const formatPercentage = (value: number) => {
@@ -67,7 +62,7 @@ export function BurnRateChart({ data, title = "Burn Rate Analysis", description 
           <p className="font-medium">{formatDate(label)}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} style={{ color: entry.color }} className="text-sm">
-              {entry.name}: {entry.name.includes('Burn') ? formatCurrency(entry.value) : 
+              {entry.name}: {entry.name.includes('Burn') ? formatBudget(entry.value) : 
                            entry.name.includes('Utilization') ? formatPercentage(entry.value) :
                            entry.value}
             </p>
@@ -97,7 +92,7 @@ export function BurnRateChart({ data, title = "Burn Rate Analysis", description 
             <YAxis 
               yAxisId="burn"
               orientation="left"
-              tickFormatter={formatCurrency}
+              tickFormatter={formatBudget}
               tick={{ fontSize: 12 }}
             />
             {showUtilization && (
@@ -163,7 +158,7 @@ export function BurnRateChart({ data, title = "Burn Rate Analysis", description 
               tick={{ fontSize: 12 }}
             />
             <YAxis 
-              tickFormatter={formatCurrency}
+              tickFormatter={formatBudget}
               tick={{ fontSize: 12 }}
             />
             <Tooltip content={<CustomTooltip />} />
@@ -186,7 +181,7 @@ export function BurnRateChart({ data, title = "Burn Rate Analysis", description 
               tick={{ fontSize: 12 }}
             />
             <YAxis 
-              tickFormatter={formatCurrency}
+              tickFormatter={formatBudget}
               tick={{ fontSize: 12 }}
             />
             <Tooltip content={<CustomTooltip />} />
@@ -293,13 +288,13 @@ export function BurnRateChart({ data, title = "Burn Rate Analysis", description 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t">
               <div className="text-center">
                 <p className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(data.reduce((sum, d) => sum + d.plannedBurn, 0))}
+                  {formatBudget(data.reduce((sum, d) => sum + d.plannedBurn, 0))}
                 </p>
                 <p className="text-xs text-muted-foreground">Total Planned</p>
               </div>
               <div className="text-center">
                 <p className="text-2xl font-bold text-green-600">
-                  {formatCurrency(data.reduce((sum, d) => sum + d.actualBurn, 0))}
+                  {formatBudget(data.reduce((sum, d) => sum + d.actualBurn, 0))}
                 </p>
                 <p className="text-xs text-muted-foreground">Total Actual</p>
               </div>

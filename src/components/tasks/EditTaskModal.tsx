@@ -86,6 +86,7 @@ interface TaskFormData {
   labels: string
   story: string
   epic: string
+  isBillable: boolean
 }
 
 export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: EditTaskModalProps) {
@@ -113,7 +114,8 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
     estimatedHours: '',
     labels: '',
     story: '',
-    epic: ''
+    epic: '',
+    isBillable: true
   })
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
   const [initialFormData, setInitialFormData] = useState<TaskFormData | null>(null)
@@ -135,7 +137,8 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
         estimatedHours: task.estimatedHours?.toString() || '',
         labels: task.labels?.join(', ') || '',
         story: task.story?._id || task.story || '',
-        epic: task.epic?._id || task.epic || ''
+        epic: task.epic?._id || task.epic || '',
+        isBillable: typeof task.isBillable === 'boolean' ? task.isBillable : true
       }
       setFormData(initialData)
       setInitialFormData(initialData)
@@ -898,6 +901,18 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
                   value={formData.dueDate}
                   onChange={(e) => setFormData({...formData, dueDate: e.target.value})}
                   className="mt-1"
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-foreground">Billable</label>
+                  <p className="text-xs text-muted-foreground">Override project default for this task.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={formData.isBillable}
+                  onChange={(e) => setFormData(prev => ({ ...prev, isBillable: e.target.checked }))}
                 />
               </div>
 

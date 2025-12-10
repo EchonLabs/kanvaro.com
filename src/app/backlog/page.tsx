@@ -212,7 +212,19 @@ export default function BacklogPage() {
     checkAuth()
   }, [checkAuth])
 
-  // Fetch when pagination changes (after initial load)
+  // Fetch when pagination or filters change (after initial load)
+  useEffect(() => {
+    if (!loading && !authError) {
+      // Reset to page 1 when filters change
+      if (currentPage === 1) {
+        fetchBacklogItems()
+      } else {
+        setCurrentPage(1)
+      }
+    }
+  }, [searchQuery, typeFilter, priorityFilter, statusFilter, projectFilterValue, assignedToFilter, assignedByFilter, dateRangeFilter])
+
+  // Fetch when pagination changes
   useEffect(() => {
     if (!loading && !authError) {
       fetchBacklogItems()
@@ -234,6 +246,17 @@ export default function BacklogPage() {
       const params = new URLSearchParams()
       params.set('page', currentPage.toString())
       params.set('limit', pageSize.toString())
+      
+      // Add filters to API call
+      if (searchQuery) params.set('search', searchQuery)
+      if (typeFilter !== 'all') params.set('type', typeFilter)
+      if (priorityFilter !== 'all') params.set('priority', priorityFilter)
+      if (statusFilter !== 'all') params.set('status', statusFilter)
+      if (projectFilterValue !== 'all') params.set('project', projectFilterValue)
+      if (assignedToFilter !== 'all') params.set('assignedTo', assignedToFilter)
+      if (assignedByFilter !== 'all') params.set('createdBy', assignedByFilter)
+      if (dateRangeFilter?.from) params.set('createdAtFrom', dateRangeFilter.from.toISOString())
+      if (dateRangeFilter?.to) params.set('createdAtTo', dateRangeFilter.to.toISOString())
       
       const response = await fetch(`/api/backlog?${params.toString()}`)
       const data = await response.json()
@@ -303,6 +326,13 @@ export default function BacklogPage() {
   }
 
   const setTaskSelected = (taskId: string, shouldSelect: boolean) => {
+    // Prevent selecting tasks that are already in a sprint
+    if (shouldSelect) {
+      const task = backlogItems.find(item => item.type === 'task' && item._id === taskId)
+      if (task && task.sprint) {
+        return // Don't allow selection if task is already in a sprint
+      }
+    }
     setSelectedTaskIds((prev) => {
       if (shouldSelect) {
         if (prev.includes(taskId)) {
@@ -315,6 +345,13 @@ export default function BacklogPage() {
   }
 
   const setStorySelected = (storyId: string, shouldSelect: boolean) => {
+    // Prevent selecting stories that are already in a sprint
+    if (shouldSelect) {
+      const story = backlogItems.find(item => item.type === 'story' && item._id === storyId)
+      if (story && story.sprint) {
+        return // Don't allow selection if story is already in a sprint
+      }
+    }
     setSelectedStoryIds((prev) => {
       if (shouldSelect) {
         if (prev.includes(storyId)) {
@@ -461,10 +498,26 @@ export default function BacklogPage() {
       existingSprint?: { _id: string; name: string }
     }
   ) => {
-    const uniqueTaskIds = Array.from(new Set(taskIds.filter(Boolean)))
-    const uniqueStoryIds = Array.from(new Set(storyIds.filter(Boolean)))
+    // Filter out tasks and stories that are already in a sprint
+    const tasksNotInSprint = taskIds.filter(taskId => {
+      const task = backlogItems.find(item => item.type === 'task' && item._id === taskId)
+      return task && !task.sprint
+    })
+    const storiesNotInSprint = storyIds.filter(storyId => {
+      const story = backlogItems.find(item => item.type === 'story' && item._id === storyId)
+      return story && !story.sprint
+    })
     
-    if (uniqueTaskIds.length === 0 && uniqueStoryIds.length === 0) return
+    const uniqueTaskIds = Array.from(new Set(tasksNotInSprint.filter(Boolean)))
+    const uniqueStoryIds = Array.from(new Set(storiesNotInSprint.filter(Boolean)))
+    
+    if (uniqueTaskIds.length === 0 && uniqueStoryIds.length === 0) {
+      // Show error if all selected items are already in sprints
+      if (taskIds.length > 0 || storyIds.length > 0) {
+        setSprintsError('Selected items are already in a sprint and cannot be added to another sprint.')
+      }
+      return
+    }
 
     setTaskIdsForSprint(uniqueTaskIds)
     setStoryIdsForSprint(uniqueStoryIds)
@@ -520,16 +573,19 @@ export default function BacklogPage() {
   }, [showSprintModal, fetchAvailableSprints])
 
   useEffect(() => {
+    // Remove tasks and stories that are already in a sprint from selection
     setSelectedTaskIds((prev) => {
-      const validIds = prev.filter((id) =>
-        backlogItems.some((item) => item._id === id && item.type === 'task')
-      )
+      const validIds = prev.filter((id) => {
+        const item = backlogItems.find((item) => item._id === id && item.type === 'task')
+        return item && !item.sprint // Only keep tasks that are not in a sprint
+      })
       return validIds.length === prev.length ? prev : validIds
     })
     setSelectedStoryIds((prev) => {
-      const validIds = prev.filter((id) =>
-        backlogItems.some((item) => item._id === id && item.type === 'story')
-      )
+      const validIds = prev.filter((id) => {
+        const item = backlogItems.find((item) => item._id === id && item.type === 'story')
+        return item && !item.sprint // Only keep stories that are not in a sprint
+      })
       return validIds.length === prev.length ? prev : validIds
     })
   }, [backlogItems])
@@ -1494,7 +1550,10 @@ export default function BacklogPage() {
                 </div>
                 {selectMode && (
                   <p className="text-xs text-muted-foreground">
-                    Select stories or tasks to add to a sprint. When a story is selected, all its related tasks will be automatically included.
+                    Select stories or tasks to add to a sprint. When a story is selected, all its related tasks will be automatically included. 
+                    <span className="block mt-1 text-amber-600 dark:text-amber-400">
+                      Note: Items already in a sprint cannot be selected.
+                    </span>
                   </p>
                 )}
               </div>
@@ -1509,30 +1568,57 @@ export default function BacklogPage() {
                 const isTaskSelected = isTask && selectedTaskIds.includes(item._id)
                 const isStorySelected = isStory && selectedStoryIds.includes(item._id)
                 const isSelected = isTaskSelected || isStorySelected
+                const isInSprint = !!(item.sprint && item.sprint._id)
                 const showCheckbox = selectMode && (isTask || isStory)
+                const canSelect = !isInSprint // Can only select if not already in a sprint
 
                 return (
                   <Card
                     key={item._id}
                     className={cn(
-                      'hover:shadow-md transition-shadow',
-                      showCheckbox && isSelected && 'border-primary/60 bg-primary/5'
+                      'hover:shadow-md transition-shadow cursor-pointer',
+                      showCheckbox && isSelected && 'border-primary/60 bg-primary/5',
+                      showCheckbox && !canSelect && 'opacity-60'
                     )}
+                    onClick={(e) => {
+                      // Don't navigate if clicking on checkbox, dropdown, or buttons
+                      const target = e.target as HTMLElement
+                      if (
+                        target.closest('button') ||
+                        target.closest('[role="checkbox"]') ||
+                        target.closest('[role="menuitem"]') ||
+                        target.closest('.dropdown-menu')
+                      ) {
+                        return
+                      }
+                      // Navigate based on item type
+                      if (isTask) {
+                        router.push(`/tasks/${item._id}`)
+                      } else if (isStory) {
+                        router.push(`/stories/${item._id}`)
+                      } else if (item.type === 'epic') {
+                        router.push(`/epics/${item._id}`)
+                      }
+                    }}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">
                         {showCheckbox && (
                           <Checkbox
                             checked={isSelected}
+                            disabled={!canSelect}
                             onCheckedChange={(checked) => {
+                              if (!canSelect) return // Prevent selection if already in sprint
                               if (isTask) {
                                 setTaskSelected(item._id, Boolean(checked))
                               } else if (isStory) {
                                 setStorySelected(item._id, Boolean(checked))
                               }
                             }}
-                            aria-label={`Select ${item.title}`}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={canSelect ? `Select ${item.title}` : `${item.title} is already in a sprint and cannot be selected`}
                             className="mt-1"
+                            title={!canSelect ? `This ${item.type} is already in a sprint and cannot be selected` : undefined}
                           />
                         )}
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
@@ -1654,7 +1740,12 @@ export default function BacklogPage() {
                           <div className="flex items-center space-x-2 flex-shrink-0">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="flex-shrink-0">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="flex-shrink-0"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
@@ -2154,7 +2245,7 @@ export default function BacklogPage() {
                     </SelectContent>
                   </Select>
                   <span>
-                    Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}
+                    Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredAndSortedItems.length)} of {filteredAndSortedItems.length}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -2167,11 +2258,11 @@ export default function BacklogPage() {
                     Previous
                   </Button>
                   <span className="text-sm text-muted-foreground px-2">
-                    Page {currentPage} of {Math.ceil(totalCount / pageSize) || 1}
+                    Page {currentPage} of {Math.ceil(filteredAndSortedItems.length / pageSize) || 1}
                   </span>
                   <Button
                     onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage >= Math.ceil(totalCount / pageSize) || loading}
+                    disabled={currentPage >= Math.ceil(filteredAndSortedItems.length / pageSize) || loading}
                     variant="outline"
                     size="sm"
                   >

@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
+import { useOrganization } from '@/hooks/useOrganization'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -80,6 +81,8 @@ interface Project {
 export default function ProjectsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { organization } = useOrganization()
+  const orgCurrency = organization?.currency || 'USD'
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -516,7 +519,9 @@ export default function ProjectsPage() {
                         {project.budget && (
                           <div className="flex items-center space-x-1.5">
                             <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                            <span className="whitespace-nowrap">{project.budget.currency} {project.budget.total.toLocaleString()}</span>
+                            <span className="whitespace-nowrap">
+                              {new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.total)}
+                            </span>
                           </div>
                         )}
                       </div>

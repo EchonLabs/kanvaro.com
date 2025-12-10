@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -27,7 +28,8 @@ import {
   Trash2,
   Plus,
   Star,
-  Layers
+  Layers,
+  BookOpen
 } from 'lucide-react'
 
 interface Epic {
@@ -69,6 +71,7 @@ export default function EpicDetailPage() {
   const router = useRouter()
   const params = useParams()
   const epicId = params.id as string
+  const { setItems } = useBreadcrumb()
   
   const [epic, setEpic] = useState<Epic | null>(null)
   const [loading, setLoading] = useState(true)
@@ -76,6 +79,8 @@ export default function EpicDetailPage() {
   const [deleting, setDeleting] = useState(false)
   const [authError, setAuthError] = useState('')
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
+  const [stories, setStories] = useState<any[]>([])
+  const [storiesLoading, setStoriesLoading] = useState(false)
 
   const checkAuth = useCallback(async () => {
     try {
@@ -111,6 +116,14 @@ export default function EpicDetailPage() {
   }, [router, epicId])
 
   useEffect(() => {
+    // Set breadcrumb immediately on mount
+    setItems([
+      { label: 'Epics', href: '/epics' },
+      { label: 'View Epic' }
+    ])
+  }, [setItems])
+
+  useEffect(() => {
     checkAuth()
   }, [checkAuth])
 
@@ -122,6 +135,13 @@ export default function EpicDetailPage() {
 
       if (data.success) {
         setEpic(data.data)
+        // Ensure breadcrumb is set
+        setItems([
+          { label: 'Epics', href: '/epics' },
+          { label: 'View Epic' }
+        ])
+        // Fetch stories for this epic
+        fetchStories()
       } else {
         setError(data.error || 'Failed to fetch epic')
       }
@@ -129,6 +149,22 @@ export default function EpicDetailPage() {
       setError('Failed to fetch epic')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchStories = async () => {
+    try {
+      setStoriesLoading(true)
+      const response = await fetch(`/api/stories?epicId=${epicId}`)
+      const data = await response.json()
+
+      if (data.success) {
+        setStories(data.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch stories:', err)
+    } finally {
+      setStoriesLoading(false)
     }
   }
 
@@ -222,9 +258,9 @@ export default function EpicDetailPage() {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <p className="text-destructive mb-4">{error || 'Epic not found'}</p>
-            <Button onClick={() => router.push('/epics')}>
+            <Button onClick={() => router.back()}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Epics
+              Back
             </Button>
           </div>
         </div>
@@ -237,7 +273,7 @@ export default function EpicDetailPage() {
       <div className="space-y-6 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto min-w-0">
-            <Button variant="ghost" onClick={() => router.push('/epics')} className="w-full sm:w-auto flex-shrink-0">
+            <Button variant="ghost" onClick={() => router.back()} className="w-full sm:w-auto flex-shrink-0">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
@@ -328,6 +364,64 @@ export default function EpicDetailPage() {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="overflow-x-hidden">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Stories ({stories.length})
+                </CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Stories under this epic</CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 sm:p-6 pt-0">
+                {storiesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : stories.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No stories found for this epic.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {stories.map((story) => (
+                      <Card
+                        key={story._id}
+                        className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-blue-500"
+                        onClick={() => router.push(`/stories/${story._id}`)}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-sm sm:text-base text-foreground mb-1 truncate" title={story.title}>
+                                {story.title}
+                              </h4>
+                              {story.description && (
+                                <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mb-2">
+                                  {story.description}
+                                </p>
+                              )}
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge className={`${getStatusColor(story.status)} text-xs`}>
+                                  {getStatusIcon(story.status)}
+                                  <span className="ml-1">{formatToTitleCase(story.status)}</span>
+                                </Badge>
+                                <Badge className={`${getPriorityColor(story.priority)} text-xs`}>
+                                  {formatToTitleCase(story.priority)}
+                                </Badge>
+                                {story.storyPoints && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {story.storyPoints} pts
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

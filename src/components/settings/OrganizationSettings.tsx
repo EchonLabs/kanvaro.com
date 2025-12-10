@@ -15,7 +15,9 @@ import { useCurrencies } from '@/hooks/useCurrencies'
 
 export function OrganizationSettings() {
   const { organization, loading, refetch } = useOrganization()
-  const { currencies, loading: currenciesLoading, formatCurrencyDisplay } = useCurrencies(true)
+  const { currencies, loading: currenciesLoading, formatCurrencyDisplay, getCurrencyByCode } = useCurrencies(true)
+  const orgCurrency = organization?.currency || 'USD'
+  const currencySymbol = getCurrencyByCode(orgCurrency)?.symbol || '$'
   const [saving, setSaving] = useState(false)
   const [savingRegistration, setSavingRegistration] = useState(false)
   const [savingTimeTracking, setSavingTimeTracking] = useState(false)
@@ -1000,7 +1002,7 @@ export function OrganizationSettings() {
 
               {formData.timeTracking.allowBillableTime && (
                 <div>
-                  <Label htmlFor="defaultHourlyRate" className="text-xs sm:text-sm">Default Hourly Rate ($)</Label>
+                  <Label htmlFor="defaultHourlyRate" className="text-xs sm:text-sm">Default Hourly Rate ({currencySymbol})</Label>
                   <Input
                     id="defaultHourlyRate"
                     type="number"

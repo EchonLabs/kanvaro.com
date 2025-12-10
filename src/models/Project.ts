@@ -6,9 +6,14 @@ export interface IProject extends Document {
   status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   isDraft: boolean
+  isBillableByDefault: boolean
   organization: mongoose.Types.ObjectId
   createdBy: mongoose.Types.ObjectId
   teamMembers: mongoose.Types.ObjectId[]
+  memberRates?: Array<{
+    user: mongoose.Types.ObjectId
+    hourlyRate: number
+  }>
   client?: mongoose.Types.ObjectId
   projectNumber: number
   // Project-specific roles for team members
@@ -25,7 +30,6 @@ export interface IProject extends Document {
     spent: number
     currency: string
     categories: {
-      labor: number
       materials: number
       overhead: number
       external: number
@@ -61,6 +65,10 @@ export interface IProject extends Document {
     uploadedBy: mongoose.Types.ObjectId
     uploadedAt: Date
   }[]
+  externalLinks?: {
+    figma?: string[]
+    documentation?: string[]
+  }
   // Test management - versions array
   versions: {
     name: string
@@ -94,6 +102,11 @@ const ProjectSchema = new Schema<IProject>({
   createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   projectNumber: { type: Number, required: true },
   teamMembers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+  isBillableByDefault: { type: Boolean, default: true },
+  memberRates: [{
+    user: { type: Schema.Types.ObjectId, ref: 'User' },
+    hourlyRate: Number
+  }],
   client: { type: Schema.Types.ObjectId, ref: 'User' },
   // Project-specific roles
   projectRoles: [{
@@ -113,11 +126,11 @@ const ProjectSchema = new Schema<IProject>({
     spent: { type: Number, default: 0 },
     currency: { type: String, default: 'USD' },
     categories: {
-      labor: { type: Number, default: 0 },
       materials: { type: Number, default: 0 },
       overhead: { type: Number, default: 0 },
       external: { type: Number, default: 0 }
     },
+    defaultHourlyRate: { type: Number, default: 0 },
     lastUpdated: { type: Date, default: Date.now },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User' }
   },
@@ -149,6 +162,10 @@ const ProjectSchema = new Schema<IProject>({
     uploadedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     uploadedAt: { type: Date, default: Date.now }
   }],
+  externalLinks: {
+    figma: { type: [String], default: [] },
+    documentation: { type: [String], default: [] }
+  },
   // Test management - versions array
   versions: [{
     name: { type: String, required: true, trim: true, maxlength: 200 },
@@ -161,7 +178,8 @@ const ProjectSchema = new Schema<IProject>({
   }],
   archived: { type: Boolean, default: false }
 }, {
-  timestamps: true
+  timestamps: true,
+  minimize: false // Prevent Mongoose from removing empty objects
 })
 
 // Indexes

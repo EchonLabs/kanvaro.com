@@ -2,6 +2,7 @@
 
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useEffect, useMemo, useState } from 'react'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Progress } from '@/components/ui/Progress'
@@ -21,10 +22,19 @@ import {
 } from 'lucide-react'
 
 export default function TestReportsPage() {
+  const { setItems } = useBreadcrumb()
   const [cases, setCases] = useState<any[]>([])
   const [executions, setExecutions] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Set breadcrumb
+    setItems([
+      { label: 'Test Management', href: '/test-management' },
+      { label: 'Test Reports' }
+    ])
+  }, [setItems])
 
   useEffect(() => {
     const fetchData = async () => {

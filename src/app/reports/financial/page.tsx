@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { PageWrapper } from '@/components/layout/PageWrapper'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -71,6 +72,7 @@ interface FilterState {
 }
 
 export default function FinancialReportsPage() {
+  const { setItems } = useBreadcrumb()
   const [reportData, setReportData] = useState<FinancialReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
@@ -88,6 +90,14 @@ export default function FinancialReportsPage() {
     sortOrder: 'desc'
   })
   const [showFilters, setShowFilters] = useState(false)
+
+  useEffect(() => {
+    // Set breadcrumb
+    setItems([
+      { label: 'Reports', href: '/reports' },
+      { label: 'Financial Reports' }
+    ])
+  }, [setItems])
 
   useEffect(() => {
     fetchFinancialReports()

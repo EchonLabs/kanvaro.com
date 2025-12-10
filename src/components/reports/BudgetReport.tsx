@@ -44,7 +44,6 @@ interface BudgetData {
       spent: number
       currency: string
       categories: {
-        labor: number
         materials: number
         overhead: number
         external: number
@@ -112,7 +111,6 @@ export function BudgetReport({ projectId }: BudgetReportProps) {
 
   const getCategoryColor = (category: string) => {
     const colors = {
-      labor: 'bg-blue-500',
       materials: 'bg-green-500',
       overhead: 'bg-yellow-500',
       external: 'bg-purple-500',

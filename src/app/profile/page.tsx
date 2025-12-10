@@ -426,7 +426,7 @@ export default function ProfilePage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2">
+                    {/* <div className="space-y-2">
                       <Label htmlFor="currency">Currency</Label>
                       <Select value={formData.currency} onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value }))}>
                         <SelectTrigger>
@@ -444,7 +444,7 @@ export default function ProfilePage() {
                           )}
                         </SelectContent>
                       </Select>
-                    </div>
+                    </div> */}
                   </div>
                 </CardContent>
               </Card>

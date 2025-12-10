@@ -236,14 +236,14 @@ const navigationItems = [
         id: 'reports-project',
         label: 'Project Reports',
         icon: FolderOpen,
-        path: '/reports/projects',
+        path: '/reports/project-reports',
         permission: Permission.REPORTING_VIEW
       },
       {
         id: 'reports-gantt',
         label: 'Gantt Chart',
         icon: Calendar,
-        path: '/reports/projects/gantt',
+        path: '/reports/project-reports/gantt',
         permission: Permission.REPORTING_VIEW
       },
       {

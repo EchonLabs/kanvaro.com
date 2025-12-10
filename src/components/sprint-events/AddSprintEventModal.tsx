@@ -65,23 +65,23 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
   const [selectedDate, setSelectedDate] = useState<Date>()
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [linkUrl, setLinkUrl] = useState('')
-  
+
   // Search queries for dropdowns
   const [projectQuery, setProjectQuery] = useState('')
   const [sprintQuery, setSprintQuery] = useState('')
   const [eventTypeQuery, setEventTypeQuery] = useState('')
   const [statusQuery, setStatusQuery] = useState('')
   const [attendeeQuery, setAttendeeQuery] = useState('')
-  
+
   // Debounced search queries (300ms delay)
   const debouncedProjectQuery = useDebounce(projectQuery, 300)
   const debouncedSprintQuery = useDebounce(sprintQuery, 300)
   const debouncedEventTypeQuery = useDebounce(eventTypeQuery, 300)
   const debouncedAttendeeQuery = useDebounce(attendeeQuery, 300)
-  
+
   // Request cancellation
   const abortControllerRef = useRef<AbortController | null>(null)
-  
+
   // Simple cache for API responses (5 minute TTL)
   const cacheRef = useRef<{
     projects?: { data: Project[]; timestamp: number }
@@ -89,13 +89,13 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     users?: { data: User[]; timestamp: number }
   }>({})
   const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
-  
+
   // Separate error messages for start and end time
   const [startTimeError, setStartTimeError] = useState('')
   const [endTimeError, setEndTimeError] = useState('')
   const [dateError, setDateError] = useState('')
   const [selectedSprint, setSelectedSprint] = useState<Sprint | null>(null)
-  
+
   const [formData, setFormData] = useState({
     projectId: projectId || '',
     sprintId: '',
@@ -123,7 +123,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
       reminderTime: 'none' as 'none' | '10mins' | '30mins' | '1hour' | '24hours',
       emailReminder1Day: true,
       notificationReminder1Hour: true,
-      notificationReminder5Min: true
+      notificationReminder15Min: true
     }
   })
 
@@ -153,11 +153,11 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
       setProjects(cached.data)
       return
     }
-    
+
     try {
       const response = await fetch('/api/projects', { signal })
       if (signal?.aborted) return
-      
+
       if (response.ok) {
         const data = await response.json()
         const projectsData = data.data || data.projects || []
@@ -172,27 +172,27 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
   }, [])
 
   const fetchSprints = useCallback(async (projId: string, signal?: AbortSignal) => {
-      if (!projId) {
-        setSprints([])
-        return
-      }
-    
+    if (!projId) {
+      setSprints([])
+      return
+    }
+
     // Check cache first
     const cached = cacheRef.current.sprints
     if (cached && cached.projectId === projId && Date.now() - cached.timestamp < CACHE_DURATION) {
       setSprints(cached.data)
       return
     }
-    
+
     try {
       const response = await fetch(`/api/sprints?project=${projId}&limit=100`, { signal })
       if (signal?.aborted) return
-      
+
       if (response.ok) {
         const data = await response.json()
         const allSprints = data.data || data.sprints || []
         // Only show planning and active sprints
-        const filteredSprints = allSprints.filter((sprint: Sprint) => 
+        const filteredSprints = allSprints.filter((sprint: Sprint) =>
           sprint.status === 'planning' || sprint.status === 'active'
         )
         setSprints(filteredSprints)
@@ -215,11 +215,11 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
       setUsers(cached.data)
       return
     }
-    
+
     try {
       const response = await fetch('/api/members?limit=1000', { signal })
       if (signal?.aborted) return
-      
+
       if (response.ok) {
         const data = await response.json()
         // Handle different response structures
@@ -241,7 +241,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
         // Fallback to /api/users if /api/members fails
         const fallbackResponse = await fetch('/api/users', { signal })
         if (signal?.aborted) return
-        
+
         if (fallbackResponse.ok) {
           const usersData = await fallbackResponse.json()
           const usersArray = Array.isArray(usersData) ? usersData : []
@@ -253,12 +253,12 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return
-      
+
       // Try fallback API
       try {
         const fallbackResponse = await fetch('/api/users', { signal })
         if (signal?.aborted) return
-        
+
         if (fallbackResponse.ok) {
           const usersData = await fallbackResponse.json()
           const usersArray = Array.isArray(usersData) ? usersData : []
@@ -281,28 +281,28 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
-    
+
     abortControllerRef.current = new AbortController()
     const signal = abortControllerRef.current.signal
-    
+
     // Fetch all data in parallel
     const fetchAllData = async () => {
       const promises: Promise<void>[] = []
-      
+
       // Always fetch users (cached)
       promises.push(fetchUsers(signal))
-      
+
       if (projectId) {
         promises.push(fetchSprints(projectId, signal))
       } else {
         promises.push(fetchProjects(signal))
       }
-      
+
       await Promise.all(promises)
     }
-    
+
     fetchAllData()
-    
+
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
@@ -317,12 +317,12 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
         ...prev,
         sprintId: ''
       }))
-      
+
       // Cancel previous request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
       }
-      
+
       abortControllerRef.current = new AbortController()
       fetchSprints(formData.projectId, abortControllerRef.current.signal)
     }
@@ -331,7 +331,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
   // Date validation function
   const validateDate = useCallback((date: Date) => {
     setDateError('')
-    
+
     if (!selectedSprint || !selectedSprint.startDate || !selectedSprint.endDate) {
       return true // Allow if sprint details not loaded yet
     }
@@ -354,6 +354,21 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
       return false
     }
 
+    // Special validation for Sprint Review: must be AFTER sprint end date
+    if (formData.eventType === 'review') {
+      const dayAfterSprintEnd = new Date(selectedSprint.endDate)
+      dayAfterSprintEnd.setDate(dayAfterSprintEnd.getDate() + 1)
+      dayAfterSprintEnd.setHours(0, 0, 0, 0)
+
+      if (selected < dayAfterSprintEnd) {
+        setDateError(`Sprint Review must be scheduled after the sprint ends (after ${format(sprintEnd, 'MMM dd, yyyy')})`)
+        return false
+      }
+      // No upper limit for Sprint Review
+      return true
+    }
+
+    // For other event types, validate within sprint dates
     // Check if date is before sprint start
     if (selected < sprintStart) {
       setDateError(`Date must be on or after sprint start date (${format(sprintStart, 'MMM dd, yyyy')})`)
@@ -367,7 +382,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     }
 
     return true
-  }, [selectedSprint])
+  }, [selectedSprint, formData.eventType])
 
   const handleDateSelect = (date: Date | undefined) => {
     if (!date) {
@@ -473,7 +488,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
           // Use uploadedByName from API when available, otherwise fall back to a generic label
           uploadedBy: data.uploadedByName || 'Attachment',
           uploadedAt: data.uploadedAt || new Date().toISOString()
-      }
+        }
       ])
     } catch (error) {
       console.error('Error uploading file:', error)
@@ -490,28 +505,28 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
       window.open(attachment.url, '_blank', 'noopener,noreferrer')
       return
     }
-    
+
     try {
       // Fetch the file as a blob to force download
       const response = await fetch(attachment.url)
       if (!response.ok) {
         throw new Error('Failed to fetch file')
       }
-      
+
       const blob = await response.blob()
       const blobUrl = window.URL.createObjectURL(blob)
-      
+
       // Create a temporary link element to trigger download
       const link = document.createElement('a')
       link.href = blobUrl
       link.download = attachment.name
       link.style.display = 'none'
-      
+
       // Append to body, click, then remove
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      
+
       // Clean up the blob URL after a short delay
       setTimeout(() => {
         window.URL.revokeObjectURL(blobUrl)
@@ -593,28 +608,28 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
   // Check if form is valid
   const isFormValid = () => {
     const projId = projectId || formData.projectId
-    const hasRequiredFields = 
+    const hasRequiredFields =
       projId &&
       formData.sprintId &&
       formData.eventType &&
       formData.title &&
       selectedDate
-    
+
     // If start time is provided, end time must also be provided and valid
     // If both times are provided, they must be valid (no timeError) and duration must be > 0
-    const hasValidTime = 
+    const hasValidTime =
       (!formData.startTime && !formData.endTime) || // Both empty is OK (optional)
       (formData.startTime && formData.endTime && !startTimeError && !endTimeError && formData.duration > 0) // Both filled and valid
-    
+
     // Check date validation - date must be valid if selected
     const hasValidDate = !dateError || (selectedDate && (!selectedSprint || validateDate(selectedDate)))
-    
+
     return hasRequiredFields && hasValidTime && hasValidDate
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!isFormValid()) {
       return
     }
@@ -660,7 +675,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
             reminderTime: formData.notificationSettings.reminderTime,
             emailReminder1Day: formData.notificationSettings.emailReminder1Day,
             notificationReminder1Hour: formData.notificationSettings.notificationReminder1Hour,
-            notificationReminder5Min: formData.notificationSettings.notificationReminder5Min
+            notificationReminder15Min: formData.notificationSettings.notificationReminder15Min
           } : undefined
         })
       })
@@ -718,7 +733,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
         [field]: value
       }))
     }
-    
+
     // Reset sprint and attendees when project changes
     if (field === 'projectId' && value) {
       setFormData(prev => ({
@@ -746,32 +761,32 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     const query = debouncedProjectQuery.toLowerCase()
     return projects.filter(p => p.name.toLowerCase().includes(query))
   }, [projects, debouncedProjectQuery])
-  
+
   const filteredSprints = useMemo(() => {
     if (!debouncedSprintQuery.trim()) return sprints
     const query = debouncedSprintQuery.toLowerCase()
     return sprints.filter(s => s.name.toLowerCase().includes(query))
   }, [sprints, debouncedSprintQuery])
-  
+
   const filteredEventTypes = useMemo(() => {
     if (!debouncedEventTypeQuery.trim()) return eventTypes
     const query = debouncedEventTypeQuery.toLowerCase()
     return eventTypes.filter(et => et.label.toLowerCase().includes(query))
   }, [debouncedEventTypeQuery])
-  
+
   const filteredStatusOptions = useMemo(() => {
     if (!statusQuery.trim()) return statusOptions
     const query = statusQuery.toLowerCase()
     return statusOptions.filter(so => so.label.toLowerCase().includes(query))
   }, [statusQuery])
-  
+
   const filteredUsers = useMemo(() => {
     if (!Array.isArray(users)) return []
     if (!debouncedAttendeeQuery.trim()) return users
     const query = debouncedAttendeeQuery.toLowerCase()
     return users.filter((u: User) => {
-    const fullName = `${u.firstName} ${u.lastName}`.toLowerCase()
-    return fullName.includes(query) || u.email.toLowerCase().includes(query)
+      const fullName = `${u.firstName} ${u.lastName}`.toLowerCase()
+      return fullName.includes(query) || u.email.toLowerCase().includes(query)
     })
   }, [users, debouncedAttendeeQuery])
 
@@ -818,8 +833,8 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
               {!projectId && (
                 <div className="space-y-2">
                   <Label htmlFor="projectId">Project *</Label>
-                  <Select 
-                    value={formData.projectId} 
+                  <Select
+                    value={formData.projectId}
                     onValueChange={(value) => handleInputChange('projectId', value)}
                     onOpenChange={(open) => { if (open) setProjectQuery('') }}
                   >
@@ -853,8 +868,8 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="sprintId">Sprint *</Label>
-                  <Select 
-                    value={formData.sprintId} 
+                  <Select
+                    value={formData.sprintId}
                     onValueChange={(value) => handleInputChange('sprintId', value)}
                     disabled={!formData.projectId && !projectId}
                     onOpenChange={(open) => { if (open) setSprintQuery('') }}
@@ -889,8 +904,8 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="eventType">Event Type *</Label>
-                  <Select 
-                    value={formData.eventType} 
+                  <Select
+                    value={formData.eventType}
                     onValueChange={(value) => handleInputChange('eventType', value)}
                     onOpenChange={(open) => { if (open) setEventTypeQuery('') }}
                   >
@@ -953,24 +968,24 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                           today.setHours(0, 0, 0, 0)
                           const checkDate = new Date(date)
                           checkDate.setHours(0, 0, 0, 0)
-                          
+
                           // Disable past dates
                           if (checkDate < today) {
                             return true
                           }
-                          
+
                           // Disable dates outside sprint range if sprint is selected
                           if (selectedSprint && selectedSprint.startDate && selectedSprint.endDate) {
                             const sprintStart = new Date(selectedSprint.startDate)
                             sprintStart.setHours(0, 0, 0, 0)
                             const sprintEnd = new Date(selectedSprint.endDate)
                             sprintEnd.setHours(23, 59, 59, 999)
-                            
+
                             if (checkDate < sprintStart || checkDate > sprintEnd) {
                               return true
                             }
                           }
-                          
+
                           return false
                         }}
                         initialFocus
@@ -986,12 +1001,12 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="status">Status *</Label>
-                        <Input
+                  <Input
                     id="status"
                     value="Scheduled"
                     disabled
                     className="bg-muted"
-                        />
+                  />
                   <input type="hidden" value={formData.status} />
                 </div>
               </div>
@@ -1048,23 +1063,39 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
               <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
                 <div className="space-y-2">
                   <Label htmlFor="recurrenceType">Repeat</Label>
-                  <Select 
-                    value={formData.recurrence.type} 
-                    onValueChange={(value) => handleInputChange('recurrence.type', value)}
+                  <Select
+                    value={formData.recurrence.type}
+                    onValueChange={(value) => {
+                      handleInputChange('recurrence.type', value)
+                      // For Daily Standup with Continuous, auto-set weekdays
+                      if (formData.eventType === 'daily_standup' && value === 'weekly') {
+                        handleInputChange('recurrence.interval', 1)
+                        handleInputChange('recurrence.daysOfWeek', [1, 2, 3, 4, 5]) // Mon-Fri
+                      }
+                    }}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Does not repeat" />
+                      <SelectValue placeholder={formData.eventType === 'daily_standup' ? 'One-time' : 'Does not repeat'} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Does not repeat</SelectItem>
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
+                      {formData.eventType === 'daily_standup' ? (
+                        <>
+                          <SelectItem value="none">One-time</SelectItem>
+                          <SelectItem value="weekly">Continuous (Weekdays)</SelectItem>
+                        </>
+                      ) : (
+                        <>
+                          <SelectItem value="none">Does not repeat</SelectItem>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
 
-                {formData.recurrence.type !== 'none' && (
+                {formData.recurrence.type !== 'none' && !(formData.eventType === 'daily_standup' && formData.recurrence.type === 'weekly') && (
                   <>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -1095,8 +1126,8 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                           <PopoverTrigger asChild>
                             <Button variant="outline" className="w-full justify-start text-left font-normal">
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {formData.recurrence.endDate 
-                                ? format(formData.recurrence.endDate, 'PPP') 
+                              {formData.recurrence.endDate
+                                ? format(formData.recurrence.endDate, 'PPP')
                                 : 'No end date'}
                             </Button>
                           </PopoverTrigger>
@@ -1145,8 +1176,8 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                     {formData.recurrence.type === 'monthly' && (
                       <div className="space-y-2">
                         <Label htmlFor="dayOfMonth">Day of month</Label>
-                        <Select 
-                          value={formData.recurrence.dayOfMonth?.toString() || ''} 
+                        <Select
+                          value={formData.recurrence.dayOfMonth?.toString() || ''}
                           onValueChange={(value) => handleInputChange('recurrence.dayOfMonth', parseInt(value))}
                         >
                           <SelectTrigger>
@@ -1266,7 +1297,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                   />
                   <span className="text-sm font-medium">Enable reminders</span>
                 </label>
-                
+
                 {formData.notificationSettings.enabled && (
                   <div className="space-y-4 ml-6">
                     {/* Email Reminders */}
@@ -1293,18 +1324,18 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                       </label>
                       <label className="flex items-center space-x-2">
                         <Checkbox
-                          checked={formData.notificationSettings.notificationReminder5Min}
-                          onCheckedChange={(checked) => handleInputChange('notificationSettings.notificationReminder5Min', checked)}
+                          checked={formData.notificationSettings.notificationReminder15Min}
+                          onCheckedChange={(checked) => handleInputChange('notificationSettings.notificationReminder15Min', checked)}
                         />
-                        <span className="text-sm">5 minutes before the event</span>
+                        <span className="text-sm">15 minutes before the event</span>
                       </label>
                     </div>
 
                     {/* Legacy reminder time selector */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-muted-foreground">Additional Reminder</Label>
-                      <Select 
-                        value={formData.notificationSettings.reminderTime} 
+                      <Select
+                        value={formData.notificationSettings.reminderTime}
                         onValueChange={(value) => handleInputChange('notificationSettings.reminderTime', value)}
                       >
                         <SelectTrigger className="w-full">
@@ -1351,9 +1382,9 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button 
-            type="submit" 
-            form="create-sprint-event-form" 
+          <Button
+            type="submit"
+            form="create-sprint-event-form"
             disabled={loading || !isFormValid()}
           >
             {loading ? (

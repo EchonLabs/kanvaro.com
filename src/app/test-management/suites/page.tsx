@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import TestSuiteTree from '@/components/test-management/TestSuiteTree'
 import { TestSuiteForm } from '@/components/test-management/TestSuiteForm'
 import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmDialog'
@@ -18,6 +19,7 @@ interface TestSuite {
 }
 
 export default function TestSuitesPage() {
+  const { setItems } = useBreadcrumb()
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [testSuites, setTestSuites] = useState<TestSuite[]>([])
   const [testSuiteDialogOpen, setTestSuiteDialogOpen] = useState(false)
@@ -26,6 +28,14 @@ export default function TestSuitesPage() {
   const [deleteItem, setDeleteItem] = useState<{ id: string; name: string } | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  useEffect(() => {
+    // Set breadcrumb
+    setItems([
+      { label: 'Test Management', href: '/test-management' },
+      { label: 'Test Suites' }
+    ])
+  }, [setItems])
 
   useEffect(() => {
     // In a real app, you'd fetch the user's projects and set the first one

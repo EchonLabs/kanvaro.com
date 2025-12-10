@@ -9,11 +9,11 @@ import { formatToTitleCase } from '@/lib/utils'
 import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { 
-  Search, 
-  Filter, 
-  MoreHorizontal, 
-  Calendar, 
+import {
+  Search,
+  Filter,
+  MoreHorizontal,
+  Calendar,
   Clock,
   CheckCircle,
   AlertTriangle,
@@ -25,7 +25,8 @@ import {
   Loader2,
   Plus,
   BarChart3,
-  RefreshCw
+  RefreshCw,
+  History
 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 
@@ -53,6 +54,10 @@ interface Task {
   labels: string[]
   createdAt: string
   updatedAt: string
+  movedFromSprint?: {
+    _id: string
+    name: string
+  }
 }
 
 interface BacklogViewProps {
@@ -159,10 +164,10 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
 
   const filteredAndSortedTasks = tasks
     .filter(task => {
-      const matchesSearch = !searchQuery || 
+      const matchesSearch = !searchQuery ||
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         task.description.toLowerCase().includes(searchQuery.toLowerCase())
-      
+
       const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
       const matchesType = typeFilter === 'all' || task.type === typeFilter
 
@@ -192,8 +197,8 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
     const previousStatus = previousTask?.status
 
     // Optimistic update - update UI immediately
-    setTasks(prevTasks => 
-      prevTasks.map(task => 
+    setTasks(prevTasks =>
+      prevTasks.map(task =>
         task._id === taskId ? { ...task, status: newStatus as any } : task
       )
     )
@@ -208,7 +213,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
       })
 
       const contentType = response.headers.get('content-type') || ''
-      
+
       if (!response.ok) {
         // Check if response is JSON or HTML
         if (contentType.includes('application/json')) {
@@ -229,26 +234,26 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
       }
 
       const data = await response.json()
-      
+
       if (data.success && data.data) {
         // Update with server response to ensure consistency
-        setTasks(prevTasks => 
-          prevTasks.map(task => 
+        setTasks(prevTasks =>
+          prevTasks.map(task =>
             task._id === taskId ? { ...task, ...data.data, status: newStatus as any } : task
           )
         )
       } else if (data.success) {
         // If success but no data, just update status
-        setTasks(prevTasks => 
-          prevTasks.map(task => 
+        setTasks(prevTasks =>
+          prevTasks.map(task =>
             task._id === taskId ? { ...task, status: newStatus as any } : task
           )
         )
       } else {
         // Revert on error
         if (previousStatus) {
-          setTasks(prevTasks => 
-            prevTasks.map(task => 
+          setTasks(prevTasks =>
+            prevTasks.map(task =>
               task._id === taskId ? { ...task, status: previousStatus } : task
             )
           )
@@ -259,14 +264,14 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
       console.error('Failed to update task status:', error)
       // Revert on error
       if (previousStatus) {
-        setTasks(prevTasks => 
-          prevTasks.map(task => 
+        setTasks(prevTasks =>
+          prevTasks.map(task =>
             task._id === taskId ? { ...task, status: previousStatus } : task
           )
         )
       }
-      const errorMessage = error instanceof Error 
-        ? error.message 
+      const errorMessage = error instanceof Error
+        ? error.message
         : 'Failed to update task status. The API endpoint may not be available in this environment.'
       setError(errorMessage)
     }
@@ -281,7 +286,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
       })
 
       const data = await response.json()
-      
+
       if (data.success) {
         setTasks(tasks.filter(task => task._id !== taskId))
       }
@@ -295,7 +300,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
     const todoTasks = tasks.filter(task => task.status === 'todo').length
     const inProgressTasks = tasks.filter(task => task.status === 'in_progress').length
     const completedTasks = tasks.filter(task => task.status === 'done').length
-    
+
     // Calculate story points from user stories (not tasks)
     // Consider stories with status 'done' or 'completed' as completed
     const totalStoryPoints = stories.reduce((sum, story) => sum + (story.storyPoints || 0), 0)
@@ -427,9 +432,9 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
               <span className="font-medium">{stats.completionPercentage}%</span>
             </div>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
-              <div 
+              <div
                 className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full transition-all duration-300 ease-out"
-                style={{ 
+                style={{
                   width: `${Math.min(100, Math.max(0, stats.completionPercentage || 0))}%`,
                   minWidth: stats.completionPercentage > 0 ? '2px' : '0px'
                 }}
@@ -497,8 +502,8 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
       {/* Backlog Items */}
       <div className="space-y-4">
         {filteredAndSortedTasks.map((task, index) => (
-          <Card 
-            key={task._id} 
+          <Card
+            key={task._id}
             className="hover:shadow-md transition-shadow cursor-pointer"
             onClick={() => router.push(`/tasks/${task._id}`)}
           >
@@ -521,6 +526,12 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
                         <Badge variant="outline" className="hover:bg-transparent dark:hover:bg-transparent">
                           <BarChart3 className="h-3 w-3 mr-1" />
                           {task.storyPoints} pts
+                        </Badge>
+                      )}
+                      {task.movedFromSprint && (
+                        <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900">
+                          <History className="h-3 w-3 mr-1" />
+                          Moved from {task.movedFromSprint.name}
                         </Badge>
                       )}
                     </div>
@@ -559,8 +570,8 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
                   </div>
                 </div>
                 <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
-                  <Select 
-                    value={task.status} 
+                  <Select
+                    value={task.status}
                     onValueChange={(value) => handleStatusChange(task._id, value)}
                   >
                     <SelectTrigger className="w-32">
@@ -590,7 +601,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
                         View Details
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem 
+                      <DropdownMenuItem
                         onClick={() => handleDeleteTask(task._id)}
                         className="text-destructive focus:text-destructive"
                       >

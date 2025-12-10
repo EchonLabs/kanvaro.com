@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { formatToTitleCase } from '@/lib/utils'
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { 
   ArrowLeft,
   Calendar,
@@ -29,10 +30,13 @@ import {
   Wrench,
   Layers,
   Circle,
-  Paperclip
+  Paperclip,
+  MessageSquarePlus
 } from 'lucide-react'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { AttachmentList } from '@/components/ui/AttachmentList'
+import { Input } from '@/components/ui/Input'
+import { Textarea } from '@/components/ui/textarea'
 
 interface Task {
   _id: string
@@ -100,18 +104,51 @@ interface Task {
       email?: string
     }
   }>
+  comments?: Array<{
+    _id?: string
+    content: string
+    createdAt: string
+    author?: {
+      firstName?: string
+      lastName?: string
+      email?: string
+      _id?: string
+    }
+    mentions?: string[]
+    linkedIssues?: Array<{
+      _id?: string
+      displayId?: string
+      title?: string
+    }>
+  }>
+}
+
+type SuggestionItem = {
+  _id: string
+  name?: string
+  displayId?: string
+  title?: string
 }
 
 export default function TaskDetailPage() {
   const router = useRouter()
   const params = useParams()
   const taskId = params.id as string
+  const { setItems } = useBreadcrumb()
   
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
+  const [commentContent, setCommentContent] = useState('')
+  const [commentSubmitting, setCommentSubmitting] = useState(false)
+  const [mentionsList, setMentionsList] = useState<Array<{ _id: string; name: string }>>([])
+  const [issuesList, setIssuesList] = useState<Array<{ _id: string; displayId?: string; title?: string }>>([])
+  const [suggestionMode, setSuggestionMode] = useState<'mention' | 'issue' | null>(null)
+  const [suggestionQuery, setSuggestionQuery] = useState('')
+  const [suggestionPos, setSuggestionPos] = useState<{ top: number; left: number } | null>(null)
+  const editorRef = useRef<HTMLTextAreaElement | null>(null)
 
   const checkAuth = useCallback(async () => {
     try {
@@ -147,6 +184,14 @@ export default function TaskDetailPage() {
   }, [router, taskId])
 
   useEffect(() => {
+    // Set breadcrumb immediately on mount
+    setItems([
+      { label: 'Tasks', href: '/tasks' },
+      { label: 'View Task' }
+    ])
+  }, [setItems])
+
+  useEffect(() => {
     checkAuth()
   }, [checkAuth])
 
@@ -158,6 +203,17 @@ export default function TaskDetailPage() {
 
       if (data.success) {
         setTask(data.data)
+        // preload mentions and issues lists (project members and project tasks)
+        const projectId = data.data?.project?._id
+        if (projectId) {
+          fetchProjectMembers(projectId)
+          fetchProjectIssues(projectId)
+        }
+        // Ensure breadcrumb is set
+        setItems([
+          { label: 'Tasks', href: '/tasks' },
+          { label: 'View Task' }
+        ])
       } else {
         setError(data.error || 'Failed to fetch task')
       }
@@ -165,6 +221,40 @@ export default function TaskDetailPage() {
       setError('Failed to fetch task')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchProjectMembers = async (projectId: string) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}`)
+      const data = await res.json()
+      if (data?.success && data.data?.teamMembers) {
+        const members = data.data.teamMembers.map((m: any) => ({
+          _id: m._id,
+          name: `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.email || 'User'
+        }))
+        setMentionsList(members)
+      }
+    } catch (e) {
+      console.error('Failed to fetch project members for mentions', e)
+    }
+  }
+
+  const fetchProjectIssues = async (projectId: string) => {
+    try {
+      const params = new URLSearchParams({ project: projectId, limit: '50' })
+      const res = await fetch(`/api/tasks?${params.toString()}`)
+      const data = await res.json()
+      if (data?.success && Array.isArray(data.data)) {
+        const issues = data.data.map((t: any) => ({
+          _id: t._id,
+          displayId: t.displayId,
+          title: t.title
+        }))
+        setIssuesList(issues)
+      }
+    } catch (e) {
+      console.error('Failed to fetch project issues for linking', e)
     }
   }
 
@@ -184,6 +274,189 @@ export default function TaskDetailPage() {
     } catch (error) {
       setError('Failed to delete task')
     }
+  }
+
+  const renderComments = useMemo(() => {
+    if (!task?.comments || task.comments.length === 0) {
+      return <p className="text-sm text-muted-foreground">No comments yet.</p>
+    }
+    return (
+      <div className="space-y-3">
+        {task.comments.map((comment) => (
+          <div key={comment._id || Math.random().toString(36)} className="rounded-md border p-3 bg-muted/30">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-medium">
+                {comment.author?.firstName || comment.author?.lastName
+                  ? `${comment.author?.firstName || ''} ${comment.author?.lastName || ''}`.trim()
+                  : comment.author?.email || 'User'}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {comment.createdAt ? new Date(comment.createdAt).toLocaleString() : ''}
+              </div>
+            </div>
+            <div className="text-sm text-foreground whitespace-pre-wrap mt-1">{comment.content}</div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {comment.mentions && comment.mentions.length > 0 && (
+                <Badge variant="outline" className="text-xs">
+                  Mentions: {comment.mentions.length}
+                </Badge>
+              )}
+              {comment.linkedIssues && comment.linkedIssues.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {comment.linkedIssues.map((issue) => (
+                    <Badge
+                      key={issue._id || Math.random().toString(36)}
+                      variant="secondary"
+                      className="text-xs cursor-pointer"
+                      onClick={() => {
+                        if (issue._id) router.push(`/tasks/${issue._id}`)
+                      }}
+                    >
+                      #{issue.displayId || issue._id} {issue.title ? `— ${issue.title}` : ''}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }, [router, task?.comments])
+
+  const filteredSuggestions = useMemo<SuggestionItem[]>(() => {
+    const q = suggestionQuery.trim().toLowerCase()
+    if (!suggestionMode) return []
+    if (suggestionMode === 'mention') {
+      return mentionsList
+        .filter(m => m.name.toLowerCase().includes(q))
+        .slice(0, 6)
+        .map(m => ({ _id: m._id, name: m.name }))
+    }
+    return issuesList
+      .filter(i => (i.displayId || '').toLowerCase().includes(q) || (i.title || '').toLowerCase().includes(q))
+      .slice(0, 6)
+      .map(i => ({ _id: i._id, displayId: i.displayId, title: i.title }))
+  }, [suggestionMode, suggestionQuery, mentionsList, issuesList])
+
+  const replaceActiveToken = (replacement: string) => {
+    setCommentContent(prev => {
+      const textarea = editorRef.current
+      const cursorPos = textarea?.selectionStart ?? prev.length
+      const textBefore = prev.slice(0, cursorPos)
+      const textAfter = prev.slice(cursorPos)
+      // match last @word or #word before cursor
+      const match = textBefore.match(/([@#][^\s@#]*)$/)
+      if (!match) return prev
+      const start = textBefore.lastIndexOf(match[1])
+      const newBefore = textBefore.slice(0, start) + replacement + ' '
+      const nextContent = newBefore + textAfter
+      // move cursor to after inserted token
+      const newCursor = newBefore.length
+      setTimeout(() => {
+        if (textarea) {
+          textarea.focus()
+          textarea.setSelectionRange(newCursor, newCursor)
+        }
+      }, 0)
+      return nextContent
+    })
+    setSuggestionMode(null)
+    setSuggestionQuery('')
+    setSuggestionPos(null)
+  }
+  const handleAddComment = async () => {
+    if (!commentContent.trim()) return
+    setCommentSubmitting(true)
+    try {
+      // Parse mentions/links based on stored selections (we track from dropdown insertions)
+      // For simplicity, we send IDs for mentions and linked issues we recognized in the textarea.
+      // Extract IDs from markers we inserted: we set data attributes? Here we collect from state by matching tokens.
+      const mentionIds: string[] = []
+      mentionsList.forEach(m => {
+        const token = `@${m.name}`
+        if (commentContent.includes(token)) {
+          mentionIds.push(m._id)
+        }
+      })
+      const issueIds: string[] = []
+      issuesList.forEach(i => {
+        const token = `#${i.displayId || i._id}`
+        if (commentContent.includes(token)) {
+          issueIds.push(i._id)
+        }
+      })
+
+      const res = await fetch(`/api/tasks/${taskId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: commentContent,
+          mentions: mentionIds,
+          linkedIssues: issueIds
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        // Optimistically append comment
+        const newComment = {
+          _id: data.data._id || Math.random().toString(36),
+          content: commentContent,
+          createdAt: new Date().toISOString(),
+          author: {
+            firstName: 'You',
+            lastName: '',
+            email: ''
+          },
+          mentions: mentionIds,
+          linkedIssues: issuesList.filter(i => issueIds.includes(i._id))
+        }
+        setTask(prev => prev ? { ...prev, comments: [...(prev.comments || []), newComment] } : prev)
+        setCommentContent('')
+      } else {
+        setError(data.error || 'Failed to add comment')
+      }
+    } catch (e) {
+      setError('Failed to add comment')
+    } finally {
+      setCommentSubmitting(false)
+    }
+  }
+
+  const updateSuggestionPosition = (value: string, cursorPos: number) => {
+    const textarea = editorRef.current
+    if (!textarea) return
+    const mirror = document.createElement('div')
+    const style = window.getComputedStyle(textarea)
+    mirror.style.position = 'absolute'
+    mirror.style.visibility = 'hidden'
+    mirror.style.whiteSpace = 'pre-wrap'
+    mirror.style.wordWrap = 'break-word'
+    mirror.style.fontSize = style.fontSize
+    mirror.style.fontFamily = style.fontFamily
+    mirror.style.lineHeight = style.lineHeight
+    mirror.style.padding = style.padding
+    mirror.style.border = style.border
+    mirror.style.boxSizing = style.boxSizing
+    mirror.style.width = `${textarea.clientWidth}px`
+    mirror.style.left = `${textarea.getBoundingClientRect().left}px`
+    mirror.style.top = `${textarea.getBoundingClientRect().top}px`
+
+    const before = value.slice(0, cursorPos)
+    const after = value.slice(cursorPos)
+    const marker = document.createElement('span')
+    marker.textContent = '\u200b'
+    mirror.textContent = before
+    mirror.appendChild(marker)
+    mirror.append(after)
+    document.body.appendChild(mirror)
+    const markerRect = marker.getBoundingClientRect()
+    document.body.removeChild(mirror)
+
+    setSuggestionPos({
+      top: markerRect.bottom + 4,
+      left: markerRect.left
+    })
   }
 
   const getStatusColor = (status: string) => {
@@ -282,9 +555,9 @@ export default function TaskDetailPage() {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <p className="text-destructive mb-4">{error || 'Task not found'}</p>
-            <Button onClick={() => router.push('/tasks')}>
+            <Button onClick={() => router.back()}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Tasks
+              Back
             </Button>
           </div>
         </div>
@@ -352,6 +625,89 @@ export default function TaskDetailPage() {
                 <p className="text-muted-foreground">
                   {task.description || 'No description provided'}
                 </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquarePlus className="h-4 w-4" />
+                  <span>Comments</span>
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddComment}
+                  disabled={commentSubmitting || !commentContent.trim()}
+                >
+                  {commentSubmitting ? 'Posting...' : 'Post Comment'}
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="relative">
+                  <Textarea
+                    ref={editorRef}
+                    value={commentContent}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setCommentContent(val)
+                      const textarea = e.target
+                      const cursor = textarea.selectionStart
+                      const before = val.slice(0, cursor)
+                      const match = before.match(/([@#])([^\s@#]{0,30})$/)
+                      if (match) {
+                        const mode = match[1] === '@' ? 'mention' : 'issue'
+                        setSuggestionMode(mode)
+                        setSuggestionQuery(match[2] || '')
+                        updateSuggestionPosition(val, cursor)
+                      } else {
+                        setSuggestionMode(null)
+                        setSuggestionQuery('')
+                        setSuggestionPos(null)
+                      }
+                    }}
+                    placeholder="Add a comment. Use @ to mention team members, # to link project tasks."
+                    rows={4}
+                  />
+                  {suggestionMode && filteredSuggestions.length > 0 && suggestionPos && (
+                    <div
+                      className="z-20 rounded-md border bg-card shadow-lg"
+                      style={{
+                        position: 'fixed',
+                        top: suggestionPos.top,
+                        left: suggestionPos.left,
+                        minWidth: '220px',
+                        maxWidth: '360px'
+                      }}
+                    >
+                      <div className="max-h-56 overflow-y-auto divide-y">
+                        {filteredSuggestions.map((s) => (
+                          <button
+                            key={s._id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 hover:bg-muted text-sm"
+                            onClick={() => {
+                              if (suggestionMode === 'mention') {
+                                replaceActiveToken(`@${s.name}`)
+                              } else {
+                                replaceActiveToken(`#${s.displayId || s._id}`)
+                              }
+                            }}
+                          >
+                            {suggestionMode === 'mention'
+                              ? `@${s.name}`
+                              : `#${s.displayId || s._id} ${s.title ? '— ' + s.title : ''}`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-semibold mb-2 text-foreground">All Comments</h3>
+                  {renderComments}
+                </div>
               </CardContent>
             </Card>
 

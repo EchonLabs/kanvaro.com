@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -32,12 +33,22 @@ interface Execution {
 export default function TestExecutionViewPage() {
   const router = useRouter()
   const params = useParams() as { id: string }
+  const { setItems } = useBreadcrumb()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [execution, setExecution] = useState<Execution | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+
+  useEffect(() => {
+    // Set breadcrumb
+    setItems([
+      { label: 'Test Management', href: '/test-management' },
+      { label: 'Test Executions', href: '/test-management/executions' },
+      { label: 'View Test Execution' }
+    ])
+  }, [setItems])
 
   useEffect(() => {
     const fetchExecution = async () => {

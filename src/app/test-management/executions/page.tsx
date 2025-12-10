@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -29,6 +30,7 @@ interface TestExecution {
 
 export default function TestExecutionsPage() {
   const router = useRouter()
+  const { setItems } = useBreadcrumb()
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [testExecutionDialogOpen, setTestExecutionDialogOpen] = useState(false)
   const [selectedTestExecution, setSelectedTestExecution] = useState<TestExecution | null>(null)
@@ -37,6 +39,14 @@ export default function TestExecutionsPage() {
   const [loading, setLoading] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Set breadcrumb
+    setItems([
+      { label: 'Test Management', href: '/test-management' },
+      { label: 'Test Executions' }
+    ])
+  }, [setItems])
 
   useEffect(() => {
     const fetchExecutions = async () => {

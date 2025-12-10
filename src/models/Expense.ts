@@ -1,18 +1,17 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
 export interface IExpense extends Document {
-  description: string
-  amount: number
-  currency: string
-  category: string
-  vendor?: string
-  date: Date
   project: mongoose.Types.ObjectId
-  organization: mongoose.Types.ObjectId
-  createdBy: mongoose.Types.ObjectId
-  approvedBy?: mongoose.Types.ObjectId
-  status: 'pending' | 'approved' | 'rejected'
-  notes?: string
+  name: string
+  description?: string
+  unitPrice: number
+  quantity: number
+  fullAmount: number
+  expenseDate: Date
+  category: 'materials' | 'overhead' | 'external' | 'other'
+  isBillable: boolean
+  paidStatus: 'paid' | 'unpaid'
+  paidBy?: mongoose.Types.ObjectId
   attachments: {
     name: string
     url: string
@@ -21,70 +20,67 @@ export interface IExpense extends Document {
     uploadedBy: mongoose.Types.ObjectId
     uploadedAt: Date
   }[]
-  tags: string[]
+  addedBy: mongoose.Types.ObjectId
   createdAt: Date
   updatedAt: Date
 }
 
 const ExpenseSchema = new Schema<IExpense>({
-  description: {
-    type: String,
-    required: true,
-    trim: true,
-    maxlength: 200
-  },
-  amount: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  currency: {
-    type: String,
-    required: true,
-    default: 'USD'
-  },
-  category: {
-    type: String,
-    required: true,
-    trim: true,
-    maxlength: 50
-  },
-  vendor: {
-    type: String,
-    trim: true,
-    maxlength: 100
-  },
-  date: {
-    type: Date,
-    required: true
-  },
   project: {
     type: Schema.Types.ObjectId,
     ref: 'Project',
     required: true
   },
-  organization: {
-    type: Schema.Types.ObjectId,
-    ref: 'Organization',
+  name: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 200
+  },
+  description: {
+    type: String,
+    trim: true,
+    maxlength: 1000
+  },
+  unitPrice: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  quantity: {
+    type: Number,
+    required: true,
+    min: 1,
+    default: 1
+  },
+  fullAmount: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  expenseDate: {
+    type: Date,
+    required: true,
+    default: Date.now
+  },
+  category: {
+    type: String,
+    enum: [ 'materials', 'overhead', 'external', 'other'],
     required: true
   },
-  createdBy: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+  isBillable: {
+    type: Boolean,
+    default: false
   },
-  approvedBy: {
+  paidStatus: {
+    type: String,
+    enum: ['paid', 'unpaid'],
+    required: true,
+    default: 'unpaid'
+  },
+  paidBy: {
     type: Schema.Types.ObjectId,
     ref: 'User'
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'pending'
-  },
-  notes: {
-    type: String,
-    maxlength: 500
   },
   attachments: [{
     name: { type: String, required: true },
@@ -94,24 +90,19 @@ const ExpenseSchema = new Schema<IExpense>({
     uploadedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     uploadedAt: { type: Date, default: Date.now }
   }],
-  tags: [{
-    type: String,
-    trim: true,
-    maxlength: 50
-  }]
+  addedBy: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  }
 }, {
   timestamps: true
 })
 
 // Indexes
-ExpenseSchema.index({ organization: 1 })
-ExpenseSchema.index({ project: 1 })
-ExpenseSchema.index({ createdBy: 1 })
-ExpenseSchema.index({ status: 1 })
-ExpenseSchema.index({ category: 1 })
-ExpenseSchema.index({ date: 1 })
-ExpenseSchema.index({ organization: 1, project: 1 })
-ExpenseSchema.index({ organization: 1, status: 1 })
-ExpenseSchema.index({ project: 1, status: 1 })
+ExpenseSchema.index({ project: 1, expenseDate: -1 })
+ExpenseSchema.index({ project: 1, paidStatus: 1 })
+ExpenseSchema.index({ project: 1, category: 1 })
+ExpenseSchema.index({ addedBy: 1 })
 
 export const Expense = mongoose.models.Expense || mongoose.model<IExpense>('Expense', ExpenseSchema)

@@ -246,6 +246,7 @@ export async function GET(
         { path: 'project', select: '_id name' },
         { path: 'assignedTo', select: 'firstName lastName email' },
         { path: 'createdBy', select: 'firstName lastName email' },
+        { path: 'comments.author', select: 'firstName lastName email' },
         {
           path: 'story',
           select: 'title status epic',
@@ -330,6 +331,10 @@ export async function PUT(
       updateData.attachments = sanitizeAttachments(updateData.attachments, userId)
     }
 
+    if (Object.prototype.hasOwnProperty.call(updateData, 'isBillable')) {
+      updateData.isBillable = !!updateData.isBillable
+    }
+
     if (Object.prototype.hasOwnProperty.call(updateData, 'storyPoints')) {
       const value = updateData.storyPoints
       if (value === '' || value === null || typeof value === 'undefined') {
@@ -384,6 +389,16 @@ export async function PUT(
       if (typeof updateData.epic === 'string') {
         const trimmed = updateData.epic.trim()
         updateData.epic = trimmed.length > 0 ? trimmed : undefined
+      }
+    }
+
+    // Normalize sprint field - handle null, undefined, empty string
+    if (Object.prototype.hasOwnProperty.call(updateData, 'sprint')) {
+      if (updateData.sprint === null || updateData.sprint === undefined || updateData.sprint === '') {
+        updateData.sprint = null
+      } else if (typeof updateData.sprint === 'string') {
+        const trimmed = updateData.sprint.trim()
+        updateData.sprint = trimmed.length > 0 ? trimmed : null
       }
     }
 
@@ -548,15 +563,29 @@ export async function PUT(
       try {
         // Synchronize sprint tasks array if sprint changed
         if (Object.prototype.hasOwnProperty.call(updateData, 'sprint')) {
-          const newSprintId = updateData.sprint
+          // Normalize newSprintId - null/undefined/empty means moving to backlog
+          const newSprintId = (updateData.sprint === null || updateData.sprint === undefined || updateData.sprint === '') 
+            ? null 
+            : updateData.sprint
           const oldSprintId = currentTask.sprint
 
           const updates: Promise<unknown>[] = []
 
-          if (oldSprintId && (!newSprintId || oldSprintId.toString() !== newSprintId)) {
+          // Get old sprint ID as string for comparison
+          const oldSprintIdStr = oldSprintId 
+            ? (typeof oldSprintId === 'object' && oldSprintId !== null && '_id' in oldSprintId
+                ? String(oldSprintId._id)
+                : String(oldSprintId))
+            : null
+          
+          // Get new sprint ID as string for comparison
+          const newSprintIdStr = newSprintId ? String(newSprintId) : null
+
+          // Remove task from old sprint if it exists and is different from new sprint
+          if (oldSprintIdStr && oldSprintIdStr !== newSprintIdStr) {
             updates.push(
               Sprint.findByIdAndUpdate(
-                oldSprintId,
+                oldSprintIdStr,
                 { $pull: { tasks: taskIdStr } },
                 { new: false }
               ).exec().catch(error => {
@@ -565,8 +594,9 @@ export async function PUT(
             )
           }
 
-          if (newSprintId) {
-            const sprintDocResult = await Sprint.findById(newSprintId).select('_id project').lean()
+          // Add task to new sprint if provided (not null/undefined/empty)
+          if (newSprintIdStr) {
+            const sprintDocResult = await Sprint.findById(newSprintIdStr).select('_id project').lean()
             const sprintDocResultTyped = Array.isArray(sprintDocResult) ? sprintDocResult[0] : sprintDocResult
             if (sprintDocResultTyped) {
               const sprintDoc: LeanSprint = sprintDocResultTyped as LeanSprint
@@ -580,7 +610,7 @@ export async function PUT(
               }
               updates.push(
                 Sprint.findByIdAndUpdate(
-                  newSprintId,
+                  newSprintIdStr,
                   { $addToSet: { tasks: taskIdStr } },
                   { new: false }
                 ).exec().catch(error => {
@@ -588,7 +618,7 @@ export async function PUT(
                 })
               )
             } else {
-              console.warn(`Sprint ${newSprintId} not found when updating task ${taskId}`)
+              console.warn(`Sprint ${newSprintIdStr} not found when updating task ${taskId}`)
             }
           }
 

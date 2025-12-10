@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -50,6 +51,7 @@ interface Project {
 }
 
 export default function TestManagementPage() {
+  const { setItems } = useBreadcrumb()
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -87,6 +89,13 @@ export default function TestManagementPage() {
     }
     return counts
   }, [executions])
+
+  useEffect(() => {
+    // Set breadcrumb
+    setItems([
+      { label: 'Test Management' }
+    ])
+  }, [setItems])
 
   useEffect(() => {
     fetchProjects()

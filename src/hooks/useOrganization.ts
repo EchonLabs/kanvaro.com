@@ -100,7 +100,8 @@ export function useOrganization() {
           name: 'Kanvaro',
           logo: undefined,
           darkLogo: undefined,
-          logoMode: 'auto'
+          logoMode: 'auto',
+          currency: 'USD'
         }
         setOrganization(mockOrganization)
         organizationCache = mockOrganization
@@ -114,7 +115,8 @@ export function useOrganization() {
         name: 'Kanvaro',
         logo: undefined,
         darkLogo: undefined,
-        logoMode: 'auto'
+        logoMode: 'auto',
+        currency: 'USD'
       }
       setOrganization(mockOrganization)
       organizationCache = mockOrganization
