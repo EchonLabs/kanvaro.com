@@ -1157,7 +1157,7 @@ export default function TasksClient({
                                                                                             handleInlineStatusChange(task, value as Task['status'])
                                                                                         }
                                                                                         disabled={statusUpdatingId === task._id}
-                                                                                        onClick={(e) => e.stopPropagation()}
+                                                                                        //onClick={(e) => e.stopPropagation()}
                                                                                     >
                                                                                         <SelectTrigger className="h-7 w-full sm:w-[150px] text-xs">
                                                                                             <SelectValue placeholder="Status" />
