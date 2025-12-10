@@ -101,6 +101,7 @@ interface Sprint {
       _id: string
       name: string
     } | null
+    movedToBacklog?: boolean
   }>
   createdAt: string
   updatedAt: string
@@ -555,13 +556,6 @@ export default function SprintDetailPage() {
     const data = await res.json().catch(() => ({}))
 
     if (!res.ok || !data.success) {
-      // If there are incomplete subtasks, format the error message
-      if (data.incompleteSubtasks && Array.isArray(data.incompleteSubtasks)) {
-        const taskList = data.incompleteSubtasks
-          .map((item: any) => `"${item.taskTitle}" (${item.incompleteSubtasks.length} incomplete)`)
-          .join(', ')
-        throw new Error(`Cannot complete sprint. Tasks with incomplete sub-tasks: ${taskList}`)
-      }
       throw new Error(data.error || 'Failed to complete sprint')
     }
 
@@ -1130,6 +1124,11 @@ export default function SprintDetailPage() {
                                 Moved to: {task.movedToSprint.name}
                               </p>
                             )}
+                            {task.movedToBacklog && (
+                              <p className="text-xs font-medium text-orange-600 dark:text-orange-400 mt-1">
+                                Moved to Backlog
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-[11px] uppercase hover:bg-transparent dark:hover:bg-transparent">
@@ -1145,6 +1144,11 @@ export default function SprintDetailPage() {
                                 Spillover
                               </Badge>
                             )}
+                            {task.movedToBacklog && (
+                              <Badge variant="outline" className="text-[11px] bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20">
+                                Backlog
+                              </Badge>
+                            )}
                           </div>
                         </div>
 
@@ -1154,7 +1158,7 @@ export default function SprintDetailPage() {
                           </Badge>
                         </div>
 
-                        {!task.movedToSprint && (
+                        {!task.movedToSprint && !task.movedToBacklog && (
                           <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
                             <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
@@ -1184,6 +1188,13 @@ export default function SprintDetailPage() {
                           <div className="rounded-md border bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800 p-2">
                             <p className="text-xs text-muted-foreground">
                               This task has been moved to <span className="font-medium text-orange-700 dark:text-orange-400">{task.movedToSprint.name}</span>
+                            </p>
+                          </div>
+                        )}
+                        {task.movedToBacklog && (
+                          <div className="rounded-md border bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800 p-2">
+                            <p className="text-xs text-muted-foreground">
+                              This task has been moved to <span className="font-medium text-orange-700 dark:text-orange-400">Backlog</span>
                             </p>
                           </div>
                         )}
@@ -1519,10 +1530,10 @@ export default function SprintDetailPage() {
 
                 {selectedTaskIds.size === 0 ? (
                   // No tasks selected - show "Move to Backlog" option
-                   
-                    <p className="text-xs text-muted-foreground">
-                      All incomplete tasks will be moved to the backlog.
-                    </p>
+
+                  <p className="text-xs text-muted-foreground">
+                    All incomplete tasks will be moved to the backlog.
+                  </p>
                 ) : (
                   // Some tasks selected - show existing/new sprint options
                   <>

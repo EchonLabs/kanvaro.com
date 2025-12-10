@@ -100,47 +100,7 @@ export async function POST(
       }
     }
 
-    // Only check for incomplete sub-tasks if there's NO target sprint to move tasks to
-    // If there's a target sprint, allow completion and move tasks (with their incomplete sub-tasks) to the next sprint
-    if (!targetSprintId) {
-      const sprintTasks = await Task.find({
-        sprint: sprintId,
-        organization: organizationId,
-        archived: { $ne: true }
-      }).select('_id title subtasks')
-
-      const tasksWithIncompleteSubtasks: Array<{ taskId: string; taskTitle: string; incompleteSubtasks: Array<{ title: string; status: string }> }> = []
-
-      for (const task of sprintTasks) {
-        if (task.subtasks && Array.isArray(task.subtasks) && task.subtasks.length > 0) {
-          const incompleteSubtasks = task.subtasks.filter((subtask: any) => {
-            const status = subtask.status || 'backlog'
-            return status !== 'done' && status !== 'completed' && !subtask.isCompleted
-          })
-
-          if (incompleteSubtasks.length > 0) {
-            tasksWithIncompleteSubtasks.push({
-              taskId: task._id.toString(),
-              taskTitle: task.title,
-              incompleteSubtasks: incompleteSubtasks.map((subtask: any) => ({
-                title: subtask.title || 'Untitled',
-                status: subtask.status || 'backlog'
-              }))
-            })
-          }
-        }
-      }
-
-      if (tasksWithIncompleteSubtasks.length > 0) {
-        return NextResponse.json(
-          {
-            error: 'Cannot complete sprint with incomplete sub-tasks. Please move tasks to another sprint or complete all sub-tasks.',
-            incompleteSubtasks: tasksWithIncompleteSubtasks
-          },
-          { status: 400 }
-        )
-      }
-    }
+    // Subtask validation logic removed as per requirements to allow free movement to backlog
 
     sprint.status = 'completed'
     sprint.actualEndDate = new Date()
@@ -190,14 +150,16 @@ export async function POST(
       if (tasksToMoveToBacklog.length > 0) {
         await Task.updateMany(
           { _id: { $in: tasksToMoveToBacklog } },
-          { sprint: null, status: 'backlog' }
+          { 
+            sprint: null, 
+            status: 'backlog',
+            movedFromSprint: sprintId
+          }
         )
         
-        // Remove tasks from sprint's tasks array when moving to backlog
-        await Sprint.findByIdAndUpdate(
-          sprintId,
-          { $pull: { tasks: { $in: tasksToMoveToBacklog } } }
-        )
+        // Note: We DO NOT remove tasks from the sprint's tasks array when moving to backlog.
+        // This is to preserve the history of what was in the sprint, even if it wasn't completed.
+
       }
     }
 

@@ -33,6 +33,7 @@ export interface ITask extends Document {
   estimatedHours?: number
   actualHours?: number
   sprint?: mongoose.Types.ObjectId
+  movedFromSprint?: mongoose.Types.ObjectId
   startDate?: Date
   completedAt?: Date
   labels: string[]
@@ -174,6 +175,10 @@ const TaskSchema = new Schema<ITask>({
     default: 0
   },
   sprint: {
+    type: Schema.Types.ObjectId,
+    ref: 'Sprint'
+  },
+  movedFromSprint: {
     type: Schema.Types.ObjectId,
     ref: 'Sprint'
   },

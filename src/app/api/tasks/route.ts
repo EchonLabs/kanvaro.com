@@ -282,6 +282,7 @@ export async function GET(request: NextRequest) {
       .populate('project', '_id name')
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
+      .populate('movedFromSprint', '_id name')
       .sort(sort)
       .skip((page - 1) * PAGE_SIZE)
       .limit(PAGE_SIZE)
