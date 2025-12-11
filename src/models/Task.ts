@@ -55,9 +55,19 @@ export interface ITask extends Document {
     _id?: mongoose.Types.ObjectId
     content: string
     author: mongoose.Types.ObjectId
+    parentCommentId?: mongoose.Types.ObjectId | null
     mentions?: mongoose.Types.ObjectId[]
     linkedIssues?: mongoose.Types.ObjectId[]
     createdAt: Date
+    updatedAt?: Date
+    attachments?: Array<{
+      name: string
+      url: string
+      size?: number
+      type?: string
+      uploadedBy?: mongoose.Types.ObjectId
+      uploadedAt?: Date
+    }>
   }>
   linkedTestCase?: mongoose.Types.ObjectId
   foundInVersion?: string
@@ -217,9 +227,19 @@ const TaskSchema = new Schema<ITask>({
   comments: [{
     content: { type: String, required: true, trim: true, maxlength: 2000 },
     author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    parentCommentId: { type: Schema.Types.ObjectId, ref: 'Task.comments._id', default: null },
     mentions: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     linkedIssues: [{ type: Schema.Types.ObjectId, ref: 'Task' }],
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date },
+    attachments: [{
+      name: { type: String, required: true },
+      url: { type: String, required: true },
+      size: { type: Number },
+      type: { type: String },
+      uploadedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+      uploadedAt: { type: Date, default: Date.now }
+    }]
   }],
   linkedTestCase: {
     type: Schema.Types.ObjectId,

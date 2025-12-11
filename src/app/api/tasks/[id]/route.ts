@@ -247,6 +247,7 @@ export async function GET(
         { path: 'assignedTo', select: 'firstName lastName email' },
         { path: 'createdBy', select: 'firstName lastName email' },
         { path: 'comments.author', select: 'firstName lastName email' },
+        { path: 'comments.linkedIssues', select: 'displayId title', options: { strictPopulate: false } },
         {
           path: 'story',
           select: 'title status epic',

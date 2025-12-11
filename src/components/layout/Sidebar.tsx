@@ -338,6 +338,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     }
   }, [pathname])
 
+  if (!mounted) return null
+
   const toggleExpanded = (itemId: string) => {
     setExpandedItems(prev => 
       prev.includes(itemId) 
