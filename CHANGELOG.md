@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.12.5...v1.13.0) (2025-12-11)
+
+
+### Features
+
+* add increasement in comment section ([8ab8a8b](https://github.com/EchonLabs/kanvaro.com/commit/8ab8a8b3d77a2e63eca658323903d3a59a31872b))
+
 ## [1.12.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.12.4...v1.12.5) (2025-12-10)
 
 
