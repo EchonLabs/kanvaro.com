@@ -331,7 +331,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
           <h3 className="text-xl sm:text-2xl font-semibold text-foreground">Product Backlog</h3>
@@ -359,7 +359,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
       )}
 
       {/* Backlog Stats */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
@@ -500,7 +500,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
       </div>
 
       {/* Backlog Items */}
-      <div className="space-y-4">
+      <div className="space-y-6">
         {filteredAndSortedTasks.map((task, index) => (
           <Card
             key={task._id}

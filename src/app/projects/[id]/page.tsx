@@ -485,7 +485,7 @@ export default function ProjectDetailPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-8 mt-4">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-1 min-w-0">
@@ -546,7 +546,7 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* Project Stats */}
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mt-8">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center space-x-2">
@@ -623,8 +623,8 @@ export default function ProjectDetailPage() {
           const newSearchParams = new URLSearchParams(searchParams.toString())
           newSearchParams.set('tab', value)
           router.push(`/projects/${projectId}?${newSearchParams.toString()}`)
-        }} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-11 gap-1 overflow-x-auto">
+        }} className="space-y-8">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-11 gap-1 overflow-x-auto mt-2">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
             <TabsTrigger value="team" className="text-xs sm:text-sm">Team</TabsTrigger>
             <TabsTrigger value="attachments" className="text-xs sm:text-sm">Attachments</TabsTrigger>
@@ -638,11 +638,11 @@ export default function ProjectDetailPage() {
             <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2 space-y-6">
+          <TabsContent value="overview" className="space-y-8">
+            <div className="grid gap-8 lg:grid-cols-3">
+              <div className="lg:col-span-2 space-y-8">
                 {/* Project Details */}
-                <Card>
+                <Card className="mt-2">
                   <CardHeader>
                     <CardTitle>Project Details</CardTitle>
                   </CardHeader>
@@ -692,7 +692,7 @@ export default function ProjectDetailPage() {
 
                 {/* Budget Breakdown */}
                 {project.budget && (
-                  <Card className="mt-6">
+                  <Card>
                     <CardHeader>
                       <CardTitle>Budget Breakdown</CardTitle>
                     </CardHeader>
@@ -768,9 +768,9 @@ export default function ProjectDetailPage() {
                 )}
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-8 mt-8 lg:mt-0 pt-2">
                 {/* Team Members */}
-                <Card className="mt-6">
+                <Card>
                   <CardHeader>
                     <CardTitle>Team Members</CardTitle>
                   </CardHeader>
@@ -792,7 +792,7 @@ export default function ProjectDetailPage() {
                 </Card>
 
                 {/* Quick Actions */}
-                <Card className="mt-6">
+                <Card>
                   <CardHeader>
                     <CardTitle>Quick Actions</CardTitle>
                   </CardHeader>
@@ -834,13 +834,13 @@ export default function ProjectDetailPage() {
             </div>
           </TabsContent>
 
-          <TabsContent value="team" className="space-y-6">
+          <TabsContent value="team" className="space-y-8">
             <ProjectTeamTab projectId={projectId} project={project} onUpdate={fetchProject} />
           </TabsContent>
 
-          <TabsContent value="attachments" className="space-y-4 sm:space-y-6">
+          <TabsContent value="attachments" className="space-y-8">
             {/* Combined Attachments Card */}
-            <Card className="mt-6">
+            <Card className="mt-4">
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                   <Paperclip className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -850,7 +850,7 @@ export default function ProjectDetailPage() {
                   Uploaded files, Figma designs, and documentation links
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+              <CardContent className="space-y-6 p-4 sm:p-6">
                 {/* File Attachments */}
                 <div className="space-y-2 sm:space-y-3">
                   <div className="flex items-center justify-between">
@@ -1011,7 +1011,7 @@ export default function ProjectDetailPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="budget" className="space-y-6">
+          <TabsContent value="budget" className="space-y-8">
             {/* Budget Overview */}
             {project.budget && (
               <Card>
@@ -1019,7 +1019,7 @@ export default function ProjectDetailPage() {
                   <CardTitle>Budget Overview</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-muted-foreground">Total Budget</p>
                       <p className="text-2xl font-bold text-foreground">
@@ -1042,7 +1042,7 @@ export default function ProjectDetailPage() {
 
                   <div className="space-y-2 pt-4 border-t">
                     <p className="text-sm font-medium text-muted-foreground mb-3">Budget by Category</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
 
                       <div>
                         <p className="text-xs text-muted-foreground">Materials</p>
@@ -1102,7 +1102,7 @@ export default function ProjectDetailPage() {
                       <p className="text-sm mt-1">Click "Add Expense" to get started</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {expenses.map((expense: any) => (
                         <Card key={expense._id} className="hover:shadow-md transition-shadow">
                           <CardContent className="p-4">
@@ -1153,14 +1153,14 @@ export default function ProjectDetailPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="tasks" className="space-y-4">
+          <TabsContent value="tasks" className="space-y-8">
             <TaskList
               projectId={projectId}
               onCreateTask={() => setShowCreateTaskModal(true)}
             />
           </TabsContent>
 
-          <TabsContent value="kanban" className="space-y-4">
+          <TabsContent value="kanban" className="space-y-8">
             <KanbanBoard
               projectId={projectId}
               onCreateTask={() => setShowCreateTaskModal(true)}
@@ -1178,22 +1178,22 @@ export default function ProjectDetailPage() {
             />
           </TabsContent>
 
-          <TabsContent value="calendar" className="space-y-4">
+          <TabsContent value="calendar" className="space-y-8">
             <CalendarView
               projectId={projectId}
               onCreateTask={() => setShowCreateTaskModal(true)}
             />
           </TabsContent>
 
-          <TabsContent value="backlog" className="space-y-4">
+          <TabsContent value="backlog" className="space-y-8">
             <BacklogView
               projectId={projectId}
               onCreateTask={() => setShowCreateTaskModal(true)}
             />
           </TabsContent>
 
-          <TabsContent value="testing" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <TabsContent value="testing" className="space-y-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-1">
                 <TestSuiteTree
                   key={`${projectId}-${suitesRefreshCounter}`}
@@ -1230,8 +1230,8 @@ export default function ProjectDetailPage() {
             </div>
           </TabsContent>
 
-          <TabsContent value="reports" className="space-y-6">
-            <div className="space-y-6">
+          <TabsContent value="reports" className="space-y-8">
+            <div className="space-y-8">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <h3 className="text-xl sm:text-2xl font-semibold text-foreground">Project Reports</h3>
@@ -1251,7 +1251,7 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
 
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Project Progress</CardTitle>
@@ -1292,7 +1292,7 @@ export default function ProjectDetailPage() {
                 </Card>
               </div>
 
-              <div className="grid gap-6 lg:grid-cols-2">
+              <div className="grid gap-8 lg:grid-cols-2">
                 <Card>
                   <CardHeader>
                     <CardTitle>Recent Activity</CardTitle>

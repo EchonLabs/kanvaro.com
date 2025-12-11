@@ -184,7 +184,7 @@ export function EmailSettings() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-8">
       <Card>
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
@@ -195,11 +195,11 @@ export function EmailSettings() {
             Configure your email provider settings for sending notifications and invitations.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
+        <CardContent className="space-y-6 sm:space-y-8 p-4 sm:p-6 pt-0">
           {/* Email Provider Selection */}
-          <div className="space-y-3 sm:space-y-4">
+          <div className="space-y-5">
             <Label className="text-xs sm:text-sm">Email Provider</Label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-6">
               <div
                 className={`p-3 sm:p-4 border-2 rounded-lg cursor-pointer transition-all ${
                   formData.provider === 'smtp'

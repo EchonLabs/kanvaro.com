@@ -220,7 +220,7 @@ export default function ProjectReportsPage() {
   return (
     <MainLayout>
       <PageWrapper>
-        <div className="space-y-6">
+        <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -252,8 +252,8 @@ export default function ProjectReportsPage() {
             <CardTitle>Filters</CardTitle>
             <CardDescription>Filter and sort project reports</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="search">Search Projects</Label>
                 <div className="relative">
@@ -361,7 +361,7 @@ export default function ProjectReportsPage() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Projects</CardTitle>
@@ -435,8 +435,8 @@ export default function ProjectReportsPage() {
       </div>
 
       {/* Report Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 overflow-x-auto">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 overflow-x-auto mb-2">
           <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
           <TabsTrigger value="progress" className="text-xs sm:text-sm">Progress</TabsTrigger>
           <TabsTrigger value="timeline" className="text-xs sm:text-sm">Timeline</TabsTrigger>

@@ -79,9 +79,9 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
   }))
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Budget Analysis Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Budgeted</CardTitle>
@@ -146,7 +146,7 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
         {/* Budget vs Spent by Category */}
         <Card>
           <CardHeader>
@@ -262,9 +262,9 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
           <CardDescription className="text-xs sm:text-sm">Detailed breakdown of budget performance by category</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {budgetBreakdown.map((category, index) => (
-              <div key={category.category} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+              <div key={category.category} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
                 <div className="flex-1 min-w-0 w-full sm:w-auto">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
                     <div className="flex items-center space-x-2">
@@ -295,7 +295,7 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
                       <Progress value={Math.min(100, category.utilizationRate)} className="h-2" />
                     </div>
                     
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-xs sm:text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 text-xs sm:text-sm">
                       <div>
                         <div className="text-muted-foreground">Budgeted</div>
                         <div className="font-medium break-words">${category.budgeted.toLocaleString()}</div>

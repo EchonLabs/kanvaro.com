@@ -200,7 +200,7 @@ export default function TestCasesPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold">Test Cases</h1>
@@ -241,7 +241,7 @@ export default function TestCasesPage() {
           )}
         </div>
 
-        <div className="rounded-lg border bg-card p-4 sm:p-6">
+        <div className="rounded-lg border bg-card p-4 sm:p-6 space-y-6">
           <TestCaseList 
             projectId={selectedProject}
             key={`${selectedProject}-${refreshCounter}`}

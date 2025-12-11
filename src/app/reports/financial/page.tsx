@@ -231,9 +231,9 @@ export default function FinancialReportsPage() {
   return (
     <MainLayout>
       <PageWrapper>
-        <div className="space-y-6">
+        <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
         <div className="flex-1 min-w-0">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Financial Reports</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">
@@ -263,8 +263,8 @@ export default function FinancialReportsPage() {
             <CardTitle className="text-base sm:text-lg">Filters</CardTitle>
             <CardDescription className="text-xs sm:text-sm">Filter and sort financial reports</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="search" className="text-xs sm:text-sm">Search</Label>
                 <div className="relative">
@@ -356,7 +356,7 @@ export default function FinancialReportsPage() {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-5">
               <Button variant="outline" onClick={clearFilters} className="w-full sm:w-auto">
                 Clear Filters
               </Button>
@@ -389,7 +389,7 @@ export default function FinancialReportsPage() {
       )}
 
       {/* Key Financial Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Budget</CardTitle>
@@ -455,8 +455,8 @@ export default function FinancialReportsPage() {
       </div>
 
       {/* Report Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 overflow-x-auto">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 overflow-x-auto mb-4">
           <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
           <TabsTrigger value="budget" className="text-xs sm:text-sm">Budget Analysis</TabsTrigger>
           <TabsTrigger value="expenses" className="text-xs sm:text-sm">Expenses</TabsTrigger>

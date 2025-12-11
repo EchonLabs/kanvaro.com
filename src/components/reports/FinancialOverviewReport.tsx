@@ -80,9 +80,9 @@ export function FinancialOverviewReport({ overview, budgetBreakdown, monthlyTren
   }))
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Financial Health Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Budget Health</CardTitle>
@@ -168,7 +168,7 @@ export function FinancialOverviewReport({ overview, budgetBreakdown, monthlyTren
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
         {/* Budget Breakdown by Category */}
         <Card>
           <CardHeader>
@@ -278,9 +278,9 @@ export function FinancialOverviewReport({ overview, budgetBreakdown, monthlyTren
           <CardDescription className="text-xs sm:text-sm">Comprehensive view of budget allocation and spending</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {budgetBreakdown.map((category, index) => (
-              <div key={category.category} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+              <div key={category.category} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
                 <div className="flex-1 min-w-0 w-full sm:w-auto">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
                     <div className="flex items-center space-x-2">
@@ -297,7 +297,7 @@ export function FinancialOverviewReport({ overview, budgetBreakdown, monthlyTren
                   </div>
                   <div className="mt-3 sm:mt-2">
                     <Progress value={category.utilizationRate} className="mb-2" />
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 text-xs sm:text-sm text-muted-foreground">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-5 text-xs sm:text-sm text-muted-foreground">
                       <span className="break-words">Budgeted: ${category.budgeted.toLocaleString()}</span>
                       <span className="break-words">Spent: ${category.spent.toLocaleString()}</span>
                       <span className="break-words">Remaining: ${category.remaining.toLocaleString()}</span>

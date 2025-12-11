@@ -180,7 +180,7 @@ export default function TestExecutionsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold">Test Executions</h1>
@@ -194,7 +194,7 @@ export default function TestExecutionsPage() {
           </Button>
         </div>
 
-        <div className="grid gap-4">
+        <div className="grid gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Recent Test Executions</CardTitle>

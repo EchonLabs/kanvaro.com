@@ -391,7 +391,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Filters */}
       <Card>
         <CardHeader>
@@ -400,14 +400,14 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
             Time Tracking Reports
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div>
               <Label htmlFor="startDate">Start Date</Label>
               <Input
@@ -569,7 +569,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
 
       {/* Summary Widgets */}
       {reportData && filters.reportType === 'detailed' && reportData.detailedEntries && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -694,7 +694,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                   </div>
 
                   {/* Mobile Card View */}
-                  <div className="md:hidden space-y-4">
+                  <div className="md:hidden space-y-5">
                     {reportData.detailedEntries.map((entry) => (
                       <div key={entry._id} className="border rounded-lg p-4 space-y-3">
                         <div className="flex items-start justify-between">
