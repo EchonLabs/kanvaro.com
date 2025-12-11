@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { ITask } from '@/models/Task'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface PopulatedTask extends Omit<ITask, 'assignedTo' | 'project'> {
   project?: {
@@ -70,10 +71,11 @@ export default function SortableTask({
 
   return (
     <Card 
-    
       ref={setNodeRef}
       style={style}
-      className={`hover:shadow-md transition-shadow cursor-pointer ${
+      {...attributes}
+      {...listeners}
+      className={`hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing ${
         isDragging ? 'opacity-50' : ''
       } ${isDragOverlay ? 'rotate-3 shadow-lg' : ''}`}
       onClick={onClick}
@@ -83,17 +85,24 @@ export default function SortableTask({
 
       <div className="flex items-start justify-between gap-2 min-w-0">
             <div className="flex-1 min-w-0">
-              <h4 className="font-medium text-foreground text-xs sm:text-sm line-clamp-2 truncate" title={task.title}>
-                {task.title}
-              </h4>
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <h4 className="font-medium text-foreground text-xs sm:text-sm line-clamp-2 truncate">
+                      {task.title}
+                    </h4>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" align="start" className="max-w-xs break-words">
+                    {task.title}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             <div className="flex items-center space-x-1 flex-shrink-0">
               <Button 
                 variant="ghost" 
                 size="sm" 
                 className="h-8 w-8 sm:h-6 sm:w-6 p-0 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 cursor-grab active:cursor-grabbing"
-                {...attributes}
-                {...listeners}
                 onClick={(e) => e.stopPropagation()}
               >
                 <GripVertical className="h-3 w-3 sm:h-4 sm:w-4" />

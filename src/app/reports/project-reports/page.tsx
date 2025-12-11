@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover
 import { CalendarIcon, Download, Filter, RefreshCw, Search } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { ProjectOverviewReport } from '@/components/reports/ProjectOverviewReport'
 import { ProjectProgressReport } from '@/components/reports/ProjectProgressReport'
 import { ProjectTimelineReport } from '@/components/reports/ProjectTimelineReport'
@@ -88,6 +89,7 @@ interface FilterState {
 
 export default function ProjectReportsPage() {
   const { setItems } = useBreadcrumb()
+  const { formatCurrency } = useOrgCurrency()
   const [reportData, setReportData] = useState<ProjectReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
@@ -220,7 +222,7 @@ export default function ProjectReportsPage() {
   return (
     <MainLayout>
       <PageWrapper>
-        <div className="space-y-8">
+        <div className="space-y-8 overflow-x-hidden">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -387,10 +389,10 @@ export default function ProjectReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold">
-              ${reportData.summary.totalSpent.toLocaleString()}
+              {formatCurrency(reportData.summary.totalSpent)}
             </div>
             <p className="text-xs text-muted-foreground mt-1 break-words">
-              of ${reportData.summary.totalBudget.toLocaleString()} total budget
+              of {formatCurrency(reportData.summary.totalBudget)} total budget
             </p>
             <Progress 
               value={reportData.summary.totalBudget > 0 ? (reportData.summary.totalSpent / reportData.summary.totalBudget) * 100 : 0} 

@@ -29,6 +29,7 @@ import {
   History
 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface Task {
   _id: string
@@ -515,7 +516,18 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-2">
-                      <h4 className="font-medium text-foreground">{task.title}</h4>
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <h4 className="font-medium text-foreground truncate max-w-[220px] sm:max-w-none">
+                              {task.title}
+                            </h4>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start" className="max-w-xs break-words">
+                            {task.title}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <Badge className={getPriorityColor(task.priority)}>
                         {formatToTitleCase(task.priority)}
                       </Badge>

@@ -22,6 +22,7 @@ import {
   Download,
   Filter
 } from 'lucide-react'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 
 interface ExpenseReportProps {
   topExpenses: {
@@ -44,6 +45,8 @@ interface ExpenseReportProps {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D']
 
 export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: ExpenseReportProps) {
+  const { formatCurrency } = useOrgCurrency()
+
   // Calculate expense metrics
   const totalExpenses = topExpenses.reduce((sum, expense) => sum + expense.amount, 0)
   const averageExpense = topExpenses.length > 0 ? totalExpenses / topExpenses.length : 0
@@ -83,7 +86,7 @@ export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: Expense
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold break-words">
-              ${totalExpenses.toLocaleString()}
+              {formatCurrency(totalExpenses)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Across all categories
@@ -98,7 +101,7 @@ export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: Expense
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold break-words">
-              ${averageExpense.toLocaleString()}
+              {formatCurrency(averageExpense)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Per transaction
@@ -113,7 +116,7 @@ export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: Expense
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold break-words">
-              ${highestExpense.toLocaleString()}
+              {formatCurrency(highestExpense)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Single transaction
@@ -162,7 +165,7 @@ export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: Expense
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']} />
+                <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Amount']} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -180,7 +183,7 @@ export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: Expense
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="category" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']} />
+                <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Amount']} />
                 <Bar dataKey="budgeted" fill="#8884d8" name="Budgeted" />
                 <Bar dataKey="spent" fill="#82ca9d" name="Spent" />
               </BarChart>
@@ -200,7 +203,7 @@ export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: Expense
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="description" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']} />
+                <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Amount']} />
                 <Bar dataKey="amount" fill="#FF8042" />
               </BarChart>
             </ResponsiveContainer>
@@ -257,7 +260,7 @@ export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: Expense
                 <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
                   <div className="text-left sm:text-right w-full sm:w-auto">
                     <div className="text-base sm:text-lg font-bold break-words">
-                      ${expense.amount.toLocaleString()}
+                      {formatCurrency(expense.amount)}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       Transaction Amount
@@ -301,16 +304,16 @@ export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: Expense
                   <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 text-xs sm:text-sm">
                     <div>
                       <div className="text-muted-foreground">Budgeted</div>
-                      <div className="font-medium break-words">${category.budgeted.toLocaleString()}</div>
+                      <div className="font-medium break-words">{formatCurrency(category.budgeted)}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Spent</div>
-                      <div className="font-medium break-words">${category.spent.toLocaleString()}</div>
+                      <div className="font-medium break-words">{formatCurrency(category.spent)}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Remaining</div>
                       <div className={`font-medium break-words ${category.remaining < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        ${category.remaining.toLocaleString()}
+                        {formatCurrency(category.remaining)}
                       </div>
                     </div>
                   </div>

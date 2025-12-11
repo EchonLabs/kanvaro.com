@@ -26,6 +26,7 @@ import {
   Target,
   AlertCircle
 } from 'lucide-react'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 
 interface FinancialOverviewReportProps {
   overview: {
@@ -56,6 +57,8 @@ interface FinancialOverviewReportProps {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D']
 
 export function FinancialOverviewReport({ overview, budgetBreakdown, monthlyTrends, filters }: FinancialOverviewReportProps) {
+  const { formatCurrency } = useOrgCurrency()
+
   // Prepare data for charts
   const budgetData = budgetBreakdown.map(item => ({
     name: item.category,
@@ -141,7 +144,7 @@ export function FinancialOverviewReport({ overview, budgetBreakdown, monthlyTren
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold text-green-600 break-words">
-              ${overview.totalRevenue.toLocaleString()}
+              {formatCurrency(overview.totalRevenue)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Total revenue generated
@@ -153,12 +156,12 @@ export function FinancialOverviewReport({ overview, budgetBreakdown, monthlyTren
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Net Profit</CardTitle>
             <Badge variant={overview.netProfit >= 0 ? 'default' : 'destructive'} className="flex-shrink-0 ml-2 text-xs">
-              {overview.netProfit >= 0 ? '+' : ''}${overview.netProfit.toLocaleString()}
+              {overview.netProfit >= 0 ? '+' : ''}{formatCurrency(overview.netProfit)}
             </Badge>
           </CardHeader>
           <CardContent>
             <div className={`text-xl sm:text-2xl font-bold ${overview.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              ${overview.netProfit.toLocaleString()}
+              {formatCurrency(overview.netProfit)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {overview.netProfit >= 0 ? 'Profit' : 'Loss'}
@@ -183,7 +186,7 @@ export function FinancialOverviewReport({ overview, budgetBreakdown, monthlyTren
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, value, percent }) => `${name}: $${value.toLocaleString()} (${(percent * 100).toFixed(0)}%)`}
+                  label={({ name, value, percent }) => `${name}: ${formatCurrency(value)} (${(percent * 100).toFixed(0)}%)`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
@@ -192,7 +195,7 @@ export function FinancialOverviewReport({ overview, budgetBreakdown, monthlyTren
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Budget']} />
+                <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Budget']} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -210,7 +213,7 @@ export function FinancialOverviewReport({ overview, budgetBreakdown, monthlyTren
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']} />
+                <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Amount']} />
                 <Bar dataKey="budgeted" fill="#8884d8" name="Budgeted" />
                 <Bar dataKey="spent" fill="#82ca9d" name="Spent" />
               </BarChart>
@@ -230,7 +233,7 @@ export function FinancialOverviewReport({ overview, budgetBreakdown, monthlyTren
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']} />
+                <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Amount']} />
                 <Area 
                   type="monotone" 
                   dataKey="profit" 
@@ -298,9 +301,9 @@ export function FinancialOverviewReport({ overview, budgetBreakdown, monthlyTren
                   <div className="mt-3 sm:mt-2">
                     <Progress value={category.utilizationRate} className="mb-2" />
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-5 text-xs sm:text-sm text-muted-foreground">
-                      <span className="break-words">Budgeted: ${category.budgeted.toLocaleString()}</span>
-                      <span className="break-words">Spent: ${category.spent.toLocaleString()}</span>
-                      <span className="break-words">Remaining: ${category.remaining.toLocaleString()}</span>
+                      <span className="break-words">Budgeted: {formatCurrency(category.budgeted)}</span>
+                      <span className="break-words">Spent: {formatCurrency(category.spent)}</span>
+                      <span className="break-words">Remaining: {formatCurrency(category.remaining)}</span>
                     </div>
                   </div>
                 </div>

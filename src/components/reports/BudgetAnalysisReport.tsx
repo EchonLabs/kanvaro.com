@@ -23,6 +23,7 @@ import {
   AlertCircle,
   Target
 } from 'lucide-react'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 
 interface BudgetAnalysisReportProps {
   budgetBreakdown: {
@@ -45,6 +46,8 @@ interface BudgetAnalysisReportProps {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D']
 
 export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }: BudgetAnalysisReportProps) {
+  const { formatCurrency } = useOrgCurrency()
+
   // Calculate budget metrics
   const totalBudgeted = budgetBreakdown.reduce((sum, item) => sum + item.budgeted, 0)
   const totalSpent = budgetBreakdown.reduce((sum, item) => sum + item.spent, 0)
@@ -89,7 +92,7 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold break-words">
-              ${totalBudgeted.toLocaleString()}
+              {formatCurrency(totalBudgeted)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Across all categories
@@ -104,7 +107,7 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold break-words">
-              ${totalSpent.toLocaleString()}
+              {formatCurrency(totalSpent)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {totalBudgeted > 0 ? ((totalSpent / totalBudgeted) * 100).toFixed(1) : 0}% of budget
@@ -120,7 +123,7 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold break-words">
-              ${totalRemaining.toLocaleString()}
+              {formatCurrency(totalRemaining)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Available to spend
@@ -159,7 +162,7 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']} />
+                <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Amount']} />
                 <Bar dataKey="budgeted" fill="#8884d8" name="Budgeted" />
                 <Bar dataKey="spent" fill="#82ca9d" name="Spent" />
               </BarChart>
@@ -198,7 +201,7 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']} />
+                <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Amount']} />
                 <Area 
                   type="monotone" 
                   dataKey="budget" 
@@ -234,7 +237,7 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Variance']} />
+                <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Variance']} />
                 <Line 
                   type="monotone" 
                   dataKey="variance" 
@@ -298,16 +301,16 @@ export function BudgetAnalysisReport({ budgetBreakdown, monthlyTrends, filters }
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 text-xs sm:text-sm">
                       <div>
                         <div className="text-muted-foreground">Budgeted</div>
-                        <div className="font-medium break-words">${category.budgeted.toLocaleString()}</div>
+                      <div className="font-medium break-words">{formatCurrency(category.budgeted)}</div>
                       </div>
                       <div>
                         <div className="text-muted-foreground">Spent</div>
-                        <div className="font-medium break-words">${category.spent.toLocaleString()}</div>
+                      <div className="font-medium break-words">{formatCurrency(category.spent)}</div>
                       </div>
                       <div>
                         <div className="text-muted-foreground">Remaining</div>
-                        <div className={`font-medium break-words ${category.remaining < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          ${category.remaining.toLocaleString()}
+                      <div className={`font-medium break-words ${category.remaining < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {formatCurrency(category.remaining)}
                         </div>
                       </div>
                     </div>

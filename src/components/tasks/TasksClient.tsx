@@ -1140,12 +1140,20 @@ export default function TasksClient({
                                                                         <div className="flex-1 min-w-0 w-full">
                                                                             <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2 min-w-0">
                                                                                 <div className="flex-1 min-w-0">
-                                                                                    <h3
-                                                                                        className="font-medium text-sm sm:text-base text-foreground truncate"
-                                                                                        title={task.title}
-                                                                                    >
-                                                                                        {task.title}
-                                                                                    </h3>
+                                                                                    <TooltipProvider delayDuration={150}>
+                                                                                        <Tooltip>
+                                                                                            <TooltipTrigger asChild>
+                                                                                                <h3
+                                                                                                    className="font-medium text-sm sm:text-base text-foreground truncate"
+                                                                                                >
+                                                                                                    {task.title}
+                                                                                                </h3>
+                                                                                            </TooltipTrigger>
+                                                                                            <TooltipContent side="top" align="start" className="max-w-xs break-words">
+                                                                                                {task.title}
+                                                                                            </TooltipContent>
+                                                                                        </Tooltip>
+                                                                                    </TooltipProvider>
                                                                                 </div>
                                                                                 <div className="flex flex-wrap items-center gap-1 sm:gap-2 flex-shrink-0">
                                                                                     {task.displayId && (

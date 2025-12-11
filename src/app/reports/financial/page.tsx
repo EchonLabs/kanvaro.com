@@ -21,6 +21,7 @@ import { FinancialOverviewReport } from '@/components/reports/FinancialOverviewR
 import { BudgetAnalysisReport } from '@/components/reports/BudgetAnalysisReport'
 import { ExpenseReport } from '@/components/reports/ExpenseReport'
 import { RevenueReport } from '@/components/reports/RevenueReport'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 
 interface FinancialReportData {
   overview: {
@@ -73,6 +74,7 @@ interface FilterState {
 
 export default function FinancialReportsPage() {
   const { setItems } = useBreadcrumb()
+  const { formatCurrency } = useOrgCurrency()
   const [reportData, setReportData] = useState<FinancialReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
@@ -397,7 +399,7 @@ export default function FinancialReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold">
-              ${reportData.overview.totalBudget.toLocaleString()}
+              {formatCurrency(reportData.overview.totalBudget)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Across all projects
@@ -412,7 +414,7 @@ export default function FinancialReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold">
-              ${reportData.overview.totalSpent.toLocaleString()}
+              {formatCurrency(reportData.overview.totalSpent)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {reportData.overview.budgetUtilization.toFixed(1)}% of budget
@@ -428,7 +430,7 @@ export default function FinancialReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold text-green-600">
-              ${reportData.overview.totalRevenue.toLocaleString()}
+              {formatCurrency(reportData.overview.totalRevenue)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Generated revenue
@@ -440,12 +442,12 @@ export default function FinancialReportsPage() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Net Profit</CardTitle>
             <Badge variant={reportData.overview.netProfit >= 0 ? 'default' : 'destructive'} className="flex-shrink-0 ml-2 text-xs">
-              {reportData.overview.netProfit >= 0 ? '+' : ''}${reportData.overview.netProfit.toLocaleString()}
+              {reportData.overview.netProfit >= 0 ? '+' : ''}{formatCurrency(reportData.overview.netProfit)}
             </Badge>
           </CardHeader>
           <CardContent>
             <div className={`text-xl sm:text-2xl font-bold ${reportData.overview.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              ${reportData.overview.netProfit.toLocaleString()}
+              {formatCurrency(reportData.overview.netProfit)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {reportData.overview.profitMargin.toFixed(1)}% profit margin

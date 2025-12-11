@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/Badge'
 import { Progress } from '@/components/ui/Progress'
 import { Button } from '@/components/ui/Button'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { 
   BarChart, 
   Bar, 
