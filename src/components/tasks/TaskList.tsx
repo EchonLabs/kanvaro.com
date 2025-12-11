@@ -454,7 +454,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         )}
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         {filteredTasks.map((task) => (
           <Card 
             key={task._id} 
