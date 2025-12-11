@@ -28,7 +28,11 @@ export function MainLayout({ children }: MainLayoutProps) {
   }, [])
 
   if (!mounted) {
-    return null
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <ContentLoader message="Loading..." size="lg" />
+      </div>
+    )
   }
 
   // Wait for permissions to load before rendering the layout
@@ -36,7 +40,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   if (permissionsLoading && !permissions) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
-        <ContentLoader message="Loading permissions..." size="lg" />
+        <ContentLoader message="Loading..." size="lg" />
       </div>
     )
   }
@@ -70,15 +74,17 @@ export function MainLayout({ children }: MainLayoutProps) {
         />
         
         {/* Main Content */}
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden min-h-0">
           {/* Header */}
           <Header onMobileMenuToggle={() => setMobileMenuOpen(true)} />
           
           {/* Breadcrumb */}
-          <Breadcrumb />
+          <div className="mb-4">
+            <Breadcrumb />
+          </div>
           
           {/* Page Content */}
-          <main className="flex-1 overflow-auto p-3 sm:p-4 lg:p-6">
+          <main className="flex-1 overflow-auto p-3 sm:p-4 lg:p-6 min-h-0">
             <div className="mx-auto max-w-7xl">
               {children}
             </div>

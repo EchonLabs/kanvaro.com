@@ -114,7 +114,7 @@ export function DatabaseSettings() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-8">
       <Card>
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="flex items-center gap-2 text-base sm:text-2xl">
@@ -125,8 +125,8 @@ export function DatabaseSettings() {
             Configure your MongoDB database connection settings.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        <CardContent className="space-y-6 sm:space-y-8 p-4 sm:p-6 pt-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6">
             <div className="space-y-2">
               <Label htmlFor="db-host" className="text-xs sm:text-sm">Host</Label>
               <Input

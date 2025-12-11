@@ -312,6 +312,31 @@ export async function GET(request: NextRequest) {
       }
     }
     
+    // Preload user and project names for display
+    const [allUsers, allProjects] = await Promise.all([
+      User.find({}, 'firstName lastName email').lean(),
+      Project.find({}, 'name').lean()
+    ])
+    const userNameMap = new Map<string, string>()
+    allUsers.forEach((u: any) => {
+      const name = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email || ''
+      userNameMap.set((u._id as any).toString(), name || (u._id as any).toString())
+    })
+    const projectNameMap = new Map<string, string>()
+    allProjects.forEach((p: any) => {
+      projectNameMap.set((p._id as any).toString(), p.name || (p._id as any).toString())
+    })
+    const getUserName = (id?: any) => {
+      if (!id) return undefined
+      const key = id.toString()
+      return userNameMap.get(key) || key
+    }
+    const getProjectName = (id?: any) => {
+      if (!id) return undefined
+      const key = id.toString()
+      return projectNameMap.get(key) || key
+    }
+
     // Search Tasks
     if (!filters.type || filters.type.includes('task')) {
       const taskQuery: any = {
@@ -352,8 +377,8 @@ export async function GET(request: NextRequest) {
             metadata: {
               status: task.status,
               priority: task.priority,
-              assignee: (task as any).assignedTo ? ((task as any).assignedTo?._id?.toString?.() || (task as any).assignedTo?.toString?.()) : undefined,
-              project: (task as any).project?.toString?.(),
+              assignee: getUserName((task as any).assignedTo),
+              project: getProjectName((task as any).project),
               createdAt: task.createdAt.toISOString(),
               updatedAt: task.updatedAt.toISOString()
             }
@@ -394,7 +419,7 @@ export async function GET(request: NextRequest) {
             metadata: {
               status: story.status,
               priority: story.priority,
-              project: story.projectId?.toString(),
+              project: getProjectName(story.projectId),
               createdAt: story.createdAt.toISOString(),
               updatedAt: story.updatedAt.toISOString()
             }
@@ -435,7 +460,7 @@ export async function GET(request: NextRequest) {
             metadata: {
               status: epic.status,
               priority: epic.priority,
-              project: (epic as any).project?.toString?.(),
+              project: getProjectName((epic as any).project),
               createdAt: epic.createdAt.toISOString(),
               updatedAt: epic.updatedAt.toISOString()
             }

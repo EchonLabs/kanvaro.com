@@ -139,9 +139,9 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
   })
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Resource Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Team Members</CardTitle>
@@ -206,7 +206,7 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Team Size Distribution */}
         <Card>
           <CardHeader>
@@ -317,9 +317,9 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
           <CardDescription className="text-xs sm:text-sm">Detailed resource allocation for each project</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {projects.map((project) => (
-              <div key={project._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+              <div key={project._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
                 <div className="flex-1 min-w-0 w-full sm:w-auto">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
                     <h3 className="font-semibold text-sm sm:text-base truncate">{project.name}</h3>
@@ -335,7 +335,7 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
                   </div>
 
                   {/* Resource Metrics */}
-                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-5">
                     <div>
                       <div className="flex items-center space-x-2 mb-2">
                         <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
@@ -395,7 +395,7 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full sm:w-auto sm:ml-6">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-5 w-full sm:w-auto sm:ml-6">
                   <div className="flex sm:flex-col items-center sm:items-center text-center gap-2 sm:gap-0">
                     <div className="text-xs sm:text-sm font-medium">
                       {project.stats.sprints.active}

@@ -196,7 +196,7 @@ export default function TestPlansPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold">Test Plans</h1>
@@ -210,7 +210,7 @@ export default function TestPlansPage() {
           </Button>
         </div>
 
-        <div className="grid gap-6">
+        <div className="grid gap-8">
           {testPlans.map((plan) => (
             <Card key={plan._id}>
               <CardHeader>
@@ -245,7 +245,7 @@ export default function TestPlansPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-4">
                   <div className="flex items-center space-x-2">
                     <CheckSquare className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm text-muted-foreground">Test Cases:</span>

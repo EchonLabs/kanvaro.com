@@ -134,7 +134,7 @@ export default function SettingsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 sm:space-y-8 px-4 sm:px-6">
+      <div className="space-y-8 px-4 sm:px-6">
         {/* Settings Header */}
         <div className="border-b border-border pb-4 sm:pb-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
@@ -153,9 +153,9 @@ export default function SettingsPage() {
         </div>
 
         {/* Settings Content */}
-        <div className="space-y-4 sm:space-y-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-            <TabsList className="grid w-full grid-cols-3 gap-1 overflow-x-auto">
+        <div className="space-y-6 sm:space-y-8">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 sm:space-y-8">
+            <TabsList className="grid w-full grid-cols-3 gap-1 overflow-x-auto mb-4">
               <TabsTrigger value="organization" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
                 <Building2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                 <span className="truncate">Organization</span>

@@ -89,9 +89,9 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
   }))
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Team Health Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Team Size</CardTitle>
@@ -157,7 +157,7 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
         {/* Department Distribution */}
         <Card>
           <CardHeader>
@@ -265,9 +265,9 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
           <CardDescription className="text-xs sm:text-sm">Team members with highest productivity scores</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {topPerformers.map((performer, index) => (
-              <div key={performer._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+              <div key={performer._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
                 <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
                   <div className="flex items-center space-x-2 flex-shrink-0">
                     <Badge variant="outline" className="w-6 h-6 rounded-full flex items-center justify-center">
@@ -328,9 +328,9 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
           <CardDescription className="text-xs sm:text-sm">Detailed performance metrics by department</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {departmentBreakdown.map((dept, index) => (
-              <div key={dept.department} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+              <div key={dept.department} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
                 <div className="flex-1 min-w-0 w-full sm:w-auto">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
                     <div className="flex items-center space-x-2">
@@ -342,7 +342,7 @@ export function TeamOverviewReport({ overview, departmentBreakdown, topPerformer
                     </div>
                     <Badge variant="outline" className="flex-shrink-0">{dept.members} members</Badge>
                   </div>
-                  <div className="mt-2 space-y-2">
+                  <div className="mt-2 space-y-3">
                     <div>
                       <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
                         <span>Productivity</span>

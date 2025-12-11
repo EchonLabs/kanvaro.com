@@ -424,7 +424,7 @@ export function OrganizationSettings() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-8">
       <Card>
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
@@ -435,7 +435,7 @@ export function OrganizationSettings() {
             Update your organization's basic information and settings.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
+        <CardContent className="space-y-6 sm:space-y-8 p-4 sm:p-6 pt-0">
           <div className="space-y-2">
             <Label htmlFor="name" className="text-xs sm:text-sm">Organization Name *</Label>
             <Input
@@ -478,7 +478,7 @@ export function OrganizationSettings() {
             </div>
 
             {/* Logo Mode Selection */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6">
               <div
                 className={`p-4 sm:p-6 border-2 rounded-lg cursor-pointer transition-all ${
                   logoMode === 'single'
@@ -572,7 +572,7 @@ export function OrganizationSettings() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6">
                 {/* Light Mode Logo */}
                 <div className="bg-card border rounded-lg p-4 sm:p-6">
                   <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
@@ -750,7 +750,7 @@ export function OrganizationSettings() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6">
               {organizationSizes.map((size) => {
                 const getIcon = () => {
                   switch (size.value) {
@@ -1170,7 +1170,7 @@ export function OrganizationSettings() {
                 </div>
               )}
 
-              <div className="space-y-3 sm:space-y-4">
+          <div className="space-y-5">
                 <h4 className="text-sm sm:text-base font-medium">Rounding Rules</h4>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
                   <div className="space-y-0.5 flex-1 min-w-0">
@@ -1193,7 +1193,7 @@ export function OrganizationSettings() {
                 </div>
 
                 {formData.timeTracking.roundingRules.enabled && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6">
                     <div>
                       <Label htmlFor="roundingIncrement" className="text-xs sm:text-sm">Increment (minutes)</Label>
                       <Input

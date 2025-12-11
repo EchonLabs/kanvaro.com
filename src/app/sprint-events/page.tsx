@@ -411,7 +411,7 @@ export default function SprintEventsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -578,8 +578,8 @@ export default function SprintEventsPage() {
                   <TabsTrigger value="list">List View</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="grid" className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <TabsContent value="grid" className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {paginatedEvents.map((event) => (
                       <Card 
                         key={event._id} 
@@ -665,8 +665,8 @@ export default function SprintEventsPage() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="list" className="space-y-4">
-                  <div className="space-y-4">
+                <TabsContent value="list" className="space-y-6">
+                  <div className="space-y-6">
                     {paginatedEvents.map((event) => (
               <Card 
                 key={event._id} 

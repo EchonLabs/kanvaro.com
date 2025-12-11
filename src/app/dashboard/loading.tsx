@@ -6,7 +6,7 @@ import { ContentLoader } from '@/components/ui/ContentLoader'
 export default function Loading() {
   return (
     <MainLayout>
-      <ContentLoader message="Loading dashboard..." />
+      <ContentLoader message="Loading..." />
     </MainLayout>
   )
 }

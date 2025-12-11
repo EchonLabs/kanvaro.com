@@ -872,7 +872,7 @@ export default function SprintDetailPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 overflow-x-hidden">
+      <div className="space-y-8 sm:space-y-10 lg:space-y-12 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto min-w-0">
             <Button variant="ghost" onClick={() => router.push('/sprints')} className="w-full sm:w-auto flex-shrink-0">
@@ -941,8 +941,8 @@ export default function SprintDetailPage() {
           </Alert>
         )}
 
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-3">
-          <div className="md:col-span-2 space-y-4 sm:space-y-6">
+        <div className="grid gap-8 grid-cols-1 md:grid-cols-3">
+          <div className="md:col-span-2 space-y-8">
             <Card className="overflow-x-hidden">
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-base sm:text-lg">Description</CardTitle>
@@ -1002,7 +1002,7 @@ export default function SprintDetailPage() {
 
                 {sprint?.progress?.totalTasks ? (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                       <div className="rounded-lg border bg-background p-3">
                         <div className="flex items-center justify-between text-xs uppercase text-muted-foreground tracking-wide">
                           <span>Tasks Completed</span>
@@ -1023,7 +1023,7 @@ export default function SprintDetailPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="rounded-lg border bg-background p-3">
                         <div className="flex items-center justify-between text-xs uppercase text-muted-foreground tracking-wide">
                           <span>Estimated Hours</span>
@@ -1206,7 +1206,7 @@ export default function SprintDetailPage() {
             </Card>
           </div>
 
-          <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-8">
             <Card className="overflow-x-hidden">
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-base sm:text-lg">Details</CardTitle>

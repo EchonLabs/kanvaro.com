@@ -1,3 +1,13 @@
+## [1.13.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.13.0...v1.13.1) (2025-12-11)
+
+
+### Bug Fixes
+
+* add changes ([7c97f9c](https://github.com/EchonLabs/kanvaro.com/commit/7c97f9ca42b235a46e6f7b7a4173af7c9ded9b8a))
+* add dashboard changes ([4da871b](https://github.com/EchonLabs/kanvaro.com/commit/4da871bd1f07033c85db438dddcab630a09fb5d2))
+* add space changes ([8976452](https://github.com/EchonLabs/kanvaro.com/commit/8976452f1227d92759cc234ea5b699d299ea120b))
+* fix ui issues ([bc2a662](https://github.com/EchonLabs/kanvaro.com/commit/bc2a662594f7d1c1f333cecfef197fbf27e599ba))
+
 # [1.13.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.12.5...v1.13.0) (2025-12-11)
 
 
