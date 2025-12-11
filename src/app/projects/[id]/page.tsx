@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -15,10 +15,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { 
-  ArrowLeft, 
-  Calendar, 
-  Users, 
+import {
+  ArrowLeft,
+  Calendar,
+  Users,
   DollarSign,
   Clock,
   CheckCircle,
@@ -40,10 +40,17 @@ import {
   Edit,
   UserPlus,
   Save,
-  Trash2
+  Trash2,
+  Paperclip,
+  Link as LinkIcon,
+  File,
+  Image,
+  ExternalLink
 } from 'lucide-react'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
+import { useOrganization } from '@/hooks/useOrganization'
 import EditTaskModal from '@/components/tasks/EditTaskModal'
+import { AddExpenseDialog } from '@/components/projects/AddExpenseDialog'
 import ViewTaskModal from '@/components/tasks/ViewTaskModal'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import TaskList from '@/components/tasks/TaskList'
@@ -57,6 +64,7 @@ import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { TestSuiteForm } from '@/components/test-management/TestSuiteForm'
 import { TestCaseForm } from '@/components/test-management/TestCaseForm'
 import { ProjectTeamTab } from '@/components/projects/ProjectTeamTab'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 
 interface Project {
   _id: string
@@ -73,9 +81,10 @@ interface Project {
     spent: number
     currency: string
     categories: {
-      labor: number
+
       materials: number
       overhead: number
+      external: number
     }
   }
   createdBy: {
@@ -126,6 +135,22 @@ interface Project {
     }
   }
   tags: string[]
+  attachments?: Array<{
+    name: string
+    url: string
+    size: number
+    type: string
+    uploadedBy?: {
+      firstName: string
+      lastName: string
+      email: string
+    }
+    uploadedAt: string
+  }>
+  externalLinks?: {
+    figma?: string[]
+    documentation?: string[]
+  }
   createdAt: string
   updatedAt: string
 }
@@ -136,7 +161,10 @@ export default function ProjectDetailPage() {
   const searchParams = useSearchParams()
   const projectId = params.id as string
   const activeTab = searchParams.get('tab') || 'overview'
-  
+  const { organization } = useOrganization()
+  const orgCurrency = organization?.currency || 'USD'
+  const { formatCurrency } = useOrgCurrency()
+
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -147,6 +175,9 @@ export default function ProjectDetailPage() {
   const [tasks, setTasks] = useState<any[]>([])
   const [suiteDialogOpen, setSuiteDialogOpen] = useState(false)
   const [suiteSaving, setSuiteSaving] = useState(false)
+  const [expenses, setExpenses] = useState<any[]>([])
+  const [showAddExpenseDialog, setShowAddExpenseDialog] = useState(false)
+  const [expensesLoading, setExpensesLoading] = useState(false)
   const [editingSuite, setEditingSuite] = useState<any | null>(null)
   const [parentSuiteIdForCreate, setParentSuiteIdForCreate] = useState<string | undefined>(undefined)
   const [suitesRefreshCounter, setSuitesRefreshCounter] = useState(0)
@@ -178,6 +209,12 @@ export default function ProjectDetailPage() {
   const [settingsError, setSettingsError] = useState('')
   const [savingSettings, setSavingSettings] = useState(false)
   const settingsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [expenseSuccess, setExpenseSuccess] = useState('')
+  const expenseSuccessTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const totalExpenses = useMemo(
+    () => expenses.reduce((sum, exp) => sum + (exp.fullAmount || 0), 0),
+    [expenses]
+  )
 
   useEffect(() => {
     if (projectId) {
@@ -187,16 +224,40 @@ export default function ProjectDetailPage() {
     }
   }, [projectId])
 
+  const fetchExpenses = async () => {
+    if (!projectId || !project?.settings?.allowExpenseTracking) return
+
+    try {
+      setExpensesLoading(true)
+      const response = await fetch(`/api/projects/${projectId}/expenses`)
+      const data = await response.json()
+
+      if (data.success) {
+        setExpenses(data.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching expenses:', error)
+    } finally {
+      setExpensesLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (project && project.settings?.allowExpenseTracking) {
+      fetchExpenses()
+    }
+  }, [project])
+
   useEffect(() => {
     if (project) {
       setStatusForm(project.status)
       setPriorityForm(project.priority)
-      
+
       // Respect global settings - if global is OFF, project must be OFF too
       const allowTimeTracking = (project.settings?.allowTimeTracking ?? false) && (globalTimeTrackingSettings?.allowTimeTracking ?? true)
       const allowManualTimeSubmission = (project.settings?.allowManualTimeSubmission ?? false) && (globalTimeTrackingSettings?.allowManualTimeSubmission ?? true)
       const requireApproval = (project.settings?.requireApproval ?? false) && (globalTimeTrackingSettings?.requireApproval ?? true)
-      
+
       setSettingsForm({
         allowTimeTracking,
         allowManualTimeSubmission,
@@ -216,6 +277,9 @@ export default function ProjectDetailPage() {
       if (settingsTimeoutRef.current) {
         clearTimeout(settingsTimeoutRef.current)
       }
+      if (expenseSuccessTimeoutRef.current) {
+        clearTimeout(expenseSuccessTimeoutRef.current)
+      }
     }
   }, [])
 
@@ -227,6 +291,17 @@ export default function ProjectDetailPage() {
     settingsTimeoutRef.current = setTimeout(() => {
       setSettingsSuccess('')
       settingsTimeoutRef.current = null
+    }, 3000)
+  }
+
+  const showExpenseSuccess = (message: string) => {
+    setExpenseSuccess(message)
+    if (expenseSuccessTimeoutRef.current) {
+      clearTimeout(expenseSuccessTimeoutRef.current)
+    }
+    expenseSuccessTimeoutRef.current = setTimeout(() => {
+      setExpenseSuccess('')
+      expenseSuccessTimeoutRef.current = null
     }, 3000)
   }
 
@@ -245,7 +320,7 @@ export default function ProjectDetailPage() {
         requireApproval: settingsForm.requireApproval && (globalTimeTrackingSettings?.requireApproval ?? true),
         notifications: { ...settingsForm.notifications },
       }
-      
+
       const response = await fetch(`/api/projects/${projectId}`, {
         method: 'PUT',
         headers: {
@@ -296,7 +371,7 @@ export default function ProjectDetailPage() {
     try {
       const response = await fetch(`/api/tasks?project=${projectId}`)
       const data = await response.json()
-      
+
       if (data.success) {
         setTasks(data.data)
       }
@@ -309,7 +384,7 @@ export default function ProjectDetailPage() {
     try {
       const response = await fetch('/api/time-tracking/settings')
       const data = await response.json()
-      
+
       if (data.success && data.data) {
         setGlobalTimeTrackingSettings({
           allowTimeTracking: data.data.allowTimeTracking ?? true,
@@ -441,23 +516,23 @@ export default function ProjectDetailPage() {
               </div>
               <p className="text-sm sm:text-base text-muted-foreground mt-1 break-words whitespace-normal" title={project.description || 'No description'}>
                 <span className="sm:hidden">
-                  {project.description && project.description.length > 25 
-                    ? `${project.description.substring(0, 25)}...` 
+                  {project.description && project.description.length > 25
+                    ? `${project.description.substring(0, 25)}...`
                     : (project.description || 'No description')}
                 </span>
                 <span className="hidden sm:inline">
-                  {project.description && project.description.length > 100 
-                    ? `${project.description.substring(0, 100)}...` 
+                  {project.description && project.description.length > 100
+                    ? `${project.description.substring(0, 100)}...`
                     : (project.description || 'No description')}
                 </span>
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => router.push(`/projects/create?edit=${projectId}`)} 
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(`/projects/create?edit=${projectId}`)}
               className="w-full sm:w-auto"
             >
               <Edit className="h-4 w-4 mr-2" />
@@ -515,7 +590,7 @@ export default function ProjectDetailPage() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Duration</p>
                   <p className="text-2xl font-bold text-foreground">
-                    {project.startDate && project.endDate 
+                    {project.startDate && project.endDate
                       ? Math.ceil((new Date(project.endDate).getTime() - new Date(project.startDate).getTime()) / (1000 * 60 * 60 * 24))
                       : 'N/A'
                     }
@@ -535,7 +610,7 @@ export default function ProjectDetailPage() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Budget</p>
                   <p className="text-2xl font-bold text-foreground">
-                    {project.budget ? `${project.budget.currency} ${project.budget.total.toLocaleString()}` : 'N/A'}
+                    {project.budget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.total) : 'N/A'}
                   </p>
                 </div>
               </div>
@@ -549,9 +624,11 @@ export default function ProjectDetailPage() {
           newSearchParams.set('tab', value)
           router.push(`/projects/${projectId}?${newSearchParams.toString()}`)
         }} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-1 overflow-x-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-11 gap-1 overflow-x-auto">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
             <TabsTrigger value="team" className="text-xs sm:text-sm">Team</TabsTrigger>
+            <TabsTrigger value="attachments" className="text-xs sm:text-sm">Attachments</TabsTrigger>
+            <TabsTrigger value="budget" className="text-xs sm:text-sm">Budget</TabsTrigger>
             <TabsTrigger value="tasks" className="text-xs sm:text-sm">Tasks</TabsTrigger>
             <TabsTrigger value="kanban" className="text-xs sm:text-sm">Kanban</TabsTrigger>
             <TabsTrigger value="calendar" className="text-xs sm:text-sm">Calendar</TabsTrigger>
@@ -615,7 +692,7 @@ export default function ProjectDetailPage() {
 
                 {/* Budget Breakdown */}
                 {project.budget && (
-                  <Card>
+                  <Card className="mt-6">
                     <CardHeader>
                       <CardTitle>Budget Breakdown</CardTitle>
                     </CardHeader>
@@ -624,19 +701,19 @@ export default function ProjectDetailPage() {
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-muted-foreground">Total Budget</span>
                           <span className="text-sm font-semibold text-foreground">
-                            {project.budget.currency} {project.budget.total.toLocaleString()}
+                            {formatCurrency(project.budget.total, orgCurrency)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-muted-foreground">Spent</span>
                           <span className="text-sm text-foreground">
-                            {project.budget.currency} {project.budget.spent.toLocaleString()}
+                            {formatCurrency(project.budget.spent, orgCurrency)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-muted-foreground">Remaining</span>
                           <span className="text-sm text-foreground">
-                            {project.budget.currency} {(project.budget.total - project.budget.spent).toLocaleString()}
+                            {formatCurrency(project.budget.total - project.budget.spent, orgCurrency)}
                           </span>
                         </div>
                       </div>
@@ -644,16 +721,45 @@ export default function ProjectDetailPage() {
                         <div className="text-sm font-medium text-muted-foreground">Categories</div>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
-                            <span>Labor</span>
-                            <span>{project.budget.currency} {project.budget.categories.labor.toLocaleString()}</span>
-                          </div>
-                          <div className="flex items-center justify-between text-sm">
                             <span>Materials</span>
-                            <span>{project.budget.currency} {project.budget.categories.materials.toLocaleString()}</span>
+                            <span>{formatCurrency(project.budget.categories.materials || 0, orgCurrency)}</span>
                           </div>
                           <div className="flex items-center justify-between text-sm">
                             <span>Overhead</span>
-                            <span>{project.budget.currency} {project.budget.categories.overhead.toLocaleString()}</span>
+                            <span>{formatCurrency(project.budget.categories.overhead || 0, orgCurrency)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span>External</span>
+                            <span>{formatCurrency(project.budget.categories.external || 0, orgCurrency)}</span>
+                          </div>
+                        </div>
+                        <div className="pt-3 border-t">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-muted-foreground">Expenses</span>
+                            <span className="text-sm font-semibold">
+                              {formatCurrency(totalExpenses || 0, orgCurrency)}
+                            </span>
+                          </div>
+                          <div className="mt-2 space-y-2">
+                            {(expenses || []).slice(0, 3).map((expense) => (
+                              <div
+                                key={expense._id}
+                                className="flex items-center justify-between text-sm text-muted-foreground"
+                              >
+                                <span className="truncate max-w-[65%]" title={expense.name || 'Expense'}>
+                                  {expense.name || 'Expense'}
+                                </span>
+                                <span>{formatCurrency(expense.fullAmount || 0, orgCurrency)}</span>
+                              </div>
+                            ))}
+                            {(!expenses || expenses.length === 0) && (
+                              <div className="text-sm text-muted-foreground">No expenses added yet</div>
+                            )}
+                            {expenses && expenses.length > 3 && (
+                              <div className="text-xs text-muted-foreground">
+                                + {expenses.length - 3} more expense{expenses.length - 3 === 1 ? '' : 's'}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -664,7 +770,7 @@ export default function ProjectDetailPage() {
 
               <div className="space-y-6">
                 {/* Team Members */}
-                <Card>
+                <Card className="mt-6">
                   <CardHeader>
                     <CardTitle>Team Members</CardTitle>
                   </CardHeader>
@@ -686,14 +792,14 @@ export default function ProjectDetailPage() {
                 </Card>
 
                 {/* Quick Actions */}
-                <Card>
+                <Card className="mt-6">
                   <CardHeader>
                     <CardTitle>Quick Actions</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="w-full justify-start"
                       onClick={() => router.push(`/projects/create?edit=${projectId}`)}
                     >
@@ -704,18 +810,18 @@ export default function ProjectDetailPage() {
                       <Plus className="mr-2 h-4 w-4" />
                       Add Task
                     </Button> */}
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="w-full justify-start"
                       onClick={() => router.push(`/projects/${projectId}?tab=team`)}
                     >
                       <Users className="mr-2 h-4 w-4" />
                       Manage Team
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="w-full justify-start"
                       onClick={() => router.push(`/projects/${projectId}?tab=reports`)}
                     >
@@ -732,16 +838,331 @@ export default function ProjectDetailPage() {
             <ProjectTeamTab projectId={projectId} project={project} onUpdate={fetchProject} />
           </TabsContent>
 
+          <TabsContent value="attachments" className="space-y-4 sm:space-y-6">
+            {/* Combined Attachments Card */}
+            <Card className="mt-6">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                  <Paperclip className="h-5 w-5 sm:h-6 sm:w-6" />
+                  Attachments & Links
+                </CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  Uploaded files, Figma designs, and documentation links
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+                {/* File Attachments */}
+                <div className="space-y-2 sm:space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs sm:text-sm font-medium flex items-center gap-2">
+                      <Paperclip className="h-4 w-4 flex-shrink-0" />
+                      <span className="whitespace-nowrap">Uploaded Files</span>
+                      {project.attachments && project.attachments.length > 0 && (
+                        <Badge variant="secondary" className="ml-2 text-xs">
+                          {project.attachments.length}
+                        </Badge>
+                      )}
+                    </Label>
+                  </div>
+                  {project.attachments && project.attachments.length > 0 ? (
+                    <div className="space-y-2">
+                      {project.attachments.map((attachment, index) => (
+                        <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                          <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+                            {attachment.type.startsWith('image/') ? (
+                              <Image className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0" />
+                            ) : (
+                              <File className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-xs sm:text-sm truncate">{attachment.name}</p>
+                              <p className="text-xs text-muted-foreground break-words sm:break-normal">
+                                <span className="whitespace-nowrap">{(attachment.size / 1024).toFixed(2)} KB</span>
+                                {attachment.uploadedBy && (
+                                  <span className="hidden sm:inline">
+                                    {` • ${attachment.uploadedBy.firstName} ${attachment.uploadedBy.lastName}`}
+                                  </span>
+                                )}
+                                {attachment.uploadedAt && (
+                                  <span className="hidden sm:inline">
+                                    {` • ${new Date(attachment.uploadedAt).toLocaleDateString()}`}
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(attachment.url, '_blank')}
+                            className="w-full sm:w-auto self-start sm:self-auto"
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2 sm:mr-0" />
+                            <span className="sm:hidden">Open</span>
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-muted rounded-lg p-4 sm:p-6 text-center">
+                      <Paperclip className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-xs sm:text-sm text-muted-foreground">No files uploaded yet</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Figma Links */}
+                <div className="space-y-2 sm:space-y-3 pt-3 sm:pt-4 border-t">
+                  <Label className="text-xs sm:text-sm font-medium flex items-center gap-2">
+                    <LinkIcon className="h-4 w-4 flex-shrink-0" />
+                    <span className="whitespace-nowrap">Figma Links</span>
+                    {project.externalLinks?.figma && project.externalLinks.figma.length > 0 && (
+                      <Badge variant="secondary" className="ml-2 text-xs">
+                        {project.externalLinks.figma.length}
+                      </Badge>
+                    )}
+                  </Label>
+                  {project.externalLinks?.figma && project.externalLinks.figma.length > 0 ? (
+                    <div className="space-y-1 sm:space-y-2">
+                      {project.externalLinks.figma.map((link, index) => {
+                        // Ensure URL has protocol
+                        const formattedLink = link.startsWith('http://') || link.startsWith('https://')
+                          ? link
+                          : `https://${link}`
+
+                        return (
+                          <a
+                            key={index}
+                            href={formattedLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
+                          >
+                            <span className="text-xs sm:text-sm text-primary group-hover:underline flex-1 truncate break-all sm:break-normal">
+                              {link}
+                            </span>
+                            <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors self-start sm:self-auto" />
+                          </a>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-muted rounded-lg p-4 sm:p-6 text-center">
+                      <LinkIcon className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-xs sm:text-sm text-muted-foreground">No Figma links added yet</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Documentation Links */}
+                <div className="space-y-2 sm:space-y-3 pt-3 sm:pt-4 border-t">
+                  <Label className="text-xs sm:text-sm font-medium flex items-center gap-2">
+                    <LinkIcon className="h-4 w-4 flex-shrink-0" />
+                    <span className="whitespace-nowrap">Documentation URLs</span>
+                    {project.externalLinks?.documentation && project.externalLinks.documentation.length > 0 && (
+                      <Badge variant="secondary" className="ml-2 text-xs">
+                        {project.externalLinks.documentation.length}
+                      </Badge>
+                    )}
+                  </Label>
+                  {project.externalLinks?.documentation && project.externalLinks.documentation.length > 0 ? (
+                    <div className="space-y-1 sm:space-y-2">
+                      {project.externalLinks.documentation.map((link, index) => {
+                        // Ensure URL has protocol
+                        const formattedLink = link.startsWith('http://') || link.startsWith('https://')
+                          ? link
+                          : `https://${link}`
+
+                        return (
+                          <a
+                            key={index}
+                            href={formattedLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
+                          >
+                            <span className="text-xs sm:text-sm text-primary group-hover:underline flex-1 truncate break-all sm:break-normal">
+                              {link}
+                            </span>
+                            <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors self-start sm:self-auto" />
+                          </a>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-muted rounded-lg p-4 sm:p-6 text-center">
+                      <LinkIcon className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-xs sm:text-sm text-muted-foreground">No documentation links added yet</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Empty State - Show only if all sections are empty */}
+                {(!project.attachments || project.attachments.length === 0) &&
+                  (!project.externalLinks?.figma || project.externalLinks.figma.length === 0) &&
+                  (!project.externalLinks?.documentation || project.externalLinks.documentation.length === 0) && (
+                    <div className="border-2 border-dashed border-muted rounded-lg p-6 sm:p-8 text-center">
+                      <Paperclip className="h-8 w-8 sm:h-10 sm:w-10 mx-auto mb-3 text-muted-foreground" />
+                      <p className="text-sm sm:text-base text-muted-foreground mb-1">No attachments or links added yet</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground">Upload files or add external links to get started</p>
+                    </div>
+                  )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="budget" className="space-y-6">
+            {/* Budget Overview */}
+            {project.budget && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Budget Overview</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Total Budget</p>
+                      <p className="text-2xl font-bold text-foreground">
+                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.total)}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Spent</p>
+                      <p className="text-2xl font-bold text-red-600">
+                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.spent || 0)}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Remaining</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.total - (project.budget.spent || 0))}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-4 border-t">
+                    <p className="text-sm font-medium text-muted-foreground mb-3">Budget by Category</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+                      <div>
+                        <p className="text-xs text-muted-foreground">Materials</p>
+                        <p className="text-sm font-semibold">
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.categories.materials || 0)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Overhead</p>
+                        <p className="text-sm font-semibold">
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(project.budget.categories.overhead || 0)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">External</p>
+                        <p className="text-sm font-semibold">
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format((project.budget.categories as any).external || 0)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Expenses Section */}
+            {project.settings?.allowExpenseTracking && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Expenses</CardTitle>
+                    <Button onClick={() => setShowAddExpenseDialog(true)} size="sm">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Expense
+                    </Button>
+                  </div>
+                </CardHeader>
+
+                {expenseSuccess && (
+                  <div className="px-6 pt-4">
+                    <Alert variant="success" className="animate-in fade-in slide-in-from-top-2">
+                      <CheckCircle className="h-4 w-4" />
+                      <AlertDescription>{expenseSuccess}</AlertDescription>
+                    </Alert>
+                  </div>
+                )}
+
+                <CardContent>
+                  {expensesLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : expenses.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <DollarSign className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>No expenses added yet</p>
+                      <p className="text-sm mt-1">Click "Add Expense" to get started</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {expenses.map((expense: any) => (
+                        <Card key={expense._id} className="hover:shadow-md transition-shadow">
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-sm mb-1">{expense.name}</h4>
+                                {expense.description && (
+                                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{expense.description}</p>
+                                )}
+                              </div>
+                              <Badge variant={expense.paidStatus === 'paid' ? 'default' : 'secondary'} className="ml-2">
+                                {expense.paidStatus === 'paid' ? 'Paid' : 'Unpaid'}
+                              </Badge>
+                            </div>
+
+                            <div className="space-y-1 text-xs">
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Amount:</span>
+                                <span className="font-semibold">
+                                  {new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(expense.fullAmount)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Category:</span>
+                                <span className="capitalize">{expense.category}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Date:</span>
+                                <span>{new Date(expense.expenseDate).toLocaleDateString()}</span>
+                              </div>
+                              {expense.isBillable && (
+                                <Badge variant="outline" className="mt-1">Billable</Badge>
+                              )}
+                              {expense.paidStatus === 'paid' && expense.paidBy && (
+                                <div className="flex justify-between mt-1">
+                                  <span className="text-muted-foreground">Paid by:</span>
+                                  <span>{expense.paidBy.firstName} {expense.paidBy.lastName}</span>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
           <TabsContent value="tasks" className="space-y-4">
-            <TaskList 
-              projectId={projectId} 
+            <TaskList
+              projectId={projectId}
               onCreateTask={() => setShowCreateTaskModal(true)}
             />
           </TabsContent>
 
           <TabsContent value="kanban" className="space-y-4">
-            <KanbanBoard 
-              projectId={projectId} 
+            <KanbanBoard
+              projectId={projectId}
               onCreateTask={() => setShowCreateTaskModal(true)}
               onEditTask={(task) => {
                 setSelectedTask(task)
@@ -758,15 +1179,15 @@ export default function ProjectDetailPage() {
           </TabsContent>
 
           <TabsContent value="calendar" className="space-y-4">
-            <CalendarView 
-              projectId={projectId} 
+            <CalendarView
+              projectId={projectId}
               onCreateTask={() => setShowCreateTaskModal(true)}
             />
           </TabsContent>
 
           <TabsContent value="backlog" className="space-y-4">
-            <BacklogView 
-              projectId={projectId} 
+            <BacklogView
+              projectId={projectId}
               onCreateTask={() => setShowCreateTaskModal(true)}
             />
           </TabsContent>
@@ -1165,9 +1586,9 @@ export default function ProjectDetailPage() {
           title={editingSuite ? 'Edit Test Suite' : 'Create Test Suite'}
           footer={
             <>
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => {
                   setSuiteDialogOpen(false)
                   setEditingSuite(null)
@@ -1176,8 +1597,8 @@ export default function ProjectDetailPage() {
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={suiteSaving}
                 form="test-suite-form"
               >
@@ -1337,7 +1758,7 @@ export default function ProjectDetailPage() {
                 const response = await fetch(`/api/tasks/${selectedTask._id}`, {
                   method: 'DELETE'
                 })
-                
+
                 if (response.ok) {
                   setShowDeleteConfirmModal(false)
                   setSelectedTask(null)
@@ -1360,6 +1781,16 @@ export default function ProjectDetailPage() {
           variant="destructive"
         />
 
+        <AddExpenseDialog
+          open={showAddExpenseDialog}
+          onClose={() => setShowAddExpenseDialog(false)}
+          projectId={projectId}
+          onSuccess={() => {
+            showExpenseSuccess('Expense added successfully')
+            fetchExpenses()
+            fetchProject() // Refresh project to update budget
+          }}
+        />
       </div>
     </MainLayout>
   )

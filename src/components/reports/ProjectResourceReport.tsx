@@ -5,13 +5,13 @@ import { Badge } from '@/components/ui/Badge'
 import { Progress } from '@/components/ui/Progress'
 import { Button } from '@/components/ui/Button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/Avatar'
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -19,9 +19,9 @@ import {
   LineChart,
   Line
 } from 'recharts'
-import { 
-  Users, 
-  Clock, 
+import {
+  Users,
+  Clock,
   DollarSign,
   TrendingUp,
   Target,
@@ -71,58 +71,72 @@ interface ProjectResourceReportProps {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D']
 
+import { useOrganization } from '@/hooks/useOrganization'
+
+// ... existing imports
+
 export function ProjectResourceReport({ projects, filters }: ProjectResourceReportProps) {
-  // Calculate resource metrics
-  const totalTeamMembers = projects.reduce((sum, project) => sum + (project.team?.length || 0), 0)
-  const totalHoursLogged = projects.reduce((sum, project) => sum + project.stats.timeTracking.totalHours, 0)
-  const totalBudget = projects.reduce((sum, project) => sum + project.stats.budget.total, 0)
-  const totalSpent = projects.reduce((sum, project) => sum + project.stats.budget.spent, 0)
+  const { organization } = useOrganization()
+  const currency = organization?.currency || 'USD'
 
-  // Prepare data for charts
-  const resourceData = projects.map(project => ({
-    name: project.name.length > 15 ? project.name.substring(0, 15) + '...' : project.name,
-    teamSize: project.team?.length || 0,
-    hoursLogged: project.stats.timeTracking.totalHours,
-    budget: project.stats.budget.total,
-    spent: project.stats.budget.spent,
-    utilization: project.stats.budget.utilizationRate
-  }))
-
-  const teamDistribution = projects.reduce((acc, project) => {
-    const teamSize = project.team?.length || 0
-    if (teamSize === 0) {
-      acc['No Team'] = (acc['No Team'] || 0) + 1
-    } else if (teamSize <= 2) {
-      acc['Small Team (1-2)'] = (acc['Small Team (1-2)'] || 0) + 1
-    } else if (teamSize <= 5) {
-      acc['Medium Team (3-5)'] = (acc['Medium Team (3-5)'] || 0) + 1
-    } else {
-      acc['Large Team (6+)'] = (acc['Large Team (6+)'] || 0) + 1
+  const formatCurrency = (amount: number) => {
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency
+      }).format(amount)
+    } catch (e) {
+      return `${currency} ${amount.toLocaleString()}`
     }
-    return acc
-  }, {} as Record<string, number>)
+  }
 
-  const teamSizeData = Object.entries(teamDistribution).map(([size, count]) => ({
+  // Aggregates
+  const totalTeamMembers = projects.reduce((sum, p) => sum + (p.team?.length || 0), 0)
+  const totalHoursLogged = projects.reduce((sum, p) => sum + (p.stats?.timeTracking?.totalHours || 0), 0)
+  const totalBudget = projects.reduce((sum, p) => sum + (p.stats?.budget?.total || 0), 0)
+  const totalSpent = projects.reduce((sum, p) => sum + (p.stats?.budget?.spent || 0), 0)
+
+  // Team size distribution buckets
+  const teamBuckets: Record<string, number> = { '0-5': 0, '6-10': 0, '11-20': 0, '21+': 0 }
+  projects.forEach(p => {
+    const size = p.team?.length || 0
+    if (size <= 5) teamBuckets['0-5'] += 1
+    else if (size <= 10) teamBuckets['6-10'] += 1
+    else if (size <= 20) teamBuckets['11-20'] += 1
+    else teamBuckets['21+'] += 1
+  })
+  const totalProjects = projects.length || 1
+  const teamSizeData = Object.entries(teamBuckets).map(([size, count]) => ({
     size,
     count,
-    percentage: (count / projects.length) * 100
+    percentage: totalProjects > 0 ? (count / totalProjects) * 100 : 0
   }))
 
-  const budgetData = projects.map(project => ({
-    name: project.name.length > 15 ? project.name.substring(0, 15) + '...' : project.name,
-    budget: project.stats.budget.total,
-    spent: project.stats.budget.spent,
-    remaining: project.stats.budget.remaining
+  // Resource allocation data
+  const resourceData = projects.map(p => ({
+    name: p.name,
+    teamSize: p.team?.length || 0,
+    hoursLogged: Number(p.stats?.timeTracking?.totalHours || 0)
   }))
 
-  const timeData = projects.map(project => ({
-    name: project.name.length > 15 ? project.name.substring(0, 15) + '...' : project.name,
-    hours: project.stats.timeTracking.totalHours,
-    entries: project.stats.timeTracking.entries,
-    avgSession: project.stats.timeTracking.entries > 0 
-      ? project.stats.timeTracking.totalHours / project.stats.timeTracking.entries 
-      : 0
+  // Budget chart data
+  const budgetData = projects.map(p => ({
+    name: p.name,
+    budget: Number(p.stats?.budget?.total || 0),
+    spent: Number(p.stats?.budget?.spent || 0)
   }))
+
+  // Time tracking efficiency data
+  const timeData = projects.map(p => {
+    const hours = Number(p.stats?.timeTracking?.totalHours || 0)
+    const entries = Number(p.stats?.timeTracking?.entries || 0)
+    const avgSession = entries > 0 ? hours / entries : 0
+    return {
+      name: p.name,
+      hours,
+      avgSession
+    }
+  })
 
   return (
     <div className="space-y-6">
@@ -163,7 +177,7 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold">
-              ${totalBudget.toLocaleString()}
+              {formatCurrency(totalBudget)}
             </div>
             <p className="text-xs text-muted-foreground mt-1 break-words">
               Allocated budget
@@ -181,10 +195,10 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
               {totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(1) : 0}%
             </div>
             <p className="text-xs text-muted-foreground mt-1 break-words">
-              ${totalSpent.toLocaleString()} spent
+              {formatCurrency(totalSpent)} spent
             </p>
-            <Progress 
-              value={totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0} 
+            <Progress
+              value={totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0}
               className="mt-2"
             />
           </CardContent>
@@ -255,7 +269,7 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']} />
+                <Tooltip formatter={(value) => [`${formatCurrency(Number(value))}`, 'Amount']} />
                 <Bar dataKey="budget" fill="#8884d8" name="Budget" />
                 <Bar dataKey="spent" fill="#82ca9d" name="Spent" />
               </BarChart>
@@ -276,17 +290,17 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip />
-                <Line 
-                  type="monotone" 
-                  dataKey="hours" 
-                  stroke="#8884d8" 
+                <Line
+                  type="monotone"
+                  dataKey="hours"
+                  stroke="#8884d8"
                   strokeWidth={2}
                   name="Hours Logged"
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="avgSession" 
-                  stroke="#82ca9d" 
+                <Line
+                  type="monotone"
+                  dataKey="avgSession"
+                  stroke="#82ca9d"
                   strokeWidth={2}
                   name="Avg Session Length"
                 />
@@ -319,7 +333,7 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
                       </Badge>
                     )}
                   </div>
-                  
+
                   {/* Resource Metrics */}
                   <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
@@ -348,7 +362,7 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
                         </div>
                       )}
                     </div>
-                    
+
                     <div>
                       <div className="flex items-center space-x-2 mb-2">
                         <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
@@ -361,26 +375,26 @@ export function ProjectResourceReport({ projects, filters }: ProjectResourceRepo
                         {project.stats.timeTracking.entries} entries
                       </div>
                     </div>
-                    
+
                     <div>
                       <div className="flex items-center space-x-2 mb-2">
                         <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
                         <span className="text-xs sm:text-sm font-medium">Budget</span>
                       </div>
                       <div className="text-base sm:text-lg font-bold break-words">
-                        ${project.stats.budget.spent.toLocaleString()}
+                        {formatCurrency(project.stats.budget.spent)}
                       </div>
                       <div className="text-xs text-muted-foreground break-words">
-                        of ${project.stats.budget.total.toLocaleString()}
+                        of {formatCurrency(project.stats.budget.total)}
                       </div>
-                      <Progress 
-                        value={project.stats.budget.utilizationRate} 
+                      <Progress
+                        value={project.stats.budget.utilizationRate}
                         className="mt-1 h-1"
                       />
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full sm:w-auto sm:ml-6">
                   <div className="flex sm:flex-col items-center sm:items-center text-center gap-2 sm:gap-0">
                     <div className="text-xs sm:text-sm font-medium">

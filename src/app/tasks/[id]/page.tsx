@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { formatToTitleCase } from '@/lib/utils'
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { 
   ArrowLeft,
   Calendar,
@@ -29,10 +30,14 @@ import {
   Wrench,
   Layers,
   Circle,
-  Paperclip
+  Paperclip,
+  MessageSquarePlus
 } from 'lucide-react'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { AttachmentList } from '@/components/ui/AttachmentList'
+import { Input } from '@/components/ui/Input'
+import { Textarea } from '@/components/ui/textarea'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface Task {
   _id: string
@@ -100,24 +105,108 @@ interface Task {
       email?: string
     }
   }>
+  comments?: Array<{
+    _id?: string
+    content: string
+    parentCommentId?: string | null
+    createdAt: string
+    updatedAt?: string
+    attachments?: Array<{
+      name: string
+      url: string
+      size?: number
+      type?: string
+      uploadedAt?: string
+    }>
+    author?: {
+      firstName?: string
+      lastName?: string
+      email?: string
+      _id?: string
+    }
+    mentions?: string[]
+    linkedIssues?: Array<{
+      _id?: string
+      displayId?: string
+      title?: string
+    }>
+  }>
+}
+
+type SuggestionItem = {
+  _id: string
+  name?: string
+  displayId?: string
+  title?: string
+}
+
+type CommentNode = {
+  _id: string
+  content: string
+  parentCommentId?: string | null
+  createdAt?: string
+  updatedAt?: string
+  attachments?: Array<{
+    name: string
+    url: string
+    size?: number
+    type?: string
+    uploadedAt?: string
+  }>
+  author?: {
+    firstName?: string
+    lastName?: string
+    email?: string
+    _id?: string
+  }
+  mentions?: string[]
+  linkedIssues?: Array<{
+    _id?: string
+    displayId?: string
+    title?: string
+  }>
+  children: CommentNode[]
 }
 
 export default function TaskDetailPage() {
   const router = useRouter()
   const params = useParams()
   const taskId = params.id as string
+  const { setItems } = useBreadcrumb()
   
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
+  const [commentContent, setCommentContent] = useState('')
+  const [commentSubmitting, setCommentSubmitting] = useState(false)
+  const [mentionsList, setMentionsList] = useState<Array<{ _id: string; name: string }>>([])
+  const [issuesList, setIssuesList] = useState<Array<{ _id: string; displayId?: string; title?: string }>>([])
+  const [suggestionMode, setSuggestionMode] = useState<'mention' | 'issue' | null>(null)
+  const [suggestionQuery, setSuggestionQuery] = useState('')
+  const [suggestionPos, setSuggestionPos] = useState<{ top: number; left: number } | null>(null)
+  const [currentUserId, setCurrentUserId] = useState('')
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
+  const [editingContent, setEditingContent] = useState<string>('')
+  const [replyTargetId, setReplyTargetId] = useState<string | null>(null)
+  const [replyContent, setReplyContent] = useState<string>('')
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [commentAttachments, setCommentAttachments] = useState<Array<{ name: string; url: string; size?: number; type?: string; uploadedAt?: string }>>([])
+  const [replyAttachments, setReplyAttachments] = useState<Array<{ name: string; url: string; size?: number; type?: string; uploadedAt?: string }>>([])
+  const [uploading, setUploading] = useState(false)
+  const editorRef = useRef<HTMLTextAreaElement | null>(null)
+  const commentFileInputRef = useRef<HTMLInputElement | null>(null)
+  const replyFileInputRef = useRef<HTMLInputElement | null>(null)
 
   const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me')
       
       if (response.ok) {
+        const me = await response.json().catch(() => null)
+        const uid = me?.id || me?._id || ''
+        if (uid) setCurrentUserId(uid)
         setAuthError('')
         await fetchTask()
       } else if (response.status === 401) {
@@ -126,6 +215,9 @@ export default function TaskDetailPage() {
         })
         
         if (refreshResponse.ok) {
+          const me = await fetch('/api/auth/me').then(r => r.json()).catch(() => null)
+          const uid = me?.id || me?._id || ''
+          if (uid) setCurrentUserId(uid)
           setAuthError('')
           await fetchTask()
         } else {
@@ -147,6 +239,14 @@ export default function TaskDetailPage() {
   }, [router, taskId])
 
   useEffect(() => {
+    // Set breadcrumb immediately on mount
+    setItems([
+      { label: 'Tasks', href: '/tasks' },
+      { label: 'View Task' }
+    ])
+  }, [setItems])
+
+  useEffect(() => {
     checkAuth()
   }, [checkAuth])
 
@@ -158,6 +258,17 @@ export default function TaskDetailPage() {
 
       if (data.success) {
         setTask(data.data)
+        // preload mentions and issues lists (project members and project tasks)
+        const projectId = data.data?.project?._id
+        if (projectId) {
+          fetchProjectMembers(projectId)
+          fetchProjectIssues(projectId)
+        }
+        // Ensure breadcrumb is set
+        setItems([
+          { label: 'Tasks', href: '/tasks' },
+          { label: 'View Task' }
+        ])
       } else {
         setError(data.error || 'Failed to fetch task')
       }
@@ -165,6 +276,40 @@ export default function TaskDetailPage() {
       setError('Failed to fetch task')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchProjectMembers = async (projectId: string) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}`)
+      const data = await res.json()
+      if (data?.success && data.data?.teamMembers) {
+        const members = data.data.teamMembers.map((m: any) => ({
+          _id: m._id,
+          name: `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.email || 'User'
+        }))
+        setMentionsList(members)
+      }
+    } catch (e) {
+      console.error('Failed to fetch project members for mentions', e)
+    }
+  }
+
+  const fetchProjectIssues = async (projectId: string) => {
+    try {
+      const params = new URLSearchParams({ project: projectId, limit: '50' })
+      const res = await fetch(`/api/tasks?${params.toString()}`)
+      const data = await res.json()
+      if (data?.success && Array.isArray(data.data)) {
+        const issues = data.data.map((t: any) => ({
+          _id: t._id,
+          displayId: t.displayId,
+          title: t.title
+        }))
+        setIssuesList(issues)
+      }
+    } catch (e) {
+      console.error('Failed to fetch project issues for linking', e)
     }
   }
 
@@ -184,6 +329,530 @@ export default function TaskDetailPage() {
     } catch (error) {
       setError('Failed to delete task')
     }
+  }
+
+
+  const filteredSuggestions = useMemo<SuggestionItem[]>(() => {
+    const q = suggestionQuery.trim().toLowerCase()
+    if (!suggestionMode) return []
+    if (suggestionMode === 'mention') {
+      return mentionsList
+        .filter(m => m.name.toLowerCase().includes(q))
+        .slice(0, 6)
+        .map(m => ({ _id: m._id, name: m.name }))
+    }
+    return issuesList
+      .filter(i => (i.displayId || '').toLowerCase().includes(q) || (i.title || '').toLowerCase().includes(q))
+      .slice(0, 6)
+      .map(i => ({ _id: i._id, displayId: i.displayId, title: i.title }))
+  }, [suggestionMode, suggestionQuery, mentionsList, issuesList])
+
+  const replaceActiveToken = (replacement: string) => {
+    setCommentContent(prev => {
+      const textarea = editorRef.current
+      const cursorPos = textarea?.selectionStart ?? prev.length
+      const textBefore = prev.slice(0, cursorPos)
+      const textAfter = prev.slice(cursorPos)
+      // match last @word or #word before cursor
+      const match = textBefore.match(/([@#][^\s@#]*)$/)
+      if (!match) return prev
+      const start = textBefore.lastIndexOf(match[1])
+      const newBefore = textBefore.slice(0, start) + replacement + ' '
+      const nextContent = newBefore + textAfter
+      // move cursor to after inserted token
+      const newCursor = newBefore.length
+      setTimeout(() => {
+        if (textarea) {
+          textarea.focus()
+          textarea.setSelectionRange(newCursor, newCursor)
+        }
+      }, 0)
+      return nextContent
+    })
+    setSuggestionMode(null)
+    setSuggestionQuery('')
+    setSuggestionPos(null)
+  }
+  const buildMentionAndIssueIds = (text: string) => {
+    const mentionIds: string[] = []
+    mentionsList.forEach(m => {
+      const token = `@${m.name}`
+      if (text.includes(token)) {
+        mentionIds.push(m._id)
+      }
+    })
+    const issueIds: string[] = []
+    issuesList.forEach(i => {
+      const token = `#${i.displayId || i._id}`
+      if (text.includes(token)) {
+        issueIds.push(i._id)
+      }
+    })
+    return { mentionIds, issueIds }
+  }
+
+  const submitComment = async (text: string, parentCommentId?: string | null) => {
+    setCommentSubmitting(true)
+    try {
+      const { mentionIds, issueIds } = buildMentionAndIssueIds(text)
+      const attachmentsPayload = (parentCommentId ? replyAttachments : commentAttachments).map(att => ({
+        name: att.name,
+        url: att.url,
+        size: att.size,
+        type: att.type,
+        uploadedAt: att.uploadedAt
+      }))
+      const res = await fetch(`/api/tasks/${taskId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: text,
+          mentions: mentionIds,
+          linkedIssues: issueIds,
+          attachments: attachmentsPayload,
+          parentCommentId: parentCommentId || null
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        const newComment = {
+          _id: data.data._id || Math.random().toString(36),
+          content: text,
+          createdAt: new Date().toISOString(),
+          parentCommentId: parentCommentId || null,
+          attachments: attachmentsPayload,
+          author: {
+            firstName: 'You',
+            lastName: '',
+            email: '',
+            _id: currentUserId
+          },
+          mentions: mentionIds,
+          linkedIssues: issuesList.filter(i => issueIds.includes(i._id))
+        }
+        setTask(prev => prev ? { ...prev, comments: [...(prev.comments || []), newComment] } : prev)
+        if (parentCommentId) {
+          setReplyAttachments([])
+        } else {
+          setCommentAttachments([])
+        }
+        return true
+      } else {
+        setError(data.error || 'Failed to add comment')
+        return false
+      }
+    } catch (e) {
+      setError('Failed to add comment')
+      return false
+    } finally {
+      setCommentSubmitting(false)
+    }
+  }
+
+  const handleAddComment = async () => {
+    if (!commentContent.trim()) return
+    const ok = await submitComment(commentContent)
+    if (ok) setCommentContent('')
+  }
+
+  const uploadAttachmentFile = async (file: File, isReply = false) => {
+    setUploading(true)
+    try {
+      const formDataUpload = new FormData()
+      formDataUpload.append('attachment', file)
+      const response = await fetch('/api/uploads/attachments', {
+        method: 'POST',
+        body: formDataUpload
+      })
+      const uploadData = await response.json()
+      if (!response.ok || !uploadData?.success) {
+        throw new Error(uploadData?.error || 'Failed to upload attachment')
+      }
+      const att = uploadData.data
+      const newAttachment = {
+        name: att.name || file.name,
+        url: att.url,
+        size: att.size || file.size,
+        type: att.type || file.type,
+        uploadedAt: att.uploadedAt || new Date().toISOString()
+      }
+      if (isReply) {
+        setReplyAttachments(prev => [...prev, newAttachment])
+      } else {
+        setCommentAttachments(prev => [...prev, newAttachment])
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to upload attachment')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>, isReply = false) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      await uploadAttachmentFile(file, isReply)
+      e.target.value = ''
+    }
+  }
+
+  const handleStartReply = (commentId: string) => {
+    setReplyTargetId(commentId)
+    setReplyContent('')
+  }
+
+  const handleCancelReply = () => {
+    setReplyTargetId(null)
+    setReplyContent('')
+  }
+
+  const handleSubmitReply = async () => {
+    if (!replyTargetId || !replyContent.trim()) return
+    const ok = await submitComment(replyContent, replyTargetId)
+    if (ok) {
+      setReplyContent('')
+      setReplyTargetId(null)
+      setReplyAttachments([])
+    }
+  }
+
+  const handleStartEditComment = (commentId: string, content: string) => {
+    setEditingCommentId(commentId)
+    setEditingContent(content)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingCommentId(null)
+    setEditingContent('')
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingCommentId || !editingContent.trim()) return
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/comments`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commentId: editingCommentId, content: editingContent })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setTask(prev => prev ? {
+          ...prev,
+          comments: (prev.comments || []).map(c =>
+            (c._id || '').toString() === editingCommentId
+              ? { ...c, content: editingContent, updatedAt: data.data.updatedAt || new Date().toISOString() }
+              : c
+          )
+        } : prev)
+        handleCancelEdit()
+      } else {
+        setError(data.error || 'Failed to update comment')
+      }
+    } catch (e) {
+      setError('Failed to update comment')
+    }
+  }
+
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/comments`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commentId })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setTask(prev => prev ? {
+          ...prev,
+          comments: (prev.comments || []).filter(c => (c._id || '').toString() !== commentId)
+        } : prev)
+        if (editingCommentId === commentId) handleCancelEdit()
+      } else {
+        setError(data.error || 'Failed to delete comment')
+      }
+    } catch (e) {
+      setError('Failed to delete comment')
+    }
+  }
+
+  const commentTree = useMemo<CommentNode[]>(() => {
+    if (!task?.comments || task.comments.length === 0) return []
+    const map: Record<string, CommentNode> = {}
+    const roots: CommentNode[] = []
+    const sorted = [...task.comments].sort((a, b) => {
+      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0
+      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0
+      return aDate - bDate
+    })
+    sorted.forEach((c) => {
+      const id = (c._id || Math.random().toString(36)).toString()
+      map[id] = {
+        _id: id,
+        content: c.content,
+        parentCommentId: c.parentCommentId || null,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        attachments: c.attachments,
+        author: c.author,
+        mentions: c.mentions,
+        linkedIssues: c.linkedIssues,
+        children: []
+      }
+    })
+    Object.values(map).forEach((node) => {
+      const parentId = node.parentCommentId || ''
+      if (parentId && map[parentId]) {
+        map[parentId].children.push(node)
+      } else {
+        roots.push(node)
+      }
+    })
+    const sortChildren = (arr: CommentNode[]) => {
+      arr.sort((a, b) => {
+        const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return aDate - bDate
+      })
+      arr.forEach((c) => sortChildren(c.children))
+    }
+    sortChildren(roots)
+    return roots
+  }, [task?.comments])
+
+  const renderCommentNode = useCallback((comment: CommentNode, depth = 0) => {
+    const commentId = (comment._id || '').toString()
+    const isAuthor = comment.author?._id === currentUserId
+    const isEditing = editingCommentId === commentId
+    const isReplying = replyTargetId === commentId
+
+    return (
+      <div key={commentId} className="rounded-md border p-3 bg-muted/30" style={{ marginLeft: depth ? depth * 16 : 0 }}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-sm font-medium">
+            {comment.author?.firstName || comment.author?.lastName
+              ? `${comment.author?.firstName || ''} ${comment.author?.lastName || ''}`.trim()
+              : comment.author?.email || 'User'}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {comment.createdAt ? new Date(comment.createdAt).toLocaleString() : ''}
+            {comment.updatedAt && (
+              <span className="ml-2 text-[11px]">(edited)</span>
+            )}
+          </div>
+        </div>
+        {isEditing ? (
+          <div className="space-y-2 mt-1">
+            <Textarea
+              value={editingContent}
+              onChange={(e) => setEditingContent(e.target.value)}
+              rows={3}
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSaveEdit} disabled={!editingContent.trim()}>
+                Save
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-sm text-foreground whitespace-pre-wrap mt-1">{comment.content}</div>
+        )}
+        <div className="flex flex-wrap gap-2 mt-2 items-center">
+          {comment.mentions && comment.mentions.length > 0 && (
+            <Badge variant="outline" className="text-xs">
+              Mentions: {comment.mentions.length}
+            </Badge>
+          )}
+          {comment.linkedIssues && comment.linkedIssues.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {comment.linkedIssues.map((issue) => (
+                <Badge
+                  key={issue?._id || Math.random().toString(36)}
+                  variant="secondary"
+                  className="text-xs cursor-pointer"
+                  onClick={() => {
+                    if (issue?._id) router.push(`/tasks/${issue._id}`)
+                  }}
+                >
+                  #{issue?.displayId || issue?._id} {issue?.title ? `— ${issue.title}` : ''}
+                </Badge>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2 text-xs ml-auto">
+            {!isEditing && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2"
+                onClick={() => handleStartReply(commentId)}
+              >
+                Reply
+              </Button>
+            )}
+            {isAuthor && !isEditing && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={() => handleStartEditComment(commentId, comment.content)}
+                >
+                  Edit
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-destructive"
+                    onClick={() => setDeleteConfirmId(commentId)}
+                >
+                  Delete
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+        {isReplying && (
+          <div className="mt-2 space-y-2">
+            <Textarea
+              value={replyContent}
+              onChange={(e) => setReplyContent(e.target.value)}
+              rows={3}
+              placeholder="Write a reply..."
+            />
+            <div className="flex items-center gap-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div
+                      role="button"
+                      aria-label="Attachments"
+                      className="h-8 w-8 inline-flex items-center justify-center rounded-md border hover:bg-muted cursor-pointer"
+                      onClick={() => replyFileInputRef.current?.click()}
+                    >
+                      <Paperclip className="h-4 w-4" />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Attachments</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <input
+                ref={replyFileInputRef}
+                type="file"
+                className="hidden"
+                onChange={(e) => handleFileInputChange(e, true)}
+              />
+              {replyAttachments.length > 0 && (
+                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  {replyAttachments.map((att, idx) => (
+                    <span key={`${att.url}-${idx}`} className="inline-flex items-center gap-1 rounded border px-2 py-1">
+                      <a className="text-primary hover:underline" href={att.url} target="_blank" rel="noreferrer">
+                        {att.name}
+                      </a>
+                      {att.size ? <span>({(att.size / 1024).toFixed(1)} KB)</span> : null}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSubmitReply} disabled={!replyContent.trim() || commentSubmitting}>
+                Reply
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleCancelReply}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+        {comment.children && comment.children.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {comment.children.map(child => renderCommentNode(child, depth + 1))}
+          </div>
+        )}
+        {comment.attachments && comment.attachments.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {comment.attachments.map((att, idx) => (
+              <div key={`${att.url}-${idx}`} className="flex items-center gap-2 text-xs text-muted-foreground">
+                <a href={att.url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                  {att.name}
+                </a>
+                {att.size ? <span>({(att.size / 1024).toFixed(1)} KB)</span> : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }, [
+    commentSubmitting,
+    currentUserId,
+    editingCommentId,
+    editingContent,
+    replyContent,
+    replyTargetId,
+    router,
+    handleStartReply,
+    handleStartEditComment,
+    handleDeleteComment,
+    handleSaveEdit,
+    handleCancelEdit,
+    handleSubmitReply,
+    handleCancelReply
+  ])
+
+  const renderComments = useMemo(() => {
+    if (!commentTree.length) {
+      return <p className="text-sm text-muted-foreground">No comments yet.</p>
+    }
+    return (
+      <div className="space-y-3">
+        {commentTree.map((c) => renderCommentNode(c))}
+      </div>
+    )
+  }, [commentTree, renderCommentNode])
+
+  const deleteTargetComment = useMemo(() => {
+    if (!deleteConfirmId || !task?.comments) return null
+    return task.comments.find(c => (c._id || '').toString() === deleteConfirmId) || null
+  }, [deleteConfirmId, task?.comments])
+
+  const updateSuggestionPosition = (value: string, cursorPos: number) => {
+    const textarea = editorRef.current
+    if (!textarea) return
+    const mirror = document.createElement('div')
+    const style = window.getComputedStyle(textarea)
+    mirror.style.position = 'absolute'
+    mirror.style.visibility = 'hidden'
+    mirror.style.whiteSpace = 'pre-wrap'
+    mirror.style.wordWrap = 'break-word'
+    mirror.style.fontSize = style.fontSize
+    mirror.style.fontFamily = style.fontFamily
+    mirror.style.lineHeight = style.lineHeight
+    mirror.style.padding = style.padding
+    mirror.style.border = style.border
+    mirror.style.boxSizing = style.boxSizing
+    mirror.style.width = `${textarea.clientWidth}px`
+    mirror.style.left = `${textarea.getBoundingClientRect().left}px`
+    mirror.style.top = `${textarea.getBoundingClientRect().top}px`
+
+    const before = value.slice(0, cursorPos)
+    const after = value.slice(cursorPos)
+    const marker = document.createElement('span')
+    marker.textContent = '\u200b'
+    mirror.textContent = before
+    mirror.appendChild(marker)
+    mirror.append(after)
+    document.body.appendChild(mirror)
+    const markerRect = marker.getBoundingClientRect()
+    document.body.removeChild(mirror)
+
+    setSuggestionPos({
+      top: markerRect.bottom + 4,
+      left: markerRect.left
+    })
   }
 
   const getStatusColor = (status: string) => {
@@ -282,9 +951,9 @@ export default function TaskDetailPage() {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <p className="text-destructive mb-4">{error || 'Task not found'}</p>
-            <Button onClick={() => router.push('/tasks')}>
+            <Button onClick={() => router.back()}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Tasks
+              Back
             </Button>
           </div>
         </div>
@@ -354,6 +1023,137 @@ export default function TaskDetailPage() {
                 </p>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquarePlus className="h-4 w-4" />
+                  <span>Comments</span>
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddComment}
+                  disabled={commentSubmitting || !commentContent.trim()}
+                >
+                  {commentSubmitting ? 'Posting...' : 'Post Comment'}
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="relative">
+                  <Textarea
+                    ref={editorRef}
+                    value={commentContent}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setCommentContent(val)
+                      const textarea = e.target
+                      const cursor = textarea.selectionStart
+                      const before = val.slice(0, cursor)
+                      const match = before.match(/([@#])([^\s@#]{0,30})$/)
+                      if (match) {
+                        const mode = match[1] === '@' ? 'mention' : 'issue'
+                        setSuggestionMode(mode)
+                        setSuggestionQuery(match[2] || '')
+                        updateSuggestionPosition(val, cursor)
+                      } else {
+                        setSuggestionMode(null)
+                        setSuggestionQuery('')
+                        setSuggestionPos(null)
+                      }
+                    }}
+                    placeholder="Add a comment. Use @ to mention team members, # to link project tasks."
+                    rows={4}
+                  />
+              <div className="flex items-center gap-2 mt-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        role="button"
+                        aria-label="Attachments"
+                        className="h-9 w-9 inline-flex items-center justify-center rounded-md border hover:bg-muted cursor-pointer"
+                        onClick={() => commentFileInputRef.current?.click()}
+                      >
+                        <Paperclip className="h-4 w-4" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Attachments</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <input
+                  ref={commentFileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => handleFileInputChange(e, false)}
+                />
+                {commentAttachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    {commentAttachments.map((att, idx) => (
+                      <span key={`${att.url}-${idx}`} className="inline-flex items-center gap-1 rounded border px-2 py-1">
+                        <a className="text-primary hover:underline" href={att.url} target="_blank" rel="noreferrer">
+                          {att.name}
+                        </a>
+                        {att.size ? <span>({(att.size / 1024).toFixed(1)} KB)</span> : null}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+                  {suggestionMode && filteredSuggestions.length > 0 && suggestionPos && (
+                    <div
+                      className="z-20 rounded-md border bg-card shadow-lg"
+                      style={{
+                        position: 'fixed',
+                        top: suggestionPos.top,
+                        left: suggestionPos.left,
+                        minWidth: '220px',
+                        maxWidth: '360px'
+                      }}
+                    >
+                      <div className="max-h-56 overflow-y-auto divide-y">
+                        {filteredSuggestions.map((s) => (
+                          <button
+                            key={s._id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 hover:bg-muted text-sm"
+                            onClick={() => {
+                              if (suggestionMode === 'mention') {
+                                replaceActiveToken(`@${s.name}`)
+                              } else {
+                                replaceActiveToken(`#${s.displayId || s._id}`)
+                              }
+                            }}
+                          >
+                            {suggestionMode === 'mention'
+                              ? `@${s.name}`
+                              : `#${s.displayId || s._id} ${s.title ? '— ' + s.title : ''}`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-semibold mb-2 text-foreground">All Comments</h3>
+                  {renderComments}
+                </div>
+              </CardContent>
+            </Card>
+
+            <ConfirmationModal
+              isOpen={!!deleteConfirmId}
+              onClose={() => setDeleteConfirmId(null)}
+              title="Delete comment"
+              description="Are you sure you want to delete this comment?"
+              confirmText="Delete"
+              onConfirm={async () => {
+                if (!deleteConfirmId) return
+                await handleDeleteComment(deleteConfirmId)
+                setDeleteConfirmId(null)
+              }}
+            />
 
             {task.parentTask && (
               <Card>

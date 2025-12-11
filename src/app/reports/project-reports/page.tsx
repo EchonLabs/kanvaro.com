@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { PageWrapper } from '@/components/layout/PageWrapper'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -86,6 +87,7 @@ interface FilterState {
 }
 
 export default function ProjectReportsPage() {
+  const { setItems } = useBreadcrumb()
   const [reportData, setReportData] = useState<ProjectReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
@@ -100,6 +102,14 @@ export default function ProjectReportsPage() {
     sortOrder: 'asc'
   })
   const [showFilters, setShowFilters] = useState(false)
+
+  useEffect(() => {
+    // Set breadcrumb
+    setItems([
+      { label: 'Reports', href: '/reports' },
+      { label: 'Project Reports' }
+    ])
+  }, [setItems])
 
   useEffect(() => {
     fetchProjectReports()
@@ -468,3 +478,4 @@ export default function ProjectReportsPage() {
     </MainLayout>
   )
 }
+

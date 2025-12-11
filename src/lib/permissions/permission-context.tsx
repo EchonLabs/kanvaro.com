@@ -29,14 +29,49 @@ const PermissionContext = createContext<PermissionContextType | undefined>(undef
 let permissionsCache: UserPermissions | null = null;
 let cacheTimestamp: number = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const STORAGE_KEY = 'kanvaro_permissions';
+const STORAGE_TIMESTAMP_KEY = 'kanvaro_permissions_timestamp';
 
-// Global function to clear permission cache for debugging
+// Load permissions from sessionStorage on initialization
 if (typeof window !== 'undefined') {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    const storedTimestamp = sessionStorage.getItem(STORAGE_TIMESTAMP_KEY);
+    if (stored && storedTimestamp) {
+      const timestamp = parseInt(storedTimestamp, 10);
+      if (Date.now() - timestamp < CACHE_DURATION) {
+        permissionsCache = JSON.parse(stored);
+        cacheTimestamp = timestamp;
+      } else {
+        // Clear expired cache
+        sessionStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem(STORAGE_TIMESTAMP_KEY);
+      }
+    }
+  } catch (error) {
+    console.error('Error loading permissions from sessionStorage:', error);
+  }
+
+  // Global function to clear permission cache for debugging
   (window as any).clearPermissionCache = () => {
     permissionsCache = null;
     cacheTimestamp = 0;
+    sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(STORAGE_TIMESTAMP_KEY);
     console.log('Permission cache cleared. Refresh the page to reload permissions.');
   };
+}
+
+// Helper function to save permissions to sessionStorage
+function savePermissionsToStorage(permissions: UserPermissions) {
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(permissions));
+      sessionStorage.setItem(STORAGE_TIMESTAMP_KEY, Date.now().toString());
+    } catch (error) {
+      console.error('Error saving permissions to sessionStorage:', error);
+    }
+  }
 }
 
 interface PermissionProviderProps {
@@ -45,8 +80,15 @@ interface PermissionProviderProps {
 }
 
 export function PermissionProvider({ children, initialPermissions }: PermissionProviderProps) {
-  // Seed from initialPermissions (server-hydrated) or existing cache
-  const initial = initialPermissions ?? permissionsCache;
+  // Seed from initialPermissions (server-hydrated), sessionStorage, or existing cache
+  let initial: UserPermissions | null = null;
+  
+  if (initialPermissions) {
+    initial = initialPermissions;
+  } else if (permissionsCache && Date.now() - cacheTimestamp < CACHE_DURATION) {
+    initial = permissionsCache;
+  }
+  
   const [permissions, setPermissions] = useState<UserPermissions | null>(initial);
   const [loading, setLoading] = useState(!initial);
   const [error, setError] = useState<string | null>(null);
@@ -104,9 +146,10 @@ export function PermissionProvider({ children, initialPermissions }: PermissionP
       
       const data = await response.json();
       setPermissions(data);
-      // Cache the data
+      // Cache the data in memory and sessionStorage
       permissionsCache = data;
       cacheTimestamp = Date.now();
+      savePermissionsToStorage(data);
     } catch (err) {
       console.error('Error fetching permissions:', err);
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -151,10 +194,19 @@ export function PermissionProvider({ children, initialPermissions }: PermissionP
     if (initialPermissions) {
       permissionsCache = initialPermissions;
       cacheTimestamp = Date.now();
+      savePermissionsToStorage(initialPermissions);
       setPermissions(initialPermissions);
       setLoading(false);
       return;
     }
+    
+    // Check if we have cached permissions (from sessionStorage or memory)
+    if (permissionsCache && Date.now() - cacheTimestamp < CACHE_DURATION) {
+      setPermissions(permissionsCache);
+      setLoading(false);
+      return;
+    }
+    
     // Otherwise, fetch on mount
     fetchPermissions();
   }, [initialPermissions]);

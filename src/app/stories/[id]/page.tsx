@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -28,7 +29,8 @@ import {
   Star,
   BookOpen,
   Layers,
-  Rocket
+  Rocket,
+  ListTodo
 } from 'lucide-react'
 
 interface Story {
@@ -95,6 +97,7 @@ export default function StoryDetailPage() {
   const router = useRouter()
   const params = useParams()
   const storyId = params.id as string
+  const { setItems } = useBreadcrumb()
   
   const [story, setStory] = useState<Story | null>(null)
   const [loading, setLoading] = useState(true)
@@ -103,6 +106,8 @@ export default function StoryDetailPage() {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [tasks, setTasks] = useState<any[]>([])
+  const [tasksLoading, setTasksLoading] = useState(false)
 
   const checkAuth = useCallback(async () => {
     try {
@@ -138,6 +143,14 @@ export default function StoryDetailPage() {
   }, [router, storyId])
 
   useEffect(() => {
+    // Set breadcrumb immediately on mount
+    setItems([
+      { label: 'Stories', href: '/stories' },
+      { label: 'View Story' }
+    ])
+  }, [setItems])
+
+  useEffect(() => {
     checkAuth()
   }, [checkAuth])
 
@@ -149,6 +162,13 @@ export default function StoryDetailPage() {
 
       if (data.success) {
         setStory(data.data)
+        // Ensure breadcrumb is set
+        setItems([
+          { label: 'Stories', href: '/stories' },
+          { label: 'View Story' }
+        ])
+        // Fetch tasks for this story
+        fetchTasks()
       } else {
         setError(data.error || 'Failed to fetch story')
       }
@@ -156,6 +176,22 @@ export default function StoryDetailPage() {
       setError('Failed to fetch story')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchTasks = async () => {
+    try {
+      setTasksLoading(true)
+      const response = await fetch(`/api/tasks?story=${storyId}`)
+      const data = await response.json()
+
+      if (data.success) {
+        setTasks(data.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch tasks:', err)
+    } finally {
+      setTasksLoading(false)
     }
   }
 
@@ -255,9 +291,9 @@ export default function StoryDetailPage() {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <p className="text-destructive mb-4">{error || 'Story not found'}</p>
-            <Button onClick={() => router.push('/stories')}>
+            <Button onClick={() => router.back()}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Stories
+              Back
             </Button>
           </div>
         </div>
@@ -270,7 +306,7 @@ export default function StoryDetailPage() {
       <div className="space-y-6 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto min-w-0">
-            <Button variant="ghost" onClick={() => router.push('/stories')} className="w-full sm:w-auto flex-shrink-0">
+            <Button variant="ghost" onClick={() => router.back()} className="w-full sm:w-auto flex-shrink-0">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
@@ -492,6 +528,72 @@ export default function StoryDetailPage() {
                 </CardContent>
               </Card>
             )}
+
+            <Card className="overflow-x-hidden">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ListTodo className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Tasks ({tasks.length})
+                </CardTitle>
+                <CardDescription>Tasks under this story</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {tasksLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : tasks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No tasks found for this story.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {tasks.map((task) => (
+                      <Card
+                        key={task._id}
+                        className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-green-500"
+                        onClick={() => router.push(`/tasks/${task._id}`)}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                {task.displayId && (
+                                  <Badge variant="outline" className="text-xs">{task.displayId}</Badge>
+                                )}
+                                <h4 className="font-medium text-sm sm:text-base text-foreground truncate" title={task.title}>
+                                  {task.title}
+                                </h4>
+                              </div>
+                              {task.description && (
+                                <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mb-2">
+                                  {task.description}
+                                </p>
+                              )}
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge className={`${getStatusColor(task.status)} text-xs`}>
+                                  {getStatusIcon(task.status)}
+                                  <span className="ml-1">{formatToTitleCase(task.status)}</span>
+                                </Badge>
+                                <Badge className={`${getPriorityColor(task.priority)} text-xs`}>
+                                  {formatToTitleCase(task.priority)}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {formatToTitleCase(task.type)}
+                                </Badge>
+                                {task.storyPoints && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {task.storyPoints} pts
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           <div className="space-y-6">

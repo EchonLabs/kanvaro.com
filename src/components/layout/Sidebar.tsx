@@ -260,14 +260,14 @@ const navigationItems = [
         id: 'reports-project',
         label: 'Project Reports',
         icon: FolderOpen,
-        path: '/reports/projects',
+        path: '/reports/project-reports',
         permission: Permission.REPORTING_VIEW
       },
       {
         id: 'reports-gantt',
         label: 'Gantt Chart',
         icon: Calendar,
-        path: '/reports/projects/gantt',
+        path: '/reports/project-reports/gantt',
         permission: Permission.REPORTING_VIEW
       },
       {
@@ -305,11 +305,17 @@ const navigationItems = [
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([])
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const { organization, loading } = useOrganization()
   const { theme, resolvedTheme } = useTheme()
   const { hasPermission } = usePermissions()
+
+  // Ensure component is mounted before rendering conditional content
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Auto-expand parent sections when child pages are active
   useEffect(() => {
@@ -331,6 +337,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       })
     }
   }, [pathname])
+
+  if (!mounted) return null
 
   const toggleExpanded = (itemId: string) => {
     setExpandedItems(prev => 
@@ -370,7 +378,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <div className="flex h-16 items-center justify-between px-4">
         {!collapsed && (
           <div className="flex items-center space-x-3">
-            {loading ? (
+            {!mounted || loading ? (
               <div className="h-8 w-8 rounded bg-primary/10 animate-pulse" />
             ) : (
               <OrganizationLogo 
@@ -412,6 +420,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 pathname={pathname}
                 expandedItems={expandedItems}
                 onToggleExpanded={toggleExpanded}
+                setExpandedItems={setExpandedItems}
                 router={router}
               />
             </PermissionGate>
@@ -460,10 +469,11 @@ interface NavigationItemProps {
   pathname: string
   expandedItems: string[]
   onToggleExpanded: (itemId: string) => void
+  setExpandedItems: React.Dispatch<React.SetStateAction<string[]>>
   router: any
 }
 
-function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpanded, router }: NavigationItemProps) {
+function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpanded, setExpandedItems, router }: NavigationItemProps) {
   const isActive = pathname === item.path
   const hasChildren = item.children && item.children.length > 0
   const isExpanded = expandedItems.includes(item.id)
@@ -527,6 +537,10 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
           onClick={() => {
             if (hasChildren && !collapsed) {
               onToggleExpanded(item.id)
+              // If clicking on a parent with children, expand it and keep it expanded
+              if (!expandedItems.includes(item.id)) {
+                setExpandedItems(prev => [...prev, item.id])
+              }
             } else {
               // Use startTransition for non-blocking navigation
               startTransition(() => {
@@ -554,20 +568,36 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
         {/* Sub-navigation */}
         {hasChildren && isExpanded && !collapsed && (
           <div className="ml-4 space-y-1">
-            {item.children.map((child: any) => (
-              <PermissionGate key={child.id} permission={child.permission}>
-                <Button
-                  variant={pathname === child.path ? 'secondary' : 'ghost'}
-                  className="w-full justify-start text-sm rounded-md"
-                  asChild
-                >
-                  <Link href={child.path} prefetch onMouseEnter={() => router.prefetch(child.path)}>
-                    <child.icon className="mr-2 h-4 w-4" />
-                    {child.label}
-                  </Link>
-                </Button>
-              </PermissionGate>
-            ))}
+            {item.children.map((child: any) => {
+              const isChildActive = pathname === child.path
+              return (
+                <PermissionGate key={child.id} permission={child.permission}>
+                  <Button
+                    variant={isChildActive ? 'secondary' : 'ghost'}
+                    className={cn(
+                      "w-full justify-start text-sm rounded-md",
+                      isChildActive && 'bg-secondary text-secondary-foreground'
+                    )}
+                    asChild
+                  >
+                    <Link 
+                      href={child.path} 
+                      prefetch 
+                      onMouseEnter={() => router.prefetch(child.path)}
+                      onClick={() => {
+                        // Keep parent expanded when navigating to child
+                        if (!expandedItems.includes(item.id)) {
+                          setExpandedItems(prev => [...prev, item.id])
+                        }
+                      }}
+                    >
+                      <child.icon className="mr-2 h-4 w-4" />
+                      {child.label}
+                    </Link>
+                  </Button>
+                </PermissionGate>
+              )
+            })}
           </div>
         )}
       </div>

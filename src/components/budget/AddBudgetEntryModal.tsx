@@ -129,7 +129,6 @@ export function AddBudgetEntryModal({ projectId, onClose, onSuccess }: AddBudget
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="labor">Labor</SelectItem>
                 <SelectItem value="materials">Materials</SelectItem>
                 <SelectItem value="overhead">Overhead</SelectItem>
                 <SelectItem value="external">External</SelectItem>

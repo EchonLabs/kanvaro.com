@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -26,6 +27,7 @@ export default function EditEpicPage() {
   const router = useRouter()
   const params = useParams()
   const epicId = params.id as string
+  const { setItems } = useBreadcrumb()
 
   const [form, setForm] = useState<EpicForm>({
     title: '',

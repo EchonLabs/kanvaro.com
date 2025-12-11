@@ -120,6 +120,7 @@ interface TaskFormData {
   labels: string[]
   story: string
   epic: string
+  isBillable: boolean
 }
 
 export default function CreateTaskModal({
@@ -161,7 +162,8 @@ export default function CreateTaskModal({
     estimatedHours: '',
     labels: [],
     story: '',
-    epic: ''
+    epic: '',
+    isBillable: true
   })
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [attachments, setAttachments] = useState<AttachmentDraft[]>([])
@@ -184,8 +186,11 @@ export default function CreateTaskModal({
       const data = await response.json()
 
       if (response.ok && data.success && data.data) {
-        const members = Array.isArray(data.data.teamMembers) ? data.data.teamMembers : []
+        const projectData = data.data
+        const members = Array.isArray(projectData.teamMembers) ? projectData.teamMembers : []
         setProjectMembers(members)
+        const billableDefault = typeof projectData.isBillableByDefault === 'boolean' ? projectData.isBillableByDefault : true
+        setFormData(prev => ({ ...prev, isBillable: billableDefault }))
       } else {
         setProjectMembers([])
       }
@@ -326,7 +331,8 @@ export default function CreateTaskModal({
         estimatedHours: '',
         labels: [],
         story: '',
-        epic: ''
+        epic: '',
+        isBillable: false // Add missing required property
       })
       setSubtasks([])
       setAssignedToIds([])
@@ -550,7 +556,8 @@ export default function CreateTaskModal({
             estimatedHours: '',
             labels: [],
             story: '',
-            epic: ''
+            epic: '',
+            isBillable: false, // Fix: Provide required field missing from TaskFormData
           })
           setSubtasks([])
           setAssignedToIds([])
@@ -1067,6 +1074,18 @@ export default function CreateTaskModal({
                   min={new Date().toISOString().split('T')[0]}
                   className="mt-1"
                   required
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-foreground">Billable</label>
+                  <p className="text-xs text-muted-foreground">Defaults from project; you can override per task.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={formData.isBillable}
+                  onChange={(e) => setFormData(prev => ({ ...prev, isBillable: e.target.checked }))}
                 />
               </div>
 

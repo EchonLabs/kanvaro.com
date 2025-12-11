@@ -613,17 +613,6 @@ export default function MembersPage() {
                             <p className="text-xs text-muted-foreground">
                               Joined {new Date(member.createdAt).toLocaleDateString()}
                             </p>
-                            {/* Project Manager / HR partner info - only show for non-admin and non-HR roles */}
-                            {member.role !== 'admin' && member.role !== 'human_resource' && (!member.projectManager || !member.humanResourcePartner) && (
-                              <p className="text-xs text-amber-600 dark:text-amber-300">
-                                Project Manager and Human Resource Partner pending
-                              </p>
-                            )}
-                            {member.role !== 'admin' && member.role !== 'human_resource' && member.projectManager && member.humanResourcePartner && (
-                              <p className="text-xs text-muted-foreground">
-                                PM: {member.projectManager.firstName} {member.projectManager.lastName} • HR: {member.humanResourcePartner.firstName} {member.humanResourcePartner.lastName}
-                              </p>
-                            )}
                           </div>
                           <div className="flex items-center gap-2 w-full pt-2 border-t">
                             <Button
@@ -687,17 +676,6 @@ export default function MembersPage() {
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
                               Joined {new Date(member.createdAt).toLocaleDateString()}
                             </span>
-                            {/* Project Manager / HR partner info - only show for non-admin and non-HR roles */}
-                            {member.role !== 'admin' && member.role !== 'human_resource' && (!member.projectManager || !member.humanResourcePartner) && (
-                              <p className="text-xs text-amber-600 dark:text-amber-300 w-full">
-                                Project Manager and Human Resource Partner pending
-                              </p>
-                            )}
-                            {member.role !== 'admin' && member.role !== 'human_resource' && member.projectManager && member.humanResourcePartner && (
-                              <p className="text-xs text-muted-foreground w-full">
-                                PM: {member.projectManager.firstName} {member.projectManager.lastName} • HR: {member.humanResourcePartner.firstName} {member.humanResourcePartner.lastName}
-                              </p>
-                            )}
                           </div>
                         </div>
                       </div>

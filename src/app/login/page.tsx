@@ -17,6 +17,7 @@ function LoginForm() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const router = useRouter()
@@ -50,18 +51,54 @@ function LoginForm() {
       console.log('Login response data:', data)
 
       if (response.ok && data.success) {
-        console.log('Login successful, redirecting to dashboard')
-        // Login successful, redirect to dashboard
-        router.push('/dashboard')
+        console.log('Login successful, loading permissions...')
+        // Login successful, now load permissions before redirecting
+        setIsLoading(false)
+        setIsLoadingPermissions(true)
+        
+        try {
+          // Fetch permissions to ensure they're loaded before redirecting
+          const permissionsResponse = await fetch('/api/auth/permissions', {
+            method: 'GET',
+            credentials: 'include'
+          })
+          
+          if (permissionsResponse.ok) {
+            const permissionsData = await permissionsResponse.json()
+            console.log('Permissions loaded successfully, storing and redirecting to dashboard')
+            
+            // Store permissions in sessionStorage for persistence across page reloads
+            try {
+              sessionStorage.setItem('kanvaro_permissions', JSON.stringify(permissionsData))
+              sessionStorage.setItem('kanvaro_permissions_timestamp', Date.now().toString())
+            } catch (storageError) {
+              console.error('Error storing permissions in sessionStorage:', storageError)
+            }
+            
+            // Permissions loaded and stored, now redirect to dashboard
+            router.push('/dashboard')
+          } else {
+            console.error('Failed to load permissions:', permissionsResponse.status)
+            // Even if permissions fail, redirect to dashboard (it will handle loading there)
+            router.push('/dashboard')
+          }
+        } catch (permError) {
+          console.error('Error loading permissions:', permError)
+          // Even if permissions fail, redirect to dashboard (it will handle loading there)
+          router.push('/dashboard')
+        } finally {
+          setIsLoadingPermissions(false)
+        }
       } else {
         console.error('Login failed:', data.error)
         setError(data.error || 'Login failed. Please try again.')
+        setIsLoading(false)
       }
     } catch (error) {
       console.error('Login failed:', error)
       setError('Login failed. Please check your connection and try again.')
-    } finally {
       setIsLoading(false)
+      setIsLoadingPermissions(false)
     }
   }
 
@@ -127,7 +164,7 @@ function LoginForm() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="admin@kanvaro.com"
                     required
-                    disabled={isLoading}
+                    disabled={isLoading || isLoadingPermissions}
                     className="w-full"
                   />
                 </div>
@@ -142,7 +179,7 @@ function LoginForm() {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
                       required
-                      disabled={isLoading}
+                      disabled={isLoading || isLoadingPermissions}
                       className="w-full pr-10"
                     />
                     <Button
@@ -151,7 +188,7 @@ function LoginForm() {
                       size="sm"
                       className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                       onClick={() => setShowPassword(!showPassword)}
-                      disabled={isLoading}
+                      disabled={isLoading || isLoadingPermissions}
                     >
                       {showPassword ? (
                         <EyeOff className="h-4 w-4" />
@@ -165,9 +202,14 @@ function LoginForm() {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={isLoading}
+                  disabled={isLoading || isLoadingPermissions}
                 >
-                  {isLoading ? (
+                  {isLoadingPermissions ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Preparing your dashboard...
+                    </>
+                  ) : isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Signing in...
@@ -182,7 +224,7 @@ function LoginForm() {
                     type="button"
                     onClick={() => router.push('/forgot-password')}
                     className="text-sm text-primary hover:underline"
-                    disabled={isLoading}
+                    disabled={isLoading || isLoadingPermissions}
                   >
                     Forgot your password?
                   </button>

@@ -28,14 +28,8 @@ export async function GET(
     const organizationId = user.organization
     const projectId = params.id
 
-    // Check if user can access this project
-    const canAccessProject = await PermissionService.canAccessProject(userId, projectId)
-    if (!canAccessProject) {
-      return NextResponse.json(
-        { error: 'Access denied to project' },
-        { status: 403 }
-      )
-    }
+    // Check if user has budget handling permission
+    const hasBudgetPermission = await PermissionService.hasPermission(userId, Permission.BUDGET_HANDLING)
 
     // Find project and populate team members
     const project = await Project.findOne({
@@ -43,7 +37,7 @@ export async function GET(
       organization: organizationId,
       is_deleted: { $ne: true }
     })
-      .populate('teamMembers', 'firstName lastName email avatar role')
+      .populate('teamMembers', 'firstName lastName email avatar role hourlyRate')
       .populate('createdBy', 'firstName lastName email avatar')
       .populate('client', 'firstName lastName email avatar')
       .populate('projectRoles.user', 'firstName lastName email avatar')
@@ -61,7 +55,7 @@ export async function GET(
       isActive: true,
       _id: { $nin: project.teamMembers }
     })
-      .select('firstName lastName email avatar role')
+      .select('firstName lastName email avatar role hourlyRate')
       .lean()
 
     // Normalize avatar URLs for all members
@@ -73,24 +67,162 @@ export async function GET(
       }
     }
 
+    // Enhance team members with rate info if user has permission
+    const enhanceMemberWithRate = (member: any) => {
+      const normalizedMember = normalizeUserAvatar(member)
+      if (!hasBudgetPermission) {
+        const { hourlyRate, ...memberWithoutRate } = normalizedMember
+        return memberWithoutRate
+      }
+      
+      // Find project specific rate
+      const projectRateEntry = project.memberRates?.find(
+        (r: any) => r.user.toString() === (member._id || member).toString()
+      )
+      
+      return {
+        ...normalizedMember,
+        projectHourlyRate: projectRateEntry ? projectRateEntry.hourlyRate : undefined,
+        // user.hourlyRate is already in member object
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         teamMembers: Array.isArray(project.teamMembers) 
-          ? project.teamMembers.map(normalizeUserAvatar)
-          : project.teamMembers ? [normalizeUserAvatar(project.teamMembers)] : [],
+          ? project.teamMembers.map(enhanceMemberWithRate)
+          : project.teamMembers ? [enhanceMemberWithRate(project.teamMembers)] : [],
         projectRoles: (project.projectRoles || []).map((pr: any) => ({
           ...pr,
           user: pr.user ? normalizeUserAvatar(pr.user) : pr.user
         })),
         createdBy: normalizeUserAvatar(project.createdBy),
         client: normalizeUserAvatar(project.client),
-        availableMembers: organizationMembers.map(normalizeUserAvatar)
+        availableMembers: organizationMembers.map(normalizeUserAvatar),
+        // Include project budget info if user has permission
+        budget: hasBudgetPermission ? project.budget : undefined
       }
     })
 
   } catch (error) {
     console.error('Get project team error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// PUT /api/projects/[id]/team - Update team member rate (or other details)
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await connectDB()
+
+    const authResult = await authenticateUser()
+    if ('error' in authResult) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { user } = authResult
+    const userId = user.id
+    console.log('userId',userId) 
+    const organizationId = user.organization
+    const projectId = params.id
+    const { memberId, hourlyRate } = await request.json()
+
+    if (!memberId) {
+      return NextResponse.json(
+        { error: 'Member ID is required' },
+        { status: 400 }
+      )
+    }
+
+    // If updating hourly rate, check budget permission
+    if (hourlyRate !== undefined) {
+      const hasBudgetPermission = await PermissionService.hasPermission(userId.toString(), Permission.BUDGET_HANDLING)
+      if (!hasBudgetPermission) {
+        return NextResponse.json(
+          { error: 'Insufficient permissions to manage budget/rates' },
+          { status: 403 }
+        )
+      }
+    } else {
+       // If updating other things (future use), check project manage team permission
+       const canManageTeam = await PermissionService.hasPermission(userId, Permission.PROJECT_MANAGE_TEAM, projectId)
+       if (!canManageTeam) {
+         return NextResponse.json(
+           { error: 'Insufficient permissions to manage project team' },
+           { status: 403 }
+         )
+       }
+    }
+
+    // Find project
+    const project = await Project.findOne({
+      _id: projectId,
+      organization: organizationId,
+      is_deleted: { $ne: true }
+    })
+
+    if (!project) {
+      return NextResponse.json(
+        { error: 'Project not found' },
+        { status: 404 }
+      )
+    }
+
+    // Verify member is in team
+    if (!project.teamMembers.includes(memberId)) {
+      return NextResponse.json(
+        { error: 'Member is not in the project team' },
+        { status: 400 }
+      )
+    }
+
+    // Update hourly rate
+    if (hourlyRate !== undefined) {
+      // Initialize memberRates if doesn't exist
+      if (!project.memberRates) {
+        project.memberRates = []
+      }
+
+      const existingRateIndex = project.memberRates.findIndex(
+        (r: any) => r.user.toString() === memberId
+      )
+
+      if (existingRateIndex > -1) {
+        // Update existing rate
+        if (hourlyRate === null || hourlyRate === '') {
+           // Remove if setting to null/empty (reset to default)
+           project.memberRates.splice(existingRateIndex, 1)
+        } else {
+           project.memberRates[existingRateIndex].hourlyRate = Number(hourlyRate)
+        }
+      } else if (hourlyRate !== null && hourlyRate !== '') {
+        // Add new rate
+        project.memberRates.push({
+          user: memberId,
+          hourlyRate: Number(hourlyRate)
+        })
+      }
+    }
+
+    await project.save()
+
+    return NextResponse.json({
+      success: true,
+      message: 'Team member updated successfully'
+    })
+
+  } catch (error) {
+    console.error('Update team member error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -61,7 +61,7 @@ export async function GET(
       _id: { $in: sprintTaskIds },
       organization: organizationId
     })
-      .select('title status storyPoints estimatedHours actualHours priority type assignedTo archived subtasks sprint')
+      .select('title status storyPoints estimatedHours actualHours priority type assignedTo archived subtasks sprint movedFromSprint')
       .populate('assignedTo', 'firstName lastName email')
       .populate('sprint', 'name _id')
 
@@ -97,7 +97,8 @@ export async function GET(
               email: taskObj.assignedTo.email
             }
           : null,
-        movedToSprint // Indicates if task was moved to another sprint
+        movedToSprint, // Indicates if task was moved to another sprint
+        movedToBacklog: !taskObj.sprint && taskObj.movedFromSprint && taskObj.movedFromSprint.toString() === sprintId
       }
     })
 

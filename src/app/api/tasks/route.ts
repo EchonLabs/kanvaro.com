@@ -4,6 +4,7 @@ import mongoose from 'mongoose'
 import { Task, TASK_STATUS_VALUES, TaskStatus } from '@/models/Task'
 import { Project } from '@/models/Project'
 import { User } from '@/models/User'
+import '@/models/Sprint'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -170,6 +171,7 @@ export async function GET(request: NextRequest) {
     const priority = searchParams.get('priority') || '';
     const type = searchParams.get('type') || '';
     const project = searchParams.get('project') || '';
+    const story = searchParams.get('story') || '';
     const assignedTo = searchParams.get('assignedTo') || '';
     const createdBy = searchParams.get('createdBy') || '';
     const dueDateFrom = searchParams.get('dueDateFrom') || '';
@@ -235,6 +237,7 @@ export async function GET(request: NextRequest) {
     if (priority) filters.priority = priority;
     if (type) filters.type = type;
     if (project) filters.project = project;
+    if (story) filters.story = story;
 
     // Date range filters
     if (dueDateFrom || dueDateTo) {
@@ -280,6 +283,7 @@ export async function GET(request: NextRequest) {
       .populate('project', '_id name')
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
+      .populate('movedFromSprint', '_id name')
       .sort(sort)
       .skip((page - 1) * PAGE_SIZE)
       .limit(PAGE_SIZE)
@@ -344,7 +348,8 @@ export async function POST(request: NextRequest) {
       estimatedHours,
       labels,
       subtasks,
-      attachments
+      attachments,
+      isBillable
     } = payload
 
     // Validate required fields first (fail fast)
@@ -357,7 +362,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch project and check permissions in parallel for better performance
     const [projectDoc, canCreateTask] = await Promise.all([
-      Project.findById(project).select('projectNumber organization name teamMembers createdBy'),
+      Project.findById(project).select('projectNumber organization name teamMembers createdBy isBillableByDefault'),
       PermissionService.hasPermission(userId, Permission.TASK_CREATE, project)
     ])
 
@@ -440,7 +445,10 @@ export async function POST(request: NextRequest) {
       labels: sanitizeLabels(labels),
       subtasks: sanitizeSubtasks(subtasks),
       attachments: sanitizeAttachments(attachments, userId),
-      position: nextPosition
+      position: nextPosition,
+      isBillable: typeof isBillable === 'boolean'
+        ? isBillable
+        : (projectDoc as any)?.isBillableByDefault ?? true
     })
 
     // Save task and prepare response data in parallel where possible

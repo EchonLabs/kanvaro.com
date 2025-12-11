@@ -3,13 +3,13 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Progress } from '@/components/ui/Progress'
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -19,12 +19,13 @@ import {
   Area,
   AreaChart
 } from 'recharts'
-import { 
-  DollarSign, 
-  TrendingUp, 
+import {
+  DollarSign,
+  TrendingUp,
   Target,
   Award
 } from 'lucide-react'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 
 interface RevenueReportProps {
   revenueSources: {
@@ -45,10 +46,12 @@ interface RevenueReportProps {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D']
 
 export function RevenueReport({ revenueSources, monthlyTrends, filters }: RevenueReportProps) {
+  const { formatCurrency } = useOrgCurrency()
+
   // Calculate revenue metrics
   const totalRevenue = revenueSources.reduce((sum, source) => sum + source.amount, 0)
   const averageRevenue = revenueSources.length > 0 ? totalRevenue / revenueSources.length : 0
-  const topSource = revenueSources.length > 0 
+  const topSource = revenueSources.length > 0
     ? revenueSources.reduce((max, source) => source.amount > max.amount ? source : max)
     : null
 
@@ -80,7 +83,7 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold text-green-600 break-words">
-              ${totalRevenue.toLocaleString()}
+              {formatCurrency(totalRevenue)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Generated revenue
@@ -95,7 +98,7 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold break-words">
-              ${averageRevenue.toLocaleString()}
+              {formatCurrency(averageRevenue)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Per source
@@ -150,7 +153,7 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, amount, percentage }) => `${name}: $${amount.toLocaleString()} (${percentage.toFixed(0)}%)`}
+                  label={({ name, amount, percentage }) => `${name}: ${formatCurrency(amount)} (${percentage.toFixed(0)}%)`}
                   outerRadius={60}
                   fill="#8884d8"
                   dataKey="amount"
@@ -159,7 +162,7 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']} />
+                <Tooltip formatter={(value) => [`${formatCurrency(Number(value))}`, 'Revenue']} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -177,22 +180,22 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']} />
-                <Area 
-                  type="monotone" 
-                  dataKey="revenue" 
-                  stackId="1" 
-                  stroke="#00C49F" 
-                  fill="#00C49F" 
+                <Tooltip formatter={(value) => [`${formatCurrency(Number(value))}`, 'Amount']} />
+                <Area
+                  type="monotone"
+                  dataKey="revenue"
+                  stackId="1"
+                  stroke="#00C49F"
+                  fill="#00C49F"
                   fillOpacity={0.6}
                   name="Revenue"
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="profit" 
-                  stackId="2" 
-                  stroke="#0088FE" 
-                  fill="#0088FE" 
+                <Area
+                  type="monotone"
+                  dataKey="profit"
+                  stackId="2"
+                  stroke="#0088FE"
+                  fill="#0088FE"
                   fillOpacity={0.6}
                   name="Profit"
                 />
@@ -213,7 +216,7 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']} />
+                <Tooltip formatter={(value) => [`${formatCurrency(Number(value))}`, 'Revenue']} />
                 <Bar dataKey="amount" fill="#82ca9d" />
               </BarChart>
             </ResponsiveContainer>
@@ -233,10 +236,10 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip formatter={(value) => [`${typeof value === 'number' ? value.toFixed(1) : value}%`, 'Margin']} />
-                <Line 
-                  type="monotone" 
-                  dataKey="margin" 
-                  stroke="#FFBB28" 
+                <Line
+                  type="monotone"
+                  dataKey="margin"
+                  stroke="#FFBB28"
                   strokeWidth={2}
                   name="Profit Margin %"
                 />
@@ -259,8 +262,8 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
                 <div className="flex-1 min-w-0 w-full sm:w-auto">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
                     <div className="flex items-center space-x-2">
-                      <div 
-                        className="w-3 h-3 sm:w-4 sm:h-4 rounded-full flex-shrink-0" 
+                      <div
+                        className="w-3 h-3 sm:w-4 sm:h-4 rounded-full flex-shrink-0"
                         style={{ backgroundColor: COLORS[index % COLORS.length] }}
                       />
                       <h3 className="font-semibold text-sm sm:text-base truncate">{source.source}</h3>
@@ -269,7 +272,7 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
                   </div>
                   <div className="mt-2">
                     <div className="text-xl sm:text-2xl font-bold text-green-600 break-words">
-                      ${source.amount.toLocaleString()}
+                      {formatCurrency(source.amount)}
                     </div>
                     <div className="text-xs sm:text-sm text-muted-foreground mt-1">
                       Revenue generated
@@ -309,13 +312,13 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
                     <div>
                       <div className="text-muted-foreground">Revenue</div>
                       <div className="font-medium text-green-600 break-words">
-                        ${month.revenue.toLocaleString()}
+                        {formatCurrency(month.revenue)}
                       </div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Profit</div>
                       <div className={`font-medium break-words ${month.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        ${month.profit.toLocaleString()}
+                        {formatCurrency(month.profit)}
                       </div>
                     </div>
                     <div>
@@ -340,11 +343,11 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
 
 function calculateRevenueGrowth(monthlyTrends: any[]): number {
   if (monthlyTrends.length < 2) return 0
-  
+
   const currentMonth = monthlyTrends[monthlyTrends.length - 1]
   const previousMonth = monthlyTrends[monthlyTrends.length - 2]
-  
+
   if (previousMonth.revenue === 0) return 0
-  
+
   return ((currentMonth.revenue - previousMonth.revenue) / previousMonth.revenue) * 100
 }

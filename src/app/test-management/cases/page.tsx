@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import TestCaseList from '@/components/test-management/TestCaseList'
 import { TestCaseForm } from '@/components/test-management/TestCaseForm'
 import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmDialog'
@@ -58,6 +59,7 @@ interface Project {
 }
 
 export default function TestCasesPage() {
+  const { setItems } = useBreadcrumb()
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [testCases, setTestCases] = useState<TestCase[]>([])
@@ -69,6 +71,14 @@ export default function TestCasesPage() {
   const [deleting, setDeleting] = useState(false)
   const [refreshCounter, setRefreshCounter] = useState(0)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Set breadcrumb
+    setItems([
+      { label: 'Test Management', href: '/test-management' },
+      { label: 'Test Cases' }
+    ])
+  }, [setItems])
 
   useEffect(() => {
     fetchProjects()

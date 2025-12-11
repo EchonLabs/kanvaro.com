@@ -410,15 +410,16 @@ async function getDetailedEntriesReport(query: any, format: string) {
   // Detailed entries report should only include approved entries
   const approvedQuery = { ...query, isApproved: true }
   
-  // Fetch organization to get currency
+  // Fetch organization to get currency and default rate
   const organization = await Organization.findById(query.organization).lean()
   const currency = (organization as any)?.currency || 'USD'
+  const orgDefaultRate = (organization as any)?.settings?.timeTracking?.defaultHourlyRate || 0
   
   const entries = await TimeEntry.find(approvedQuery)
-    .populate('user', 'firstName lastName email')
+    .populate('user', 'firstName lastName email hourlyRate')
     .populate({
       path: 'project',
-      select: 'name budget'
+      select: 'name budget memberRates'
     })
     .populate('task', 'title')
     .populate('approvedBy', 'firstName lastName email')
@@ -436,7 +437,33 @@ async function getDetailedEntriesReport(query: any, format: string) {
     const startTime = entry.startTime ? new Date(entry.startTime).toISOString() : ''
     const endTime = entry.endTime ? new Date(entry.endTime).toISOString() : ''
     const duration = entry.duration || 0
-    const hourlyRate = entry.hourlyRate || 0
+    
+    // Calculate effective hourly rate
+    let effectiveHourlyRate = 0
+    const userId = entry.user?._id || entry.user
+
+    // 1. Check if employee has project-specific hourly rate
+    const projectMemberRate = entry.project?.memberRates?.find(
+      (rate: any) => rate.user?.toString() === userId?.toString()
+    )
+
+    if (projectMemberRate && projectMemberRate.hourlyRate !== undefined && projectMemberRate.hourlyRate !== null) {
+      effectiveHourlyRate = projectMemberRate.hourlyRate
+    }
+    // 2. Check project default hourly rate
+    else if (entry.project?.budget?.defaultHourlyRate !== undefined && entry.project?.budget?.defaultHourlyRate !== null) {
+      effectiveHourlyRate = entry.project.budget.defaultHourlyRate
+    }
+    // 3. Check user's default hourly rate
+    else if (entry.user?.hourlyRate !== undefined && entry.user?.hourlyRate !== null) {
+      effectiveHourlyRate = entry.user.hourlyRate
+    }
+    // 4. Fallback to organization default rate
+    else {
+      effectiveHourlyRate = orgDefaultRate
+    }
+
+    const hourlyRate = effectiveHourlyRate
     const cost = (duration / 60) * hourlyRate
     const notes = entry.notes || entry.description || ''
     const isBillable = entry.isBillable || false

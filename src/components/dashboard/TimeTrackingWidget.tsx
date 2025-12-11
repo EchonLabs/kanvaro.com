@@ -214,9 +214,10 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
   }
 
   const formatCurrency = (amount: number) => {
+    const orgCurrency = organization?.currency || 'USD'
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: orgCurrency
     }).format(amount)
   }
 

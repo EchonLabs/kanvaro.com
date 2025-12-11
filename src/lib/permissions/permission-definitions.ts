@@ -101,10 +101,12 @@ export enum Permission {
   // View time of users assigned to you (as PM or HR partner)
   TIME_TRACKING_VIEW_ASSIGNED = 'time_tracking:view_assigned',
   TIME_TRACKING_EMPLOYEE_FILTER_READ = 'time_tracking:employee_filter:read',
+  TIME_TRACKING_VIEW_ALL_TIMER = 'time_tracking:view_all_timer',
   
   // Financial permissions
   FINANCIAL_READ = 'financial:read',
   FINANCIAL_MANAGE_BUDGET = 'financial:manage_budget',
+  BUDGET_HANDLING = 'financial:budget_handling',
   FINANCIAL_CREATE_EXPENSE = 'financial:create_expense',
   FINANCIAL_APPROVE_EXPENSE = 'financial:approve_expense',
   FINANCIAL_CREATE_INVOICE = 'financial:create_invoice',
@@ -265,10 +267,12 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_EXPORT,
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
+    Permission.TIME_TRACKING_VIEW_ALL_TIMER,
     
     // Financial
     Permission.FINANCIAL_READ,
     Permission.FINANCIAL_MANAGE_BUDGET,
+    Permission.BUDGET_HANDLING,
     Permission.FINANCIAL_CREATE_EXPENSE,
     Permission.FINANCIAL_APPROVE_EXPENSE,
     Permission.FINANCIAL_CREATE_INVOICE,
@@ -405,10 +409,12 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_VIEW_ASSIGNED,
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
+    Permission.TIME_TRACKING_VIEW_ALL_TIMER,
     
     // Financial
     Permission.FINANCIAL_READ,
     Permission.FINANCIAL_MANAGE_BUDGET,
+    Permission.BUDGET_HANDLING,
     Permission.FINANCIAL_CREATE_EXPENSE,
     Permission.FINANCIAL_APPROVE_EXPENSE,
     Permission.FINANCIAL_CREATE_INVOICE,
@@ -539,6 +545,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_EXPORT,
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
+    Permission.TIME_TRACKING_VIEW_ALL_TIMER,
     
     // Financial
     Permission.FINANCIAL_READ,
@@ -1097,7 +1104,9 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.TEAM_INVITE, // Organization-wide permission to invite team members
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_VIEW_ASSIGNED,
+    Permission.TIME_TRACKING_VIEW_ALL_TIMER, // View all active timers in organization
     Permission.FINANCIAL_READ,
+    Permission.BUDGET_HANDLING,
     Permission.REPORTING_VIEW,
     Permission.REPORTING_CREATE,
     Permission.REPORTING_EXPORT,

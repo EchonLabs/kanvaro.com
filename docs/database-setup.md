@@ -211,7 +211,6 @@ export interface IProject extends Document {
     spent: number;
     currency: string;
     categories: {
-      labor: number;
       materials: number;
       overhead: number;
     };
@@ -249,7 +248,6 @@ const ProjectSchema = new Schema<IProject>({
     spent: { type: Number, default: 0 },
     currency: { type: String, default: 'USD' },
     categories: {
-      labor: { type: Number, default: 0 },
       materials: { type: Number, default: 0 },
       overhead: { type: Number, default: 0 }
     }

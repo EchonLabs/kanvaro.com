@@ -36,7 +36,6 @@ const ProjectSchema = new mongoose.Schema({
     spent: Number,
     currency: String,
     categories: {
-      labor: Number,
       materials: Number,
       overhead: Number,
       external: Number

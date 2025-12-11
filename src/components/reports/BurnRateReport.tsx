@@ -27,7 +27,6 @@ interface BurnRateData {
   budgetRemaining: number
   forecastedCompletion?: string
   categories: {
-    labor: { planned: number; actual: number }
     materials: { planned: number; actual: number }
     overhead: { planned: number; actual: number }
     external: { planned: number; actual: number }

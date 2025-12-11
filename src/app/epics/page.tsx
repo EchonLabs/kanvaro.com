@@ -667,7 +667,7 @@ export default function EpicsPage() {
                     </SelectContent>
                   </Select>
                   <span>
-                    Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}
+                    Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredEpics.length)} of {filteredEpics.length}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -680,11 +680,11 @@ export default function EpicsPage() {
                     Previous
                   </Button>
                   <span className="text-sm text-muted-foreground px-2">
-                    Page {currentPage} of {Math.ceil(totalCount / pageSize) || 1}
+                    Page {currentPage} of {Math.ceil(filteredEpics.length / pageSize) || 1}
                   </span>
                   <Button
                     onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage >= Math.ceil(totalCount / pageSize) || loading}
+                    disabled={currentPage >= Math.ceil(filteredEpics.length / pageSize) || loading}
                     variant="outline"
                     size="sm"
                   >
