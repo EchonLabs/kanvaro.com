@@ -73,9 +73,9 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
   const revenueGrowth = calculateRevenueGrowth(monthlyTrends)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Revenue Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Revenue</CardTitle>
@@ -138,7 +138,7 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
         {/* Revenue by Source */}
         <Card>
           <CardHeader>
@@ -256,9 +256,9 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
           <CardDescription className="text-xs sm:text-sm">Detailed breakdown of revenue by source</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {revenueSources.map((source, index) => (
-              <div key={source.source} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+              <div key={source.source} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
                 <div className="flex-1 min-w-0 w-full sm:w-auto">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
                     <div className="flex items-center space-x-2">
@@ -303,12 +303,12 @@ export function RevenueReport({ revenueSources, monthlyTrends, filters }: Revenu
           <CardDescription className="text-xs sm:text-sm">Revenue and profit by month</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {monthlyRevenueData.map((month, index) => (
-              <div key={month.month} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+              <div key={month.month} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
                 <div className="flex-1 min-w-0 w-full sm:w-auto">
                   <h3 className="font-semibold text-sm sm:text-base truncate">{month.month}</h3>
-                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-xs sm:text-sm">
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 text-xs sm:text-sm">
                     <div>
                       <div className="text-muted-foreground">Revenue</div>
                       <div className="font-medium text-green-600 break-words">

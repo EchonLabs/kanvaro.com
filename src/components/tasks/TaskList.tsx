@@ -25,6 +25,7 @@ import {
   Plus
 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import EditTaskModal from './EditTaskModal'
 import ViewTaskModal from './ViewTaskModal'
@@ -463,19 +464,30 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
             <CardContent className="p-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex-1 min-w-0 w-full">
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <h4 className="font-medium text-foreground text-sm sm:text-base truncate flex-1 min-w-0">{task.title}</h4>
-                    <Badge className={getStatusColor(task.status) + ' flex-shrink-0'}>
-                      {getStatusIcon(task.status)}
-                      <span className="ml-1">{formatToTitleCase(task.status)}</span>
-                    </Badge>
-                    <Badge className={getPriorityColor(task.priority) + ' flex-shrink-0'}>
-                      {formatToTitleCase(task.priority)}
-                    </Badge>
-                    <Badge className={getTypeColor(task.type) + ' flex-shrink-0'}>
-                      {formatToTitleCase(task.type)}
-                    </Badge>
-                  </div>
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <h4 className="font-medium text-foreground text-sm sm:text-base truncate flex-1 min-w-0">
+                              {task.title}
+                            </h4>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start" className="max-w-xs break-words">
+                            {task.title}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <Badge className={getStatusColor(task.status) + ' flex-shrink-0'}>
+                        {getStatusIcon(task.status)}
+                        <span className="ml-1">{formatToTitleCase(task.status)}</span>
+                      </Badge>
+                      <Badge className={getPriorityColor(task.priority) + ' flex-shrink-0'}>
+                        {formatToTitleCase(task.priority)}
+                      </Badge>
+                      <Badge className={getTypeColor(task.type) + ' flex-shrink-0'}>
+                        {formatToTitleCase(task.type)}
+                      </Badge>
+                    </div>
                   <p className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">
                     {task.description || 'No description'}
                   </p>

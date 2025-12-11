@@ -89,7 +89,7 @@ export default function TimeReportsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <div className="flex-1 min-w-0">
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground flex items-center space-x-2">

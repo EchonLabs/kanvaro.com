@@ -213,7 +213,7 @@ export default function TestReportsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Test Reports</h1>
@@ -228,7 +228,7 @@ export default function TestReportsPage() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Test Cases</CardTitle>
@@ -286,7 +286,7 @@ export default function TestReportsPage() {
               Test execution statistics by project
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="text-muted-foreground">Loading project statistics...</div>
@@ -300,7 +300,7 @@ export default function TestReportsPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
+            <div className="space-y-5">
                 {projectStats.map((project, index) => (
                   <div key={index} className="space-y-2">
                     <div className="flex items-center justify-between">

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense, useRef, startTransition } from 'react';
+import React, { useState, useEffect, Suspense, useRef, startTransition, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -36,6 +36,25 @@ function DocsLayoutContent({
   const [searchQuery, setSearchQuery] = useState('');
   const [isNavigating, setIsNavigating] = useState(false);
   const referrerRef = useRef<string | null>(null);
+
+  const syncQueryToUrl = useCallback(
+    (aud?: Audience, cat?: Category, search?: string) => {
+      if (typeof window === 'undefined') return;
+      const params = new URLSearchParams(window.location.search);
+      if (aud) params.set('audience', aud);
+      else params.delete('audience');
+      if (cat) params.set('category', cat);
+      else params.delete('category');
+      if (search) params.set('search', search);
+      else params.delete('search');
+      const qs = params.toString();
+      const target = qs ? `${pathname}?${qs}` : pathname;
+      startTransition(() => {
+        router.replace(target, { scroll: false });
+      });
+    },
+    [pathname, router]
+  );
 
   // Store referrer on mount for back navigation
   useEffect(() => {
@@ -73,6 +92,11 @@ function DocsLayoutContent({
     setSelectedCategory(category);
     setSearchQuery(search);
   }, [searchParams, initialAudience, initialCategory, initialSearch]);
+
+  // Push audience/category/search changes into URL so filters affect results
+  useEffect(() => {
+    syncQueryToUrl(selectedAudience, selectedCategory, searchQuery);
+  }, [selectedAudience, selectedCategory, searchQuery, syncQueryToUrl]);
 
   // Handle back navigation with smooth transition
   const handleBack = (e: React.MouseEvent) => {

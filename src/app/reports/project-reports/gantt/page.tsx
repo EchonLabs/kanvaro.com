@@ -201,8 +201,8 @@ export default function GanttReportPage() {
   return (
     <MainLayout>
       <PageWrapper>
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="space-y-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
             <div className="flex-1 min-w-0">
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Gantt Chart</h1>
               <p className="text-sm sm:text-base text-muted-foreground mt-1">
@@ -224,7 +224,7 @@ export default function GanttReportPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="project" className="text-xs sm:text-sm">Project</Label>
                   <Select

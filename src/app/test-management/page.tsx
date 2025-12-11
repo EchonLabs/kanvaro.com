@@ -328,7 +328,7 @@ export default function TestManagementPage() {
   if (loading) {
     return (
       <MainLayout>
-        <div className="space-y-6">
+        <div className="space-y-8">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold">Test Management</h1>
@@ -336,7 +336,7 @@ export default function TestManagementPage() {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
               <Card key={i}>
                 <CardContent className="p-6">
@@ -355,7 +355,7 @@ export default function TestManagementPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex-1 min-w-0">
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Test Management</h1>
@@ -388,16 +388,16 @@ export default function TestManagementPage() {
             </CardContent>
           </Card>
         ) : (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 overflow-x-auto">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 overflow-x-auto mb-4">
               <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
               <TabsTrigger value="suites" className="text-xs sm:text-sm">Test Suites</TabsTrigger>
               <TabsTrigger value="cases" className="text-xs sm:text-sm">Test Cases</TabsTrigger>
               <TabsTrigger value="executions" className="text-xs sm:text-sm">Executions</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="overview" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <TabsContent value="overview" className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <Card>
                   <CardContent className="p-6">
                     <div className="flex items-center space-x-2">
@@ -443,7 +443,7 @@ export default function TestManagementPage() {
                 </Card>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <Card>
                   <CardHeader>
                     <CardTitle>Recent Executions</CardTitle>
@@ -535,8 +535,8 @@ export default function TestManagementPage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="suites" className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <TabsContent value="suites" className="space-y-8">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-1">
                   <TestSuiteTree
                     key={`${selectedProject}-${suitesRefreshCounter}`}
@@ -595,7 +595,7 @@ export default function TestManagementPage() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-1">
                               <div className="text-xs text-muted-foreground">Project</div>
                               <div className="text-sm">{selectedSuiteDetails.project?.name || '—'}</div>
@@ -622,7 +622,7 @@ export default function TestManagementPage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="cases" className="space-y-6">
+            <TabsContent value="cases" className="space-y-8">
               <TestCaseList
                 projectId={selectedProject}
                 key={`${selectedProject}-${testCasesRefreshCounter}-${selectedSuiteId ?? 'all'}`}
@@ -660,7 +660,7 @@ export default function TestManagementPage() {
               />
             </TabsContent>
 
-            <TabsContent value="executions" className="space-y-6">
+            <TabsContent value="executions" className="space-y-8">
               <Card>
                 <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <CardTitle className="text-xl sm:text-2xl">Test Executions</CardTitle>

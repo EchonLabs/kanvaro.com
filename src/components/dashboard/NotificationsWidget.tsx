@@ -157,7 +157,7 @@ export function NotificationsWidget() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => router.push('/activity')}
+              onClick={() => router.push('/notifications')}
               className="w-full text-xs"
             >
               View All Notifications

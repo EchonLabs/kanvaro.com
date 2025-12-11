@@ -29,6 +29,7 @@ import {
   History
 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface Task {
   _id: string
@@ -331,7 +332,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
           <h3 className="text-xl sm:text-2xl font-semibold text-foreground">Product Backlog</h3>
@@ -359,7 +360,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
       )}
 
       {/* Backlog Stats */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
@@ -500,7 +501,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
       </div>
 
       {/* Backlog Items */}
-      <div className="space-y-4">
+      <div className="space-y-6">
         {filteredAndSortedTasks.map((task, index) => (
           <Card
             key={task._id}
@@ -515,7 +516,18 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-2">
-                      <h4 className="font-medium text-foreground">{task.title}</h4>
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <h4 className="font-medium text-foreground truncate max-w-[220px] sm:max-w-none">
+                              {task.title}
+                            </h4>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start" className="max-w-xs break-words">
+                            {task.title}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <Badge className={getPriorityColor(task.priority)}>
                         {formatToTitleCase(task.priority)}
                       </Badge>

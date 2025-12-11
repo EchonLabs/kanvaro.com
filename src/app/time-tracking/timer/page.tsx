@@ -781,7 +781,7 @@ export default function TimerPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <Button 
             variant="ghost" 
@@ -857,7 +857,7 @@ export default function TimerPage() {
           </Alert>
         )}
 
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'timer' | 'manual')} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'timer' | 'manual')} className="space-y-8">
           <TabsList className={`grid w-full ${timeTrackingSettings?.allowManualTimeSubmission ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <TabsTrigger value="timer" className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
@@ -871,7 +871,7 @@ export default function TimerPage() {
             )}
           </TabsList>
 
-          <TabsContent value="timer" className="space-y-6">
+          <TabsContent value="timer" className="space-y-8">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -883,7 +883,7 @@ export default function TimerPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="project">Project *</Label>
                     <Select 
@@ -976,7 +976,7 @@ export default function TimerPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label htmlFor="description">
                     Description {timeTrackingSettings?.requireDescription ? '*' : ''}
                   </Label>

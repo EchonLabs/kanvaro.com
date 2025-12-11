@@ -104,9 +104,9 @@ export function ProjectProgressReport({ projects, filters }: ProjectProgressRepo
   }))
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Progress Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Projects</CardTitle>
@@ -169,7 +169,7 @@ export function ProjectProgressReport({ projects, filters }: ProjectProgressRepo
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Project Completion Rates */}
         <Card>
           <CardHeader>
@@ -272,7 +272,7 @@ export function ProjectProgressReport({ projects, filters }: ProjectProgressRepo
           <CardDescription className="text-xs sm:text-sm">Detailed progress tracking for each project</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {projects.map((project) => (
               <div key={project._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
                 <div className="flex-1 min-w-0 w-full sm:w-auto">
