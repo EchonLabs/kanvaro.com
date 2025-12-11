@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { MobileMenu } from '@/components/ui/MobileMenu'
@@ -17,10 +17,19 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const { loading: permissionsLoading, error: permissionsError, permissions } = usePermissionContext()
   
   // Listen for time tracking notifications and show toast popups
   useTimeTrackingNotifications()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return null
+  }
 
   // Wait for permissions to load before rendering the layout
   // Only show loading if permissions are actually being fetched (not just initialized)
