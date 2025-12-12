@@ -31,6 +31,9 @@ import {
   Layers,
   BookOpen
 } from 'lucide-react'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { extractUserId } from '@/lib/auth/user-utils'
 
 interface Epic {
   _id: string
@@ -81,10 +84,23 @@ export default function EpicDetailPage() {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [stories, setStories] = useState<any[]>([])
   const [storiesLoading, setStoriesLoading] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string>('')
+
+  const { hasPermission } = usePermissions()
+
+  const fetchAndSetCurrentUser = useCallback(async () => {
+    const response = await fetch('/api/auth/me')
+    if (response.ok) {
+      const data = await response.json().catch(() => ({}))
+      const userId = extractUserId(data)
+      if (userId) setCurrentUserId(userId.toString())
+    }
+    return response
+  }, [])
 
   const checkAuth = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/me')
+      const response = await fetchAndSetCurrentUser()
       
       if (response.ok) {
         setAuthError('')
@@ -96,7 +112,15 @@ export default function EpicDetailPage() {
         
         if (refreshResponse.ok) {
           setAuthError('')
-          await fetchEpic()
+          const meAfterRefresh = await fetchAndSetCurrentUser()
+          if (meAfterRefresh.ok) {
+            await fetchEpic()
+          } else {
+            setAuthError('Session expired')
+            setTimeout(() => {
+              router.push('/login')
+            }, 2000)
+          }
         } else {
           setAuthError('Session expired')
           setTimeout(() => {
@@ -113,7 +137,7 @@ export default function EpicDetailPage() {
         router.push('/login')
       }, 2000)
     }
-  }, [router, epicId])
+  }, [router, epicId, fetchAndSetCurrentUser])
 
   useEffect(() => {
     // Set breadcrumb immediately on mount
@@ -179,14 +203,18 @@ export default function EpicDetailPage() {
       const data = await res.json()
       if (res.ok && data.success) {
         setShowDeleteConfirmModal(false)
+        notifySuccess({ title: 'Epic deleted successfully' })
         router.push('/epics')
       } else {
-        setError(data?.error || 'Failed to delete epic')
+        const message = data?.error || 'Failed to delete epic'
+        setError(message)
         setShowDeleteConfirmModal(false)
+        notifyError({ title: message })
       }
     } catch (e) {
       setError('Failed to delete epic')
       setShowDeleteConfirmModal(false)
+      notifyError({ title: 'Failed to delete epic' })
     } finally {
       setDeleting(false)
     }
@@ -225,6 +253,17 @@ export default function EpicDetailPage() {
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
+
+  const isCreator = (epic: Epic) => {
+    const creatorId = (epic as any)?.createdBy?._id || (epic as any)?.createdBy?.id
+    return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
+  }
+
+  const canEditEpic = (epic: Epic) =>
+    hasPermission(Permission.EPIC_EDIT) || isCreator(epic)
+
+  const canDeleteEpic = (epic: Epic) =>
+    hasPermission(Permission.EPIC_DELETE) || isCreator(epic)
 
   if (loading) {
     return (
@@ -268,6 +307,9 @@ export default function EpicDetailPage() {
     )
   }
 
+  const editAllowed = epic ? canEditEpic(epic) : false
+  const deleteAllowed = epic ? canDeleteEpic(epic) : false
+
   return (
     <MainLayout>
       <div className="space-y-8 sm:space-y-10 lg:space-y-12 overflow-x-hidden">
@@ -289,11 +331,27 @@ export default function EpicDetailPage() {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-shrink-0">
-           <Button variant="outline" onClick={() => router.push(`/epics/${epicId}/edit`)} className="w-full sm:w-auto">
-             <Edit className="h-4 w-4 mr-2" />
-             Edit
-           </Button>
-            <Button variant="destructive" onClick={handleDeleteClick} disabled={deleting} className="w-full sm:w-auto">
+            <Button
+              variant="outline"
+              disabled={!editAllowed}
+              onClick={() => {
+                if (!editAllowed) return
+                router.push(`/epics/${epicId}/edit`)
+              }}
+              className="w-full sm:w-auto"
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!deleteAllowed || deleting) return
+                handleDeleteClick()
+              }}
+              disabled={!deleteAllowed || deleting}
+              className="w-full sm:w-auto"
+            >
               <Trash2 className="h-4 w-4 mr-2" />
               {deleting ? 'Deleting...' : 'Delete'}
             </Button>

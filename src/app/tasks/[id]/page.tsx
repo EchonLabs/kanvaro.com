@@ -38,6 +38,10 @@ import { AttachmentList } from '@/components/ui/AttachmentList'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useNotify } from '@/lib/notify'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { extractUserId } from '@/lib/auth/user-utils'
 
 interface Task {
   _id: string
@@ -198,6 +202,8 @@ export default function TaskDetailPage() {
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
   const commentFileInputRef = useRef<HTMLInputElement | null>(null)
   const replyFileInputRef = useRef<HTMLInputElement | null>(null)
+  const { success: notifySuccess, error: notifyError } = useNotify()
+  const { hasPermission } = usePermissions()
 
   const checkAuth = useCallback(async () => {
     try {
@@ -205,7 +211,7 @@ export default function TaskDetailPage() {
       
       if (response.ok) {
         const me = await response.json().catch(() => null)
-        const uid = me?.id || me?._id || ''
+        const uid = extractUserId(me)
         if (uid) setCurrentUserId(uid)
         setAuthError('')
         await fetchTask()
@@ -216,7 +222,7 @@ export default function TaskDetailPage() {
         
         if (refreshResponse.ok) {
           const me = await fetch('/api/auth/me').then(r => r.json()).catch(() => null)
-          const uid = me?.id || me?._id || ''
+          const uid = extractUserId(me)
           if (uid) setCurrentUserId(uid)
           setAuthError('')
           await fetchTask()
@@ -314,6 +320,7 @@ export default function TaskDetailPage() {
   }
 
   const handleDeleteTask = async () => {
+    if (!deleteAllowed) return
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'DELETE'
@@ -323,11 +330,14 @@ export default function TaskDetailPage() {
       if (data.success) {
         setShowDeleteConfirmModal(false)
         router.push('/tasks')
+        notifySuccess({ title: 'Task deleted successfully' })
       } else {
         setError(data.error || 'Failed to delete task')
+        notifyError({ title: data.error || 'Failed to delete task' })
       }
     } catch (error) {
       setError('Failed to delete task')
+      notifyError({ title: 'Failed to delete task' })
     }
   }
 
@@ -961,6 +971,14 @@ export default function TaskDetailPage() {
     )
   }
 
+  const isCreator = (t: Task) => {
+    const creatorId = (t as any)?.createdBy?._id || (t as any)?.createdBy?.id
+    return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
+  }
+
+  const editAllowed = hasPermission(Permission.TASK_EDIT_ALL) || isCreator(task)
+  const deleteAllowed = hasPermission(Permission.TASK_DELETE_ALL) || isCreator(task)
+
   const attachmentListItems = (task.attachments || []).map(attachment => ({
     name: attachment.name,
     url: attachment.url,
@@ -996,13 +1014,25 @@ export default function TaskDetailPage() {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-shrink-0">
-            <Button variant="outline" onClick={() => router.push(`/tasks/${taskId}/edit`)} className="w-full sm:w-auto">
+            <Button
+              variant="outline"
+              disabled={!editAllowed}
+              onClick={() => {
+                if (!editAllowed) return
+                router.push(`/tasks/${taskId}/edit`)
+              }}
+              className="w-full sm:w-auto"
+            >
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
             <Button 
-              variant="destructive" 
-              onClick={() => setShowDeleteConfirmModal(true)}
+              variant="destructive"
+              disabled={!deleteAllowed}
+              onClick={() => {
+                if (!deleteAllowed) return
+                setShowDeleteConfirmModal(true)
+              }}
               className="w-full sm:w-auto"
             >
               <Trash2 className="h-4 w-4 mr-2" />

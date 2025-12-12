@@ -128,6 +128,12 @@ export default function RolesPage() {
     setTimeout(() => setSuccess(''), 3000)
   }
 
+  useEffect(() => {
+    if (error) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [error])
+
   const handleDeleteClick = (role: Role) => {
     if (role.isSystem) {
       setError('Cannot delete system roles')

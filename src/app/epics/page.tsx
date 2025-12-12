@@ -15,6 +15,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { useNotify } from '@/lib/notify'
+import { extractUserId } from '@/lib/auth/user-utils'
 import { 
   Plus, 
   Search, 
@@ -94,33 +98,44 @@ export default function EpicsPage() {
   const [selectedEpic, setSelectedEpic] = useState<Epic | null>(null)
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [successMessage, setSuccessMessage] = useState('')
-  const [showSuccessAlert, setShowSuccessAlert] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
+  const [currentUserId, setCurrentUserId] = useState<string>('')
 
-  // Check for success message from query params
+  const { hasPermission } = usePermissions()
+  const { success: notifySuccess, error: notifyError } = useNotify()
+
+  // Show success when redirected with ?updated=true
   useEffect(() => {
     const updated = searchParams.get('updated')
     if (updated === 'true') {
-      setSuccessMessage('Epic updated successfully')
-      setShowSuccessAlert(true)
-      // Clear the query parameter from URL
+      notifySuccess({ title: 'Epic updated successfully' })
       router.replace('/epics', { scroll: false })
-      // Auto-hide after 5 seconds
-      const timer = setTimeout(() => {
-        setShowSuccessAlert(false)
-        setSuccessMessage('')
-      }, 5000)
-      return () => clearTimeout(timer)
     }
+    // notifySuccess is stable enough; omit from deps to avoid re-run loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, router])
+
+  const fetchAndSetCurrentUser = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/me')
+      if (response.ok) {
+        const data = await response.json().catch(() => ({}))
+        const userId = extractUserId(data)
+        if (userId) setCurrentUserId(userId.toString())
+      }
+      return response
+    } catch (error) {
+      console.error('Auth check failed:', error)
+      throw error
+    }
+  }, [])
 
   const checkAuth = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/me')
-      
+      const response = await fetchAndSetCurrentUser()
+
       if (response.ok) {
         setAuthError('')
         await fetchEpics()
@@ -130,8 +145,16 @@ export default function EpicsPage() {
         })
         
         if (refreshResponse.ok) {
-          setAuthError('')
-          await fetchEpics()
+          const meResponse = await fetchAndSetCurrentUser()
+          if (meResponse.ok) {
+            setAuthError('')
+            await fetchEpics()
+          } else {
+            setAuthError('Session expired')
+            setTimeout(() => {
+              router.push('/login')
+            }, 2000)
+          }
         } else {
           setAuthError('Session expired')
           setTimeout(() => {
@@ -148,11 +171,19 @@ export default function EpicsPage() {
         router.push('/login')
       }, 2000)
     }
-  }, [router])
+  }, [router, fetchAndSetCurrentUser])
 
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
+
+  useEffect(() => {
+    if (error) {
+      notifyError({ title: error })
+    }
+    // notifyError is stable enough; omit from deps to avoid re-run loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error])
 
   // Fetch when pagination changes (after initial load)
   useEffect(() => {
@@ -202,13 +233,16 @@ export default function EpicsPage() {
         setEpics(prev => prev.filter(e => e._id !== selectedEpic._id))
         setShowDeleteConfirmModal(false)
         setSelectedEpic(null)
+        notifySuccess({ title: 'Epic deleted successfully' })
       } else {
         setError(data.error || 'Failed to delete epic')
         setShowDeleteConfirmModal(false)
+        notifyError({ title: data.error || 'Failed to delete epic' })
       }
     } catch (e) {
       setError('Failed to delete epic')
       setShowDeleteConfirmModal(false)
+      notifyError({ title: 'Failed to delete epic' })
     } finally {
       setDeleting(false)
     }
@@ -262,6 +296,24 @@ export default function EpicsPage() {
     return matchesSearch && matchesStatus && matchesPriority
   })
 
+  const isCreator = (epic: Epic) => {
+    const creatorId = (epic as any)?.createdBy?._id || (epic as any)?.createdBy?.id
+    return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
+  }
+
+  const canViewEpic = (epic: Epic) =>
+    hasPermission(Permission.EPIC_VIEW) ||
+    hasPermission(Permission.EPIC_READ) ||
+    isCreator(epic)
+
+  const canEditEpic = (epic: Epic) =>
+    hasPermission(Permission.EPIC_EDIT) || isCreator(epic)
+
+  const canDeleteEpic = (epic: Epic) =>
+    hasPermission(Permission.EPIC_DELETE) || isCreator(epic)
+
+  const canCreateEpic = hasPermission(Permission.EPIC_CREATE)
+
   if (loading) {
     return (
       <MainLayout>
@@ -296,7 +348,15 @@ export default function EpicsPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Epics</h1>
             <p className="text-sm sm:text-base text-muted-foreground">Manage your product epics and large features</p>
           </div>
-          <Button onClick={() => router.push('/epics/create')} className="w-full sm:w-auto">
+          <Button
+            onClick={() => {
+              if (!canCreateEpic) return
+              router.push('/epics/create')
+            }}
+            disabled={!canCreateEpic}
+            title={!canCreateEpic ? 'You need epic:create permission to create an epic.' : undefined}
+            className="w-full sm:w-auto"
+          >
             <Plus className="h-4 w-4 mr-2" />
             New Epic
           </Button>
@@ -369,37 +429,21 @@ export default function EpicsPage() {
                 <TabsTrigger value="list">List View</TabsTrigger>
               </TabsList>
               
-              {showSuccessAlert && successMessage && (
-                <Alert className="mt-4 border-green-500 bg-green-50 dark:bg-green-900/20">
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
-                      <AlertDescription className="text-green-800 dark:text-green-200 flex-1">
-                        {successMessage}
-                      </AlertDescription>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40 ml-auto flex-shrink-0"
-                      onClick={() => {
-                        setShowSuccessAlert(false)
-                        setSuccessMessage('')
-                      }}
-                    >
-                      <X className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    </Button>
-                  </div>
-                </Alert>
-              )}
-
               <TabsContent value="grid" className="space-y-4">
                 <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredEpics.map((epic) => (
+                  {filteredEpics.map((epic) => {
+                    const epicIsCreator = isCreator(epic)
+                    const viewAllowed = canViewEpic(epic)
+                    const editAllowed = canEditEpic(epic)
+                    const deleteAllowed = canDeleteEpic(epic)
+                    return (
                     <Card 
                       key={epic?._id} 
-                      className="hover:shadow-md transition-shadow cursor-pointer overflow-x-hidden"
-                      onClick={() => router.push(`/epics/${epic?._id}`)}
+                      className={`hover:shadow-md transition-shadow overflow-x-hidden ${viewAllowed ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                      onClick={() => {
+                        if (!viewAllowed) return
+                        router.push(`/epics/${epic?._id}`)
+                      }}
                     >
                       <CardHeader className="p-3 sm:p-6">
                         <div className="flex items-start justify-between gap-2">
@@ -419,24 +463,32 @@ export default function EpicsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/epics/${epic._id}`)
-                                }}>
+                                <DropdownMenuItem
+                                  disabled={!viewAllowed}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!viewAllowed) return
+                                    router.push(`/epics/${epic._id}`)
+                                  }}>
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Epic
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/epics/${epic._id}/edit`)
-                                }}>
+                                <DropdownMenuItem
+                                  disabled={!editAllowed}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!editAllowed) return
+                                    router.push(`/epics/${epic._id}/edit`)
+                                  }}>
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit Epic
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem 
+                                  disabled={!deleteAllowed}
                                   onClick={(e) => {
                                     e.stopPropagation()
+                                    if (!deleteAllowed) return
                                     handleDeleteClick(epic)
                                   }}
                                   className="text-destructive focus:text-destructive"
@@ -513,17 +565,25 @@ export default function EpicsPage() {
                         )}
                       </CardContent>
                     </Card>
-                  ))}
+                    )
+                  })}
                 </div>
               </TabsContent>
 
               <TabsContent value="list" className="space-y-4">
                 <div className="space-y-4">
-                  {filteredEpics.map((epic) => (
+                  {filteredEpics.map((epic) => {
+                    const viewAllowed = canViewEpic(epic)
+                    const editAllowed = canEditEpic(epic)
+                    const deleteAllowed = canDeleteEpic(epic)
+                    return (
                     <Card 
                       key={epic?._id} 
-                      className="hover:shadow-md transition-shadow cursor-pointer overflow-x-hidden"
-                      onClick={() => router.push(`/epics/${epic?._id}`)}
+                      className={`hover:shadow-md transition-shadow overflow-x-hidden ${viewAllowed ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                      onClick={() => {
+                        if (!viewAllowed) return
+                        router.push(`/epics/${epic?._id}`)
+                      }}
                     >
                       <CardContent className="p-3 sm:p-4">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
@@ -611,24 +671,32 @@ export default function EpicsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/epics/${epic._id}`)
-                                }}>
+                                <DropdownMenuItem
+                                  disabled={!viewAllowed}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!viewAllowed) return
+                                    router.push(`/epics/${epic._id}`)
+                                  }}>
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Epic
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/epics/${epic._id}/edit`)
-                                }}>
+                                <DropdownMenuItem
+                                  disabled={!editAllowed}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!editAllowed) return
+                                    router.push(`/epics/${epic._id}/edit`)
+                                  }}>
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit Epic
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem 
+                                  disabled={!deleteAllowed}
                                   onClick={(e) => {
                                     e.stopPropagation()
+                                    if (!deleteAllowed) return
                                     handleDeleteClick(epic)
                                   }}
                                   className="text-destructive focus:text-destructive"
@@ -642,7 +710,8 @@ export default function EpicsPage() {
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
+                    )
+                  })}
                 </div>
               </TabsContent>
             </Tabs>

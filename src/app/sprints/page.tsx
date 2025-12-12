@@ -15,6 +15,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Label } from '@/components/ui/label'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
 import {
   Plus,
   Search,
@@ -142,6 +144,14 @@ export default function SprintsPage() {
   const [totalCount, setTotalCount] = useState(0)
 
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { hasPermission } = usePermissions()
+
+  const canCreateSprint = hasPermission(Permission.SPRINT_CREATE)
+  const canViewSprint = hasPermission(Permission.SPRINT_VIEW) || hasPermission(Permission.SPRINT_READ)
+  const canEditSprint = hasPermission(Permission.SPRINT_EDIT) && hasPermission(Permission.SPRINT_CREATE)
+  const canDeleteSprint = hasPermission(Permission.SPRINT_DELETE)
+  const canStartSprint = hasPermission(Permission.SPRINT_START)
+  const canCompleteSprint = hasPermission(Permission.SPRINT_COMPLETE)
 
   const showSuccess = useCallback((message: string) => {
     setSuccess(message)
@@ -238,6 +248,10 @@ export default function SprintsPage() {
   }
 
   const handleDeleteSprint = async (sprintId: string) => {
+    if (!canDeleteSprint) {
+      setError('You do not have permission to delete sprints.')
+      return
+    }
     try {
       const res = await fetch(`/api/sprints/${sprintId}`, { method: 'DELETE' })
       const data = await res.json()
@@ -366,7 +380,19 @@ export default function SprintsPage() {
     }
   }
 
-  const handleSprintLifecycleAction = async (sprintId: string, action: 'start' | 'complete') => {
+  const handleSprintLifecycleAction = async (sprintId: string, action: 'start' | 'complete', hasTasks = true) => {
+    if (action === 'start' && !canStartSprint) {
+      setError('You do not have permission to start sprints.')
+      return
+    }
+    if (action === 'complete' && !canCompleteSprint) {
+      setError('You do not have permission to complete sprints.')
+      return
+    }
+    if (!hasTasks) {
+      setError('Add tasks to this sprint before performing this action.')
+      return
+    }
     if (action === 'complete') {
       const incomplete = await checkSprintForIncompleteTasks(sprintId)
 
@@ -740,7 +766,15 @@ export default function SprintsPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Sprints</h1>
             <p className="text-sm sm:text-base text-muted-foreground">Manage your agile sprints and iterations</p>
           </div>
-          <Button onClick={() => router.push('/sprints/create')} className="w-full sm:w-auto">
+          <Button
+            onClick={() => {
+              if (!canCreateSprint) return
+              router.push('/sprints/create')
+            }}
+            disabled={!canCreateSprint}
+            title={!canCreateSprint ? 'You need sprint:create permission to create a sprint.' : undefined}
+            className="w-full sm:w-auto"
+          >
             <Plus className="h-4 w-4 mr-2" />
             New Sprint
           </Button>
@@ -878,8 +912,11 @@ export default function SprintsPage() {
                     return (
                       <Card
                         key={sprint._id}
-                        className="hover:shadow-md transition-shadow cursor-pointer overflow-x-hidden"
-                        onClick={() => router.push(`/sprints/${sprint._id}`)}
+                        className={`hover:shadow-md transition-shadow overflow-x-hidden ${canViewSprint ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                        onClick={() => {
+                          if (!canViewSprint) return
+                          router.push(`/sprints/${sprint._id}`)
+                        }}
                       >
                         <CardHeader className="p-3 sm:p-6">
                           <div className="flex items-start justify-between gap-2">
@@ -898,10 +935,14 @@ export default function SprintsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/sprints/${sprint._id}`)
-                                }}>
+                                <DropdownMenuItem
+                                  disabled={!canViewSprint}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!canViewSprint) return
+                                    router.push(`/sprints/${sprint._id}`)
+                                  }}
+                                >
                                   <Zap className="h-4 w-4 mr-2" />
                                   View Sprint
                                 </DropdownMenuItem>
@@ -912,17 +953,23 @@ export default function SprintsPage() {
                                 <Settings className="h-4 w-4 mr-2" />
                                 Settings
                               </DropdownMenuItem> */}
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/sprints/${sprint._id}/edit`)
-                                }}>
+                                <DropdownMenuItem
+                                  disabled={!canEditSprint}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!canEditSprint) return
+                                    router.push(`/sprints/${sprint._id}/edit`)
+                                  }}
+                                >
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit Sprint
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
+                                  disabled={!canDeleteSprint}
                                   onClick={(e) => {
                                     e.stopPropagation()
+                                    if (!canDeleteSprint) return
                                     if (confirm('Are you sure you want to delete this sprint? This action cannot be undone.')) {
                                       handleDeleteSprint(sprint._id)
                                     }
@@ -1024,10 +1071,17 @@ export default function SprintsPage() {
                                 size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  handleSprintLifecycleAction(sprint._id, 'start')
+                                  if (!canStartSprint || !hasTasks) return
+                                  handleSprintLifecycleAction(sprint._id, 'start', hasTasks)
                                 }}
-                                disabled={updatingSprintId === sprint._id || !hasTasks}
-                                title={!hasTasks ? 'Add tasks to this sprint before starting it.' : undefined}
+                                disabled={updatingSprintId === sprint._id || !hasTasks || !canStartSprint}
+                                title={
+                                  !hasTasks
+                                    ? 'Add tasks to this sprint before starting it.'
+                                    : !canStartSprint
+                                      ? 'You need sprint:start permission to start a sprint.'
+                                      : undefined
+                                }
                               >
                                 <Play className="h-4 w-4 mr-1" />
                                 {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
@@ -1039,9 +1093,17 @@ export default function SprintsPage() {
                                 variant="secondary"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  handleSprintLifecycleAction(sprint._id, 'complete')
+                                  if (!canCompleteSprint || !hasTasks) return
+                                  handleSprintLifecycleAction(sprint._id, 'complete', hasTasks)
                                 }}
-                                disabled={updatingSprintId === sprint._id}
+                                disabled={updatingSprintId === sprint._id || !hasTasks || !canCompleteSprint}
+                                title={
+                                  !hasTasks
+                                    ? 'Add tasks to this sprint before completing it.'
+                                    : !canCompleteSprint
+                                      ? 'You need sprint:complete permission to complete a sprint.'
+                                      : undefined
+                                }
                               >
                                 <CheckCircle className="h-4 w-4 mr-1" />
                                 {updatingSprintId === sprint._id ? 'Completing...' : 'Complete Sprint'}
@@ -1082,8 +1144,11 @@ export default function SprintsPage() {
                     return (
                       <Card
                         key={sprint?._id}
-                        className="hover:shadow-md transition-shadow cursor-pointer overflow-x-hidden"
-                        onClick={() => router.push(`/sprints/${sprint?._id}`)}
+                        className={`hover:shadow-md transition-shadow overflow-x-hidden ${canViewSprint ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                        onClick={() => {
+                          if (!canViewSprint || !sprint?._id) return
+                          router.push(`/sprints/${sprint?._id}`)
+                        }}
                       >
                         <CardContent className="p-3 sm:p-4">
                           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
@@ -1144,10 +1209,17 @@ export default function SprintsPage() {
                                     size="sm"
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      handleSprintLifecycleAction(sprint._id, 'start')
+                                  if (!canStartSprint || !hasTasks) return
+                                  handleSprintLifecycleAction(sprint._id, 'start', hasTasks)
                                     }}
-                                    disabled={updatingSprintId === sprint._id || !hasTasks}
-                                    title={!hasTasks ? 'Add tasks to this sprint before starting it.' : undefined}
+                                disabled={updatingSprintId === sprint._id || !hasTasks || !canStartSprint}
+                                title={
+                                  !hasTasks
+                                    ? 'Add tasks to this sprint before starting it.'
+                                    : !canStartSprint
+                                      ? 'You need sprint:start permission to start a sprint.'
+                                      : undefined
+                                }
                                   >
                                     <Play className="h-4 w-4 mr-1" />
                                     {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
@@ -1159,9 +1231,17 @@ export default function SprintsPage() {
                                     variant="secondary"
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      handleSprintLifecycleAction(sprint._id, 'complete')
+                                  if (!canCompleteSprint || !hasTasks) return
+                                  handleSprintLifecycleAction(sprint._id, 'complete', hasTasks)
                                     }}
-                                    disabled={updatingSprintId === sprint._id}
+                                disabled={updatingSprintId === sprint._id || !hasTasks || !canCompleteSprint}
+                                title={
+                                  !hasTasks
+                                    ? 'Add tasks to this sprint before completing it.'
+                                    : !canCompleteSprint
+                                      ? 'You need sprint:complete permission to complete a sprint.'
+                                      : undefined
+                                }
                                   >
                                     <CheckCircle className="h-4 w-4 mr-1" />
                                     {updatingSprintId === sprint._id ? 'Completing...' : 'Complete Sprint'}
@@ -1201,24 +1281,34 @@ export default function SprintsPage() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation()
-                                    router.push(`/sprints/${sprint._id}`)
-                                  }}>
+                                  <DropdownMenuItem
+                                    disabled={!canViewSprint}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (!canViewSprint) return
+                                      router.push(`/sprints/${sprint._id}`)
+                                    }}
+                                  >
                                     <Zap className="h-4 w-4 mr-2" />
                                     View Sprint
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation()
-                                    router.push(`/sprints/${sprint._id}/edit`)
-                                  }}>
+                                  <DropdownMenuItem
+                                    disabled={!canEditSprint}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (!canEditSprint) return
+                                      router.push(`/sprints/${sprint._id}/edit`)
+                                    }}
+                                  >
                                     <Edit className="h-4 w-4 mr-2" />
                                     Edit Sprint
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
+                                    disabled={!canDeleteSprint}
                                     onClick={(e) => {
                                       e.stopPropagation()
+                                      if (!canDeleteSprint) return
                                       if (confirm('Are you sure you want to delete this sprint? This action cannot be undone.')) {
                                         handleDeleteSprint(sprint._id)
                                       }

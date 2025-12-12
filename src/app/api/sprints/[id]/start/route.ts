@@ -3,6 +3,8 @@ import connectDB from '@/lib/db-config'
 import { Sprint } from '@/models/Sprint'
 import { Task } from '@/models/Task'
 import { authenticateUser } from '@/lib/auth-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 export async function POST(
   request: NextRequest,
@@ -21,9 +23,8 @@ export async function POST(
 
     const { user } = authResult
     const organizationId = user.organization
+    const userId = user.id
     const sprintId = params.id
-console.log('sprintId', sprintId);
-console.log('organizationId', organizationId);
 
     if (!sprintId) {
       return NextResponse.json(
@@ -53,6 +54,32 @@ console.log('organizationId', organizationId);
     if (sprint.status !== 'planning') {
       return NextResponse.json(
         { error: 'Only sprints in planning can be started' },
+        { status: 400 }
+      )
+    }
+
+    const sprintProjectId = sprint.project?.toString?.()
+    const canStartSprint = await PermissionService.hasPermission(
+      userId.toString(),
+      Permission.SPRINT_START,
+      sprintProjectId
+    )
+
+    if (!canStartSprint) {
+      return NextResponse.json(
+        { error: 'You do not have permission to start this sprint' },
+        { status: 403 }
+      )
+    }
+
+    const activeTaskCount = await Task.countDocuments({
+      sprint: sprintId,
+      archived: { $ne: true }
+    })
+
+    if (activeTaskCount === 0) {
+      return NextResponse.json(
+        { error: 'Add tasks to this sprint before starting it' },
         { status: 400 }
       )
     }

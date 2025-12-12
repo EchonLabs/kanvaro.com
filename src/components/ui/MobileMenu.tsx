@@ -103,7 +103,7 @@ const navigationItems = [
         label: 'Sprints',
         icon: Zap,
         path: '/sprints',
-        permission: Permission.SPRINT_READ
+        permission: Permission.SPRINT_VIEW
       },
       {
         id: 'tasks-epics',

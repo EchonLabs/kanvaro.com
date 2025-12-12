@@ -127,14 +127,14 @@ const navigationItems = [
         label: 'Sprints',
         icon: Zap,
         path: '/sprints',
-        permission: Permission.SPRINT_READ
+        permission: Permission.SPRINT_VIEW
       },
       {
         id: 'tasks-epics',
         label: 'Epics',
         icon: Columns,
         path: '/epics',
-        permission: Permission.EPIC_READ
+        permission: Permission.EPIC_VIEW
       },
       {
         id: 'tasks-sprint-events',

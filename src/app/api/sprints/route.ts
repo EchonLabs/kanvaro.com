@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Sprint } from '@/models/Sprint'
+import { Project } from '@/models/Project'
 import { Task } from '@/models/Task'
 import { Story } from '@/models/Story'
 import { authenticateUser } from '@/lib/auth-utils'
@@ -23,6 +24,18 @@ export async function GET(request: NextRequest) {
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
+
+    const canViewSprints = await PermissionService.hasAnyPermission(
+      userId.toString(),
+      [Permission.SPRINT_VIEW, Permission.SPRINT_READ]
+    )
+    
+    if (!canViewSprints) {
+      return NextResponse.json(
+        { error: 'You do not have permission to view sprints' },
+        { status: 403 }
+      )
+    }
 
     // Check if user has permission to view all sprints
     const hasSprintViewAll = await PermissionService.hasPermission(
@@ -227,6 +240,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Name, project, start date, and end date are required' },
         { status: 400 }
+      )
+    }
+
+    // Ensure project exists and belongs to the user's organization
+    const projectDoc = await Project.findById(project).select('organization')
+    if (!projectDoc) {
+      return NextResponse.json(
+        { error: 'Project not found' },
+        { status: 404 }
+      )
+    }
+
+    if (projectDoc.organization.toString() !== organizationId.toString()) {
+      return NextResponse.json(
+        { error: 'You do not have access to this project' },
+        { status: 403 }
+      )
+    }
+
+    const canCreateSprint = await PermissionService.hasPermission(
+      userId.toString(),
+      Permission.SPRINT_CREATE,
+      projectDoc._id.toString()
+    )
+
+    if (!canCreateSprint) {
+      return NextResponse.json(
+        { error: 'You do not have permission to create sprints' },
+        { status: 403 }
       )
     }
 
