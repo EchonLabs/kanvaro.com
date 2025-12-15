@@ -86,6 +86,8 @@ export enum Permission {
   // Team permissions
   TEAM_READ = 'team:read',
   TEAM_INVITE = 'team:invite',
+  TEAM_EDIT = 'team:edit',
+  TEAM_DELETE = 'team:delete',
   TEAM_REMOVE = 'team:remove',
   TEAM_MANAGE_PERMISSIONS = 'team:manage_permissions',
   TEAM_VIEW_ACTIVITY = 'team:view_activity',
@@ -128,18 +130,25 @@ export enum Permission {
   
   // Epic permissions
   EPIC_CREATE = 'epic:create',
+  EPIC_VIEW = 'epic:view',
   EPIC_READ = 'epic:read',
   EPIC_UPDATE = 'epic:update',
+  EPIC_EDIT = 'epic:edit',
   EPIC_DELETE = 'epic:delete',
+  EPIC_REMOVE = 'epic:remove',
   EPIC_VIEW_ALL = 'epic:view_all',
   
   // Sprint permissions
   SPRINT_CREATE = 'sprint:create',
+  SPRINT_VIEW = 'sprint:view',
   SPRINT_READ = 'sprint:read',
   SPRINT_UPDATE = 'sprint:update',
+  SPRINT_EDIT = 'sprint:edit',
   SPRINT_DELETE = 'sprint:delete',
   SPRINT_MANAGE = 'sprint:manage',
   SPRINT_VIEW_ALL = 'sprint:view_all',
+  SPRINT_START = 'sprint:start',
+  SPRINT_COMPLETE = 'sprint:complete',
   
   // Story permissions
   STORY_CREATE = 'story:create',
@@ -254,6 +263,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Team
     Permission.TEAM_READ,
     Permission.TEAM_INVITE,
+    Permission.TEAM_EDIT,
     Permission.TEAM_REMOVE,
     Permission.TEAM_MANAGE_PERMISSIONS,
     Permission.TEAM_VIEW_ACTIVITY,
@@ -294,18 +304,25 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     
     // Epics
     Permission.EPIC_CREATE,
+    Permission.EPIC_VIEW,
     Permission.EPIC_READ,
+    Permission.EPIC_EDIT,
     Permission.EPIC_UPDATE,
     Permission.EPIC_DELETE,
+    Permission.EPIC_REMOVE,
     Permission.EPIC_VIEW_ALL,
     
     // Sprints
     Permission.SPRINT_CREATE,
+    Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
     Permission.SPRINT_UPDATE,
+    Permission.SPRINT_EDIT,
     Permission.SPRINT_DELETE,
     Permission.SPRINT_MANAGE,
     Permission.SPRINT_VIEW_ALL,
+    Permission.SPRINT_START,
+    Permission.SPRINT_COMPLETE,
     
     // Stories
     Permission.STORY_CREATE,
@@ -395,6 +412,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Team
     Permission.TEAM_READ,
     Permission.TEAM_INVITE,
+    Permission.TEAM_EDIT,
+    Permission.TEAM_DELETE,
     Permission.TEAM_REMOVE,
     Permission.TEAM_MANAGE_PERMISSIONS,
     Permission.TEAM_VIEW_ACTIVITY,
@@ -436,16 +455,23 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     
     // Epics
     Permission.EPIC_CREATE,
+    Permission.EPIC_VIEW,
     Permission.EPIC_READ,
+    Permission.EPIC_EDIT,
     Permission.EPIC_UPDATE,
     Permission.EPIC_DELETE,
+    Permission.EPIC_REMOVE,
     
     // Sprints
     Permission.SPRINT_CREATE,
+    Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
+    Permission.SPRINT_EDIT,
     Permission.SPRINT_UPDATE,
     Permission.SPRINT_DELETE,
     Permission.SPRINT_MANAGE,
+    Permission.SPRINT_START,
+    Permission.SPRINT_COMPLETE,
     
     // Stories
     Permission.STORY_CREATE,
@@ -532,6 +558,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Team
     Permission.TEAM_READ,
     Permission.TEAM_INVITE,
+    Permission.TEAM_EDIT,
+    Permission.TEAM_DELETE,
     Permission.TEAM_REMOVE,
     Permission.TEAM_MANAGE_PERMISSIONS,
     Permission.TEAM_VIEW_ACTIVITY,
@@ -571,18 +599,25 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     
     // Epics
     Permission.EPIC_CREATE,
+    Permission.EPIC_VIEW,
     Permission.EPIC_READ,
+    Permission.EPIC_EDIT,
     Permission.EPIC_UPDATE,
     Permission.EPIC_DELETE,
+    Permission.EPIC_REMOVE,
     Permission.EPIC_VIEW_ALL,
     
     // Sprints
     Permission.SPRINT_CREATE,
+    Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
+    Permission.SPRINT_EDIT,
     Permission.SPRINT_UPDATE,
     Permission.SPRINT_DELETE,
     Permission.SPRINT_MANAGE,
     Permission.SPRINT_VIEW_ALL,
+    Permission.SPRINT_START,
+    Permission.SPRINT_COMPLETE,
     
     // Stories
     Permission.STORY_CREATE,
@@ -665,9 +700,12 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.SETTINGS_READ,
     
     // Epics (read only)
+    Permission.EPIC_CREATE,
+    Permission.EPIC_VIEW,
     Permission.EPIC_READ,
     
     // Sprints (read only)
+    Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
     
     // Stories (read only)
@@ -712,9 +750,11 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.SETTINGS_READ,
     
     // Epics (read only)
+    Permission.EPIC_VIEW,
     Permission.EPIC_READ,
     
     // Sprints (read only)
+    Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
     
     // Stories (read only)
@@ -759,9 +799,11 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.SETTINGS_READ,
     
     // Epics (read only)
+    Permission.EPIC_VIEW,
     Permission.EPIC_READ,
     
     // Sprints (read only)
+    Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
     
     // Stories (read only)
@@ -815,6 +857,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.EPIC_READ,
     
     // Sprints (read only)
+    Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
     
     // Stories (read only)
@@ -886,6 +929,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.EPIC_READ,
     
     // Sprints (read only)
+    Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
     
     // Stories (read only)
@@ -935,14 +979,21 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.FINANCIAL_READ,
     Permission.FINANCIAL_MANAGE_BUDGET,
     Permission.EPIC_CREATE,
+    Permission.EPIC_VIEW,
     Permission.EPIC_READ,
+    Permission.EPIC_EDIT,
     Permission.EPIC_UPDATE,
     Permission.EPIC_DELETE,
+    Permission.EPIC_REMOVE,
     Permission.SPRINT_CREATE,
+    Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
+    Permission.SPRINT_EDIT,
     Permission.SPRINT_UPDATE,
     Permission.SPRINT_DELETE,
     Permission.SPRINT_MANAGE,
+    Permission.SPRINT_START,
+    Permission.SPRINT_COMPLETE,
     Permission.STORY_CREATE,
     Permission.STORY_READ,
     Permission.STORY_UPDATE,
@@ -971,6 +1022,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.TIME_TRACKING_DELETE,
     Permission.FINANCIAL_READ,
     Permission.EPIC_READ,
+    Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
     Permission.STORY_CREATE,
     Permission.STORY_READ,
@@ -987,6 +1039,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.TIME_TRACKING_READ,
     Permission.FINANCIAL_READ,
     Permission.EPIC_READ,
+    Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
     Permission.STORY_READ,
     Permission.CALENDAR_READ,
@@ -1001,6 +1054,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.TIME_TRACKING_READ,
     Permission.FINANCIAL_READ,
     Permission.EPIC_READ,
+    Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
     Permission.STORY_READ,
     Permission.CALENDAR_READ,
@@ -1021,6 +1075,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.TIME_TRACKING_READ,
     Permission.FINANCIAL_READ,
     Permission.EPIC_READ,
+    Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
     Permission.STORY_READ,
     Permission.CALENDAR_READ,
@@ -1058,6 +1113,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.TIME_TRACKING_READ,
     Permission.FINANCIAL_READ,
     Permission.EPIC_READ,
+    Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
     Permission.STORY_READ,
     Permission.CALENDAR_READ,
@@ -1097,11 +1153,17 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.TASK_VIEW_ALL,
     Permission.TASK_EDIT_ALL,
     Permission.TASK_DELETE_ALL,
+    Permission.EPIC_VIEW,
+    Permission.EPIC_READ,
     Permission.STORY_VIEW_ALL,
+    Permission.SPRINT_VIEW,
+    Permission.SPRINT_READ,
     Permission.SPRINT_VIEW_ALL,
     Permission.EPIC_VIEW_ALL,
     Permission.SPRINT_EVENT_VIEW_ALL,
     Permission.TEAM_INVITE, // Organization-wide permission to invite team members
+    Permission.TEAM_EDIT,
+    Permission.TEAM_DELETE,
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_VIEW_ASSIGNED,
     Permission.TIME_TRACKING_VIEW_ALL_TIMER, // View all active timers in organization

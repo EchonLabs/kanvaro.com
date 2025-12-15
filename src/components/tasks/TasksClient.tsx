@@ -40,6 +40,8 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { useDebounce } from '@/hooks/useDebounce'
 import { useProjectKanbanStatuses } from '@/hooks/useProjectKanbanStatuses'
 import dynamic from 'next/dynamic'
+import { extractUserId } from '@/lib/auth/user-utils'
+import { useNotify } from '@/lib/notify'
 import { Permission, PermissionGate } from '@/lib/permissions'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
@@ -49,8 +51,7 @@ import { format } from 'date-fns'
 import { DateRange } from 'react-day-picker'
 import { DEFAULT_TASK_STATUS_KEYS, type TaskStatusKey } from '@/constants/taskStatuses'
 
-// Dynamically import heavy modals
-const CreateTaskModal = dynamic(() => import('./CreateTaskModal'), { ssr: false })
+import CreateTaskModal from './CreateTaskModal'
 type KanbanBoardComponentProps = {
     projectId: string
     filters?: {
@@ -179,6 +180,8 @@ export default function TasksClient({
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
     const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
     const { statusMap: projectsWithStatuses } = useProjectKanbanStatuses()
+    const [currentUserId, setCurrentUserId] = useState<string>('')
+    const { success: notifySuccess, error: notifyError } = useNotify()
 
     const startDateBoundary = useMemo(() => {
         if (!dateRangeFilter?.from) return null
@@ -193,6 +196,40 @@ export default function TasksClient({
         boundary.setHours(23, 59, 59, 999)
         return boundary
     }, [dateRangeFilter])
+
+    const isCreator = useCallback(
+        (task: Task) => {
+            const creatorId = (task as any)?.createdBy?._id || (task as any)?.createdBy?.id
+            return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
+        },
+        [currentUserId]
+    )
+
+    const canEditTask = useCallback(
+        (task: Task) => hasPermission(Permission.TASK_EDIT_ALL) || isCreator(task),
+        [hasPermission, isCreator]
+    )
+
+    const canDeleteTask = useCallback(
+        (task: Task) => hasPermission(Permission.TASK_DELETE_ALL) || isCreator(task),
+        [hasPermission, isCreator]
+    )
+
+    // Fetch current user for creator checks
+    useEffect(() => {
+        const fetchMe = async () => {
+            try {
+                const res = await fetch('/api/auth/me')
+                if (!res.ok) return
+                const data = await res.json().catch(() => null)
+                const uid = extractUserId(data)
+                if (uid) setCurrentUserId(uid)
+            } catch (e) {
+                // ignore
+            }
+        }
+        fetchMe()
+    }, [])
     useEffect(() => {
         const q = searchParams.get('search') || ''
         const s = searchParams.get('status') || 'all'
@@ -699,13 +736,15 @@ export default function TasksClient({
                 setTasks(tasks.filter(p => p._id !== selectedTask._id))
                 setShowDeleteConfirmModal(false)
                 setSelectedTask(null)
-                setSuccess('Task deleted successfully.')
-                setTimeout(() => setSuccess(''), 3000)
+                notifySuccess({ title: 'Task deleted successfully' })
             } else {
-                setError(data.error || 'Failed to delete task')
+                const message = data.error || 'Failed to delete task'
+                setError(message)
+                notifyError({ title: message })
             }
         } catch (err) {
             setError('Failed to delete task')
+            notifyError({ title: 'Failed to delete task' })
         }
     }
 
@@ -1253,32 +1292,29 @@ export default function TasksClient({
                                                                                         <Eye className="h-4 w-4 mr-2" />
                                                                                         View Task
                                                                                     </DropdownMenuItem>
-                                                                                    {task.project?._id && (
-                                                                                        <>
-                                                                                            <PermissionGate permission={Permission.TASK_UPDATE} projectId={task?.project?._id}>
-                                                                                                <DropdownMenuItem onClick={(e) => {
-                                                                                                    e.stopPropagation()
-                                                                                                    router.push(`/tasks/${task._id}/edit`)
-                                                                                                }}>
-                                                                                                    <Edit className="h-4 w-4 mr-2" />
-                                                                                                    Edit Task
-                                                                                                </DropdownMenuItem>
-                                                                                            </PermissionGate>
-                                                                                            <PermissionGate permission={Permission.TASK_DELETE} projectId={task.project._id}>
-                                                                                                <DropdownMenuSeparator />
-                                                                                                <DropdownMenuItem
-                                                                                                    onClick={(e) => {
-                                                                                                        e.stopPropagation()
-                                                                                                        handleDeleteClick(task)
-                                                                                                    }}
-                                                                                                    className="text-destructive focus:text-destructive"
-                                                                                                >
-                                                                                                    <Trash2 className="h-4 w-4 mr-2" />
-                                                                                                    Delete Task
-                                                                                                </DropdownMenuItem>
-                                                                                            </PermissionGate>
-                                                                                        </>
-                                                                                    )}
+                                                                                    <DropdownMenuItem
+                                                                                        disabled={!canEditTask(task)}
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation()
+                                                                                            if (!canEditTask(task)) return
+                                                                                            router.push(`/tasks/${task._id}/edit`)
+                                                                                        }}>
+                                                                                        <Edit className="h-4 w-4 mr-2" />
+                                                                                        Edit Task
+                                                                                    </DropdownMenuItem>
+                                                                                    <DropdownMenuSeparator />
+                                                                                    <DropdownMenuItem
+                                                                                        disabled={!canDeleteTask(task)}
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation()
+                                                                                            if (!canDeleteTask(task)) return
+                                                                                            handleDeleteClick(task)
+                                                                                        }}
+                                                                                        className="text-destructive focus:text-destructive"
+                                                                                    >
+                                                                                        <Trash2 className="h-4 w-4 mr-2" />
+                                                                                        Delete Task
+                                                                                    </DropdownMenuItem>
                                                                                 </DropdownMenuContent>
                                                                             </DropdownMenu>
                                                                         </div>

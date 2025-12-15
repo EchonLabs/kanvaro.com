@@ -121,6 +121,7 @@ export function PermissionProvider({ children, initialPermissions }: PermissionP
               Permission.SETTINGS_READ,
               Permission.EPIC_READ,
               Permission.SPRINT_READ,
+              Permission.SPRINT_VIEW,
               Permission.STORY_READ,
               Permission.CALENDAR_READ,
               Permission.KANBAN_READ,
@@ -166,6 +167,7 @@ export function PermissionProvider({ children, initialPermissions }: PermissionP
           Permission.SETTINGS_READ,
           Permission.EPIC_READ,
           Permission.SPRINT_READ,
+          Permission.SPRINT_VIEW,
           Permission.STORY_READ,
           Permission.CALENDAR_READ,
           Permission.KANBAN_READ,
@@ -330,7 +332,7 @@ export function useFeaturePermissions() {
     canManageTasks: hasPermission(Permission.TASK_UPDATE) || hasPermission(Permission.TASK_DELETE) || hasPermission(Permission.TASK_ASSIGN),
     
     // Team permissions
-    canManageTeam: hasPermission(Permission.TEAM_INVITE) || hasPermission(Permission.TEAM_REMOVE) || hasPermission(Permission.TEAM_MANAGE_PERMISSIONS),
+    canManageTeam: hasPermission(Permission.TEAM_EDIT) || hasPermission(Permission.TEAM_DELETE) || hasPermission(Permission.TEAM_INVITE) || hasPermission(Permission.TEAM_REMOVE) || hasPermission(Permission.TEAM_MANAGE_PERMISSIONS),
     
     // Time tracking permissions
     canTrackTime: hasPermission(Permission.TIME_TRACKING_CREATE),
@@ -354,7 +356,10 @@ export function useFeaturePermissions() {
     canManageEpics: hasPermission(Permission.EPIC_CREATE) || hasPermission(Permission.EPIC_UPDATE) || hasPermission(Permission.EPIC_DELETE),
     
     // Sprint permissions
-    canManageSprints: hasPermission(Permission.SPRINT_CREATE) || hasPermission(Permission.SPRINT_UPDATE) || hasPermission(Permission.SPRINT_DELETE) || hasPermission(Permission.SPRINT_MANAGE),
+    canViewSprints: hasPermission(Permission.SPRINT_VIEW) || hasPermission(Permission.SPRINT_READ),
+    canManageSprints: hasPermission(Permission.SPRINT_CREATE) || hasPermission(Permission.SPRINT_UPDATE) || hasPermission(Permission.SPRINT_DELETE) || hasPermission(Permission.SPRINT_MANAGE) || hasPermission(Permission.SPRINT_EDIT),
+    canStartSprints: hasPermission(Permission.SPRINT_START),
+    canCompleteSprints: hasPermission(Permission.SPRINT_COMPLETE),
     
     // Story permissions
     canManageStories: hasPermission(Permission.STORY_CREATE) || hasPermission(Permission.STORY_UPDATE) || hasPermission(Permission.STORY_DELETE),

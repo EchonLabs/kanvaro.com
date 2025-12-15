@@ -7,8 +7,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/Badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Checkbox } from '@/components/ui/Checkbox'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   X, 
   Save, 
@@ -21,6 +21,7 @@ import {
   Plus,
   Trash2
 } from 'lucide-react'
+import { useNotify } from '@/lib/notify'
 
 interface EditTaskModalProps {
   isOpen: boolean
@@ -90,6 +91,7 @@ interface TaskFormData {
 }
 
 export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: EditTaskModalProps) {
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -166,28 +168,13 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
       setSubtasks(initialSubtasksData)
       setInitialSubtasks(initialSubtasksData)
       
-      // Get project ID - try from task.project first, otherwise fetch full task data
+      // Get project ID - use task.project if available
       const getProjectId = async () => {
         let projectId: string | null = null
         
         // First, try to get project ID from task object
         if (task.project) {
           projectId = typeof task.project === 'string' ? task.project : task.project._id
-        }
-        
-        // If project is not available, fetch full task data from API
-        if (!projectId && task._id) {
-          try {
-            const response = await fetch(`/api/tasks/${task._id}`)
-            const data = await response.json()
-            if (data.success && data.data?.project) {
-              projectId = typeof data.data.project === 'string' 
-                ? data.data.project 
-                : data.data.project._id
-            }
-          } catch (error) {
-            console.error('Failed to fetch task data for project ID:', error)
-          }
         }
         
         // Fetch all data if we have a project ID
@@ -378,23 +365,21 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
       const data = await response.json()
       
       if (data.success) {
-        setSuccess('Task updated successfully')
         setError('')
+        notifySuccess({ title: 'Task updated successfully' })
         // Call update callback asynchronously to not block UI
         setTimeout(() => {
           onTaskUpdated()
         }, 0)
-        // Close modal after a short delay to show success message
-        setTimeout(() => {
-          onClose()
-          setSuccess('')
-        }, 1500)
+        onClose()
       } else {
-        setError(data.error || 'Failed to update task')
-        setSuccess('')
+        const message = data.error || 'Failed to update task'
+        setError(message)
+        notifyError({ title: message })
       }
     } catch (error) {
       setError('Failed to update task')
+      notifyError({ title: 'Failed to update task' })
     } finally {
       setLoading(false)
     }
@@ -560,7 +545,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
         </CardHeader>
         <CardContent className="flex-1 overflow-y-auto">
           <form onSubmit={handleSubmit} className="space-y-6" id="edit-task-form">
-            {success && (
+            {false && (
               <Alert variant="success" className="flex items-center justify-between pr-2">
                 <AlertDescription className="flex-1">{success}</AlertDescription>
                 <Button
@@ -576,7 +561,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
                 </Button>
               </Alert>
             )}
-            {error && (
+            {false && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>

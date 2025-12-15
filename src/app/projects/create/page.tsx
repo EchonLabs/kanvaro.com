@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/Progress'
 import { useCurrencies } from '@/hooks/useCurrencies'
 import { useOrganization } from '@/hooks/useOrganization'
+import { useNotify } from '@/lib/notify'
 import {
   ArrowLeft,
   ArrowRight,
@@ -110,12 +111,12 @@ export default function CreateProjectPage() {
   const router = useRouter()
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay, error: currenciesError } = useCurrencies(true)
   const { organization } = useOrganization()
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const orgCurrency = organization?.currency || 'USD'
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [availableMembers, setAvailableMembers] = useState<any[]>([])
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
   const [clientSearchQuery, setClientSearchQuery] = useState('')
@@ -327,7 +328,6 @@ export default function CreateProjectPage() {
       setIsSubmitting(true)
       setLoading(true)
       setError('')
-      setSuccess('')
 
       const url = isEditMode ? `/api/projects/${editProjectId}` : '/api/projects'
       const method = isEditMode ? 'PUT' : 'POST'
@@ -375,15 +375,15 @@ export default function CreateProjectPage() {
       if (data.success) {
         if (isEditMode) {
           if (isDraft) {
-            setSuccess('Project updated and saved as draft!')
+            notifySuccess({ title: 'Success', message: 'Project updated and saved as draft!' })
           } else {
-            setSuccess('Project updated successfully!')
+            notifySuccess({ title: 'Success', message: 'Project updated successfully!' })
           }
         } else {
           if (isDraft) {
-            setSuccess('Project saved as draft!')
+            notifySuccess({ title: 'Success', message: 'Project saved as draft!' })
           } else {
-            setSuccess('Project created successfully!')
+            notifySuccess({ title: 'Success', message: 'Project created successfully!' })
           }
         }
 
@@ -391,10 +391,10 @@ export default function CreateProjectPage() {
           router.push('/projects')
         }, 2000)
       } else {
-        setError(data.error || (isEditMode ? 'Failed to update project' : 'Failed to create project'))
+        notifyError({ title: 'Error', message: data.error || (isEditMode ? 'Failed to update project' : 'Failed to create project') })
       }
     } catch (err) {
-      setError(isEditMode ? 'Failed to update project' : 'Failed to create project')
+      notifyError({ title: 'Error', message: isEditMode ? 'Failed to update project' : 'Failed to create project' })
     } finally {
       setIsSubmitting(false)
       setLoading(false)
@@ -610,8 +610,7 @@ export default function CreateProjectPage() {
           }
         ]
       }))
-      setSuccess('File uploaded successfully')
-      setTimeout(() => setSuccess(''), 3000)
+      notifySuccess({ title: 'Success', message: 'File uploaded successfully' })
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to upload attachment'
       setAttachmentError(errorMessage)
@@ -647,8 +646,7 @@ export default function CreateProjectPage() {
     })
 
     if (alreadyExists) {
-      setError('This team member is already added to the project')
-      setTimeout(() => setError(''), 3000)
+      notifyError({ title: 'Error', message: 'This team member is already added to the project' })
       return
     }
 
@@ -658,8 +656,7 @@ export default function CreateProjectPage() {
     }))
     setShowMemberSearch(false)
     setMemberSearchQuery('')
-    setSuccess('Team member added successfully')
-    setTimeout(() => setSuccess(''), 3000)
+    notifySuccess({ title: 'Success', message: 'Team member added successfully' })
   }
 
   // Remove team member
@@ -687,8 +684,7 @@ export default function CreateProjectPage() {
     }))
     setShowClientSearch(false)
     setClientSearchQuery('')
-    setSuccess('Client assigned successfully')
-    setTimeout(() => setSuccess(''), 3000)
+    notifySuccess({ title: 'Success', message: 'Client assigned successfully' })
   }
 
   // Remove client
@@ -820,10 +816,10 @@ export default function CreateProjectPage() {
             : '0'
         )
       } else {
-        setError('Failed to load project data')
+        notifyError({ title: 'Error', message: 'Failed to load project data' })
       }
     } catch (err) {
-      setError('Failed to load project data')
+      notifyError({ title: 'Error', message: 'Failed to load project data' })
     } finally {
       setLoading(false)
     }
@@ -882,19 +878,6 @@ export default function CreateProjectPage() {
           </CardContent>
         </Card>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {success && (
-          <Alert variant="success">
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>{success}</AlertDescription>
-          </Alert>
-        )}
 
         <Tabs value={currentStep.toString()} className="space-y-4" onValueChange={(value) => {
           const targetStep = parseInt(value)

@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useNotify } from '@/lib/notify'
+import { validateSprintDates } from '@/lib/sprintDateValidation'
 import {
   ArrowLeft,
   Save,
@@ -31,6 +33,7 @@ interface User {
 
 export default function CreateSprintPage() {
   const router = useRouter()
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
@@ -38,7 +41,8 @@ export default function CreateSprintPage() {
   const [users, setUsers] = useState<User[]>([])
   const [selectedProject, setSelectedProject] = useState<any>(null)
   const [projectQuery, setProjectQuery] = useState("")
-  const [dateError, setDateError] = useState('')
+  const [startDateError, setStartDateError] = useState('')
+  const [endDateError, setEndDateError] = useState('')
 
   const [formData, setFormData] = useState({
     name: '',
@@ -160,11 +164,11 @@ export default function CreateSprintPage() {
         } else {
           setUsers([])
         }
-        // Clear date error when project changes
-        setDateError('')
-        // Clear dates if they're outside the new project's date range
+        // Clear date errors when project changes and re-validate if dates exist
+        setStartDateError('')
+        setEndDateError('')
         if (formData.startDate || formData.endDate) {
-          validateDates(formData.startDate, formData.endDate, data.data)
+          runDateValidation(formData.startDate, formData.endDate, data.data, false)
         }
       } else {
         setSelectedProject(null)
@@ -177,81 +181,48 @@ export default function CreateSprintPage() {
     }
   }
 
-  // Validate sprint dates
-  const validateDates = (startDate: string, endDate: string, project?: any) => {
-    setDateError('')
-
-    if (!startDate || !endDate) {
-      // Allow empty dates during typing; submit handler will still require them
-      return true
-    }
-
-    const today = new Date()
-    today.setHours(0, 0, 0, 0) // Reset time to start of day
-
-    const sprintStart = new Date(startDate)
-    sprintStart.setHours(0, 0, 0, 0)
-
-    const sprintEnd = new Date(endDate)
-    sprintEnd.setHours(0, 0, 0, 0)
-
-    // Basic validation independent of project dates
-    if (sprintStart < today) {
-      setDateError(`Start date: Must be today (${today.toLocaleDateString()}) or a future date.`)
-      return false
-    }
-
-    if (sprintEnd < sprintStart) {
-      setDateError('End date: Must be after the start date.')
-      return false
-    }
-
-    // If project has valid dates, also enforce sprint within project range
-    if (project && project.startDate && project.endDate) {
-      const projectStart = new Date(project.startDate)
-      projectStart.setHours(0, 0, 0, 0)
-
-      const projectEnd = new Date(project.endDate)
-      projectEnd.setHours(23, 59, 59, 999) // End of day
-
-      if (sprintStart < projectStart) {
-        setDateError(`Start date: Must be on or after project start date (${projectStart.toLocaleDateString()}).`)
-        return false
-      }
-
-      if (sprintStart > projectEnd) {
-        setDateError(`Start date: Must be on or before project end date (${projectEnd.toLocaleDateString()}).`)
-        return false
-      }
-
-      if (sprintEnd < projectStart) {
-        setDateError(`End date: Must be on or after project start date (${projectStart.toLocaleDateString()}).`)
-        return false
-      }
-
-      if (sprintEnd > projectEnd) {
-        setDateError(`End date: Must be on or before project end date (${projectEnd.toLocaleDateString()}).`)
-        return false
-      }
-    }
-
-    return true
+  const runDateValidation = (
+    startDate: string,
+    endDate: string,
+    project: any,
+    requireBoth = false
+  ) => {
+    const result = validateSprintDates({
+      startDate,
+      endDate,
+      projectStart: project?.startDate,
+      projectEnd: project?.endDate,
+      requireBoth
+    })
+    setStartDateError(result.startError)
+    setEndDateError(result.endError)
+    return result.isValid
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
-    setDateError('')
+    setStartDateError('')
+    setEndDateError('')
 
     // Validate dates before submission
     if (!selectedProject) {
       setError('Please select a project')
+      notifyError({ title: 'Please select a project' })
       setLoading(false)
       return
     }
 
-    if (!validateDates(formData.startDate, formData.endDate, selectedProject)) {
+    const datesAreValid = runDateValidation(
+      formData.startDate,
+      formData.endDate,
+      selectedProject,
+      true
+    )
+
+    if (!datesAreValid) {
+      notifyError({ title: 'Please fix the start and end date errors before submitting.' })
       setLoading(false)
       return
     }
@@ -272,12 +243,15 @@ export default function CreateSprintPage() {
       const data = await response.json()
 
       if (data.success) {
+        notifySuccess({ title: 'Sprint created successfully' })
         router.push('/sprints?success=sprint-created')
       } else {
         setError(data.error || 'Failed to create sprint')
+        notifyError({ title: data.error || 'Failed to create sprint' })
       }
     } catch (err) {
       setError('Failed to create sprint')
+      notifyError({ title: 'Failed to create sprint' })
     } finally {
       setLoading(false)
     }
@@ -303,17 +277,19 @@ export default function CreateSprintPage() {
         // Clear dates when project changes
         newData.startDate = ''
         newData.endDate = ''
-        setDateError('')
+        setStartDateError('')
+        setEndDateError('')
       }
 
       // Validate dates when they change
       if (field === 'startDate' || field === 'endDate') {
-        const startDate = field === 'startDate' ? value as string : prev.startDate
-        const endDate = field === 'endDate' ? value as string : prev.endDate
-        if (selectedProject && startDate && endDate) {
-          validateDates(startDate, endDate, selectedProject)
+        const nextStart = field === 'startDate' ? (value as string) : prev.startDate
+        const nextEnd = field === 'endDate' ? (value as string) : prev.endDate
+        if (selectedProject && (nextStart || nextEnd)) {
+          runDateValidation(nextStart, nextEnd, selectedProject, false)
         } else {
-          setDateError('')
+          setStartDateError('')
+          setEndDateError('')
         }
       }
 
@@ -367,14 +343,6 @@ export default function CreateSprintPage() {
             <p className="text-sm sm:text-base text-muted-foreground mt-1">Create a new sprint for your project</p>
           </div>
         </div>
-
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
 
         <Card>
           <CardHeader>
@@ -431,7 +399,7 @@ export default function CreateSprintPage() {
 
                   <div>
                     <label className="text-sm font-medium text-foreground">Start Date *</label>
-                    {selectedProject && (
+                    {selectedProject?.startDate && selectedProject?.endDate && (
                       <div className="mb-2 p-2 bg-muted/50 rounded-md border border-muted">
                         <p className="text-xs text-muted-foreground">
                           <span className="font-medium">Project Duration:</span>{' '}
@@ -449,24 +417,23 @@ export default function CreateSprintPage() {
                       onChange={(e) => handleChange('startDate', e.target.value)}
                       min={
                         selectedProject?.startDate
-                          ? new Date(Math.max(
-                            new Date(selectedProject.startDate).getTime(),
-                            new Date().setHours(0, 0, 0, 0)
-                          )).toISOString().split('T')[0]
+                          ? new Date(
+                              Math.max(
+                                new Date(selectedProject.startDate).getTime(),
+                                new Date().setHours(0, 0, 0, 0)
+                              )
+                            )
+                            .toISOString()
+                            .split('T')[0]
                           : new Date().toISOString().split('T')[0]
                       }
                       max={
-                        selectedProject?.endDate && formData.endDate
-                          ? new Date(Math.min(
-                            new Date(selectedProject.endDate).getTime(),
-                            new Date(formData.endDate).getTime()
-                          )).toISOString().split('T')[0]
-                          : selectedProject?.endDate
-                            ? new Date(selectedProject.endDate).toISOString().split('T')[0]
-                            : undefined
+                        selectedProject?.endDate
+                          ? new Date(selectedProject.endDate).toISOString().split('T')[0]
+                          : undefined
                       }
                       required
-                      className={`w-full ${dateError && formData.startDate && dateError.includes('start') ? 'border-destructive' : ''}`}
+                      className={`w-full ${startDateError ? 'border-destructive' : ''}`}
                       disabled={!formData.project}
                     />
                     {!formData.project && (
@@ -475,10 +442,10 @@ export default function CreateSprintPage() {
                         Please select a project first to set sprint dates
                       </p>
                     )}
-                    {dateError && formData.startDate && dateError.includes('start') && (
+                    {startDateError && (
                       <p className="text-xs text-destructive mt-1 flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3 flex-shrink-0" />
-                        {dateError}
+                        {startDateError}
                       </p>
                     )}
                   </div>
@@ -490,23 +457,19 @@ export default function CreateSprintPage() {
                       value={formData.endDate}
                       onChange={(e) => handleChange('endDate', e.target.value)}
                       min={
-                        selectedProject?.startDate && formData.startDate
-                          ? new Date(Math.max(
-                            new Date(selectedProject.startDate).getTime(),
-                            new Date(formData.startDate).getTime(),
-                            new Date().setHours(0, 0, 0, 0)
-                          )).toISOString().split('T')[0]
-                          : formData.startDate
-                            ? new Date(Math.max(
-                              new Date(formData.startDate).getTime(),
-                              new Date().setHours(0, 0, 0, 0)
-                            )).toISOString().split('T')[0]
-                            : selectedProject?.startDate
-                              ? new Date(Math.max(
-                                new Date(selectedProject.startDate).getTime(),
+                        selectedProject?.startDate || formData.startDate
+                          ? new Date(
+                              Math.max(
+                                selectedProject?.startDate
+                                  ? new Date(selectedProject.startDate).getTime()
+                                  : 0,
+                                formData.startDate ? new Date(formData.startDate).getTime() : 0,
                                 new Date().setHours(0, 0, 0, 0)
-                              )).toISOString().split('T')[0]
-                              : new Date().toISOString().split('T')[0]
+                              )
+                            )
+                            .toISOString()
+                            .split('T')[0]
+                          : new Date().toISOString().split('T')[0]
                       }
                       max={
                         selectedProject?.endDate
@@ -514,7 +477,7 @@ export default function CreateSprintPage() {
                           : undefined
                       }
                       required
-                      className={`w-full ${dateError && formData.endDate && (dateError.includes('end') || dateError.includes('after')) ? 'border-destructive' : ''}`}
+                      className={`w-full ${endDateError ? 'border-destructive' : ''}`}
                       disabled={!formData.project || !formData.startDate}
                     />
                     {!formData.project && (
@@ -529,10 +492,10 @@ export default function CreateSprintPage() {
                         Please select start date first
                       </p>
                     )}
-                    {dateError && formData.endDate && (dateError.includes('end') || dateError.includes('after')) && (
+                    {endDateError && (
                       <p className="text-xs text-destructive mt-1 flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3 flex-shrink-0" />
-                        {dateError}
+                        {endDateError}
                       </p>
                     )}
                   </div>

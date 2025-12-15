@@ -104,6 +104,7 @@ export default function SprintEventsPage() {
   const [filterType, setFilterType] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterProject, setFilterProject] = useState('all')
+  const [filterSprint, setFilterSprint] = useState('all')
   const [projectQuery, setProjectQuery] = useState('')
   
   // Debounced search (300ms delay)
@@ -352,11 +353,13 @@ export default function SprintEventsPage() {
 
       const matchesType = filterType === 'all' || event.eventType === filterType
       const matchesStatus = filterStatus === 'all' || event.status === filterStatus
-      const matchesProject = filterProject === 'all' || event.project._id === filterProject
+      const matchesProject = filterProject === 'all' || event.project?._id === filterProject
+      const matchesSprint = filterSprint === 'all' || event.sprint?._id === filterSprint  
 
-      return matchesSearch && matchesType && matchesStatus && matchesProject
+
+      return matchesSearch && matchesType && matchesStatus && matchesProject && matchesSprint
     })
-  }, [events, debouncedSearchTerm, filterType, filterStatus, filterProject])
+  }, [events, debouncedSearchTerm, filterType, filterStatus, filterProject, filterSprint])
 
   // Pagination derived data
   const totalCount = filteredEvents.length
@@ -594,7 +597,7 @@ export default function SprintEventsPage() {
                                 <div className="flex-1 min-w-0">
                                   <h3 className="text-lg font-semibold truncate">{event.title}</h3>
                                   <p className="text-sm text-muted-foreground truncate">
-                                    {event.sprint.name} • {event.project.name}
+                                    {event.sprint?.name || 'Unavailable Sprint'} • {event.project?.name || 'Unavailable Project'}
                                   </p>
                                 </div>
                               </div>
@@ -685,9 +688,9 @@ export default function SprintEventsPage() {
                             {getStatusBadge(event.status)}
                           </div>
                           <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-                            <span>{event.sprint.name}</span>
+                            <span>{event.sprint?.name || 'Unavailable Sprint'}</span>
                             <span>•</span>
-                            <span>{event.project.name}</span>
+                            <span>{event.project?.name || 'Unavailable Project'}</span>
                             <span>•</span>
                             <span>{formatDateTime(event.scheduledDate, event.startTime, event.endTime)}</span>
                             <span>•</span>

@@ -38,10 +38,13 @@ import {
   X,
   Layers
 } from 'lucide-react'
-import { Permission, PermissionGate } from '@/lib/permissions'
+import { Permission } from '@/lib/permissions'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { extractUserId } from '@/lib/auth/user-utils'
+import { useNotify } from '@/lib/notify'
 
 interface Story {
   _id: string
@@ -101,9 +104,6 @@ export default function StoriesPage() {
   const [stories, setStories] = useState<Story[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
-  const [showSuccessAlert, setShowSuccessAlert] = useState(false)
-  const [success, setSuccess] = useState('')
 
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -124,11 +124,30 @@ export default function StoriesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
+  const [currentUserId, setCurrentUserId] = useState<string>('')
+
+  const { hasPermission } = usePermissions()
+  const { success: notifySuccess, error: notifyError } = useNotify()
+
+  const fetchAndSetCurrentUser = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/me')
+      if (response.ok) {
+        const data = await response.json().catch(() => ({}))
+        const userId = extractUserId(data)
+        if (userId) setCurrentUserId(userId)
+      }
+      return response
+    } catch (error) {
+      console.error('Auth check failed:', error)
+      throw error
+    }
+  }, [])
 
   const checkAuth = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/me')
-      
+      const response = await fetchAndSetCurrentUser()
+
       if (response.ok) {
         setAuthError('')
         await fetchStories()
@@ -138,8 +157,16 @@ export default function StoriesPage() {
         })
         
         if (refreshResponse.ok) {
-          setAuthError('')
-          await fetchStories()
+          const meResponse = await fetchAndSetCurrentUser()
+          if (meResponse.ok) {
+            setAuthError('')
+            await fetchStories()
+          } else {
+            setAuthError('Session expired')
+            setTimeout(() => {
+              router.push('/login')
+            }, 2000)
+          }
         } else {
           setAuthError('Session expired')
           setTimeout(() => {
@@ -156,19 +183,27 @@ export default function StoriesPage() {
         router.push('/login')
       }, 2000)
     }
-  }, [router])
+  }, [router, fetchAndSetCurrentUser])
 
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
 
   useEffect(() => {
+    if (error) {
+      notifyError({ title: error })
+    }
+    // notifyError is stable enough; omit from deps to avoid re-run loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error])
+
+  useEffect(() => {
     const successParam = searchParams?.get('success')
     if (successParam === 'story-created') {
-      setSuccess('User story created successfully.')
-      const timeout = setTimeout(() => setSuccess(''), 3000)
-      return () => clearTimeout(timeout)
+      notifySuccess({ title: 'User story created successfully' })
     }
+    // notifySuccess is stable enough; omit from deps to avoid re-run loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
   // Fetch when pagination changes (after initial load)
@@ -182,17 +217,11 @@ export default function StoriesPage() {
   useEffect(() => {
     const updated = searchParams.get('updated')
     if (updated === 'true') {
-      setSuccessMessage('Story updated successfully')
-      setShowSuccessAlert(true)
-      // Clear the query parameter from URL
+      notifySuccess({ title: 'Story updated successfully' })
       router.replace('/stories', { scroll: false })
-      // Auto-hide after 5 seconds
-      const timer = setTimeout(() => {
-        setShowSuccessAlert(false)
-        setSuccessMessage('')
-      }, 5000)
-      return () => clearTimeout(timer)
     }
+    // notifySuccess is stable enough; omit from deps to avoid re-run loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, router])
 
   const fetchStories = async () => {
@@ -279,18 +308,14 @@ export default function StoriesPage() {
         setStories(stories.filter(p => p._id !== selectedStory._id))
         setShowDeleteConfirmModal(false)
         setSelectedStory(null)
-        setSuccessMessage('Story deleted successfully')
-        setShowSuccessAlert(true)
-        // Auto-hide after 5 seconds
-        setTimeout(() => {
-          setShowSuccessAlert(false)
-          setSuccessMessage('')
-        }, 5000)
+        notifySuccess({ title: 'Story deleted successfully' })
       } else {
         setError(data.error || 'Failed to delete story')
+        notifyError({ title: data.error || 'Failed to delete story' })
       }
     } catch (err) {
       setError('Failed to delete story')
+      notifyError({ title: 'Failed to delete story' })
     } finally {
       setDeleting(false)
     }
@@ -324,6 +349,17 @@ export default function StoriesPage() {
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
+
+  const isCreator = (story: Story) => {
+    const creatorId = (story as any)?.createdBy?._id || (story as any)?.createdBy?.id
+    return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
+  }
+
+  const canEditStory = (story: Story) =>
+    hasPermission(Permission.STORY_UPDATE, story.project?._id) || isCreator(story)
+
+  const canDeleteStory = (story: Story) =>
+    hasPermission(Permission.STORY_DELETE, story.project?._id) || isCreator(story)
 
   const filteredStories = stories.filter(story => {
     const matchesSearch = !searchQuery || 
@@ -374,12 +410,12 @@ export default function StoriesPage() {
           item._id === story._id ? { ...item, status: nextStatus } : item
         )
       )
-      setSuccess('Story status updated successfully.')
-      setTimeout(() => setSuccess(''), 3000)
+      notifySuccess({ title: 'Story status updated successfully' })
     } catch (err) {
       console.error('Failed to update story status:', err)
-      setError(err instanceof Error ? err.message : 'Failed to update story status')
-      setTimeout(() => setError(''), 4000)
+      const message = err instanceof Error ? err.message : 'Failed to update story status'
+      setError(message)
+      notifyError({ title: message })
     }
   }
 
@@ -441,12 +477,6 @@ export default function StoriesPage() {
                   </CardDescription>
                 </div>
               </div>
-              {success && (
-                <Alert variant="success">
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>{success}</AlertDescription>
-                </Alert>
-              )}
               <div className="flex flex-col gap-2 sm:gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -535,30 +565,6 @@ export default function StoriesPage() {
                 <TabsTrigger value="kanban">Kanban View</TabsTrigger>
               </TabsList>
               
-              {showSuccessAlert && successMessage && (
-                <Alert className="mt-4 border-green-500 bg-green-50 dark:bg-green-900/20">
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
-                      <AlertDescription className="text-green-800 dark:text-green-200 flex-1">
-                        {successMessage}
-                      </AlertDescription>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40 ml-auto flex-shrink-0"
-                      onClick={() => {
-                        setShowSuccessAlert(false)
-                        setSuccessMessage('')
-                      }}
-                    >
-                      <X className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    </Button>
-                  </div>
-                </Alert>
-              )}
-
               <TabsContent value="list" className="space-y-4">
                 <div className="space-y-4">
                   {filteredStories.map((story) => (
@@ -681,25 +687,40 @@ export default function StoriesPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="min-w-[172px] py-2 rounded-md shadow-lg border border-border bg-background z-[10000]">
-                               
-                                  <DropdownMenuItem onClick={e => { e.stopPropagation(); router.push(`/stories/${story._id}`); }} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    <span>View Story</span>
-                                  </DropdownMenuItem>
-                              
-                                <PermissionGate permission={Permission.STORY_UPDATE} projectId={story.project?._id}>
-                                  <DropdownMenuItem onClick={e => { e.stopPropagation(); router.push(`/stories/${story._id}/edit`); }} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    <span>Edit Story</span>
-                                  </DropdownMenuItem>
-                                </PermissionGate>
-                                <PermissionGate permission={Permission.STORY_DELETE} projectId={story.project?._id}>
-                                  <DropdownMenuSeparator className="my-1" />
-                                  <DropdownMenuItem onClick={e => { e.stopPropagation(); handleDeleteClick(story); }} className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer">
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    <span>Delete Story</span>
-                                  </DropdownMenuItem>
-                                </PermissionGate>
+                                <DropdownMenuItem
+                                  onClick={e => { e.stopPropagation(); router.push(`/stories/${story._id}`); }}
+                                  className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  <span>View Story</span>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem
+                                  disabled={!canEditStory(story)}
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    if (!canEditStory(story)) return
+                                    router.push(`/stories/${story._id}/edit`)
+                                  }}
+                                  className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                >
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  <span>Edit Story</span>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuSeparator className="my-1" />
+                                <DropdownMenuItem
+                                  disabled={!canDeleteStory(story)}
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    if (!canDeleteStory(story)) return
+                                    handleDeleteClick(story)
+                                  }}
+                                  className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  <span>Delete Story</span>
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                             </div>

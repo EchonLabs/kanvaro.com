@@ -135,8 +135,12 @@ export async function PUT(request: NextRequest) {
     const { memberId, updates } = await request.json()
 
     // Check if user has permission to update members
-    const canEditMembers = await PermissionService.hasPermission(userId, Permission.USER_UPDATE)
-    if (!canEditMembers) {
+    const [canEditMembers, hasTeamEditPermission] = await Promise.all([
+      PermissionService.hasPermission(userId.toString(), Permission.USER_UPDATE),
+      PermissionService.hasPermission(userId.toString(), Permission.TEAM_EDIT)
+    ])
+
+    if (!canEditMembers || !hasTeamEditPermission) {
       return NextResponse.json(
         { error: 'Insufficient permissions' },
         { status: 403 }
@@ -218,8 +222,9 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Check if user has permission to remove members
-    if (user.role !== 'admin') {
+    // Check if user has permission to delete/remove members
+    const hasDeletePermission = await PermissionService.hasPermission(userId.toString(), Permission.TEAM_DELETE)
+    if (!hasDeletePermission) {
       return NextResponse.json(
         { error: 'Insufficient permissions' },
         { status: 403 }

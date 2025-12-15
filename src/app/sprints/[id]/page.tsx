@@ -15,6 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { useProjectKanbanStatuses } from '@/hooks/useProjectKanbanStatuses'
 import { DEFAULT_TASK_STATUS_OPTIONS, DEFAULT_TASK_STATUS_BADGE_MAP, type TaskStatusOption } from '@/constants/taskStatuses'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { useNotify } from '@/lib/notify'
 import {
   ArrowLeft,
   Calendar,
@@ -181,6 +184,7 @@ export default function SprintDetailPage() {
   const router = useRouter()
   const params = useParams()
   const sprintId = params.id as string
+  const { success: notifySuccess, error: notifyError } = useNotify()
 
   const [sprint, setSprint] = useState<Sprint | null>(null)
   const [loading, setLoading] = useState(true)
@@ -222,13 +226,25 @@ export default function SprintDetailPage() {
   const [taskStatusError, setTaskStatusError] = useState('')
   const { getStatusesForProject } = useProjectKanbanStatuses()
 
+  const { hasPermission } = usePermissions()
+
+  const sprintTasks = sprint?.tasks || []
+
+  const canCreateSprint = hasPermission(Permission.SPRINT_CREATE)
+  const canViewSprint = hasPermission(Permission.SPRINT_VIEW) || hasPermission(Permission.SPRINT_READ)
+  const canEditSprint = hasPermission(Permission.SPRINT_EDIT) && canCreateSprint
+  const canDeleteSprint = hasPermission(Permission.SPRINT_DELETE)
+  const canStartSprint = hasPermission(Permission.SPRINT_START)
+  const canCompleteSprint = hasPermission(Permission.SPRINT_COMPLETE)
+
+  const totalTasks = sprint?.progress?.totalTasks ?? sprintTasks.length
+  const hasTasks = (totalTasks ?? 0) > 0
+
   useEffect(() => {
     if (!successMessage) return
     const timeout = setTimeout(() => setSuccessMessage(''), 3000)
     return () => clearTimeout(timeout)
   }, [successMessage])
-
-  const sprintTasks = sprint?.tasks || []
 
   const projectStatusOptions = useMemo<TaskStatusOption[]>(() => {
     if (!sprint?.project?._id) {
@@ -506,18 +522,27 @@ export default function SprintDetailPage() {
   }, [completeModalOpen])
 
   const handleDelete = async () => {
+    if (!canDeleteSprint) {
+      setActionError('You do not have permission to delete this sprint.')
+      notifyError({ title: 'You do not have permission to delete this sprint.' })
+      setShowDeleteConfirm(false)
+      return
+    }
     try {
       setDeleting(true)
       setActionError('')
       const res = await fetch(`/api/sprints/${sprintId}`, { method: 'DELETE' })
       const data = await res.json()
       if (res.ok && data.success) {
+        notifySuccess({ title: 'Sprint deleted successfully' })
         router.push('/sprints')
       } else {
         setActionError(data?.error || 'Failed to delete sprint')
+        notifyError({ title: data?.error || 'Failed to delete sprint' })
       }
     } catch (e) {
       setActionError('Failed to delete sprint')
+      notifyError({ title: 'Failed to delete sprint' })
     } finally {
       setDeleting(false)
       setShowDeleteConfirm(false)
@@ -525,6 +550,16 @@ export default function SprintDetailPage() {
   }
 
   const handleStartSprint = async () => {
+    if (!canStartSprint) {
+      setActionError('You do not have permission to start this sprint.')
+      notifyError({ title: 'You do not have permission to start this sprint.' })
+      return
+    }
+    if (!hasTasks) {
+      setActionError('Add tasks to this sprint before starting it.')
+      notifyError({ title: 'Add tasks to this sprint before starting it.' })
+      return
+    }
     try {
       setStartingSprint(true)
       setActionError('')
@@ -534,9 +569,11 @@ export default function SprintDetailPage() {
         throw new Error(data.error || 'Failed to start sprint')
       }
       setSuccessMessage('Sprint started successfully.')
+      notifySuccess({ title: 'Sprint started successfully' })
       await fetchSprint({ silent: true })
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to start sprint')
+      notifyError({ title: err instanceof Error ? err.message : 'Failed to start sprint' })
     } finally {
       setStartingSprint(false)
     }
@@ -560,6 +597,7 @@ export default function SprintDetailPage() {
     }
 
     setSuccessMessage('Sprint completed successfully.')
+    notifySuccess({ title: 'Sprint completed successfully' })
     setCompleteModalOpen(false)
     setIncompleteTasks([])
     setSelectedTaskIds(new Set())
@@ -571,6 +609,16 @@ export default function SprintDetailPage() {
 
   const handleCompleteSprintClick = async () => {
     if (!sprint) return
+    if (!canCompleteSprint) {
+      setActionError('You do not have permission to complete this sprint.')
+      notifyError({ title: 'You do not have permission to complete this sprint.' })
+      return
+    }
+    if (!hasTasks) {
+      setActionError('Add tasks to this sprint before completing it.')
+      notifyError({ title: 'Add tasks to this sprint before completing it.' })
+      return
+    }
 
     const incomplete = await checkSprintForIncompleteTasks(sprintId)
 
@@ -642,6 +690,7 @@ export default function SprintDetailPage() {
       await finalizeCompleteSprint()
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to complete sprint')
+      notifyError({ title: err instanceof Error ? err.message : 'Failed to complete sprint' })
     } finally {
       setCompletingSprint(false)
     }
@@ -654,6 +703,7 @@ export default function SprintDetailPage() {
         await finalizeCompleteSprint()
       } catch (err) {
         setCompleteError(err instanceof Error ? err.message : 'Failed to complete sprint')
+        notifyError({ title: err instanceof Error ? err.message : 'Failed to complete sprint' })
       } finally {
         setCompletingSprint(false)
       }
@@ -667,6 +717,7 @@ export default function SprintDetailPage() {
         await finalizeCompleteSprint() // No targetSprintId means move all to backlog
       } catch (err) {
         setCompleteError(err instanceof Error ? err.message : 'Failed to complete sprint')
+        notifyError({ title: err instanceof Error ? err.message : 'Failed to complete sprint' })
       } finally {
         setCompletingSprint(false)
       }
@@ -766,6 +817,7 @@ export default function SprintDetailPage() {
     try {
       if (!projectStatusOptions.some(option => option.value === newStatus)) {
         setTaskStatusError('Selected status is not available for this project.')
+        notifyError({ title: 'Selected status is not available for this project.' })
         return
       }
       setTaskStatusUpdating(taskId)
@@ -793,8 +845,10 @@ export default function SprintDetailPage() {
           progress: updatedProgress
         }
       })
+      notifySuccess({ title: 'Task status updated' })
     } catch (err) {
       setTaskStatusError(err instanceof Error ? err.message : 'Failed to update task status')
+      notifyError({ title: err instanceof Error ? err.message : 'Failed to update task status' })
     } finally {
       setTaskStatusUpdating(null)
     }
@@ -888,18 +942,46 @@ export default function SprintDetailPage() {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-shrink-0">
-            <Button variant="outline" onClick={() => router.push(`/sprints/${sprintId}/edit`)} className="w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (!canEditSprint) return
+                router.push(`/sprints/${sprintId}/edit`)
+              }}
+              disabled={!canEditSprint}
+              title={!canEditSprint ? 'You need sprint:edit and sprint:create permissions to edit.' : undefined}
+              className="w-full sm:w-auto"
+            >
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
-            <Button variant="destructive" onClick={() => setShowDeleteConfirm(true)} disabled={deleting} className="w-full sm:w-auto">
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!canDeleteSprint) {
+                  setActionError('You do not have permission to delete this sprint.')
+                  return
+                }
+                setShowDeleteConfirm(true)
+              }}
+              disabled={deleting || !canDeleteSprint}
+              title={!canDeleteSprint ? 'You need sprint:delete permission to delete.' : undefined}
+              className="w-full sm:w-auto"
+            >
               <Trash2 className="h-4 w-4 mr-2" />
               {deleting ? 'Deleting...' : 'Delete'}
             </Button>
             {sprint.status === 'planning' && (
               <Button
                 onClick={handleStartSprint}
-                disabled={startingSprint}
+                disabled={startingSprint || !hasTasks || !canStartSprint}
+                title={
+                  !hasTasks
+                    ? 'Add tasks to this sprint before starting it.'
+                    : !canStartSprint
+                      ? 'You need sprint:start permission to start this sprint.'
+                      : undefined
+                }
                 className="w-full sm:w-auto"
               >
                 {startingSprint ? (
@@ -913,7 +995,14 @@ export default function SprintDetailPage() {
             {sprint.status === 'active' && (
               <Button
                 onClick={handleCompleteSprintClick}
-                disabled={completingSprint}
+                disabled={completingSprint || !hasTasks || !canCompleteSprint}
+                title={
+                  !hasTasks
+                    ? 'Add tasks to this sprint before completing it.'
+                    : !canCompleteSprint
+                      ? 'You need sprint:complete permission to complete this sprint.'
+                      : undefined
+                }
                 className="w-full sm:w-auto"
               >
                 {completingSprint ? (
@@ -926,20 +1015,6 @@ export default function SprintDetailPage() {
             )}
           </div>
         </div>
-
-        {actionError && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{actionError}</AlertDescription>
-          </Alert>
-        )}
-
-        {successMessage && (
-          <Alert variant="success">
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>{successMessage}</AlertDescription>
-          </Alert>
-        )}
 
         <div className="grid gap-8 grid-cols-1 md:grid-cols-3">
           <div className="md:col-span-2 space-y-8">
@@ -990,9 +1065,10 @@ export default function SprintDetailPage() {
                     />
                   </div>
                 </div>
+                <br />
 
                 {!sprint?.progress?.totalTasks && (
-                  <Alert variant="default" className="border-dashed border-muted-foreground/40 bg-muted/40">
+                  <Alert variant="default" className="mb-4 border-dashed border-muted-foreground/40 bg-muted/40">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription className="text-xs sm:text-sm">
                       Assign tasks to this sprint to start tracking progress, story points, and burn-down metrics.

@@ -109,11 +109,48 @@ export async function PUT(
 
     const updateData = await request.json()
 
-    // Find and update story
-    const story = await Story.findOneAndUpdate(
-      {
-        _id: storyId,
-      },
+    const existingStory = await Story.findById(storyId)
+      .populate('project', 'name')
+      .populate({
+        path: 'epic',
+        select: 'title description status priority dueDate tags project createdBy',
+        populate: [
+          { path: 'project', select: 'name' },
+          { path: 'createdBy', select: 'firstName lastName email' }
+        ]
+      })
+      .populate('assignedTo', 'firstName lastName email')
+      .populate('createdBy', 'firstName lastName email')
+      .populate({
+        path: 'sprint',
+        select: 'name description status startDate endDate goal project',
+        populate: [
+          { path: 'project', select: 'name' }
+        ]
+      })
+
+    if (!existingStory) {
+      return NextResponse.json(
+        { error: 'Story not found or unauthorized' },
+        { status: 404 }
+      )
+    }
+
+    const isCreator = existingStory.createdBy?._id?.toString?.() === userId.toString()
+    const canEditStory = isCreator || await PermissionService.hasPermission(
+      userId.toString(),
+      Permission.STORY_UPDATE
+    )
+
+    if (!canEditStory) {
+      return NextResponse.json(
+        { error: 'You do not have permission to edit this story' },
+        { status: 403 }
+      )
+    }
+
+    const story = await Story.findByIdAndUpdate(
+      storyId,
       updateData,
       { new: true }
     )
@@ -135,13 +172,6 @@ export async function PUT(
           { path: 'project', select: 'name' }
         ]
       })
-
-    if (!story) {
-      return NextResponse.json(
-        { error: 'Story not found or unauthorized' },
-        { status: 404 }
-      )
-    }
 
     // If this story belongs to an epic, check if epic should be completed
     // Use the completion service to ensure consistent logic
@@ -187,11 +217,7 @@ export async function DELETE(
     const organizationId = user.organization
     const storyId = params.id
 
-    // Find and delete story (only creator can delete)
-    const story = await Story.findOneAndDelete({
-      _id: storyId,
-      createdBy: userId
-    })
+    const story = await Story.findById(storyId)
 
     if (!story) {
       return NextResponse.json(
@@ -199,6 +225,21 @@ export async function DELETE(
         { status: 404 }
       )
     }
+
+    const isCreator = story.createdBy?.toString?.() === userId.toString()
+    const canDeleteStory = isCreator || await PermissionService.hasPermission(
+      userId,
+      Permission.STORY_DELETE
+    )
+
+    if (!canDeleteStory) {
+      return NextResponse.json(
+        { error: 'You do not have permission to delete this story' },
+        { status: 403 }
+      )
+    }
+
+    await Story.findByIdAndDelete(storyId)
 
     return NextResponse.json({
       success: true,

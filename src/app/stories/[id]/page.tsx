@@ -32,6 +32,10 @@ import {
   Rocket,
   ListTodo
 } from 'lucide-react'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions'
+import { extractUserId } from '@/lib/auth/user-utils'
+import { useNotify } from '@/lib/notify'
 
 interface Story {
   _id: string
@@ -108,11 +112,25 @@ export default function StoryDetailPage() {
   const [deleteError, setDeleteError] = useState('');
   const [tasks, setTasks] = useState<any[]>([])
   const [tasksLoading, setTasksLoading] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string>('')
+
+  const { hasPermission } = usePermissions()
+  const { success: notifySuccess, error: notifyError } = useNotify()
+
+  const fetchAndSetCurrentUser = useCallback(async () => {
+    const response = await fetch('/api/auth/me')
+    if (response.ok) {
+      const data = await response.json().catch(() => ({}))
+      const userId = extractUserId(data)
+      if (userId) setCurrentUserId(userId)
+    }
+    return response
+  }, [])
 
   const checkAuth = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/me')
-      
+      const response = await fetchAndSetCurrentUser()
+
       if (response.ok) {
         setAuthError('')
         await fetchStory()
@@ -122,8 +140,16 @@ export default function StoryDetailPage() {
         })
         
         if (refreshResponse.ok) {
-          setAuthError('')
-          await fetchStory()
+          const meResponse = await fetchAndSetCurrentUser()
+          if (meResponse.ok) {
+            setAuthError('')
+            await fetchStory()
+          } else {
+            setAuthError('Session expired')
+            setTimeout(() => {
+              router.push('/login')
+            }, 2000)
+          }
         } else {
           setAuthError('Session expired')
           setTimeout(() => {
@@ -140,7 +166,7 @@ export default function StoryDetailPage() {
         router.push('/login')
       }, 2000)
     }
-  }, [router, storyId])
+  }, [router, storyId, fetchAndSetCurrentUser])
 
   useEffect(() => {
     // Set breadcrumb immediately on mount
@@ -153,6 +179,17 @@ export default function StoryDetailPage() {
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
+
+  useEffect(() => {
+    if (error) {
+      notifyError({ title: error })
+    }
+    if (deleteError) {
+      notifyError({ title: deleteError })
+    }
+    // notifyError is stable enough; omit from deps to avoid re-run loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error, deleteError])
 
   const fetchStory = async () => {
     try {
@@ -203,15 +240,18 @@ export default function StoryDetailPage() {
         method: 'DELETE',
       });
       if (response.ok) {
+        notifySuccess({ title: 'Story deleted successfully' })
         router.push('/stories');
       } else {
         const data = await response.json();
         setDeleteError(data.error || 'Failed to delete story');
         setShowDeleteConfirmModal(false);
+        notifyError({ title: data.error || 'Failed to delete story' })
       }
     } catch (e) {
       setDeleteError('Failed to delete story');
       setShowDeleteConfirmModal(false);
+      notifyError({ title: 'Failed to delete story' })
     } finally {
       setDeleting(false);
     }
@@ -259,6 +299,17 @@ export default function StoryDetailPage() {
     }
   }
 
+  const isCreator = (story: Story) => {
+    const creatorId = (story as any)?.createdBy?._id || (story as any)?.createdBy?.id
+    return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
+  }
+
+  const canEditStory = (story: Story) =>
+    hasPermission(Permission.STORY_UPDATE, story.project?._id) || isCreator(story)
+
+  const canDeleteStory = (story: Story) =>
+    hasPermission(Permission.STORY_DELETE, story.project?._id) || isCreator(story)
+
   if (loading) {
     return (
       <MainLayout>
@@ -301,6 +352,9 @@ export default function StoryDetailPage() {
     )
   }
 
+  const editAllowed = story ? canEditStory(story) : false
+  const deleteAllowed = story ? canDeleteStory(story) : false
+
   return (
     <MainLayout>
       <div className="space-y-8 sm:space-y-10 lg:space-y-12 overflow-x-hidden">
@@ -322,11 +376,27 @@ export default function StoryDetailPage() {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-shrink-0">
-            <Button variant="outline" onClick={() => router.push(`/stories/${storyId}/edit`)} className="w-full sm:w-auto">
+            <Button
+              variant="outline"
+              disabled={!editAllowed}
+              onClick={() => {
+                if (!editAllowed) return
+                router.push(`/stories/${storyId}/edit`)
+              }}
+              className="w-full sm:w-auto"
+            >
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
-            <Button variant="destructive" onClick={() => setShowDeleteConfirmModal(true)} className="w-full sm:w-auto">
+            <Button
+              variant="destructive"
+              disabled={!deleteAllowed}
+              onClick={() => {
+                if (!deleteAllowed) return
+                setShowDeleteConfirmModal(true)
+              }}
+              className="w-full sm:w-auto"
+            >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
             </Button>

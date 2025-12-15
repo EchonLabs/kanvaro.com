@@ -32,12 +32,14 @@ import { EditMemberModal } from '@/components/members/EditMemberModal'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { useNotify } from '@/lib/notify'
 
 interface Member {
   _id: string
   firstName: string
   lastName: string
   email: string
+  avatar?: string
   role: string
   customRole?: {
     _id: string
@@ -97,15 +99,20 @@ export default function MembersPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [invitationViewMode, setInvitationViewMode] = useState<'grid' | 'list'>('grid')
   const { hasPermission, loading: permissionsLoading } = usePermissions()
+  const { success: notifySuccess, error: notifyError } = useNotify()
 
   const canViewMembers = hasPermission(Permission.TEAM_READ) || hasPermission(Permission.USER_READ)
   const canInviteMembers = hasPermission(Permission.TEAM_INVITE) || hasPermission(Permission.USER_INVITE)
-  const canEditMembers = hasPermission(Permission.USER_UPDATE)
-  const canEditAdminMembers = hasPermission(Permission.USER_MANAGE_ROLES)
+  const canEditMembers = hasPermission(Permission.TEAM_EDIT) && hasPermission(Permission.USER_UPDATE)
+  const canEditAdminMembers = hasPermission(Permission.TEAM_EDIT) && hasPermission(Permission.USER_MANAGE_ROLES)
+  const canDeleteMembers = hasPermission(Permission.TEAM_DELETE)
   const [organizationRoles, setOrganizationRoles] = useState<Array<{ id: string; name: string; isSystem?: boolean }>>([])
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [memberToRemove, setMemberToRemove] = useState<Member | null>(null)
   const [removingMember, setRemovingMember] = useState(false)
+  const [showCancelInvitationConfirm, setShowCancelInvitationConfirm] = useState(false)
+  const [invitationToCancel, setInvitationToCancel] = useState<PendingInvitation | null>(null)
+  const [cancelingInvitation, setCancelingInvitation] = useState(false)
 
   // Load available organization roles (both system and custom) from the central roles API
   useEffect(() => {
@@ -177,10 +184,10 @@ export default function MembersPage() {
         setMembers(data.data.members)
         setPendingInvitations(data.data.pendingInvitations)
       } else {
-        setError(data.error || 'Failed to fetch members')
+        notifyError({ title: data.error || 'Failed to fetch members' })
       }
     } catch (err) {
-      setError('Failed to fetch members')
+      notifyError({ title: 'Failed to fetch members' })
     } finally {
       setLoading(false)
     }
@@ -189,8 +196,7 @@ export default function MembersPage() {
   const handleInviteMember = async (inviteData: any): Promise<{ error?: string } | void> => {
     if (!canInviteMembers) {
       const errorMsg = 'You do not have permission to invite members.'
-      setError(errorMsg)
-      setSuccess('')
+      notifyError({ title: errorMsg })
       return { error: errorMsg }
     }
 
@@ -207,12 +213,9 @@ export default function MembersPage() {
 
       if (data.success) {
         setShowInviteModal(false)
-        setSuccess('Invitation sent successfully!')
-        setError('')
+        notifySuccess({ title: 'Invitation sent successfully' })
         // Switch to Pending Invitations tab
         setActiveTab('invitations')
-        // Clear success message after 3 seconds
-        setTimeout(() => setSuccess(''), 3000)
         // Refresh authentication state and then fetch members
         await checkAuth()
         await fetchMembers()
@@ -220,13 +223,12 @@ export default function MembersPage() {
         return
       } else {
         const errorMsg = data.error || 'Failed to send invitation'
-        setError(errorMsg)
-        setSuccess('')
+        notifyError({ title: errorMsg })
         return { error: errorMsg }
       }
     } catch (err) {
       const errorMsg = 'Failed to send invitation'
-      setError(errorMsg)
+      notifyError({ title: errorMsg })
       return { error: errorMsg }
     }
   }
@@ -234,13 +236,13 @@ export default function MembersPage() {
   const handleUpdateMember = async (memberId: string, updates: any) => {
     const member = members.find((m) => m._id === memberId)
     if (!member) {
-      setError('Member not found')
+      notifyError({ title: 'Member not found' })
       return
     }
 
     const requiresAdminAccess = member.role === 'admin'
     if (!canEditMembers || (requiresAdminAccess && !canEditAdminMembers)) {
-      setError('You do not have permission to edit this member.')
+      notifyError({ title: 'You do not have permission to edit this member.' })
       return
     }
 
@@ -260,39 +262,60 @@ export default function MembersPage() {
 
       if (data.success) {
         setEditingMember(null)
+        notifySuccess({ title: 'Team member updated successfully' })
         fetchMembers()
       } else {
-        setError(data.error || 'Failed to update member')
+        notifyError({ title: data.error || 'Failed to update member' })
       }
     } catch (err) {
-      setError('Failed to update member')
+      notifyError({ title: 'Failed to update member' })
     }
   }
 
-  const handleCancelInvitation = async (invitationId: string) => {
+  const handleCancelInvitationClick = (invitation: PendingInvitation) => {
+    setInvitationToCancel(invitation)
+    setShowCancelInvitationConfirm(true)
+  }
+
+  const handleCancelInvitationConfirm = async () => {
+    if (!invitationToCancel) return
+
     try {
-      const response = await fetch(`/api/members/cancel-invitation?invitationId=${invitationId}`, {
+      setCancelingInvitation(true)
+      const response = await fetch(`/api/members/cancel-invitation?invitationId=${invitationToCancel._id}`, {
         method: 'DELETE'
       })
 
       const data = await response.json()
 
       if (data.success) {
-        setSuccess('Invitation cancelled successfully!')
-        setError('')
-        setTimeout(() => setSuccess(''), 3000)
-        fetchMembers()
+        notifySuccess({ title: 'Invitation cancelled successfully' })
+        await fetchMembers()
       } else {
-        setError(data.error || 'Failed to cancel invitation')
+        notifyError({ title: data.error || 'Failed to cancel invitation' })
       }
     } catch (err) {
-      setError('Failed to cancel invitation')
+      notifyError({ title: 'Failed to cancel invitation' })
+    } finally {
+      setCancelingInvitation(false)
+      setShowCancelInvitationConfirm(false)
+      setInvitationToCancel(null)
     }
+  }
+
+  const handleCancelInvitationCancel = () => {
+    if (cancelingInvitation) return
+    setShowCancelInvitationConfirm(false)
+    setInvitationToCancel(null)
   }
 
   const handleRemoveMemberClick = (member: Member) => {
     // Extra guard: do not allow removing admins or HR from here
     if (member.role === 'admin' || member.role === 'human_resource') return
+    if (!canDeleteMembers) {
+      notifyError({ title: 'You do not have permission to delete team members.' })
+      return
+    }
     setMemberToRemove(member)
     setShowRemoveConfirm(true)
   }
@@ -309,15 +332,13 @@ export default function MembersPage() {
       const data = await response.json()
 
       if (data.success) {
-        setSuccess('Member removed successfully')
-        setError('')
+        notifySuccess({ title: 'Member removed successfully' })
         await fetchMembers()
-        setTimeout(() => setSuccess(''), 3000)
       } else {
-        setError(data.error || 'Failed to remove member')
+        notifyError({ title: data.error || 'Failed to remove member' })
       }
     } catch (err) {
-      setError('Failed to remove member')
+      notifyError({ title: 'Failed to remove member' })
     } finally {
       setRemovingMember(false)
       setShowRemoveConfirm(false)
@@ -344,15 +365,13 @@ export default function MembersPage() {
 
     // Prevent assigning admin role without proper permission
     if (newRole === 'admin' && !canEditAdminMembers) {
-      setError('You do not have permission to assign admin role.')
-      setSuccess('')
+      notifyError({ title: 'You do not have permission to assign admin role.' })
       return
     }
 
     await handleUpdateMember(member._id, { role: newRole })
     // Optional inline success message
-    setSuccess('Member role updated successfully.')
-    setTimeout(() => setSuccess(''), 3000)
+    notifySuccess({ title: 'Member role updated successfully.' })
   }
 
   // Generate a consistent color for custom roles based on their ID
@@ -449,8 +468,7 @@ export default function MembersPage() {
 
   const handleOpenInviteModal = () => {
     if (!canInviteMembers) {
-      setError('You do not have permission to invite members.')
-      setSuccess('')
+      notifyError({ title: 'You do not have permission to invite members.' })
       return
     }
     setShowInviteModal(true)
@@ -580,11 +598,12 @@ export default function MembersPage() {
                       <CardContent className="p-4 sm:p-5">
                         <div className="flex flex-col items-center text-center space-y-3">
                           <div className="relative">
-                            <GravatarAvatar 
+                            <GravatarAvatar
                               user={{
                                 firstName: member.firstName,
                                 lastName: member.lastName,
-                                email: member.email
+                                email: member.email,
+                                avatar: member.avatar
                               }}
                               className="h-16 w-16 sm:h-20 sm:w-20"
                             />
@@ -633,7 +652,7 @@ export default function MembersPage() {
                               variant="outline"
                               size="sm"
                               onClick={() => handleRemoveMemberClick(member)}
-                              disabled={member.role === 'admin' || member.role === 'human_resource' || !member.isActive}
+                              disabled={!canDeleteMembers || member.role === 'admin' || member.role === 'human_resource' || !member.isActive}
                               className="flex-1 text-xs sm:text-sm min-h-[36px]"
                             >
                               Remove
@@ -698,7 +717,7 @@ export default function MembersPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleRemoveMemberClick(member)}
-                          disabled={member.role === 'admin' || member.role === 'human_resource' || !member.isActive}
+                          disabled={!canDeleteMembers || member.role === 'admin' || member.role === 'human_resource' || !member.isActive}
                           className="flex-1 sm:flex-initial text-xs sm:text-sm min-h-[44px] touch-target"
                         >
                           Remove
@@ -776,7 +795,7 @@ export default function MembersPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleCancelInvitation(invitation._id)}
+                              onClick={() => handleCancelInvitationClick(invitation)}
                               className="text-destructive hover:text-destructive flex-1 text-xs sm:text-sm min-h-[36px]"
                             >
                               <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
@@ -819,7 +838,7 @@ export default function MembersPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleCancelInvitation(invitation._id)}
+                          onClick={() => handleCancelInvitationClick(invitation)}
                           className="text-destructive hover:text-destructive flex-1 sm:flex-initial text-xs sm:text-sm min-h-[44px] touch-target"
                         >
                           <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
@@ -868,6 +887,22 @@ export default function MembersPage() {
         cancelText="Cancel"
         variant="destructive"
         isLoading={removingMember}
+      />
+
+      <ConfirmationModal
+        isOpen={showCancelInvitationConfirm}
+        onClose={handleCancelInvitationCancel}
+        onConfirm={handleCancelInvitationConfirm}
+        title="Cancel invitation"
+        description={
+          invitationToCancel
+            ? `Are you sure you want to cancel the invitation for ${invitationToCancel.email}? This action cannot be undone.`
+            : 'Are you sure you want to cancel this invitation?'
+        }
+        confirmText="Cancel Invitation"
+        cancelText="Keep Invitation"
+        variant="destructive"
+        isLoading={cancelingInvitation}
       />
       </div>
     </MainLayout>

@@ -90,10 +90,14 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
     category: PermissionCategory.SPRINT,
     permissions: [
       { permission: Permission.SPRINT_CREATE, label: 'Create Sprints', description: 'Create new sprints' },
-      { permission: Permission.SPRINT_READ, label: 'View Sprints', description: 'View sprint information' },
-      { permission: Permission.SPRINT_UPDATE, label: 'Edit Sprints', description: 'Edit sprint details' },
+      { permission: Permission.SPRINT_VIEW, label: 'View Sprints', description: 'Open sprint list and details' },
+      { permission: Permission.SPRINT_READ, label: 'Read Sprints', description: 'Read sprint data via API/exports' },
+      { permission: Permission.SPRINT_UPDATE, label: 'Update Sprints', description: 'Update sprint records' },
+      { permission: Permission.SPRINT_EDIT, label: 'Edit Sprints', description: 'Edit sprint details in the UI' },
       { permission: Permission.SPRINT_DELETE, label: 'Delete Sprints', description: 'Delete sprints' },
       { permission: Permission.SPRINT_MANAGE, label: 'Manage Sprints', description: 'Manage sprint settings' },
+      { permission: Permission.SPRINT_START, label: 'Start Sprints', description: 'Start sprint execution' },
+      { permission: Permission.SPRINT_COMPLETE, label: 'Complete Sprints', description: 'Complete/close sprints' },
       { permission: Permission.SPRINT_VIEW_ALL, label: 'View All Sprints', description: 'View all sprints created or assigned to anyone' }
     ]
   },
@@ -101,9 +105,12 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
     category: PermissionCategory.EPIC,
     permissions: [
       { permission: Permission.EPIC_CREATE, label: 'Create Epics', description: 'Create new epics' },
-      { permission: Permission.EPIC_READ, label: 'View Epics', description: 'View epic information' },
-      { permission: Permission.EPIC_UPDATE, label: 'Edit Epics', description: 'Edit epic details' },
-      { permission: Permission.EPIC_DELETE, label: 'Delete Epics', description: 'Delete epics' },
+      { permission: Permission.EPIC_VIEW, label: 'View Epics', description: 'Open epic list and details' },
+      { permission: Permission.EPIC_READ, label: 'Read Epics', description: 'Read epic data via API/exports' },
+      { permission: Permission.EPIC_UPDATE, label: 'Update Epics', description: 'Update epic records' },
+      { permission: Permission.EPIC_EDIT, label: 'Edit Epics', description: 'Edit epic details in the UI' },
+      { permission: Permission.EPIC_DELETE, label: 'Delete Epics', description: 'Delete epics (legacy)' },
+      { permission: Permission.EPIC_REMOVE, label: 'Remove Epics', description: 'Remove epics from the system' },
       { permission: Permission.EPIC_VIEW_ALL, label: 'View All Epics', description: 'View all epics created or assigned to anyone' }
     ]
   },
@@ -122,6 +129,8 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
     permissions: [
       { permission: Permission.TEAM_READ, label: 'View Team', description: 'View team information' },
       { permission: Permission.TEAM_INVITE, label: 'Invite Members', description: 'Invite team members' },
+      { permission: Permission.TEAM_EDIT, label: 'Edit Members', description: 'Edit member details and roles' },
+      { permission: Permission.TEAM_DELETE, label: 'Delete Members', description: 'Delete team members' },
       { permission: Permission.TEAM_REMOVE, label: 'Remove Members', description: 'Remove team members' },
       { permission: Permission.TEAM_MANAGE_PERMISSIONS, label: 'Manage Permissions', description: 'Manage team permissions' },
       { permission: Permission.TEAM_VIEW_ACTIVITY, label: 'View Activity', description: 'View team activity' }
