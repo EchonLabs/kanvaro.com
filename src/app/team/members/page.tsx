@@ -38,6 +38,7 @@ interface Member {
   firstName: string
   lastName: string
   email: string
+  avatar?: string
   role: string
   customRole?: {
     _id: string
@@ -586,11 +587,12 @@ export default function MembersPage() {
                       <CardContent className="p-4 sm:p-5">
                         <div className="flex flex-col items-center text-center space-y-3">
                           <div className="relative">
-                            <GravatarAvatar 
+                            <GravatarAvatar
                               user={{
                                 firstName: member.firstName,
                                 lastName: member.lastName,
-                                email: member.email
+                                email: member.email,
+                                avatar: member.avatar
                               }}
                               className="h-16 w-16 sm:h-20 sm:w-20"
                             />
