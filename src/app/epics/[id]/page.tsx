@@ -11,6 +11,7 @@ import { Progress } from '@/components/ui/Progress'
 import { formatToTitleCase } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { useNotify } from '@/lib/notify'
 import { 
   ArrowLeft,
   Calendar,
@@ -75,6 +76,7 @@ export default function EpicDetailPage() {
   const params = useParams()
   const epicId = params.id as string
   const { setItems } = useBreadcrumb()
+  const { notifySuccess } = useNotify()
   
   const [epic, setEpic] = useState<Epic | null>(null)
   const [loading, setLoading] = useState(true)
