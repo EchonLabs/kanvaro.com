@@ -110,6 +110,9 @@ export default function MembersPage() {
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [memberToRemove, setMemberToRemove] = useState<Member | null>(null)
   const [removingMember, setRemovingMember] = useState(false)
+  const [showCancelInvitationConfirm, setShowCancelInvitationConfirm] = useState(false)
+  const [invitationToCancel, setInvitationToCancel] = useState<PendingInvitation | null>(null)
+  const [cancelingInvitation, setCancelingInvitation] = useState(false)
 
   // Load available organization roles (both system and custom) from the central roles API
   useEffect(() => {
@@ -269,9 +272,17 @@ export default function MembersPage() {
     }
   }
 
-  const handleCancelInvitation = async (invitationId: string) => {
+  const handleCancelInvitationClick = (invitation: PendingInvitation) => {
+    setInvitationToCancel(invitation)
+    setShowCancelInvitationConfirm(true)
+  }
+
+  const handleCancelInvitationConfirm = async () => {
+    if (!invitationToCancel) return
+
     try {
-      const response = await fetch(`/api/members/cancel-invitation?invitationId=${invitationId}`, {
+      setCancelingInvitation(true)
+      const response = await fetch(`/api/members/cancel-invitation?invitationId=${invitationToCancel._id}`, {
         method: 'DELETE'
       })
 
@@ -279,13 +290,23 @@ export default function MembersPage() {
 
       if (data.success) {
         notifySuccess({ title: 'Invitation cancelled successfully' })
-        fetchMembers()
+        await fetchMembers()
       } else {
         notifyError({ title: data.error || 'Failed to cancel invitation' })
       }
     } catch (err) {
       notifyError({ title: 'Failed to cancel invitation' })
+    } finally {
+      setCancelingInvitation(false)
+      setShowCancelInvitationConfirm(false)
+      setInvitationToCancel(null)
     }
+  }
+
+  const handleCancelInvitationCancel = () => {
+    if (cancelingInvitation) return
+    setShowCancelInvitationConfirm(false)
+    setInvitationToCancel(null)
   }
 
   const handleRemoveMemberClick = (member: Member) => {
@@ -774,7 +795,7 @@ export default function MembersPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleCancelInvitation(invitation._id)}
+                              onClick={() => handleCancelInvitationClick(invitation)}
                               className="text-destructive hover:text-destructive flex-1 text-xs sm:text-sm min-h-[36px]"
                             >
                               <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
@@ -817,7 +838,7 @@ export default function MembersPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleCancelInvitation(invitation._id)}
+                          onClick={() => handleCancelInvitationClick(invitation)}
                           className="text-destructive hover:text-destructive flex-1 sm:flex-initial text-xs sm:text-sm min-h-[44px] touch-target"
                         >
                           <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
@@ -866,6 +887,22 @@ export default function MembersPage() {
         cancelText="Cancel"
         variant="destructive"
         isLoading={removingMember}
+      />
+
+      <ConfirmationModal
+        isOpen={showCancelInvitationConfirm}
+        onClose={handleCancelInvitationCancel}
+        onConfirm={handleCancelInvitationConfirm}
+        title="Cancel invitation"
+        description={
+          invitationToCancel
+            ? `Are you sure you want to cancel the invitation for ${invitationToCancel.email}? This action cannot be undone.`
+            : 'Are you sure you want to cancel this invitation?'
+        }
+        confirmText="Cancel Invitation"
+        cancelText="Keep Invitation"
+        variant="destructive"
+        isLoading={cancelingInvitation}
       />
       </div>
     </MainLayout>
