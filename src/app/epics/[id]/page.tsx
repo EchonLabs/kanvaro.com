@@ -76,7 +76,7 @@ export default function EpicDetailPage() {
   const params = useParams()
   const epicId = params.id as string
   const { setItems } = useBreadcrumb()
-  const { notifySuccess } = useNotify()
+  const { success: notifySuccess, error: notifyError } = useNotify()
   
   const [epic, setEpic] = useState<Epic | null>(null)
   const [loading, setLoading] = useState(true)

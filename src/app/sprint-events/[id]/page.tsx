@@ -90,6 +90,8 @@ export default function SprintEventDetailsPage() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth()
   const eventId = params.id as string
   const [event, setEvent] = useState<SprintEvent | null>(null)
+  const [fullProject, setFullProject] = useState<{ _id: string; name: string } | null>(null)
+const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [editingEvent, setEditingEvent] = useState<SprintEvent | null>(null)
 
@@ -113,6 +115,16 @@ export default function SprintEventDetailsPage() {
       if (response.ok) {
         const data = await response.json()
         setEvent(data)
+console.log('data', data)
+          // Fetch full project
+      const projectRes = await fetch(`/api/projects/${data?.project?._id}`)
+      const projectData = projectRes.ok ? await projectRes.json() : null
+      setFullProject(projectData)
+
+      // Fetch full sprint
+      const sprintRes = await fetch(`/api/sprints/${data?.sprint?._id}`)
+      const sprintData = sprintRes.ok ? await sprintRes.json() : null
+      setFullSprint(sprintData)
       }
     } catch (error) {
       console.error('Error fetching sprint event:', error)
@@ -304,7 +316,7 @@ export default function SprintEventDetailsPage() {
             <div>
               <h1 className="text-3xl font-bold">{event.title}</h1>
               <p className="text-muted-foreground">
-                {event.project.name} • {event.sprint.name}
+                {event.project?.name} • {event.sprint?.name}
               </p>
             </div>
           </div>
@@ -371,7 +383,7 @@ export default function SprintEventDetailsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Sprint</p>
-                    <p className="font-medium">{event.sprint.name}</p>
+                    <p className="font-medium">{event.sprint?.name}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Created By</p>
