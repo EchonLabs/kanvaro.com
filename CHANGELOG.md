@@ -1,3 +1,12 @@
+## [1.13.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.13.2...v1.13.3) (2025-12-15)
+
+
+### Bug Fixes
+
+* add changes ([cdc033a](https://github.com/EchonLabs/kanvaro.com/commit/cdc033aadf1e186e4cdd9a7e358308510fe4b7bd))
+* add epic changes ([eeeb30e](https://github.com/EchonLabs/kanvaro.com/commit/eeeb30ed6662fe19b45b748e79decbc2ac60f109))
+* add sprint delete ([5bf6412](https://github.com/EchonLabs/kanvaro.com/commit/5bf64123f65510e40e1abcd1603c1cef4f073cf2))
+
 ## [1.13.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.13.1...v1.13.2) (2025-12-11)
 
 
