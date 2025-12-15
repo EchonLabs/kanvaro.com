@@ -211,10 +211,11 @@ export async function DELETE(
       )
     }
 
-    const isCreator = epic.createdBy?.toString?.() === userId.toString()
+    const isCreator = epic.createdBy?.toString() === userId.toString()
     const canDeleteEpic = isCreator || await PermissionService.hasPermission(
       userId.toString(),
-      Permission.EPIC_DELETE
+      Permission.EPIC_DELETE,
+      epic.project.toString()
     )
 
     if (!canDeleteEpic) {

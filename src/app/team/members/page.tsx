@@ -32,12 +32,14 @@ import { EditMemberModal } from '@/components/members/EditMemberModal'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { useNotify } from '@/lib/notify'
 
 interface Member {
   _id: string
   firstName: string
   lastName: string
   email: string
+  avatar?: string
   role: string
   customRole?: {
     _id: string
@@ -97,6 +99,7 @@ export default function MembersPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [invitationViewMode, setInvitationViewMode] = useState<'grid' | 'list'>('grid')
   const { hasPermission, loading: permissionsLoading } = usePermissions()
+  const { success: notifySuccess, error: notifyError } = useNotify()
 
   const canViewMembers = hasPermission(Permission.TEAM_READ) || hasPermission(Permission.USER_READ)
   const canInviteMembers = hasPermission(Permission.TEAM_INVITE) || hasPermission(Permission.USER_INVITE)
@@ -178,10 +181,10 @@ export default function MembersPage() {
         setMembers(data.data.members)
         setPendingInvitations(data.data.pendingInvitations)
       } else {
-        setError(data.error || 'Failed to fetch members')
+        notifyError({ title: data.error || 'Failed to fetch members' })
       }
     } catch (err) {
-      setError('Failed to fetch members')
+      notifyError({ title: 'Failed to fetch members' })
     } finally {
       setLoading(false)
     }
@@ -190,8 +193,7 @@ export default function MembersPage() {
   const handleInviteMember = async (inviteData: any): Promise<{ error?: string } | void> => {
     if (!canInviteMembers) {
       const errorMsg = 'You do not have permission to invite members.'
-      setError(errorMsg)
-      setSuccess('')
+      notifyError({ title: errorMsg })
       return { error: errorMsg }
     }
 
@@ -208,12 +210,9 @@ export default function MembersPage() {
 
       if (data.success) {
         setShowInviteModal(false)
-        setSuccess('Invitation sent successfully!')
-        setError('')
+        notifySuccess({ title: 'Invitation sent successfully' })
         // Switch to Pending Invitations tab
         setActiveTab('invitations')
-        // Clear success message after 3 seconds
-        setTimeout(() => setSuccess(''), 3000)
         // Refresh authentication state and then fetch members
         await checkAuth()
         await fetchMembers()
@@ -221,13 +220,12 @@ export default function MembersPage() {
         return
       } else {
         const errorMsg = data.error || 'Failed to send invitation'
-        setError(errorMsg)
-        setSuccess('')
+        notifyError({ title: errorMsg })
         return { error: errorMsg }
       }
     } catch (err) {
       const errorMsg = 'Failed to send invitation'
-      setError(errorMsg)
+      notifyError({ title: errorMsg })
       return { error: errorMsg }
     }
   }
@@ -235,13 +233,13 @@ export default function MembersPage() {
   const handleUpdateMember = async (memberId: string, updates: any) => {
     const member = members.find((m) => m._id === memberId)
     if (!member) {
-      setError('Member not found')
+      notifyError({ title: 'Member not found' })
       return
     }
 
     const requiresAdminAccess = member.role === 'admin'
     if (!canEditMembers || (requiresAdminAccess && !canEditAdminMembers)) {
-      setError('You do not have permission to edit this member.')
+      notifyError({ title: 'You do not have permission to edit this member.' })
       return
     }
 
@@ -261,12 +259,13 @@ export default function MembersPage() {
 
       if (data.success) {
         setEditingMember(null)
+        notifySuccess({ title: 'Team member updated successfully' })
         fetchMembers()
       } else {
-        setError(data.error || 'Failed to update member')
+        notifyError({ title: data.error || 'Failed to update member' })
       }
     } catch (err) {
-      setError('Failed to update member')
+      notifyError({ title: 'Failed to update member' })
     }
   }
 
@@ -279,15 +278,13 @@ export default function MembersPage() {
       const data = await response.json()
 
       if (data.success) {
-        setSuccess('Invitation cancelled successfully!')
-        setError('')
-        setTimeout(() => setSuccess(''), 3000)
+        notifySuccess({ title: 'Invitation cancelled successfully' })
         fetchMembers()
       } else {
-        setError(data.error || 'Failed to cancel invitation')
+        notifyError({ title: data.error || 'Failed to cancel invitation' })
       }
     } catch (err) {
-      setError('Failed to cancel invitation')
+      notifyError({ title: 'Failed to cancel invitation' })
     }
   }
 
@@ -295,8 +292,7 @@ export default function MembersPage() {
     // Extra guard: do not allow removing admins or HR from here
     if (member.role === 'admin' || member.role === 'human_resource') return
     if (!canDeleteMembers) {
-      setError('You do not have permission to delete team members.')
-      setSuccess('')
+      notifyError({ title: 'You do not have permission to delete team members.' })
       return
     }
     setMemberToRemove(member)
@@ -315,15 +311,13 @@ export default function MembersPage() {
       const data = await response.json()
 
       if (data.success) {
-        setSuccess('Member removed successfully')
-        setError('')
+        notifySuccess({ title: 'Member removed successfully' })
         await fetchMembers()
-        setTimeout(() => setSuccess(''), 3000)
       } else {
-        setError(data.error || 'Failed to remove member')
+        notifyError({ title: data.error || 'Failed to remove member' })
       }
     } catch (err) {
-      setError('Failed to remove member')
+      notifyError({ title: 'Failed to remove member' })
     } finally {
       setRemovingMember(false)
       setShowRemoveConfirm(false)
@@ -350,15 +344,13 @@ export default function MembersPage() {
 
     // Prevent assigning admin role without proper permission
     if (newRole === 'admin' && !canEditAdminMembers) {
-      setError('You do not have permission to assign admin role.')
-      setSuccess('')
+      notifyError({ title: 'You do not have permission to assign admin role.' })
       return
     }
 
     await handleUpdateMember(member._id, { role: newRole })
     // Optional inline success message
-    setSuccess('Member role updated successfully.')
-    setTimeout(() => setSuccess(''), 3000)
+    notifySuccess({ title: 'Member role updated successfully.' })
   }
 
   // Generate a consistent color for custom roles based on their ID
@@ -455,8 +447,7 @@ export default function MembersPage() {
 
   const handleOpenInviteModal = () => {
     if (!canInviteMembers) {
-      setError('You do not have permission to invite members.')
-      setSuccess('')
+      notifyError({ title: 'You do not have permission to invite members.' })
       return
     }
     setShowInviteModal(true)
@@ -586,11 +577,12 @@ export default function MembersPage() {
                       <CardContent className="p-4 sm:p-5">
                         <div className="flex flex-col items-center text-center space-y-3">
                           <div className="relative">
-                            <GravatarAvatar 
+                            <GravatarAvatar
                               user={{
                                 firstName: member.firstName,
                                 lastName: member.lastName,
-                                email: member.email
+                                email: member.email,
+                                avatar: member.avatar
                               }}
                               className="h-16 w-16 sm:h-20 sm:w-20"
                             />

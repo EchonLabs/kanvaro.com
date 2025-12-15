@@ -11,14 +11,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { CreateRoleModal } from '@/components/roles/CreateRoleModal'
 import { EditRoleModal } from '@/components/roles/EditRoleModal'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
-import { 
-  Shield, 
-  Plus, 
-  Edit, 
-  Trash2, 
+import { useNotify } from '@/lib/notify'
+import {
+  Shield,
+  Plus,
+  Edit,
+  Trash2,
   Users,
-  Loader2,
-  CheckCircle
+  Loader2
 } from 'lucide-react'
 
 interface Role {
@@ -33,10 +33,10 @@ interface Role {
 
 export default function RolesPage() {
   const router = useRouter()
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [authError, setAuthError] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -107,9 +107,7 @@ export default function RolesPage() {
   const handleRoleCreated = (newRole: Role) => {
     setRoles(prev => [...prev, newRole])
     setShowCreateModal(false)
-    setSuccess('Role created successfully')
-    setError('')
-    setTimeout(() => setSuccess(''), 3000)
+    notifySuccess({ title: 'Success', message: 'Role created successfully' })
   }
 
   const handleEditRole = (role: Role) => {
@@ -121,11 +119,7 @@ export default function RolesPage() {
     setRoles(prev => prev.map(role => role._id === updatedRole._id ? updatedRole : role))
     setShowEditModal(false)
     setSelectedRole(null)
-    setSuccess('Role updated successfully')
-    setError('')
-    // Scroll to top to show success message
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-    setTimeout(() => setSuccess(''), 3000)
+    notifySuccess({ title: 'Success', message: 'Role updated successfully' })
   }
 
   useEffect(() => {
@@ -136,12 +130,12 @@ export default function RolesPage() {
 
   const handleDeleteClick = (role: Role) => {
     if (role.isSystem) {
-      setError('Cannot delete system roles')
+      notifyError({ title: 'Error', message: 'Cannot delete system roles' })
       return
     }
 
     if (role.userCount > 0) {
-      setError('Cannot delete role that is assigned to users')
+      notifyError({ title: 'Error', message: 'Cannot delete role that is assigned to users' })
       return
     }
 
@@ -154,8 +148,7 @@ export default function RolesPage() {
 
     try {
       setIsDeleting(true)
-      setError('')
-      
+
       const response = await fetch(`/api/roles/${roleToDelete._id}`, {
         method: 'DELETE'
       })
@@ -164,16 +157,14 @@ export default function RolesPage() {
 
       if (data.success) {
         setRoles(prev => prev.filter(r => r._id !== roleToDelete._id))
-        setError('')
-        setSuccess('Role deleted successfully')
+        notifySuccess({ title: 'Success', message: 'Role deleted successfully' })
         setShowDeleteConfirm(false)
         setRoleToDelete(null)
-        setTimeout(() => setSuccess(''), 3000)
       } else {
-        setError(data.error || 'Failed to delete role')
+        notifyError({ title: 'Error', message: data.error || 'Failed to delete role' })
       }
     } catch (err) {
-      setError('Failed to delete role')
+      notifyError({ title: 'Error', message: 'Failed to delete role' })
     } finally {
       setIsDeleting(false)
     }
@@ -219,18 +210,6 @@ export default function RolesPage() {
           </Button>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {success && (
-          <Alert variant="success">
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>{success}</AlertDescription>
-          </Alert>
-        )}
 
         <div className="grid gap-6">
           {roles.map((role) => (
