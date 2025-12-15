@@ -8,14 +8,13 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   ArrowLeft,
   Save,
   Loader2,
-  AlertTriangle,
   Layers
 } from 'lucide-react'
+import { useNotify } from '@/lib/notify'
 
 interface Project {
   _id: string
@@ -24,9 +23,8 @@ interface Project {
 
 export default function CreateEpicPage() {
   const router = useRouter()
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [authError, setAuthError] = useState('')
   const [projects, setProjects] = useState<Project[]>([])
   const [projectQuery, setProjectQuery] = useState("");
@@ -98,8 +96,6 @@ export default function CreateEpicPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError('')
-    setSuccess('')
 
     try {
       const response = await fetch('/api/epics', {
@@ -118,15 +114,13 @@ export default function CreateEpicPage() {
       const data = await response.json()
 
       if (data.success) {
-        setSuccess('Epic created successfully')
-        setTimeout(() => {
-          router.push('/epics?created=1')
-        }, 1000)
+        notifySuccess({ title: 'Epic created successfully' })
+        router.push('/epics?created=1')
       } else {
-        setError(data.error || 'Failed to create epic')
+        notifyError({ title: data.error || 'Failed to create epic' })
       }
     } catch (err) {
-      setError('Failed to create epic')
+      notifyError({ title: 'Failed to create epic' })
     } finally {
       setLoading(false)
     }
@@ -177,19 +171,6 @@ export default function CreateEpicPage() {
             <p className="text-sm sm:text-base text-muted-foreground">Create a new epic for your project</p>
           </div>
         </div>
-
-        {success && (
-          <Alert variant="success">
-            <AlertDescription>{success}</AlertDescription>
-          </Alert>
-        )}
-
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
 
         <Card className="overflow-x-hidden">
           <CardHeader>

@@ -8,7 +8,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/Badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   X, 
   Plus, 
@@ -16,13 +15,13 @@ import {
   User, 
   Target, 
   Clock,
-  AlertTriangle,
   Loader2,
   Trash2,
   Paperclip,
   Check
 } from 'lucide-react'
 import { AttachmentList } from '@/components/ui/AttachmentList'
+import { useNotify } from '@/lib/notify'
 
 interface CreateTaskModalProps {
   isOpen: boolean
@@ -133,9 +132,9 @@ export default function CreateTaskModal({
   stayOnCurrentPage = false
 }: CreateTaskModalProps) {
   const router = useRouter()
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [projectMembers, setProjectMembers] = useState<User[]>([])
   const [loadingProjectMembers, setLoadingProjectMembers] = useState(false)
   const [projects, setProjects] = useState<Array<{ _id: string; name: string }>>([])
@@ -320,7 +319,6 @@ export default function CreateTaskModal({
   useEffect(() => {
     if (!isOpen) {
       setError('')
-      setSuccess('')
       setFormData({
         title: '',
         description: '',
@@ -470,7 +468,6 @@ export default function CreateTaskModal({
     e.preventDefault()
     setLoading(true)
     setError('')
-    setSuccess('')
     // Validate required fields including subtasks titles
     const missingSubtaskTitle = subtasks.some(st => !(st.title && st.title.trim().length > 0))
     const missingDueDate = !(formData.dueDate && formData.dueDate.trim().length > 0)
@@ -533,65 +530,51 @@ export default function CreateTaskModal({
       // Read response body only once - you can't read it twice!
       const data = await response.json().catch(() => ({ error: 'Failed to parse response' }))
       
-      if (!response.ok) {
-        setError(data.error || 'Failed to create task')
+      if (!response.ok || !data.success) {
+        const message = data.error || 'Failed to create task'
+        setError(message)
+        notifyError({ title: message })
         setLoading(false)
         return
       }
 
-      if (data.success) {
-        setSuccess('Task created successfully')
-        setError('')
-        onTaskCreated()
-        // Show success message briefly before closing
-        setTimeout(() => {
-          // Reset form
-          setFormData({
-            title: '',
-            description: '',
-            priority: 'medium',
-            type: 'task',
-            assignedTo: '',
-            dueDate: '',
-            estimatedHours: '',
-            labels: [],
-            story: '',
-            epic: '',
-            isBillable: false, // Fix: Provide required field missing from TaskFormData
-          })
-          setSubtasks([])
-          setAssignedToIds([])
-          setAssigneeQuery('')
-          setNewLabel('')
-          if (!projectId) setSelectedProjectId('')
-          setAttachments([])
-          setAttachmentError('')
-          setSuccess('')
-          onClose()
-          // Only redirect to tasks page if not staying on current page (e.g., kanban board)
-          if (!stayOnCurrentPage) {
-            setTimeout(() => {
-              router.push('/tasks')
-            }, 100)
-          }
-        }, 1500)
-      } else {
-        setError(data.error || 'Failed to create task')
-        setLoading(false)
+      notifySuccess({ title: 'Task created successfully' })
+      setError('')
+      onTaskCreated()
+
+      // Reset form immediately after success
+      setFormData({
+        title: '',
+        description: '',
+        priority: 'medium',
+        type: 'task',
+        assignedTo: '',
+        dueDate: '',
+        estimatedHours: '',
+        labels: [],
+        story: '',
+        epic: '',
+        isBillable: false, // Fix: Provide required field missing from TaskFormData
+      })
+      setSubtasks([])
+      setAssignedToIds([])
+      setAssigneeQuery('')
+      setNewLabel('')
+      if (!projectId) setSelectedProjectId('')
+      setAttachments([])
+      setAttachmentError('')
+      onClose()
+
+      if (!stayOnCurrentPage) {
+        setTimeout(() => router.push('/tasks'), 100)
       }
     } catch (error) {
       console.error('Task creation error:', error)
       setError('Failed to create task. Please try again.')
+      notifyError({ title: 'Failed to create task. Please try again.' })
       setLoading(false)
     }
   }
-
-  useEffect(() => {
-    if (success) {
-      const t = setTimeout(() => setSuccess(''), 3000)
-      return () => clearTimeout(t)
-    }
-  }, [success])
 
   useEffect(() => {
     if (error) {
@@ -635,29 +618,6 @@ export default function CreateTaskModal({
         </CardHeader>
         <CardContent className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <form onSubmit={handleSubmit} className="space-y-6" autoComplete="on" id="create-task-form">
-            {success && (
-              <Alert variant="success" className="flex items-center justify-between pr-2">
-                <AlertDescription className="flex-1">{success}</AlertDescription>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40"
-                  onClick={() => {
-                    setSuccess('')
-                    onClose()
-                  }}
-                >
-                  <X className="h-4 w-4 text-green-700 dark:text-green-300" />
-                </Button>
-              </Alert>
-            )}
-            {error && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
             {!projectId && (
               <div>
                 <label className="text-sm font-medium text-foreground">Project *</label>
@@ -1215,18 +1175,6 @@ export default function CreateTaskModal({
           </div>
         </div>
       </Card>
-      {(success || error) && (
-        <div className="fixed bottom-6 right-6 z-[10000]">
-          <div
-            className={`flex items-center space-x-2 rounded-md px-4 py-3 shadow-lg ${success ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}
-            role="status"
-            aria-live="polite"
-          >
-            {success ? <Check className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-            <span className="text-sm font-medium">{success || error}</span>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

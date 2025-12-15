@@ -397,7 +397,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         </Alert>
       )}
 
-      <div className="flex flex-col gap-2 sm:gap-4">
+      <div className="flex flex-col gap-3 sm:gap-5 space-y-4 sm:space-y-5">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
@@ -407,7 +407,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
             className="pl-10 w-full"
           />
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 flex-wrap mb-4 sm:mb-6">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Status" />
@@ -454,11 +454,11 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         )}
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-8">
         {filteredTasks.map((task) => (
           <Card 
             key={task._id} 
-            className="hover:shadow-md transition-shadow cursor-pointer"
+            className="hover:shadow-md transition-shadow cursor-pointer "
             onClick={() => handleViewTask(task)}
           >
             <CardContent className="p-4">

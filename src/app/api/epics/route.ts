@@ -22,9 +22,12 @@ export async function GET(request: NextRequest) {
     const userId = user.id
     const organizationId = user.organization
 
-    // Check if user has permission to view all epics
+    const canViewEpics = await PermissionService.hasAnyPermission(
+      userId.toString(),
+      [Permission.EPIC_VIEW, Permission.EPIC_READ, Permission.EPIC_VIEW_ALL]
+    );
     const hasEpicViewAll = await PermissionService.hasPermission(
-      userId,
+      userId.toString(),
       Permission.EPIC_VIEW_ALL
     );
 
@@ -57,8 +60,11 @@ export async function GET(request: NextRequest) {
       ...filters,
     }
     
-    if (!hasEpicViewAll) {
+    if (!canViewEpics && !hasEpicViewAll) {
+      // Allow creator-only view fallback
       epicQuery.createdBy = userId
+    } else if (!hasEpicViewAll) {
+      epicQuery.$or = [{ createdBy: userId }]
     }
 
     const epics = await Epic.find(epicQuery)

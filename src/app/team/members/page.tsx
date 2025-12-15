@@ -100,8 +100,9 @@ export default function MembersPage() {
 
   const canViewMembers = hasPermission(Permission.TEAM_READ) || hasPermission(Permission.USER_READ)
   const canInviteMembers = hasPermission(Permission.TEAM_INVITE) || hasPermission(Permission.USER_INVITE)
-  const canEditMembers = hasPermission(Permission.USER_UPDATE)
-  const canEditAdminMembers = hasPermission(Permission.USER_MANAGE_ROLES)
+  const canEditMembers = hasPermission(Permission.TEAM_EDIT) && hasPermission(Permission.USER_UPDATE)
+  const canEditAdminMembers = hasPermission(Permission.TEAM_EDIT) && hasPermission(Permission.USER_MANAGE_ROLES)
+  const canDeleteMembers = hasPermission(Permission.TEAM_DELETE)
   const [organizationRoles, setOrganizationRoles] = useState<Array<{ id: string; name: string; isSystem?: boolean }>>([])
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [memberToRemove, setMemberToRemove] = useState<Member | null>(null)
@@ -293,6 +294,11 @@ export default function MembersPage() {
   const handleRemoveMemberClick = (member: Member) => {
     // Extra guard: do not allow removing admins or HR from here
     if (member.role === 'admin' || member.role === 'human_resource') return
+    if (!canDeleteMembers) {
+      setError('You do not have permission to delete team members.')
+      setSuccess('')
+      return
+    }
     setMemberToRemove(member)
     setShowRemoveConfirm(true)
   }
@@ -633,7 +639,7 @@ export default function MembersPage() {
                               variant="outline"
                               size="sm"
                               onClick={() => handleRemoveMemberClick(member)}
-                              disabled={member.role === 'admin' || member.role === 'human_resource' || !member.isActive}
+                              disabled={!canDeleteMembers || member.role === 'admin' || member.role === 'human_resource' || !member.isActive}
                               className="flex-1 text-xs sm:text-sm min-h-[36px]"
                             >
                               Remove
@@ -698,7 +704,7 @@ export default function MembersPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleRemoveMemberClick(member)}
-                          disabled={member.role === 'admin' || member.role === 'human_resource' || !member.isActive}
+                          disabled={!canDeleteMembers || member.role === 'admin' || member.role === 'human_resource' || !member.isActive}
                           className="flex-1 sm:flex-initial text-xs sm:text-sm min-h-[44px] touch-target"
                         >
                           Remove
