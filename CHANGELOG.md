@@ -1,3 +1,11 @@
+## [1.13.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.13.4...v1.13.5) (2025-12-15)
+
+
+### Bug Fixes
+
+* add  changes ([d5c5a56](https://github.com/EchonLabs/kanvaro.com/commit/d5c5a56b57d66419b98829bf2b2f40eda4724e6a))
+* add profile icon ([732c6c9](https://github.com/EchonLabs/kanvaro.com/commit/732c6c9a69a8d6e62e268b049574e9856f221efe))
+
 ## [1.13.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.13.3...v1.13.4) (2025-12-15)
 
 
