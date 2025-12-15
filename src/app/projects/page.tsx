@@ -12,6 +12,7 @@ import { formatToTitleCase } from '@/lib/utils'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
+import { useNotify } from '@/lib/notify'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -84,11 +85,10 @@ export default function ProjectsPage() {
   const searchParams = useSearchParams()
   const { organization } = useOrganization()
   const { formatCurrency } = useOrgCurrency()
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const orgCurrency = organization?.currency || 'USD'
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -197,10 +197,10 @@ export default function ProjectsPage() {
         setProjects(data.data)
         setTotalCount(data.pagination?.total || data.data.length)
       } else {
-        setError(data.error || 'Failed to fetch projects')
+        notifyError({ title: 'Error', message: data.error || 'Failed to fetch projects' })
       }
     } catch (err) {
-      setError('Failed to fetch projects')
+      notifyError({ title: 'Error', message: 'Failed to fetch projects' })
     } finally {
       setLoading(false)
     }
@@ -219,20 +219,20 @@ export default function ProjectsPage() {
       const response = await fetch(`/api/projects/${projectToDelete}`, {
         method: 'DELETE'
       })
+
       const data = await response.json()
 
       if (data.success) {
         setProjects(projects.filter(p => p._id !== projectToDelete))
         setDeleteModalOpen(false)
         setProjectToDelete(null)
-        setError('')
-        setSuccess('Project deleted successfully.')
-        setTimeout(() => setSuccess(''), 3000)
+        notifySuccess({ title: 'Success', message: 'Project deleted successfully.' })
       } else {
-        setError(data.error || 'Failed to delete project')
+        notifyError({ title: 'Error', message: data.error || 'Failed to delete project' })
       }
     } catch (err) {
-      setError('Failed to delete project')
+      console.error('Delete error:', err)
+      notifyError({ title: 'Error', message: 'Failed to delete project' })
     } finally {
       setIsDeleting(false)
     }
@@ -324,12 +324,6 @@ export default function ProjectsPage() {
         </PermissionGate>
       </div>
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
 
       <Card>
         <CardHeader className="p-4 sm:p-6">
@@ -389,12 +383,6 @@ export default function ProjectsPage() {
               <TabsTrigger value="list" className="text-xs sm:text-sm">List View</TabsTrigger>
             </TabsList>
 
-            {success && (
-              <Alert variant="success" className="mt-4">
-                <CheckCircle className="h-4 w-4" />
-                <AlertDescription>{success}</AlertDescription>
-              </Alert>
-            )}
 
             <TabsContent value="grid" className="space-y-4 mt-0">
               <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">

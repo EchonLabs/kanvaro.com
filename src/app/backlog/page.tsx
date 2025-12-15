@@ -42,6 +42,7 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { DateRange } from 'react-day-picker'
+import { useNotify } from '@/lib/notify'
 
 interface UserSummary {
   _id: string
@@ -114,8 +115,7 @@ export default function BacklogPage() {
   const searchParams = useSearchParams()
   const [backlogItems, setBacklogItems] = useState<BacklogItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const [deleteError, setDeleteError] = useState('')
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -234,11 +234,9 @@ export default function BacklogPage() {
   useEffect(() => {
     const successParam = searchParams?.get('success')
     if (successParam === 'story-created') {
-      setSuccess('User story created successfully.')
-      const timeout = setTimeout(() => setSuccess(''), 3000)
-      return () => clearTimeout(timeout)
+      notifySuccess({ title: 'Success', message: 'User story created successfully.' })
     }
-  }, [searchParams])
+  }, [searchParams, notifySuccess])
 
   const fetchBacklogItems = async () => {
     try {
@@ -307,10 +305,10 @@ export default function BacklogPage() {
           `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
         ))
       } else {
-        setError(data.error || 'Failed to fetch backlog items')
+        notifyError({ title: 'Error', message: data.error || 'Failed to fetch backlog items' })
       }
     } catch (err) {
-      setError('Failed to fetch backlog items')
+      notifyError({ title: 'Error', message: 'Failed to fetch backlog items' })
     } finally {
       setLoading(false)
     }
@@ -867,8 +865,7 @@ export default function BacklogPage() {
       }
       const message = `${parts.join(' and ')} assigned to ${sprint.name} successfully.`
 
-      setSuccess(message)
-      setTimeout(() => setSuccess(''), 3000)
+      notifySuccess({ title: 'Success', message: message })
 
       setShowSprintModal(false)
       resetSprintModalState()
@@ -996,8 +993,7 @@ export default function BacklogPage() {
       }
       const message = `${parts.join(' and ')} removed from sprint successfully.`
 
-      setSuccess(message)
-      setTimeout(() => setSuccess(''), 3000)
+      notifySuccess({ title: 'Success', message: message })
 
       setShowSprintModal(false)
       resetSprintModalState()
@@ -1031,8 +1027,7 @@ export default function BacklogPage() {
       const data = await res.json()
       if (res.ok && data.success) {
         setBacklogItems(prev => prev.filter(x => x._id !== selectedForDelete.id))
-        setSuccess(`${selectedForDelete.type.charAt(0).toUpperCase() + selectedForDelete.type.slice(1)} deleted successfully.`)
-        setTimeout(() => setSuccess(''), 3000)
+        notifySuccess({ title: 'Success', message: `${selectedForDelete.type.charAt(0).toUpperCase() + selectedForDelete.type.slice(1)} deleted successfully.` })
         setShowDeleteConfirmModal(false)
         setSelectedForDelete(null)
       } else {
@@ -1097,8 +1092,7 @@ export default function BacklogPage() {
         )
       )
 
-      setSuccess('Task status updated successfully.')
-      setTimeout(() => setSuccess(''), 3000)
+      notifySuccess({ title: 'Success', message: 'Task status updated successfully.' })
       closeStatusChangeModal()
     } catch (error) {
       console.error('Failed to change task status:', error)
@@ -1267,18 +1261,6 @@ export default function BacklogPage() {
           </div>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-        {success && (
-          <Alert variant="success">
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>{success}</AlertDescription>
-          </Alert>
-        )}
 
         <Card>
           <CardHeader>
