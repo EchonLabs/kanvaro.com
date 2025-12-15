@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
+import { useNotify } from '@/lib/notify'
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -47,6 +49,7 @@ import {
   ChevronRight,
   X
 } from 'lucide-react'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 
 interface Sprint {
   _id: string
@@ -118,6 +121,11 @@ export default function SprintsPage() {
   const [availableSprints, setAvailableSprints] = useState<Sprint[]>([])
   const [availableSprintsLoading, setAvailableSprintsLoading] = useState(false)
   const [selectedTargetSprintId, setSelectedTargetSprintId] = useState('')
+  const { success: notifySuccess, error: notifyError } = useNotify()
+  const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null)
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  
   const [completeError, setCompleteError] = useState('')
   const [incompleteTasks, setIncompleteTasks] = useState<Array<{
     _id: string
@@ -247,25 +255,45 @@ export default function SprintsPage() {
     }
   }
 
-  const handleDeleteSprint = async (sprintId: string) => {
+  const handleDeleteClick = (sprintId: string) => {
     if (!canDeleteSprint) {
       setError('You do not have permission to delete sprints.')
       return
     }
+    setSelectedSprintId(sprintId)
+    setShowDeleteConfirmModal(true)
+  }
+  
+  const handleDeleteConfirm = async () => {
+    if (!selectedSprintId) return
+  
     try {
-      const res = await fetch(`/api/sprints/${sprintId}`, { method: 'DELETE' })
+      setDeleting(true)
+  
+      const res = await fetch(`/api/sprints/${selectedSprintId}`, {
+        method: 'DELETE'
+      })
       const data = await res.json()
+  
       if (res.ok && data.success) {
-        setSprints(prev => prev.filter(s => s._id !== sprintId))
-        showSuccess('Sprint deleted successfully.')
+        setSprints(prev => prev.filter(s => s._id !== selectedSprintId))
+        notifySuccess({ title: 'Sprint deleted successfully' })
+        setShowDeleteConfirmModal(false)
+        setSelectedSprintId(null)
       } else {
         setError(data.error || 'Failed to delete sprint')
+        notifyError({ title: data.error || 'Failed to delete sprint' })
+        setShowDeleteConfirmModal(false)
       }
     } catch (e) {
       setError('Failed to delete sprint')
+      notifyError({ title: 'Failed to delete sprint' })
+      setShowDeleteConfirmModal(false)
+    } finally {
+      setDeleting(false)
     }
   }
-
+  
   const formatDateInputValue = (date: Date): string => {
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -970,9 +998,8 @@ export default function SprintsPage() {
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     if (!canDeleteSprint) return
-                                    if (confirm('Are you sure you want to delete this sprint? This action cannot be undone.')) {
-                                      handleDeleteSprint(sprint._id)
-                                    }
+                                    handleDeleteClick(sprint._id)
+
                                   }}
                                   className="text-destructive focus:text-destructive"
                                 >
@@ -1309,9 +1336,8 @@ export default function SprintsPage() {
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       if (!canDeleteSprint) return
-                                      if (confirm('Are you sure you want to delete this sprint? This action cannot be undone.')) {
-                                        handleDeleteSprint(sprint._id)
-                                      }
+                                      handleDeleteClick(sprint._id)
+
                                     }}
                                     className="text-destructive focus:text-destructive"
                                   >
@@ -1743,6 +1769,20 @@ export default function SprintsPage() {
           )
         }
       </div >
+      <ConfirmationModal
+  isOpen={showDeleteConfirmModal}
+  onClose={() => {
+    setShowDeleteConfirmModal(false)
+    setSelectedSprintId(null)
+  }}
+  onConfirm={handleDeleteConfirm}
+  title="Delete Sprint"
+  description="Are you sure you want to delete this sprint? This action cannot be undone."
+  confirmText={deleting ? 'Deleting...' : 'Delete'}
+  cancelText="Cancel"
+  variant="destructive"
+/>
+
     </MainLayout >
   )
 }
