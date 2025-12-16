@@ -186,8 +186,7 @@ export function TimeLogs({
     startTime: '',
     endDate: '',
     endTime: '',
-    description: '',
-    isBillable: false
+    description: ''
   })
   const [submittingManualLog, setSubmittingManualLog] = useState(false)
   const [sessionHoursError, setSessionHoursError] = useState('')
@@ -211,7 +210,6 @@ export function TimeLogs({
     endDate: string
     endTime: string
     description: string
-    isBillable: boolean
   } | null>(null)
 
   // Resolve auth if props are missing
@@ -245,6 +243,12 @@ export function TimeLogs({
   const { organization } = useOrganization()
   const { canApproveTime } = useFeaturePermissions()
   const { hasPermission } = usePermissions()
+
+  // Permission checks for time tracking operations
+  const canViewAllTime = hasPermission(Permission.TIME_TRACKING_VIEW_ALL)
+  const canUpdateTime = hasPermission(Permission.TIME_TRACKING_UPDATE)
+  const canDeleteTime = hasPermission(Permission.TIME_TRACKING_DELETE)
+  const canApproveTimeLogs = hasPermission(Permission.TIME_TRACKING_APPROVE)
 
   // Check if user can view employee filter using permission
   const canViewEmployeeFilter = useMemo(() => {
@@ -520,6 +524,12 @@ export function TimeLogs({
     return `${date}T${time}`
   }
 
+  // Helper function to get billable status from selected task
+  const getBillableFromTask = (taskId: string): boolean => {
+    const selectedTask = tasks.find(task => task._id === taskId)
+    return selectedTask?.isBillable ?? false
+  }
+
   // Validate maxSessionHours and future time when dates/times change
   const validateSessionHours = useCallback(() => {
     setSessionHoursError('')
@@ -661,7 +671,7 @@ export function TimeLogs({
           description: manualLogData.description || undefined,
           startTime: startDateTime,
           endTime: endDateTime,
-          isBillable: manualLogData.isBillable && timeTrackingSettings?.allowBillableTime
+          isBillable: getBillableFromTask(selectedTaskForLog) && timeTrackingSettings?.allowBillableTime
         })
       })
 
@@ -674,8 +684,7 @@ export function TimeLogs({
           startTime: '',
           endDate: '',
           endTime: '',
-          description: '',
-          isBillable: false
+          description: ''
         })
         setSelectedProjectForLog('')
         setSelectedTaskForLog('')
@@ -753,7 +762,7 @@ export function TimeLogs({
           description: manualLogData.description || undefined,
           startTime: startDateTime,
           endTime: endDateTime,
-          isBillable: manualLogData.isBillable && timeTrackingSettings?.allowBillableTime
+          isBillable: getBillableFromTask(selectedTaskForLog) && timeTrackingSettings?.allowBillableTime
         })
       })
 
@@ -766,8 +775,7 @@ export function TimeLogs({
           startTime: '',
           endDate: '',
           endTime: '',
-          description: '',
-          isBillable: false
+          description: ''
         })
         setSelectedProjectForLog('')
         setSelectedTaskForLog('')
@@ -1237,8 +1245,7 @@ export function TimeLogs({
       startTime: start.toTimeString().substring(0, 5),
       endDate: end.toISOString().split('T')[0],
       endTime: end.toTimeString().substring(0, 5),
-      description: entry.description || '',
-      isBillable: entry.isBillable || false
+      description: entry.description || ''
     })
     setEditInitial({
       projectId: entry.project?._id || '',
@@ -1247,8 +1254,7 @@ export function TimeLogs({
       startTime: start.toTimeString().substring(0, 5),
       endDate: end.toISOString().split('T')[0],
       endTime: end.toTimeString().substring(0, 5),
-      description: entry.description || '',
-      isBillable: entry.isBillable || false
+      description: entry.description || ''
     })
     
     // Load tasks if project is set
@@ -1268,8 +1274,7 @@ export function TimeLogs({
       editInitial.startTime !== manualLogData.startTime ||
       editInitial.endDate !== manualLogData.endDate ||
       editInitial.endTime !== manualLogData.endTime ||
-      editInitial.description !== manualLogData.description ||
-      editInitial.isBillable !== manualLogData.isBillable
+      editInitial.description !== manualLogData.description
     )
   }, [isEditing, editInitial, selectedProjectForLog, selectedTaskForLog, manualLogData])
 
@@ -2166,7 +2171,7 @@ export function TimeLogs({
             <div className="space-y-2 w-full overflow-x-hidden">
               {/* Table Header - Hidden on mobile */}
               <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium overflow-x-auto ${
-                showSelectionAndApproval && canApproveTime 
+                showSelectionAndApproval && canApproveTimeLogs 
                   ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]' 
                   : showSelectionAndApproval
                     ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]'
@@ -2325,7 +2330,7 @@ export function TimeLogs({
 
                   {/* Desktop Table View */}
                   <div className={`hidden md:grid gap-2 p-3 overflow-x-auto ${
-                    showSelectionAndApproval && canApproveTime 
+                    showSelectionAndApproval && canApproveTimeLogs 
                       ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]' 
                       : showSelectionAndApproval
                         ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]'
@@ -2445,20 +2450,24 @@ export function TimeLogs({
                         </DropdownMenu.Trigger>
                         <DropdownMenu.Portal>
                           <DropdownMenu.Content className="min-w-[120px] bg-popover dark:bg-popover rounded-md p-1 shadow-lg border border-border dark:border-border z-50">
-                            <DropdownMenu.Item 
-                              className="flex items-center px-2 py-1.5 text-sm rounded hover:bg-accent dark:hover:bg-accent hover:text-accent-foreground dark:hover:text-accent-foreground cursor-pointer outline-none text-foreground dark:text-foreground"
-                              onSelect={() => handleEdit(entry)}
-                            >
-                              <Edit className="mr-2 h-4 w-4" />
-                              <span>Edit</span>
-                            </DropdownMenu.Item>
-                            <DropdownMenu.Item 
-                              className="flex items-center px-2 py-1.5 text-sm rounded text-destructive dark:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 cursor-pointer outline-none"
-                              onSelect={() => handleDeleteClick(entry)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              <span>Delete</span>
-                            </DropdownMenu.Item>
+                            {canUpdateTime && (
+                              <DropdownMenu.Item
+                                className="flex items-center px-2 py-1.5 text-sm rounded hover:bg-accent dark:hover:bg-accent hover:text-accent-foreground dark:hover:text-accent-foreground cursor-pointer outline-none text-foreground dark:text-foreground"
+                                onSelect={() => handleEdit(entry)}
+                              >
+                                <Edit className="mr-2 h-4 w-4" />
+                                <span>Edit</span>
+                              </DropdownMenu.Item>
+                            )}
+                            {canDeleteTime && (
+                              <DropdownMenu.Item
+                                className="flex items-center px-2 py-1.5 text-sm rounded text-destructive dark:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 cursor-pointer outline-none"
+                                onSelect={() => handleDeleteClick(entry)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>Delete</span>
+                              </DropdownMenu.Item>
+                            )}
                           </DropdownMenu.Content>
                         </DropdownMenu.Portal>
                       </DropdownMenu.Root>
@@ -2471,27 +2480,53 @@ export function TimeLogs({
         </div>
 
         {/* Pagination */}
-        {pagination.pages > 1 && (
+        {pagination.total > 0 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
-              Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} entries
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm text-muted-foreground">Items per page:</span>
+                <Select
+                  value={pagination.limit.toString()}
+                  onValueChange={(value) => {
+                    const newLimit = parseInt(value)
+                    setPagination(prev => ({
+                      ...prev,
+                      limit: newLimit,
+                      page: 1 // Reset to first page when changing limit
+                    }))
+                  }}
+                >
+                  <SelectTrigger className="w-16 h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-xs sm:text-sm text-muted-foreground">
+                Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+              </div>
             </div>
-            <div className="flex gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handlePageChange(pagination.page - 1)}
                 disabled={pagination.page === 1}
-                className="flex-1 sm:flex-initial"
               >
                 Previous
               </Button>
+              <span className="text-xs sm:text-sm text-muted-foreground">
+                Page {pagination.page} of {pagination.pages}
+              </span>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handlePageChange(pagination.page + 1)}
                 disabled={pagination.page === pagination.pages}
-                className="flex-1 sm:flex-initial"
               >
                 Next
               </Button>
@@ -2706,18 +2741,6 @@ export function TimeLogs({
             />
           </div>
 
-          {timeTrackingSettings?.allowBillableTime && (
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="modal-billable"
-                checked={manualLogData.isBillable}
-                onCheckedChange={(checked) => setManualLogData(prev => ({ ...prev, isBillable: checked as boolean }))}
-              />
-              <Label htmlFor="modal-billable" className="text-sm font-normal cursor-pointer">
-                Mark as billable
-              </Label>
-            </div>
-          )}
         </DialogBody>
         <DialogFooter>
           <Button
@@ -2729,8 +2752,7 @@ export function TimeLogs({
                 startTime: '',
                 endDate: '',
                 endTime: '',
-                description: '',
-                isBillable: false
+                description: ''
               })
               setSelectedProjectForLog('')
               setSelectedTaskForLog('')
@@ -2959,18 +2981,6 @@ export function TimeLogs({
             />
           </div>
 
-          {timeTrackingSettings?.allowBillableTime && (
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="edit-billable"
-                checked={manualLogData.isBillable}
-                onCheckedChange={(checked) => setManualLogData(prev => ({ ...prev, isBillable: checked as boolean }))}
-              />
-              <Label htmlFor="edit-billable" className="text-sm font-normal cursor-pointer">
-                Mark as billable
-              </Label>
-            </div>
-          )}
         </DialogBody>
         <DialogFooter>
           <Button
@@ -2982,8 +2992,7 @@ export function TimeLogs({
                 startTime: '',
                 endDate: '',
                 endTime: '',
-                description: '',
-                isBillable: false
+                description: ''
               })
               setSelectedProjectForLog('')
               setSelectedTaskForLog('')

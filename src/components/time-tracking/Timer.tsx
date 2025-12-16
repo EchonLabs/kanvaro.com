@@ -15,6 +15,7 @@ interface TimerProps {
   projectId?: string
   taskId?: string
   description?: string
+  isBillable?: boolean
   requireDescription?: boolean
   allowOvertime?: boolean
   onTimerUpdate?: (timer: any) => void
@@ -41,6 +42,7 @@ export function Timer({
   projectId,
   taskId,
   description = '',
+  isBillable,
   requireDescription = true,
   allowOvertime = true,
   onTimerUpdate
@@ -54,21 +56,14 @@ export function Timer({
   const tickStartMsRef = useRef<number | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Debug logging
-
-  // Log whenever activeTimer changes to capture its ID and state
+  // Track active timer state
   useEffect(() => {
     if (activeTimer) {
-      console.log('Timer/state: activeTimer set', {
-        _id: (activeTimer as any)._id,
-        isPaused: activeTimer.isPaused,
-        projectId: activeTimer.project?._id,
-        taskId: activeTimer.task?._id,
-      })
+      console.log('Timer: Active timer loaded', activeTimer._id)
     } else {
-      console.log('Timer/state: activeTimer cleared (null)')
+      console.log('Timer: No active timer')
     }
-  }, [activeTimer, allowOvertime])
+  }, [activeTimer])
 
   // Early return if required props are missing
   if (!userId || !organizationId) {
@@ -122,10 +117,7 @@ export function Timer({
 
       // Auto-stop when reaching max session
       if (!allowOvertime && runningMinutes >= activeTimer.maxSessionHours * 60) {
-        console.log('Timer/auto-stop: reached max session, stopping', {
-          runningMinutes,
-          maxSessionMinutes: activeTimer.maxSessionHours * 60
-        })
+        console.log('Timer: Auto-stopping - reached max session hours')
         handleStopTimer()
       }
     }, 1000)
@@ -144,21 +136,16 @@ export function Timer({
     }
 
     try {
-      const url = `/api/time-tracking/timer?userId=${userId}&organizationId=${organizationId}`
-      console.log('Timer/loadActiveTimer: GET', url)
-      const response = await fetch(url)
-      console.log('Timer/loadActiveTimer: status', response.status)
+      const response = await fetch(`/api/time-tracking/timer?userId=${userId}&organizationId=${organizationId}`)
       const data = await response.json()
-      console.log('Timer/loadActiveTimer: data', data)
-      
+
       if (response.ok) {
-        console.log('Timer/loadActiveTimer: activeTimer id', data?.activeTimer?._id)
         setActiveTimer(data.activeTimer)
       } else {
-        console.error('Timer/loadActiveTimer: failed', data?.error)
+        console.error('Failed to load active timer:', data?.error)
       }
     } catch (error) {
-      console.error('Timer/loadActiveTimer: exception', error)
+      console.error('Error loading active timer:', error)
     }
   }, [userId, organizationId])
 
@@ -179,33 +166,25 @@ export function Timer({
     setError('')
 
     try {
-      const payload = { userId, organizationId, projectId, taskId, description }
-      console.log('Timer/start: request payload', payload)
-
       const response = await fetch('/api/time-tracking/timer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ userId, organizationId, projectId, taskId, description, isBillable })
       })
 
-      console.log('Timer/start: response status', response.status)
       const data = await response.json()
-      console.log('Timer/start: response data', data)
 
       if (response.ok) {
-        console.log('Timer/start: success, activeTimer', data?.activeTimer)
-        console.log('Timer/start: activeTimer id', data?.activeTimer?._id)
         setActiveTimer(data.activeTimer)
         onTimerUpdate?.(data.activeTimer)
       } else {
-        console.error('Timer/start: failed', data?.error)
+        console.error('Failed to start timer:', data?.error)
         setError(data.error || 'Failed to start timer')
       }
     } catch (error) {
-      console.error('Timer/start: exception', error)
+      console.error('Error starting timer:', error)
       setError('Failed to start timer')
     } finally {
-      console.log('Timer/start: finished')
       setIsLoading(false)
     }
   }
@@ -215,31 +194,25 @@ export function Timer({
     setError('')
 
     try {
-      const payload = { userId, organizationId, action: 'pause' }
-      console.log('Timer/pause: request payload', payload)
       const response = await fetch('/api/time-tracking/timer', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ userId, organizationId, action: 'pause' })
       })
 
-      console.log('Timer/pause: response status', response.status)
       const data = await response.json()
-      console.log('Timer/pause: response data', data)
 
       if (response.ok) {
-        console.log('Timer/pause: activeTimer id', data?.activeTimer?._id)
         setActiveTimer(data.activeTimer)
         onTimerUpdate?.(data.activeTimer)
       } else {
-        console.error('Timer/pause: failed', data?.error)
+        console.error('Failed to pause timer:', data?.error)
         setError(data.error || 'Failed to pause timer')
       }
     } catch (error) {
-      console.error('Timer/pause: exception', error)
+      console.error('Error pausing timer:', error)
       setError('Failed to pause timer')
     } finally {
-      console.log('Timer/pause: finished')
       setIsLoading(false)
     }
   }
@@ -249,30 +222,25 @@ export function Timer({
     setError('')
 
     try {
-      const payload = { userId, organizationId, action: 'resume' }
-      console.log('Timer/resume: request payload', payload)
       const response = await fetch('/api/time-tracking/timer', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ userId, organizationId, action: 'resume' })
       })
 
-      console.log('Timer/resume: response status', response.status)
       const data = await response.json()
-      console.log('Timer/resume: response data', data)
 
       if (response.ok) {
         setActiveTimer(data.activeTimer)
         onTimerUpdate?.(data.activeTimer)
       } else {
-        console.error('Timer/resume: failed', data?.error)
+        console.error('Failed to resume timer:', data?.error)
         setError(data.error || 'Failed to resume timer')
       }
     } catch (error) {
-      console.error('Timer/resume: exception', error)
+      console.error('Error resuming timer:', error)
       setError('Failed to resume timer')
     } finally {
-      console.log('Timer/resume: finished')
       setIsLoading(false)
     }
   }
@@ -282,39 +250,32 @@ export function Timer({
     setError('')
 
     try {
-      const payload = { userId, organizationId, action: 'stop', description }
-      console.log('Timer/stop: request payload', payload)
       const response = await fetch('/api/time-tracking/timer', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ userId, organizationId, action: 'stop', description })
       })
 
-      console.log('Timer/stop: response status', response.status)
       const data = await response.json()
-      console.log('Timer/stop: response data', data)
 
       if (response.ok) {
-        console.log('Timer/stop: clearing activeTimer (previous id)', (activeTimer as any)?._id)
         const hasTimeLogged = data.hasTimeLogged && data.duration > 0
         setActiveTimer(null)
         setDisplayTime('00:00:00')
         // Pass timeEntry info through callback so parent can decide whether to show notifications
-        // If time was logged, pass info; otherwise pass null (no notification needed)
         if (hasTimeLogged && data.timeEntry) {
           onTimerUpdate?.({ timeEntry: data.timeEntry, hasTimeLogged: true, duration: data.duration })
         } else {
           onTimerUpdate?.(null)
         }
       } else {
-        console.error('Timer/stop: failed', data?.error)
+        console.error('Failed to stop timer:', data?.error)
         setError(data.error || 'Failed to stop timer')
       }
     } catch (error) {
-      console.error('Timer/stop: exception', error)
+      console.error('Error stopping timer:', error)
       setError('Failed to stop timer')
     } finally {
-      console.log('Timer/stop: finished')
       setIsLoading(false)
     }
   }

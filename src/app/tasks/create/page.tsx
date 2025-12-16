@@ -166,7 +166,8 @@ export default function CreateTaskPage() {
     type: 'task',
     dueDate: '',
     estimatedHours: '',
-    labels: [] as string[]
+    labels: [] as string[],
+    isBillable: false
   })
 
   const fetchProjects = useCallback(async () => {
@@ -293,6 +294,10 @@ export default function CreateTaskPage() {
       if (response.ok && data.success && data.data) {
         const members = Array.isArray(data.data.teamMembers) ? data.data.teamMembers : []
         setProjectMembers(members)
+
+        // Set billable default from project
+        const billableDefault = typeof data.data.isBillableByDefault === 'boolean' ? data.data.isBillableByDefault : true
+        setFormData(prev => ({ ...prev, isBillable: billableDefault }))
       } else {
         setProjectMembers([])
       }
@@ -364,6 +369,7 @@ export default function CreateTaskPage() {
           dueDate: formData.dueDate,
           estimatedHours: formData.estimatedHours ? parseInt(formData.estimatedHours) : undefined,
           labels: Array.isArray(formData.labels) ? formData.labels : [],
+          isBillable: formData.isBillable,
           subtasks: preparedSubtasks,
           attachments: attachments.map(attachment => ({
             name: attachment.name,
@@ -409,12 +415,19 @@ export default function CreateTaskPage() {
       setAssignedToIds([])
       setAssigneeQuery('')
       setProjectMembers([])
-      setFormData(prev => ({ ...prev, story: '', epic: '' }))
+      setFormData(prev => ({
+        ...prev,
+        story: '',
+        epic: '',
+        isBillable: false // Reset to unchecked when project changes
+      }))
       setStories([])
       setEpics([])
-      fetchStories(value)
-      fetchEpics(value)
-      fetchProjectMembers(value)
+      if (value) {
+        fetchStories(value)
+        fetchEpics(value)
+        fetchProjectMembers(value)
+      }
     }
   }, [fetchStories, fetchEpics, fetchProjectMembers])
 
@@ -955,6 +968,18 @@ export default function CreateTaskPage() {
                       value={formData.estimatedHours}
                       onChange={(e) => handleChange('estimatedHours', e.target.value)}
                       placeholder="Enter estimated hours"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-sm font-medium text-foreground">Billable</label>
+                      <p className="text-xs text-muted-foreground">Defaults from project; you can override per task.</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={formData.isBillable}
+                      onChange={(e) => setFormData(prev => ({ ...prev, isBillable: e.target.checked }))}
                     />
                   </div>
 
