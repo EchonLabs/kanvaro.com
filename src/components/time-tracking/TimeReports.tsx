@@ -120,6 +120,20 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     taskId: 'all'
   })
 
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 50, // Default to 50 entries per page
+    total: 0,
+    totalPages: 0
+  })
+
+  const [detailedEntriesPagination, setDetailedEntriesPagination] = useState({
+    page: 1,
+    limit: 10, // Default to 10 entries per page for detailed view
+    total: 0,
+    totalPages: 0
+  })
+
   const loadReport = useCallback(async () => {
     setIsLoading(true)
     setError('')
@@ -127,7 +141,9 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     try {
       const params = new URLSearchParams({
         organizationId,
-        reportType: filters.reportType
+        reportType: filters.reportType,
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString()
       })
 
       if (filters.projectId && filters.projectId !== 'all') params.append('projectId', filters.projectId)
@@ -154,6 +170,11 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
         if (data.organizationCurrency) {
           setOrgCurrency(data.organizationCurrency)
         }
+
+        // Set pagination from API response
+        if (data.pagination) {
+          setPagination(data.pagination)
+        }
       } else {
         setError(data?.error || 'Failed to load report')
       }
@@ -167,6 +188,35 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   useEffect(() => {
     loadReport()
   }, [loadReport])
+
+  // Reset pagination to page 1 when filters change
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, page: 1 }))
+    setDetailedEntriesPagination(prev => ({ ...prev, page: 1 }))
+  }, [filters.startDate, filters.endDate, filters.projectId, filters.assignedTo, filters.assignedBy, filters.taskId])
+
+  // Update detailed entries pagination when reportData changes
+  useEffect(() => {
+    if (reportData?.detailedEntries) {
+      const total = reportData.detailedEntries.length
+      const totalPages = Math.ceil(total / detailedEntriesPagination.limit)
+      setDetailedEntriesPagination(prev => ({
+        ...prev,
+        total,
+        totalPages,
+        page: Math.min(prev.page, totalPages || 1)
+      }))
+    }
+  }, [reportData?.detailedEntries])
+
+  // Get paginated detailed entries
+  const getPaginatedDetailedEntries = useMemo(() => {
+    if (!reportData?.detailedEntries) return []
+
+    const startIndex = (detailedEntriesPagination.page - 1) * detailedEntriesPagination.limit
+    const endIndex = startIndex + detailedEntriesPagination.limit
+    return reportData.detailedEntries.slice(startIndex, endIndex)
+  }, [reportData?.detailedEntries, detailedEntriesPagination.page, detailedEntriesPagination.limit])
 
   // Load organization currency and debug
   useEffect(() => {
@@ -589,8 +639,9 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 <div className="ml-4">
                   <p className="text-sm font-medium text-muted-foreground">Total Cost</p>
                   <p className="text-2xl font-bold">{(() => {
-                    const formatted = formatCurrency(summaryStats.totalCost, orgCurrency);
-                    return formatted;
+                    // Use API summary total cost if available, otherwise fall back to calculated
+                    const totalCost = reportData.summary?.totalCost ?? summaryStats.totalCost;
+                    return formatCurrency(totalCost, orgCurrency);
                   })()}</p>
                 </div>
               </div>
@@ -650,7 +701,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                       <div className="col-span-1">Billable</div>
                       <div className="col-span-2">Notes</div>
                     </div>
-                    {reportData.detailedEntries.map((entry) => (
+                    {getPaginatedDetailedEntries.map((entry) => (
                       <div key={entry._id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-muted/50">
                         <div className="col-span-2">
                           <div className="font-medium text-sm">{entry.userName}</div>
@@ -695,7 +746,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
 
                   {/* Mobile Card View */}
                   <div className="md:hidden space-y-5">
-                    {reportData.detailedEntries.map((entry) => (
+                    {getPaginatedDetailedEntries.map((entry) => (
                       <div key={entry._id} className="border rounded-lg p-4 space-y-3">
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
@@ -745,6 +796,61 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
               </div>
             )}
           </CardContent>
+
+          {/* Pagination Controls */}
+          {detailedEntriesPagination.total > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 pb-6">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Items per page:</span>
+                  <Select
+                    value={detailedEntriesPagination.limit.toString()}
+                    onValueChange={(value) => {
+                      const newLimit = parseInt(value)
+                      setDetailedEntriesPagination(prev => ({
+                        ...prev,
+                        limit: newLimit,
+                        page: 1 // Reset to first page when changing limit
+                      }))
+                    }}
+                  >
+                    <SelectTrigger className="w-16 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Showing {((detailedEntriesPagination.page - 1) * detailedEntriesPagination.limit) + 1} to {Math.min(detailedEntriesPagination.page * detailedEntriesPagination.limit, detailedEntriesPagination.total)} of {detailedEntriesPagination.total}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDetailedEntriesPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                  disabled={detailedEntriesPagination.page === 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {detailedEntriesPagination.page} of {detailedEntriesPagination.totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDetailedEntriesPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                  disabled={detailedEntriesPagination.page === detailedEntriesPagination.totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 

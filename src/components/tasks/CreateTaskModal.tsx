@@ -162,7 +162,7 @@ export default function CreateTaskModal({
     labels: [],
     story: '',
     epic: '',
-    isBillable: true
+    isBillable: false
   })
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [attachments, setAttachments] = useState<AttachmentDraft[]>([])
@@ -330,7 +330,7 @@ export default function CreateTaskModal({
         labels: [],
         story: '',
         epic: '',
-        isBillable: false // Add missing required property
+        isBillable: false
       })
       setSubtasks([])
       setAssignedToIds([])
@@ -554,7 +554,7 @@ export default function CreateTaskModal({
         labels: [],
         story: '',
         epic: '',
-        isBillable: false, // Fix: Provide required field missing from TaskFormData
+        isBillable: false
       })
       setSubtasks([])
       setAssignedToIds([])
@@ -628,12 +628,19 @@ export default function CreateTaskModal({
                     setAssignedToIds([])
                     setAssigneeQuery('')
                     setProjectMembers([])
-                    setFormData(prev => ({ ...prev, story: '', epic: '' }))
+                    setFormData(prev => ({
+                      ...prev,
+                      story: '',
+                      epic: '',
+                      isBillable: false // Reset to unchecked when project changes
+                    }))
                     setStories([])
                     setEpics([])
-                    fetchProjectMembers(v)
-                    fetchStories(v)
-                    fetchEpics(v)
+                    if (v) {
+                      fetchProjectMembers(v)
+                      fetchStories(v)
+                      fetchEpics(v)
+                    }
                   }}
                   onOpenChange={(open) => { if (open) setProjectQuery('') }}
                 >

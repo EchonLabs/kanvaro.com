@@ -238,6 +238,10 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
       if (response.ok && data.success && data.data) {
         const members = Array.isArray(data.data.teamMembers) ? data.data.teamMembers : []
         setUsers(members)
+
+        // Set billable default from project
+        const billableDefault = typeof data.data.isBillableByDefault === 'boolean' ? data.data.isBillableByDefault : true
+        setFormData(prev => ({ ...prev, isBillable: billableDefault }))
       } else {
         // Fallback to all members if project endpoint doesn't work
         const fallbackResponse = await fetch('/api/members')
