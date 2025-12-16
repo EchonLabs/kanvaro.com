@@ -316,7 +316,7 @@ function LoginForm() {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={isLoading || isLoadingPermissions || (orgRequiresVerification && verificationRequired)}
+                  disabled={isLoading || isLoadingPermissions || (orgRequiresVerification ? !!verificationRequired : false)}
                 >
                   {isLoadingPermissions ? (
                     <>
