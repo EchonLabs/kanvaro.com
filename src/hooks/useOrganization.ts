@@ -68,19 +68,54 @@ interface Organization {
   }
 }
 
-// Cache organization data to prevent repeated API calls
-let organizationCache: Organization | null = null
-let cacheTimestamp: number = 0
-const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+// Use sessionStorage for caching organization data
+// This ensures cache is cleared on page reload, preventing stale settings data
+const CACHE_KEY = 'kanvaro_organization_cache'
+const CACHE_TIMESTAMP_KEY = 'kanvaro_organization_timestamp'
+const CACHE_DURATION = 30 * 1000 // 30 seconds
 
 export function useOrganization() {
-  const [organization, setOrganization] = useState<Organization | null>(organizationCache)
-  const [loading, setLoading] = useState(!organizationCache)
+  // Try to get cached data from sessionStorage
+  const getCachedData = () => {
+    if (typeof window === 'undefined') return null
+
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY)
+      const timestamp = sessionStorage.getItem(CACHE_TIMESTAMP_KEY)
+
+      if (cached && timestamp) {
+        const age = Date.now() - parseInt(timestamp)
+        if (age < CACHE_DURATION) {
+          return JSON.parse(cached)
+        }
+      }
+    } catch (error) {
+      // Ignore cache errors
+    }
+
+    return null
+  }
+
+  const setCachedData = (data: Organization) => {
+    if (typeof window === 'undefined') return
+
+    try {
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify(data))
+      sessionStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
+    } catch (error) {
+      // Ignore cache errors
+    }
+  }
+
+  const [organization, setOrganization] = useState<Organization | null>(getCachedData)
+  const [loading, setLoading] = useState(!getCachedData)
 
   const fetchOrganization = async (force = false) => {
-    // Use cached data if available and not expired, unless force refresh
-    if (!force && organizationCache && Date.now() - cacheTimestamp < CACHE_DURATION) {
-      setOrganization(organizationCache)
+    const cachedData = getCachedData()
+    const shouldUseCache = !force && cachedData
+
+    if (shouldUseCache) {
+      setOrganization(cachedData)
       setLoading(false)
       return
     }
@@ -90,9 +125,8 @@ export function useOrganization() {
       if (response.ok) {
         const data = await response.json()
         setOrganization(data)
-        // Cache the data
-        organizationCache = data
-        cacheTimestamp = Date.now()
+        // Cache the data in sessionStorage
+        setCachedData(data)
       } else {
         // Fallback to mock data if API fails
         const mockOrganization: Organization = {
@@ -104,8 +138,7 @@ export function useOrganization() {
           currency: 'USD'
         }
         setOrganization(mockOrganization)
-        organizationCache = mockOrganization
-        cacheTimestamp = Date.now()
+        setCachedData(mockOrganization)
       }
     } catch (error) {
       console.error('Failed to fetch organization:', error)
@@ -119,16 +152,20 @@ export function useOrganization() {
         currency: 'USD'
       }
       setOrganization(mockOrganization)
-      organizationCache = mockOrganization
-      cacheTimestamp = Date.now()
+      setCachedData(mockOrganization)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchOrganization()
-  }, [])
+    // Only fetch if we don't have cached data
+    if (!organization) {
+      fetchOrganization()
+    } else {
+      setLoading(false)
+    }
+  }, [organization])
 
   return {
     organization,

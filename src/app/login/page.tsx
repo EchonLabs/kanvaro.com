@@ -20,15 +20,54 @@ function LoginForm() {
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [verificationRequired, setVerificationRequired] = useState(false)
+  const [userEmail, setUserEmail] = useState('')
+  const [resendingVerification, setResendingVerification] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const { organization, loading: orgLoading } = useOrganization()
 
   useEffect(() => {
-    if (searchParams.get('message') === 'setup-completed') {
+    const message = searchParams.get('message')
+    const error = searchParams.get('error')
+    const success = searchParams.get('success')
+
+    if (message === 'setup-completed') {
       setSuccessMessage('Setup completed successfully! Please log in with your admin credentials.')
+    } else if (success) {
+      setSuccessMessage(success)
+    } else if (error) {
+      setError(error)
     }
   }, [searchParams])
+
+  const handleResendVerification = async () => {
+    if (!userEmail) return
+
+    setResendingVerification(true)
+    try {
+      const response = await fetch('/api/auth/verify-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: userEmail }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setSuccessMessage('Verification email sent successfully. Please check your inbox.')
+        setError('')
+      } else {
+        setError(data.error || 'Failed to send verification email')
+      }
+    } catch (err) {
+      setError('Failed to send verification email')
+    } finally {
+      setResendingVerification(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -91,7 +130,15 @@ function LoginForm() {
         }
       } else {
         console.error('Login failed:', data.error)
-        setError(data.error || 'Login failed. Please try again.')
+
+        // Handle email verification requirement
+        if (data.requiresVerification) {
+          setVerificationRequired(true)
+          setUserEmail(data.email || email)
+          setError('')
+        } else {
+          setError(data.error || 'Login failed. Please try again.')
+        }
         setIsLoading(false)
       }
     } catch (error) {
@@ -137,7 +184,7 @@ function LoginForm() {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
                 {successMessage && (
-                  <Alert>
+                  <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200">
                     <AlertDescription>{successMessage}</AlertDescription>
                   </Alert>
                 )}
@@ -152,6 +199,53 @@ function LoginForm() {
                     >
                       <X className="h-4 w-4" />
                     </button>
+                  </Alert>
+                )}
+
+                {verificationRequired && (
+                  <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+                    <AlertDescription className="text-amber-800 dark:text-amber-200">
+                      <div className="space-y-2">
+                        <div>
+                          <strong>Email verification required</strong>
+                          <p className="mt-1 text-sm">
+                            Your account requires email verification before you can sign in.
+                            We've sent a verification link to <strong>{userEmail}</strong>.
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleResendVerification}
+                            disabled={resendingVerification}
+                            className="text-xs"
+                          >
+                            {resendingVerification ? (
+                              <>
+                                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                Sending...
+                              </>
+                            ) : (
+                              'Resend Email'
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            onClick={() => {
+                              setVerificationRequired(false)
+                              setError('')
+                            }}
+                            className="text-xs h-auto p-0 text-amber-700 dark:text-amber-300"
+                          >
+                            Try different email
+                          </Button>
+                        </div>
+                      </div>
+                    </AlertDescription>
                   </Alert>
                 )}
 

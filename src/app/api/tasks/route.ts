@@ -162,7 +162,7 @@ export async function GET(request: NextRequest) {
     const organizationId = user.organization;
 
     const { searchParams } = new URL(request.url);
-    
+
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const after = searchParams.get('after');
@@ -178,6 +178,7 @@ export async function GET(request: NextRequest) {
     const dueDateTo = searchParams.get('dueDateTo') || '';
     const createdAtFrom = searchParams.get('createdAtFrom') || '';
     const createdAtTo = searchParams.get('createdAtTo') || '';
+    const minimal = searchParams.get('minimal') === 'true';
 
     const useCursorPagination = !!after;
     const PAGE_SIZE = Math.min(limit, 100);
@@ -279,11 +280,16 @@ export async function GET(request: NextRequest) {
 
     const taskQueryFilters: any = { ...filters };
 
+    // Use minimal population for story detail view to improve performance
+    const populatePaths = minimal ? [] : [
+      { path: 'project', select: '_id name' },
+      { path: 'assignedTo', select: 'firstName lastName email' },
+      { path: 'createdBy', select: 'firstName lastName email' },
+      { path: 'movedFromSprint', select: '_id name' }
+    ];
+
     const items = await Task.find(taskQueryFilters)
-      .populate('project', '_id name')
-      .populate('assignedTo', 'firstName lastName email')
-      .populate('createdBy', 'firstName lastName email')
-      .populate('movedFromSprint', '_id name')
+      .populate(populatePaths)
       .sort(sort)
       .skip((page - 1) * PAGE_SIZE)
       .limit(PAGE_SIZE)

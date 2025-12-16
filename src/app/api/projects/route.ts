@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
     }
 
     const projects = await Project.find(projectQuery)
+      .select('name startDate endDate createdBy teamMembers client status')
       .populate('createdBy', 'firstName lastName email')
       .populate('teamMembers', 'firstName lastName email')
       .populate('client', 'firstName lastName email')

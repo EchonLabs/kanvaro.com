@@ -8,17 +8,21 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { 
+import {
   ArrowLeft,
   Save,
   Loader2,
-  Layers
+  Layers,
+  Plus,
+  X
 } from 'lucide-react'
 import { useNotify } from '@/lib/notify'
 
 interface Project {
   _id: string
   name: string
+  startDate?: Date
+  endDate?: Date
 }
 
 export default function CreateEpicPage() {
@@ -37,8 +41,9 @@ export default function CreateEpicPage() {
     priority: 'medium',
     dueDate: '',
     estimatedHours: '',
-    labels: ''
+    labels: [] as string[]
   })
+  const [newLabel, setNewLabel] = useState('')
 
   const checkAuth = useCallback(async () => {
     try {
@@ -77,9 +82,25 @@ export default function CreateEpicPage() {
     checkAuth()
   }, [checkAuth])
 
+  // Clear due date if it's outside the valid range when project changes
+  useEffect(() => {
+    if (formData.project && formData.dueDate) {
+      const dateRange = getValidDateRange()
+      if (dateRange) {
+        const selectedDate = new Date(formData.dueDate)
+        const isBeforeMin = dateRange.minDate && selectedDate < dateRange.minDate
+        const isAfterMax = dateRange.maxDate && selectedDate > dateRange.maxDate
+
+        if (isBeforeMin || isAfterMax) {
+          setFormData(prev => ({ ...prev, dueDate: '' }))
+        }
+      }
+    }
+  }, [formData.project])
+
   const fetchProjects = async () => {
     try {
-      const response = await fetch('/api/projects')
+      const response = await fetch('/api/projects?fields=name,startDate,endDate')
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
@@ -91,6 +112,50 @@ export default function CreateEpicPage() {
       console.error('Failed to fetch projects:', err)
       setProjects([])
     }
+  }
+
+  const addLabel = () => {
+    if (newLabel.trim() && !formData.labels.includes(newLabel.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        labels: [...prev.labels, newLabel.trim()]
+      }))
+      setNewLabel('')
+    }
+  }
+
+  const removeLabel = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      labels: prev.labels.filter((_, i) => i !== index)
+    }))
+  }
+
+  // Calculate valid date range for due date based on selected project
+  const getValidDateRange = () => {
+    const selectedProject = projects.find(p => p._id === formData.project)
+    if (!selectedProject) return null
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    let minDate = today // Must be today or future
+    let maxDate = null
+
+    // If project has start date, due date should be after project start
+    if (selectedProject.startDate) {
+      const projectStart = new Date(selectedProject.startDate)
+      projectStart.setHours(0, 0, 0, 0)
+      minDate = projectStart > today ? projectStart : today
+    }
+
+    // If project has end date, due date should be before or on project end
+    if (selectedProject.endDate) {
+      maxDate = new Date(selectedProject.endDate)
+      maxDate.setHours(23, 59, 59, 999)
+    }
+
+    return { minDate, maxDate }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -107,7 +172,7 @@ export default function CreateEpicPage() {
           ...formData,
           title: formData.name?.trim() || undefined,
           estimatedHours: formData.estimatedHours ? parseInt(formData.estimatedHours) : undefined,
-          labels: formData.labels ? formData.labels.split(',').map(label => label.trim()) : []
+          labels: formData.labels
         })
       })
 
@@ -245,8 +310,15 @@ export default function CreateEpicPage() {
                       type="date"
                       value={formData.dueDate}
                       onChange={(e) => handleChange('dueDate', e.target.value)}
+                      min={getValidDateRange()?.minDate?.toISOString().split('T')[0]}
+                      max={getValidDateRange()?.maxDate?.toISOString().split('T')[0]}
                       required
                     />
+                    {formData.project && getValidDateRange() && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Due date must be within the selected project's date range
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -263,11 +335,39 @@ export default function CreateEpicPage() {
 
                   <div>
                     <label className="text-sm font-medium text-foreground">Labels</label>
-                    <Input
-                      value={formData.labels}
-                      onChange={(e) => handleChange('labels', e.target.value)}
-                      placeholder="Enter labels separated by commas"
-                    />
+                    <div className="space-y-2">
+                      <div className="flex space-x-2">
+                        <Input
+                          value={newLabel}
+                          onChange={(e) => setNewLabel(e.target.value)}
+                          placeholder="Enter label"
+                          onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLabel())}
+                        />
+                        <Button type="button" onClick={addLabel} size="sm" disabled={newLabel.trim() === ''}>
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {formData.labels.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {formData.labels.map((label, index) => (
+                            <div
+                              key={index}
+                              className="inline-flex items-center gap-1.5 bg-muted px-3 py-1.5 rounded-md text-sm"
+                            >
+                              <span>{label}</span>
+                              <button
+                                type="button"
+                                aria-label="Remove label"
+                                className="text-muted-foreground hover:text-foreground focus:outline-none transition-colors"
+                                onClick={() => removeLabel(index)}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
