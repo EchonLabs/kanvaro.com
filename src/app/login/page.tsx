@@ -23,9 +23,24 @@ function LoginForm() {
   const [verificationRequired, setVerificationRequired] = useState(false)
   const [userEmail, setUserEmail] = useState('')
   const [resendingVerification, setResendingVerification] = useState(false)
+  const [orgRequiresVerification, setOrgRequiresVerification] = useState<boolean | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const { organization, loading: orgLoading } = useOrganization()
+
+  // Check organization email verification settings
+  useEffect(() => {
+    if (organization && !orgLoading) {
+      const requiresVerification = organization.settings?.requireEmailVerification ?? true
+      setOrgRequiresVerification(requiresVerification)
+
+      // If verification is not required, reset any verification states
+      if (!requiresVerification) {
+        setVerificationRequired(false)
+        setUserEmail('')
+      }
+    }
+  }, [organization, orgLoading])
 
   useEffect(() => {
     const message = searchParams.get('message')
@@ -36,6 +51,11 @@ function LoginForm() {
       setSuccessMessage('Setup completed successfully! Please log in with your admin credentials.')
     } else if (success) {
       setSuccessMessage(success)
+      // If email verification was successful, clear verification states
+      if (success.includes('Email verified')) {
+        setVerificationRequired(false)
+        setUserEmail('')
+      }
     } else if (error) {
       setError(error)
     }
@@ -202,7 +222,7 @@ function LoginForm() {
                   </Alert>
                 )}
 
-                {verificationRequired && (
+                {orgRequiresVerification && verificationRequired && (
                   <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
                     <AlertDescription className="text-amber-800 dark:text-amber-200">
                       <div className="space-y-2">
@@ -296,7 +316,7 @@ function LoginForm() {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={isLoading || isLoadingPermissions}
+                  disabled={isLoading || isLoadingPermissions || (orgRequiresVerification && verificationRequired)}
                 >
                   {isLoadingPermissions ? (
                     <>
