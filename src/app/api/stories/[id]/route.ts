@@ -136,7 +136,7 @@ export async function PUT(
       )
     }
 
-    const story = await Story.findByIdAndUpdate(
+    const story: any = await Story.findByIdAndUpdate(
       storyId,
       updateData,
       { new: true }
@@ -163,9 +163,9 @@ export async function PUT(
 
     // If this story belongs to an epic, check if epic should be completed
     // Use the completion service to ensure consistent logic
-    if (story.epic) {
+    if (story?.epic) {
       const { CompletionService } = await import('@/lib/completion-service')
-      CompletionService.checkEpicCompletion(story.epic.toString()).catch(error => {
+      CompletionService.checkEpicCompletion(story?.epic.toString()).catch(error => {
         console.error('Error checking epic completion:', error)
       })
     }
