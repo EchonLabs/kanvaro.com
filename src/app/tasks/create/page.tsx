@@ -827,7 +827,7 @@ export default function CreateTaskPage() {
                       }}
                       onOpenChange={(open) => { if (open) setStoryQuery('') }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a story" />
                       </SelectTrigger>
                       <SelectContent className="z-[10050] p-0">
@@ -853,8 +853,10 @@ export default function CreateTaskPage() {
                               }
                               
                               return filtered.map((story) => (
-                                <SelectItem key={story._id} value={story._id}>
-                                  {story.title}
+                                <SelectItem key={story._id} value={story._id} title={story.title}>
+                                  <div className="truncate max-w-xs" title={story.title}>
+                                    {story.title}
+                                  </div>
                                 </SelectItem>
                               ))
                             })()}
@@ -872,7 +874,7 @@ export default function CreateTaskPage() {
                       disabled={loadingEpics}
                       onOpenChange={(open) => { if (open) setEpicQuery('') }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder={loadingEpics ? 'Loading epics...' : 'Select an epic'} />
                       </SelectTrigger>
                       <SelectContent className="z-[10050] p-0">
@@ -923,8 +925,10 @@ export default function CreateTaskPage() {
                               }
                               
                               return filtered.map((epic) => (
-                                <SelectItem key={epic._id} value={epic._id}>
-                                  {epic.title}
+                                <SelectItem key={epic._id} value={epic._id} title={epic.title}>
+                                  <div className="truncate max-w-xs" title={epic.title}>
+                                    {epic.title}
+                                  </div>
                                 </SelectItem>
                               ))
                             })()}

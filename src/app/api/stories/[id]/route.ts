@@ -46,25 +46,27 @@ export async function GET(
       ];
     }
 
+    // Optimize population to only fetch what's needed for the UI
     const story = await Story.findOne(storyQuery)
-      .populate('project', 'name')
+      .populate('project', '_id name') // Include _id for permission checks
       .populate({
         path: 'epic',
-        select: 'title description status priority dueDate tags project createdBy',
+        select: '_id title description status priority dueDate tags project createdBy',
         populate: [
-          { path: 'project', select: 'name' },
-          { path: 'createdBy', select: 'firstName lastName email' }
+          { path: 'project', select: '_id name' },
+          { path: 'createdBy', select: '_id firstName lastName email' }
         ]
       })
-      .populate('assignedTo', 'firstName lastName email')
-      .populate('createdBy', 'firstName lastName email')
+      .populate('assignedTo', '_id firstName lastName email') // Include _id for permission checks
+      .populate('createdBy', '_id firstName lastName email') // Include _id for permission checks
       .populate({
         path: 'sprint',
-        select: 'name description status startDate endDate goal project',
+        select: '_id name description status startDate endDate goal project',
         populate: [
-          { path: 'project', select: 'name' }
+          { path: 'project', select: '_id name' }
         ]
       })
+      .lean() // Use lean for better performance
 
     if (!story) {
       return NextResponse.json(
@@ -109,25 +111,10 @@ export async function PUT(
 
     const updateData = await request.json()
 
+    // Only fetch essential data for permission check and update validation
     const existingStory = await Story.findById(storyId)
-      .populate('project', 'name')
-      .populate({
-        path: 'epic',
-        select: 'title description status priority dueDate tags project createdBy',
-        populate: [
-          { path: 'project', select: 'name' },
-          { path: 'createdBy', select: 'firstName lastName email' }
-        ]
-      })
-      .populate('assignedTo', 'firstName lastName email')
-      .populate('createdBy', 'firstName lastName email')
-      .populate({
-        path: 'sprint',
-        select: 'name description status startDate endDate goal project',
-        populate: [
-          { path: 'project', select: 'name' }
-        ]
-      })
+      .populate('project', '_id')
+      .populate('createdBy', '_id')
 
     if (!existingStory) {
       return NextResponse.json(
@@ -154,24 +141,25 @@ export async function PUT(
       updateData,
       { new: true }
     )
-      .populate('project', 'name')
+      .populate('project', '_id name')
       .populate({
         path: 'epic',
-        select: 'title description status priority dueDate tags project createdBy',
+        select: '_id title description status priority dueDate tags project createdBy',
         populate: [
-          { path: 'project', select: 'name' },
-          { path: 'createdBy', select: 'firstName lastName email' }
+          { path: 'project', select: '_id name' },
+          { path: 'createdBy', select: '_id firstName lastName email' }
         ]
       })
-      .populate('assignedTo', 'firstName lastName email')
-      .populate('createdBy', 'firstName lastName email')
+      .populate('assignedTo', '_id firstName lastName email')
+      .populate('createdBy', '_id firstName lastName email')
       .populate({
         path: 'sprint',
-        select: 'name description status startDate endDate goal project',
+        select: '_id name description status startDate endDate goal project',
         populate: [
-          { path: 'project', select: 'name' }
+          { path: 'project', select: '_id name' }
         ]
       })
+      .lean()
 
     // If this story belongs to an epic, check if epic should be completed
     // Use the completion service to ensure consistent logic

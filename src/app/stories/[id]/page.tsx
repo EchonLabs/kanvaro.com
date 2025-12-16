@@ -133,17 +133,23 @@ export default function StoryDetailPage() {
 
       if (response.ok) {
         setAuthError('')
+        // Fetch story first, then fetch tasks
         await fetchStory()
+        // Fetch tasks after story is loaded (non-blocking)
+        fetchTasks()
       } else if (response.status === 401) {
         const refreshResponse = await fetch('/api/auth/refresh', {
           method: 'POST'
         })
-        
+
         if (refreshResponse.ok) {
           const meResponse = await fetchAndSetCurrentUser()
           if (meResponse.ok) {
             setAuthError('')
+            // Fetch story first, then fetch tasks
             await fetchStory()
+            // Fetch tasks after story is loaded (non-blocking)
+            fetchTasks()
           } else {
             setAuthError('Session expired')
             setTimeout(() => {
@@ -202,10 +208,8 @@ export default function StoryDetailPage() {
         // Ensure breadcrumb is set
         setItems([
           { label: 'Stories', href: '/stories' },
-          { label: 'View Story' }
+          { label: data.data.title || 'View Story' }
         ])
-        // Fetch tasks for this story
-        fetchTasks()
       } else {
         setError(data.error || 'Failed to fetch story')
       }
@@ -217,9 +221,12 @@ export default function StoryDetailPage() {
   }
 
   const fetchTasks = async () => {
+    if (!storyId) return
+
     try {
       setTasksLoading(true)
-      const response = await fetch(`/api/tasks?story=${storyId}`)
+      // Add minimal=true parameter to get lightweight task data for story view
+      const response = await fetch(`/api/tasks?story=${storyId}&minimal=true`)
       const data = await response.json()
 
       if (data.success) {

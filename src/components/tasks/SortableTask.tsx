@@ -77,7 +77,7 @@ export default function SortableTask({
       {...listeners}
       className={`hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing ${
         isDragging ? 'opacity-50' : ''
-      } ${isDragOverlay ? 'rotate-3 shadow-lg' : ''}`}
+      } ${isDragOverlay ? 'shadow-lg' : ''}`}
       onClick={onClick}
     >
       <CardContent className="p-2 sm:p-3">

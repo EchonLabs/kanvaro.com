@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -9,19 +9,20 @@ import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
-import { 
-  ArrowLeft, 
-  Search, 
-  Filter, 
-  RefreshCw, 
-  Activity, 
-  Users, 
+import {
+  ArrowLeft,
+  Search,
+  Filter,
+  RefreshCw,
+  Activity,
+  Users,
   Calendar,
   CheckCircle,
   Plus,
   MessageSquare,
   Timer,
-  Clock
+  Clock,
+  X
 } from 'lucide-react'
 import { PageContent } from '@/components/ui/PageContent'
 
@@ -58,6 +59,7 @@ export default function ActivityPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [projects, setProjects] = useState<Array<{ _id: string; name: string }>>([])
   const [projectsLoading, setProjectsLoading] = useState(false)
+  const [projectFilterQuery, setProjectFilterQuery] = useState('')
   const [filters, setFilters] = useState<ActivityFilters>({
     type: 'all',
     action: 'all',
@@ -195,9 +197,16 @@ export default function ActivityPage() {
     loadProjects()
   }, [])
 
+  // Filtered project options based on search query
+  const filteredProjectOptions = useMemo(() => {
+    const query = projectFilterQuery.trim().toLowerCase()
+    if (!query) return projects
+    return projects.filter((project) => project.name.toLowerCase().includes(query))
+  }, [projects, projectFilterQuery])
+
   // Filter activities based on search and filters
   const filteredActivities = activities.filter(activity => {
-    const matchesSearch = searchTerm === '' || 
+    const matchesSearch = searchTerm === '' ||
       activity.target.toLowerCase().includes(searchTerm.toLowerCase()) ||
       activity.project.toLowerCase().includes(searchTerm.toLowerCase()) ||
       `${activity.user.firstName} ${activity.user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
@@ -207,7 +216,31 @@ export default function ActivityPage() {
     const matchesProject = filters.project === 'all' || activity.project === filters.project
     const matchesUser = filters.user === 'all' || activity.user._id === filters.user
 
-    return matchesSearch && matchesType && matchesAction && matchesProject && matchesUser
+    // Date range filtering
+    const matchesDateRange = (() => {
+      if (filters.dateRange === 'all') return true
+
+      const activityDate = new Date(activity.timestamp)
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+      switch (filters.dateRange) {
+        case 'today':
+          return activityDate >= today
+        case 'week':
+          const weekAgo = new Date(today)
+          weekAgo.setDate(today.getDate() - 7)
+          return activityDate >= weekAgo
+        case 'month':
+          const monthAgo = new Date(today)
+          monthAgo.setMonth(today.getMonth() - 1)
+          return activityDate >= monthAgo
+        default:
+          return true
+      }
+    })()
+
+    return matchesSearch && matchesType && matchesAction && matchesProject && matchesUser && matchesDateRange
   })
 
   if (isLoading) {
@@ -346,17 +379,50 @@ export default function ActivityPage() {
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Projects</SelectItem>
-                      {projectsLoading ? (
-                        <SelectItem value="loading" disabled>Loading projects...</SelectItem>
-                      ) : projects.length === 0 ? (
-                        <SelectItem value="none" disabled>No projects found</SelectItem>
-                      ) : (
-                        projects.map((p) => (
-                          <SelectItem key={p._id} value={p._id}>{p.name}</SelectItem>
-                        ))
-                      )}
+                    <SelectContent className="z-[10050] p-0">
+                      <div className="p-2">
+                        <div className="relative mb-2">
+                          <Input
+                            value={projectFilterQuery}
+                            onChange={(e) => setProjectFilterQuery(e.target.value)}
+                            placeholder="Search projects"
+                            className="pr-10"
+                            onKeyDown={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                          />
+                          {projectFilterQuery && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setProjectFilterQuery('')
+                                setFilters(prev => ({ ...prev, project: 'all' }))
+                              }}
+                              className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                              aria-label="Clear project filter"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="max-h-56 overflow-y-auto">
+                          <SelectItem value="all">All Projects</SelectItem>
+                          {projectsLoading ? (
+                            <SelectItem value="loading" disabled>Loading projects...</SelectItem>
+                          ) : filteredProjectOptions.length === 0 ? (
+                            projectFilterQuery ? (
+                              <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                            ) : (
+                              <SelectItem value="none" disabled>No projects found</SelectItem>
+                            )
+                          ) : (
+                            filteredProjectOptions.map((p) => (
+                              <SelectItem key={p._id} value={p.name}>{p.name}</SelectItem>
+                            ))
+                          )}
+                        </div>
+                      </div>
                     </SelectContent>
                   </Select>
                 </div>

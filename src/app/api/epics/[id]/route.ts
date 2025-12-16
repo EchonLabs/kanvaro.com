@@ -46,7 +46,7 @@ export async function GET(
     }
 
     const epic = await Epic.findOne(epicQuery)
-      .populate('project', 'name')
+      .populate('project', 'name startDate endDate')
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
 

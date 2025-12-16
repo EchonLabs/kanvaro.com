@@ -860,6 +860,268 @@ export class EmailService {
 </html>
     `
   }
+
+  generateEmailVerificationEmail(
+    firstName: string,
+    lastName: string,
+    email: string,
+    roleDisplayName: string,
+    organizationName: string = 'Kanvaro',
+    verificationUrl: string
+  ): string {
+    const fullName = `${firstName} ${lastName}`
+
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your Email for ${organizationName}</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 24px 16px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #111827;
+            background-color: #f3f4f6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .container {
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 40px 36px 36px;
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .logo {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 12px;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: bold;
+            color: white;
+        }
+        .title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #111827;
+            margin: 0 0 8px 0;
+        }
+        .subtitle {
+            font-size: 16px;
+            color: #6b7280;
+            margin: 0;
+        }
+        .content {
+            margin-bottom: 32px;
+        }
+        .greeting {
+            font-size: 18px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 16px;
+        }
+        .message {
+            font-size: 16px;
+            color: #374151;
+            margin-bottom: 24px;
+            line-height: 1.7;
+        }
+        .info-section {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 32px;
+        }
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .info-item:last-child {
+            margin-bottom: 0;
+        }
+        .info-icon {
+            width: 20px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #374151;
+            min-width: 100px;
+        }
+        .info-value {
+            color: #111827;
+        }
+        .cta-section {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            padding: 16px 32px;
+            border-radius: 12px;
+            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.25);
+            transition: all 0.2s ease;
+        }
+        .cta-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.35);
+        }
+        .help-section {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 32px;
+        }
+        .help-title {
+            font-weight: 600;
+            color: #92400e;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .help-icon {
+            font-size: 16px;
+        }
+        .help-text {
+            color: #78350f;
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .footer {
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 24px;
+            color: #6b7280;
+        }
+        .footer-text {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+        }
+        .footer-highlight {
+            color: #3b82f6;
+            font-weight: 600;
+        }
+        @media (max-width: 640px) {
+            .container {
+                padding: 24px 20px 20px;
+            }
+            .title {
+                font-size: 24px;
+            }
+            .cta-button {
+                width: 100%;
+                box-sizing: border-box;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">K</div>
+            <h1 class="title">Verify Your Email</h1>
+            <p class="subtitle">Complete your account setup for ${organizationName}</p>
+        </div>
+
+        <div class="content">
+            <div class="greeting">Hi ${firstName}!</div>
+            <div class="message">
+                Welcome to ${organizationName}! We're excited to have you join our team as a ${roleDisplayName}.
+                To complete your account setup and start collaborating, please verify your email address by clicking the button below.
+            </div>
+
+            <div class="info-section">
+                <div class="info-item">
+                    <span class="info-icon">👤</span>
+                    <span class="info-label">Name:</span>
+                    <span class="info-value">${fullName}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-icon">📧</span>
+                    <span class="info-label">Email:</span>
+                    <span class="info-value">${email}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-icon">🏢</span>
+                    <span class="info-label">Organization:</span>
+                    <span class="info-value">${organizationName}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-icon">👔</span>
+                    <span class="info-label">Role:</span>
+                    <span class="info-value">${roleDisplayName}</span>
+                </div>
+            </div>
+
+            <div class="cta-section">
+                <a href="${verificationUrl}" class="cta-button">Verify Your Email →</a>
+            </div>
+
+            <div class="help-section">
+                <div class="help-title">
+                    <span class="help-icon">⏰</span>
+                    Link Expires Soon
+                </div>
+                <p class="help-text">
+                    For security reasons, this verification link will expire in 24 hours. If the link expires, you'll need to request a new verification email from your account settings.
+                </p>
+            </div>
+
+            <div class="help-section" style="background: #ecfdf5; border-color: #10b981;">
+                <div class="help-title" style="color: #047857;">
+                    <span class="help-icon">💡</span>
+                    What happens next?
+                </div>
+                <p class="help-text" style="color: #065f46;">
+                    After verifying your email, you'll be able to sign in to your account and start exploring the platform. You'll have access to projects, tasks, and collaboration tools based on your role.
+                </p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p class="footer-text">
+                If you didn't request this account or have any questions, please contact your administrator or our support team.
+            </p>
+            <p class="footer-text" style="margin-top: 16px;">
+                Best regards,<br>
+                <strong>The ${organizationName} Team</strong>
+            </p>
+            <p class="footer-text" style="margin-top: 20px; font-size: 12px; color: #9ca3af;">
+                This is an automated verification email. Please do not reply to this message.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+    `
+  }
 }
 
 export const emailService = EmailService.getInstance()
