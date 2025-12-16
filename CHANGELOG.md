@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.13.7...v1.14.0) (2025-12-16)
+
+
+### Features
+
+* add billbale task changes ([a863119](https://github.com/EchonLabs/kanvaro.com/commit/a863119dfb9e0d151c42a8d55c9ee3546a15f19d))
+
 ## [1.13.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.13.6...v1.13.7) (2025-12-16)
 
 
