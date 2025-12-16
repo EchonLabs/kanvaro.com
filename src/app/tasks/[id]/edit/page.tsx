@@ -83,6 +83,7 @@ interface TaskFormState {
   estimatedHours?: number
   story?: string
   epic?: string
+  isBillable?: boolean
   // storyPoints?: number
 }
 
@@ -99,6 +100,7 @@ const mapTaskFormState = (data: any): TaskFormState => ({
   estimatedHours: typeof data?.estimatedHours === 'number' ? data.estimatedHours : undefined,
   story: data?.story?._id ?? data?.story ?? undefined,
   epic: data?.epic?._id ?? data?.epic ?? undefined,
+  isBillable: typeof data?.isBillable === 'boolean' ? data.isBillable : undefined,
  // storyPoints: typeof data?.storyPoints === 'number' ? data.storyPoints : undefined
 })
 
@@ -427,11 +429,11 @@ export default function EditTaskPage() {
           const firstName = userObj?.firstName || member?.firstName
           const lastName = userObj?.lastName || member?.lastName
           const email = userObj?.email || member?.email
-          
+
           if (!userId || !firstName || !lastName) {
             return null
           }
-          
+
           return {
             _id: String(userId),
             firstName: String(firstName),
@@ -440,8 +442,12 @@ export default function EditTaskPage() {
           }
         })
         .filter((member: User | null): member is User => member !== null)
-      
+
       setUsers(teamMembers)
+
+      // Set billable default from project
+      const billableDefault = typeof data.data.isBillableByDefault === 'boolean' ? data.data.isBillableByDefault : true
+      setTask((prev) => prev ? ({ ...prev, isBillable: billableDefault }) : prev)
       
       updateAssignees((prev) => {
         const valid = prev.filter(id => teamMembers.some((member) => String(member._id) === String(id)))
@@ -683,6 +689,7 @@ export default function EditTaskPage() {
           dueDate: task.dueDate || undefined,
           labels: labels,
           estimatedHours: task.estimatedHours || undefined,
+          isBillable: task.isBillable,
         //  storyPoints: task.storyPoints || undefined,
           story: task.story || undefined,
           epic: task.epic || undefined,
@@ -1256,6 +1263,18 @@ export default function EditTaskPage() {
                     value={task.dueDate || ''}
                     onChange={(e) => setTask((prev) => prev ? ({ ...prev, dueDate: e.target.value || undefined }) : prev)}
                     className="mt-1"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Billable</label>
+                    <p className="text-xs text-muted-foreground">Override project default for this task.</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={task.isBillable || false}
+                    onChange={(e) => setTask((prev) => prev ? ({ ...prev, isBillable: e.target.checked }) : prev)}
                   />
                 </div>
 

@@ -32,9 +32,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 interface Project {
   _id: string
   name: string
-  settings: {
-    allowTimeTracking: boolean
+  settings?: {
+    allowTimeTracking?: boolean
+    allowManualTimeSubmission?: boolean
+    allowExpenseTracking?: boolean
+    requireApproval?: boolean
+    kanbanStatuses?: any[]
+    notifications?: any
   }
+  isBillableByDefault?: boolean
 }
 
 interface Task {
@@ -369,21 +375,29 @@ export default function TimerPage() {
       const data = await response.json()
       if (data.success && Array.isArray(data.data)) {
         const effectiveUser = currentUser ?? user
+      // Filter projects by user access and project-level time tracking settings
       const filtered = data.data.filter((project: any) => {
         const u = effectiveUser
         if (!u) return false
-        const allow = project?.settings?.allowTimeTracking
-        if (allow !== true) return false
+
+        // Check project-level time tracking setting
+        // If not set (undefined), default to allowing time tracking
+        const projectAllowsTimeTracking = project?.settings?.allowTimeTracking !== false
+        if (!projectAllowsTimeTracking) return false
+
+        // Check user access
         const createdByMatch = project?.createdBy === u.id || project?.createdBy?.id === u.id
-          const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
-          const teamMatch = teamMembers.some((memberId: any) => {
-            if (typeof memberId === 'string') return memberId === u.id
-            return memberId?._id === u.id || memberId?.id === u.id
-          })
-          const members = Array.isArray(project?.members) ? project.members : []
-          const membersMatch = members.some((m: any) => (typeof m === 'string' ? m === u.id : m?.id === u.id || m?._id === u.id))
-          return createdByMatch || teamMatch || membersMatch
+        const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
+        const teamMatch = teamMembers.some((memberId: any) => {
+          if (typeof memberId === 'string') return memberId === u.id
+          return memberId?._id === u.id || memberId?.id === u.id
         })
+
+        const members = Array.isArray(project?.members) ? project.members : []
+        const membersMatch = members.some((m: any) => (typeof m === 'string' ? m === u.id : m?.id === u.id || m?._id === u.id))
+
+        return createdByMatch || teamMatch || membersMatch
+      })
         setProjects(filtered)
       } else {
         setProjects([])
@@ -724,15 +738,26 @@ export default function TimerPage() {
       if (!user?.organization) return
 
       try {
-        const response = await fetch(`/api/time-tracking/settings?projectId=${selectedProject || ''}`)
-        if (response.ok) {
-          const data = await response.json()
-          if (data.settings) {
-            setTimeTrackingSettings(data.settings)
-            console.log('timeTrackingSettings from API:', data.settings)
+        // First fetch organization-level settings (without projectId) to determine if time tracking is allowed
+        const orgResponse = await fetch('/api/time-tracking/settings')
+        if (orgResponse.ok) {
+          const orgData = await orgResponse.json()
+          if (orgData.settings) {
+            setTimeTrackingSettings(orgData.settings)
           }
         } else {
-          console.error('Failed to fetch time tracking settings:', response.statusText)
+          console.error('Failed to fetch organization time tracking settings:', orgResponse.statusText)
+        }
+
+        // Then fetch project-specific settings if a project is selected
+        if (selectedProject) {
+          const projectResponse = await fetch(`/api/time-tracking/settings?projectId=${selectedProject}`)
+          if (projectResponse.ok) {
+            const projectData = await projectResponse.json()
+            if (projectData.settings) {
+              setTimeTrackingSettings(projectData.settings)
+            }
+          }
         }
       } catch (error) {
         console.error('Error fetching time tracking settings:', error)
@@ -740,11 +765,31 @@ export default function TimerPage() {
     }
 
     fetchTimeTrackingSettings()
-  }, [user?.organization, selectedProject])
+  }, [user?.organization])
+
+  // Fetch project-specific settings when project changes
+  useEffect(() => {
+    if (selectedProject && user?.organization) {
+      const fetchProjectSettings = async () => {
+        try {
+          const response = await fetch(`/api/time-tracking/settings?projectId=${selectedProject}`)
+          if (response.ok) {
+            const data = await response.json()
+            if (data.settings) {
+              setTimeTrackingSettings(data.settings)
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching project-specific time tracking settings:', error)
+        }
+      }
+      fetchProjectSettings()
+    }
+  }, [selectedProject, user?.organization])
 
   // Log timeTrackingSettings whenever it changes
   useEffect(() => {
-    console.log('timeTrackingSettings updated:', timeTrackingSettings)
+    console.log('timeTrackingSettings updated:', timeTrackingSettings?.allowTimeTracking ? 'ENABLED' : 'DISABLED')
   }, [timeTrackingSettings])
 
   if (isLoading) {
@@ -1007,15 +1052,21 @@ export default function TimerPage() {
 
                 {user && timeTrackingSettings?.allowTimeTracking && (
                   <div className="my-4">
-                    <Timer
-                      userId={user.id}
-                      organizationId={user.organization}
-                      projectId={selectedProject || undefined}
-                      taskId={selectedTask || undefined}
-                      description={description}
-                      requireDescription={timeTrackingSettings?.requireDescription === true}
-                      allowOvertime={timeTrackingSettings?.allowOvertime !== false}
-                      onTimerUpdate={(timer) => {
+                    {(() => {
+                      // Determine billable status from selected task
+                      const selectedTaskObj = Array.isArray(tasks) ? tasks.find(t => t._id === selectedTask) : null
+                      const isBillable = selectedTaskObj?.isBillable ?? false
+                      return (
+                        <Timer
+                          userId={user.id}
+                          organizationId={user.organization}
+                          projectId={selectedProject || undefined}
+                          taskId={selectedTask || undefined}
+                          description={description}
+                          isBillable={isBillable}
+                          requireDescription={timeTrackingSettings?.requireDescription === true}
+                          allowOvertime={timeTrackingSettings?.allowOvertime !== false}
+                          onTimerUpdate={(timer) => {
                         if (!timer) {
                           resetTimerForm()
                           // Timer stopped - notifications will be shown by backend notification system only if time was logged
@@ -1039,7 +1090,9 @@ export default function TimerPage() {
                         }
                         setTimeLogsRefreshKey((prev) => prev + 1)
                       }}
-                    />
+                        />
+                      )
+                    })()}
                   </div>
                 )}
 
