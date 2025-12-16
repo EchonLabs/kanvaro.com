@@ -475,7 +475,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
               <span className="hidden sm:inline">Manage Columns</span>
               <span className="sm:hidden">Columns</span>
             </Button>
-            <Button
+            {/* <Button
               onClick={() => handleCreateTask()}
               disabled={selectedProjectId === 'all'}
               title={selectedProjectId === 'all' ? 'Please select a specific project to create tasks' : 'Add a new task'}
@@ -483,7 +483,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Task
-            </Button>
+            </Button> */}
           </div>
         </div>
       </div>

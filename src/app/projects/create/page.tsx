@@ -1106,9 +1106,8 @@ export default function CreateProjectPage() {
                     <div className="flex rounded-md shadow-sm">
                       <span className="flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm font-medium">
                         {(() => {
-                          if (!organization?.currency) return '$'
-                          const found = currencies.find(c => c.code === organization.currency)
-                          return found?.symbol || organization.currency || '$'
+                          if (!organization?.currency) return 'USD'
+                          return organization.currency
                         })()}
                       </span>
                       <Input

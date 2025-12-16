@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -68,6 +69,7 @@ interface TaskListProps {
 }
 
 export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
+  const router = useRouter()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -384,10 +386,10 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
             {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} found
           </p>
         </div>
-        <Button onClick={handleCreateTaskClick} className="w-full sm:w-auto">
+        {/* <Button onClick={handleCreateTaskClick} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           Add Task
-        </Button>
+        </Button> */}
       </div>
 
       {error && (
@@ -456,19 +458,19 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
 
       <div className="space-y-8">
         {filteredTasks.map((task) => (
-          <Card 
-            key={task._id} 
+          <Card
+            key={task._id}
             className="hover:shadow-md transition-shadow cursor-pointer "
-            onClick={() => handleViewTask(task)}
+            onClick={() => router.push(`/tasks/${task._id}`)}
           >
             <CardContent className="p-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex-1 min-w-0 w-full">
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <div className="flex items-center justify-between mb-2">
                       <TooltipProvider delayDuration={150}>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <h4 className="font-medium text-foreground text-sm sm:text-base truncate flex-1 min-w-0">
+                            <h4 className="font-medium text-foreground text-sm sm:text-base truncate flex-1 min-w-0 mr-2">
                               {task.title}
                             </h4>
                           </TooltipTrigger>
@@ -477,16 +479,18 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      <Badge className={getStatusColor(task.status) + ' flex-shrink-0'}>
-                        {getStatusIcon(task.status)}
-                        <span className="ml-1">{formatToTitleCase(task.status)}</span>
-                      </Badge>
-                      <Badge className={getPriorityColor(task.priority) + ' flex-shrink-0'}>
-                        {formatToTitleCase(task.priority)}
-                      </Badge>
-                      <Badge className={getTypeColor(task.type) + ' flex-shrink-0'}>
-                        {formatToTitleCase(task.type)}
-                      </Badge>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge className={getStatusColor(task.status) + ' flex-shrink-0'}>
+                          {getStatusIcon(task.status)}
+                          <span className="ml-1">{formatToTitleCase(task.status)}</span>
+                        </Badge>
+                        <Badge className={getPriorityColor(task.priority) + ' flex-shrink-0'}>
+                          {formatToTitleCase(task.priority)}
+                        </Badge>
+                        <Badge className={getTypeColor(task.type) + ' flex-shrink-0'}>
+                          {formatToTitleCase(task.type)}
+                        </Badge>
+                      </div>
                     </div>
                   <p className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">
                     {task.description || 'No description'}

@@ -1,3 +1,19 @@
+## [1.13.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.13.6...v1.13.7) (2025-12-16)
+
+
+### Bug Fixes
+
+* fix build fail ([8780762](https://github.com/EchonLabs/kanvaro.com/commit/878076245d657b9ce5c47c5c28fe8dfe8932cd66))
+* fixes ([de15345](https://github.com/EchonLabs/kanvaro.com/commit/de15345039f6d6550d59376f43494496bd553a69))
+
+## [1.13.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.13.5...v1.13.6) (2025-12-16)
+
+
+### Bug Fixes
+
+* add changes ([aacd0e0](https://github.com/EchonLabs/kanvaro.com/commit/aacd0e0070f0984d4486c507dba156a5aaf47bfc))
+* add changes ([0982833](https://github.com/EchonLabs/kanvaro.com/commit/0982833720cfe835ea1fd7bc927322d3b87b9424))
+
 ## [1.13.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.13.4...v1.13.5) (2025-12-15)
 
 

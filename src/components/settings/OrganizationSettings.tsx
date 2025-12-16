@@ -174,7 +174,7 @@ export function OrganizationSettings() {
         language: organization.language || 'en',
         industry: organization.industry || '',
         size: organization.size || 'small',
-        requireEmailVerification: organization.settings?.requireEmailVerification || true,
+        requireEmailVerification: organization.settings?.requireEmailVerification ?? true,
         defaultUserRole: organization.settings?.defaultUserRole || 'team_member',
         timeTracking: {
           allowTimeTracking: true,
@@ -360,7 +360,7 @@ export function OrganizationSettings() {
         throw new Error(errorData.error || 'Failed to update registration settings')
       }
 
-      refetch()
+      // No need to refetch since registration settings don't affect other parts of the form
       setRegistrationMessage({ type: 'success', text: 'Registration settings updated successfully' })
     } catch (error) {
       setRegistrationMessage({ type: 'error', text: 'Failed to update registration settings' })

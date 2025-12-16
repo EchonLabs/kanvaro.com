@@ -389,7 +389,7 @@ function AcceptInvitationContent() {
                     onBlur={() => handleFieldBlur('password')}
                     required
                     minLength={8}
-                    className={`h-11 pr-10 ${touched.password && fieldErrors.password ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                    className={`h-11 pr-12 ${touched.password && fieldErrors.password ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                     placeholder="Create a strong password"
                     aria-invalid={touched.password && !!fieldErrors.password}
                     aria-describedby={touched.password && fieldErrors.password ? 'password-error' : undefined}
@@ -398,9 +398,9 @@ function AcceptInvitationContent() {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-muted/50 focus:bg-muted/50 rounded-md"
                     onClick={() => setShowPassword(!showPassword)}
-                    tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -470,7 +470,7 @@ function AcceptInvitationContent() {
                     onBlur={() => handleFieldBlur('confirmPassword')}
                     required
                     minLength={8}
-                    className={`h-11 pr-10 ${touched.confirmPassword && fieldErrors.confirmPassword ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                    className={`h-11 pr-12 ${touched.confirmPassword && fieldErrors.confirmPassword ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                     placeholder="Confirm your password"
                     aria-invalid={touched.confirmPassword && !!fieldErrors.confirmPassword}
                     aria-describedby={touched.confirmPassword && fieldErrors.confirmPassword ? 'confirmPassword-error' : undefined}
@@ -479,9 +479,9 @@ function AcceptInvitationContent() {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-muted/50 focus:bg-muted/50 rounded-md"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    tabIndex={-1}
+                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                   >
                     {showConfirmPassword ? (
                       <EyeOff className="h-4 w-4 text-muted-foreground" />

@@ -345,10 +345,10 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button onClick={onCreateTask} className="w-full sm:w-auto">
+          {/* <Button onClick={onCreateTask} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Add Task
-          </Button>
+          </Button> */}
         </div>
       </div>
 

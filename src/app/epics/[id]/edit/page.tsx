@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, ArrowLeft } from 'lucide-react'
+import { Loader2, ArrowLeft, Plus, X } from 'lucide-react'
 
 interface EpicForm {
   title: string
@@ -20,7 +20,7 @@ interface EpicForm {
   priority: 'low' | 'medium' | 'high' | 'critical'
   dueDate: string
   estimatedHours: number | string
-  labels: string
+  labels: string[]
 }
 
 export default function EditEpicPage() {
@@ -36,8 +36,10 @@ export default function EditEpicPage() {
     priority: 'medium',
     dueDate: '',
     estimatedHours: '',
-    labels: ''
+    labels: []
   })
+  const [newLabel, setNewLabel] = useState('')
+  const [project, setProject] = useState<{ startDate?: Date; endDate?: Date } | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -65,7 +67,7 @@ export default function EditEpicPage() {
         if (!validStatuses.includes(normalizedStatus as EpicForm['status'])) {
           normalizedStatus = 'backlog'
         }
-        
+
         const nextForm: EpicForm = {
           title: e?.title || '',
           description: e?.description || '',
@@ -73,11 +75,20 @@ export default function EditEpicPage() {
           priority: (e?.priority || 'medium'),
           dueDate: e?.dueDate ? new Date(e.dueDate).toISOString().slice(0, 10) : '',
           estimatedHours: e?.estimatedHours ?? '',
-          labels: Array.isArray(e?.tags) ? e.tags.join(', ') : ''
+          labels: Array.isArray(e?.tags) ? e.tags : []
         }
         console.log('Fetched epic status:', e?.status, 'Normalized to:', normalizedStatus)
         setForm(nextForm)
         setInitialForm(nextForm)
+
+        // Set project details for date validation
+        if (e?.project) {
+          setProject({
+            startDate: e.project.startDate ? new Date(e.project.startDate) : undefined,
+            endDate: e.project.endDate ? new Date(e.project.endDate) : undefined
+          })
+        }
+
         if (e?.progress) {
           setStoryProgress({
             totalStories: e.progress.totalStories ?? 0,
@@ -101,6 +112,65 @@ export default function EditEpicPage() {
     if (epicId) fetchEpic()
   }, [epicId, fetchEpic])
 
+  // Clear due date if it's outside the valid range
+  useEffect(() => {
+    if (project && form.dueDate) {
+      const dateRange = getValidDateRange()
+      if (dateRange) {
+        const selectedDate = new Date(form.dueDate)
+        const isBeforeMin = dateRange.minDate && selectedDate < dateRange.minDate
+        const isAfterMax = dateRange.maxDate && selectedDate > dateRange.maxDate
+
+        if (isBeforeMin || isAfterMax) {
+          setForm(prev => ({ ...prev, dueDate: '' }))
+        }
+      }
+    }
+  }, [project])
+
+  const addLabel = () => {
+    if (newLabel.trim() && !form.labels.includes(newLabel.trim())) {
+      setForm(prev => ({
+        ...prev,
+        labels: [...prev.labels, newLabel.trim()]
+      }))
+      setNewLabel('')
+    }
+  }
+
+  const removeLabel = (index: number) => {
+    setForm(prev => ({
+      ...prev,
+      labels: prev.labels.filter((_, i) => i !== index)
+    }))
+  }
+
+  // Calculate valid date range for due date based on project
+  const getValidDateRange = () => {
+    if (!project) return null
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    let minDate = today // Must be today or future
+    let maxDate = null
+
+    // If project has start date, due date should be after project start
+    if (project.startDate) {
+      const projectStart = new Date(project.startDate)
+      projectStart.setHours(0, 0, 0, 0)
+      minDate = projectStart > today ? projectStart : today
+    }
+
+    // If project has end date, due date should be before or on project end
+    if (project.endDate) {
+      maxDate = new Date(project.endDate)
+      maxDate.setHours(23, 59, 59, 999)
+    }
+
+    return { minDate, maxDate }
+  }
+
   const handleSave = async () => {
     try {
       setSaving(true)
@@ -113,7 +183,7 @@ export default function EditEpicPage() {
       }
       if (form.dueDate) payload.dueDate = new Date(form.dueDate)
       if (form.estimatedHours !== '') payload.estimatedHours = Number(form.estimatedHours)
-      if (form.labels.trim()) payload.tags = form.labels.split(',').map((s) => s.trim()).filter(Boolean)
+      if (form.labels.length > 0) payload.tags = form.labels
 
       const res = await fetch(`/api/epics/${epicId}`, {
         method: 'PUT',
@@ -244,7 +314,19 @@ export default function EditEpicPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium">Due Date</label>
-                <Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className="mt-1" />
+                <Input
+                  type="date"
+                  value={form.dueDate}
+                  onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                  min={getValidDateRange()?.minDate?.toISOString().split('T')[0]}
+                  max={getValidDateRange()?.maxDate?.toISOString().split('T')[0]}
+                  className="mt-1"
+                />
+                {getValidDateRange() && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Due date must be within the project's date range
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium">Estimated Hours</label>
@@ -253,8 +335,40 @@ export default function EditEpicPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">Labels (comma separated)</label>
-                <Input value={form.labels} onChange={(e) => setForm({ ...form, labels: e.target.value })} className="mt-1" />
+                <label className="text-sm font-medium">Labels</label>
+                <div className="space-y-2 mt-1">
+                  <div className="flex space-x-2">
+                    <Input
+                      value={newLabel}
+                      onChange={(e) => setNewLabel(e.target.value)}
+                      placeholder="Enter label"
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLabel())}
+                    />
+                    <Button type="button" onClick={addLabel} size="sm" disabled={newLabel.trim() === ''}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {form.labels.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {form.labels.map((label, index) => (
+                        <div
+                          key={index}
+                          className="inline-flex items-center gap-1.5 bg-muted px-3 py-1.5 rounded-md text-sm"
+                        >
+                          <span>{label}</span>
+                          <button
+                            type="button"
+                            aria-label="Remove label"
+                            className="text-muted-foreground hover:text-foreground focus:outline-none transition-colors"
+                            onClick={() => removeLabel(index)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 

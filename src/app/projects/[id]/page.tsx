@@ -528,7 +528,7 @@ export default function ProjectDetailPage() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto sm:mt-4 lg:mt-6">
             <Button
               variant="outline"
               size="sm"
