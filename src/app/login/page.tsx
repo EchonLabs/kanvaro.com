@@ -204,7 +204,7 @@ function LoginForm() {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
                 {successMessage && (
-                  <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200">
+                  <Alert className="bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200">
                     <AlertDescription>{successMessage}</AlertDescription>
                   </Alert>
                 )}
@@ -223,7 +223,7 @@ function LoginForm() {
                 )}
 
                 {orgRequiresVerification && verificationRequired && (
-                  <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+                  <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900">
                     <AlertDescription className="text-amber-800 dark:text-amber-200">
                       <div className="space-y-2">
                         <div>

@@ -730,7 +730,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                         </div>
                         <div className="col-span-1">
                           {entry.isBillable ? (
-                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
+                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-400">
                               Yes
                             </Badge>
                           ) : (
@@ -754,7 +754,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                             <div className="text-xs text-muted-foreground">{entry.userEmail}</div>
                           </div>
                           {entry.isBillable && (
-                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
+                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-400">
                               Billable
                             </Badge>
                           )}

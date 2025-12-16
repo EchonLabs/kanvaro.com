@@ -537,7 +537,7 @@ export function EmailSettings() {
           {message && (
             <Alert 
               variant={message.type === 'error' ? 'destructive' : 'default'}
-              className={message.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}
+              className={message.type === 'success' ? 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}
             >
               <div className="flex items-start justify-between w-full">
                 <div className="flex items-start gap-2 flex-1 min-w-0">

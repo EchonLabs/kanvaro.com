@@ -811,7 +811,7 @@ export function OrganizationSettings() {
           {message && (
             <Alert 
               variant={message.type === 'error' ? 'destructive' : 'default'}
-              className={`flex items-start gap-2 ${message.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
+              className={`flex items-start gap-2 ${message.type === 'success' ? 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
             >
               <div className="flex items-start gap-2 flex-1 min-w-0">
                 {message.type === 'error' ? (
@@ -884,7 +884,7 @@ export function OrganizationSettings() {
           {registrationMessage && (
             <Alert 
               variant={registrationMessage.type === 'error' ? 'destructive' : 'default'}
-              className={`flex items-start gap-2 ${registrationMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
+              className={`flex items-start gap-2 ${registrationMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
             >
               <div className="flex items-start gap-2 flex-1 min-w-0">
                 {registrationMessage.type === 'error' ? (
@@ -1353,7 +1353,7 @@ export function OrganizationSettings() {
           {timeTrackingMessage && (
             <Alert 
               variant={timeTrackingMessage.type === 'error' ? 'destructive' : 'default'}
-              className={`flex items-start gap-2 ${timeTrackingMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
+              className={`flex items-start gap-2 ${timeTrackingMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
             >
               <div className="flex items-start gap-2 flex-1 min-w-0">
                 {timeTrackingMessage.type === 'error' ? (

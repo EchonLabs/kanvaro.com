@@ -502,7 +502,7 @@ export default function MembersPage() {
         </div>
 
       {success && (
-        <Alert variant="success" className="break-words border-green-500 bg-green-50 dark:bg-green-900/20">
+        <Alert variant="success" className="break-words border-green-500 bg-green-50 dark:bg-green-900">
           <CheckCircle className="h-4 w-4 flex-shrink-0 text-green-600 dark:text-green-400" />
           <AlertDescription className="break-words text-green-800 dark:text-green-200">{success}</AlertDescription>
         </Alert>
