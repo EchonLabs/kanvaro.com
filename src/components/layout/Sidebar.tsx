@@ -350,6 +350,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const handleLogout = async () => {
     try {
+      // Clear permission cache before logout
+      try {
+        sessionStorage.removeItem('kanvaro_permissions')
+        sessionStorage.removeItem('kanvaro_permissions_timestamp')
+      } catch (cacheError) {
+        console.error('Error clearing permission cache:', cacheError)
+      }
+
       const response = await fetch('/api/auth/logout', { method: 'POST' })
       if (response.ok) {
         // Clear any client-side state if needed
@@ -445,7 +453,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           onClick={() => setShowLogoutConfirm(true)}
         >
           <LogOut className={cn('h-4 w-4', collapsed ? 'mx-auto' : 'mr-2')} />
-          {!collapsed && 'Sign Out'}
+          {!collapsed && 'Logout'}
         </Button>
       </div>
     </div>
@@ -454,9 +462,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       isOpen={showLogoutConfirm}
       onClose={() => setShowLogoutConfirm(false)}
       onConfirm={handleLogout}
-      title="Sign Out"
-      description="Are you sure you want to sign out?"
-      confirmText="Sign Out"
+      title="Logout"
+      description="Are you sure you want to logout?"
+      confirmText="Logout"
       cancelText="Cancel"
     />
     </>

@@ -284,6 +284,7 @@ export async function GET(request: NextRequest) {
     const populatePaths = minimal ? [] : [
       { path: 'project', select: '_id name' },
       { path: 'assignedTo', select: 'firstName lastName email' },
+      { path: 'assignees', select: 'firstName lastName email' },
       { path: 'createdBy', select: 'firstName lastName email' },
       { path: 'movedFromSprint', select: '_id name' }
     ];

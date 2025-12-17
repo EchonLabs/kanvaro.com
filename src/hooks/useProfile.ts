@@ -75,9 +75,11 @@ export function useProfile() {
           preferences: {
             theme: data.theme,
             sidebarCollapsed: data.sidebarCollapsed,
-            dateFormat: data.dateFormat,
-            timeFormat: data.timeFormat,
-            notifications: data.notifications
+            notifications: {
+              ...data.notifications,
+              dateFormat: data.dateFormat,
+              timeFormat: data.timeFormat
+            }
           }
         })
       })
@@ -85,8 +87,6 @@ export function useProfile() {
       const result = await response.json()
 
       if (result.success) {
-        setSuccess('Profile updated successfully')
-        setTimeout(() => setSuccess(''), 3000)
         return { success: true, data: result.data }
       } else {
         setError(result.error || 'Failed to update profile')
@@ -126,8 +126,6 @@ export function useProfile() {
       const result = await response.json()
 
       if (result.success) {
-        setSuccess('Password changed successfully')
-        setTimeout(() => setSuccess(''), 3000)
         return { success: true }
       } else {
         setError(result.error || 'Failed to change password')
@@ -159,8 +157,6 @@ export function useProfile() {
       const result = await response.json()
 
       if (result.success) {
-        setSuccess('Avatar updated successfully')
-        setTimeout(() => setSuccess(''), 3000)
         return { success: true, data: result.data }
       } else {
         setError(result.error || 'Failed to upload avatar')

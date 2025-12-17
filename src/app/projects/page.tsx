@@ -13,6 +13,7 @@ import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { useNotify } from '@/lib/notify'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -86,6 +87,7 @@ export default function ProjectsPage() {
   const { organization } = useOrganization()
   const { formatCurrency } = useOrgCurrency()
   const { success: notifySuccess, error: notifyError } = useNotify()
+  const { formatDate } = useDateTime()
   const orgCurrency = organization?.currency || 'USD'
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
@@ -519,11 +521,11 @@ export default function ProjectsPage() {
                       <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm pt-1">
                         <div className="flex items-center space-x-1.5 text-gray-500 dark:text-gray-400">
                           <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                          <span className="whitespace-nowrap">{new Date(project.startDate).toLocaleDateString()}</span>
+                          <span className="whitespace-nowrap">{formatDate(project.startDate)}</span>
                         </div>
                         {project.endDate && (
                           <div className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm whitespace-nowrap">
-                            Due {new Date(project.endDate).toLocaleDateString()}
+                            Due {formatDate(project.endDate)}
                           </div>
                         )}
                       </div>
@@ -584,7 +586,7 @@ export default function ProjectsPage() {
                             </div>
                             <div className="flex items-center space-x-1.5">
                               <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                              <span className="whitespace-nowrap">{new Date(project.startDate).toLocaleDateString()}</span>
+                              <span className="whitespace-nowrap">{formatDate(project.startDate)}</span>
                             </div>
                             {project.budget && (
                             <div className="flex items-center space-x-1.5">

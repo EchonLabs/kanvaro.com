@@ -245,6 +245,7 @@ export async function GET(
       .populate([
         { path: 'project', select: '_id name' },
         { path: 'assignedTo', select: 'firstName lastName email' },
+        { path: 'assignees', select: 'firstName lastName email' },
         { path: 'createdBy', select: 'firstName lastName email' },
         { path: 'comments.author', select: 'firstName lastName email' },
         { path: 'comments.linkedIssues', select: 'displayId title', options: { strictPopulate: false } },
@@ -369,6 +370,21 @@ export async function PUT(
       if (typeof updateData.assignedTo === 'string') {
         const trimmed = updateData.assignedTo.trim()
         updateData.assignedTo = trimmed.length > 0 ? trimmed : undefined
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'assignees')) {
+      if (Array.isArray(updateData.assignees)) {
+        // Filter out empty strings and trim valid IDs
+        updateData.assignees = updateData.assignees
+          .filter((id: any) => typeof id === 'string' && id.trim().length > 0)
+          .map((id: string) => id.trim())
+        // If empty array, set to undefined
+        if (updateData.assignees.length === 0) {
+          updateData.assignees = undefined
+        }
+      } else {
+        updateData.assignees = undefined
       }
     }
 
@@ -513,6 +529,7 @@ export async function PUT(
       .populate([
         { path: 'project', select: '_id name' },
         { path: 'assignedTo', select: 'firstName lastName email' },
+        { path: 'assignees', select: 'firstName lastName email' },
         { path: 'createdBy', select: 'firstName lastName email' },
         {
           path: 'story',

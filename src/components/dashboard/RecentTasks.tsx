@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { formatToTitleCase } from '@/lib/utils'
 import { Calendar, User, ArrowRight, CheckCircle } from 'lucide-react'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { useRouter } from 'next/navigation'
 
 interface RecentTasksProps {
@@ -52,6 +53,7 @@ const getPriorityColor = (priority: string) => {
 export function RecentTasks({ tasks, isLoading, onTaskUpdate }: RecentTasksProps) {
   const router = useRouter()
   const { showToast } = useToast()
+  const { formatDate } = useDateTime()
   // Selection controls removed per request; tasks are view-only here.
 
   if (isLoading) {
@@ -184,7 +186,7 @@ export function RecentTasks({ tasks, isLoading, onTaskUpdate }: RecentTasksProps
                   {task.dueDate && (
                     <div className="flex items-center whitespace-nowrap">
                       <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
-                      <span className="truncate">{new Date(task.dueDate).toLocaleDateString()}</span>
+                      <span className="truncate">{formatDate(task.dueDate)}</span>
                     </div>
                   )}
                 </div>

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { OrganizationLogo } from '@/components/ui/OrganizationLogo'
 import { useOrganization } from '@/hooks/useOrganization'
+import { usePermissionContext } from '@/lib/permissions/permission-context'
 import { Eye, EyeOff, Loader2, X } from 'lucide-react'
 import { getAppVersion } from '@/lib/version'
 
@@ -18,6 +19,7 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(false)
+  const { clearPermissionsCache } = usePermissionContext()
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [verificationRequired, setVerificationRequired] = useState(false)
@@ -116,6 +118,9 @@ function LoginForm() {
         setIsLoadingPermissions(true)
         
         try {
+          // Clear any cached permissions from previous user sessions
+          clearPermissionsCache()
+
           // Fetch permissions to ensure they're loaded before redirecting
           const permissionsResponse = await fetch('/api/auth/permissions', {
             method: 'GET',
@@ -123,18 +128,9 @@ function LoginForm() {
           })
           
           if (permissionsResponse.ok) {
-            const permissionsData = await permissionsResponse.json()
-            console.log('Permissions loaded successfully, storing and redirecting to dashboard')
-            
-            // Store permissions in sessionStorage for persistence across page reloads
-            try {
-              sessionStorage.setItem('kanvaro_permissions', JSON.stringify(permissionsData))
-              sessionStorage.setItem('kanvaro_permissions_timestamp', Date.now().toString())
-            } catch (storageError) {
-              console.error('Error storing permissions in sessionStorage:', storageError)
-            }
-            
-            // Permissions loaded and stored, now redirect to dashboard
+            console.log('Permissions loaded successfully, redirecting to dashboard')
+
+            // Permissions will be cached by the permission context, redirect to dashboard
             router.push('/dashboard')
           } else {
             console.error('Failed to load permissions:', permissionsResponse.status)

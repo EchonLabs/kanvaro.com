@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { formatToTitleCase } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
@@ -84,6 +85,7 @@ interface PendingInvitation {
 
 export default function MembersPage() {
   const router = useRouter()
+  const { formatDate } = useDateTime()
   const [members, setMembers] = useState<Member[]>([])
   const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([])
   const [loading, setLoading] = useState(true)
@@ -105,7 +107,7 @@ export default function MembersPage() {
   const canInviteMembers = hasPermission(Permission.TEAM_INVITE) || hasPermission(Permission.USER_INVITE)
   const canEditMembers = hasPermission(Permission.TEAM_EDIT) && hasPermission(Permission.USER_UPDATE)
   const canEditAdminMembers = hasPermission(Permission.TEAM_EDIT) && hasPermission(Permission.USER_MANAGE_ROLES)
-  const canDeleteMembers = hasPermission(Permission.TEAM_DELETE)
+  const canDeleteMembers = hasPermission(Permission.USER_DEACTIVATE)
   const [organizationRoles, setOrganizationRoles] = useState<Array<{ id: string; name: string; isSystem?: boolean }>>([])
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [memberToRemove, setMemberToRemove] = useState<Member | null>(null)
@@ -322,6 +324,12 @@ export default function MembersPage() {
 
   const confirmRemoveMember = async () => {
     if (!memberToRemove) return
+
+    // Double-check permission before making API call
+    if (!canDeleteMembers) {
+      notifyError({ title: 'Insufficient permissions to remove member' })
+      return
+    }
 
     try {
       setRemovingMember(true)
@@ -630,7 +638,7 @@ export default function MembersPage() {
                               </Badge>
                             </div>
                             <p className="text-xs text-muted-foreground">
-                              Joined {new Date(member.createdAt).toLocaleDateString()}
+                              Joined {formatDate(member.createdAt)}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 w-full pt-2 border-t">
@@ -693,7 +701,7 @@ export default function MembersPage() {
                               {getMemberRoleLabel(member)}
                             </Badge>
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
-                              Joined {new Date(member.createdAt).toLocaleDateString()}
+                              Joined {formatDate(member.createdAt)}
                             </span>
                           </div>
                         </div>
@@ -784,7 +792,7 @@ export default function MembersPage() {
                             </Badge>
                             <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
                               <Clock className="h-3.5 w-3.5 text-yellow-500" />
-                              <span>Expires {new Date(invitation.expiresAt).toLocaleDateString()}</span>
+                              <span>Expires {formatDate(invitation.expiresAt)}</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 w-full pt-2 border-t">
@@ -825,7 +833,7 @@ export default function MembersPage() {
                               {getInvitationRoleLabel(invitation)}
                             </Badge>
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
-                              Expires {new Date(invitation.expiresAt).toLocaleDateString()}
+                              Expires {formatDate(invitation.expiresAt)}
                             </span>
                           </div>
                         </div>

@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/Progress'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { useCurrencies } from '@/hooks/useCurrencies'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useNotify } from '@/lib/notify'
@@ -112,11 +113,15 @@ export default function CreateProjectPage() {
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay, error: currenciesError } = useCurrencies(true)
   const { organization } = useOrganization()
   const { success: notifySuccess, error: notifyError } = useNotify()
+  const { formatDate } = useDateTime()
   const orgCurrency = organization?.currency || 'USD'
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [materialsInput, setMaterialsInput] = useState('')
+const [overheadInput, setOverheadInput] = useState('')
+
   const [availableMembers, setAvailableMembers] = useState<any[]>([])
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
   const [clientSearchQuery, setClientSearchQuery] = useState('')
@@ -1058,7 +1063,7 @@ export default function CreateProjectPage() {
                       <p>The project timeline helps with resource planning and deadline tracking.</p>
                       {formData.startDate && formData.endDate && !validationErrors.endDate && (
                         <p className="text-xs text-muted-foreground mt-2">
-                          <span className="font-medium">Project Duration:</span> {new Date(formData.startDate).toLocaleDateString()} to {new Date(formData.endDate).toLocaleDateString()}
+                          <span className="font-medium">Project Duration:</span> {formatDate(formData.startDate)} to {formatDate(formData.endDate)}
                         </p>
                       )}
                     </div>
@@ -1155,39 +1160,67 @@ export default function CreateProjectPage() {
                     />
                   </div> */}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="materials">Materials</Label>
-                      <Input
-                        id="materials"
-                        type="number"
-                        value={formData.budget.categories.materials}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          budget: {
-                            ...prev.budget,
-                            categories: { ...prev.budget.categories, materials: parseFloat(e.target.value) || 0 }
-                          }
-                        }))}
-                        placeholder="0.00"
-                      />
-                    </div>
+<div className="space-y-2">
+  <Label htmlFor="materials">Materials</Label>
+  <Input
+    id="materials"
+    type="number"
+    value={materialsInput}
+    onChange={(e) => {
+      const value = e.target.value
+      const parsedValue = parseFloat(value)
 
-                    <div className="space-y-2">
-                      <Label htmlFor="overhead">Overhead</Label>
-                      <Input
-                        id="overhead"
-                        type="number"
-                        value={formData.budget.categories.overhead}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          budget: {
-                            ...prev.budget,
-                            categories: { ...prev.budget.categories, overhead: parseFloat(e.target.value) || 0 }
-                          }
-                        }))}
-                        placeholder="0.00"
-                      />
-                    </div>
+      setMaterialsInput(value)
+
+      setFormData(prev => ({
+        ...prev,
+        budget: {
+          ...prev.budget,
+          categories: {
+            ...prev.budget.categories,
+            materials:
+              value === '' || Number.isNaN(parsedValue)
+                ? 0
+                : parsedValue
+          }
+        }
+      }))
+    }}
+    placeholder="0.00"
+  />
+</div>
+
+
+<div className="space-y-2">
+  <Label htmlFor="overhead">Overhead</Label>
+  <Input
+    id="overhead"
+    type="number"
+    value={overheadInput}
+    onChange={(e) => {
+      const value = e.target.value
+      const parsedValue = parseFloat(value)
+
+      setOverheadInput(value)
+
+      setFormData(prev => ({
+        ...prev,
+        budget: {
+          ...prev.budget,
+          categories: {
+            ...prev.budget.categories,
+            overhead:
+              value === '' || Number.isNaN(parsedValue)
+                ? 0
+                : parsedValue
+          }
+        }
+      }))
+    }}
+    placeholder="0.00"
+  />
+</div>
+
                   </div>
                 </div>
               </CardContent>
@@ -1973,11 +2006,11 @@ export default function CreateProjectPage() {
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-muted-foreground">Start Date</span>
-                            <span className="text-sm text-foreground">{formData.startDate ? new Date(formData.startDate).toLocaleDateString() : 'Not set'}</span>
+                            <span className="text-sm text-foreground">{formData.startDate ? formatDate(formData.startDate) : 'Not set'}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-muted-foreground">End Date</span>
-                            <span className="text-sm text-foreground">{formData.endDate ? new Date(formData.endDate).toLocaleDateString() : 'Not set'}</span>
+                            <span className="text-sm text-foreground">{formData.endDate ? formatDate(formData.endDate) : 'Not set'}</span>
                           </div>
                         </div>
                         <div className="space-y-2">

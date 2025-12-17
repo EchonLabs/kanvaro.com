@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { Calendar as DateRangeCalendar } from '@/components/ui/calendar'
 import { cn, formatToTitleCase } from '@/lib/utils'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import {
     Plus,
     Search,
@@ -143,6 +144,7 @@ export default function TasksClient({
     const router = useRouter()
     const searchParams = useSearchParams()
     const { hasPermission } = usePermissions()
+    const { formatDate } = useDateTime()
     const canViewAllTasks = hasPermission(Permission.PROJECT_VIEW_ALL)
 
     const [tasks, setTasks] = useState<Task[]>(initialTasks)
@@ -1255,7 +1257,7 @@ export default function TasksClient({
                                                                                 {task?.dueDate && (
                                                                                     <div className="flex items-center space-x-1 flex-shrink-0">
                                                                                         <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                                                                        <span className="whitespace-nowrap">Due {new Date(task?.dueDate).toLocaleDateString()}</span>
+                                                                                        <span className="whitespace-nowrap">Due {formatDate(task?.dueDate)}</span>
                                                                                     </div>
                                                                                 )}
                                                                                 {task?.storyPoints && (

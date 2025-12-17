@@ -9,6 +9,7 @@ import { BreadcrumbProvider } from '@/contexts/BreadcrumbContext'
 import { useTimeTrackingNotifications } from '@/hooks/useTimeTrackingNotifications'
 import { usePermissionContext } from '@/lib/permissions/permission-context'
 import { ContentLoader } from '@/components/ui/ContentLoader'
+import { DateTimeProvider } from '@/components/providers/DateTimeProvider'
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -57,8 +58,9 @@ export function MainLayout({ children }: MainLayoutProps) {
   }
 
   return (
-    <BreadcrumbProvider>
-      <div className="flex h-screen bg-background overflow-x-hidden">
+    <DateTimeProvider>
+      <BreadcrumbProvider>
+        <div className="flex h-screen bg-background overflow-x-hidden">
         {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <Sidebar 
@@ -91,6 +93,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           </main>
         </div>
       </div>
-    </BreadcrumbProvider>
+      </BreadcrumbProvider>
+    </DateTimeProvider>
   )
 }

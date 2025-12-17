@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
@@ -185,6 +186,7 @@ export default function SprintDetailPage() {
   const params = useParams()
   const sprintId = params.id as string
   const { success: notifySuccess, error: notifyError } = useNotify()
+  const { formatDate } = useDateTime()
 
   const [sprint, setSprint] = useState<Sprint | null>(null)
   const [loading, setLoading] = useState(true)
@@ -927,92 +929,49 @@ export default function SprintDetailPage() {
   return (
     <MainLayout>
       <div className="space-y-8 sm:space-y-10 lg:space-y-12 overflow-x-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto min-w-0">
-            <Button variant="ghost" onClick={() => router.push('/sprints')} className="w-full sm:w-auto flex-shrink-0">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <div className="flex-1 min-w-0 w-full sm:w-auto">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0">
-                <Zap className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-blue-600 flex-shrink-0" />
-                <span className="truncate min-w-0" title={sprint?.name}>{sprint?.name}</span>
-              </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">Sprint Details</p>
+        <div className="border-b border-border/40 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+              <Button
+                variant="ghost"
+                onClick={() => router.push('/sprints')}
+                className="self-start text-sm hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-3"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                <h1 className="text-2xl font-semibold leading-snug text-foreground flex items-start gap-2 min-w-0 flex-wrap max-w-[70ch] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden break-words overflow-wrap-anywhere">
+                  <Zap className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-blue-600 flex-shrink-0" />
+                  <span className="break-words overflow-wrap-anywhere" title={sprint?.name}>{sprint?.name}</span>
+                </h1>
+                <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (!canEditSprint) return
+                      router.push(`/sprints/${sprintId}/edit`)
+                    }}
+                    className="min-h-[36px] w-full sm:w-auto"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      if (!canDeleteSprint) return
+                      setShowDeleteConfirm(true)
+                    }}
+                    className="min-h-[36px] w-full sm:w-auto"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-shrink-0">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (!canEditSprint) return
-                router.push(`/sprints/${sprintId}/edit`)
-              }}
-              disabled={!canEditSprint}
-              title={!canEditSprint ? 'You need sprint:edit and sprint:create permissions to edit.' : undefined}
-              className="w-full sm:w-auto"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (!canDeleteSprint) {
-                  setActionError('You do not have permission to delete this sprint.')
-                  return
-                }
-                setShowDeleteConfirm(true)
-              }}
-              disabled={deleting || !canDeleteSprint}
-              title={!canDeleteSprint ? 'You need sprint:delete permission to delete.' : undefined}
-              className="w-full sm:w-auto"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              {deleting ? 'Deleting...' : 'Delete'}
-            </Button>
-            {sprint.status === 'planning' && (
-              <Button
-                onClick={handleStartSprint}
-                disabled={startingSprint || !hasTasks || !canStartSprint}
-                title={
-                  !hasTasks
-                    ? 'Add tasks to this sprint before starting it.'
-                    : !canStartSprint
-                      ? 'You need sprint:start permission to start this sprint.'
-                      : undefined
-                }
-                className="w-full sm:w-auto"
-              >
-                {startingSprint ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Play className="h-4 w-4 mr-2" />
-                )}
-                {startingSprint ? 'Starting...' : 'Start Sprint'}
-              </Button>
-            )}
-            {sprint.status === 'active' && (
-              <Button
-                onClick={handleCompleteSprintClick}
-                disabled={completingSprint || !hasTasks || !canCompleteSprint}
-                title={
-                  !hasTasks
-                    ? 'Add tasks to this sprint before completing it.'
-                    : !canCompleteSprint
-                      ? 'You need sprint:complete permission to complete this sprint.'
-                      : undefined
-                }
-                className="w-full sm:w-auto"
-              >
-                {completingSprint ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                )}
-                {completingSprint ? 'Completing...' : 'Complete Sprint'}
-              </Button>
-            )}
+            <p className="text-sm text-muted-foreground">Sprint Details</p>
           </div>
         </div>
 
@@ -1316,14 +1275,14 @@ export default function SprintDetailPage() {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <span className="text-xs sm:text-sm text-muted-foreground">Start Date</span>
                   <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
-                    {new Date(sprint?.startDate).toLocaleDateString()}
+                    {formatDate(sprint?.startDate)}
                   </span>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <span className="text-xs sm:text-sm text-muted-foreground">End Date</span>
                   <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
-                    {new Date(sprint?.endDate).toLocaleDateString()}
+                    {formatDate(sprint?.endDate)}
                   </span>
                 </div>
 
@@ -1377,7 +1336,7 @@ export default function SprintDetailPage() {
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {new Date(sprint?.createdAt).toLocaleDateString()}
+                  {formatDate(sprint?.createdAt)}
                 </p>
               </CardContent>
             </Card>

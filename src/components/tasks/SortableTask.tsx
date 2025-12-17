@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { 
   GripVertical, 
   MoreHorizontal, 
@@ -55,6 +56,7 @@ export default function SortableTask({
   onEdit,
   onDelete
 }: SortableTaskProps) {
+  const { formatDate } = useDateTime()
   const {
     attributes,
     listeners,
@@ -182,7 +184,7 @@ export default function SortableTask({
             {task.dueDate && (
               <div className="flex items-center space-x-1">
                 <Calendar className="h-3 w-3 flex-shrink-0" />
-                <span className="whitespace-nowrap">Due {new Date(task.dueDate).toLocaleDateString()}</span>
+                <span className="whitespace-nowrap">Due {formatDate(task.dueDate)}</span>
               </div>
             )}
             {task.storyPoints && (

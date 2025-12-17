@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { formatToTitleCase } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -177,7 +178,8 @@ export default function TaskDetailPage() {
   const params = useParams()
   const taskId = params.id as string
   const { setItems } = useBreadcrumb()
-  
+  const { formatDate, formatDateTime } = useDateTime()
+
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -644,7 +646,7 @@ export default function TaskDetailPage() {
               : comment.author?.email || 'User'}
           </div>
           <div className="text-xs text-muted-foreground">
-            {comment.createdAt ? new Date(comment.createdAt).toLocaleString() : ''}
+            {comment.createdAt ? formatDateTime(comment.createdAt) : ''}
             {comment.updatedAt && (
               <span className="ml-2 text-[11px]">(edited)</span>
             )}
@@ -894,7 +896,7 @@ export default function TaskDetailPage() {
   const formatDateTime = (value?: string) => {
     if (!value) return 'Not set'
     const date = new Date(value)
-    return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    return formatDateTime(date)
   }
 
   const getPriorityColor = (priority: string) => {
@@ -996,48 +998,54 @@ export default function TaskDetailPage() {
   return (
     <MainLayout>
       <div className="space-y-8 sm:space-y-10 lg:space-y-12 overflow-x-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto min-w-0">
-            <Button variant="ghost" onClick={() => router.back()} className="w-full sm:w-auto flex-shrink-0">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <div className="flex-1 min-w-0 w-full sm:w-auto">
-              <h1 
-                className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0"
-                title={`${task.title} ${task.displayId}`}
+        <div className="border-b border-border/40 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+              <Button
+                variant="ghost"
+                onClick={() => router.back()}
+                className="self-start text-sm hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-3"
               >
-                <span className="flex-shrink-0">{getTypeIcon(task.type)}</span>
-                <span className="truncate min-w-0">{task.title} {task.displayId}</span>
-              </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">Task Details</p>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                <h1
+                  className="text-2xl font-semibold leading-snug text-foreground flex items-start gap-2 min-w-0 flex-wrap max-w-[70ch] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden break-words overflow-wrap-anywhere"
+                  title={`${task.title} ${task.displayId}`}
+                >
+                  <span className="flex-shrink-0">{getTypeIcon(task.type)}</span>
+                  <span className="break-words overflow-wrap-anywhere">{task.title} {task.displayId}</span>
+                </h1>
+                <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
+                  <Button
+                    variant="outline"
+                    disabled={!editAllowed}
+                    onClick={() => {
+                      if (!editAllowed) return
+                      router.push(`/tasks/${taskId}/edit`)
+                    }}
+                    className="min-h-[36px] w-full sm:w-auto"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    disabled={!deleteAllowed}
+                    onClick={() => {
+                      if (!deleteAllowed) return
+                      setShowDeleteConfirmModal(true)
+                    }}
+                    className="min-h-[36px] w-full sm:w-auto"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-shrink-0">
-            <Button
-              variant="outline"
-              disabled={!editAllowed}
-              onClick={() => {
-                if (!editAllowed) return
-                router.push(`/tasks/${taskId}/edit`)
-              }}
-              className="w-full sm:w-auto"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-            <Button 
-              variant="destructive"
-              disabled={!deleteAllowed}
-              onClick={() => {
-                if (!deleteAllowed) return
-                setShowDeleteConfirmModal(true)
-              }}
-              className="w-full sm:w-auto"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </Button>
+            <p className="text-sm text-muted-foreground">Task Details</p>
           </div>
         </div>
 
@@ -1395,7 +1403,7 @@ export default function TaskDetailPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Due Date</span>
                     <span className="font-medium">
-                      {new Date(task.dueDate).toLocaleDateString()}
+                      {formatDate(task.dueDate)}
                     </span>
                   </div>
                 )}
@@ -1453,7 +1461,7 @@ export default function TaskDetailPage() {
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {new Date(task.createdAt).toLocaleDateString()}
+                  {formatDate(task.createdAt)}
                 </p>
               </CardContent>
             </Card>

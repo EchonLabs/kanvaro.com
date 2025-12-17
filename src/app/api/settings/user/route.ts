@@ -43,8 +43,8 @@ export async function PUT(request: NextRequest) {
     // Update preferences
     if (updates.theme) user.preferences.theme = updates.theme
     if (updates.sidebarCollapsed !== undefined) user.preferences.sidebarCollapsed = updates.sidebarCollapsed
-    if (updates.dateFormat) user.preferences.dateFormat = updates.dateFormat
-    if (updates.timeFormat) user.preferences.timeFormat = updates.timeFormat
+
+    // Handle notifications preferences (including date/time format)
     if (updates.notifications) {
       user.preferences.notifications = {
         ...user.preferences.notifications,

@@ -1664,11 +1664,9 @@ export default function BacklogPage() {
                                 )}
                               </Tooltip>
                             </TooltipProvider>
-                            {item.assignedTo && (
-                              <p className="text-xs sm:text-sm text-muted-foreground mb-2">
-                                {item.assignedTo.firstName} {item.assignedTo.lastName}
-                              </p>
-                            )}
+                            <p className="text-xs sm:text-sm text-muted-foreground mb-2">
+                              {item.assignedTo ? `${item.assignedTo.firstName} ${item.assignedTo.lastName}` : 'Not assigned'}
+                            </p>
                             <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                               <div className="flex items-center space-x-1">
                                 <Target className="h-3 w-3 sm:h-4 sm:w-4" />

@@ -28,6 +28,7 @@ export interface ITask extends Document {
   epic?: mongoose.Types.ObjectId
   parentTask?: mongoose.Types.ObjectId
   assignedTo?: mongoose.Types.ObjectId
+  assignees?: mongoose.Types.ObjectId[]
   createdBy: mongoose.Types.ObjectId
   storyPoints?: number
   dueDate?: Date
@@ -169,6 +170,10 @@ const TaskSchema = new Schema<ITask>({
     type: Schema.Types.ObjectId,
     ref: 'User'
   },
+  assignees: [{
+    type: Schema.Types.ObjectId,
+    ref: 'User'
+  }],
   createdBy: {
     type: Schema.Types.ObjectId,
     ref: 'User',

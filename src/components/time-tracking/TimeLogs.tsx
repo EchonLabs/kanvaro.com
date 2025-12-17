@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules } from '@/lib/utils'
 import { useFeaturePermissions, usePermissions } from '@/lib/permissions/permission-context'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { toast } from 'sonner'
@@ -81,6 +82,7 @@ export function TimeLogs({
   showSelectionAndApproval = true,
   showManualLogButtons = false
 }: TimeLogsProps) {
+  const { formatDateTime } = useDateTime()
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -571,14 +573,14 @@ export function TimeLogs({
       }
     }
 
-    // Check maxSessionHours only when overtime is disabled
-    if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxSessionHours) {
+    // Check maxSessionHours only when overtime is allowed
+    if (timeTrackingSettings?.allowOvertime === true && timeTrackingSettings?.maxSessionHours) {
       const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
       const durationHours = durationMinutes / 60
       const maxHours = timeTrackingSettings.maxSessionHours
 
       if (durationHours > maxHours) {
-        setSessionHoursError(`Session duration (${durationHours.toFixed(2)}h) exceeds maximum allowed (${maxHours}h). Overtime is not allowed.`)
+        setSessionHoursError(`Session duration (${durationHours.toFixed(2)}h) exceeds maximum allowed (${maxHours}h).`)
         return
       }
     }
@@ -985,25 +987,7 @@ export function TimeLogs({
     }
   }, [authResolving, loadTimeEntries, loadActiveTimer, refreshKey])
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
 
-  const formatDateParts = (dateString: string) => {
-    const d = new Date(dateString)
-    const yyyy = d.getFullYear()
-    const mm = String(d.getMonth() + 1).padStart(2, '0')
-    const dd = String(d.getDate()).padStart(2, '0')
-    const date = `${yyyy}-${mm}-${dd}`
-    const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-    return { date, time }
-  }
 
   const handleDeleteEntry = async (entryId: string) => {
     if (!confirm('Are you sure you want to delete this time entry?')) return
@@ -1546,7 +1530,7 @@ export function TimeLogs({
     // Check max session hours
     const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
     const durationHours = durationMinutes / 60
-    if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxSessionHours && durationHours > timeTrackingSettings.maxSessionHours) {
+    if (timeTrackingSettings?.allowOvertime === true && timeTrackingSettings?.maxSessionHours && durationHours > timeTrackingSettings.maxSessionHours) {
       return { valid: false, error: `Row ${rowIndex + 1}: Session duration exceeds maximum allowed (${timeTrackingSettings.maxSessionHours}h)` }
     }
 
@@ -2253,21 +2237,17 @@ export function TimeLogs({
                       </div>
                       <div>
                         <div className="text-muted-foreground">Start Time</div>
-                        {(() => { const p = formatDateParts(entry.startTime); return (
-                          <div className="mt-1">
-                            <div>{p.date}</div>
-                            <div className="text-muted-foreground">{p.time}</div>
-                          </div>
-                        ) })()}
+                        <div className="mt-1">
+                          <div>{formatDateTime(entry.startTime)}</div>
+                        </div>
                       </div>
                       <div>
                         <div className="text-muted-foreground">End Time</div>
-                        {entry.endTime ? (() => { const p = formatDateParts(entry.endTime as string); return (
+                        {entry.endTime ? (
                           <div className="mt-1">
-                            <div>{p.date}</div>
-                            <div className="text-muted-foreground">{p.time}</div>
+                            <div>{formatDateTime(entry.endTime)}</div>
                           </div>
-                        ) })() : <div className="mt-1">-</div>}
+                        ) : <div className="mt-1">-</div>}
                       </div>
                       <div>
                         <div className="text-muted-foreground">Duration</div>
@@ -2386,18 +2366,10 @@ export function TimeLogs({
                       {([entry.user?.firstName, entry.user?.lastName].filter(Boolean).join(' ') || 'Unknown')}
                     </div>
                     <div className="text-xs sm:text-sm leading-tight">
-                      {(() => { const p = formatDateParts(entry.startTime); return (
-                        <>
-                          <div>{p.date}</div>
-                          <div className="text-muted-foreground">{p.time}</div>
-                        </>
-                      )})()}
+                      {formatDateTime(entry.startTime)}
                     </div>
                     <div className="text-xs sm:text-sm leading-tight">
-                      {entry.endTime ? (() => { const p = formatDateParts(entry.endTime as string); return (<>
-                        <div>{p.date}</div>
-                        <div className="text-muted-foreground">{p.time}</div>
-                      </>) })() : '-'}
+                      {entry.endTime ? formatDateTime(entry.endTime) : '-'}
                     </div>
                     <div className="text-xs sm:text-sm">
                       {formatDuration(entry.duration)}

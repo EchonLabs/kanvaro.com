@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
 import { Input } from '@/components/ui/Input'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
@@ -79,6 +80,7 @@ interface Story {
 
 export default function BacklogView({ projectId, onCreateTask }: BacklogViewProps) {
   const router = useRouter()
+  const { formatDate } = useDateTime()
   const [tasks, setTasks] = useState<Task[]>([])
   const [stories, setStories] = useState<Story[]>([])
   const [loading, setLoading] = useState(true)
@@ -560,7 +562,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
                       {task.dueDate && (
                         <div className="flex items-center space-x-1">
                           <Calendar className="h-4 w-4" />
-                          <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>
+                          <span>Due {formatDate(task.dueDate)}</span>
                         </div>
                       )}
                       {task.estimatedHours && (

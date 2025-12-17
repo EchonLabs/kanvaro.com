@@ -393,7 +393,7 @@ export async function POST(request: NextRequest) {
     const requestedDuration = duration || calculatedDuration
 
     if (
-      settings.allowOvertime === false &&
+      settings.allowOvertime === true &&
       settings.maxSessionHours &&
       requestedDuration > settings.maxSessionHours * 60
     ) {
@@ -401,7 +401,7 @@ export async function POST(request: NextRequest) {
         {
           error: `Session duration exceeds the maximum of ${settings.maxSessionHours} ${
             settings.maxSessionHours === 1 ? 'hour' : 'hours'
-          }. Overtime is disabled for this organization.`
+          }.`
         },
         { status: 400 }
       )

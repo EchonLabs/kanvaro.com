@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules } from '@/lib/utils'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 
 interface TimeReportsProps {
   userId?: string
@@ -99,6 +100,7 @@ interface ReportData {
 export function TimeReports({ userId, organizationId, projectId }: TimeReportsProps) {
   const { organization } = useOrganization()
   const { formatCurrency } = useOrgCurrency()
+  const { formatDate, formatTime } = useDateTime()
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -714,13 +716,13 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                           )}
                         </div>
                         <div className="col-span-1 text-sm">
-                          {new Date(entry.date).toLocaleDateString()}
+                          {formatDate(entry.date)}
                         </div>
                         <div className="col-span-1 text-sm">
-                          {entry.startTime ? new Date(entry.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                          {entry.startTime ? formatTime(entry.startTime) : '-'}
                         </div>
                         <div className="col-span-1 text-sm">
-                          {entry.endTime ? new Date(entry.endTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                          {entry.endTime ? formatTime(entry.endTime) : '-'}
                         </div>
                         <div className="col-span-1 text-sm font-medium">
                           {formatDuration(entry.duration)}
@@ -768,7 +770,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div>
                             <span className="text-muted-foreground">Date: </span>
-                            <span>{new Date(entry.date).toLocaleDateString()}</span>
+                            <span>{formatDate(entry.date)}</span>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Duration: </span>
@@ -776,7 +778,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                           </div>
                           <div>
                             <span className="text-muted-foreground">Start: </span>
-                            <span>{entry.startTime ? new Date(entry.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-'}</span>
+                            <span>{entry.startTime ? formatTime(entry.startTime) : '-'}</span>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Cost: </span>

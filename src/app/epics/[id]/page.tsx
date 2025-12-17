@@ -12,6 +12,7 @@ import { formatToTitleCase } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { useNotify } from '@/lib/notify'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { 
   ArrowLeft,
   Calendar,
@@ -77,6 +78,7 @@ export default function EpicDetailPage() {
   const epicId = params.id as string
   const { setItems } = useBreadcrumb()
   const { success: notifySuccess, error: notifyError } = useNotify()
+  const { formatDate } = useDateTime()
   
   const [epic, setEpic] = useState<Epic | null>(null)
   const [loading, setLoading] = useState(true)
@@ -315,24 +317,26 @@ export default function EpicDetailPage() {
   return (
     <MainLayout>
       <div className="space-y-8 sm:space-y-10 lg:space-y-12 overflow-x-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto min-w-0">
-            <Button variant="ghost" onClick={() => router.back()} className="w-full sm:w-auto flex-shrink-0">
+        <div className="border-b border-border/40 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+              <Button
+                variant="ghost"
+                onClick={() => router.back()}
+                className="self-start text-sm hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-3"
+              >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div className="flex-1 min-w-0 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
               <h1
-                className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0"
+                  className="text-2xl font-semibold leading-snug text-foreground flex items-start gap-2 min-w-0 flex-wrap max-w-[70ch] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden break-words overflow-wrap-anywhere"
                 title={epic?.title}
               >
                 <Layers className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-purple-600 flex-shrink-0" />
-                <span className="truncate min-w-0">{epic?.title}</span>
+                  <span className="break-words overflow-wrap-anywhere">{epic?.title}</span>
               </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">Epic Details</p>
-            </div>
-          </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-shrink-0">
+                <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
             <Button
               variant="outline"
               disabled={!editAllowed}
@@ -340,23 +344,27 @@ export default function EpicDetailPage() {
                 if (!editAllowed) return
                 router.push(`/epics/${epicId}/edit`)
               }}
-              className="w-full sm:w-auto"
+                    className="min-h-[36px] w-full sm:w-auto"
             >
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
             <Button
               variant="destructive"
+                    disabled={!deleteAllowed}
               onClick={() => {
-                if (!deleteAllowed || deleting) return
-                handleDeleteClick()
+                      if (!deleteAllowed) return
+                      setShowDeleteConfirmModal(true)
               }}
-              disabled={!deleteAllowed || deleting}
-              className="w-full sm:w-auto"
+                    className="min-h-[36px] w-full sm:w-auto"
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              {deleting ? 'Deleting...' : 'Delete'}
+                    Delete
             </Button>
+                </div>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">Epic Details</p>
           </div>
         </div>
 
@@ -530,7 +538,7 @@ export default function EpicDetailPage() {
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                     <span className="text-xs sm:text-sm text-muted-foreground">Due Date</span>
                     <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
-                      {new Date(epic?.dueDate).toLocaleDateString()}
+                      {formatDate(epic?.dueDate)}
                     </span>
                   </div>
                 )}
@@ -581,7 +589,7 @@ export default function EpicDetailPage() {
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {new Date(epic?.createdAt).toLocaleDateString()}
+                  {formatDate(epic?.createdAt)}
                 </p>
               </CardContent>
             </Card>
