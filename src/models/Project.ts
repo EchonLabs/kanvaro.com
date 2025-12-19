@@ -9,7 +9,10 @@ export interface IProject extends Document {
   isBillableByDefault: boolean
   organization: mongoose.Types.ObjectId
   createdBy: mongoose.Types.ObjectId
-  teamMembers: mongoose.Types.ObjectId[]
+  teamMembers: Array<{
+    memberId: mongoose.Types.ObjectId
+    hourlyRate?: number
+  }>
   memberRates?: Array<{
     user: mongoose.Types.ObjectId
     hourlyRate: number
@@ -101,7 +104,10 @@ const ProjectSchema = new Schema<IProject>({
   organization: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
   createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   projectNumber: { type: Number, required: true },
-  teamMembers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+  teamMembers: [{
+    memberId: { type: Schema.Types.ObjectId, ref: 'User' },
+    hourlyRate: { type: Number, min: 0 }
+  }],
   isBillableByDefault: { type: Boolean, default: true },
   memberRates: [{
     user: { type: Schema.Types.ObjectId, ref: 'User' },

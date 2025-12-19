@@ -13,10 +13,11 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { FileUploader } from '@/components/ui/FileUploader'
 import { AttachmentList } from '@/components/ui/AttachmentList'
-import { CalendarIcon, X, Link as LinkIcon, AlertCircle, Loader2, CheckCircle, Repeat } from 'lucide-react'
+import { CalendarIcon, X, Link as LinkIcon, AlertCircle, Loader2, Repeat } from 'lucide-react'
 import { format } from 'date-fns'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useNotify } from '@/lib/notify'
 
 interface Sprint {
   _id: string
@@ -57,14 +58,13 @@ interface AddSprintEventModalProps {
 export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprintEventModalProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState('')
-  const [error, setError] = useState('')
   const [projects, setProjects] = useState<Project[]>([])
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [selectedDate, setSelectedDate] = useState<Date>()
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [linkUrl, setLinkUrl] = useState('')
+  const { success: notifySuccess, error: notifyError } = useNotify()
 
   // Search queries for dropdowns
   const [projectQuery, setProjectQuery] = useState('')
@@ -682,38 +682,37 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
       })
 
       if (response.ok) {
-        setSuccess('Sprint Event created successfully')
-        setError('')
+        notifySuccess({
+          title: 'Sprint Event Created',
+          message: 'Sprint Event created successfully'
+        })
         setLoading(false)
         onSuccess()
-        // Show success message briefly before closing and redirecting
+        // Close modal and redirect after showing success notification
         setTimeout(() => {
-          setSuccess('')
           onClose()
           router.push('/sprint-events?success=created')
-        }, 2500)
+        }, 1000)
       } else {
         const errorData = await response.json()
         const errorMessage = errorData.error || 'Failed to create event'
         console.error('Error creating sprint event:', errorData)
-        setError(errorMessage)
-        setSuccess('')
+        notifyError({
+          title: 'Failed to Create Sprint Event',
+          message: errorMessage
+        })
         setLoading(false)
       }
     } catch (err) {
       console.error('Error creating sprint event:', err)
-      setError('Failed to create event. Please try again.')
-      setSuccess('')
+      notifyError({
+        title: 'Failed to Create Sprint Event',
+        message: 'Failed to create event. Please try again.'
+      })
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    if (error) {
-      const t = setTimeout(() => setError(''), 5000)
-      return () => clearTimeout(t)
-    }
-  }, [error])
 
   const handleInputChange = useCallback((field: string, value: string | number | any) => {
     if (field.includes('.')) {
@@ -803,31 +802,6 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
         <DialogBody className="flex-1 overflow-y-auto px-4 sm:px-6">
           <form onSubmit={handleSubmit} className="space-y-6" id="create-sprint-event-form">
-            {success && (
-              <Alert variant="success" className="flex items-center justify-between pr-2">
-                <AlertDescription className="flex-1 flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4" />
-                  {success}
-                </AlertDescription>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40"
-                  onClick={() => {
-                    setSuccess('')
-                    onClose()
-                  }}
-                >
-                  <X className="h-4 w-4 text-green-700 dark:text-green-300" />
-                </Button>
-              </Alert>
-            )}
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
             {/* (1) Basic Details */}
             <div className="space-y-4">
               <h3 className="text-sm font-semibold">Basic Details</h3>

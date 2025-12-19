@@ -17,16 +17,17 @@ export async function GET(
 
     const projectId = params.id
     const project = await Project.findById(projectId)
-      .populate('versions.createdBy', 'firstName lastName email')
 
     if (!project) {
       return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
     }
 
     // Check if user has access to this project
-    const hasAccess = project.teamMembers.includes(authResult.user.id) || 
-                     project.createdBy.toString() === authResult.user.id ||
-                     project.projectRoles.some((role: any) => role.user.toString() === authResult.user.id)
+    const hasAccess = Array.isArray(project.teamMembers)
+      ? project.teamMembers.some((m: any) => (m.memberId || m).toString() === authResult.user.id)
+      : project.teamMembers?.toString() === authResult.user.id ||
+        project.createdBy.toString() === authResult.user.id ||
+        project.projectRoles.some((role: any) => role.user.toString() === authResult.user.id)
 
     if (!hasAccess) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 })
@@ -74,12 +75,14 @@ export async function POST(
     }
 
     // Check if user has permission to manage project
-    const hasPermission = project.teamMembers.includes(authResult.user.id) || 
-                         project.createdBy.toString() === authResult.user.id ||
-                         project.projectRoles.some((role: any) => 
-                           role.user.toString() === authResult.user.id && 
-                           ['project_manager', 'project_qa_lead'].includes(role.role)
-                         )
+    const hasPermission = Array.isArray(project.teamMembers)
+      ? project.teamMembers.some((m: any) => (m.memberId || m).toString() === authResult.user.id)
+      : project.teamMembers?.toString() === authResult.user.id ||
+        project.createdBy.toString() === authResult.user.id ||
+        project.projectRoles.some((role: any) =>
+          role.user.toString() === authResult.user.id &&
+          ['project_manager', 'project_qa_lead'].includes(role.role)
+        )
 
     if (!hasPermission) {
       return NextResponse.json({ success: false, error: 'Permission denied' }, { status: 403 })

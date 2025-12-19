@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { Calendar as DateRangeCalendar } from '@/components/ui/calendar'
 import { cn, formatToTitleCase } from '@/lib/utils'
@@ -35,7 +34,8 @@ import {
     Settings,
     Edit,
     Trash2,
-    X
+    X,
+    RotateCcw
 } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -136,6 +136,8 @@ interface TasksClientProps {
     }
 }
 
+const TASKS_MODULE_STATUS_VALUES = ['backlog', 'todo', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const
+
 export default function TasksClient({
     initialTasks,
     initialPagination,
@@ -153,8 +155,6 @@ export default function TasksClient({
     const [pageSize, setPageSize] = useState(10)
     const [totalCount, setTotalCount] = useState(0)
     const [loading, setLoading] = useState(false)
-    const [error, setError] = useState('')
-    const [success, setSuccess] = useState('')
     const [searchQuery, setSearchQuery] = useState(initialFilters.search || '')
     const [statusFilter, setStatusFilter] = useState(initialFilters.status || 'all')
     const [priorityFilter, setPriorityFilter] = useState(initialFilters.priority || 'all')
@@ -176,6 +176,7 @@ export default function TasksClient({
     const [projectFilterQuery, setProjectFilterQuery] = useState('')
     const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
     const [createdByFilterQuery, setCreatedByFilterQuery] = useState('')
+    const [selectedProjectDetails, setSelectedProjectDetails] = useState<any>(null)
     const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list')
     const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
     const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
@@ -184,6 +185,33 @@ export default function TasksClient({
     const { statusMap: projectsWithStatuses } = useProjectKanbanStatuses()
     const [currentUserId, setCurrentUserId] = useState<string>('')
     const { success: notifySuccess, error: notifyError } = useNotify()
+
+    // Check if any filters are active
+    const hasActiveFilters = searchQuery !== '' ||
+                            statusFilter !== 'all' ||
+                            priorityFilter !== 'all' ||
+                            typeFilter !== 'all' ||
+                            projectFilter !== 'all' ||
+                            assignedToFilter !== 'all' ||
+                            createdByFilter !== 'all' ||
+                            dateRangeFilter !== undefined
+
+    // Reset all filters
+    const resetFilters = () => {
+      setSearchQuery('')
+      setStatusFilter('all')
+      setPriorityFilter('all')
+      setTypeFilter('all')
+      setProjectFilter('all')
+      setAssignedToFilter('all')
+      setCreatedByFilter('all')
+      setDateRangeFilter(undefined)
+      setProjectFilterQuery('')
+      setAssignedToFilterQuery('')
+      setCreatedByFilterQuery('')
+      // Trigger a fresh fetch with reset filters
+      fetchTasks(true)
+    }
 
     const startDateBoundary = useMemo(() => {
         if (!dateRangeFilter?.from) return null
@@ -395,6 +423,49 @@ export default function TasksClient({
         )
     }, [createdByOptions, createdByFilterQuery])
 
+    // Fetch project details when project filter changes
+    useEffect(() => {
+        const fetchProjectDetails = async () => {
+            if (projectFilter === 'all' || !projectFilter) {
+                setSelectedProjectDetails(null)
+                return
+            }
+
+            try {
+                const response = await fetch(`/api/projects/${projectFilter}`)
+                if (response.ok) {
+                    const data = await response.json()
+                    if (data.success) {
+                        setSelectedProjectDetails(data.data)
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to fetch project details:', error)
+                setSelectedProjectDetails(null)
+            }
+        }
+
+        fetchProjectDetails()
+    }, [projectFilter])
+
+    // Dynamic status options based on selected project
+    const availableStatusOptions = useMemo(() => {
+        if (selectedProjectDetails?.settings?.kanbanStatuses && selectedProjectDetails.settings.kanbanStatuses.length > 0) {
+            return selectedProjectDetails.settings.kanbanStatuses
+                .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+                .map((status: any) => status.key)
+        } else {
+            return TASKS_MODULE_STATUS_VALUES
+        }
+    }, [selectedProjectDetails])
+
+    // Reset status filter if current value is not valid for the new context
+    useEffect(() => {
+        if (statusFilter !== 'all' && !availableStatusOptions.includes(statusFilter as any)) {
+            setStatusFilter('all')
+        }
+    }, [availableStatusOptions, statusFilter])
+
     // Virtualization refs
     const parentRef = useRef<HTMLDivElement>(null)
     const rowVirtualizer = useVirtualizer({
@@ -479,28 +550,27 @@ export default function TasksClient({
 
             if (!response.ok) {
                 if (response.status === 401 || response.status === 403) {
-                    setError('Authentication required. Redirecting to login...')
+                    notifyError({ title: 'Authentication Required', message: 'Redirecting to login...' })
                     setTimeout(() => router.push('/login'), 1200)
                     return
                 }
                 const text = await response.text()
-                setError(text || 'Failed to fetch tasks')
+                notifyError({ title: 'Failed to Load Tasks', message: text || 'Failed to fetch tasks' })
                 return
             }
             const data = await response.json()
 
             if (data.success) {
-                setError('')
                 setTasks(data.data)
                 setTotalCount(data.pagination?.total || data.data.length)
                 if (reset) {
                     setCurrentPage(1)
                 }
             } else {
-                setError(data.error || 'Failed to fetch tasks')
+                notifyError({ title: 'Failed to Load Tasks', message: data.error || 'Failed to fetch tasks' })
             }
         } catch (err) {
-            setError('Failed to fetch tasks')
+            notifyError({ title: 'Failed to Load Tasks', message: 'Failed to fetch tasks' })
         } finally {
             setLoading(false)
         }
@@ -741,12 +811,10 @@ export default function TasksClient({
                 notifySuccess({ title: 'Task deleted successfully' })
             } else {
                 const message = data.error || 'Failed to delete task'
-                setError(message)
-                notifyError({ title: message })
+                notifyError({ title: 'Failed to Delete Task', message })
             }
         } catch (err) {
-            setError('Failed to delete task')
-            notifyError({ title: 'Failed to delete task' })
+            notifyError({ title: 'Failed to Delete Task', message: 'Failed to delete task' })
         }
     }
 
@@ -787,12 +855,16 @@ export default function TasksClient({
             setTasks((prev) =>
                 prev.map((item) => (item._id === task._id ? { ...item, status: nextStatus } : item))
             )
-            setSuccess('Task status updated successfully.')
-            setTimeout(() => setSuccess(''), 3000)
+            notifySuccess({
+                title: 'Status Updated',
+                message: 'Task status updated successfully.'
+            })
         } catch (error) {
             console.error('Failed to update task status:', error)
-            setError(error instanceof Error ? error.message : 'Failed to update status')
-            setTimeout(() => setError(''), 4000)
+            notifyError({
+                title: 'Failed to Update Status',
+                message: error instanceof Error ? error.message : 'Failed to update status'
+            })
         } finally {
             setStatusUpdatingId(null)
         }
@@ -813,12 +885,6 @@ export default function TasksClient({
                 </Button>
             </div>
 
-            {error && (
-                <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
-                </Alert>
-            )}
 
             <Card className="overflow-x-hidden">
                 <CardHeader>
@@ -855,48 +921,8 @@ export default function TasksClient({
                                 )}
                             </div>
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
-                                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                    <SelectTrigger className="w-full sm:w-40">
-                                        <SelectValue placeholder="Status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Status</SelectItem>
-                                        {getAllAvailableStatuses().map((status) => (
-                                            <SelectItem key={status} value={status}>
-                                                {formatToTitleCase(status)}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                                    <SelectTrigger className="w-full sm:w-40">
-                                        <SelectValue placeholder="Priority" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Priority</SelectItem>
-                                        <SelectItem value="low">Low</SelectItem>
-                                        <SelectItem value="medium">Medium</SelectItem>
-                                        <SelectItem value="high">High</SelectItem>
-                                        <SelectItem value="critical">Critical</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                                    <SelectTrigger className="w-full sm:w-40">
-                                        <SelectValue placeholder="Type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Types</SelectItem>
-                                        <SelectItem value="bug">Bug</SelectItem>
-                                        <SelectItem value="feature">Feature</SelectItem>
-                                        <SelectItem value="improvement">Improvement</SelectItem>
-                                        <SelectItem value="task">Task</SelectItem>
-                                        <SelectItem value="subtask">Subtask</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
                                 <Select value={projectFilter} onValueChange={setProjectFilter}>
-                                    <SelectTrigger className="w-full">
+                                    <SelectTrigger className="w-full sm:w-40">
                                         <SelectValue placeholder="Project" />
                                     </SelectTrigger>
                                     <SelectContent className="z-[10050] p-0">
@@ -941,6 +967,46 @@ export default function TasksClient({
                                         </div>
                                     </SelectContent>
                                 </Select>
+                                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                    <SelectTrigger className="w-full sm:w-40">
+                                        <SelectValue placeholder="Status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Status</SelectItem>
+                                        {availableStatusOptions.map((status: string) => (
+                                            <SelectItem key={status} value={status}>
+                                                {formatToTitleCase(status.replace('_', ' '))}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                                    <SelectTrigger className="w-full sm:w-40">
+                                        <SelectValue placeholder="Priority" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Priority</SelectItem>
+                                        <SelectItem value="low">Low</SelectItem>
+                                        <SelectItem value="medium">Medium</SelectItem>
+                                        <SelectItem value="high">High</SelectItem>
+                                        <SelectItem value="critical">Critical</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                                    <SelectTrigger className="w-full sm:w-40">
+                                        <SelectValue placeholder="Type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Types</SelectItem>
+                                        <SelectItem value="bug">Bug</SelectItem>
+                                        <SelectItem value="feature">Feature</SelectItem>
+                                        <SelectItem value="improvement">Improvement</SelectItem>
+                                        <SelectItem value="task">Task</SelectItem>
+                                        <SelectItem value="subtask">Subtask</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
                                 {canViewAllTasks && (
                                     <>
                                         <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
@@ -1083,6 +1149,29 @@ export default function TasksClient({
                                     </div>
                                 </div>
                             </div>
+                            {hasActiveFilters && (
+                              <div className="flex justify-end mt-2">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={resetFilters}
+                                        className="text-xs"
+                                        aria-label="Reset all filters"
+                                      >
+                                        <RotateCcw className="h-4 w-4 mr-1" />
+                                        Reset Filters
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Reset filters</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            )}
                         </div>
                     </div>
                 </CardHeader>
@@ -1095,7 +1184,6 @@ export default function TasksClient({
                             setViewMode(v)
                             // When returning to list view, force a fresh fetch to avoid stale/empty data
                             if (v === 'list') {
-                                setError('')
                                 setTasks([])
                                 setPagination({})
                                 fetchTasks(true)
@@ -1107,16 +1195,6 @@ export default function TasksClient({
                             <TabsTrigger value="kanban">Kanban View</TabsTrigger>
                         </TabsList>
 
-                        {success && (
-                            <div className="mt-3">
-                                <Alert variant="success">
-                                    <div className="flex items-center">
-                                        <CheckCircle className="h-4 w-4 mr-2" />
-                                        <AlertDescription>{success}</AlertDescription>
-                                    </div>
-                                </Alert>
-                            </div>
-                        )}
 
                         <TabsContent value="list" className="space-y-4">
                             {shouldShowInitialLoader ? (

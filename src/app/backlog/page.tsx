@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
@@ -38,7 +39,8 @@ import {
   Kanban,
   ArrowUp,
   ArrowDown,
-  Star
+  Star,
+  RotateCcw
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { DateRange } from 'react-day-picker'
@@ -49,6 +51,7 @@ interface UserSummary {
   firstName: string
   lastName: string
   email: string
+  hourlyRate?: number
 }
 
 interface ProjectSummary {
@@ -64,7 +67,7 @@ interface BacklogItem {
   priority: string
   status: string
   project?: ProjectSummary | null
-  assignedTo?: UserSummary | null
+  assignedTo?: UserSummary[]
   createdBy: UserSummary
   storyPoints?: number
   dueDate?: string
@@ -96,7 +99,10 @@ interface SprintOption {
   } | null
 }
 
-const ALLOWED_BACKLOG_STATUSES: string[] = ['backlog', 'todo', 'sprint', 'in_progress', 'done']
+const ALLOWED_BACKLOG_STATUSES: string[] = ['Backlog', 'todo', 'inprogress', 'done', 'cancelled']
+
+const TASK_STATUS_VALUES = ['backlog', 'todo', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const
+const EPIC_STORY_STATUSES: string[] = ['Backlog', 'todo', 'inprogress', 'done', 'cancelled']
 
 function truncateText(value: string, maxLength = 20): string {
   if (!value) {
@@ -116,6 +122,7 @@ export default function BacklogPage() {
   const [backlogItems, setBacklogItems] = useState<BacklogItem[]>([])
   const [loading, setLoading] = useState(true)
   const { success: notifySuccess, error: notifyError } = useNotify()
+  const { formatDate } = useDateTime()
   const [deleteError, setDeleteError] = useState('')
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -162,6 +169,7 @@ export default function BacklogPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
   const [assignedByFilterQuery, setAssignedByFilterQuery] = useState('')
+  const [selectedProjectDetails, setSelectedProjectDetails] = useState<any>(null)
   const startDateBoundary = useMemo(() => {
     if (!dateRangeFilter?.from) return null
     const boundary = new Date(dateRangeFilter.from)
@@ -174,6 +182,80 @@ export default function BacklogPage() {
     boundary.setHours(23, 59, 59, 999)
     return boundary
   }, [dateRangeFilter])
+
+  // Dynamic status options based on selected project and type filter
+  const availableStatusOptions = useMemo(() => {
+    // Priority 1: If a project is selected and has custom kanban statuses, use them
+    if (selectedProjectDetails?.settings?.kanbanStatuses && selectedProjectDetails.settings.kanbanStatuses.length > 0) {
+      return selectedProjectDetails.settings.kanbanStatuses
+        .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+        .map((status: any) => status.key)
+    }
+
+    // Priority 2: Use default statuses based on type filter
+    if (typeFilter === 'task') {
+      return TASK_STATUS_VALUES
+    } else {
+      return EPIC_STORY_STATUSES
+    }
+  }, [typeFilter, selectedProjectDetails])
+
+  // Check if any filters are active
+  const hasActiveFilters = searchQuery !== '' ||
+                          typeFilter !== 'all' ||
+                          priorityFilter !== 'all' ||
+                          statusFilter !== 'all' ||
+                          projectFilterValue !== 'all' ||
+                          assignedToFilter !== 'all' ||
+                          assignedByFilter !== 'all' ||
+                          dateRangeFilter !== undefined
+
+  // Reset all filters
+  const resetFilters = () => {
+    setSearchQuery('')
+    setTypeFilter('all')
+    setPriorityFilter('all')
+    setStatusFilter('all')
+    setProjectFilterValue('all')
+    setAssignedToFilter('all')
+    setAssignedByFilter('all')
+    setDateRangeFilter(undefined)
+    setProjectFilterQuery('')
+    setAssignedToFilterQuery('')
+    setAssignedByFilterQuery('')
+  }
+
+  // Reset status filter if current value is not valid for the new context
+  useEffect(() => {
+    if (statusFilter !== 'all' && !availableStatusOptions.includes(statusFilter as any)) {
+      setStatusFilter('all')
+    }
+  }, [availableStatusOptions, statusFilter])
+
+  // Fetch project details when project filter changes
+  useEffect(() => {
+    const fetchProjectDetails = async () => {
+      if (projectFilterValue === 'all' || !projectFilterValue) {
+        setSelectedProjectDetails(null)
+        return
+      }
+
+      try {
+        const response = await fetch(`/api/projects/${projectFilterValue}`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            setSelectedProjectDetails(data.data)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch project details:', error)
+        setSelectedProjectDetails(null)
+      }
+    }
+
+    fetchProjectDetails()
+  }, [projectFilterValue])
 
   const checkAuth = useCallback(async () => {
     try {
@@ -279,12 +361,16 @@ export default function BacklogPage() {
               name: item.project.name
             })
           }
-          if (item.assignedTo?._id) {
-            assignedToMap.set(item.assignedTo._id, {
-              _id: item.assignedTo._id,
-              firstName: item.assignedTo.firstName,
-              lastName: item.assignedTo.lastName,
-              email: item.assignedTo.email
+          if (item.assignedTo && Array.isArray(item.assignedTo)) {
+            item.assignedTo.forEach((user) => {
+              if (user._id) {
+                assignedToMap.set(user._id, {
+                  _id: user._id,
+                  firstName: user.firstName,
+                  lastName: user.lastName,
+                  email: user.email
+                })
+              }
             })
           }
           if (item.createdBy?._id) {
@@ -655,17 +741,30 @@ export default function BacklogPage() {
 
   const filteredSprints = useMemo(() => {
     const query = sprintQuery.trim().toLowerCase()
-    if (!query) {
-      return sprints
+
+    // Get projects from selected tasks and stories
+    const selectedItems = backlogItems.filter(item =>
+      (item.type === 'task' && selectedTaskIds.includes(item._id)) ||
+      (item.type === 'story' && selectedStoryIds.includes(item._id))
+    )
+    const selectedProjectIds = selectedItems.map(item => item.project?._id).filter(Boolean)
+
+    // Filter sprints by selected items' projects
+    let filtered = selectedProjectIds.length > 0
+      ? sprints.filter(sprint => selectedProjectIds.includes(sprint.project?._id ?? ''))
+      : sprints
+
+    // Apply search filter
+    if (query) {
+      filtered = filtered.filter((sprint) => {
+        const nameMatch = sprint.name.toLowerCase().includes(query)
+        const projectMatch = sprint.project?.name?.toLowerCase().includes(query)
+        return nameMatch || projectMatch
+      })
     }
-    return sprints.filter((sprint) => {
-      const nameMatch = sprint.name.toLowerCase().includes(query)
-      const projectMatch = sprint.project?.name
-        ? sprint.project.name.toLowerCase().includes(query)
-        : false
-      return nameMatch || projectMatch
-    })
-  }, [sprints, sprintQuery])
+
+    return filtered
+  }, [sprints, sprintQuery, selectedTaskIds, selectedStoryIds, backlogItems])
 
   const filteredProjectOptions = useMemo(() => {
     const query = projectFilterQuery.trim().toLowerCase()
@@ -1163,10 +1262,18 @@ export default function BacklogPage() {
         (item.project?._id ? item.project._id === projectFilterValue : false)
       const matchesAssignedTo =
         assignedToFilter === 'all' ||
-        (item.assignedTo?._id ? item.assignedTo._id === assignedToFilter : false)
+        (item.assignedTo && item.assignedTo.length > 0
+          ? item.assignedTo.some(user => user._id === assignedToFilter)
+          : false)
       const matchesAssignedBy =
         assignedByFilter === 'all' ||
         (item.createdBy?._id ? item.createdBy._id === assignedByFilter : false)
+
+      // Filter by sprint project when a sprint is selected
+      const selectedSprint = selectedSprintId ? sprints.find(s => s._id === selectedSprintId) : null
+      const matchesSprintProject =
+        !selectedSprint ||
+        (item.project ? item.project.toString() === selectedSprint.project?.toString() : false)
 
       const createdAtDate = new Date(item.createdAt)
       const matchesStartDate = !startDateBoundary || createdAtDate >= startDateBoundary
@@ -1180,6 +1287,7 @@ export default function BacklogPage() {
         matchesProject &&
         matchesAssignedTo &&
         matchesAssignedBy &&
+        matchesSprintProject &&
         matchesStartDate &&
         matchesEndDate
       )
@@ -1284,6 +1392,46 @@ export default function BacklogPage() {
                   />
                 </div>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+                  <Select value={projectFilterValue} onValueChange={setProjectFilterValue}>
+                    <SelectTrigger className="w-full sm:w-32">
+                      <SelectValue placeholder="Project" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div className="p-2">
+                        <Input
+                          value={projectFilterQuery}
+                          onChange={(e) => setProjectFilterQuery(e.target.value)}
+                          placeholder="Search projects"
+                          className="mb-2"
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          <SelectItem value="all">All Projects</SelectItem>
+                          {filteredProjectOptions.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                          ) : (
+                            filteredProjectOptions.map((project) => (
+                              <SelectItem key={project._id} value={project._id}>
+                                {project.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full sm:w-32">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      {availableStatusOptions.map((status: string) => (
+                        <SelectItem key={status} value={status}>
+                          {formatToTitleCase(status.replace('_', ' '))}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Select value={typeFilter} onValueChange={setTypeFilter}>
                     <SelectTrigger className="w-full sm:w-32">
                       <SelectValue placeholder="Type" />
@@ -1305,18 +1453,6 @@ export default function BacklogPage() {
                       <SelectItem value="medium">Medium</SelectItem>
                       <SelectItem value="high">High</SelectItem>
                       <SelectItem value="critical">Critical</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full sm:w-32">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="backlog">Backlog</SelectItem>
-                      <SelectItem value="sprint">Sprint</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="done">Done</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={sortBy} onValueChange={setSortBy}>
@@ -1348,133 +1484,26 @@ export default function BacklogPage() {
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
-                  <Select value={projectFilterValue} onValueChange={setProjectFilterValue}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Project" />
-                    </SelectTrigger>
-                    <SelectContent className="z-[10050] p-0">
-                      <div className="p-2">
-                        <Input
-                          value={projectFilterQuery}
-                          onChange={(e) => setProjectFilterQuery(e.target.value)}
-                          placeholder="Search projects"
-                          className="mb-2"
-                        />
-                        <div className="max-h-56 overflow-y-auto">
-                          <SelectItem value="all">All Projects</SelectItem>
-                          {filteredProjectOptions.length === 0 ? (
-                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
-                          ) : (
-                            filteredProjectOptions.map((project) => (
-                              <SelectItem key={project._id} value={project._id}>
-                                {project.name}
-                              </SelectItem>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </SelectContent>
-                  </Select>
-                  <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Assigned To" />
-                    </SelectTrigger>
-                    <SelectContent className="z-[10050] p-0">
-                      <div className="p-2">
-                        <Input
-                          value={assignedToFilterQuery}
-                          onChange={(e) => setAssignedToFilterQuery(e.target.value)}
-                          placeholder="Search assignees"
-                          className="mb-2"
-                        />
-                        <div className="max-h-56 overflow-y-auto">
-                          <SelectItem value="all">All Assignees</SelectItem>
-                          {filteredAssignedToOptions.length === 0 ? (
-                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching assignees</div>
-                          ) : (
-                            filteredAssignedToOptions.map((member) => (
-                              <SelectItem key={member._id} value={member._id}>
-                                {member.firstName} {member.lastName}
-                              </SelectItem>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </SelectContent>
-                  </Select>
-                  <Select value={assignedByFilter} onValueChange={setAssignedByFilter}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Assigned By" />
-                    </SelectTrigger>
-                    <SelectContent className="z-[10050] p-0">
-                      <div className="p-2">
-                        <Input
-                          value={assignedByFilterQuery}
-                          onChange={(e) => setAssignedByFilterQuery(e.target.value)}
-                          placeholder="Search creators"
-                          className="mb-2"
-                        />
-                        <div className="max-h-56 overflow-y-auto">
-                          <SelectItem value="all">All Creators</SelectItem>
-                          {filteredAssignedByOptions.length === 0 ? (
-                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching creators</div>
-                          ) : (
-                            filteredAssignedByOptions.map((member) => (
-                              <SelectItem key={member._id} value={member._id}>
-                                {member.firstName} {member.lastName}
-                              </SelectItem>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </SelectContent>
-                  </Select>
-                  <div className="flex flex-col gap-2">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            'w-full justify-start text-left font-normal',
-                            !dateRangeFilter?.from && !dateRangeFilter?.to && 'text-muted-foreground'
-                          )}
-                        >
-                          <Calendar className="mr-2 h-4 w-4" />
-                          {dateRangeFilter?.from ? (
-                            dateRangeFilter.to ? (
-                              `${format(dateRangeFilter.from, 'LLL dd, y')} - ${format(dateRangeFilter.to, 'LLL dd, y')}`
-                            ) : (
-                              `${format(dateRangeFilter.from, 'LLL dd, y')} - …`
-                            )
-                          ) : (
-                            'Select date range'
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <DateRangeCalendar
-                          initialFocus
-                          mode="range"
-                          defaultMonth={dateRangeFilter?.from}
-                          selected={dateRangeFilter}
-                          onSelect={setDateRangeFilter}
-                          numberOfMonths={2}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <div className="flex justify-end">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={clearDateFilters}
-                        disabled={!dateRangeFilter?.from && !dateRangeFilter?.to}
-                      >
-                        Clear dates
-                      </Button>
-                    </div>
-                  </div>
+                  {hasActiveFilters && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={resetFilters}
+                            className="w-full sm:w-auto"
+                            aria-label="Reset all filters"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Reset filters</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
@@ -1665,7 +1694,17 @@ export default function BacklogPage() {
                               </Tooltip>
                             </TooltipProvider>
                             <p className="text-xs sm:text-sm text-muted-foreground mb-2">
-                              {item.assignedTo ? `${item.assignedTo.firstName} ${item.assignedTo.lastName}` : 'Not assigned'}
+                              {item.assignedTo && item.assignedTo.length > 0
+                                ? item.assignedTo.map((assignment: any) => {
+                                    // Try to get user data from populated user field first, then from denormalized fields
+                                    const firstName = assignment?.user?.firstName || assignment?.firstName;
+                                    const lastName = assignment?.user?.lastName || assignment?.lastName;
+                                    if (firstName && lastName) {
+                                      return `${firstName} ${lastName}`;
+                                    }
+                                    return 'Unknown User';
+                                  }).join(', ')
+                                : 'Not assigned'}
                             </p>
                             <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                               <div className="flex items-center space-x-1">
@@ -1692,7 +1731,7 @@ export default function BacklogPage() {
                               {item.dueDate && (
                                 <div className="flex items-center space-x-1">
                                   <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span>Due {new Date(item.dueDate).toLocaleDateString()}</span>
+                                  <span>Due {formatDate(item.dueDate)}</span>
                                 </div>
                               )}
                               {item.storyPoints && (
@@ -2007,13 +2046,13 @@ export default function BacklogPage() {
                                 <div className="text-xs text-muted-foreground flex flex-wrap gap-x-1">
                                   <span>
                                     {sprint.startDate
-                                      ? new Date(sprint.startDate).toLocaleDateString()
+                                      ? formatDate(sprint.startDate)
                                       : 'TBD'}
                                   </span>
                                   <span>-</span>
                                   <span>
                                     {sprint.endDate
-                                      ? new Date(sprint.endDate).toLocaleDateString()
+                                      ? formatDate(sprint.endDate)
                                       : 'TBD'}
                                   </span>
                                 </div>
@@ -2191,7 +2230,7 @@ export default function BacklogPage() {
                 <SelectContent className="z-[10050]">
                   {ALLOWED_BACKLOG_STATUSES.map((status) => (
                     <SelectItem key={status} value={status}>
-                      {status.replace('_', ' ')}
+                      {formatToTitleCase(status)}
                     </SelectItem>
                   ))}
                 </SelectContent>

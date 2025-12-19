@@ -312,7 +312,7 @@ export async function GET(request: NextRequest) {
       includeTasks
         ? Task.find(taskFilter)
             .populate('project', 'name')
-            .populate('assignedTo', 'firstName lastName email')
+            .populate('assignedTo.user', '_id firstName lastName email')
             .populate('createdBy', 'firstName lastName email')
             .populate('story', 'title')
             .populate('sprint', 'name status')
@@ -321,7 +321,6 @@ export async function GET(request: NextRequest) {
       includeStories
         ? Story.find(storyFilter)
             .populate('project', 'name')
-            .populate('assignedTo', 'firstName lastName email')
             .populate('createdBy', 'firstName lastName email')
             .populate('epic', 'title')
             .populate('sprint', 'name status')
@@ -336,18 +335,34 @@ export async function GET(request: NextRequest) {
     ])
 
     const allItems = [
-      ...tasks.map(task => ({
-        ...task.toObject(),
+      ...tasks.map(task => {
+        const taskObj = task.toObject()
+        // assignedTo is already an array of populated user objects
+        return {
+          ...taskObj,
         type: 'task'
-      })),
-      ...stories.map(story => ({
-        ...story.toObject(),
+        }
+      }),
+      ...stories.map(story => {
+        const storyObj = story.toObject()
+        // Normalize assignedTo for stories: convert single user to array
+        const normalizedAssignedTo = storyObj.assignedTo ? [storyObj.assignedTo] : []
+        return {
+          ...storyObj,
+          assignedTo: normalizedAssignedTo,
         type: 'story'
-      })),
-      ...epics.map(epic => ({
-        ...epic.toObject(),
+        }
+      }),
+      ...epics.map(epic => {
+        const epicObj = epic.toObject()
+        // Normalize assignedTo for epics: convert single user to array
+        const normalizedAssignedTo = epicObj.assignedTo ? [epicObj.assignedTo] : []
+        return {
+          ...epicObj,
+          assignedTo: normalizedAssignedTo,
         type: 'epic'
-      }))
+        }
+      })
     ]
 
     // Sort by createdAt descending (newest first)

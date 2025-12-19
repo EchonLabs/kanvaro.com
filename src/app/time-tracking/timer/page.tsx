@@ -104,7 +104,7 @@ export default function TimerPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showToast } = useToast()
-  const { formatDate, formatTime, formatDateTime } = useDateTime()
+  const { formatDate, formatTime } = useDateTime()
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [authError, setAuthError] = useState('')

@@ -17,15 +17,17 @@ interface DocsLayoutProps {
   initialAudience?: Audience;
   initialCategory?: Category;
   initialSearch?: string;
+  searchEnabled?: boolean;
 }
 
-function DocsLayoutContent({ 
-  doc, 
-  children, 
+function DocsLayoutContent({
+  doc,
+  children,
   visibility,
   initialAudience,
   initialCategory,
-  initialSearch
+  initialSearch,
+  searchEnabled = true
 }: DocsLayoutProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -192,11 +194,13 @@ function DocsLayoutContent({
                   onAudienceChange={setSelectedAudience}
                   visibility={visibility}
                 />
-                <DocSearch
-                  query={searchQuery}
-                  onQueryChange={setSearchQuery}
-                  visibility={visibility}
-                />
+                {searchEnabled && (
+                  <DocSearch
+                    query={searchQuery}
+                    onQueryChange={setSearchQuery}
+                    visibility={visibility}
+                  />
+                )}
               </div>
             </div>
           </div>

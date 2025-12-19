@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -40,15 +40,17 @@ interface Task {
   status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled' | 'backlog'
   priority: 'low' | 'medium' | 'high' | 'critical'
   type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
-  assignedTo?: {
-    firstName: string
-    lastName: string
-    email: string
-  }
-  assignees?: Array<{
-    firstName: string
-    lastName: string
-    email: string
+  assignedTo?: Array<{
+    user?: {
+      _id: string
+      firstName: string
+      lastName: string
+      email: string
+    }
+    firstName?: string
+    lastName?: string
+    email?: string
+    _id?: string
   }>
   createdBy: {
     firstName: string
@@ -498,31 +500,29 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                     {task.description || 'No description'}
                   </p>
                   <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                    {(task.assignees && task.assignees.length > 0) || task.assignedTo ? (
+                    {task.assignedTo && task.assignedTo.length > 0 ? (
                       <div className="flex items-center space-x-1 flex-wrap gap-1">
                         <User className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                        {task.assignees && task.assignees.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
-                            {task.assignees.map((assignee, idx) => (
+                          {task.assignedTo.map((assignee, idx) => {
+                            // Try to get user data from populated user field first, then from denormalized fields
+                            const firstName = assignee?.user?.firstName || assignee?.firstName || '';
+                            const lastName = assignee?.user?.lastName || assignee?.lastName || '';
+                            const email = assignee?.user?.email || assignee?.email || '';
+                            const displayName = `${firstName} ${lastName}`.trim();
+
+                            return (
                               <Badge
-                                key={idx}
+                                key={assignee?.user?._id || assignee?._id || idx}
                                 variant="secondary"
                                 className="text-xs px-2 py-0.5"
-                                title={`${assignee.firstName} ${assignee.lastName} (${assignee.email})`}
+                                title={`${displayName} (${email})`}
                               >
-                                {assignee.firstName} {assignee.lastName}
+                                {displayName || 'Unknown User'}
                               </Badge>
-                            ))}
+                            );
+                          })}
                           </div>
-                        ) : task.assignedTo ? (
-                          <Badge
-                            variant="secondary"
-                            className="text-xs px-2 py-0.5"
-                            title={`${task.assignedTo.firstName} ${task.assignedTo.lastName} (${task.assignedTo.email})`}
-                          >
-                            {task.assignedTo.firstName} {task.assignedTo.lastName}
-                          </Badge>
-                        ) : null}
                       </div>
                     ) : null}
                     {task.dueDate && (

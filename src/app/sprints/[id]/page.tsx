@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Input } from '@/components/ui/Input'
@@ -203,7 +202,6 @@ export default function SprintDetailPage() {
   const [availableSprints, setAvailableSprints] = useState<SprintOption[]>([])
   const [availableSprintsLoading, setAvailableSprintsLoading] = useState(false)
   const [selectedTargetSprintId, setSelectedTargetSprintId] = useState('')
-  const [completeError, setCompleteError] = useState('')
   const [incompleteTasks, setIncompleteTasks] = useState<Array<{
     _id: string
     title: string
@@ -225,7 +223,6 @@ export default function SprintDetailPage() {
     capacity: ''
   })
   const [taskStatusUpdating, setTaskStatusUpdating] = useState<string | null>(null)
-  const [taskStatusError, setTaskStatusError] = useState('')
   const { getStatusesForProject } = useProjectKanbanStatuses()
 
   const { hasPermission } = usePermissions()
@@ -505,7 +502,7 @@ export default function SprintDetailPage() {
     } catch (err) {
       console.error('Failed to load sprints list:', err)
       setAvailableSprints([])
-      setCompleteError(err instanceof Error ? err.message : 'Failed to load sprints')
+      notifyError({ title: 'Failed to Load Sprints', message: err instanceof Error ? err.message : 'Failed to load sprints' })
     } finally {
       setAvailableSprintsLoading(false)
     }
@@ -513,7 +510,6 @@ export default function SprintDetailPage() {
 
   useEffect(() => {
     if (!completeModalOpen) {
-      setCompleteError('')
       setSelectedTargetSprintId('')
       setCompletionMode('existing')
       setIncompleteTasks([])
@@ -604,7 +600,6 @@ export default function SprintDetailPage() {
     setIncompleteTasks([])
     setSelectedTaskIds(new Set())
     setSelectedTargetSprintId('')
-    setCompleteError('')
     setExpandedTasks(new Set())
     await fetchSprint({ silent: true })
   }
@@ -704,8 +699,7 @@ export default function SprintDetailPage() {
         setCompletingSprint(true)
         await finalizeCompleteSprint()
       } catch (err) {
-        setCompleteError(err instanceof Error ? err.message : 'Failed to complete sprint')
-        notifyError({ title: err instanceof Error ? err.message : 'Failed to complete sprint' })
+        notifyError({ title: 'Failed to Complete Sprint', message: err instanceof Error ? err.message : 'Failed to complete sprint' })
       } finally {
         setCompletingSprint(false)
       }
@@ -718,8 +712,7 @@ export default function SprintDetailPage() {
         setCompletingSprint(true)
         await finalizeCompleteSprint() // No targetSprintId means move all to backlog
       } catch (err) {
-        setCompleteError(err instanceof Error ? err.message : 'Failed to complete sprint')
-        notifyError({ title: err instanceof Error ? err.message : 'Failed to complete sprint' })
+        notifyError({ title: 'Failed to Complete Sprint', message: err instanceof Error ? err.message : 'Failed to complete sprint' })
       } finally {
         setCompletingSprint(false)
       }
@@ -728,14 +721,14 @@ export default function SprintDetailPage() {
 
     if (completionMode === 'existing') {
       if (!selectedTargetSprintId) {
-        setCompleteError('Select a sprint to move the remaining tasks into.')
+        notifyError({ title: 'Sprint Selection Required', message: 'Select a sprint to move the remaining tasks into.' })
         return
       }
       try {
         setCompletingSprint(true)
         await finalizeCompleteSprint(selectedTargetSprintId)
       } catch (err) {
-        setCompleteError(err instanceof Error ? err.message : 'Failed to move tasks to the selected sprint')
+        notifyError({ title: 'Failed to Move Tasks', message: err instanceof Error ? err.message : 'Failed to move tasks to the selected sprint' })
       } finally {
         setCompletingSprint(false)
       }
@@ -743,12 +736,12 @@ export default function SprintDetailPage() {
     }
 
     if (!newSprintForm.name || !newSprintForm.startDate || !newSprintForm.endDate) {
-      setCompleteError('Provide a name and date range for the new sprint.')
+      notifyError({ title: 'Validation Error', message: 'Provide a name and date range for the new sprint.' })
       return
     }
 
     if (!sprint?.project?._id) {
-      setCompleteError('Sprint project information is missing.')
+      notifyError({ title: 'Project Information Missing', message: 'Sprint project information is missing.' })
       return
     }
 
@@ -809,7 +802,7 @@ export default function SprintDetailPage() {
 
       await finalizeCompleteSprint(newSprintId, newSprint)
     } catch (err) {
-      setCompleteError(err instanceof Error ? err.message : 'Failed to create sprint')
+      notifyError({ title: 'Failed to Create Sprint', message: err instanceof Error ? err.message : 'Failed to create sprint' })
     } finally {
       setCompletingSprint(false)
     }
@@ -818,12 +811,10 @@ export default function SprintDetailPage() {
   const handleTaskStatusChange = async (taskId: string, newStatus: string) => {
     try {
       if (!projectStatusOptions.some(option => option.value === newStatus)) {
-        setTaskStatusError('Selected status is not available for this project.')
-        notifyError({ title: 'Selected status is not available for this project.' })
+        notifyError({ title: 'Invalid Status', message: 'Selected status is not available for this project.' })
         return
       }
       setTaskStatusUpdating(taskId)
-      setTaskStatusError('')
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -849,8 +840,7 @@ export default function SprintDetailPage() {
       })
       notifySuccess({ title: 'Task status updated' })
     } catch (err) {
-      setTaskStatusError(err instanceof Error ? err.message : 'Failed to update task status')
-      notifyError({ title: err instanceof Error ? err.message : 'Failed to update task status' })
+      notifyError({ title: 'Failed to Update Task', message: err instanceof Error ? err.message : 'Failed to update task status' })
     } finally {
       setTaskStatusUpdating(null)
     }
@@ -1026,14 +1016,6 @@ export default function SprintDetailPage() {
                 </div>
                 <br />
 
-                {!sprint?.progress?.totalTasks && (
-                  <Alert variant="default" className="mb-4 border-dashed border-muted-foreground/40 bg-muted/40">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription className="text-xs sm:text-sm">
-                      Assign tasks to this sprint to start tracking progress, story points, and burn-down metrics.
-                    </AlertDescription>
-                  </Alert>
-                )}
 
                 {sprint?.progress?.totalTasks ? (
                   <div className="space-y-4">
@@ -1125,12 +1107,6 @@ export default function SprintDetailPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 sm:p-6 pt-0 space-y-4">
-                {taskStatusError && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{taskStatusError}</AlertDescription>
-                  </Alert>
-                )}
-
                 {sprintTasks.length === 0 ? (
                   <p className="text-sm sm:text-base text-muted-foreground">
                     No tasks {sprint?.status === 'completed' ? 'were' : 'are currently'} assigned to this sprint.
@@ -1361,7 +1337,6 @@ export default function SprintDetailPage() {
           onOpenChange={(open) => {
             if (!open) {
               setCompleteModalOpen(false)
-              setCompleteError('')
               setSelectedTargetSprintId('')
               setCompletionMode('existing')
               setIncompleteTasks([])
@@ -1426,12 +1401,6 @@ export default function SprintDetailPage() {
           }
         >
           <div className="space-y-4">
-            {completeError && (
-              <Alert variant="destructive">
-                <AlertDescription>{completeError}</AlertDescription>
-              </Alert>
-            )}
-
             {incompleteTasks.length > 0 ? (
               <div className="space-y-3">
                 <div>
@@ -1580,7 +1549,6 @@ export default function SprintDetailPage() {
                         onClick={() => {
                           setCompletionMode('existing')
                           setSelectedTargetSprintId('')
-                          setCompleteError('')
                         }}
                       >
                         Move to Next Sprint
@@ -1591,7 +1559,6 @@ export default function SprintDetailPage() {
                         size="sm"
                         onClick={() => {
                           setCompletionMode('new')
-                          setCompleteError('')
                         }}
                       >
                         Create New Sprint

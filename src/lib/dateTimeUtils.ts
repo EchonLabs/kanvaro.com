@@ -60,7 +60,7 @@ export const formatTime = (date: Date | string, preferences: DateTimePreferences
 /**
  * Format date and time together
  */
-export const formatDateTime = (date: Date | string, preferences: DateTimePreferences): string => {
+export const formatDateTimeSafe = (date: Date | string, preferences: DateTimePreferences): string => {
   return `${formatDate(date, preferences)} ${formatTime(date, preferences)}`
 }
 

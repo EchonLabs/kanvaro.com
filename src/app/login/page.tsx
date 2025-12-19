@@ -19,7 +19,6 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(false)
-  const { clearPermissionsCache } = usePermissionContext()
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [verificationRequired, setVerificationRequired] = useState(false)
@@ -118,8 +117,6 @@ function LoginForm() {
         setIsLoadingPermissions(true)
         
         try {
-          // Clear any cached permissions from previous user sessions
-          clearPermissionsCache()
 
           // Fetch permissions to ensure they're loaded before redirecting
           const permissionsResponse = await fetch('/api/auth/permissions', {

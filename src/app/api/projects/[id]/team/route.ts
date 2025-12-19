@@ -37,7 +37,7 @@ export async function GET(
       organization: organizationId,
       is_deleted: { $ne: true }
     })
-      .populate('teamMembers', 'firstName lastName email avatar role hourlyRate')
+      .populate('teamMembers.memberId', 'firstName lastName email avatar role')
       .populate('createdBy', 'firstName lastName email avatar')
       .populate('client', 'firstName lastName email avatar')
       .populate('projectRoles.user', 'firstName lastName email avatar')
@@ -69,20 +69,28 @@ export async function GET(
 
     // Enhance team members with rate info if user has permission
     const enhanceMemberWithRate = (member: any) => {
-      const normalizedMember = normalizeUserAvatar(member)
+      // Handle both old ObjectId format and new object format
+      const memberId = member.memberId || member._id || member
+      const memberHourlyRate = member.hourlyRate
+
+      const normalizedMember = normalizeUserAvatar(typeof member === 'object' && member.memberId ? member.memberId : member)
       if (!hasBudgetPermission) {
         const { hourlyRate, ...memberWithoutRate } = normalizedMember
         return memberWithoutRate
       }
-      
-      // Find project specific rate
-      const projectRateEntry = project.memberRates?.find(
-        (r: any) => r.user.toString() === (member._id || member).toString()
-      )
-      
+
+      // Use hourly rate from teamMembers if available, otherwise fall back to memberRates
+      let projectRate = memberHourlyRate
+      if (projectRate === undefined) {
+        const projectRateEntry = project.memberRates?.find(
+          (r: any) => r.user.toString() === memberId.toString()
+        )
+        projectRate = projectRateEntry ? projectRateEntry.hourlyRate : undefined
+      }
+
       return {
         ...normalizedMember,
-        projectHourlyRate: projectRateEntry ? projectRateEntry.hourlyRate : undefined,
+        projectHourlyRate: projectRate,
         // user.hourlyRate is already in member object
       }
     }
@@ -90,7 +98,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: {
-        teamMembers: Array.isArray(project.teamMembers) 
+        teamMembers: Array.isArray(project.teamMembers)
           ? project.teamMembers.map(enhanceMemberWithRate)
           : project.teamMembers ? [enhanceMemberWithRate(project.teamMembers)] : [],
         projectRoles: (project.projectRoles || []).map((pr: any) => ({
@@ -137,6 +145,8 @@ export async function PUT(
     const projectId = params.id
     const { memberId, hourlyRate } = await request.json()
 
+    console.log('PUT request:', { projectId, memberId, hourlyRate })
+
     if (!memberId) {
       return NextResponse.json(
         { error: 'Member ID is required' },
@@ -171,6 +181,7 @@ export async function PUT(
       is_deleted: { $ne: true }
     })
 
+    console.log('Project found:', !!project)
     if (!project) {
       return NextResponse.json(
         { error: 'Project not found' },
@@ -179,18 +190,42 @@ export async function PUT(
     }
 
     // Verify member is in team
-    if (!project.teamMembers.includes(memberId)) {
+    const memberExists = Array.isArray(project.teamMembers)
+      ? project.teamMembers.some((m: any) => (m.memberId || m).toString() === memberId.toString())
+      : project.teamMembers?.toString() === memberId.toString()
+
+    if (!memberExists) {
       return NextResponse.json(
         { error: 'Member is not in the project team' },
         { status: 400 }
       )
     }
 
-    // Update hourly rate
+    // Update hourly rate directly on team member
     if (hourlyRate !== undefined) {
-      // Initialize memberRates if doesn't exist
-      if (!project.memberRates) {
-        project.memberRates = []
+      console.log('Updating hourly rate:', { memberId, hourlyRate })
+      console.log('Current team members:', JSON.stringify(project.teamMembers, null, 2))
+
+      // Find and update the team member
+      if (Array.isArray(project.teamMembers)) {
+        const teamMember = project.teamMembers.find((m: any) => {
+          const mId = m.memberId || m
+          // Convert both to strings for comparison
+          const mIdStr = mId ? mId.toString() : ''
+          const memberIdStr = memberId ? memberId.toString() : ''
+          const comparison = mIdStr === memberIdStr
+          console.log(`Comparing "${mIdStr}" with "${memberIdStr}": ${comparison}`)
+          return comparison
+        })
+
+        if (teamMember) {
+          console.log('Found team member, updating hourly rate')
+          teamMember.hourlyRate = hourlyRate
+          // Mark the teamMembers array as modified
+          project.markModified('teamMembers')
+        } else {
+          console.log('Team member not found')
+        }
       }
 
       const existingRateIndex = project.memberRates.findIndex(
@@ -215,6 +250,8 @@ export async function PUT(
     }
 
     await project.save()
+
+    console.log('Project saved, updated team members:', project.teamMembers)
 
     return NextResponse.json({
       success: true,
@@ -298,7 +335,11 @@ export async function POST(
     }
 
     // Check if member is already in the team
-    if (project.teamMembers.includes(memberId)) {
+    const memberAlreadyExists = Array.isArray(project.teamMembers)
+      ? project.teamMembers.some((m: any) => (m.memberId || m).toString() === memberId.toString())
+      : project.teamMembers?.toString() === memberId.toString()
+
+    if (memberAlreadyExists) {
       return NextResponse.json(
         { error: 'Member is already in the project team' },
         { status: 400 }
@@ -306,7 +347,11 @@ export async function POST(
     }
 
     // Add member to team
-    project.teamMembers.push(memberId)
+    if (Array.isArray(project.teamMembers)) {
+      project.teamMembers.push({ memberId, hourlyRate: undefined })
+    } else {
+      project.teamMembers = [{ memberId, hourlyRate: undefined }]
+    }
 
     // Add project role if specified
     if (role && ['project_manager', 'project_member', 'project_viewer', 'project_client', 'project_account_manager', 'project_qa_lead', 'project_tester'].includes(role)) {
@@ -328,7 +373,7 @@ export async function POST(
 
     // Populate and return updated team
     const updatedProject = await Project.findById(projectId)
-      .populate('teamMembers', 'firstName lastName email avatar role')
+      .populate('teamMembers.memberId', 'firstName lastName email avatar role')
       .populate('projectRoles.user', 'firstName lastName email avatar')
 
     return NextResponse.json({
@@ -412,9 +457,9 @@ export async function DELETE(
     }
 
     // Remove member from team
-    project.teamMembers = project.teamMembers.filter(
-      (member: any) => member.toString() !== memberId
-    )
+    project.teamMembers = Array.isArray(project.teamMembers)
+      ? project.teamMembers.filter((m: any) => (m.memberId || m).toString() !== memberId.toString())
+      : []
 
     // Remove project roles for this user
     project.projectRoles = project.projectRoles.filter(

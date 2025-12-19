@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Progress } from '@/components/ui/Progress'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { 
   BarChart, 
   Download, 
@@ -27,6 +28,7 @@ export default function TestReportsPage() {
   const [executions, setExecutions] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const { formatDate } = useDateTime()
 
   useEffect(() => {
     // Set breadcrumb
@@ -372,7 +374,7 @@ export default function TestReportsPage() {
                         {execution.status.charAt(0).toUpperCase() + execution.status.slice(1)}
                       </Badge>
                       <span className="text-sm text-muted-foreground">
-                        {new Date(execution.executedAt).toLocaleDateString()}
+                        {formatDate(execution.executedAt)}
                       </span>
                     </div>
                   </div>

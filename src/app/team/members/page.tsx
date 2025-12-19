@@ -13,20 +13,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { 
-  Users, 
-  UserPlus, 
-  Search, 
-  Filter, 
-  MoreHorizontal, 
-  Mail, 
+import {
+  Users,
+  UserPlus,
+  Search,
+  Filter,
+  MoreHorizontal,
+  Mail,
   Clock,
   CheckCircle,
   XCircle,
   UserCheck,
   Loader2,
   Grid3x3,
-  List
+  List,
+  X
 } from 'lucide-react'
 import { InviteMemberModal } from '@/components/members/InviteMemberModal'
 import { EditMemberModal } from '@/components/members/EditMemberModal'
@@ -108,6 +109,17 @@ export default function MembersPage() {
   const canEditMembers = hasPermission(Permission.TEAM_EDIT) && hasPermission(Permission.USER_UPDATE)
   const canEditAdminMembers = hasPermission(Permission.TEAM_EDIT) && hasPermission(Permission.USER_MANAGE_ROLES)
   const canDeleteMembers = hasPermission(Permission.USER_DEACTIVATE)
+
+  // Check if any filters are active
+  const hasActiveFilters = searchQuery !== '' || roleFilter !== 'all' || statusFilter !== 'all'
+
+  // Reset all filters
+  const resetFilters = () => {
+    setSearchQuery('')
+    setRoleFilter('all')
+    setStatusFilter('all')
+  }
+
   const [organizationRoles, setOrganizationRoles] = useState<Array<{ id: string; name: string; isSystem?: boolean }>>([])
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [memberToRemove, setMemberToRemove] = useState<Member | null>(null)
@@ -594,6 +606,41 @@ export default function MembersPage() {
               </div>
             </CardHeader>
             <CardContent className="p-4 sm:p-6 pt-0">
+              {/* Results Count */}
+              <div className="flex items-center justify-between mb-4 pb-3 border-b">
+                <div className="text-sm text-muted-foreground">
+                  {hasActiveFilters ? (
+                    <span>
+                      Showing <span className="font-medium text-foreground">{filteredMembers.length}</span> of{' '}
+                      <span className="font-medium text-foreground">{members.length}</span> team members
+                      <span className="ml-2 text-xs text-blue-600">
+                        (filtered from {members.length} total members)
+                      </span>
+                      <span className="ml-2 text-xs">
+                        {searchQuery && `• "${searchQuery}"`}
+                        {roleFilter !== 'all' && `• ${formatToTitleCase(roleFilter.replace(/_/g, ' '))}`}
+                        {statusFilter !== 'all' && `• ${statusFilter === 'active' ? 'Active' : 'Inactive'}`}
+                      </span>
+                    </span>
+                  ) : (
+                    <span>
+                      <span className="font-medium text-foreground">{members.length}</span> team members total
+                    </span>
+                  )}
+                </div>
+                {hasActiveFilters && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetFilters}
+                    className="text-xs"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+
               {filteredMembers.length === 0 ? (
                 <div className="text-center py-8 sm:py-12 text-muted-foreground">
                   <Users className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50 flex-shrink-0" />

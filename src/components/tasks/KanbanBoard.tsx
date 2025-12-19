@@ -54,11 +54,12 @@ interface PopulatedTask extends Omit<ITask, 'assignedTo' | 'project'> {
     _id: string
     name: string
   }
-  assignedTo?: {
+  assignedTo?: Array<{
     firstName: string
     lastName: string
     email: string
-  }
+    hourlyRate?: number
+  }>
 }
 
 // Dynamically import heavy modals
@@ -543,7 +544,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
               getPriorityColor={getPriorityColor}
               getTypeColor={getTypeColor}
               isDragOverlay
-              onEdit={onEditTask}
+            //  onEdit={onEditTask}
               onDelete={onDeleteTask}
             />
           ) : null}

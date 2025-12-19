@@ -8,12 +8,11 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useNotify } from '@/lib/notify'
 import { 
   ArrowLeft,
   Save,
   Loader2,
-  AlertTriangle,
   Target,
   Plus,
   X,
@@ -32,6 +31,7 @@ interface User {
   firstName: string
   lastName: string
   email: string
+  projectHourlyRate?: number
 }
 
 interface Story {
@@ -131,8 +131,11 @@ const SUBTASK_STATUS_OPTIONS: Array<{ value: SubtaskStatus; label: string }> = [
 export default function CreateTaskPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
+
+  // Use the notification hook
+  const { error: notifyError } = useNotify()
+
   const [projects, setProjects] = useState<Project[]>([])
   const [projectMembers, setProjectMembers] = useState<User[]>([])
   const [loadingProjectMembers, setLoadingProjectMembers] = useState(false)
@@ -143,7 +146,13 @@ export default function CreateTaskPage() {
   const [epicQuery, setEpicQuery] = useState('')
   const today = new Date().toISOString().split('T')[0]
   const [projectQuery, setProjectQuery] = useState("");
-  const [assignedToIds, setAssignedToIds] = useState<string[]>([]);
+  const [assignedTo, setAssignedTo] = useState<Array<{
+    _id: string
+    firstName: string
+    lastName: string
+    email: string
+    hourlyRate?: string
+  }>>([])
   const [assigneeQuery, setAssigneeQuery] = useState('');
   const [newLabel, setNewLabel] = useState('')
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
@@ -293,7 +302,17 @@ export default function CreateTaskPage() {
 
       if (response.ok && data.success && data.data) {
         const members = Array.isArray(data.data.teamMembers) ? data.data.teamMembers : []
-        setProjectMembers(members)
+
+        // Transform populated team members data
+        const populatedMembers = members.map((member: any) => ({
+          _id: member.memberId._id,
+          firstName: member.memberId.firstName,
+          lastName: member.memberId.lastName,
+          email: member.memberId.email,
+          projectHourlyRate: member.hourlyRate
+        }))
+
+        setProjectMembers(populatedMembers)
 
         // Set billable default from project
         const billableDefault = typeof data.data.isBillableByDefault === 'boolean' ? data.data.isBillableByDefault : true
@@ -312,12 +331,11 @@ export default function CreateTaskPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError('')
 
     try {
       // Prevent past due dates
       if (formData.dueDate && formData.dueDate < today) {
-        setError('Due date cannot be in the past')
+        notifyError({ title: 'Invalid Date', message: 'Due date cannot be in the past' })
         setLoading(false)
         return
       }
@@ -325,19 +343,19 @@ export default function CreateTaskPage() {
       // Validate required fields before submitting
       const missingSubtaskTitle = subtasks.some(st => !(st.title && st.title.trim().length > 0))
       if (!formData.title.trim() || !formData.project || !formData.dueDate) {
-        setError('Please fill in all required fields')
+        notifyError({ title: 'Validation Error', message: 'Please fill in all required fields' })
         setLoading(false)
         return
       }
 
-      if (assignedToIds.length === 0) {
-        setError('Please assign this task to at least one user')
+      if (assignedTo.length === 0) {
+        notifyError({ title: 'Assignment Required', message: 'Please assign this task to at least one user' })
         setLoading(false)
         return
       }
 
       if (missingSubtaskTitle) {
-        setError('Please fill in all required subtask titles')
+        notifyError({ title: 'Validation Error', message: 'Please fill in all required subtask titles' })
         setLoading(false)
         return
       }
@@ -362,7 +380,13 @@ export default function CreateTaskPage() {
           story: formData.story === 'none' ? undefined : formData.story || undefined,
           epic: formData.epic === 'none' ? undefined : formData.epic || undefined,
           parentTask: formData.parentTask || undefined,
-          assignedTo: assignedToIds.length === 1 ? assignedToIds[0] : assignedToIds.length > 0 ? assignedToIds[0] : undefined,
+          assignedTo: assignedTo.map(assignee => ({
+            user: assignee._id,
+            firstName: assignee.firstName,
+            lastName: assignee.lastName,
+            email: assignee.email,
+            hourlyRate: assignee.hourlyRate ? parseFloat(assignee.hourlyRate) : undefined
+          })),
           priority: formData.priority,
           type: formData.type,
           status: 'backlog',
@@ -386,7 +410,7 @@ export default function CreateTaskPage() {
       const data = await response.json().catch(() => ({ error: 'Failed to parse response' }))
 
       if (!response.ok) {
-        setError(data.error || 'Failed to create task')
+        notifyError({ title: 'Failed to Create Task', message: data.error || 'Failed to create task' })
         setLoading(false)
         return
       }
@@ -395,12 +419,12 @@ export default function CreateTaskPage() {
         router.push('/tasks')
         setAttachments([])
       } else {
-        setError(data.error || 'Failed to create task')
+        notifyError({ title: 'Failed to Create Task', message: data.error || 'Failed to create task' })
         setLoading(false)
       }
     } catch (err) {
       console.error('Task creation error:', err)
-      setError('Failed to create task. Please try again.')
+      notifyError({ title: 'Failed to Create Task', message: 'Failed to create task. Please try again.' })
       setLoading(false)
     }
   }
@@ -412,7 +436,7 @@ export default function CreateTaskPage() {
     }))
 
     if (field === 'project') {
-      setAssignedToIds([])
+      setAssignedTo([])
       setAssigneeQuery('')
       setProjectMembers([])
       setFormData(prev => ({
@@ -563,10 +587,10 @@ export default function CreateTaskPage() {
       !!formData.title.trim() &&
       !!formData.project &&
       !!formData.dueDate &&
-      assignedToIds.length > 0 &&
+      assignedTo.length > 0 &&
       !subtasks.some(st => !(st.title && st.title.trim().length > 0))
     )
-  }, [formData.title, formData.project, formData.dueDate, assignedToIds.length, subtasks])
+  }, [formData.title, formData.project, formData.dueDate, assignedTo.length, subtasks])
 
   const attachmentListItems = useMemo(
     () =>
@@ -611,12 +635,6 @@ export default function CreateTaskPage() {
           </div>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
 
         <Card>
           <CardHeader>
@@ -690,11 +708,21 @@ export default function CreateTaskPage() {
                           value=""
                           onValueChange={(value) => {
                             if (value === '__unassigned') {
-                              setAssignedToIds([])
+                              setAssignedTo([])
                               return
                             }
-                            if (!assignedToIds.includes(value)) {
-                              setAssignedToIds(prev => [...prev, value])
+                            if (!assignedTo.some(assignee => assignee._id === value)) {
+                              const selectedUser = projectMembers.find(u => u._id === value)
+                              if (selectedUser) {
+                                setAssignedTo(prev => [...prev, {
+                                  _id: selectedUser._id,
+                                  firstName: selectedUser.firstName,
+                                  lastName: selectedUser.lastName,
+                                  email: selectedUser.email,
+                                  hourlyRate: ''
+                                }])
+                                setAssigneeQuery('')
+                              }
                             }
                           }}
                           onOpenChange={(open) => { if (open) setAssigneeQuery(""); }}
@@ -741,7 +769,7 @@ export default function CreateTaskPage() {
                                   </>
                                 ) : filteredProjectMembers.length > 0 ? (
                                   filteredProjectMembers.map(user => {
-                                    const isSelected = assignedToIds.includes(user._id);
+                                    const isSelected = assignedTo.some(assignee => assignee._id === user._id);
                                     return (
                                       <SelectItem 
                                         key={user._id} 
@@ -765,28 +793,24 @@ export default function CreateTaskPage() {
                             </div>
                           </SelectContent>
                         </Select>
-                        {assignedToIds.length > 0 && (
+                        {assignedTo.length > 0 && (
                           <div className="flex flex-wrap gap-2">
-                            {assignedToIds.map(id => {
-                              const u = projectMembers.find(x => x._id === id);
-                              if (!u) return null;
-                              return (
-                                <span 
-                                  key={id} 
-                                  className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
+                            {assignedTo.map(assignee => (
+                              <span
+                                key={assignee._id}
+                                className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
+                              >
+                                <span>{assignee.firstName} {assignee.lastName}</span>
+                                <button
+                                  type="button"
+                                  aria-label="Remove assignee"
+                                  className="text-muted-foreground hover:text-foreground focus:outline-none"
+                                  onClick={() => setAssignedTo(prev => prev.filter(a => a._id !== assignee._id))}
                                 >
-                                  <span>{u.firstName} {u.lastName}</span>
-                                  <button
-                                    type="button"
-                                    aria-label="Remove assignee"
-                                    className="text-muted-foreground hover:text-foreground focus:outline-none"
-                                    onClick={() => setAssignedToIds(prev => prev.filter(x => x !== id))}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </span>
-                              );
-                            })}
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            ))}
                           </div>
                         )}
                       </div>

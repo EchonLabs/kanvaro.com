@@ -82,7 +82,7 @@ export function TimeLogs({
   showSelectionAndApproval = true,
   showManualLogButtons = false
 }: TimeLogsProps) {
-  const { formatDateTime } = useDateTime()
+  const { formatDateTimeSafe } = useDateTime()
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -2238,14 +2238,14 @@ export function TimeLogs({
                       <div>
                         <div className="text-muted-foreground">Start Time</div>
                         <div className="mt-1">
-                          <div>{formatDateTime(entry.startTime)}</div>
+                          <div>{formatDateTimeSafe(entry.startTime)}</div>
                         </div>
                       </div>
                       <div>
                         <div className="text-muted-foreground">End Time</div>
                         {entry.endTime ? (
                           <div className="mt-1">
-                            <div>{formatDateTime(entry.endTime)}</div>
+                            <div>{formatDateTimeSafe(entry.endTime)}</div>
                           </div>
                         ) : <div className="mt-1">-</div>}
                       </div>
@@ -2366,10 +2366,10 @@ export function TimeLogs({
                       {([entry.user?.firstName, entry.user?.lastName].filter(Boolean).join(' ') || 'Unknown')}
                     </div>
                     <div className="text-xs sm:text-sm leading-tight">
-                      {formatDateTime(entry.startTime)}
+                      {formatDateTimeSafe(entry.startTime)}
                     </div>
                     <div className="text-xs sm:text-sm leading-tight">
-                      {entry.endTime ? formatDateTime(entry.endTime) : '-'}
+                      {entry.endTime ? formatDateTimeSafe(entry.endTime) : '-'}
                     </div>
                     <div className="text-xs sm:text-sm">
                       {formatDuration(entry.duration)}

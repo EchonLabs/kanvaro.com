@@ -139,14 +139,16 @@ export default function DashboardPage() {
     return () => clearInterval(interval)
   }, [checkAuth])
 
-  // Wait for permissions to load before showing dashboard
-  // Only show loading if permissions are actually being fetched (not just initialized)
-  if (permissionsLoading && !permissions) {
+  // Handle loading states consistently to prevent hydration mismatch
+  // Show loading until both permissions are loaded AND initial auth check is complete
+  const isInitialLoading = permissionsLoading || isLoading || !permissions;
+
+  if (isInitialLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Loading permissions...</p>
+          <p className="text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
     )
@@ -158,17 +160,6 @@ export default function DashboardPage() {
         <div className="text-center">
           <p className="text-sm text-destructive">Failed to load permissions</p>
           <p className="text-xs text-muted-foreground mt-1">{permissionsError}</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
     )

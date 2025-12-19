@@ -6,13 +6,18 @@ import { MainLayout } from '@/components/layout/MainLayout'
 import { TimeReports } from '@/components/time-tracking/TimeReports'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { BarChart3, Loader2 } from 'lucide-react'
+import { BarChart3, Loader2, Shield } from 'lucide-react'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 export default function TimeReportsPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [authError, setAuthError] = useState('')
+  const { hasPermission } = usePermissions()
+
+  const canAccessTimeReports = hasPermission(Permission.TIME_LOG_REPORT_ACCESS)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -84,6 +89,32 @@ export default function TimeReportsPage() {
           <p className="text-muted-foreground">No user data available</p>
         </div>
       </div>
+    )
+  }
+
+  // Check if user has permission to access time reports
+  if (!canAccessTimeReports) {
+    return (
+      <MainLayout>
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <Card className="max-w-md w-full">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
+                <Shield className="h-6 w-6 text-red-600" />
+              </div>
+              <CardTitle className="text-red-600">Access Denied</CardTitle>
+              <CardDescription>
+                You don't have permission to access Time Reports. This feature is restricted to Administrators and HR personnel only.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+              <Button onClick={() => router.push('/dashboard')} variant="outline">
+                Return to Dashboard
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
     )
   }
 

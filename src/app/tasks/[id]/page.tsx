@@ -56,11 +56,18 @@ interface Task {
     _id: string
     name: string
   }
-  assignedTo?: {
-    firstName: string
-    lastName: string
-    email: string
-  }
+  assignedTo?: [Array<{
+    user?: {
+      _id: string
+      firstName: string
+      lastName: string
+      email: string
+    }
+    firstName?: string
+    lastName?: string
+    email?: string
+    hourlyRate?: number
+  }>]
   createdBy: {
     firstName: string
     lastName: string
@@ -178,7 +185,7 @@ export default function TaskDetailPage() {
   const params = useParams()
   const taskId = params.id as string
   const { setItems } = useBreadcrumb()
-  const { formatDate, formatDateTime } = useDateTime()
+  const { formatDate, formatDateTimeSafe } = useDateTime()
 
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
@@ -266,8 +273,10 @@ export default function TaskDetailPage() {
 
       if (data.success) {
         setTask(data.data)
+
+
         // preload mentions and issues lists (project members and project tasks)
-        const projectId = data.data?.project?._id
+          const projectId = task?.project?._id
         if (projectId) {
           fetchProjectMembers(projectId)
           fetchProjectIssues(projectId)
@@ -646,7 +655,7 @@ export default function TaskDetailPage() {
               : comment.author?.email || 'User'}
           </div>
           <div className="text-xs text-muted-foreground">
-            {comment.createdAt ? formatDateTime(comment.createdAt) : ''}
+            {comment.createdAt ? formatDateTimeSafe(comment.createdAt) : ''}
             {comment.updatedAt && (
               <span className="ml-2 text-[11px]">(edited)</span>
             )}
@@ -896,7 +905,7 @@ export default function TaskDetailPage() {
   const formatDateTime = (value?: string) => {
     if (!value) return 'Not set'
     const date = new Date(value)
-    return formatDateTime(date)
+    return formatDateTimeSafe(date)
   }
 
   const getPriorityColor = (priority: string) => {
@@ -1390,12 +1399,34 @@ export default function TaskDetailPage() {
                   </div>
                 )}
                 
-                {task.assignedTo && (
+                {task.assignedTo && task.assignedTo.length > 0 && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Assigned To</span>
-                    <span className="font-medium">
-                      {task.assignedTo.firstName} {task.assignedTo.lastName}
-                    </span>
+                    <div className="font-medium flex flex-wrap gap-1">
+                      {task.assignedTo.map((assignee: any, idx) => {
+                        // Try to get user data from populated user field first, then from denormalized fields
+                        const firstName = assignee?.user?.firstName || assignee?.firstName;
+                        const lastName = assignee?.user?.lastName || assignee?.lastName;
+                        const userId = assignee?.user?._id || assignee?.user;
+
+                        if (firstName && lastName) {
+                          const displayName = `${firstName} ${lastName}`.trim();
+                          return (
+                            <span key={userId || `assignee-${idx}`}>
+                              {displayName}
+                              {idx < (task.assignedTo?.length ?? 0) - 1 && ', '}
+                            </span>
+                          );
+                        }
+
+                        return (
+                          <span key={`unknown-${idx}`}>
+                            Unknown User
+                            {idx < (task.assignedTo?.length ?? 0) - 1 && ', '}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
                 
