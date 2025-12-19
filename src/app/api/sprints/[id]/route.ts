@@ -11,7 +11,6 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-        console.log('GET sprints');
 
     await connectDB()
 
@@ -69,8 +68,6 @@ export async function GET(
     // This includes tasks that may have been moved to another sprint
     const sprintTaskIds = sprint.tasks || []
     
-    console.log('Sprint API - Fetching tasks for sprint:', sprintId)
-    console.log('Sprint API - Sprint task IDs:', sprintTaskIds)
 
     const taskDocs = await Task.find({
       _id: { $in: sprintTaskIds },
@@ -82,7 +79,6 @@ export async function GET(
         { path: 'sprint', select: 'name _id' }
       ])
 
-    console.log('Sprint API - Raw task docs from DB:', taskDocs)
 
     // Get current sprint tasks (tasks still assigned to this sprint)
     const currentSprintTaskIds = taskDocs
@@ -91,10 +87,7 @@ export async function GET(
 
     const tasks = taskDocs.map(task => {
       const taskObj = task.toObject()
-      console.log('Sprint API - Processing task:', taskObj._id, {
-        displayId: taskObj.displayId,
-        assignedTo: taskObj.assignedTo
-      })
+      
       const isInCurrentSprint = taskObj.sprint && taskObj.sprint._id.toString() === sprintId
       const movedToSprint = !isInCurrentSprint && taskObj.sprint ? {
         _id: taskObj.sprint._id.toString(),
@@ -118,19 +111,12 @@ export async function GET(
         movedToBacklog: !taskObj.sprint && taskObj.movedFromSprint && taskObj.movedFromSprint.toString() === sprintId
       }
 
-      console.log('Sprint API - Processed task:', processedTask._id, {
-        displayId: processedTask.displayId,
-        assignedTo: processedTask.assignedTo
-      })
+     
 
       return processedTask
     })
 
-    console.log('Sprint API - Final tasks array:', tasks.map(t => ({
-      id: t._id,
-      displayId: t.displayId,
-      assignedTo: t.assignedTo
-    })))
+   
 
     // Calculate progress from ALL tasks that were in this sprint (including moved ones)
     const totalTasks = tasks.length
@@ -182,20 +168,7 @@ export async function GET(
       }
     })
 
-    console.log('Sprint API - Final response data:', {
-      success: true,
-      data: {
-        ...sprint.toObject(),
-        progress,
-        taskSummary,
-        tasks: tasks.map(t => ({
-          id: t._id,
-          displayId: t.displayId,
-          assignedTo: t.assignedTo
-        }))
-      }
-    })
-
+   
   } catch (error) {
     console.error('Get sprint error:', error)
     return NextResponse.json(
