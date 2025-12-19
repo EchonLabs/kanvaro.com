@@ -685,6 +685,10 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEST_EXECUTION_UPDATE,
     Permission.TEST_REPORT_VIEW,
     Permission.TEST_REPORT_EXPORT,
+
+    // Documentation
+    Permission.DOCUMENTATION_VIEW,
+    Permission.DOCUMENTATION_SEARCH,
   ],
   
   [Role.TEAM_MEMBER]: [
