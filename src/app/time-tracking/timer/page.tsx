@@ -28,7 +28,6 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/components/ui/Toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useDateTime } from '@/components/providers/DateTimeProvider'
 
 interface Project {
   _id: string
@@ -104,7 +103,6 @@ export default function TimerPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showToast } = useToast()
-  const { formatDate, formatTime } = useDateTime()
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [authError, setAuthError] = useState('')
@@ -171,14 +169,14 @@ export default function TimerPage() {
     // Check for future time logging
     if (!timeTrackingSettings?.allowFutureTime) {
       if (start > now) {
-        const startDateStr = formatDate(start)
-        const startTimeStr = formatTime(start)
+        const startDateStr = start.toLocaleDateString()
+        const startTimeStr = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         setSessionHoursError(`⚠️ Future time not allowed: The start time (${startDateStr} at ${startTimeStr}) is in the future. Please select a time that is today or in the past.`)
         return
       }
       if (end > now) {
-        const endDateStr = formatDate(end)
-        const endTimeStr = formatTime(end)
+        const endDateStr = end.toLocaleDateString()
+        const endTimeStr = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         setSessionHoursError(`⚠️ Future time not allowed: The end time (${endDateStr} at ${endTimeStr}) is in the future. Please select a time that is today or in the past.`)
         return
       }
@@ -528,15 +526,15 @@ export default function TimerPage() {
     // Validate future time logging
     const now = new Date()
     if (start > now && !timeTrackingSettings?.allowFutureTime) {
-      const startDateStr = formatDate(start)
-      const startTimeStr = formatTime(start)
+      const startDateStr = start.toLocaleDateString()
+      const startTimeStr = start.toLocaleTimeString()
       setError(`⚠️ Future time not allowed: Your organization does not allow logging time for future dates/times. The selected start time (${startDateStr} ${startTimeStr}) is in the future. Please select a start date/time that is today or in the past.`)
       return
     }
 
     if (end > now && !timeTrackingSettings?.allowFutureTime) {
-      const endDateStr = formatDate(end)
-      const endTimeStr = formatTime(end)
+      const endDateStr = end.toLocaleDateString()
+      const endTimeStr = end.toLocaleTimeString()
       setError(`⚠️ Future time not allowed: Your organization does not allow logging time for future dates/times. The selected end time (${endDateStr} ${endTimeStr}) is in the future. Please select an end date/time that is today or in the past.`)
       return
     }
@@ -552,7 +550,7 @@ export default function TimerPage() {
       }
       
       if (timeTrackingSettings.allowPastTime && daysDiff > pastLimitDays) {
-        const startDateStr = formatDate(start)
+        const startDateStr = start.toLocaleDateString()
         setError(`⚠️ Past time limit exceeded: You can only log time up to ${pastLimitDays} days in the past. The selected start date (${startDateStr}) is more than ${pastLimitDays} days ago. Please select a more recent date.`)
         return
       }
