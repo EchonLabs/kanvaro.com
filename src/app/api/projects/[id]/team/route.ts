@@ -140,12 +140,10 @@ export async function PUT(
 
     const { user } = authResult
     const userId = user.id
-    console.log('userId',userId) 
     const organizationId = user.organization
     const projectId = params.id
     const { memberId, hourlyRate } = await request.json()
 
-    console.log('PUT request:', { projectId, memberId, hourlyRate })
 
     if (!memberId) {
       return NextResponse.json(
@@ -181,7 +179,6 @@ export async function PUT(
       is_deleted: { $ne: true }
     })
 
-    console.log('Project found:', !!project)
     if (!project) {
       return NextResponse.json(
         { error: 'Project not found' },
@@ -203,8 +200,6 @@ export async function PUT(
 
     // Update hourly rate directly on team member
     if (hourlyRate !== undefined) {
-      console.log('Updating hourly rate:', { memberId, hourlyRate })
-      console.log('Current team members:', JSON.stringify(project.teamMembers, null, 2))
 
       // Find and update the team member
       if (Array.isArray(project.teamMembers)) {
@@ -214,18 +209,14 @@ export async function PUT(
           const mIdStr = mId ? mId.toString() : ''
           const memberIdStr = memberId ? memberId.toString() : ''
           const comparison = mIdStr === memberIdStr
-          console.log(`Comparing "${mIdStr}" with "${memberIdStr}": ${comparison}`)
           return comparison
         })
 
         if (teamMember) {
-          console.log('Found team member, updating hourly rate')
           teamMember.hourlyRate = hourlyRate
           // Mark the teamMembers array as modified
           project.markModified('teamMembers')
-        } else {
-          console.log('Team member not found')
-        }
+        } 
       }
 
       const existingRateIndex = project.memberRates.findIndex(
@@ -251,7 +242,6 @@ export async function PUT(
 
     await project.save()
 
-    console.log('Project saved, updated team members:', project.teamMembers)
 
     return NextResponse.json({
       success: true,
