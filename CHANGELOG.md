@@ -1,3 +1,10 @@
+## [1.15.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.15.0...v1.15.1) (2025-12-19)
+
+
+### Bug Fixes
+
+* fix build issue ([58cd0ae](https://github.com/EchonLabs/kanvaro.com/commit/58cd0ae206653d20c5cc7df2d71b6ed3c1eaeccf))
+
 # [1.15.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.14.0...v1.15.0) (2025-12-19)
 
 
