@@ -13,11 +13,14 @@ import { Settings, Save, Loader2, AlertCircle, CheckCircle, Bell, Palette, Globe
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useCurrencies } from '@/hooks/useCurrencies'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { DateTimePreferences } from '@/lib/dateTimeUtils'
 import { NotificationTest } from '@/components/notifications/NotificationTest'
 
 export default function PreferencesPage() {
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay } = useCurrencies(true)
   const { isSupported, isSubscribed, permission, isLoading: pushLoading, toggleSubscription, showTestNotification } = usePushNotifications()
+  const { setPreferences: setDateTimePreferences } = useDateTime()
   const [isLoading, setIsLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [user, setUser] = useState<any>(null)
@@ -66,6 +69,19 @@ export default function PreferencesPage() {
             teamActivity: userData.preferences?.notifications?.teamActivity ?? false
           }
         })
+
+        // Sync DateTimeProvider with user preferences
+        const loadedPreferences = {
+          dateFormat: userData.preferences?.dateFormat || 'MM/DD/YYYY',
+          timeFormat: userData.preferences?.timeFormat || '12h'
+        }
+        setDateTimePreferences(loadedPreferences)
+
+        // Store in sessionStorage
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('user_date_preferences', JSON.stringify(loadedPreferences))
+        }
+
         setAuthError('')
       } else if (response.status === 401) {
         console.log('Preferences: 401 response, trying refresh token')
@@ -91,6 +107,19 @@ export default function PreferencesPage() {
               teamActivity: refreshData.user.preferences?.notifications?.teamActivity ?? false
             }
           })
+
+          // Sync DateTimeProvider with refreshed user preferences
+          const refreshedPreferences = {
+            dateFormat: refreshData.user.preferences?.dateFormat || 'MM/DD/YYYY',
+            timeFormat: refreshData.user.preferences?.timeFormat || '12h'
+          }
+          setDateTimePreferences(refreshedPreferences)
+
+          // Store in sessionStorage
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('user_date_preferences', JSON.stringify(refreshedPreferences))
+          }
+
           setAuthError('')
         } else {
           setAuthError('Session expired')
@@ -127,18 +156,27 @@ export default function PreferencesPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...formData,
-          preferences: {
-            theme: formData.theme,
-            dateFormat: formData.dateFormat,
-            timeFormat: formData.timeFormat,
-            notifications: formData.notifications
-          }
+          theme: formData.theme,
+          dateFormat: formData.dateFormat,
+          timeFormat: formData.timeFormat,
+          notifications: formData.notifications
         }),
       })
 
       if (!response.ok) {
         throw new Error('Failed to update preferences')
+      }
+
+      // Update DateTimeProvider with new preferences
+      const newPreferences = {
+        dateFormat: formData.dateFormat as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD',
+        timeFormat: formData.timeFormat as '12h' | '24h'
+      } as unknown as DateTimePreferences
+      setDateTimePreferences(newPreferences)
+
+      // Store in sessionStorage for persistence
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('user_date_preferences', JSON.stringify(newPreferences))
       }
 
       setMessage({ type: 'success', text: 'Preferences updated successfully' })

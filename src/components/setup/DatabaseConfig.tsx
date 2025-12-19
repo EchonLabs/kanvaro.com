@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Database, TestTube, CheckCircle, XCircle } from 'lucide-react'
+import { Database, TestTube } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Switch } from '@/components/ui/switch'
+import { useNotify } from '@/lib/notify'
 
 interface DatabaseConfigProps {
   onNext: (data: any) => void
@@ -27,14 +28,11 @@ export const DatabaseConfig = ({ onNext, initialData }: DatabaseConfigProps) => 
   })
   const [isTesting, setIsTesting] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
-  const [testResult, setTestResult] = useState<'success' | 'error' | null>(null)
-  const [testMessage, setTestMessage] = useState('')
   const [existingData, setExistingData] = useState(null)
+  const { success: notifySuccess, error: notifyError } = useNotify()
 
   const handleTestConnection = async () => {
     setIsTesting(true)
-    setTestResult(null)
-    setTestMessage('')
 
     try {
       const response = await fetch('/api/setup/database/test', {
@@ -46,21 +44,30 @@ export const DatabaseConfig = ({ onNext, initialData }: DatabaseConfigProps) => 
       const result = await response.json()
 
       if (response.ok) {
-        setTestResult('success')
         if (result.existingData) {
-          setTestMessage('Database connection successful! Found existing data that will be pre-filled.')
+          notifySuccess({
+            title: 'Connection Successful',
+            message: 'Database connection successful! Found existing data that will be pre-filled.'
+          })
         } else {
-          setTestMessage('Database connection successful!')
+          notifySuccess({
+            title: 'Connection Successful',
+            message: 'Database connection successful!'
+          })
         }
         // Store existing data for passing to next steps
         setExistingData(result.existingData || null)
       } else {
-        setTestResult('error')
-        setTestMessage(result.error || 'Database connection failed')
+        notifyError({
+          title: 'Connection Failed',
+          message: result.error || 'Database connection failed'
+        })
       }
     } catch (error) {
-      setTestResult('error')
-      setTestMessage('Database connection failed')
+      notifyError({
+        title: 'Connection Failed',
+        message: 'Database connection failed'
+      })
     } finally {
       setIsTesting(false)
     }
@@ -68,8 +75,6 @@ export const DatabaseConfig = ({ onNext, initialData }: DatabaseConfigProps) => 
 
   const handleCreateDatabase = async () => {
     setIsCreating(true)
-    setTestResult(null)
-    setTestMessage('')
 
     try {
       const response = await fetch('/api/setup/database/create', {
@@ -81,15 +86,21 @@ export const DatabaseConfig = ({ onNext, initialData }: DatabaseConfigProps) => 
       const result = await response.json()
 
       if (response.ok) {
-        setTestResult('success')
-        setTestMessage('Database created successfully!')
+        notifySuccess({
+          title: 'Database Created',
+          message: 'Database created successfully!'
+        })
       } else {
-        setTestResult('error')
-        setTestMessage(result.error || 'Database creation failed')
+        notifyError({
+          title: 'Database Creation Failed',
+          message: result.error || 'Database creation failed'
+        })
       }
     } catch (error) {
-      setTestResult('error')
-      setTestMessage('Database creation failed')
+      notifyError({
+        title: 'Database Creation Failed',
+        message: 'Database creation failed'
+      })
     } finally {
       setIsCreating(false)
     }
@@ -97,17 +108,11 @@ export const DatabaseConfig = ({ onNext, initialData }: DatabaseConfigProps) => 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (connectionType === 'existing' && testResult !== 'success') {
-      return // Don't proceed if existing database connection wasn't tested successfully
-    }
-    
+
     if (connectionType === 'create') {
       // For create database, we need to test the connection first
       setIsCreating(true)
-      setTestResult(null)
-      setTestMessage('')
-      
+
       try {
         const response = await fetch('/api/setup/database/create', {
           method: 'POST',
@@ -118,19 +123,25 @@ export const DatabaseConfig = ({ onNext, initialData }: DatabaseConfigProps) => 
         const result = await response.json()
 
         if (response.ok) {
-          setTestResult('success')
-          setTestMessage('Database is ready for use!')
+          notifySuccess({
+            title: 'Database Ready',
+            message: 'Database is ready for use!'
+          })
           // Proceed to next step after successful creation
           setTimeout(() => {
             onNext({ database: formData, existingData })
           }, 1000)
         } else {
-          setTestResult('error')
-          setTestMessage(result.error || 'Database setup failed')
+          notifyError({
+            title: 'Database Setup Failed',
+            message: result.error || 'Database setup failed'
+          })
         }
       } catch (error) {
-        setTestResult('error')
-        setTestMessage('Database setup failed')
+        notifyError({
+          title: 'Database Setup Failed',
+          message: 'Database setup failed'
+        })
       } finally {
         setIsCreating(false)
       }
@@ -433,26 +444,11 @@ export const DatabaseConfig = ({ onNext, initialData }: DatabaseConfigProps) => 
             </>
           )}
 
-          {testResult && (
-            <Alert variant={testResult === 'success' ? 'default' : 'destructive'}>
-              {testResult === 'success' ? (
-                <CheckCircle className="h-4 w-4" />
-              ) : (
-                <XCircle className="h-4 w-4" />
-              )}
-              <AlertDescription>
-                {testMessage}
-              </AlertDescription>
-            </Alert>
-          )}
 
           <div className="flex flex-col sm:flex-row justify-end gap-3">
             <Button
               type="submit"
-              disabled={
-                (connectionType === 'existing' && testResult !== 'success') ||
-                isCreating
-              }
+              disabled={isCreating}
             >
               {isCreating ? (
                 <>

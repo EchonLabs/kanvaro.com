@@ -194,7 +194,7 @@ const navigationItems = [
         label: 'Reports',
         icon: BarChart,
         path: '/time-tracking/reports',
-        permission: Permission.TIME_TRACKING_READ
+        permission: Permission.TIME_LOG_REPORT_ACCESS
       }
     ]
   },
@@ -290,8 +290,8 @@ const navigationItems = [
     id: 'docs',
     label: 'Documentation',
     icon: BookOpen,
-    path: '/docs',
-    permission: Permission.SETTINGS_READ
+    path: '/docs'
+    // No permission required - docs page handles its own permissions
   },
   {
     id: 'settings',
@@ -350,6 +350,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const handleLogout = async () => {
     try {
+      // Clear permission cache before logout
+      try {
+        sessionStorage.removeItem('kanvaro_permissions')
+        sessionStorage.removeItem('kanvaro_permissions_timestamp')
+      } catch (cacheError) {
+        console.error('Error clearing permission cache:', cacheError)
+      }
+
       const response = await fetch('/api/auth/logout', { method: 'POST' })
       if (response.ok) {
         // Clear any client-side state if needed
@@ -413,8 +421,21 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <div className="flex-1 overflow-y-auto px-2 py-4">
         <nav className="space-y-1">
           {navigationItems.map((item) => (
-            <PermissionGate key={item.id} permission={item.permission}>
+            item.permission ? (
+              <PermissionGate key={item.id} permission={item.permission}>
+                <NavigationItem
+                  item={item}
+                  collapsed={collapsed}
+                  pathname={pathname}
+                  expandedItems={expandedItems}
+                  onToggleExpanded={toggleExpanded}
+                  setExpandedItems={setExpandedItems}
+                  router={router}
+                />
+              </PermissionGate>
+            ) : (
               <NavigationItem
+                key={item.id}
                 item={item}
                 collapsed={collapsed}
                 pathname={pathname}
@@ -423,7 +444,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 setExpandedItems={setExpandedItems}
                 router={router}
               />
-            </PermissionGate>
+            )
           ))}
         </nav>
       </div>
@@ -445,7 +466,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           onClick={() => setShowLogoutConfirm(true)}
         >
           <LogOut className={cn('h-4 w-4', collapsed ? 'mx-auto' : 'mr-2')} />
-          {!collapsed && 'Sign Out'}
+          {!collapsed && 'Logout'}
         </Button>
       </div>
     </div>
@@ -454,9 +475,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       isOpen={showLogoutConfirm}
       onClose={() => setShowLogoutConfirm(false)}
       onConfirm={handleLogout}
-      title="Sign Out"
-      description="Are you sure you want to sign out?"
-      confirmText="Sign Out"
+      title="Logout"
+      description="Are you sure you want to logout?"
+      confirmText="Logout"
       cancelText="Cancel"
     />
     </>

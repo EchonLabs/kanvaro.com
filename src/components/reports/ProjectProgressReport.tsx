@@ -4,27 +4,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/Badge'
 import { Progress } from '@/components/ui/Progress'
 import { Button } from '@/components/ui/Button'
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   LineChart,
   Line,
   Area,
   AreaChart
 } from 'recharts'
-import { 
-  FolderOpen, 
-  CheckCircle, 
-  Clock, 
+import {
+  FolderOpen,
+  CheckCircle,
+  Clock,
   Target,
   TrendingUp,
   Calendar
 } from 'lucide-react'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 
 interface Project {
   _id: string
@@ -68,6 +69,8 @@ interface ProjectProgressReportProps {
 }
 
 export function ProjectProgressReport({ projects, filters }: ProjectProgressReportProps) {
+  const { formatDate } = useDateTime()
+
   // Prepare data for charts
   const progressData = projects.map(project => ({
     name: project.name.length > 15 ? project.name.substring(0, 15) + '...' : project.name,
@@ -284,7 +287,7 @@ export function ProjectProgressReport({ projects, filters }: ProjectProgressRepo
                     {project.endDate && (
                       <Badge variant="outline" className="flex items-center space-x-1 flex-shrink-0">
                         <Calendar className="h-3 w-3" />
-                        <span className="text-xs sm:text-sm">Due: {new Date(project.endDate).toLocaleDateString()}</span>
+                        <span className="text-xs sm:text-sm">Due: {formatDate(project.endDate)}</span>
                       </Badge>
                     )}
                   </div>

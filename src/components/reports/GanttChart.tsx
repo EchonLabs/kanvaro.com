@@ -4,15 +4,16 @@ import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { 
-  ZoomIn, 
-  ZoomOut, 
-  Move, 
+import {
+  ZoomIn,
+  ZoomOut,
+  Move,
   Calendar,
   User,
   Clock,
   AlertTriangle
 } from 'lucide-react'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { cn } from '@/lib/utils'
 import { GanttTask } from '@/lib/gantt'
 
@@ -35,6 +36,7 @@ export function GanttChart({
   const [scrollX, setScrollX] = useState(0)
   const [selectedTask, setSelectedTask] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const { formatDate } = useDateTime()
 
   // Ensure dates are Date objects
   const safeStartDate = startDate instanceof Date ? startDate : new Date(startDate)
@@ -80,12 +82,6 @@ export function GanttChart({
     }
   }
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric' 
-    })
-  }
 
   const generateTimeline = () => {
     const timeline = []

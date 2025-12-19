@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useDebounce } from '@/hooks/useDebounce'
 import { useAuth } from '@/hooks/useAuth'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { MainLayout } from '@/components/layout/MainLayout'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Calendar, 
   Clock, 
@@ -26,13 +27,13 @@ import {
   Eye,
   MoreVertical,
   X,
-  AlertCircle
+  RotateCcw
 } from 'lucide-react'
 import { AddSprintEventModal } from '@/components/sprint-events/AddSprintEventModal'
 import { EditSprintEventModal } from '@/components/sprint-events/EditSprintEventModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { format } from 'date-fns'
+import { useNotify } from '@/lib/notify'
 
 interface SprintEvent {
   _id: string
@@ -96,6 +97,7 @@ export default function SprintEventsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, isLoading: authLoading, isAuthenticated } = useAuth()
+  const { formatDate, formatTime } = useDateTime()
   const projectId = params.id as string
   const [events, setEvents] = useState<SprintEvent[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -106,7 +108,24 @@ export default function SprintEventsPage() {
   const [filterProject, setFilterProject] = useState('all')
   const [filterSprint, setFilterSprint] = useState('all')
   const [projectQuery, setProjectQuery] = useState('')
-  
+
+  // Check if any filters are active
+  const hasActiveFilters = searchTerm !== '' ||
+                          filterType !== 'all' ||
+                          filterStatus !== 'all' ||
+                          filterProject !== 'all' ||
+                          filterSprint !== 'all'
+
+  // Reset all filters
+  const resetFilters = () => {
+    setSearchTerm('')
+    setFilterType('all')
+    setFilterStatus('all')
+    setFilterProject('all')
+    setFilterSprint('all')
+    setProjectQuery('')
+  }
+
   // Debounced search (300ms delay)
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
   
@@ -122,10 +141,9 @@ export default function SprintEventsPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingEvent, setEditingEvent] = useState<SprintEvent | null>(null)
-  const [success, setSuccess] = useState('')
-  const [error, setError] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const { success: notifySuccess, error: notifyError } = useNotify()
 
   // Define fetch functions BEFORE useEffect that uses them
   const fetchProjects = useCallback(async (signal?: AbortSignal) => {
@@ -226,20 +244,14 @@ export default function SprintEventsPage() {
     const errorParam = searchParams?.get('error')
     
     if (successParam === 'created') {
-      setSuccess('Sprint Event created successfully')
+      notifySuccess({ title: 'Sprint Event Created', message: 'Sprint Event created successfully' })
       router.replace('/sprint-events', { scroll: false })
-      const timer = setTimeout(() => setSuccess(''), 3000)
-      return () => clearTimeout(timer)
     } else if (successParam === 'updated') {
-      setSuccess('Sprint Event updated successfully')
+      notifySuccess({ title: 'Sprint Event Updated', message: 'Sprint Event updated successfully' })
       router.replace('/sprint-events', { scroll: false })
-      const timer = setTimeout(() => setSuccess(''), 3000)
-      return () => clearTimeout(timer)
     } else if (errorParam) {
-      setError(decodeURIComponent(errorParam))
+      notifyError({ title: 'Error', message: decodeURIComponent(errorParam) })
       router.replace('/sprint-events', { scroll: false })
-      const timer = setTimeout(() => setError(''), 5000)
-      return () => clearTimeout(timer)
     }
   }, [searchParams, router])
 
@@ -335,8 +347,7 @@ export default function SprintEventsPage() {
   }
 
   const formatDateTime = (date: string, startTime?: string, endTime?: string) => {
-    const dateObj = new Date(date)
-    const dateStr = format(dateObj, 'MMM dd, yyyy')
+    const dateStr = formatDate(date)
     if (startTime && endTime) {
       return `${dateStr} • ${startTime} - ${endTime}`
     }
@@ -430,45 +441,6 @@ export default function SprintEventsPage() {
         </div>
 
         {/* Success/Error Messages */}
-        {(success || error) && (
-          <Alert 
-            variant={success ? "success" : "destructive"}
-            className="flex items-center justify-between pr-2"
-          >
-            <AlertDescription className="flex-1 flex items-center gap-2">
-              {success ? (
-                <>
-                  <CheckCircle className="h-4 w-4" />
-                  {success}
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="h-4 w-4" />
-                  {error}
-                </>
-              )}
-            </AlertDescription>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`h-6 w-6 p-0 ${
-                success 
-                  ? "hover:bg-green-100 dark:hover:bg-green-900/40" 
-                  : "hover:bg-red-100 dark:hover:bg-red-900/40"
-              }`}
-              onClick={() => {
-                setSuccess('')
-                setError('')
-              }}
-            >
-              <X className={`h-4 w-4 ${
-                success 
-                  ? "text-green-700 dark:text-green-300" 
-                  : "text-red-700 dark:text-red-300"
-              }`} />
-            </Button>
-          </Alert>
-        )}
 
         {/* Filters */}
         <Card>
@@ -555,6 +527,27 @@ export default function SprintEventsPage() {
                     <SelectItem value="cancelled">Cancelled</SelectItem>
                   </SelectContent>
                 </Select>
+                {hasActiveFilters && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={resetFilters}
+                          className="text-xs"
+                          aria-label="Reset all filters"
+                        >
+                          <RotateCcw className="h-4 w-4 mr-1" />
+                          Reset Filters
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Reset filters</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
               </div>
             </div>
           </CardContent>

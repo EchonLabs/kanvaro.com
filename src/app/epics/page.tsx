@@ -11,13 +11,13 @@ import { formatToTitleCase } from '@/lib/utils'
 import { Progress } from '@/components/ui/Progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { useNotify } from '@/lib/notify'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { extractUserId } from '@/lib/auth/user-utils'
 import { 
   Plus, 
@@ -27,7 +27,6 @@ import {
   Calendar, 
   Clock,
   CheckCircle,
-  AlertTriangle,
   Pause,
   XCircle,
   Play,
@@ -89,7 +88,6 @@ export default function EpicsPage() {
   const searchParams = useSearchParams()
   const [epics, setEpics] = useState<Epic[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -105,6 +103,7 @@ export default function EpicsPage() {
 
   const { hasPermission } = usePermissions()
   const { success: notifySuccess, error: notifyError } = useNotify()
+  const { formatDate } = useDateTime()
 
   // Show success when redirected with ?updated=true
   useEffect(() => {
@@ -177,13 +176,6 @@ export default function EpicsPage() {
     checkAuth()
   }, [checkAuth])
 
-  useEffect(() => {
-    if (error) {
-      notifyError({ title: error })
-    }
-    // notifyError is stable enough; omit from deps to avoid re-run loops
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [error])
 
   // Fetch when pagination changes (after initial load)
   useEffect(() => {
@@ -207,11 +199,11 @@ export default function EpicsPage() {
         setTotalCount(data.pagination?.total || data.data.length)
       } else {
         console.error('Failed to fetch epics:', data)
-        setError(data.error || 'Failed to fetch epics')
+        notifyError({ title: 'Failed to Load Epics', message: data.error || 'Failed to fetch epics' })
       }
     } catch (err) {
       console.error('Fetch epics error:', err)
-      setError('Failed to fetch epics')
+      notifyError({ title: 'Failed to Load Epics', message: 'Failed to fetch epics' })
     } finally {
       setLoading(false)
     }
@@ -235,14 +227,12 @@ export default function EpicsPage() {
         setSelectedEpic(null)
         notifySuccess({ title: 'Epic deleted successfully' })
       } else {
-        setError(data.error || 'Failed to delete epic')
+        notifyError({ title: 'Failed to Delete Epic', message: data.error || 'Failed to delete epic' })
         setShowDeleteConfirmModal(false)
-        notifyError({ title: data.error || 'Failed to delete epic' })
       }
     } catch (e) {
-      setError('Failed to delete epic')
+      notifyError({ title: 'Failed to Delete Epic', message: 'Failed to delete epic' })
       setShowDeleteConfirmModal(false)
-      notifyError({ title: 'Failed to delete epic' })
     } finally {
       setDeleting(false)
     }
@@ -251,10 +241,8 @@ export default function EpicsPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'backlog': return 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900'
-      case 'todo': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-      case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
-      case 'review': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900'
-      case 'testing': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900'
+      case 'todo': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900'
+      case 'inprogress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
       case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
       case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
@@ -265,9 +253,7 @@ export default function EpicsPage() {
     switch (status) {
       case 'backlog': return <Layers className="h-4 w-4" />
       case 'todo': return <Target className="h-4 w-4" />
-      case 'in_progress': return <Play className="h-4 w-4" />
-      case 'review': return <AlertTriangle className="h-4 w-4" />
-      case 'testing': return <Zap className="h-4 w-4" />
+      case 'inprogress': return <Play className="h-4 w-4" />
       case 'done': return <CheckCircle className="h-4 w-4" />
       case 'cancelled': return <XCircle className="h-4 w-4" />
       default: return <Target className="h-4 w-4" />
@@ -362,12 +348,6 @@ export default function EpicsPage() {
           </Button>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
 
         <Card className="overflow-x-hidden">
           <CardHeader>
@@ -400,8 +380,6 @@ export default function EpicsPage() {
                       <SelectItem value="backlog">Backlog</SelectItem>
                       <SelectItem value="todo">To Do</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="review">Review</SelectItem>
-                      <SelectItem value="testing">Testing</SelectItem>
                       <SelectItem value="done">Done</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
@@ -544,7 +522,7 @@ export default function EpicsPage() {
                           {epic?.dueDate && (
                             <div className="flex items-center space-x-1 flex-shrink-0 whitespace-nowrap">
                               <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span>Due {new Date(epic?.dueDate).toLocaleDateString()}</span>
+                              <span>Due {formatDate(epic?.dueDate)}</span>
                             </div>
                           )}
                         </div>
@@ -630,7 +608,7 @@ export default function EpicsPage() {
                               {epic?.dueDate && (
                                 <div className="flex items-center space-x-1 flex-shrink-0 whitespace-nowrap">
                                   <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span>Due {new Date(epic?.dueDate).toLocaleDateString()}</span>
+                                  <span>Due {formatDate(epic?.dueDate)}</span>
                                 </div>
                               )}
                               {epic?.storyPoints && (

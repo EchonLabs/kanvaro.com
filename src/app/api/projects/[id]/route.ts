@@ -43,7 +43,7 @@ export async function GET(
       is_deleted: { $ne: true } // Only return non-deleted projects
     })
       .populate('createdBy', 'firstName lastName email')
-      .populate('teamMembers', 'firstName lastName email')
+      .populate('teamMembers.memberId', 'firstName lastName email')
       .populate('client', 'firstName lastName email')
 
     if (!project) {
@@ -330,7 +330,7 @@ export async function PUT(
       { new: true }
     )
       .populate('createdBy', 'firstName lastName email')
-      .populate('teamMembers', 'firstName lastName email')
+      .populate('teamMembers.memberId', 'firstName lastName email')
       .populate('client', 'firstName lastName email')
 
     if (!project) {

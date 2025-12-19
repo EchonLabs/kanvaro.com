@@ -24,7 +24,7 @@ import {
   ExternalLink,
   Target
 } from 'lucide-react'
-import { format } from 'date-fns'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { EditSprintEventModal } from '@/components/sprint-events/EditSprintEventModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 
@@ -94,6 +94,7 @@ export default function SprintEventDetailsPage() {
 const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [editingEvent, setEditingEvent] = useState<SprintEvent | null>(null)
+  const { formatDate, formatTime } = useDateTime()
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -394,7 +395,7 @@ console.log('data', data)
                   <div>
                     <p className="text-sm text-muted-foreground">Created Date(Time)</p>
                     <p className="font-medium">
-                      {format(new Date(event.createdAt), 'MMM dd, yyyy')} ({format(new Date(event.createdAt), 'HH:mm')})
+                      {formatDate(event.createdAt)} ({formatTime(event.createdAt)})
                     </p>
                   </div>
                 </div>
@@ -411,7 +412,7 @@ console.log('data', data)
                   <div>
                     <p className="text-sm text-muted-foreground">Date</p>
                     <p className="font-medium">
-                      {format(new Date(event.scheduledDate), 'MMM dd, yyyy')}
+                      {formatDate(event.scheduledDate)}
                     </p>
                   </div>
                   <div>
@@ -523,7 +524,7 @@ console.log('data', data)
                                 {item.dueDate && (
                                   <div className="flex items-center gap-1">
                                     <Calendar className="h-3 w-3" />
-                                    <span>Due {format(new Date(item.dueDate), 'MMM dd, yyyy')}</span>
+                                    <span>Due {formatDate(item.dueDate)}</span>
                                   </div>
                                 )}
                                 {item.status && (

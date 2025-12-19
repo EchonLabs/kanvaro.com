@@ -7,6 +7,8 @@ import { Category, Audience } from '@/lib/docs/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Permission } from '@/lib/permissions/permission-definitions';
+import { PermissionService } from '@/lib/permissions/permission-service';
 
 interface PageProps {
   searchParams: {
@@ -37,22 +39,98 @@ const audienceLabels: Record<Audience, string> = {
 export default async function InternalDocsIndex({ searchParams }: PageProps) {
   // Authenticate user
   const auth = await authenticateUser();
-  
+
   if ('error' in auth) {
     redirect('/login?redirect=/docs/internal');
   }
 
+  // Check user permissions for documentation access
+  const [hasViewPermission, hasSearchPermission] = await Promise.all([
+    PermissionService.hasPermission(auth.user.id, Permission.DOCUMENTATION_VIEW),
+    PermissionService.hasPermission(auth.user.id, Permission.DOCUMENTATION_SEARCH)
+  ]);
+
+  // If user doesn't have view permission, redirect to login
+  if (!hasViewPermission) {
+    redirect('/login?redirect=/docs/internal');
+  }
+
+  const userRole = auth.user.role || 'viewer'; // Default to viewer if no role
+
   const { audience, category, search } = searchParams;
-  
-  const docs = await DocsLoader.getDocsByFilter({
-    visibility: 'internal',
-    audience: audience as Audience,
-    category: category as Category,
-    search
-  });
+
+  // Get all docs (both internal and public) for authenticated users, then filter based on user permissions
+  const allDocs = await DocsLoader.getIndex();
+  const allInternalDocs = allDocs.nodes.filter(doc => doc.visibility === 'internal' || doc.visibility === 'public');
+
+  // Filter docs based on user's role/audience access
+  let accessibleDocs = allInternalDocs;
+  if (audience) {
+    // If audience filter is applied, use it
+    accessibleDocs = allInternalDocs.filter(doc => doc.audiences.includes(audience as Audience));
+  } else {
+    // Otherwise, show docs that are accessible to the user's role or are general
+    const roleAudienceMap: Record<string, Audience[]> = {
+      'super_admin': ['admin', 'project_manager', 'team_member', 'client', 'viewer', 'self_host_admin'],
+      'admin': ['admin', 'project_manager', 'team_member', 'client', 'viewer'],
+      'project_manager': ['admin', 'project_manager', 'team_member', 'client', 'viewer'],
+      'team_member': ['team_member', 'client', 'viewer'],
+      'client': ['client', 'viewer'],
+      'viewer': ['viewer'],
+      'qa_engineer': ['admin', 'project_manager', 'team_member', 'client', 'viewer'],
+      'tester': ['team_member', 'client', 'viewer'],
+      'human_resource': ['admin', 'project_manager', 'team_member', 'client', 'viewer']
+    };
+
+    const allowedAudiences = roleAudienceMap[userRole] || ['viewer'];
+    accessibleDocs = allInternalDocs.filter(doc =>
+      doc.audiences.some(audience => allowedAudiences.includes(audience)) ||
+      doc.audiences.length === 0 // Include docs with no audience restrictions
+    );
+  }
+
+  // Apply category and search filters
+  let docs = accessibleDocs;
+  if (category) {
+    docs = docs.filter(doc => doc.category === category);
+  }
+
+  if (search && hasSearchPermission) {
+    // Use enhanced search from DocsLoader
+    const searchTerms = (DocsLoader as any).expandSearchTerms(search);
+    docs = docs.filter(doc => {
+      const searchableText = [
+        doc.title,
+        doc.summary,
+        ...doc.headings.map(h => h.text),
+        doc.content
+      ].join(' ').toLowerCase();
+
+      return searchTerms.some((term: string) => searchableText.includes(term));
+    });
+  }
 
   const categories = await DocsLoader.getCategories('internal');
   const audiences = await DocsLoader.getAudiences('internal');
+
+  // Also get public categories and audiences and merge them
+  const publicCategories = await DocsLoader.getCategories('public');
+  const publicAudiences = await DocsLoader.getAudiences('public');
+
+  // Merge categories and audiences
+  Object.entries(publicCategories).forEach(([category, docs]) => {
+    if (!categories[category as Category]) {
+      categories[category as Category] = [];
+    }
+    categories[category as Category].push(...docs.filter(doc => doc.visibility === 'public'));
+  });
+
+  Object.entries(publicAudiences).forEach(([audience, docs]) => {
+    if (!audiences[audience as Audience]) {
+      audiences[audience as Audience] = [];
+    }
+    audiences[audience as Audience].push(...docs.filter(doc => doc.visibility === 'public'));
+  });
 
   return (
     <DocsLayout
@@ -60,6 +138,7 @@ export default async function InternalDocsIndex({ searchParams }: PageProps) {
       initialAudience={audience as Audience}
       initialCategory={category as Category}
       initialSearch={search}
+      searchEnabled={hasSearchPermission}
     >
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
         {/* Header */}

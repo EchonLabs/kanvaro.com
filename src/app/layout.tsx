@@ -1,11 +1,12 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+// import { Inter } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { PermissionProvider } from '@/lib/permissions/permission-context'
 import { ToastProviderWrapper } from '@/components/providers/ToastProviderWrapper'
 
-const inter = Inter({ subsets: ['latin'] })
+// Use system fonts for better reliability
+const fontClass = "font-sans"
 
 export const metadata: Metadata = {
   title: 'Kanvaro - Project Management Solution',
@@ -37,7 +38,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} antialiased overflow-y-hidden`} suppressHydrationWarning>
+      <body className={`${fontClass} antialiased overflow-y-hidden`} suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

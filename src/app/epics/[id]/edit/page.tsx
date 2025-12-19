@@ -15,8 +15,8 @@ import { Loader2, ArrowLeft, Plus, X } from 'lucide-react'
 interface EpicForm {
   title: string
   description: string
-  // Match Epic model status: backlog | in_progress | completed | done | cancelled
-  status: 'backlog' | 'in_progress' | 'completed' | 'done' | 'cancelled'
+  // Match Epic model status: Backlog | todo | inprogress | done | cancelled
+  status: 'Backlog' | 'todo' | 'inprogress' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   dueDate: string
   estimatedHours: number | string
@@ -32,7 +32,7 @@ export default function EditEpicPage() {
   const [form, setForm] = useState<EpicForm>({
     title: '',
     description: '',
-    status: 'backlog',
+    status: 'Backlog',
     priority: 'medium',
     dueDate: '',
     estimatedHours: '',
@@ -56,16 +56,15 @@ export default function EditEpicPage() {
       const data = await res.json()
       if (res.ok && data.success) {
         const e = data.data
-        // Normalize status: 'done' maps to 'completed' for form consistency
-        // Also handle any other status values that might come from the API
-        let normalizedStatus = e?.status || 'backlog'
-        if (normalizedStatus === 'done') {
-          normalizedStatus = 'completed'
+        // Normalize status to match new Epic model values
+        let normalizedStatus = e?.status || 'Backlog'
+        if (!normalizedStatus) {
+          normalizedStatus = 'Backlog'
         }
         // Ensure status is one of the valid form values
-        const validStatuses: EpicForm['status'][] = ['backlog', 'in_progress', 'completed', 'done', 'cancelled']
+        const validStatuses: EpicForm['status'][] = ['Backlog', 'todo', 'inprogress', 'done', 'cancelled']
         if (!validStatuses.includes(normalizedStatus as EpicForm['status'])) {
-          normalizedStatus = 'backlog'
+          normalizedStatus = 'Backlog'
         }
 
         const nextForm: EpicForm = {
@@ -208,7 +207,7 @@ export default function EditEpicPage() {
     storyProgress.totalStories === 0 ||
     storyProgress.storiesCompleted >= storyProgress.totalStories
 
-  const statusBlocked = form.status === 'completed' && !canMarkCompleted
+  const statusBlocked = form.status === 'done' && !canMarkCompleted
   const hasChanges = initialForm !== null && JSON.stringify(form) !== JSON.stringify(initialForm)
 
   if (loading) {
@@ -279,9 +278,10 @@ export default function EditEpicPage() {
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="backlog">Backlog</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="completed">Done</SelectItem>
+                    <SelectItem value="Backlog">Backlog</SelectItem>
+                    <SelectItem value="todo">Todo</SelectItem>
+                    <SelectItem value="inprogress">In Progress</SelectItem>
+                    <SelectItem value="done">Done</SelectItem>
                     <SelectItem value="cancelled">Cancelled</SelectItem>
                   </SelectContent>
                 </Select>

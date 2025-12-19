@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { formatToTitleCase, cn } from '@/lib/utils'
 import { useTaskSync, useTaskState } from '@/hooks/useTaskSync'
+import { useNotify } from '@/lib/notify'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { Calendar as DateRangeCalendar } from '@/components/ui/calendar'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -43,7 +45,6 @@ import {
   Calendar, 
   Clock,
   CheckCircle,
-  AlertTriangle,
   Pause,
   XCircle,
   Play,
@@ -63,7 +64,8 @@ import {
   Eye,
   Edit,
   Trash2,
-  X
+  X,
+  RotateCcw
 } from 'lucide-react'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
 import EditTaskModal from '@/components/tasks/EditTaskModal'
@@ -260,9 +262,10 @@ function ColumnDropZone({
 
 export default function KanbanPage() {
   const router = useRouter()
+  const { formatDate } = useDateTime()
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const [searchQuery, setSearchQuery] = useState('')
   const [projectFilter, setProjectFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
@@ -290,6 +293,32 @@ export default function KanbanPage() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const hasFetchedProjects = useRef(false)
 
+  // Check if any filters are active
+  const hasActiveFilters = projectFilter !== 'all' ||
+                          priorityFilter !== 'all' ||
+                          typeFilter !== 'all' ||
+                          assignedToFilter !== 'all' ||
+                          assignedByFilter !== 'all' ||
+                          taskNumberFilter !== 'all' ||
+                          dateRangeFilter !== undefined
+
+  // Reset all filters
+  const resetFilters = () => {
+    setProjectFilter('all')
+    setPriorityFilter('all')
+    setTypeFilter('all')
+    setAssignedToFilter('all')
+    setAssignedByFilter('all')
+    setTaskNumberFilter('all')
+    setDateRangeFilter(undefined)
+    setProjectFilterQuery('')
+    setPriorityFilterQuery('')
+    setTypeFilterQuery('')
+    setAssignedToFilterQuery('')
+    setAssignedByFilterQuery('')
+    setTaskNumberFilterQuery('')
+  }
+
   // Use the task state management hook
   const {
     tasks,
@@ -301,6 +330,7 @@ export default function KanbanPage() {
     handleTaskCreate,
     handleTaskDelete
   } = useTaskState([])
+  // Use the notification hook
 
   // Use the task synchronization hook
   const {
@@ -331,10 +361,10 @@ export default function KanbanPage() {
       if (data.success) {
         setTasks(data.data)
       } else {
-        setError(data.error || 'Failed to fetch tasks')
+        notifyError({ title: 'Failed to Load Tasks', message: data.error || 'Failed to fetch tasks' })
       }
     } catch (err) {
-      setError('Failed to fetch tasks')
+      notifyError({ title: 'Failed to Load Tasks', message: 'Failed to fetch tasks' })
     } finally {
       setLoading(false)
     }
@@ -534,6 +564,13 @@ export default function KanbanPage() {
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
+
+  // Handle task errors from the task state hook
+  useEffect(() => {
+    if (taskError) {
+      notifyError({ title: 'Task Synchronization Error', message: taskError })
+    }
+  }, [taskError, notifyError])
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -735,7 +772,7 @@ export default function KanbanPage() {
         })
       } catch (error) {
         console.error('Failed to update task status:', error)
-        setError('Failed to update task status. Please try again.')
+        notifyError({ title: 'Failed to Update Task', message: 'Failed to update task status. Please try again.' })
       }
     }
   }
@@ -776,7 +813,7 @@ export default function KanbanPage() {
         setSelectedTask(null)
       } catch (error) {
         console.error('Failed to delete task:', error)
-        setError('Failed to delete task. Please try again.')
+        notifyError({ title: 'Failed to Delete Task', message: 'Failed to delete task. Please try again.' })
       }
     }
   }
@@ -822,12 +859,6 @@ export default function KanbanPage() {
           </Button>
         </div>
 
-        {(error || taskError) && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error || taskError}</AlertDescription>
-          </Alert>
-        )}
 
         {/* Real-time connection status */}
         {isConnected && (
@@ -1190,6 +1221,29 @@ export default function KanbanPage() {
                 </div>
                 </div>
               </div>
+              {hasActiveFilters && (
+                <div className="flex justify-start mt-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={resetFilters}
+                          className="text-xs"
+                          aria-label="Reset all filters"
+                        >
+                          <RotateCcw className="h-4 w-4 mr-1" />
+                          Reset Filters
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Reset filters</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -1424,10 +1478,10 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
                 <span className="text-foreground text-sm line-clamp-2">{task?.project?.name}</span>
               </TruncateTooltip>
             </div>
-            {task.dueDate && (
+            {task.dueDate && (task.dueDate) && (
               <div className="flex items-center space-x-1 mb-1">
                 <Calendar className="h-3 w-3" />
-                <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>
+                <span>Due {(task.dueDate)}</span>
               </div>
             )}
             {task.storyPoints && (
@@ -1444,18 +1498,15 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
             )}
           </div>
           
-          {task.assignedTo && (
-            <div className="flex items-center space-x-2">
-              <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
-                {task?.assignedTo?.firstName[0]}{task?.assignedTo?.lastName[0]}
-              </div>
+          <div className="text-xs text-muted-foreground">
+            {task.assignedTo ? (
               <TruncateTooltip text={`${task?.assignedTo?.firstName} ${task?.assignedTo?.lastName}`}>
-                <span className="text-xs text-muted-foreground">
-                  {task?.assignedTo?.firstName} {task?.assignedTo?.lastName}
-                </span>
+                <span>{task?.assignedTo?.firstName} {task?.assignedTo?.lastName}</span>
               </TruncateTooltip>
-            </div>
-          )}
+            ) : (
+              <span>Not assigned</span>
+            )}
+          </div>
           
           {task?.labels?.length > 0 && (
             <div className="flex items-center gap-1 overflow-hidden flex-nowrap">

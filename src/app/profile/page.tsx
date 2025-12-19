@@ -15,14 +15,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useCurrencies } from '@/hooks/useCurrencies'
 import { useProfile } from '@/hooks/useProfile'
-import { 
-  User, 
-  Settings, 
-  Bell, 
-  Shield, 
+import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { useToast } from '@/components/ui/Toast'
+import {
+  User,
+  Settings,
+  Bell,
+  Shield,
   Save,
   Loader2,
-  CheckCircle,
   Palette,
   Globe,
   Mail,
@@ -69,6 +70,8 @@ export default function ProfilePage() {
   const { organization, loading: orgLoading } = useOrganization()
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay } = useCurrencies(true)
   const { updateProfile, changePassword, uploadAvatar, loading: profileLoading, error: profileError, success: profileSuccess } = useProfile()
+  const { showToast } = useToast()
+  const { formatDate: formatDateDisplay, formatTime: formatTimeDisplay, setPreferences } = useDateTime()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState('')
@@ -99,6 +102,9 @@ export default function ProfilePage() {
     }
   })
 
+  const [originalFormData, setOriginalFormData] = useState<typeof formData | null>(null)
+  const [activeTab, setActiveTab] = useState('personal')
+
   const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me')
@@ -106,6 +112,9 @@ export default function ProfilePage() {
       if (response.ok) {
         const userData = await response.json()
         setProfile(userData)
+        const loadedDateFormat = userData.preferences?.notifications?.dateFormat || userData.preferences?.dateFormat || 'MM/DD/YYYY'
+        const loadedTimeFormat = userData.preferences?.notifications?.timeFormat || userData.preferences?.timeFormat || '12h'
+
         setFormData({
           firstName: userData.firstName || '',
           lastName: userData.lastName || '',
@@ -114,8 +123,8 @@ export default function ProfilePage() {
           currency: userData.currency || 'USD',
           theme: userData.preferences?.theme || 'system',
           sidebarCollapsed: userData.preferences?.sidebarCollapsed || false,
-          dateFormat: userData.preferences?.dateFormat || 'MM/DD/YYYY',
-          timeFormat: userData.preferences?.timeFormat || '12h',
+          dateFormat: loadedDateFormat,
+          timeFormat: loadedTimeFormat,
           notifications: {
             email: userData.preferences?.notifications?.email ?? true,
             inApp: userData.preferences?.notifications?.inApp ?? true,
@@ -125,8 +134,35 @@ export default function ProfilePage() {
             teamActivity: userData.preferences?.notifications?.teamActivity ?? false
           }
         })
+
+        // Update DateTimeProvider with loaded preferences
+        setPreferences({
+          dateFormat: loadedDateFormat as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD',
+          timeFormat: loadedTimeFormat as '12h' | '24h'
+        })
+
         setAuthError('')
-      } else if (response.status === 401) {
+        // Store original form data for change detection
+        setOriginalFormData(JSON.parse(JSON.stringify({
+          firstName: userData.firstName || '',
+          lastName: userData.lastName || '',
+          timezone: userData.timezone || 'UTC',
+          language: userData.language || 'en',
+          currency: userData.currency || 'USD',
+          theme: userData.preferences?.theme || 'system',
+          sidebarCollapsed: userData.preferences?.sidebarCollapsed || false,
+          dateFormat: loadedDateFormat,
+          timeFormat: loadedTimeFormat,
+          notifications: {
+            email: userData.preferences?.notifications?.email ?? true,
+            inApp: userData.preferences?.notifications?.inApp ?? true,
+            push: userData.preferences?.notifications?.push ?? false,
+            taskReminders: userData.preferences?.notifications?.taskReminders ?? true,
+            projectUpdates: userData.preferences?.notifications?.projectUpdates ?? true,
+            teamActivity: userData.preferences?.notifications?.teamActivity ?? false
+          }
+        })))
+        } else if (response.status === 401) {
         const refreshResponse = await fetch('/api/auth/refresh', {
           method: 'POST'
         })
@@ -134,6 +170,9 @@ export default function ProfilePage() {
         if (refreshResponse.ok) {
           const refreshData = await refreshResponse.json()
           setProfile(refreshData)
+          const refreshDateFormat = refreshData.preferences?.notifications?.dateFormat || refreshData.preferences?.dateFormat || 'MM/DD/YYYY'
+          const refreshTimeFormat = refreshData.preferences?.notifications?.timeFormat || refreshData.preferences?.timeFormat || '12h'
+
           setFormData({
             firstName: refreshData.firstName || '',
             lastName: refreshData.lastName || '',
@@ -142,8 +181,8 @@ export default function ProfilePage() {
             currency: refreshData.currency || 'USD',
             theme: refreshData.preferences?.theme || 'system',
             sidebarCollapsed: refreshData.preferences?.sidebarCollapsed || false,
-            dateFormat: refreshData.preferences?.dateFormat || 'MM/DD/YYYY',
-            timeFormat: refreshData.preferences?.timeFormat || '12h',
+            dateFormat: refreshDateFormat,
+            timeFormat: refreshTimeFormat,
             notifications: {
               email: refreshData.preferences?.notifications?.email ?? true,
               inApp: refreshData.preferences?.notifications?.inApp ?? true,
@@ -153,7 +192,34 @@ export default function ProfilePage() {
               teamActivity: refreshData.preferences?.notifications?.teamActivity ?? false
             }
           })
+
+          // Update DateTimeProvider with loaded preferences
+          setPreferences({
+            dateFormat: refreshDateFormat as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD',
+            timeFormat: refreshTimeFormat as '12h' | '24h'
+          })
+
           setAuthError('')
+          // Store original form data for change detection
+          setOriginalFormData(JSON.parse(JSON.stringify({
+            firstName: refreshData.firstName || '',
+            lastName: refreshData.lastName || '',
+            timezone: refreshData.timezone || 'UTC',
+            language: refreshData.language || 'en',
+            currency: refreshData.currency || 'USD',
+            theme: refreshData.preferences?.theme || 'system',
+            sidebarCollapsed: refreshData.preferences?.sidebarCollapsed || false,
+            dateFormat: refreshDateFormat,
+            timeFormat: refreshTimeFormat,
+            notifications: {
+              email: refreshData.preferences?.notifications?.email ?? true,
+              inApp: refreshData.preferences?.notifications?.inApp ?? true,
+              push: refreshData.preferences?.notifications?.push ?? false,
+              taskReminders: refreshData.preferences?.notifications?.taskReminders ?? true,
+              projectUpdates: refreshData.preferences?.notifications?.projectUpdates ?? true,
+              teamActivity: refreshData.preferences?.notifications?.teamActivity ?? false
+            }
+          })))
         } else {
           setAuthError('Session expired')
           setTimeout(() => {
@@ -179,10 +245,45 @@ export default function ProfilePage() {
   }, [checkAuth])
 
   const handleSave = async () => {
+    // Generate tab-specific success message
+    let successMessage = ''
+    switch (activeTab) {
+      case 'personal':
+        successMessage = 'Personal information updated successfully'
+        break
+      case 'preferences':
+        successMessage = 'Display preferences updated successfully'
+        break
+      case 'notifications':
+        successMessage = 'Notification preferences updated successfully'
+        break
+      case 'security':
+        successMessage = 'Security settings updated successfully'
+        break
+      default:
+        successMessage = 'Profile updated successfully'
+    }
+
     const result = await updateProfile(formData)
     if (result.success) {
       // Update local profile state if needed
       setProfile(prev => prev ? { ...prev, ...result.data } : null)
+      // Update original form data to reflect saved state
+      setOriginalFormData(JSON.parse(JSON.stringify(formData)))
+      // Update DateTime context with new preferences
+      setPreferences({
+        dateFormat: formData.dateFormat as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD',
+        timeFormat: formData.timeFormat as '12h' | '24h'
+      })
+      // Show success toast notification
+      showToast({
+        type: 'success',
+        title: 'Profile Updated',
+        message: successMessage,
+        duration: 4000
+      })
+      // Clear any previous error
+      setAuthError('')
     }
   }
 
@@ -190,6 +291,13 @@ export default function ProfilePage() {
     const result = await changePassword(passwordData)
     if (result.success) {
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      showToast({
+        type: 'success',
+        title: 'Password Changed',
+        message: 'Your password has been updated successfully',
+        duration: 4000
+      })
+      setAuthError('')
     }
   }
 
@@ -200,6 +308,13 @@ export default function ProfilePage() {
       if (result.success) {
         // Update local profile state
         setProfile(prev => prev ? { ...prev, avatar: result.data?.avatar } : null)
+        showToast({
+          type: 'success',
+          title: 'Avatar Updated',
+          message: 'Your profile picture has been updated successfully',
+          duration: 4000
+        })
+        setAuthError('')
       }
     }
   }
@@ -242,6 +357,35 @@ export default function ProfilePage() {
     )
   }
 
+
+  // Check if there are any changes in the current tab's form data
+  const hasChanges = () => {
+    if (!originalFormData) return false
+
+    switch (activeTab) {
+      case 'personal':
+        return (
+          formData.firstName !== originalFormData.firstName ||
+          formData.lastName !== originalFormData.lastName ||
+          formData.timezone !== originalFormData.timezone ||
+          formData.language !== originalFormData.language
+        )
+      case 'preferences':
+        return (
+          formData.theme !== originalFormData.theme ||
+          formData.dateFormat !== originalFormData.dateFormat ||
+          formData.timeFormat !== originalFormData.timeFormat ||
+          formData.sidebarCollapsed !== originalFormData.sidebarCollapsed
+        )
+      case 'notifications':
+        return JSON.stringify(formData.notifications) !== JSON.stringify(originalFormData.notifications)
+      case 'security':
+        return false // Security tab doesn't have form data to save
+      default:
+        return false
+    }
+  }
+
   return (
     <MainLayout>
       <div className="space-y-8">
@@ -267,21 +411,15 @@ export default function ProfilePage() {
         </div>
 
         {/* Profile Content */}
-        <div className="space-y-6">
-          {profileError && (
+        <div className="space-y-8">
+          {(profileError || authError) && (
             <Alert variant="destructive">
-              <AlertDescription>{profileError}</AlertDescription>
+              <AlertDescription>{profileError || authError}</AlertDescription>
             </Alert>
           )}
 
-          {profileSuccess && (
-            <Alert variant="default">
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>{profileSuccess}</AlertDescription>
-            </Alert>
-          )}
 
-          <Tabs defaultValue="personal" className="space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="personal" className="flex items-center gap-2">
                 <User className="h-4 w-4" />
@@ -302,7 +440,7 @@ export default function ProfilePage() {
             </TabsList>
 
             {/* Personal Information Tab */}
-            <TabsContent value="personal" className="space-y-6">
+            <TabsContent value="personal" className="space-y-8">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -451,7 +589,7 @@ export default function ProfilePage() {
             </TabsContent>
 
             {/* Preferences Tab */}
-            <TabsContent value="preferences" className="space-y-6">
+            <TabsContent value="preferences" className="space-y-8">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -519,12 +657,19 @@ export default function ProfilePage() {
                       onCheckedChange={(checked) => setFormData(prev => ({ ...prev, sidebarCollapsed: checked }))}
                     />
                   </div>
+
+                  <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950 rounded-md border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      <strong>Note:</strong> When you change date/time formats above, all dates and times throughout the application will update immediately to reflect your preferences. Time input fields will also accept input in your selected format (e.g., "2:30 PM" for 12-hour or "14:30" for 24-hour).
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
+
             </TabsContent>
 
             {/* Notifications Tab */}
-            <TabsContent value="notifications" className="space-y-6">
+            <TabsContent value="notifications" className="space-y-8">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -657,7 +802,7 @@ export default function ProfilePage() {
             </TabsContent>
 
             {/* Security Tab */}
-            <TabsContent value="security" className="space-y-6">
+            <TabsContent value="security" className="space-y-8">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -776,7 +921,7 @@ export default function ProfilePage() {
 
           {/* Save Button */}
           <div className="flex justify-end pt-6 mt-8 border-t border-muted">
-            <Button onClick={handleSave} disabled={profileLoading} size="lg">
+            <Button onClick={handleSave} disabled={profileLoading || !hasChanges()} size="lg">
               {profileLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

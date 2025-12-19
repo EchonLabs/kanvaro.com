@@ -4,12 +4,15 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { useNotify } from '@/lib/notify'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Progress } from '@/components/ui/Progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -17,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import {
   ArrowLeft,
+  ArrowRight,
   Calendar,
   Users,
   DollarSign,
@@ -75,6 +79,7 @@ interface Project {
   isDraft: boolean
   startDate: string
   endDate?: string
+  isBillableByDefault: boolean
   projectNumber?: number
   budget?: {
     total: number
@@ -93,9 +98,18 @@ interface Project {
     email: string
   }
   teamMembers: Array<{
-    firstName: string
-    lastName: string
-    email: string
+    _id?: string
+    memberId?: {
+      firstName: string
+      lastName: string
+      email: string
+      role?: string
+    }
+    firstName?: string
+    lastName?: string
+    email?: string
+    role?: string
+    hourlyRate?: number
   }>
   client?: {
     firstName: string
@@ -164,6 +178,7 @@ export default function ProjectDetailPage() {
   const { organization } = useOrganization()
   const orgCurrency = organization?.currency || 'USD'
   const { formatCurrency } = useOrgCurrency()
+  const { formatDate } = useDateTime()
 
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
@@ -190,6 +205,7 @@ export default function ProjectDetailPage() {
     allowTimeTracking: false,
     allowManualTimeSubmission: false,
     allowExpenseTracking: false,
+    allowBillableTime: false,
     requireApproval: false,
     notifications: {
       taskUpdates: false,
@@ -205,12 +221,16 @@ export default function ProjectDetailPage() {
   } | null>(null)
   const [statusForm, setStatusForm] = useState<Project['status']>('planning')
   const [priorityForm, setPriorityForm] = useState<Project['priority']>('medium')
-  const [settingsSuccess, setSettingsSuccess] = useState('')
-  const [settingsError, setSettingsError] = useState('')
   const [savingSettings, setSavingSettings] = useState(false)
   const settingsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [expenseSuccess, setExpenseSuccess] = useState('')
-  const expenseSuccessTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Attachments pagination
+  const [attachmentsPage, setAttachmentsPage] = useState(1)
+  const attachmentsPerPage = 10
+
+  // Use the notification hook
+  const { success: notifySuccess, error: notifyError } = useNotify()
+
   const totalExpenses = useMemo(
     () => expenses.reduce((sum, exp) => sum + (exp.fullAmount || 0), 0),
     [expenses]
@@ -256,12 +276,14 @@ export default function ProjectDetailPage() {
       // Respect global settings - if global is OFF, project must be OFF too
       const allowTimeTracking = (project.settings?.allowTimeTracking ?? false) && (globalTimeTrackingSettings?.allowTimeTracking ?? true)
       const allowManualTimeSubmission = (project.settings?.allowManualTimeSubmission ?? false) && (globalTimeTrackingSettings?.allowManualTimeSubmission ?? true)
+      const allowBillableTime = (project.isBillableByDefault ?? false) && (globalTimeTrackingSettings?.allowBillableTime ?? true)
       const requireApproval = (project.settings?.requireApproval ?? false) && (globalTimeTrackingSettings?.requireApproval ?? true)
 
       setSettingsForm({
         allowTimeTracking,
         allowManualTimeSubmission,
         allowExpenseTracking: project.settings?.allowExpenseTracking ?? false,
+        allowBillableTime,
         requireApproval,
         notifications: {
           taskUpdates: project.settings?.notifications?.taskUpdates ?? false,
@@ -277,39 +299,20 @@ export default function ProjectDetailPage() {
       if (settingsTimeoutRef.current) {
         clearTimeout(settingsTimeoutRef.current)
       }
-      if (expenseSuccessTimeoutRef.current) {
-        clearTimeout(expenseSuccessTimeoutRef.current)
-      }
     }
   }, [])
 
   const showSettingsSuccess = (message: string) => {
-    setSettingsSuccess(message)
-    if (settingsTimeoutRef.current) {
-      clearTimeout(settingsTimeoutRef.current)
-    }
-    settingsTimeoutRef.current = setTimeout(() => {
-      setSettingsSuccess('')
-      settingsTimeoutRef.current = null
-    }, 3000)
+    notifySuccess({ title: 'Settings Updated', message })
   }
 
   const showExpenseSuccess = (message: string) => {
-    setExpenseSuccess(message)
-    if (expenseSuccessTimeoutRef.current) {
-      clearTimeout(expenseSuccessTimeoutRef.current)
-    }
-    expenseSuccessTimeoutRef.current = setTimeout(() => {
-      setExpenseSuccess('')
-      expenseSuccessTimeoutRef.current = null
-    }, 3000)
+    notifySuccess({ title: 'Expense Updated', message })
   }
 
   const handleSaveSettings = async () => {
     if (!projectId) return
     setSavingSettings(true)
-    setSettingsError('')
-    setSettingsSuccess('')
 
     try {
       // Ensure project settings respect global settings
@@ -328,6 +331,7 @@ export default function ProjectDetailPage() {
         },
         body: JSON.stringify({
           settings: finalSettings,
+          isBillableByDefault: settingsForm.allowBillableTime,
           status: statusForm,
           priority: priorityForm,
         }),
@@ -339,11 +343,11 @@ export default function ProjectDetailPage() {
         setProject(data.data)
         showSettingsSuccess('Project settings updated successfully.')
       } else {
-        setSettingsError(data.error || 'Failed to update project settings')
+        notifyError({ title: 'Failed to Update Settings', message: data.error || 'Failed to update project settings' })
       }
     } catch (error) {
       console.error('Failed to update project settings:', error)
-      setSettingsError('Failed to update project settings')
+      notifyError({ title: 'Failed to Update Settings', message: 'Failed to update project settings' })
     } finally {
       setSavingSettings(false)
     }
@@ -428,6 +432,7 @@ export default function ProjectDetailPage() {
     settingsForm.allowTimeTracking !== (project.settings?.allowTimeTracking ?? false) ||
     settingsForm.allowManualTimeSubmission !== (project.settings?.allowManualTimeSubmission ?? false) ||
     settingsForm.allowExpenseTracking !== (project.settings?.allowExpenseTracking ?? false) ||
+    settingsForm.allowBillableTime !== (project.isBillableByDefault ?? false) ||
     settingsForm.requireApproval !== (project.settings?.requireApproval ?? false)
   ) : false
 
@@ -484,7 +489,8 @@ export default function ProjectDetailPage() {
   }
 
   return (
-    <MainLayout>
+    <TooltipProvider>
+      <MainLayout>
       <div className="space-y-8 mt-4">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -652,13 +658,13 @@ export default function ProjectDetailPage() {
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-muted-foreground">Start Date</span>
                           <span className="text-sm text-foreground">
-                            {new Date(project.startDate).toLocaleDateString()}
+                            {formatDate(project.startDate)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-muted-foreground">End Date</span>
                           <span className="text-sm text-foreground">
-                            {project.endDate ? new Date(project.endDate).toLocaleDateString() : 'Not set'}
+                            {project.endDate ? formatDate(project.endDate) : 'Not set'}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
@@ -682,7 +688,7 @@ export default function ProjectDetailPage() {
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-muted-foreground">Created</span>
                           <span className="text-sm text-foreground">
-                            {new Date(project.createdAt).toLocaleDateString()}
+                            {formatDate(project.createdAt)}
                           </span>
                         </div>
                       </div>
@@ -775,19 +781,28 @@ export default function ProjectDetailPage() {
                     <CardTitle>Team Members</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {project.teamMembers.map((member, index) => (
-                      <div key={index} className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-medium">
-                          {member.firstName[0]}{member.lastName[0]}
+                    {project.teamMembers.map((member, index) => {
+                      // teamMembers are populated: member = { memberId: userObject, hourlyRate, _id }
+                      const user = member.memberId;
+                      return (
+                        <div key={member._id || index} className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-medium">
+                            {user?.firstName?.[0]}{user?.lastName?.[0]}
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-foreground">
+                              {user?.firstName} {user?.lastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{user?.email}</p>
+                            {member.hourlyRate && (
+                              <p className="text-xs text-muted-foreground">
+                                ${member.hourlyRate}/hr
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-foreground">
-                            {member.firstName} {member.lastName}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{member.email}</p>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </CardContent>
                 </Card>
 
@@ -865,43 +880,99 @@ export default function ProjectDetailPage() {
                     </Label>
                   </div>
                   {project.attachments && project.attachments.length > 0 ? (
-                    <div className="space-y-2">
-                      {project.attachments.map((attachment, index) => (
-                        <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-                          <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
-                            {attachment.type.startsWith('image/') ? (
-                              <Image className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0" />
-                            ) : (
-                              <File className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0" />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-xs sm:text-sm truncate">{attachment.name}</p>
-                              <p className="text-xs text-muted-foreground break-words sm:break-normal">
-                                <span className="whitespace-nowrap">{(attachment.size / 1024).toFixed(2)} KB</span>
-                                {attachment.uploadedBy && (
-                                  <span className="hidden sm:inline">
-                                    {` • ${attachment.uploadedBy.firstName} ${attachment.uploadedBy.lastName}`}
-                                  </span>
-                                )}
-                                {attachment.uploadedAt && (
-                                  <span className="hidden sm:inline">
-                                    {` • ${new Date(attachment.uploadedAt).toLocaleDateString()}`}
-                                  </span>
-                                )}
-                              </p>
-                            </div>
+                    <div className="space-y-4">
+                      {/* Pagination Info */}
+                      {project.attachments && project.attachments.length > attachmentsPerPage && (
+                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                          <span>
+                            Showing {((attachmentsPage - 1) * attachmentsPerPage) + 1} to {Math.min(attachmentsPage * attachmentsPerPage, project.attachments?.length || 0)} of {project.attachments?.length || 0} attachments
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setAttachmentsPage(prev => Math.max(1, prev - 1));
+                              }}
+                              disabled={attachmentsPage === 1}
+                            >
+                              <ArrowLeft className="h-4 w-4" />
+                              Previous
+                            </Button>
+                            <span className="px-3 py-1 bg-muted rounded text-xs">
+                              {attachmentsPage} of {Math.ceil((project.attachments?.length || 0) / attachmentsPerPage)}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setAttachmentsPage(prev => Math.min(Math.ceil((project.attachments?.length || 0) / attachmentsPerPage), prev + 1));
+                              }}
+                              disabled={attachmentsPage === Math.ceil((project.attachments?.length || 0) / attachmentsPerPage)}
+                            >
+                              Next
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(attachment.url, '_blank')}
-                            className="w-full sm:w-auto self-start sm:self-auto"
-                          >
-                            <ExternalLink className="h-4 w-4 mr-2 sm:mr-0" />
-                            <span className="sm:hidden">Open</span>
-                          </Button>
                         </div>
-                      ))}
+                      )}
+
+                      {/* Attachments List */}
+                      <div className="space-y-2">
+                        {project.attachments
+                          .slice((attachmentsPage - 1) * attachmentsPerPage, attachmentsPage * attachmentsPerPage)
+                          .map((attachment, index) => {
+                            const actualIndex = (attachmentsPage - 1) * attachmentsPerPage + index;
+                            return (
+                              <div key={actualIndex} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                                <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+                                  {attachment.type.startsWith('image/') ? (
+                                    <Image className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0" />
+                                  ) : (
+                                    <File className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0" />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-xs sm:text-sm truncate">{attachment.name}</p>
+                                    <p className="text-xs text-muted-foreground break-words sm:break-normal">
+                                      <span className="whitespace-nowrap">{(attachment.size / 1024).toFixed(2)} KB</span>
+                                      {attachment.uploadedBy && (
+                                        <span className="hidden sm:inline">
+                                          {` • ${attachment.uploadedBy.firstName} ${attachment.uploadedBy.lastName}`}
+                                        </span>
+                                      )}
+                                      {attachment.uploadedAt && (
+                                        <span className="hidden sm:inline">
+                                          {` • ${formatDate(attachment.uploadedAt)}`}
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => window.open(attachment.url, '_blank')}
+                                      className="w-full sm:w-auto self-start sm:self-auto"
+                                    >
+                                      <ExternalLink className="h-4 w-4 mr-2 sm:mr-0" />
+                                      <span className="sm:hidden">Open</span>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Open file</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
+                            );
+                          })}
+                      </div>
+
                     </div>
                   ) : (
                     <div className="border-2 border-dashed border-muted rounded-lg p-4 sm:p-6 text-center">
@@ -1081,14 +1152,6 @@ export default function ProjectDetailPage() {
                   </div>
                 </CardHeader>
 
-                {expenseSuccess && (
-                  <div className="px-6 pt-4">
-                    <Alert variant="success" className="animate-in fade-in slide-in-from-top-2">
-                      <CheckCircle className="h-4 w-4" />
-                      <AlertDescription>{expenseSuccess}</AlertDescription>
-                    </Alert>
-                  </div>
-                )}
 
                 <CardContent>
                   {expensesLoading ? (
@@ -1131,7 +1194,7 @@ export default function ProjectDetailPage() {
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-muted-foreground">Date:</span>
-                                <span>{new Date(expense.expenseDate).toLocaleDateString()}</span>
+                                <span>{formatDate(expense.expenseDate)}</span>
                               </div>
                               {expense.isBillable && (
                                 <Badge variant="outline" className="mt-1">Billable</Badge>
@@ -1305,7 +1368,7 @@ export default function ProjectDetailPage() {
                         <div className="flex-1 space-y-1">
                           <p className="text-sm font-medium">Project created</p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(project?.createdAt).toLocaleDateString()}
+                            {formatDate(project?.createdAt)}
                           </p>
                         </div>
                       </div>
@@ -1327,20 +1390,28 @@ export default function ProjectDetailPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {project?.teamMembers?.slice(0, 3).map((member: any, index: number) => (
-                        <div key={index} className="flex items-center space-x-4">
-                          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
-                            {member.firstName?.[0]}{member.lastName?.[0]}
+                      {project?.teamMembers?.slice(0, 3).map((member: any, index: number) => {
+                        const user = member.memberId;
+                        return (
+                          <div key={member._id || index} className="flex items-center space-x-4">
+                            <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
+                              {user?.firstName?.[0]}{user?.lastName?.[0]}
+                            </div>
+                            <div className="flex-1 space-y-1">
+                              <p className="text-sm font-medium">
+                                {user?.firstName} {user?.lastName}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{user?.role ? formatToTitleCase(user.role.replace(/_/g, ' ')) : ''}</p>
+                              {member.hourlyRate && (
+                                <p className="text-xs text-muted-foreground">
+                                  ${member.hourlyRate}/hr
+                                </p>
+                              )}
+                            </div>
+                            <Badge variant="secondary" className="hover:bg-secondary dark:hover:bg-secondary">Active</Badge>
                           </div>
-                          <div className="flex-1 space-y-1">
-                            <p className="text-sm font-medium">
-                              {member.firstName} {member.lastName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{member.role}</p>
-                          </div>
-                          <Badge variant="secondary" className="hover:bg-secondary dark:hover:bg-secondary">Active</Badge>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </CardContent>
                 </Card>
@@ -1357,19 +1428,6 @@ export default function ProjectDetailPage() {
                 </p>
               </div>
 
-              {settingsError && (
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>{settingsError}</AlertDescription>
-                </Alert>
-              )}
-
-              {settingsSuccess && (
-                <Alert variant="success">
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>{settingsSuccess}</AlertDescription>
-                </Alert>
-              )}
 
               <div className="grid gap-6 lg:grid-cols-2">
                 <Card className="lg:col-span-2">
@@ -1378,6 +1436,31 @@ export default function ProjectDetailPage() {
                     <CardDescription>Control how work is tracked and approved</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    
+                  <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <Label htmlFor="allow-billable-time">Billable Project</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Mark this project as billable for time tracking and invoicing
+                          {globalTimeTrackingSettings && !globalTimeTrackingSettings.allowBillableTime && (
+                            <span className="block text-xs text-amber-600 dark:text-amber-400 mt-1">
+                              ⚠️ Disabled globally in Application Settings
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <Switch
+                        id="allow-billable-time"
+                        checked={settingsForm.allowBillableTime && (globalTimeTrackingSettings?.allowBillableTime ?? true)}
+                        //disabled={!globalTimeTrackingSettings?.allowBillableTime}
+                        onCheckedChange={(checked) =>
+                          setSettingsForm((prev) => ({
+                            ...prev,
+                            allowBillableTime: checked,
+                          }))
+                        }
+                      />
+                    </div>
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex-1">
                         <Label htmlFor="allow-time-tracking">Allow Time Tracking</Label>
@@ -1393,7 +1476,7 @@ export default function ProjectDetailPage() {
                       <Switch
                         id="allow-time-tracking"
                         checked={settingsForm.allowTimeTracking && (globalTimeTrackingSettings?.allowTimeTracking ?? true)}
-                        disabled={!globalTimeTrackingSettings?.allowTimeTracking}
+                        //disabled={!globalTimeTrackingSettings?.allowTimeTracking}
                         onCheckedChange={(checked) =>
                           setSettingsForm((prev) => ({
                             ...prev,
@@ -1421,7 +1504,7 @@ export default function ProjectDetailPage() {
                           <Switch
                             id="allow-manual-time-submission"
                             checked={settingsForm.allowManualTimeSubmission && (globalTimeTrackingSettings?.allowManualTimeSubmission ?? true)}
-                            disabled={!globalTimeTrackingSettings?.allowManualTimeSubmission}
+                            //disabled={!globalTimeTrackingSettings?.allowManualTimeSubmission}
                             onCheckedChange={(checked) =>
                               setSettingsForm((prev) => ({
                                 ...prev,
@@ -1465,7 +1548,7 @@ export default function ProjectDetailPage() {
                       <Switch
                         id="require-approval"
                         checked={settingsForm.requireApproval && (globalTimeTrackingSettings?.requireApproval ?? true)}
-                        disabled={!globalTimeTrackingSettings?.requireApproval}
+                        //disabled={!globalTimeTrackingSettings?.requireApproval}
                         onCheckedChange={(checked) =>
                           setSettingsForm((prev) => ({
                             ...prev,
@@ -1474,9 +1557,12 @@ export default function ProjectDetailPage() {
                         }
                       />
                     </div>
+
                   </CardContent>
                   <CardFooter className="justify-end">
-                    <Button onClick={handleSaveSettings} disabled={savingSettings || !trackingSettingsChanged}>
+                    <Button onClick={handleSaveSettings}
+                      disabled={savingSettings || !trackingSettingsChanged}
+                    >
                       {savingSettings ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1793,5 +1879,6 @@ export default function ProjectDetailPage() {
         />
       </div>
     </MainLayout>
+    </TooltipProvider>
   )
 }

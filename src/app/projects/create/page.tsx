@@ -13,9 +13,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/Progress'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { useCurrencies } from '@/hooks/useCurrencies'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useNotify } from '@/lib/notify'
+import { formatToTitleCase } from '@/lib/utils'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   ArrowLeft,
   ArrowRight,
@@ -69,7 +72,10 @@ interface ProjectFormData {
   }
 
   // Team
-  teamMembers: string[]
+  teamMembers: Array<{
+    memberId: string
+    hourlyRate?: number
+  }>
   clients: string[]
 
   // Settings
@@ -112,20 +118,26 @@ export default function CreateProjectPage() {
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay, error: currenciesError } = useCurrencies(true)
   const { organization } = useOrganization()
   const { success: notifySuccess, error: notifyError } = useNotify()
+  const { formatDate } = useDateTime()
   const orgCurrency = organization?.currency || 'USD'
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [materialsInput, setMaterialsInput] = useState('')
+const [overheadInput, setOverheadInput] = useState('')
+
   const [availableMembers, setAvailableMembers] = useState<any[]>([])
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
   const [clientSearchQuery, setClientSearchQuery] = useState('')
   const [showMemberSearch, setShowMemberSearch] = useState(false)
   const [showClientSearch, setShowClientSearch] = useState(false)
+  const [memberHourlyRates, setMemberHourlyRates] = useState<Record<string, string>>({})
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
-  const [attachmentError, setAttachmentError] = useState('')
   const attachmentInputRef = useRef<HTMLInputElement>(null)
+  const [attachmentsPage, setAttachmentsPage] = useState(1)
+  const attachmentsPerPage = 10
   const [currentUser, setCurrentUser] = useState<{ firstName: string; lastName: string; email: string; id: string } | null>(null)
   const [newFigmaLink, setNewFigmaLink] = useState('')
   const [newDocLink, setNewDocLink] = useState('')
@@ -336,8 +348,15 @@ export default function CreateProjectPage() {
         ? formData.clients.filter(clientId => typeof clientId === 'string' && clientId.trim() !== '')
         : []
 
+      // Include hourly rates in team members data
+      const teamMembersWithRates = formData.teamMembers.map(member => ({
+        memberId: member.memberId,
+        hourlyRate: memberHourlyRates[member.memberId] ? parseFloat(memberHourlyRates[member.memberId]) : undefined
+      }))
+
       const payload: any = {
         ...formData,
+        teamMembers: teamMembersWithRates,
         isDraft
       }
 
@@ -375,15 +394,15 @@ export default function CreateProjectPage() {
       if (data.success) {
         if (isEditMode) {
           if (isDraft) {
-            notifySuccess({ title: 'Success', message: 'Project updated and saved as draft!' })
+            notifySuccess({ title: '', message: 'Project has been updated and saved as draft. You can continue editing later.' })
           } else {
-            notifySuccess({ title: 'Success', message: 'Project updated successfully!' })
+            notifySuccess({ title: '', message: 'Project has been updated successfully. All changes have been saved.' })
           }
         } else {
           if (isDraft) {
-            notifySuccess({ title: 'Success', message: 'Project saved as draft!' })
+            notifySuccess({ title: '', message: 'Project has been saved as draft. Complete the remaining details to publish it.' })
           } else {
-            notifySuccess({ title: 'Success', message: 'Project created successfully!' })
+            notifySuccess({ title: '', message: 'Project has been created successfully and is now ready to use!' })
           }
         }
 
@@ -549,7 +568,6 @@ export default function CreateProjectPage() {
     if (!file) return
 
     try {
-      setAttachmentError('')
       setIsUploadingAttachment(true)
 
       // Try to get user, but don't block upload if it fails
@@ -610,10 +628,10 @@ export default function CreateProjectPage() {
           }
         ]
       }))
-      notifySuccess({ title: 'Success', message: 'File uploaded successfully' })
+      notifySuccess({ title: '', message: 'File has been uploaded successfully and added to your project attachments.' })
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to upload attachment'
-      setAttachmentError(errorMessage)
+      notifyError({ title: 'Upload Failed', message: errorMessage })
       console.error('Upload error:', err)
     } finally {
       setIsUploadingAttachment(false)
@@ -639,11 +657,8 @@ export default function CreateProjectPage() {
     const memberId = member._id || member
     const memberIdString = typeof memberId === 'string' ? memberId : memberId.toString()
 
-    // Check if member already exists (comparing as strings)
-    const alreadyExists = formData.teamMembers.some((m: string) => {
-      const existingId = typeof m === 'string' ? m : String(m)
-      return existingId === memberIdString
-    })
+    // Check if member already exists
+    const alreadyExists = formData.teamMembers.some((m: any) => m.memberId === memberIdString)
 
     if (alreadyExists) {
       notifyError({ title: 'Error', message: 'This team member is already added to the project' })
@@ -652,19 +667,25 @@ export default function CreateProjectPage() {
 
     setFormData(prev => ({
       ...prev,
-      teamMembers: [...prev.teamMembers, memberIdString]
+      teamMembers: [...prev.teamMembers, { memberId: memberIdString }]
     }))
     setShowMemberSearch(false)
     setMemberSearchQuery('')
-    notifySuccess({ title: 'Success', message: 'Team member added successfully' })
+    notifySuccess({ title: '', message: 'Team member has been successfully added to the project team.' })
   }
 
   // Remove team member
   const removeTeamMember = (memberId: string) => {
     setFormData(prev => ({
       ...prev,
-      teamMembers: prev.teamMembers.filter(m => m !== memberId)
+      teamMembers: prev.teamMembers.filter(m => m.memberId !== memberId)
     }))
+    // Also remove hourly rate if set
+    setMemberHourlyRates(prev => {
+      const newRates = { ...prev }
+      delete newRates[memberId]
+      return newRates
+    })
   }
 
   // Add client
@@ -673,10 +694,11 @@ export default function CreateProjectPage() {
     const memberIdString = typeof memberId === 'string' ? memberId : memberId.toString()
 
     // Check if this client is already a team member
-    const isTeamMember = formData.teamMembers.some((m: string) => {
-      const existingId = typeof m === 'string' ? m : String(m)
+    const isTeamMember = formData.teamMembers.some((m: { memberId: string; hourlyRate?: number }) => {
+      const existingId = m.memberId
       return existingId === memberIdString
     })
+
 
     setFormData(prev => ({
       ...prev,
@@ -684,7 +706,7 @@ export default function CreateProjectPage() {
     }))
     setShowClientSearch(false)
     setClientSearchQuery('')
-    notifySuccess({ title: 'Success', message: 'Client assigned successfully' })
+      notifySuccess({ title: '', message: 'Client has been successfully assigned to the project.' })
   }
 
   // Remove client
@@ -707,10 +729,7 @@ export default function CreateProjectPage() {
     // Exclude members that are already in the team
     const memberId = member._id || (member as any)._id
     const memberIdString = memberId ? (typeof memberId === 'string' ? memberId : String(memberId)) : ''
-    const isAlreadyAdded = formData.teamMembers.some((m: string) => {
-      const existingId = typeof m === 'string' ? m : String(m)
-      return existingId === memberIdString
-    })
+    const isAlreadyAdded = formData.teamMembers.some((m: any) => m.memberId === memberIdString)
 
     return matchesSearch && !isAlreadyAdded
   })
@@ -756,13 +775,26 @@ export default function CreateProjectPage() {
       if (data.success && data.data) {
         const project = data.data
 
-        // Extract team member IDs from populated objects or use array of IDs
-        const teamMemberIds = Array.isArray(project.teamMembers)
+        // Extract team members with hourly rates from database objects
+        const teamMembersWithRates = Array.isArray(project.teamMembers)
           ? project.teamMembers.map((member: any) => {
-            // Handle both populated objects and plain IDs
-            return typeof member === 'object' && member._id ? member._id : member
+            // memberId is populated, so extract the _id string
+            const memberId = typeof member.memberId === 'object' ? member.memberId._id : member.memberId
+            return {
+              memberId: memberId,
+              hourlyRate: member.hourlyRate
+            }
           })
           : []
+
+        // Set hourly rates state from team members
+        const hourlyRates: Record<string, string> = {}
+        teamMembersWithRates.forEach((member: any) => {
+          if (member.hourlyRate) {
+            hourlyRates[member.memberId] = member.hourlyRate.toString()
+          }
+        })
+        setMemberHourlyRates(hourlyRates)
 
         // Extract client ID from populated object or use plain ID
         const clientId = project.client
@@ -789,7 +821,7 @@ export default function CreateProjectPage() {
               overhead: 0
             }
           },
-          teamMembers: teamMemberIds,
+          teamMembers: teamMembersWithRates,
           clients: clientId ? [clientId] : [],
           settings: project.settings || {
             allowTimeTracking: true,
@@ -815,6 +847,16 @@ export default function CreateProjectPage() {
             ? project.budget.total.toString()
             : '0'
         )
+        setMaterialsInput(
+          typeof project.budget?.categories?.materials === 'number' && !Number.isNaN(project.budget.categories.materials)
+            ? project.budget.categories.materials.toString()
+            : '0'
+        )
+        setOverheadInput(
+          typeof project.budget?.categories?.overhead === 'number' && !Number.isNaN(project.budget.categories.overhead)
+            ? project.budget.categories.overhead.toString()
+            : '0'
+        )
       } else {
         notifyError({ title: 'Error', message: 'Failed to load project data' })
       }
@@ -826,7 +868,8 @@ export default function CreateProjectPage() {
   }
 
   return (
-    <MainLayout>
+    <TooltipProvider>
+      <MainLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -1058,7 +1101,7 @@ export default function CreateProjectPage() {
                       <p>The project timeline helps with resource planning and deadline tracking.</p>
                       {formData.startDate && formData.endDate && !validationErrors.endDate && (
                         <p className="text-xs text-muted-foreground mt-2">
-                          <span className="font-medium">Project Duration:</span> {new Date(formData.startDate).toLocaleDateString()} to {new Date(formData.endDate).toLocaleDateString()}
+                          <span className="font-medium">Project Duration:</span> {formatDate(formData.startDate)} to {formatDate(formData.endDate)}
                         </p>
                       )}
                     </div>
@@ -1155,39 +1198,67 @@ export default function CreateProjectPage() {
                     />
                   </div> */}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="materials">Materials</Label>
-                      <Input
-                        id="materials"
-                        type="number"
-                        value={formData.budget.categories.materials}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          budget: {
-                            ...prev.budget,
-                            categories: { ...prev.budget.categories, materials: parseFloat(e.target.value) || 0 }
-                          }
-                        }))}
-                        placeholder="0.00"
-                      />
-                    </div>
+<div className="space-y-2">
+  <Label htmlFor="materials">Materials</Label>
+  <Input
+    id="materials"
+    type="number"
+    value={materialsInput}
+    onChange={(e) => {
+      const value = e.target.value
+      const parsedValue = parseFloat(value)
 
-                    <div className="space-y-2">
-                      <Label htmlFor="overhead">Overhead</Label>
-                      <Input
-                        id="overhead"
-                        type="number"
-                        value={formData.budget.categories.overhead}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          budget: {
-                            ...prev.budget,
-                            categories: { ...prev.budget.categories, overhead: parseFloat(e.target.value) || 0 }
-                          }
-                        }))}
-                        placeholder="0.00"
-                      />
-                    </div>
+      setMaterialsInput(value)
+
+      setFormData(prev => ({
+        ...prev,
+        budget: {
+          ...prev.budget,
+          categories: {
+            ...prev.budget.categories,
+            materials:
+              value === '' || Number.isNaN(parsedValue)
+                ? 0
+                : parsedValue
+          }
+        }
+      }))
+    }}
+    placeholder="0.00"
+  />
+</div>
+
+
+<div className="space-y-2">
+  <Label htmlFor="overhead">Overhead</Label>
+  <Input
+    id="overhead"
+    type="number"
+    value={overheadInput}
+    onChange={(e) => {
+      const value = e.target.value
+      const parsedValue = parseFloat(value)
+
+      setOverheadInput(value)
+
+      setFormData(prev => ({
+        ...prev,
+        budget: {
+          ...prev.budget,
+          categories: {
+            ...prev.budget.categories,
+            overhead:
+              value === '' || Number.isNaN(parsedValue)
+                ? 0
+                : parsedValue
+          }
+        }
+      }))
+    }}
+    placeholder="0.00"
+  />
+</div>
+
                   </div>
                 </div>
               </CardContent>
@@ -1223,33 +1294,70 @@ export default function CreateProjectPage() {
                   <div className="space-y-2">
                     {formData.teamMembers.length > 0 ? (
                       <div className="grid gap-2">
-                        {formData.teamMembers.map((memberId) => {
-                          const member = availableMembers.find(m => m._id === memberId)
-                          if (!member) return null
+                        {formData.teamMembers.map((member) => {
+                          const memberData = availableMembers.find(m => m._id === member.memberId)
+                          if (!memberData) return null
                           return (
-                            <div key={memberId} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
-                              <div className="flex items-center space-x-3">
-                                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-medium">
-                                  {member.firstName[0]}{member.lastName[0]}
+                            <div key={member.memberId} className="p-3 border rounded-lg bg-muted/50 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-3">
+                                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-medium">
+                                    {memberData.firstName[0]}{memberData.lastName[0]}
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-foreground">
+                                      {memberData.firstName} {memberData.lastName}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">{memberData.email}</p>
+                                  </div>
+                                  <Badge variant="outline" className="text-xs">
+                                    {formatToTitleCase(memberData.role?.replace(/_/g, ' '))}
+                                  </Badge>
                                 </div>
-                                <div>
-                                  <p className="font-medium text-foreground">
-                                    {member.firstName} {member.lastName}
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">{member.email}</p>
-                                </div>
-                                <Badge variant="outline" className="text-xs">
-                                  {member.role}
-                                </Badge>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeTeamMember(member.memberId)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
                               </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeTeamMember(memberId)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
+                              {/* Hourly Rate Input */}
+                              <div className="flex items-center gap-2">
+                                <Label className="text-sm font-medium">Hourly Rate:</Label>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-sm text-muted-foreground">{orgCurrency}</span>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={memberHourlyRates[member.memberId] || ''}
+                                    onChange={(e) => setMemberHourlyRates(prev => ({
+                                      ...prev,
+                                      [member.memberId]: e.target.value
+                                    }))}
+                                    placeholder={memberData.projectHourlyRate ? `${memberData.projectHourlyRate}` : 'Set rate'}
+                                    className="w-24 h-8 text-xs"
+                                  />
+                                  <span className="text-xs text-muted-foreground">/hr</span>
+                                  {memberData.projectHourlyRate && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setMemberHourlyRates(prev => ({
+                                        ...prev,
+                                        [member.memberId]: memberData.projectHourlyRate.toString()
+                                      }))}
+                                      className="text-xs h-6 px-2"
+                                      title="Use project default rate"
+                                    >
+                                      Use default
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           )
                         })}
@@ -1295,7 +1403,7 @@ export default function CreateProjectPage() {
                                     <p className="text-sm text-muted-foreground">{member.email}</p>
                                   </div>
                                   <Badge variant="outline" className="text-xs">
-                                    {member.role}
+                                    {formatToTitleCase(member.role?.replace(/_/g, ' '))}
                                   </Badge>
                                 </div>
                                 <Plus className="h-4 w-4 text-muted-foreground" />
@@ -1349,7 +1457,7 @@ export default function CreateProjectPage() {
                                   <p className="text-sm text-muted-foreground">{client.email}</p>
                                 </div>
                                 <Badge variant="outline" className="text-xs">
-                                  {client.role}
+                                  {formatToTitleCase(client.role?.replace(/_/g, ' '))}
                                 </Badge>
                               </div>
                               <Button
@@ -1405,7 +1513,7 @@ export default function CreateProjectPage() {
                                     <p className="text-sm text-muted-foreground">{member.email}</p>
                                   </div>
                                   <Badge variant="outline" className="text-xs">
-                                    {member.role}
+                                    {formatToTitleCase(member.role?.replace(/_/g, ' '))}
                                   </Badge>
                                 </div>
                                 <Plus className="h-4 w-4 text-muted-foreground" />
@@ -1471,20 +1579,81 @@ export default function CreateProjectPage() {
                       ) : (
                         <>
                           <Upload className="h-4 w-4 mr-2" />
-                          Upload File
+                          Upload Files
                         </>
                       )}
                     </Button>
                     <input
                       ref={attachmentInputRef}
                       type="file"
+                      multiple
                       className="hidden"
                       accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md,.jpg,.jpeg,.png,.gif,.svg,.webp,.zip,.rar,.7z"
                       onChange={async (e) => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
+                        const files = Array.from(e.target.files || [])
+                        if (files.length === 0) return
                         e.target.value = ''
-                        await handleFileUpload(file)
+
+                        // Improved file validation with better extension extraction
+                        const validFiles = []
+                        const invalidFiles = []
+                        const oversizedFiles = []
+
+                        for (const file of files) {
+                          // Better extension extraction - handle files with multiple dots
+                          const fileName = file.name.toLowerCase()
+                          const lastDotIndex = fileName.lastIndexOf('.')
+                          const extension = lastDotIndex !== -1 ? fileName.substring(lastDotIndex + 1) : ''
+
+                          const validExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'md', 'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'zip', 'rar', '7z']
+                          const maxFileSize = 25 * 1024 * 1024 // 25MB in bytes
+
+                          if (!extension || !validExtensions.includes(extension)) {
+                            invalidFiles.push(file.name)
+                          } else if (file.size > maxFileSize) {
+                            oversizedFiles.push(`${file.name} (${(file.size / (1024 * 1024)).toFixed(2)}MB)`)
+                          } else {
+                            validFiles.push(file)
+                          }
+                        }
+
+                        // Handle different error scenarios with meaningful messages
+                        if (invalidFiles.length > 0 && oversizedFiles.length > 0) {
+                          notifyError({
+                            title: 'Upload Failed',
+                            message: `Invalid file types: ${invalidFiles.slice(0, 3).join(', ')}${invalidFiles.length > 3 ? '...' : ''}. Oversized files: ${oversizedFiles.slice(0, 3).join(', ')}${oversizedFiles.length > 3 ? '...' : ''}.`,
+                            duration: 7000 // Longer duration for complex messages
+                          })
+                          return
+                        } else if (invalidFiles.length > 0) {
+                          notifyError({
+                            title: 'Unsupported File Type',
+                            message: `These files are not supported: ${invalidFiles.slice(0, 5).join(', ')}${invalidFiles.length > 5 ? ` and ${invalidFiles.length - 5} more` : ''}. Supported formats: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, MD, JPG, JPEG, PNG, GIF, SVG, WEBP, ZIP, RAR, 7Z.`,
+                            duration: 8000 // Longer duration for detailed error messages
+                          })
+                          return
+                        } else if (oversizedFiles.length > 0) {
+                          notifyError({
+                            title: 'File Too Large',
+                            message: `These files exceed the 25MB limit: ${oversizedFiles.slice(0, 3).join(', ')}${oversizedFiles.length > 3 ? '...' : ''}. Please reduce file size or contact support.`,
+                            duration: 6000
+                          })
+                          return
+                        }
+
+                        if (validFiles.length === 0) {
+                          return // All files were invalid, errors already shown above
+                        }
+
+                        // Show bulk upload notification
+                        if (validFiles.length > 1) {
+                          notifySuccess({ title: 'Bulk Upload Started', message: `Uploading ${validFiles.length} files...` })
+                        }
+
+                        // Upload files one by one
+                        for (const file of validFiles) {
+                          await handleFileUpload(file)
+                        }
                       }}
                     />
                   </div>
@@ -1511,15 +1680,55 @@ export default function CreateProjectPage() {
                       setIsDragging(false)
 
                       const files = Array.from(e.dataTransfer.files)
-                      const validFiles = files.filter(file => {
-                        const extension = file.name.split('.').pop()?.toLowerCase()
+                      // Improved file validation with better extension extraction
+                      const validFiles = []
+                      const invalidFiles = []
+                      const oversizedFiles = []
+
+                      for (const file of files) {
+                        // Better extension extraction - handle files with multiple dots
+                        const fileName = file.name.toLowerCase()
+                        const lastDotIndex = fileName.lastIndexOf('.')
+                        const extension = lastDotIndex !== -1 ? fileName.substring(lastDotIndex + 1) : ''
+
                         const validExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'md', 'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'zip', 'rar', '7z']
-                        return extension && validExtensions.includes(extension)
-                      })
+                        const maxFileSize = 25 * 1024 * 1024 // 25MB in bytes
+
+                        if (!extension || !validExtensions.includes(extension)) {
+                          invalidFiles.push(file.name)
+                        } else if (file.size > maxFileSize) {
+                          oversizedFiles.push(`${file.name} (${(file.size / (1024 * 1024)).toFixed(2)}MB)`)
+                        } else {
+                          validFiles.push(file)
+                        }
+                      }
+
+                      // Handle different error scenarios with meaningful messages
+                      if (invalidFiles.length > 0 && oversizedFiles.length > 0) {
+                        notifyError({
+                          title: 'Upload Failed',
+                          message: `Invalid file types: ${invalidFiles.slice(0, 3).join(', ')}${invalidFiles.length > 3 ? '...' : ''}. Oversized files: ${oversizedFiles.slice(0, 3).join(', ')}${oversizedFiles.length > 3 ? '...' : ''}.`,
+                          duration: 7000
+                        })
+                        return
+                      } else if (invalidFiles.length > 0) {
+                        notifyError({
+                          title: 'Unsupported File Type',
+                          message: `These files are not supported: ${invalidFiles.slice(0, 5).join(', ')}${invalidFiles.length > 5 ? ` and ${invalidFiles.length - 5} more` : ''}. Supported formats: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, MD, JPG, JPEG, PNG, GIF, SVG, WEBP, ZIP, RAR, 7Z.`,
+                          duration: 8000
+                        })
+                        return
+                      } else if (oversizedFiles.length > 0) {
+                        notifyError({
+                          title: 'File Too Large',
+                          message: `These files exceed the 25MB limit: ${oversizedFiles.slice(0, 3).join(', ')}${oversizedFiles.length > 3 ? '...' : ''}. Please reduce file size or contact support.`,
+                          duration: 6000
+                        })
+                        return
+                      }
 
                       if (validFiles.length === 0) {
-                        setAttachmentError('Please drop valid files (PDF, Word, Excel, PowerPoint, Text, CSV, Markdown, Images, or Archives)')
-                        return
+                        return // All files were invalid, errors already shown above
                       }
 
                       // Upload files one by one
@@ -1530,82 +1739,166 @@ export default function CreateProjectPage() {
                   >
                     <Upload className={`h-12 w-12 mx-auto mb-4 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
                     <p className="text-sm font-medium mb-2">
-                      {isDragging ? 'Drop files here' : 'Drag and drop files here'}
+                      {isDragging ? 'Drop files here' : 'Drag and drop multiple files here'}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      or click the Upload File button above
+                      or click the Upload Files button above
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Supports: PDF, Word, Excel, PowerPoint, Text, CSV, Markdown, Images, ZIP, RAR, 7Z (Max 25MB)
+                      Supports: PDF, Word, Excel, PowerPoint, Text, CSV, Markdown, Images, ZIP, RAR, 7Z (Max 25MB each)
                     </p>
                   </div>
 
-                  {attachmentError && (
-                    <Alert variant="destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>{attachmentError}</AlertDescription>
-                    </Alert>
-                  )}
 
-                  {/* Allowed File Types Info */}
-                  <div className="text-sm text-muted-foreground space-y-1">
-                    <p className="font-medium">Allowed file formats:</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <p className="font-medium">Documents:</p>
-                        <p className="text-xs">PDF, Word (.doc, .docx), Excel (.xls, .xlsx), PowerPoint (.ppt, .pptx), Text (.txt), CSV, Markdown (.md), ZIP, RAR, 7Z</p>
-                      </div>
-                      <div>
-                        <p className="font-medium">Images:</p>
-                        <p className="text-xs">JPEG (.jpg, .jpeg), PNG, GIF, SVG, WebP</p>
+                  {/* Enhanced File Types Info */}
+                  <div className="border rounded-lg p-4 bg-muted/20">
+                    <div className="flex items-start gap-2 mb-3">
+                      <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                      <div className="space-y-2">
+                        <p className="font-medium text-sm">Supported File Types & Limits</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <p className="font-medium text-muted-foreground mb-1">📄 Documents & Text:</p>
+                            <p className="text-muted-foreground">PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, MD</p>
+                          </div>
+                          <div>
+                            <p className="font-medium text-muted-foreground mb-1">🖼️ Images:</p>
+                            <p className="text-muted-foreground">JPG, JPEG, PNG, GIF, SVG, WEBP</p>
+                          </div>
+                          <div>
+                            <p className="font-medium text-muted-foreground mb-1">📦 Archives:</p>
+                            <p className="text-muted-foreground">ZIP, RAR, 7Z</p>
+                          </div>
+                          <div>
+                            <p className="font-medium text-muted-foreground mb-1">📏 Size Limit:</p>
+                            <p className="text-muted-foreground">Maximum 25MB per file</p>
+                          </div>
+                        </div>
+                        <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded text-xs">
+                          <p className="text-amber-800 dark:text-amber-200">
+                            <strong>Note:</strong> Files are uploaded one by one. Large uploads may take time to complete.
+                          </p>
+                        </div>
                       </div>
                     </div>
-                    <p className="text-xs mt-2">Maximum file size: 25MB</p>
                   </div>
 
                   {/* Attachments List */}
                   {formData.attachments.length > 0 ? (
-                    <div className="space-y-2">
-                      {formData.attachments.map((attachment, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
-                          <div className="flex items-center space-x-3 flex-1 min-w-0">
-                            {attachment.type.startsWith('image/') ? (
-                              <Image className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                            ) : (
-                              <File className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate">{attachment.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {(attachment.size / 1024).toFixed(2)} KB • {attachment.uploadedByName}
-                              </p>
-                            </div>
-                          </div>
+                    <div className="space-y-4">
+                      {/* Pagination Info */}
+                      {formData.attachments.length > attachmentsPerPage && (
+                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                          <span>
+                            Showing {((attachmentsPage - 1) * attachmentsPerPage) + 1} to {Math.min(attachmentsPage * attachmentsPerPage, formData.attachments.length)} of {formData.attachments.length} attachments
+                          </span>
                           <div className="flex items-center gap-2">
                             <Button
                               type="button"
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              onClick={() => window.open(attachment.url, '_blank')}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setAttachmentsPage(prev => Math.max(1, prev - 1));
+                              }}
+                              disabled={attachmentsPage === 1}
                             >
-                              <ExternalLink className="h-4 w-4" />
+                              <ArrowLeft className="h-4 w-4" />
+                              Previous
                             </Button>
+                            <span className="px-3 py-1 bg-muted rounded text-xs">
+                              {attachmentsPage} of {Math.ceil(formData.attachments.length / attachmentsPerPage)}
+                            </span>
                             <Button
                               type="button"
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              onClick={() => {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  attachments: prev.attachments.filter((_, i) => i !== index)
-                                }))
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setAttachmentsPage(prev => Math.min(Math.ceil(formData.attachments.length / attachmentsPerPage), prev + 1));
                               }}
+                              disabled={attachmentsPage === Math.ceil(formData.attachments.length / attachmentsPerPage)}
                             >
-                              <Trash2 className="h-4 w-4 text-destructive" />
+                              Next
+                              <ArrowRight className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
-                      ))}
+                      )}
+
+                      {/* Attachments Grid */}
+                      <div className="space-y-2">
+                        {formData.attachments
+                          .slice((attachmentsPage - 1) * attachmentsPerPage, attachmentsPage * attachmentsPerPage)
+                          .map((attachment, index) => {
+                            const actualIndex = (attachmentsPage - 1) * attachmentsPerPage + index;
+                            return (
+                              <div key={actualIndex} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
+                                <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                  {attachment.type.startsWith('image/') ? (
+                                    <Image className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                  ) : (
+                                    <File className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-sm truncate">{attachment.name}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {(attachment.size / 1024).toFixed(2)} KB • {attachment.uploadedByName}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => window.open(attachment.url, '_blank')}
+                                      >
+                                        <ExternalLink className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Open file</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          setFormData(prev => {
+                                            const newAttachments = prev.attachments.filter((_, i) => i !== actualIndex);
+                                            // Reset pagination if needed
+                                            const maxPage = Math.ceil(newAttachments.length / attachmentsPerPage);
+                                            if (attachmentsPage > maxPage && maxPage > 0) {
+                                              setAttachmentsPage(maxPage);
+                                            } else if (newAttachments.length === 0) {
+                                              setAttachmentsPage(1);
+                                            }
+                                            return {
+                                              ...prev,
+                                              attachments: newAttachments
+                                            };
+                                          })
+                                        }}
+                                      >
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Delete file</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+
                     </div>
                   ) : (
                     <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center">
@@ -1973,11 +2266,11 @@ export default function CreateProjectPage() {
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-muted-foreground">Start Date</span>
-                            <span className="text-sm text-foreground">{formData.startDate ? new Date(formData.startDate).toLocaleDateString() : 'Not set'}</span>
+                            <span className="text-sm text-foreground">{formData.startDate ? formatDate(formData.startDate) : 'Not set'}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-muted-foreground">End Date</span>
-                            <span className="text-sm text-foreground">{formData.endDate ? new Date(formData.endDate).toLocaleDateString() : 'Not set'}</span>
+                            <span className="text-sm text-foreground">{formData.endDate ? formatDate(formData.endDate) : 'Not set'}</span>
                           </div>
                         </div>
                         <div className="space-y-2">
@@ -2047,16 +2340,21 @@ export default function CreateProjectPage() {
                           </div>
                           {formData.teamMembers.length > 0 && (
                             <div className="space-y-1">
-                              {formData.teamMembers.slice(0, 3).map((memberId) => {
-                                const member = availableMembers.find(m => m._id === memberId)
-                                if (!member) return null
+                              {formData.teamMembers.slice(0, 3).map((member) => {
+                                const memberData = availableMembers.find(m => m._id === member.memberId)
+                                if (!memberData) return null
                                 return (
-                                  <div key={memberId} className="flex items-center space-x-2 text-xs">
+                                  <div key={member.memberId} className="flex items-center space-x-2 text-xs">
                                     <div className="w-4 h-4 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs">
-                                      {member.firstName[0]}{member.lastName[0]}
+                                      {memberData.firstName[0]}{memberData.lastName[0]}
                                     </div>
-                                    <span className="text-foreground">{member.firstName} {member.lastName}</span>
-                                    <Badge variant="outline" className="text-xs">{member.role}</Badge>
+                                    <span className="text-foreground">{memberData.firstName} {memberData.lastName}</span>
+                                    <Badge variant="outline" className="text-xs">{formatToTitleCase(memberData.role?.replace(/_/g, ' '))}</Badge>
+                                    {member.hourlyRate && (
+                                      <span className="text-xs text-muted-foreground">
+                                        {orgCurrency} {member.hourlyRate}/hr
+                                      </span>
+                                    )}
                                   </div>
                                 )
                               })}
@@ -2086,7 +2384,7 @@ export default function CreateProjectPage() {
                                       {client.firstName[0]}{client.lastName[0]}
                                     </div>
                                     <span className="text-foreground">{client.firstName} {client.lastName}</span>
-                                    <Badge variant="outline" className="text-xs">{client.role}</Badge>
+                                    <Badge variant="outline" className="text-xs">{formatToTitleCase(client.role?.replace(/_/g, ' '))}</Badge>
                                   </div>
                                 )
                               })}
@@ -2277,5 +2575,6 @@ export default function CreateProjectPage() {
         </div>
       </div>
     </MainLayout>
+    </TooltipProvider>
   )
 }

@@ -8,9 +8,9 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Plus, 
   Search, 
@@ -19,7 +19,6 @@ import {
   Calendar, 
   Clock,
   CheckCircle,
-  AlertTriangle,
   Pause,
   XCircle,
   Play,
@@ -50,7 +49,7 @@ interface Story {
   _id: string
   title: string
   description: string
-  status: 'backlog' | 'in_progress' | 'completed' | 'cancelled' | string
+  status: 'backlog' | 'todo' | 'inprogress' | 'done' | 'cancelled' | string
   priority: 'low' | 'medium' | 'high' | 'critical'
   project?: {
     _id: string
@@ -103,7 +102,6 @@ export default function StoriesPage() {
   const searchParams = useSearchParams()
   const [stories, setStories] = useState<Story[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
 
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -114,6 +112,7 @@ export default function StoriesPage() {
   const [sprintFilter, setSprintFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list')
   const [selectedStory, setSelectedStory] = useState<Story | null>(null)
+  const { formatDate } = useDateTime()
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [deleting, setDeleting] = useState(false);
   const [draggedStoryId, setDraggedStoryId] = useState<string | null>(null)
@@ -190,14 +189,6 @@ export default function StoriesPage() {
   }, [checkAuth])
 
   useEffect(() => {
-    if (error) {
-      notifyError({ title: error })
-    }
-    // notifyError is stable enough; omit from deps to avoid re-run loops
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [error])
-
-  useEffect(() => {
     const successParam = searchParams?.get('success')
     if (successParam === 'story-created') {
       notifySuccess({ title: 'User story created successfully' })
@@ -238,10 +229,10 @@ export default function StoriesPage() {
         setStories(data.data)
         setTotalCount(data.pagination?.total || data.data.length)
       } else {
-        setError(data.error || 'Failed to fetch stories')
+        notifyError({ title: 'Failed to Load Stories', message: data.error || 'Failed to fetch stories' })
       }
     } catch (err) {
-      setError('Failed to fetch stories')
+      notifyError({ title: 'Failed to Load Stories', message: 'Failed to fetch stories' })
     } finally {
       setLoading(false)
     }
@@ -310,12 +301,10 @@ export default function StoriesPage() {
         setSelectedStory(null)
         notifySuccess({ title: 'Story deleted successfully' })
       } else {
-        setError(data.error || 'Failed to delete story')
-        notifyError({ title: data.error || 'Failed to delete story' })
+        notifyError({ title: 'Failed to Delete Story', message: data.error || 'Failed to delete story' })
       }
     } catch (err) {
-      setError('Failed to delete story')
-      notifyError({ title: 'Failed to delete story' })
+      notifyError({ title: 'Failed to Delete Story', message: 'Failed to delete story' })
     } finally {
       setDeleting(false)
     }
@@ -323,8 +312,9 @@ export default function StoriesPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'backlog': return 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900'
-      case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
-      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
+      case 'todo': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900'
+      case 'inprogress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
       case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
@@ -333,8 +323,9 @@ export default function StoriesPage() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'backlog': return <List className="h-4 w-4" />
-      case 'in_progress': return <Play className="h-4 w-4" />
-      case 'completed': return <CheckCircle className="h-4 w-4" />
+      case 'todo': return <Target className="h-4 w-4" />
+      case 'inprogress': return <Play className="h-4 w-4" />
+      case 'done': return <CheckCircle className="h-4 w-4" />
       case 'cancelled': return <XCircle className="h-4 w-4" />
       default: return <Target className="h-4 w-4" />
     }
@@ -386,7 +377,7 @@ export default function StoriesPage() {
     )
   })
 
-  const kanbanStatuses: Array<Story['status']> = ['backlog', 'in_progress', 'completed', 'cancelled']
+  const kanbanStatuses: Array<Story['status']> = ['backlog', 'todo', 'inprogress', 'done', 'cancelled']
 
   const handleKanbanStatusChange = async (story: Story, nextStatus: Story['status']) => {
     if (nextStatus === story.status) return
@@ -414,8 +405,7 @@ export default function StoriesPage() {
     } catch (err) {
       console.error('Failed to update story status:', err)
       const message = err instanceof Error ? err.message : 'Failed to update story status'
-      setError(message)
-      notifyError({ title: message })
+      notifyError({ title: 'Failed to Update Story', message })
     }
   }
 
@@ -459,12 +449,6 @@ export default function StoriesPage() {
           </Button>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
 
         <Card>
           <CardHeader>
@@ -495,8 +479,9 @@ export default function StoriesPage() {
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
                       <SelectItem value="backlog">Backlog</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="todo">Todo</SelectItem>
+                      <SelectItem value="inprogress">In Progress</SelectItem>
+                      <SelectItem value="done">Done</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
@@ -653,7 +638,7 @@ export default function StoriesPage() {
                                 {story.dueDate && (
                                   <div className="flex items-center space-x-1">
                                     <Calendar className="h-4 w-4" />
-                                    <span>Due {new Date(story.dueDate).toLocaleDateString()}</span>
+                                    <span>Due {formatDate(story.dueDate)}</span>
                                   </div>
                                 )}
                                 {story.storyPoints && (
@@ -737,7 +722,9 @@ export default function StoriesPage() {
                   {kanbanStatuses.map((statusKey) => {
                     const columnStories = filteredStories.filter((story) => story.status === statusKey)
                     const label =
-                      statusKey === 'completed'
+                      statusKey === 'inprogress'
+                        ? 'In Progress'
+                        : statusKey === 'done'
                         ? 'Done'
                         : formatToTitleCase(statusKey)
 

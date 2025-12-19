@@ -223,7 +223,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Check if user has permission to delete/remove members
-    const hasDeletePermission = await PermissionService.hasPermission(userId.toString(), Permission.TEAM_DELETE)
+    const hasDeletePermission = await PermissionService.hasPermission(userId.toString(), Permission.USER_DEACTIVATE)
     if (!hasDeletePermission) {
       return NextResponse.json(
         { error: 'Insufficient permissions' },

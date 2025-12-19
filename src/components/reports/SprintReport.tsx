@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Progress } from '@/components/ui/Progress'
 import { formatToTitleCase } from '@/lib/utils'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { 
   Calendar, 
   Clock, 
@@ -89,6 +90,7 @@ export function SprintReport({ projectId }: SprintReportProps) {
   const [data, setData] = useState<SprintReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedSprint, setSelectedSprint] = useState<string | null>(null)
+  const { formatDate } = useDateTime()
 
   useEffect(() => {
     fetchSprintData()
@@ -357,7 +359,7 @@ export function SprintReport({ projectId }: SprintReportProps) {
                                   <ul className="text-xs text-muted-foreground list-disc list-inside">
                                     {event.outcomes.actionItems.map((item, index) => (
                                       <li key={index}>
-                                        {item.description} (Due: {new Date(item.dueDate).toLocaleDateString()})
+                                        {item.description} (Due: {formatDate(item.dueDate)})
                                       </li>
                                     ))}
                                   </ul>

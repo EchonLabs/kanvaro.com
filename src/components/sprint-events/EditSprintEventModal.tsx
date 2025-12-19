@@ -10,11 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogBody } from '@/components/ui/Dialog'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
-import { CalendarIcon, Loader2, CheckCircle, AlertCircle, X, UserPlus } from 'lucide-react'
+import { CalendarIcon, Loader2, X, UserPlus } from 'lucide-react'
 import { format } from 'date-fns'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/Badge'
 import { Checkbox } from '@/components/ui/Checkbox'
+import { useNotify } from '@/lib/notify'
 
 interface SprintEvent {
   _id: string
@@ -76,8 +76,6 @@ interface EditSprintEventModalProps {
 export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEventModalProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState('')
-  const [error, setError] = useState('')
   const [users, setUsers] = useState<User[]>([])
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [showAddAttendees, setShowAddAttendees] = useState(false)
@@ -86,6 +84,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
   const [actualDate, setActualDate] = useState<Date | undefined>(
     event.actualDate ? new Date(event.actualDate) : undefined
   )
+  const { success: notifySuccess, error: notifyError } = useNotify()
   
   // Store initial state to compare changes
   const initialFormData = {
@@ -191,28 +190,33 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
       })
 
       if (response.ok) {
-        setSuccess('Sprint Event updated successfully')
-        setError('')
+        notifySuccess({
+          title: 'Sprint Event Updated',
+          message: 'Sprint Event updated successfully'
+        })
         setLoading(false)
         onSuccess()
-        // Show success message briefly before closing and redirecting
+        // Close modal and redirect after showing success notification
         setTimeout(() => {
-          setSuccess('')
           onClose()
           router.push('/sprint-events?success=updated')
-        }, 3000)
+        }, 1000)
       } else {
         const errorData = await response.json()
         const errorMessage = errorData.error || 'Failed to update event'
         console.error('Error updating sprint event:', errorData)
-        setError(errorMessage)
-        setSuccess('')
+        notifyError({
+          title: 'Failed to Update Sprint Event',
+          message: errorMessage
+        })
         setLoading(false)
       }
     } catch (err) {
       console.error('Error updating sprint event:', err)
-      setError('Failed to update event. Please try again.')
-      setSuccess('')
+      notifyError({
+        title: 'Failed to Update Sprint Event',
+        message: 'Failed to update event. Please try again.'
+      })
       setLoading(false)
     }
   }
@@ -423,31 +427,6 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
 
         <DialogBody className="flex-1 overflow-y-auto px-4 sm:px-6">
           <form onSubmit={handleSubmit} className="space-y-4" id="edit-sprint-event-form">
-            {success && (
-              <Alert variant="success" className="flex items-center justify-between pr-2">
-                <AlertDescription className="flex-1 flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4" />
-                  {success}
-                </AlertDescription>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40"
-                  onClick={() => {
-                    setSuccess('')
-                    onClose()
-                  }}
-                >
-                  <X className="h-4 w-4 text-green-700 dark:text-green-300" />
-                </Button>
-              </Alert>
-            )}
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="title">Event Title *</Label>

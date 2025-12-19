@@ -9,6 +9,7 @@ import { BreadcrumbProvider } from '@/contexts/BreadcrumbContext'
 import { useTimeTrackingNotifications } from '@/hooks/useTimeTrackingNotifications'
 import { usePermissionContext } from '@/lib/permissions/permission-context'
 import { ContentLoader } from '@/components/ui/ContentLoader'
+import { DateTimeProvider } from '@/components/providers/DateTimeProvider'
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -19,9 +20,31 @@ export function MainLayout({ children }: MainLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const { loading: permissionsLoading, error: permissionsError, permissions } = usePermissionContext()
-  
+
   // Listen for time tracking notifications and show toast popups
   useTimeTrackingNotifications()
+
+  // Load user preferences for sidebar collapsed state (non-blocking)
+  useEffect(() => {
+    const loadUserPreferences = async () => {
+      try {
+        const response = await fetch('/api/auth/me')
+        if (response.ok) {
+          const userData = await response.json()
+          const sidebarPreference = userData.preferences?.sidebarCollapsed || false
+          setSidebarCollapsed(sidebarPreference)
+        }
+      } catch (error) {
+        console.error('Failed to load user preferences:', error)
+        // Keep default state (false) on error
+      }
+    }
+
+    if (mounted) {
+      // Load preferences asynchronously without blocking render
+      loadUserPreferences()
+    }
+  }, [mounted])
 
   useEffect(() => {
     setMounted(true)
@@ -57,13 +80,28 @@ export function MainLayout({ children }: MainLayoutProps) {
   }
 
   return (
-    <BreadcrumbProvider>
-      <div className="flex h-screen bg-background overflow-x-hidden">
+    <DateTimeProvider>
+      <BreadcrumbProvider>
+        <div className="flex h-screen bg-background overflow-x-hidden">
         {/* Desktop Sidebar */}
         <div className="hidden lg:block">
-          <Sidebar 
+          <Sidebar
             collapsed={sidebarCollapsed}
-            onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+            onToggle={async () => {
+              const newCollapsedState = !sidebarCollapsed
+              setSidebarCollapsed(newCollapsedState)
+
+              // Save preference to backend
+              try {
+                await fetch('/api/settings/user', {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ sidebarCollapsed: newCollapsedState })
+                })
+              } catch (error) {
+                console.error('Failed to save sidebar preference:', error)
+              }
+            }}
           />
         </div>
         
@@ -91,6 +129,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           </main>
         </div>
       </div>
-    </BreadcrumbProvider>
+      </BreadcrumbProvider>
+    </DateTimeProvider>
   )
 }

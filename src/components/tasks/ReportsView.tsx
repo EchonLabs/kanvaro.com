@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { 
   BarChart3, 
   TrendingUp, 
@@ -58,6 +59,7 @@ export default function ReportsView({ projectId }: ReportsViewProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [timeRange, setTimeRange] = useState('30d')
+  const { formatDate } = useDateTime()
 
   useEffect(() => {
     fetchTasks()
@@ -367,7 +369,7 @@ export default function ReportsView({ projectId }: ReportsViewProps) {
                     <div>
                       <p className="text-sm font-medium">{task.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        Due {new Date(task.dueDate!).toLocaleDateString()}
+                        Due {formatDate(task.dueDate!)}
                       </p>
                     </div>
                     <Badge variant="destructive">Overdue</Badge>
@@ -405,7 +407,7 @@ export default function ReportsView({ projectId }: ReportsViewProps) {
                     <div>
                       <p className="text-sm font-medium">{task.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        Due {new Date(task.dueDate!).toLocaleDateString()}
+                        Due {formatDate(task.dueDate!)}
                       </p>
                     </div>
                     <Badge variant="outline">Due Soon</Badge>
