@@ -208,6 +208,8 @@ export default function TaskDetailPage() {
   const [commentAttachments, setCommentAttachments] = useState<Array<{ name: string; url: string; size?: number; type?: string; uploadedAt?: string }>>([])
   const [replyAttachments, setReplyAttachments] = useState<Array<{ name: string; url: string; size?: number; type?: string; uploadedAt?: string }>>([])
   const [uploading, setUploading] = useState(false)
+  const [commentsCurrentPage, setCommentsCurrentPage] = useState(1)
+  const [commentsPageSize, setCommentsPageSize] = useState(5)
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
   const commentFileInputRef = useRef<HTMLInputElement | null>(null)
   const replyFileInputRef = useRef<HTMLInputElement | null>(null)
@@ -824,16 +826,25 @@ export default function TaskDetailPage() {
     handleCancelReply
   ])
 
+  // Pagination logic for comments
+  const paginatedComments = useMemo(() => {
+    const startIndex = (commentsCurrentPage - 1) * commentsPageSize
+    const endIndex = startIndex + commentsPageSize
+    return commentTree.slice(startIndex, endIndex)
+  }, [commentTree, commentsCurrentPage, commentsPageSize])
+
+  const commentsTotalPages = Math.ceil(commentTree.length / commentsPageSize)
+
   const renderComments = useMemo(() => {
     if (!commentTree.length) {
       return <p className="text-sm text-muted-foreground">No comments yet.</p>
     }
     return (
       <div className="space-y-3">
-        {commentTree.map((c) => renderCommentNode(c))}
+        {paginatedComments.map((c) => renderCommentNode(c))}
       </div>
     )
-  }, [commentTree, renderCommentNode])
+  }, [paginatedComments, renderCommentNode])
 
   const deleteTargetComment = useMemo(() => {
     if (!deleteConfirmId || !task?.comments) return null
@@ -1185,6 +1196,52 @@ export default function TaskDetailPage() {
                 <div className="border-t pt-4">
                   <h3 className="text-sm font-semibold mb-2 text-foreground">All Comments</h3>
                   {renderComments}
+
+                  {/* Comments Pagination Controls */}
+                  {commentTree.length > commentsPageSize && (
+                    <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Items per page:</span>
+                        <select
+                          value={commentsPageSize}
+                          onChange={(e) => {
+                            setCommentsPageSize(parseInt(e.target.value))
+                            setCommentsCurrentPage(1)
+                          }}
+                          className="px-2 py-1 border rounded text-sm bg-background"
+                        >
+                          <option value="5">5</option>
+                          <option value="10">10</option>
+                          <option value="20">20</option>
+                          <option value="50">50</option>
+                        </select>
+                        <span>
+                          Showing {((commentsCurrentPage - 1) * commentsPageSize) + 1} to {Math.min(commentsCurrentPage * commentsPageSize, commentTree.length)} of {commentTree.length}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => setCommentsCurrentPage(commentsCurrentPage - 1)}
+                          disabled={commentsCurrentPage === 1}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm text-muted-foreground px-2">
+                          Page {commentsCurrentPage} of {commentsTotalPages || 1}
+                        </span>
+                        <Button
+                          onClick={() => setCommentsCurrentPage(commentsCurrentPage + 1)}
+                          disabled={commentsCurrentPage >= commentsTotalPages}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

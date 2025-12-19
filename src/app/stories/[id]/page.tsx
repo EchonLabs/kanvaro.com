@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
@@ -115,6 +115,17 @@ export default function StoryDetailPage() {
   const [tasks, setTasks] = useState<any[]>([])
   const [tasksLoading, setTasksLoading] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string>('')
+  const [storyTasksCurrentPage, setStoryTasksCurrentPage] = useState(1)
+  const [storyTasksPageSize, setStoryTasksPageSize] = useState(5)
+
+  // Pagination logic for story tasks
+  const paginatedStoryTasks = useMemo(() => {
+    const startIndex = (storyTasksCurrentPage - 1) * storyTasksPageSize
+    const endIndex = startIndex + storyTasksPageSize
+    return tasks.slice(startIndex, endIndex)
+  }, [tasks, storyTasksCurrentPage, storyTasksPageSize])
+
+  const storyTasksTotalPages = Math.ceil(tasks.length / storyTasksPageSize)
 
   const { hasPermission } = usePermissions()
   const { success: notifySuccess, error: notifyError } = useNotify()
@@ -631,7 +642,7 @@ export default function StoryDetailPage() {
                   <p className="text-sm text-muted-foreground text-center py-8">No tasks found for this story.</p>
                 ) : (
                   <div className="space-y-3">
-                    {tasks.map((task) => (
+                    {paginatedStoryTasks.map((task) => (
                       <Card
                         key={task._id}
                         className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-green-500"
@@ -678,6 +689,56 @@ export default function StoryDetailPage() {
                   </div>
                 )}
               </CardContent>
+
+              {/* Pagination Controls */}
+              {tasks.length > storyTasksPageSize && (
+                <Card className="mt-4">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Items per page:</span>
+                        <select
+                          value={storyTasksPageSize}
+                          onChange={(e) => {
+                            setStoryTasksPageSize(parseInt(e.target.value))
+                            setStoryTasksCurrentPage(1)
+                          }}
+                          className="px-2 py-1 border rounded text-sm bg-background"
+                        >
+                          <option value="5">5</option>
+                          <option value="10">10</option>
+                          <option value="50">50</option>
+                          <option value="100">100</option>
+                        </select>
+                        <span>
+                          Showing {((storyTasksCurrentPage - 1) * storyTasksPageSize) + 1} to {Math.min(storyTasksCurrentPage * storyTasksPageSize, tasks.length)} of {tasks.length}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => setStoryTasksCurrentPage(storyTasksCurrentPage - 1)}
+                          disabled={storyTasksCurrentPage === 1}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm text-muted-foreground px-2">
+                          Page {storyTasksCurrentPage} of {storyTasksTotalPages || 1}
+                        </span>
+                        <Button
+                          onClick={() => setStoryTasksCurrentPage(storyTasksCurrentPage + 1)}
+                          disabled={storyTasksCurrentPage >= storyTasksTotalPages}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </Card>
           </div>
 

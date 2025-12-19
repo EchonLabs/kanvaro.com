@@ -87,18 +87,24 @@ interface Sprint {
   tasks?: Array<{
     _id: string
     title: string
+    displayId?: string
     status: string
     storyPoints: number
     estimatedHours: number
     actualHours: number
     priority: string
     type: string
-    assignedTo: {
-      _id: string
-      firstName: string
-      lastName: string
-      email: string
-    } | null
+    assignedTo?: Array<{
+      user?: {
+        _id: string
+        firstName: string
+        lastName: string
+        email: string
+      }
+      firstName?: string
+      lastName?: string
+      email?: string
+    }>
     archived?: boolean
     movedToSprint?: {
       _id: string
@@ -201,6 +207,8 @@ export default function SprintDetailPage() {
   const [completionMode, setCompletionMode] = useState<'existing' | 'new'>('existing')
   const [availableSprints, setAvailableSprints] = useState<SprintOption[]>([])
   const [availableSprintsLoading, setAvailableSprintsLoading] = useState(false)
+  const [sprintTasksCurrentPage, setSprintTasksCurrentPage] = useState(1)
+  const [sprintTasksPageSize, setSprintTasksPageSize] = useState(5)
   const [selectedTargetSprintId, setSelectedTargetSprintId] = useState('')
   const [incompleteTasks, setIncompleteTasks] = useState<Array<{
     _id: string
@@ -228,6 +236,15 @@ export default function SprintDetailPage() {
   const { hasPermission } = usePermissions()
 
   const sprintTasks = sprint?.tasks || []
+
+  // Pagination logic for sprint tasks
+  const paginatedSprintTasks = useMemo(() => {
+    const startIndex = (sprintTasksCurrentPage - 1) * sprintTasksPageSize
+    const endIndex = startIndex + sprintTasksPageSize
+    return sprintTasks.slice(startIndex, endIndex)
+  }, [sprintTasks, sprintTasksCurrentPage, sprintTasksPageSize])
+
+  const sprintTasksTotalPages = Math.ceil(sprintTasks.length / sprintTasksPageSize)
 
   const canCreateSprint = hasPermission(Permission.SPRINT_CREATE)
   const canViewSprint = hasPermission(Permission.SPRINT_VIEW) || hasPermission(Permission.SPRINT_READ)
@@ -1113,7 +1130,8 @@ export default function SprintDetailPage() {
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                    {sprintTasks.map(task => (
+                    {paginatedSprintTasks.map(task => {
+                      return (
                       <div
                         key={task._id}
                         onClick={() => router.push(`/tasks/${task._id}`)}
@@ -1122,13 +1140,25 @@ export default function SprintDetailPage() {
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm sm:text-base truncate" title={task.title}>
-                              {task.title}
-                            </p>
+                            <div className="flex items-center gap-2 mb-1">
+                              {task?.displayId && (
+                                <Badge variant="outline" className="text-xs">#{task.displayId}</Badge>
+                              )}
+                              <h4 className="font-medium text-sm sm:text-base truncate flex-1" title={task.title}>
+                                {task?.title || 'Untitled Task'}
+                              </h4>
+                            </div>
                             <p className="text-xs text-muted-foreground">
-                              {task.assignedTo
-                                ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}`
-                                : 'Unassigned'}
+                              {(() => {
+                                if (!task?.assignedTo || !Array.isArray(task.assignedTo) || task.assignedTo.length === 0) {
+                                  return 'Unassigned';
+                                }
+                                const assignee = task.assignedTo[0];
+                                const firstName = assignee?.user?.firstName || assignee?.firstName || '';
+                                const lastName = assignee?.user?.lastName || assignee?.lastName || '';
+                                const displayName = `${firstName} ${lastName}`.trim();
+                                return displayName || 'Unknown User';
+                              })()}
                             </p>
                             {task.movedToSprint && (
                               <p className="text-xs font-medium text-orange-600 dark:text-orange-400 mt-1">
@@ -1210,10 +1240,61 @@ export default function SprintDetailPage() {
                           </div>
                         )}
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </CardContent>
+
+              {/* Pagination Controls */}
+              {sprintTasks.length > sprintTasksPageSize && (
+                <Card className="mt-4">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Items per page:</span>
+                        <select
+                          value={sprintTasksPageSize}
+                          onChange={(e) => {
+                            setSprintTasksPageSize(parseInt(e.target.value))
+                            setSprintTasksCurrentPage(1)
+                          }}
+                          className="px-2 py-1 border rounded text-sm bg-background"
+                        >
+                          <option value="5">5</option>
+                          <option value="10">10</option>
+                          <option value="50">50</option>
+                          <option value="100">100</option>
+                        </select>
+                        <span>
+                          Showing {((sprintTasksCurrentPage - 1) * sprintTasksPageSize) + 1} to {Math.min(sprintTasksCurrentPage * sprintTasksPageSize, sprintTasks.length)} of {sprintTasks.length}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => setSprintTasksCurrentPage(sprintTasksCurrentPage - 1)}
+                          disabled={sprintTasksCurrentPage === 1}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm text-muted-foreground px-2">
+                          Page {sprintTasksCurrentPage} of {sprintTasksTotalPages || 1}
+                        </span>
+                        <Button
+                          onClick={() => setSprintTasksCurrentPage(sprintTasksCurrentPage + 1)}
+                          disabled={sprintTasksCurrentPage >= sprintTasksTotalPages}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </Card>
           </div>
 

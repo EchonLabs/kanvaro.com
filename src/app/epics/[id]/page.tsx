@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
@@ -89,6 +89,17 @@ export default function EpicDetailPage() {
   const [stories, setStories] = useState<any[]>([])
   const [storiesLoading, setStoriesLoading] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string>('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(5)
+
+  // Pagination logic for stories (must be called before any conditional returns)
+  const paginatedStories = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    return stories.slice(startIndex, endIndex)
+  }, [stories, currentPage, pageSize])
+
+  const totalPages = Math.ceil(stories.length / pageSize)
 
   const { hasPermission } = usePermissions()
 
@@ -269,6 +280,10 @@ export default function EpicDetailPage() {
   const canDeleteEpic = (epic: Epic) =>
     hasPermission(Permission.EPIC_DELETE) || isCreator(epic)
 
+  const editAllowed = epic ? canEditEpic(epic) : false
+  const deleteAllowed = epic ? canDeleteEpic(epic) : false
+
+  // Loading states
   if (loading) {
     return (
       <MainLayout>
@@ -310,9 +325,6 @@ export default function EpicDetailPage() {
       </MainLayout>
     )
   }
-
-  const editAllowed = epic ? canEditEpic(epic) : false
-  const deleteAllowed = epic ? canDeleteEpic(epic) : false
 
   return (
     <MainLayout>
@@ -452,7 +464,7 @@ export default function EpicDetailPage() {
                   <p className="text-sm text-muted-foreground text-center py-8">No stories found for this epic.</p>
                 ) : (
                   <div className="space-y-3">
-                    {stories.map((story) => (
+                    {paginatedStories.map((story: any) => (
                       <Card
                         key={story._id}
                         className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-blue-500"
@@ -491,6 +503,56 @@ export default function EpicDetailPage() {
                   </div>
                 )}
               </CardContent>
+
+              {/* Pagination Controls */}
+              {stories.length > pageSize && (
+                <Card className="mt-4">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Items per page:</span>
+                        <select
+                          value={pageSize}
+                          onChange={(e) => {
+                            setPageSize(parseInt(e.target.value))
+                            setCurrentPage(1)
+                          }}
+                          className="px-2 py-1 border rounded text-sm bg-background"
+                        >
+                          <option value="5">5</option>
+                          <option value="10">10</option>
+                          <option value="50">50</option>
+                          <option value="100">100</option>
+                        </select>
+                        <span>
+                          Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, stories.length)} of {stories.length}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => setCurrentPage(currentPage - 1)}
+                          disabled={currentPage === 1 || storiesLoading}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm text-muted-foreground px-2">
+                          Page {currentPage} of {totalPages || 1}
+                        </span>
+                        <Button
+                          onClick={() => setCurrentPage(currentPage + 1)}
+                          disabled={currentPage >= totalPages || storiesLoading}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </Card>
           </div>
 

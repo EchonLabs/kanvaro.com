@@ -115,8 +115,8 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
     try {
       const response = await fetch('/api/projects?limit=1000')
       const data = await response.json()
-      if (data.success && Array.isArray(data.data?.projects)) {
-        setProjects(data.data.projects)
+      if (data.success && Array.isArray(data.data)) {
+        setProjects(data.data)
       }
     } catch (error) {
       console.error('Failed to fetch projects:', error)
