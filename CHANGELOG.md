@@ -1,3 +1,26 @@
+## [1.15.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.15.0...v1.15.1) (2025-12-19)
+
+
+### Bug Fixes
+
+* fix build issue ([58cd0ae](https://github.com/EchonLabs/kanvaro.com/commit/58cd0ae206653d20c5cc7df2d71b6ed3c1eaeccf))
+
+# [1.15.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.14.0...v1.15.0) (2025-12-19)
+
+
+### Bug Fixes
+
+* add changes ([421392e](https://github.com/EchonLabs/kanvaro.com/commit/421392e8bf8a28999ff9a9f146f36da22888d4d3))
+* add changes ([336dc2c](https://github.com/EchonLabs/kanvaro.com/commit/336dc2c0c23d8b65b0f9f804aa133fcdaf820668))
+* add snack bar changes ([b65c44e](https://github.com/EchonLabs/kanvaro.com/commit/b65c44e4d734d791afe454f8ccbf96a4b32bba36))
+* remove consoles ([ed2aef8](https://github.com/EchonLabs/kanvaro.com/commit/ed2aef8568b54f6643bc0aa1ea45086032897997))
+
+
+### Features
+
+* add changes in organizational setting ([5beec7e](https://github.com/EchonLabs/kanvaro.com/commit/5beec7e0ad5494841d6b2b405f595130511ce5d4))
+* add chnages ([ec616c6](https://github.com/EchonLabs/kanvaro.com/commit/ec616c68a0a26c04e00a26eb7cb00de82e8dcf46))
+
 # [1.14.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.13.7...v1.14.0) (2025-12-16)
 
 

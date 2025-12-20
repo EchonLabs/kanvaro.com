@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { formatToTitleCase } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -55,11 +56,18 @@ interface Task {
     _id: string
     name: string
   }
-  assignedTo?: {
-    firstName: string
-    lastName: string
-    email: string
-  }
+  assignedTo?: [Array<{
+    user?: {
+      _id: string
+      firstName: string
+      lastName: string
+      email: string
+    }
+    firstName?: string
+    lastName?: string
+    email?: string
+    hourlyRate?: number
+  }>]
   createdBy: {
     firstName: string
     lastName: string
@@ -177,7 +185,8 @@ export default function TaskDetailPage() {
   const params = useParams()
   const taskId = params.id as string
   const { setItems } = useBreadcrumb()
-  
+  const { formatDate, formatDateTimeSafe } = useDateTime()
+
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -199,6 +208,8 @@ export default function TaskDetailPage() {
   const [commentAttachments, setCommentAttachments] = useState<Array<{ name: string; url: string; size?: number; type?: string; uploadedAt?: string }>>([])
   const [replyAttachments, setReplyAttachments] = useState<Array<{ name: string; url: string; size?: number; type?: string; uploadedAt?: string }>>([])
   const [uploading, setUploading] = useState(false)
+  const [commentsCurrentPage, setCommentsCurrentPage] = useState(1)
+  const [commentsPageSize, setCommentsPageSize] = useState(5)
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
   const commentFileInputRef = useRef<HTMLInputElement | null>(null)
   const replyFileInputRef = useRef<HTMLInputElement | null>(null)
@@ -264,8 +275,10 @@ export default function TaskDetailPage() {
 
       if (data.success) {
         setTask(data.data)
+
+
         // preload mentions and issues lists (project members and project tasks)
-        const projectId = data.data?.project?._id
+          const projectId = task?.project?._id
         if (projectId) {
           fetchProjectMembers(projectId)
           fetchProjectIssues(projectId)
@@ -644,7 +657,7 @@ export default function TaskDetailPage() {
               : comment.author?.email || 'User'}
           </div>
           <div className="text-xs text-muted-foreground">
-            {comment.createdAt ? new Date(comment.createdAt).toLocaleString() : ''}
+            {comment.createdAt ? formatDateTimeSafe(comment.createdAt) : ''}
             {comment.updatedAt && (
               <span className="ml-2 text-[11px]">(edited)</span>
             )}
@@ -813,16 +826,25 @@ export default function TaskDetailPage() {
     handleCancelReply
   ])
 
+  // Pagination logic for comments
+  const paginatedComments = useMemo(() => {
+    const startIndex = (commentsCurrentPage - 1) * commentsPageSize
+    const endIndex = startIndex + commentsPageSize
+    return commentTree.slice(startIndex, endIndex)
+  }, [commentTree, commentsCurrentPage, commentsPageSize])
+
+  const commentsTotalPages = Math.ceil(commentTree.length / commentsPageSize)
+
   const renderComments = useMemo(() => {
     if (!commentTree.length) {
       return <p className="text-sm text-muted-foreground">No comments yet.</p>
     }
     return (
       <div className="space-y-3">
-        {commentTree.map((c) => renderCommentNode(c))}
+        {paginatedComments.map((c) => renderCommentNode(c))}
       </div>
     )
-  }, [commentTree, renderCommentNode])
+  }, [paginatedComments, renderCommentNode])
 
   const deleteTargetComment = useMemo(() => {
     if (!deleteConfirmId || !task?.comments) return null
@@ -894,7 +916,7 @@ export default function TaskDetailPage() {
   const formatDateTime = (value?: string) => {
     if (!value) return 'Not set'
     const date = new Date(value)
-    return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    return formatDateTimeSafe(date)
   }
 
   const getPriorityColor = (priority: string) => {
@@ -996,48 +1018,54 @@ export default function TaskDetailPage() {
   return (
     <MainLayout>
       <div className="space-y-8 sm:space-y-10 lg:space-y-12 overflow-x-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto min-w-0">
-            <Button variant="ghost" onClick={() => router.back()} className="w-full sm:w-auto flex-shrink-0">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <div className="flex-1 min-w-0 w-full sm:w-auto">
-              <h1 
-                className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0"
-                title={`${task.title} ${task.displayId}`}
+        <div className="border-b border-border/40 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+              <Button
+                variant="ghost"
+                onClick={() => router.back()}
+                className="self-start text-sm hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-3"
               >
-                <span className="flex-shrink-0">{getTypeIcon(task.type)}</span>
-                <span className="truncate min-w-0">{task.title} {task.displayId}</span>
-              </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">Task Details</p>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                <h1
+                  className="text-2xl font-semibold leading-snug text-foreground flex items-start gap-2 min-w-0 flex-wrap max-w-[70ch] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden break-words overflow-wrap-anywhere"
+                  title={`${task.title} ${task.displayId}`}
+                >
+                  <span className="flex-shrink-0">{getTypeIcon(task.type)}</span>
+                  <span className="break-words overflow-wrap-anywhere">{task.title} {task.displayId}</span>
+                </h1>
+                <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
+                  <Button
+                    variant="outline"
+                    disabled={!editAllowed}
+                    onClick={() => {
+                      if (!editAllowed) return
+                      router.push(`/tasks/${taskId}/edit`)
+                    }}
+                    className="min-h-[36px] w-full sm:w-auto"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    disabled={!deleteAllowed}
+                    onClick={() => {
+                      if (!deleteAllowed) return
+                      setShowDeleteConfirmModal(true)
+                    }}
+                    className="min-h-[36px] w-full sm:w-auto"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-shrink-0">
-            <Button
-              variant="outline"
-              disabled={!editAllowed}
-              onClick={() => {
-                if (!editAllowed) return
-                router.push(`/tasks/${taskId}/edit`)
-              }}
-              className="w-full sm:w-auto"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-            <Button 
-              variant="destructive"
-              disabled={!deleteAllowed}
-              onClick={() => {
-                if (!deleteAllowed) return
-                setShowDeleteConfirmModal(true)
-              }}
-              className="w-full sm:w-auto"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </Button>
+            <p className="text-sm text-muted-foreground">Task Details</p>
           </div>
         </div>
 
@@ -1168,6 +1196,52 @@ export default function TaskDetailPage() {
                 <div className="border-t pt-4">
                   <h3 className="text-sm font-semibold mb-2 text-foreground">All Comments</h3>
                   {renderComments}
+
+                  {/* Comments Pagination Controls */}
+                  {commentTree.length > commentsPageSize && (
+                    <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Items per page:</span>
+                        <select
+                          value={commentsPageSize}
+                          onChange={(e) => {
+                            setCommentsPageSize(parseInt(e.target.value))
+                            setCommentsCurrentPage(1)
+                          }}
+                          className="px-2 py-1 border rounded text-sm bg-background"
+                        >
+                          <option value="5">5</option>
+                          <option value="10">10</option>
+                          <option value="20">20</option>
+                          <option value="50">50</option>
+                        </select>
+                        <span>
+                          Showing {((commentsCurrentPage - 1) * commentsPageSize) + 1} to {Math.min(commentsCurrentPage * commentsPageSize, commentTree.length)} of {commentTree.length}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => setCommentsCurrentPage(commentsCurrentPage - 1)}
+                          disabled={commentsCurrentPage === 1}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm text-muted-foreground px-2">
+                          Page {commentsCurrentPage} of {commentsTotalPages || 1}
+                        </span>
+                        <Button
+                          onClick={() => setCommentsCurrentPage(commentsCurrentPage + 1)}
+                          disabled={commentsCurrentPage >= commentsTotalPages}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1382,12 +1456,34 @@ export default function TaskDetailPage() {
                   </div>
                 )}
                 
-                {task.assignedTo && (
+                {task.assignedTo && task.assignedTo.length > 0 && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Assigned To</span>
-                    <span className="font-medium">
-                      {task.assignedTo.firstName} {task.assignedTo.lastName}
-                    </span>
+                    <div className="font-medium flex flex-wrap gap-1">
+                      {task.assignedTo.map((assignee: any, idx) => {
+                        // Try to get user data from populated user field first, then from denormalized fields
+                        const firstName = assignee?.user?.firstName || assignee?.firstName;
+                        const lastName = assignee?.user?.lastName || assignee?.lastName;
+                        const userId = assignee?.user?._id || assignee?.user;
+
+                        if (firstName && lastName) {
+                          const displayName = `${firstName} ${lastName}`.trim();
+                          return (
+                            <span key={userId || `assignee-${idx}`}>
+                              {displayName}
+                              {idx < (task.assignedTo?.length ?? 0) - 1 && ', '}
+                            </span>
+                          );
+                        }
+
+                        return (
+                          <span key={`unknown-${idx}`}>
+                            Unknown User
+                            {idx < (task.assignedTo?.length ?? 0) - 1 && ', '}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
                 
@@ -1395,7 +1491,7 @@ export default function TaskDetailPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Due Date</span>
                     <span className="font-medium">
-                      {new Date(task.dueDate).toLocaleDateString()}
+                      {formatDate(task.dueDate)}
                     </span>
                   </div>
                 )}
@@ -1453,7 +1549,7 @@ export default function TaskDetailPage() {
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {new Date(task.createdAt).toLocaleDateString()}
+                  {formatDate(task.createdAt)}
                 </p>
               </CardContent>
             </Card>

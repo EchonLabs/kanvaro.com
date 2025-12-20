@@ -1065,7 +1065,7 @@ export default function TimerPage() {
                           description={description}
                           isBillable={isBillable}
                           requireDescription={timeTrackingSettings?.requireDescription === true}
-                          allowOvertime={timeTrackingSettings?.allowOvertime !== false}
+                          allowOvertime={timeTrackingSettings?.allowOvertime ?? false}
                           onTimerUpdate={(timer) => {
                         if (!timer) {
                           resetTimerForm()
@@ -1089,6 +1089,14 @@ export default function TimerPage() {
                           }
                         }
                         setTimeLogsRefreshKey((prev) => prev + 1)
+                      }}
+                      onAutoStop={(message) => {
+                        showToast({
+                          type: 'info',
+                          title: 'Timer Auto-Stopped',
+                          message,
+                          duration: 8000
+                        })
                       }}
                         />
                       )

@@ -97,6 +97,14 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
 
   const handleLogout = async () => {
     try {
+      // Clear permission cache before logout
+      try {
+        sessionStorage.removeItem('kanvaro_permissions')
+        sessionStorage.removeItem('kanvaro_permissions_timestamp')
+      } catch (cacheError) {
+        console.error('Error clearing permission cache:', cacheError)
+      }
+
       const response = await fetch('/api/auth/logout', { method: 'POST' })
       if (response.ok) {
         // Clear any client-side state if needed

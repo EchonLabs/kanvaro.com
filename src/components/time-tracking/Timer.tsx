@@ -19,6 +19,7 @@ interface TimerProps {
   requireDescription?: boolean
   allowOvertime?: boolean
   onTimerUpdate?: (timer: any) => void
+  onAutoStop?: (reason: string) => void
 }
 
 interface ActiveTimer {
@@ -45,7 +46,8 @@ export function Timer({
   isBillable,
   requireDescription = true,
   allowOvertime = true,
-  onTimerUpdate
+  onTimerUpdate,
+  onAutoStop
 }: TimerProps) {
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -115,9 +117,11 @@ export function Timer({
       const runningMinutes = Math.max(0, baseMinutesRef.current + elapsed)
       setDisplayTime(formatTime(runningMinutes))
 
-      // Auto-stop when reaching max session
-      if (!allowOvertime && runningMinutes >= activeTimer.maxSessionHours * 60) {
+      // Auto-stop when reaching max session (only when overtime is allowed)
+      if (allowOvertime && runningMinutes >= activeTimer.maxSessionHours * 60) {
         console.log('Timer: Auto-stopping - reached max session hours')
+        const maxHours = activeTimer.maxSessionHours
+        onAutoStop?.(`Timer stopped automatically. Maximum session limit of ${maxHours} ${maxHours === 1 ? 'hour' : 'hours'} reached.`)
         handleStopTimer()
       }
     }, 1000)

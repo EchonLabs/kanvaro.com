@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Loader2, ArrowLeft, CheckCircle, Plus, X, BookOpen, Target, Calendar, Clock, Tag } from 'lucide-react'
 
 interface Project {
@@ -39,7 +40,7 @@ interface Story {
   _id: string
   title: string
   description: string
-  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'|'backlog'
+  status: 'Backlog' | 'todo' | 'inprogress' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   project?: {
     _id: string
@@ -88,6 +89,7 @@ export default function EditStoryPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const messageRef = useRef<HTMLDivElement>(null)
+  const { formatDate } = useDateTime()
 
   // Additional state for form fields
   const [projects, setProjects] = useState<Project[]>([])
@@ -220,19 +222,33 @@ export default function EditStoryPage() {
       { label: 'Stories', href: '/stories' },
       { label: 'Edit Story' }
     ])
-    
+
     try {
       setLoading(true)
       const res = await fetch(`/api/stories/${storyId}`)
       const data = await res.json()
       if (data.success) {
         const storyData = data.data
+
+        // Normalize status to match Story model values
+        let normalizedStatus = storyData?.status || 'Backlog'
+        if (!normalizedStatus) {
+          normalizedStatus = 'Backlog'
+        }
+        // Ensure status is one of the valid form values
+        const validStatuses: Story['status'][] = ['Backlog', 'todo', 'inprogress', 'done', 'cancelled']
+        if (!validStatuses.includes(normalizedStatus as Story['status'])) {
+          normalizedStatus = 'Backlog'
+        }
+
         const formattedStoryDueDate = formatDateForInput(storyData.dueDate)
         const storyObject = JSON.parse(JSON.stringify(storyData))
         const normalizedStory = {
           ...storyObject,
+          status: normalizedStatus as Story['status'],
           dueDate: formattedStoryDueDate || undefined
         } as Story
+        console.log('Fetched story status:', storyData?.status, 'Normalized to:', normalizedStatus)
         setStory(normalizedStory)
         setOriginalStory(JSON.parse(JSON.stringify(normalizedStory)))
         
@@ -603,11 +619,9 @@ export default function EditStoryPage() {
                 <Select value={story.status} onValueChange={(v) => setStory({ ...story, status: v as Story['status'] })}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="todo">To Do</SelectItem>
-                    <SelectItem value="backlog">Backlog</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="review">Review</SelectItem>
-                    <SelectItem value="testing">Testing</SelectItem>
+                    <SelectItem value="Backlog">Backlog</SelectItem>
+                    <SelectItem value="todo">Todo</SelectItem>
+                    <SelectItem value="inprogress">In Progress</SelectItem>
                     <SelectItem value="done">Done</SelectItem>
                     <SelectItem value="cancelled">Cancelled</SelectItem>
                   </SelectContent>
@@ -654,7 +668,7 @@ export default function EditStoryPage() {
                 )}
                 {selectedEpicDueDate && !dueDateError && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Epic Due Date: {new Date(selectedEpicDueDate + 'T00:00:00').toLocaleDateString()}
+                    Epic Due Date: {formatDate(selectedEpicDueDate + 'T00:00:00')}
                   </p>
                 )}
               </div>

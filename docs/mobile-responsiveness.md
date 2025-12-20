@@ -504,7 +504,7 @@ export const MobileNavigation = () => {
           <div className="border-t pt-4">
             <Button variant="ghost" className="justify-start text-destructive">
               <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
+              Logout
             </Button>
           </div>
         </div>

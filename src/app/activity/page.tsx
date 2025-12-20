@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import {
   ArrowLeft,
   Search,
@@ -67,6 +68,7 @@ export default function ActivityPage() {
     user: 'all',
     dateRange: 'all'
   })
+  const { formatDate } = useDateTime()
   const [user, setUser] = useState<any>(null)
   const [authError, setAuthError] = useState('')
   const [dataError, setDataError] = useState('')
@@ -94,7 +96,7 @@ export default function ActivityPage() {
     const diffInDays = Math.floor(diffInHours / 24)
     if (diffInDays < 7) return `${diffInDays}d ago`
     
-    return activityTime.toLocaleDateString()
+    return formatDate(activityTime)
   }
 
   const getActionText = (action: string) => {

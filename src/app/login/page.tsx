@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { OrganizationLogo } from '@/components/ui/OrganizationLogo'
 import { useOrganization } from '@/hooks/useOrganization'
+import { usePermissionContext } from '@/lib/permissions/permission-context'
 import { Eye, EyeOff, Loader2, X } from 'lucide-react'
 import { getAppVersion } from '@/lib/version'
 
@@ -116,6 +117,7 @@ function LoginForm() {
         setIsLoadingPermissions(true)
         
         try {
+
           // Fetch permissions to ensure they're loaded before redirecting
           const permissionsResponse = await fetch('/api/auth/permissions', {
             method: 'GET',
@@ -123,18 +125,9 @@ function LoginForm() {
           })
           
           if (permissionsResponse.ok) {
-            const permissionsData = await permissionsResponse.json()
-            console.log('Permissions loaded successfully, storing and redirecting to dashboard')
-            
-            // Store permissions in sessionStorage for persistence across page reloads
-            try {
-              sessionStorage.setItem('kanvaro_permissions', JSON.stringify(permissionsData))
-              sessionStorage.setItem('kanvaro_permissions_timestamp', Date.now().toString())
-            } catch (storageError) {
-              console.error('Error storing permissions in sessionStorage:', storageError)
-            }
-            
-            // Permissions loaded and stored, now redirect to dashboard
+            console.log('Permissions loaded successfully, redirecting to dashboard')
+
+            // Permissions will be cached by the permission context, redirect to dashboard
             router.push('/dashboard')
           } else {
             console.error('Failed to load permissions:', permissionsResponse.status)
@@ -204,7 +197,7 @@ function LoginForm() {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
                 {successMessage && (
-                  <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200">
+                  <Alert className="bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200">
                     <AlertDescription>{successMessage}</AlertDescription>
                   </Alert>
                 )}
@@ -223,7 +216,7 @@ function LoginForm() {
                 )}
 
                 {orgRequiresVerification && verificationRequired && (
-                  <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+                  <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900">
                     <AlertDescription className="text-amber-800 dark:text-amber-200">
                       <div className="space-y-2">
                         <div>

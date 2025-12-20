@@ -6,7 +6,7 @@ export interface IEpic extends Document {
   project: mongoose.Types.ObjectId
   createdBy: mongoose.Types.ObjectId
   assignedTo?: mongoose.Types.ObjectId
-  status: 'backlog' | 'in_progress' | 'completed' | 'done' | 'cancelled'
+  status: 'Backlog' | 'todo' | 'inprogress' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   storyPoints?: number
   estimatedHours?: number
@@ -55,8 +55,8 @@ const EpicSchema = new Schema<IEpic>({
   },
   status: {
     type: String,
-    enum: ['backlog', 'in_progress', 'completed', 'done', 'cancelled'],
-    default: 'backlog'
+    enum: ['Backlog', 'todo', 'inprogress', 'done', 'cancelled'],
+    default: 'Backlog'
   },
   priority: {
     type: String,

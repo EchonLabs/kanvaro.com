@@ -10,6 +10,7 @@ import { TestPlanForm } from '@/components/test-management/TestPlanForm'
 import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmDialog'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Plus, Calendar, Users, CheckSquare, Edit, Trash2 } from 'lucide-react'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 
 interface TestPlan {
   _id?: string
@@ -37,6 +38,7 @@ export default function TestPlansPage() {
   const [testPlans, setTestPlans] = useState<TestPlan[]>([])
   const [plansLoading, setPlansLoading] = useState(false)
   const [refreshCounter, setRefreshCounter] = useState(0)
+  const { formatDate } = useDateTime()
 
   useEffect(() => {
     // Set breadcrumb
@@ -254,12 +256,12 @@ export default function TestPlansPage() {
                   <div className="flex items-center space-x-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm text-muted-foreground">Start Date:</span>
-                    <span className="font-medium">{plan.startDate?.toLocaleDateString() || 'N/A'}</span>
+                    <span className="font-medium">{plan.startDate ? formatDate(plan.startDate) : 'N/A'}</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="h-4 w-4 rounded-full bg-blue-500" />
                     <span className="text-sm text-muted-foreground">End Date:</span>
-                    <span className="font-medium">{plan.endDate?.toLocaleDateString() || 'N/A'}</span>
+                    <span className="font-medium">{plan.endDate ? formatDate(plan.endDate) : 'N/A'}</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="h-4 w-4 rounded-full bg-green-500" />

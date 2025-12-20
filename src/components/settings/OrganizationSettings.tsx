@@ -12,12 +12,12 @@ import { useOrganization } from '@/hooks/useOrganization'
 import { Building2, Upload, Save, AlertCircle, CheckCircle, X, Users, UserCheck, Building, Crown } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useCurrencies } from '@/hooks/useCurrencies'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 
 export function OrganizationSettings() {
   const { organization, loading, refetch } = useOrganization()
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay, getCurrencyByCode } = useCurrencies(true)
-  const orgCurrency = organization?.currency || 'USD'
-  const currencySymbol = getCurrencyByCode(orgCurrency)?.symbol || '$'
+  const { currencySymbol } = useOrgCurrency()
   const [saving, setSaving] = useState(false)
   const [savingRegistration, setSavingRegistration] = useState(false)
   const [savingTimeTracking, setSavingTimeTracking] = useState(false)
@@ -35,26 +35,26 @@ export function OrganizationSettings() {
     size: 'small' as 'startup' | 'small' | 'medium' | 'enterprise',
     requireEmailVerification: true,
     defaultUserRole: 'team_member',
-    timeTracking: {
-      allowTimeTracking: true,
-      allowManualTimeSubmission: true,
-      requireApproval: false,
-      allowBillableTime: true,
-      defaultHourlyRate: 0,
-      maxDailyHours: 12,
-      maxWeeklyHours: 60,
-      maxSessionHours: 8,
-      allowOvertime: false,
-      requireDescription: true,
-      requireCategory: false,
-      allowFutureTime: false,
-      allowPastTime: true,
-      pastTimeLimitDays: 30,
-      roundingRules: {
-        enabled: false,
-        increment: 15,
-        roundUp: true
-      },
+        timeTracking: {
+          allowTimeTracking: true,
+          allowManualTimeSubmission: true,
+          requireApproval: false,
+          allowBillableTime: true,
+          defaultHourlyRate: '0',
+          maxDailyHours: '12',
+          maxWeeklyHours: '60',
+          maxSessionHours: '8',
+          allowOvertime: false,
+          requireDescription: true,
+          requireCategory: false,
+          allowFutureTime: false,
+          allowPastTime: true,
+          pastTimeLimitDays: '30',
+          roundingRules: {
+            enabled: false,
+            increment: '15',
+            roundUp: true
+          },
       notifications: {
         onTimerStart: false,
         onTimerStop: true,
@@ -181,19 +181,19 @@ export function OrganizationSettings() {
           allowManualTimeSubmission: true,
           requireApproval: false,
           allowBillableTime: true,
-          defaultHourlyRate: 0,
-          maxDailyHours: 12,
-          maxWeeklyHours: 60,
-          maxSessionHours: 8,
+          defaultHourlyRate: '0',
+          maxDailyHours: '12',
+          maxWeeklyHours: '60',
+          maxSessionHours: '8',
           allowOvertime: false,
           requireDescription: true,
           requireCategory: false,
           allowFutureTime: false,
           allowPastTime: true,
-          pastTimeLimitDays: 30,
+          pastTimeLimitDays: '30',
           roundingRules: {
             enabled: false,
-            increment: 15,
+            increment: '15',
             roundUp: true
           },
           notifications: {
@@ -380,7 +380,18 @@ export function OrganizationSettings() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          settings: formData.timeTracking
+          settings: {
+            ...formData.timeTracking,
+            defaultHourlyRate: parseFloat(formData.timeTracking.defaultHourlyRate) || 0,
+            maxDailyHours: parseInt(formData.timeTracking.maxDailyHours) || 12,
+            maxWeeklyHours: parseInt(formData.timeTracking.maxWeeklyHours) || 60,
+            maxSessionHours: parseInt(formData.timeTracking.maxSessionHours) || 8,
+            pastTimeLimitDays: parseInt(formData.timeTracking.pastTimeLimitDays?.toString()) || 30,
+            roundingRules: {
+              ...formData.timeTracking.roundingRules,
+              increment: parseInt(formData.timeTracking.roundingRules?.increment?.toString()) || 15
+            }
+          }
         }),
       })
 
@@ -811,7 +822,7 @@ export function OrganizationSettings() {
           {message && (
             <Alert 
               variant={message.type === 'error' ? 'destructive' : 'default'}
-              className={`flex items-start gap-2 ${message.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
+              className={`flex items-start gap-2 ${message.type === 'success' ? 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
             >
               <div className="flex items-start gap-2 flex-1 min-w-0">
                 {message.type === 'error' ? (
@@ -884,7 +895,7 @@ export function OrganizationSettings() {
           {registrationMessage && (
             <Alert 
               variant={registrationMessage.type === 'error' ? 'destructive' : 'default'}
-              className={`flex items-start gap-2 ${registrationMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
+              className={`flex items-start gap-2 ${registrationMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
             >
               <div className="flex items-start gap-2 flex-1 min-w-0">
                 {registrationMessage.type === 'error' ? (
@@ -1007,9 +1018,9 @@ export function OrganizationSettings() {
                     id="defaultHourlyRate"
                     type="number"
                     value={formData.timeTracking.defaultHourlyRate}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      timeTracking: { ...formData.timeTracking, defaultHourlyRate: Number(e.target.value) }
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      timeTracking: { ...formData.timeTracking, defaultHourlyRate: e.target.value }
                     })}
                     placeholder="0.00"
                     step="0.01"
@@ -1026,9 +1037,9 @@ export function OrganizationSettings() {
                     id="maxDailyHours"
                     type="number"
                     value={formData.timeTracking.maxDailyHours}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      timeTracking: { ...formData.timeTracking, maxDailyHours: Number(e.target.value) }
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      timeTracking: { ...formData.timeTracking, maxDailyHours: e.target.value }
                     })}
                     min="1"
                     max="24"
@@ -1041,9 +1052,9 @@ export function OrganizationSettings() {
                     id="maxWeeklyHours"
                     type="number"
                     value={formData.timeTracking.maxWeeklyHours}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      timeTracking: { ...formData.timeTracking, maxWeeklyHours: Number(e.target.value) }
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      timeTracking: { ...formData.timeTracking, maxWeeklyHours: e.target.value }
                     })}
                     min="1"
                     max="168"
@@ -1056,9 +1067,9 @@ export function OrganizationSettings() {
                     id="maxSessionHours"
                     type="number"
                     value={formData.timeTracking.maxSessionHours}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      timeTracking: { ...formData.timeTracking, maxSessionHours: Number(e.target.value) }
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      timeTracking: { ...formData.timeTracking, maxSessionHours: e.target.value }
                     })}
                     min="1"
                     max="24"
@@ -1159,9 +1170,9 @@ export function OrganizationSettings() {
                     id="pastTimeLimitDays"
                     type="number"
                     value={formData.timeTracking.pastTimeLimitDays}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      timeTracking: { ...formData.timeTracking, pastTimeLimitDays: Number(e.target.value) }
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      timeTracking: { ...formData.timeTracking, pastTimeLimitDays: e.target.value }
                     })}
                     min="1"
                     max="365"
@@ -1208,9 +1219,9 @@ export function OrganizationSettings() {
                             ...formData, 
                             timeTracking: { 
                               ...formData.timeTracking, 
-                              roundingRules: { 
-                                ...formData.timeTracking.roundingRules, 
-                                increment: value === '' || Number.isNaN(parsedValue) ? 0 : parsedValue 
+                              roundingRules: {
+                                ...formData.timeTracking.roundingRules,
+                                increment: value
                               }
                             }
                           })
@@ -1353,7 +1364,7 @@ export function OrganizationSettings() {
           {timeTrackingMessage && (
             <Alert 
               variant={timeTrackingMessage.type === 'error' ? 'destructive' : 'default'}
-              className={`flex items-start gap-2 ${timeTrackingMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
+              className={`flex items-start gap-2 ${timeTrackingMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
             >
               <div className="flex items-start gap-2 flex-1 min-w-0">
                 {timeTrackingMessage.type === 'error' ? (

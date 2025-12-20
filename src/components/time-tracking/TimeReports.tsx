@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { BarChart3, PieChart, TrendingUp, Download, Calendar, Users, DollarSign, Clock } from 'lucide-react'
+import { BarChart3, PieChart, TrendingUp, Download, Calendar, Users, DollarSign, Clock, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules } from '@/lib/utils'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 
 interface TimeReportsProps {
   userId?: string
@@ -99,6 +100,7 @@ interface ReportData {
 export function TimeReports({ userId, organizationId, projectId }: TimeReportsProps) {
   const { organization } = useOrganization()
   const { formatCurrency } = useOrgCurrency()
+  const { formatDate, formatTime } = useDateTime()
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -133,6 +135,33 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     total: 0,
     totalPages: 0
   })
+
+  // Check if any filters are active (not default values)
+  const hasActiveFilters = useMemo(() => {
+    return filters.startDate !== '' ||
+           filters.endDate !== '' ||
+           filters.projectId !== (projectId || 'all') ||
+           filters.assignedTo !== (userId || 'all') ||
+           filters.assignedBy !== 'all' ||
+           filters.taskId !== 'all'
+  }, [filters, projectId, userId])
+
+  // Reset all filters to default values
+  const resetFilters = () => {
+    setFilters({
+      startDate: '',
+      endDate: '',
+      reportType: 'detailed',
+      projectId: projectId || 'all',
+      assignedTo: userId || 'all',
+      assignedBy: 'all',
+      taskId: 'all'
+    })
+    setProjectFilterQuery('')
+    setAssignedToFilterQuery('')
+    setAssignedByFilterQuery('')
+    setTaskFilterQuery('')
+  }
 
   const loadReport = useCallback(async () => {
     setIsLoading(true)
@@ -681,6 +710,36 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
             <CardTitle>Approved Time Entries</CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Results Count */}
+            <div className="flex items-center justify-between mb-4 pb-3 border-b">
+              <div className="text-sm text-muted-foreground">
+                {reportData.detailedEntries && reportData.detailedEntries.length > 0 ? (
+                  <span>
+                    Showing <span className="font-medium text-foreground">{getPaginatedDetailedEntries.length}</span> of{' '}
+                    <span className="font-medium text-foreground">{reportData.summary?.totalEntries || reportData.detailedEntries.length}</span> time entries
+                    {detailedEntriesPagination.page > 1 && (
+                      <span className="ml-2 text-xs">
+                        (Page {detailedEntriesPagination.page} of {Math.ceil(reportData.detailedEntries.length / detailedEntriesPagination.limit)})
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span>No time entries found</span>
+                )}
+              </div>
+              {hasActiveFilters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={resetFilters}
+                  className="text-xs"
+                >
+                  <X className="h-3 w-3 mr-1" />
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+
             {reportData.detailedEntries.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No approved time entries found for the selected filters.
@@ -690,37 +749,36 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 <div className="min-w-full">
                   {/* Desktop Table View */}
                   <div className="hidden md:block">
-                    <div className="grid grid-cols-12 gap-4 p-4 border-b font-semibold text-sm text-muted-foreground">
+                    <div className="grid grid-cols-10 gap-4 p-4 border-b font-semibold text-sm text-muted-foreground">
                       <div className="col-span-2">Employee</div>
-                      <div className="col-span-2">Project (Task)</div>
+                      <div className="col-span-3">Project (Task)</div>
                       <div className="col-span-1">Date</div>
                       <div className="col-span-1">Start</div>
                       <div className="col-span-1">End</div>
                       <div className="col-span-1">Duration</div>
                       <div className="col-span-1">Cost</div>
                       <div className="col-span-1">Billable</div>
-                      <div className="col-span-2">Notes</div>
                     </div>
                     {getPaginatedDetailedEntries.map((entry) => (
-                      <div key={entry._id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-muted/50">
+                      <div key={entry._id} className="grid grid-cols-10 gap-4 p-4 border-b hover:bg-muted/50">
                         <div className="col-span-2">
                           <div className="font-medium text-sm">{entry.userName}</div>
                           <div className="text-xs text-muted-foreground">{entry.userEmail}</div>
                         </div>
-                        <div className="col-span-2">
+                        <div className="col-span-3">
                           <div className="font-medium text-sm">{entry.projectName}</div>
                           {entry.taskTitle && (
                             <div className="text-xs text-muted-foreground">{entry.taskTitle}</div>
                           )}
                         </div>
                         <div className="col-span-1 text-sm">
-                          {new Date(entry.date).toLocaleDateString()}
+                          {formatDate(entry.date)}
                         </div>
                         <div className="col-span-1 text-sm">
-                          {entry.startTime ? new Date(entry.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                          {entry.startTime ? formatTime(entry.startTime) : '-'}
                         </div>
                         <div className="col-span-1 text-sm">
-                          {entry.endTime ? new Date(entry.endTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                          {entry.endTime ? formatTime(entry.endTime) : '-'}
                         </div>
                         <div className="col-span-1 text-sm font-medium">
                           {formatDuration(entry.duration)}
@@ -730,15 +788,12 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                         </div>
                         <div className="col-span-1">
                           {entry.isBillable ? (
-                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
+                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-400">
                               Yes
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="text-xs">No</Badge>
                           )}
-                        </div>
-                        <div className="col-span-2 text-sm text-muted-foreground truncate" title={entry.notes}>
-                          {entry.notes || '-'}
                         </div>
                       </div>
                     ))}
@@ -754,7 +809,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                             <div className="text-xs text-muted-foreground">{entry.userEmail}</div>
                           </div>
                           {entry.isBillable && (
-                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
+                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-400">
                               Billable
                             </Badge>
                           )}
@@ -768,7 +823,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div>
                             <span className="text-muted-foreground">Date: </span>
-                            <span>{new Date(entry.date).toLocaleDateString()}</span>
+                            <span>{formatDate(entry.date)}</span>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Duration: </span>
@@ -776,19 +831,13 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                           </div>
                           <div>
                             <span className="text-muted-foreground">Start: </span>
-                            <span>{entry.startTime ? new Date(entry.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-'}</span>
+                            <span>{entry.startTime ? formatTime(entry.startTime) : '-'}</span>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Cost: </span>
                             <span className="font-medium">{formatCurrency(entry.cost, orgCurrency)}</span>
                           </div>
                         </div>
-                        {entry.notes && (
-                          <div className="text-sm text-muted-foreground">
-                            <span className="font-medium">Notes: </span>
-                            {entry.notes}
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>

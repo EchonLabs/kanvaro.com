@@ -736,9 +736,17 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                           filteredAvailableMembers.map((member) => (
                             <SelectItem key={member._id} value={member._id}>
                               <div className="flex flex-col">
-                                <span className="text-sm font-medium">
-                                  {member.firstName} {member.lastName}
-                                </span>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium">
+                                    {member.firstName} {member.lastName}
+                                  </span>
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-xs ml-2 ${getOrganizationRoleColor(member.role)} border-none`}
+                                  >
+                                    {formatOrganizationRole(member.role)}
+                                  </Badge>
+                                </div>
                                 <span className="text-xs text-muted-foreground">{member.email}</span>
                               </div>
                             </SelectItem>

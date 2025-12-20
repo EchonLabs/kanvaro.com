@@ -41,10 +41,12 @@ export async function PUT(request: NextRequest) {
     if (updates.currency) user.currency = updates.currency
 
     // Update preferences
-    if (updates.theme) user.preferences.theme = updates.theme
+    if (updates.theme !== undefined) user.preferences.theme = updates.theme
     if (updates.sidebarCollapsed !== undefined) user.preferences.sidebarCollapsed = updates.sidebarCollapsed
     if (updates.dateFormat) user.preferences.dateFormat = updates.dateFormat
     if (updates.timeFormat) user.preferences.timeFormat = updates.timeFormat
+
+    // Handle notifications preferences
     if (updates.notifications) {
       user.preferences.notifications = {
         ...user.preferences.notifications,

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Progress } from '@/components/ui/Progress'
 import { Button } from '@/components/ui/Button'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { 
   BarChart, 
   Bar, 
@@ -69,6 +70,8 @@ interface ProjectTimelineReportProps {
 }
 
 export function ProjectTimelineReport({ projects, filters }: ProjectTimelineReportProps) {
+  const { formatDate } = useDateTime()
+
   // Prepare timeline data
   const timelineData = projects.map(project => {
     const startDate = new Date(project.startDate)

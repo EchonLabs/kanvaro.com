@@ -213,9 +213,9 @@ export class DocsLoader {
       docs = docs.filter(doc => doc.category === filter.category);
     }
 
-    // Search filter
+    // Search filter with enhanced matching
     if (filter.search) {
-      const searchTerm = filter.search.toLowerCase();
+      const searchTerms = this.expandSearchTerms(filter.search);
       docs = docs.filter(doc => {
         const searchableText = [
           doc.title,
@@ -223,34 +223,138 @@ export class DocsLoader {
           ...doc.headings.map(h => h.text),
           doc.content
         ].join(' ').toLowerCase();
-        
-        return searchableText.includes(searchTerm);
+
+        return searchTerms.some(term => searchableText.includes(term));
       });
     }
 
     return docs;
   }
 
+  // Feature-related search terms mapping
+  private static readonly FEATURE_SYNONYMS: Record<string, string[]> = {
+    // Sprint-related terms
+    'sprint': ['iteration', 'scrum', 'agile cycle', 'development cycle'],
+    'retrospective': ['retro', 'reflection', 'post-mortem', 'lessons learned'],
+    'standup': ['daily scrum', 'daily meeting', 'check-in', 'sync'],
+    'planning': ['grooming', 'refinement', 'backlog refinement'],
+    'review': ['demo', 'showcase', 'presentation', 'validation'],
+
+    // Task management terms
+    'task': ['item', 'work item', 'todo', 'issue', 'ticket'],
+    'kanban': ['board', 'workflow', 'visual management', 'lean'],
+    'backlog': ['product backlog', 'story backlog', 'work queue'],
+    'epic': ['feature', 'capability', 'user story group'],
+    'story': ['user story', 'requirement', 'feature request'],
+
+    // Team management terms
+    'team': ['members', 'collaborators', 'users', 'staff'],
+    'project': ['initiative', 'program', 'effort', 'undertaking'],
+    'role': ['permission', 'access', 'authorization', 'privilege'],
+
+    // Time tracking terms
+    'time': ['duration', 'effort', 'hours', 'tracking', 'logging'],
+    'timer': ['stopwatch', 'time tracker', 'clock'],
+    'report': ['analytics', 'metrics', 'dashboard', 'insights'],
+
+    // Financial terms
+    'budget': ['cost', 'expense', 'financial', 'money', 'funding'],
+    'invoice': ['billing', 'payment', 'charge', 'bill'],
+    'expense': ['cost', 'spending', 'outlay', 'expenditure'],
+
+    // Testing terms
+    'test': ['qa', 'quality assurance', 'testing', 'validation'],
+    'case': ['scenario', 'test case', 'test scenario'],
+    'execution': ['run', 'test run', 'test execution'],
+
+    // General terms
+    'create': ['add', 'new', 'make', 'setup', 'configure'],
+    'edit': ['update', 'modify', 'change', 'alter'],
+    'delete': ['remove', 'destroy', 'erase', 'eliminate'],
+    'view': ['see', 'display', 'show', 'read'],
+    'manage': ['administer', 'control', 'handle', 'oversee']
+  };
+
+  private static expandSearchTerms(query: string): string[] {
+    const terms = query.toLowerCase().split(/\s+/).filter(term => term.length > 0);
+    const expandedTerms = new Set<string>();
+
+    for (const term of terms) {
+      expandedTerms.add(term);
+
+      // Add synonyms
+      for (const [key, synonyms] of Object.entries(this.FEATURE_SYNONYMS)) {
+        if (key.includes(term) || synonyms.some(syn => syn.includes(term))) {
+          expandedTerms.add(key);
+          synonyms.forEach(syn => expandedTerms.add(syn));
+        }
+      }
+
+      // Add partial matches for compound terms
+      if (term.includes('-') || term.includes('_')) {
+        const parts = term.split(/[-_]/);
+        parts.forEach(part => {
+          if (part.length > 2) {
+            expandedTerms.add(part);
+          }
+        });
+      }
+    }
+
+    return Array.from(expandedTerms);
+  }
+
   public static async searchDocs(query: string, visibility?: Visibility): Promise<DocNode[]> {
     const index = await this.getIndex();
-    const searchTerm = query.toLowerCase();
-    
+    const searchTerms = this.expandSearchTerms(query);
+
     let docs = index.nodes;
-    
+
     if (visibility) {
       docs = docs.filter(doc => doc.visibility === visibility);
     }
 
-    return docs.filter(doc => {
+    // Score and filter docs based on relevance
+    const scoredDocs = docs.map(doc => {
       const searchableText = [
         doc.title,
         doc.summary,
         ...doc.headings.map(h => h.text),
         doc.content
       ].join(' ').toLowerCase();
-      
-      return searchableText.includes(searchTerm);
-    });
+
+      let score = 0;
+      let matches = 0;
+
+      for (const term of searchTerms) {
+        const termMatches = (searchableText.match(new RegExp(term, 'gi')) || []).length;
+        if (termMatches > 0) {
+          matches += termMatches;
+
+          // Higher score for exact matches and title matches
+          if (doc.title.toLowerCase().includes(term)) {
+            score += 10;
+          } else if (doc.summary.toLowerCase().includes(term)) {
+            score += 5;
+          } else {
+            score += 2;
+          }
+
+          // Bonus for multiple matches
+          score += Math.min(termMatches, 3);
+        }
+      }
+
+      return { doc, score, matches };
+    }).filter(result => result.score > 0)
+      .sort((a, b) => {
+        // Sort by score first, then by matches, then by title
+        if (a.score !== b.score) return b.score - a.score;
+        if (a.matches !== b.matches) return b.matches - a.matches;
+        return a.doc.title.localeCompare(b.doc.title);
+      });
+
+    return scoredDocs.map(result => result.doc);
   }
 
   public static async getCategories(visibility?: Visibility): Promise<Record<Category, DocNode[]>> {

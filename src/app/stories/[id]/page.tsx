@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { 
   ArrowLeft,
@@ -102,7 +103,8 @@ export default function StoryDetailPage() {
   const params = useParams()
   const storyId = params.id as string
   const { setItems } = useBreadcrumb()
-  
+  const { formatDate } = useDateTime()
+
   const [story, setStory] = useState<Story | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -113,6 +115,17 @@ export default function StoryDetailPage() {
   const [tasks, setTasks] = useState<any[]>([])
   const [tasksLoading, setTasksLoading] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string>('')
+  const [storyTasksCurrentPage, setStoryTasksCurrentPage] = useState(1)
+  const [storyTasksPageSize, setStoryTasksPageSize] = useState(5)
+
+  // Pagination logic for story tasks
+  const paginatedStoryTasks = useMemo(() => {
+    const startIndex = (storyTasksCurrentPage - 1) * storyTasksPageSize
+    const endIndex = startIndex + storyTasksPageSize
+    return tasks.slice(startIndex, endIndex)
+  }, [tasks, storyTasksCurrentPage, storyTasksPageSize])
+
+  const storyTasksTotalPages = Math.ceil(tasks.length / storyTasksPageSize)
 
   const { hasPermission } = usePermissions()
   const { success: notifySuccess, error: notifyError } = useNotify()
@@ -365,48 +378,54 @@ export default function StoryDetailPage() {
   return (
     <MainLayout>
       <div className="space-y-8 sm:space-y-10 lg:space-y-12 overflow-x-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto min-w-0">
-            <Button variant="ghost" onClick={() => router.back()} className="w-full sm:w-auto flex-shrink-0">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <div className="flex-1 min-w-0 w-full sm:w-auto">
-              <h1
-                className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0"
-                title={story.title}
+        <div className="border-b border-border/40 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+              <Button
+                variant="ghost"
+                onClick={() => router.back()}
+                className="self-start text-sm hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-3"
               >
-                <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-blue-600 flex-shrink-0" />
-                <span className="truncate min-w-0">{story.title}</span>
-              </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">User Story Details</p>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                <h1
+                  className="text-2xl font-semibold leading-snug text-foreground flex items-start gap-2 min-w-0 flex-wrap max-w-[70ch] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden break-words overflow-wrap-anywhere"
+                  title={story.title}
+                >
+                  <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-blue-600 flex-shrink-0" />
+                  <span className="break-words overflow-wrap-anywhere">{story.title}</span>
+                </h1>
+                <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
+                  <Button
+                    variant="outline"
+                    disabled={!editAllowed}
+                    onClick={() => {
+                      if (!editAllowed) return
+                      router.push(`/stories/${storyId}/edit`)
+                    }}
+                    className="min-h-[36px] w-full sm:w-auto"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    disabled={!deleteAllowed}
+                    onClick={() => {
+                      if (!deleteAllowed) return
+                      setShowDeleteConfirmModal(true)
+                    }}
+                    className="min-h-[36px] w-full sm:w-auto"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-shrink-0">
-            <Button
-              variant="outline"
-              disabled={!editAllowed}
-              onClick={() => {
-                if (!editAllowed) return
-                router.push(`/stories/${storyId}/edit`)
-              }}
-              className="w-full sm:w-auto"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={!deleteAllowed}
-              onClick={() => {
-                if (!deleteAllowed) return
-                setShowDeleteConfirmModal(true)
-              }}
-              className="w-full sm:w-auto"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </Button>
+            <p className="text-sm text-muted-foreground">User Story Details</p>
           </div>
         </div>
 
@@ -501,7 +520,7 @@ export default function StoryDetailPage() {
                       <div className="flex items-center justify-between text-xs sm:text-sm">
                         <span className="text-muted-foreground">Due Date</span>
                         <span className="font-medium whitespace-nowrap">
-                          {new Date(story.epic.dueDate).toLocaleDateString()}
+                          {formatDate(story.epic.dueDate)}
                         </span>
                       </div>
                     )}
@@ -588,7 +607,7 @@ export default function StoryDetailPage() {
                       <div className="flex items-center justify-between text-xs sm:text-sm">
                         <span className="text-muted-foreground">Start Date</span>
                         <span className="font-medium whitespace-nowrap">
-                          {new Date(story.sprint.startDate).toLocaleDateString()}
+                          {formatDate(story.sprint.startDate)}
                         </span>
                       </div>
                     )}
@@ -597,7 +616,7 @@ export default function StoryDetailPage() {
                       <div className="flex items-center justify-between text-xs sm:text-sm">
                         <span className="text-muted-foreground">End Date</span>
                         <span className="font-medium whitespace-nowrap">
-                          {new Date(story.sprint.endDate).toLocaleDateString()}
+                          {formatDate(story.sprint.endDate)}
                         </span>
                       </div>
                     )}
@@ -623,7 +642,7 @@ export default function StoryDetailPage() {
                   <p className="text-sm text-muted-foreground text-center py-8">No tasks found for this story.</p>
                 ) : (
                   <div className="space-y-3">
-                    {tasks.map((task) => (
+                    {paginatedStoryTasks.map((task) => (
                       <Card
                         key={task._id}
                         className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-green-500"
@@ -670,6 +689,56 @@ export default function StoryDetailPage() {
                   </div>
                 )}
               </CardContent>
+
+              {/* Pagination Controls */}
+              {tasks.length > storyTasksPageSize && (
+                <Card className="mt-4">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Items per page:</span>
+                        <select
+                          value={storyTasksPageSize}
+                          onChange={(e) => {
+                            setStoryTasksPageSize(parseInt(e.target.value))
+                            setStoryTasksCurrentPage(1)
+                          }}
+                          className="px-2 py-1 border rounded text-sm bg-background"
+                        >
+                          <option value="5">5</option>
+                          <option value="10">10</option>
+                          <option value="50">50</option>
+                          <option value="100">100</option>
+                        </select>
+                        <span>
+                          Showing {((storyTasksCurrentPage - 1) * storyTasksPageSize) + 1} to {Math.min(storyTasksCurrentPage * storyTasksPageSize, tasks.length)} of {tasks.length}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => setStoryTasksCurrentPage(storyTasksCurrentPage - 1)}
+                          disabled={storyTasksCurrentPage === 1}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm text-muted-foreground px-2">
+                          Page {storyTasksCurrentPage} of {storyTasksTotalPages || 1}
+                        </span>
+                        <Button
+                          onClick={() => setStoryTasksCurrentPage(storyTasksCurrentPage + 1)}
+                          disabled={storyTasksCurrentPage >= storyTasksTotalPages}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </Card>
           </div>
 
@@ -714,7 +783,7 @@ export default function StoryDetailPage() {
                   <div className="flex items-center justify-between text-xs sm:text-sm">
                     <span className="text-muted-foreground">Due Date</span>
                     <span className="font-medium whitespace-nowrap">
-                      {new Date(story.dueDate).toLocaleDateString()}
+                      {formatDate(story.dueDate)}
                     </span>
                   </div>
                 )}
@@ -765,7 +834,7 @@ export default function StoryDetailPage() {
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 whitespace-nowrap">
-                  {new Date(story.createdAt).toLocaleDateString()}
+                  {formatDate(story.createdAt)}
                 </p>
               </CardContent>
             </Card>

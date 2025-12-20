@@ -18,6 +18,7 @@ import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Label } from '@/components/ui/label'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { usePermissions } from '@/lib/permissions/permission-context'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import {
   Plus,
@@ -47,7 +48,8 @@ import {
   Trash2,
   ChevronDown,
   ChevronRight,
-  X
+  X,
+  RotateCcw
 } from 'lucide-react'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 
@@ -113,6 +115,20 @@ export default function SprintsPage() {
   const [projectFilterQuery, setProjectFilterQuery] = useState('')
   const [projectOptions, setProjectOptions] = useState<Array<{ _id: string; name: string }>>([])
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const { formatDate } = useDateTime()
+
+  // Check if any filters are active
+  const hasActiveFilters = searchQuery !== '' ||
+                          statusFilter !== 'all' ||
+                          projectFilter !== 'all'
+
+  // Reset all filters
+  const resetFilters = () => {
+    setSearchQuery('')
+    setStatusFilter('all')
+    setProjectFilter('all')
+    setProjectFilterQuery('')
+  }
   const [success, setSuccess] = useState('')
   const [updatingSprintId, setUpdatingSprintId] = useState<string | null>(null)
   const [completeModalOpen, setCompleteModalOpen] = useState(false)
@@ -808,19 +824,7 @@ export default function SprintsPage() {
           </Button>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {success && (
-          <Alert variant="success">
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>{success}</AlertDescription>
-          </Alert>
-        )}
+       
 
         <Card className="overflow-x-hidden">
           <CardHeader>
@@ -902,6 +906,27 @@ export default function SprintsPage() {
                       </div>
                     </SelectContent>
                   </Select>
+                  {hasActiveFilters && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={resetFilters}
+                            className="text-xs"
+                            aria-label="Reset all filters"
+                          >
+                            <RotateCcw className="h-4 w-4 mr-1" />
+                            Reset Filters
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Reset filters</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
               </div>
             </div>
@@ -1079,13 +1104,13 @@ export default function SprintsPage() {
                             </div>
                             <div className="flex items-center space-x-1 flex-shrink-0">
                               <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span className="whitespace-nowrap">{new Date(sprint?.startDate).toLocaleDateString()}</span>
+                              <span className="whitespace-nowrap">{formatDate(sprint?.startDate)}</span>
                             </div>
                           </div>
 
                           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 text-xs sm:text-sm">
                             <div className="text-muted-foreground truncate">
-                              {new Date(sprint?.startDate).toLocaleDateString()} - {new Date(sprint?.endDate).toLocaleDateString()}
+                              {formatDate(sprint?.startDate)} - {formatDate(sprint?.endDate)}
                             </div>
                             <div className="text-muted-foreground whitespace-nowrap flex-shrink-0">
                               {Math.ceil((new Date(sprint?.endDate).getTime() - new Date(sprint?.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
@@ -1222,7 +1247,7 @@ export default function SprintsPage() {
                                 <div className="flex items-center space-x-1 min-w-0">
                                   <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                                   <span className="truncate">
-                                    {new Date(sprint?.startDate).toLocaleDateString()} - {new Date(sprint?.endDate).toLocaleDateString()}
+                                    {formatDate(sprint?.startDate)} - {formatDate(sprint?.endDate)}
                                   </span>
                                 </div>
                                 <div className="flex items-center space-x-1 flex-shrink-0 whitespace-nowrap">

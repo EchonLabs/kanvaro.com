@@ -34,6 +34,9 @@ export enum PermissionCategory {
   BACKLOG = 'backlog',
   // Test management permissions
   TEST_MANAGEMENT = 'test_management',
+
+  // Documentation permissions
+  DOCUMENTATION = 'documentation',
 }
 
 export enum Permission {
@@ -120,6 +123,7 @@ export enum Permission {
   REPORTING_CREATE = 'reporting:create',
   REPORTING_EXPORT = 'reporting:export',
   REPORTING_SHARE = 'reporting:share',
+  TIME_LOG_REPORT_ACCESS = 'time_tracking:report_access',
   
   // Settings permissions
   SETTINGS_READ = 'settings:read',
@@ -193,6 +197,14 @@ export enum Permission {
   TEST_EXECUTION_UPDATE = 'test_execution:update',
   TEST_REPORT_VIEW = 'test_report:view',
   TEST_REPORT_EXPORT = 'test_report:export',
+
+  // Documentation permissions
+  DOCUMENTATION_VIEW = 'documentation:view',
+  DOCUMENTATION_SEARCH = 'documentation:search',
+  DOCUMENTATION_CREATE = 'documentation:create',
+  DOCUMENTATION_UPDATE = 'documentation:update',
+  DOCUMENTATION_DELETE = 'documentation:delete',
+  DOCUMENTATION_MANAGE_PERMISSIONS = 'documentation:manage_permissions',
 }
 
 export enum Role {
@@ -294,6 +306,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_CREATE,
     Permission.REPORTING_EXPORT,
     Permission.REPORTING_SHARE,
+    Permission.TIME_LOG_REPORT_ACCESS,
     
     // Settings
     Permission.SETTINGS_READ,
@@ -367,6 +380,14 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEST_EXECUTION_UPDATE,
     Permission.TEST_REPORT_VIEW,
     Permission.TEST_REPORT_EXPORT,
+
+    // Documentation
+    Permission.DOCUMENTATION_VIEW,
+    Permission.DOCUMENTATION_SEARCH,
+    Permission.DOCUMENTATION_CREATE,
+    Permission.DOCUMENTATION_UPDATE,
+    Permission.DOCUMENTATION_DELETE,
+    Permission.DOCUMENTATION_MANAGE_PERMISSIONS,
   ],
 
   // Human Resource role - currently has the same permissions as ADMIN.
@@ -445,6 +466,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_CREATE,
     Permission.REPORTING_EXPORT,
     Permission.REPORTING_SHARE,
+    Permission.TIME_LOG_REPORT_ACCESS,
     
     // Settings
     Permission.SETTINGS_READ,
@@ -589,6 +611,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_CREATE,
     Permission.REPORTING_EXPORT,
     Permission.REPORTING_SHARE,
+    Permission.TIME_LOG_REPORT_ACCESS,
     
     // Settings
     Permission.SETTINGS_READ,
@@ -662,6 +685,10 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEST_EXECUTION_UPDATE,
     Permission.TEST_REPORT_VIEW,
     Permission.TEST_REPORT_EXPORT,
+
+    // Documentation
+    Permission.DOCUMENTATION_VIEW,
+    Permission.DOCUMENTATION_SEARCH,
   ],
   
   [Role.TEAM_MEMBER]: [
@@ -719,8 +746,12 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     
     // Backlog (read only)
     Permission.BACKLOG_READ,
+
+    // Documentation
+    Permission.DOCUMENTATION_VIEW,
+    Permission.DOCUMENTATION_SEARCH,
   ],
-  
+
   [Role.CLIENT]: [
     // User management (own profile only)
     Permission.USER_READ,
@@ -768,8 +799,12 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     
     // Backlog (read only)
     Permission.BACKLOG_READ,
+
+    // Documentation
+    Permission.DOCUMENTATION_VIEW,
+    Permission.DOCUMENTATION_SEARCH,
   ],
-  
+
   [Role.VIEWER]: [
     // User management (own profile only)
     Permission.USER_READ,
@@ -817,8 +852,12 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     
     // Backlog (read only)
     Permission.BACKLOG_READ,
+
+    // Documentation
+    Permission.DOCUMENTATION_VIEW,
+    Permission.DOCUMENTATION_SEARCH,
   ],
-  
+
   [Role.QA_ENGINEER]: [
     // User management (read only)
     Permission.USER_READ,
@@ -891,8 +930,12 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEST_EXECUTION_UPDATE,
     Permission.TEST_REPORT_VIEW,
     Permission.TEST_REPORT_EXPORT,
+
+    // Documentation
+    Permission.DOCUMENTATION_VIEW,
+    Permission.DOCUMENTATION_SEARCH,
   ],
-  
+
   [Role.TESTER]: [
     // User management (read only)
     Permission.USER_READ,
@@ -952,6 +995,10 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEST_EXECUTION_READ,
     Permission.TEST_EXECUTION_UPDATE,
     Permission.TEST_REPORT_VIEW,
+
+    // Documentation
+    Permission.DOCUMENTATION_VIEW,
+    Permission.DOCUMENTATION_SEARCH,
   ],
 };
 

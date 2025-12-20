@@ -3,13 +3,13 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -23,6 +23,7 @@ import {
   Filter
 } from 'lucide-react'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 
 interface ExpenseReportProps {
   topExpenses: {
@@ -46,6 +47,7 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'
 
 export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: ExpenseReportProps) {
   const { formatCurrency } = useOrgCurrency()
+  const { formatDate } = useDateTime()
 
   // Calculate expense metrics
   const totalExpenses = topExpenses.reduce((sum, expense) => sum + expense.amount, 0)
@@ -253,7 +255,7 @@ export function ExpenseReport({ topExpenses, budgetBreakdown, filters }: Expense
                   <div className="mt-2 text-xs sm:text-sm text-muted-foreground">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-4">
                       <span className="break-words">Project: {expense.project}</span>
-                      <span className="flex-shrink-0">Date: {new Date(expense.date).toLocaleDateString()}</span>
+                      <span className="flex-shrink-0">Date: {formatDate(expense.date)}</span>
                     </div>
                   </div>
                 </div>

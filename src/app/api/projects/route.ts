@@ -74,8 +74,8 @@ export async function GET(request: NextRequest) {
     const projects = await Project.find(projectQuery)
       .select('name startDate endDate createdBy teamMembers client status settings')
       .populate('createdBy', 'firstName lastName email')
-      .populate('teamMembers', 'firstName lastName email')
       .populate('client', 'firstName lastName email')
+      .populate('teamMembers.memberId', 'firstName lastName email _id')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -270,6 +270,7 @@ export async function POST(request: NextRequest) {
           total: budget.total || 0,
           spent: 0,
           currency: orgCurrency, // Use organization currency instead of project currency
+          defaultHourlyRate: budget.defaultHourlyRate || 0,
           categories: {
             materials: budget.categories?.materials || 0,
             overhead: budget.categories?.overhead || 0

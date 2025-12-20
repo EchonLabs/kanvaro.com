@@ -11,7 +11,6 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-        console.log('GET sprints');
 
     await connectDB()
 
@@ -69,13 +68,17 @@ export async function GET(
     // This includes tasks that may have been moved to another sprint
     const sprintTaskIds = sprint.tasks || []
     
+
     const taskDocs = await Task.find({
       _id: { $in: sprintTaskIds },
       organization: organizationId
     })
-      .select('title status storyPoints estimatedHours actualHours priority type assignedTo archived subtasks sprint movedFromSprint')
-      .populate('assignedTo', 'firstName lastName email')
-      .populate('sprint', 'name _id')
+      .select('title displayId status storyPoints estimatedHours actualHours priority type assignedTo archived subtasks sprint movedFromSprint')
+      .populate([
+        { path: 'assignedTo.user', select: '_id firstName lastName email' },
+        { path: 'sprint', select: 'name _id' }
+      ])
+
 
     // Get current sprint tasks (tasks still assigned to this sprint)
     const currentSprintTaskIds = taskDocs
@@ -84,15 +87,17 @@ export async function GET(
 
     const tasks = taskDocs.map(task => {
       const taskObj = task.toObject()
+      
       const isInCurrentSprint = taskObj.sprint && taskObj.sprint._id.toString() === sprintId
       const movedToSprint = !isInCurrentSprint && taskObj.sprint ? {
         _id: taskObj.sprint._id.toString(),
         name: taskObj.sprint.name
       } : null
 
-      return {
+      const processedTask = {
         _id: taskObj._id,
         title: taskObj.title,
+        displayId: taskObj.displayId,
         status: taskObj.status,
         storyPoints: taskObj.storyPoints ?? 0,
         estimatedHours: taskObj.estimatedHours ?? 0,
@@ -101,18 +106,17 @@ export async function GET(
         type: taskObj.type,
         archived: taskObj.archived ?? false,
         subtasks: Array.isArray(taskObj.subtasks) ? taskObj.subtasks : [],
-        assignedTo: taskObj.assignedTo
-          ? {
-              _id: taskObj.assignedTo._id,
-              firstName: taskObj.assignedTo.firstName,
-              lastName: taskObj.assignedTo.lastName,
-              email: taskObj.assignedTo.email
-            }
-          : null,
+        assignedTo: taskObj.assignedTo,
         movedToSprint, // Indicates if task was moved to another sprint
         movedToBacklog: !taskObj.sprint && taskObj.movedFromSprint && taskObj.movedFromSprint.toString() === sprintId
       }
+
+     
+
+      return processedTask
     })
+
+   
 
     // Calculate progress from ALL tasks that were in this sprint (including moved ones)
     const totalTasks = tasks.length
@@ -164,6 +168,7 @@ export async function GET(
       }
     })
 
+   
   } catch (error) {
     console.error('Get sprint error:', error)
     return NextResponse.json(

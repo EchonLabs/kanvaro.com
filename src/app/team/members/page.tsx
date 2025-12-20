@@ -10,22 +10,24 @@ import { Badge } from '@/components/ui/Badge'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { formatToTitleCase } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { 
-  Users, 
-  UserPlus, 
-  Search, 
-  Filter, 
-  MoreHorizontal, 
-  Mail, 
+import {
+  Users,
+  UserPlus,
+  Search,
+  Filter,
+  MoreHorizontal,
+  Mail,
   Clock,
   CheckCircle,
   XCircle,
   UserCheck,
   Loader2,
   Grid3x3,
-  List
+  List,
+  X
 } from 'lucide-react'
 import { InviteMemberModal } from '@/components/members/InviteMemberModal'
 import { EditMemberModal } from '@/components/members/EditMemberModal'
@@ -84,6 +86,7 @@ interface PendingInvitation {
 
 export default function MembersPage() {
   const router = useRouter()
+  const { formatDate } = useDateTime()
   const [members, setMembers] = useState<Member[]>([])
   const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([])
   const [loading, setLoading] = useState(true)
@@ -105,7 +108,18 @@ export default function MembersPage() {
   const canInviteMembers = hasPermission(Permission.TEAM_INVITE) || hasPermission(Permission.USER_INVITE)
   const canEditMembers = hasPermission(Permission.TEAM_EDIT) && hasPermission(Permission.USER_UPDATE)
   const canEditAdminMembers = hasPermission(Permission.TEAM_EDIT) && hasPermission(Permission.USER_MANAGE_ROLES)
-  const canDeleteMembers = hasPermission(Permission.TEAM_DELETE)
+  const canDeleteMembers = hasPermission(Permission.USER_DEACTIVATE)
+
+  // Check if any filters are active
+  const hasActiveFilters = searchQuery !== '' || roleFilter !== 'all' || statusFilter !== 'all'
+
+  // Reset all filters
+  const resetFilters = () => {
+    setSearchQuery('')
+    setRoleFilter('all')
+    setStatusFilter('all')
+  }
+
   const [organizationRoles, setOrganizationRoles] = useState<Array<{ id: string; name: string; isSystem?: boolean }>>([])
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [memberToRemove, setMemberToRemove] = useState<Member | null>(null)
@@ -323,6 +337,12 @@ export default function MembersPage() {
   const confirmRemoveMember = async () => {
     if (!memberToRemove) return
 
+    // Double-check permission before making API call
+    if (!canDeleteMembers) {
+      notifyError({ title: 'Insufficient permissions to remove member' })
+      return
+    }
+
     try {
       setRemovingMember(true)
       const response = await fetch(`/api/members?memberId=${memberToRemove._id}`, {
@@ -502,7 +522,7 @@ export default function MembersPage() {
         </div>
 
       {success && (
-        <Alert variant="success" className="break-words border-green-500 bg-green-50 dark:bg-green-900/20">
+        <Alert variant="success" className="break-words border-green-500 bg-green-50 dark:bg-green-900">
           <CheckCircle className="h-4 w-4 flex-shrink-0 text-green-600 dark:text-green-400" />
           <AlertDescription className="break-words text-green-800 dark:text-green-200">{success}</AlertDescription>
         </Alert>
@@ -586,6 +606,41 @@ export default function MembersPage() {
               </div>
             </CardHeader>
             <CardContent className="p-4 sm:p-6 pt-0">
+              {/* Results Count */}
+              <div className="flex items-center justify-between mb-4 pb-3 border-b">
+                <div className="text-sm text-muted-foreground">
+                  {hasActiveFilters ? (
+                    <span>
+                      Showing <span className="font-medium text-foreground">{filteredMembers.length}</span> of{' '}
+                      <span className="font-medium text-foreground">{members.length}</span> team members
+                      <span className="ml-2 text-xs text-blue-600">
+                        (filtered from {members.length} total members)
+                      </span>
+                      <span className="ml-2 text-xs">
+                        {searchQuery && `• "${searchQuery}"`}
+                        {roleFilter !== 'all' && `• ${formatToTitleCase(roleFilter.replace(/_/g, ' '))}`}
+                        {statusFilter !== 'all' && `• ${statusFilter === 'active' ? 'Active' : 'Inactive'}`}
+                      </span>
+                    </span>
+                  ) : (
+                    <span>
+                      <span className="font-medium text-foreground">{members.length}</span> team members total
+                    </span>
+                  )}
+                </div>
+                {hasActiveFilters && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetFilters}
+                    className="text-xs"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+
               {filteredMembers.length === 0 ? (
                 <div className="text-center py-8 sm:py-12 text-muted-foreground">
                   <Users className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50 flex-shrink-0" />
@@ -630,7 +685,7 @@ export default function MembersPage() {
                               </Badge>
                             </div>
                             <p className="text-xs text-muted-foreground">
-                              Joined {new Date(member.createdAt).toLocaleDateString()}
+                              Joined {formatDate(member.createdAt)}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 w-full pt-2 border-t">
@@ -693,7 +748,7 @@ export default function MembersPage() {
                               {getMemberRoleLabel(member)}
                             </Badge>
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
-                              Joined {new Date(member.createdAt).toLocaleDateString()}
+                              Joined {formatDate(member.createdAt)}
                             </span>
                           </div>
                         </div>
@@ -784,7 +839,7 @@ export default function MembersPage() {
                             </Badge>
                             <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
                               <Clock className="h-3.5 w-3.5 text-yellow-500" />
-                              <span>Expires {new Date(invitation.expiresAt).toLocaleDateString()}</span>
+                              <span>Expires {formatDate(invitation.expiresAt)}</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 w-full pt-2 border-t">
@@ -825,7 +880,7 @@ export default function MembersPage() {
                               {getInvitationRoleLabel(invitation)}
                             </Badge>
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
-                              Expires {new Date(invitation.expiresAt).toLocaleDateString()}
+                              Expires {formatDate(invitation.expiresAt)}
                             </span>
                           </div>
                         </div>

@@ -92,32 +92,32 @@ export default function CreateSprintPage() {
     checkAuth()
   }, [checkAuth])
 
-  // Fetch sprint count and auto-generate sprint name
-  useEffect(() => {
-    const fetchSprintCount = async () => {
-      try {
-        const response = await fetch('/api/sprints?countOnly=true')
-        const data = await response.json()
+  // Remove the old global sprint count logic
 
-        if (data.success && typeof data.count === 'number') {
-          const nextSprintNumber = data.count + 1
-          setFormData(prev => ({
-            ...prev,
-            name: `Sprint ${nextSprintNumber}`
-          }))
-        }
-      } catch (err) {
-        console.error('Failed to fetch sprint count:', err)
-        // Fallback to generic name
+  // Auto-generate sprint name based on selected project
+  const generateSprintName = async (projectId: string) => {
+    if (!projectId) return
+
+    try {
+      const response = await fetch(`/api/sprints?project=${projectId}&countOnly=true`)
+      const data = await response.json()
+
+      if (data.success && typeof data.count === 'number') {
+        const nextSprintNumber = data.count + 1
         setFormData(prev => ({
           ...prev,
-          name: 'Sprint 1'
+          name: `Sprint ${nextSprintNumber}`
         }))
       }
+    } catch (err) {
+      console.error('Failed to fetch project sprint count:', err)
+      // Fallback to generic name
+      setFormData(prev => ({
+        ...prev,
+        name: 'Sprint 1'
+      }))
     }
-
-    fetchSprintCount()
-  }, [])
+  }
 
   const fetchProjects = async () => {
     try {
@@ -268,6 +268,8 @@ export default function CreateSprintPage() {
       if (field === 'project' && typeof value === 'string') {
         if (value) {
           fetchProjectDetails(value)
+          // Generate sprint name based on project
+          generateSprintName(value)
         } else {
           setSelectedProject(null)
           setUsers([]) // Clear users when no project selected
@@ -354,17 +356,6 @@ export default function CreateSprintPage() {
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-foreground">Name *</label>
-                    <Input
-                      value={formData.name}
-                      onChange={(e) => handleChange('name', e.target.value)}
-                      placeholder="Enter sprint name"
-                      required
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div>
                     <label className="text-sm font-medium text-foreground">Project *</label>
                     <Select
                       value={formData.project}
@@ -395,6 +386,17 @@ export default function CreateSprintPage() {
                         </div>
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Name *</label>
+                    <Input
+                      value={formData.name}
+                      onChange={(e) => handleChange('name', e.target.value)}
+                      placeholder="Enter sprint name"
+                      required
+                      className="w-full"
+                    />
                   </div>
 
                   <div>
