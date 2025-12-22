@@ -1167,7 +1167,7 @@ export default function SprintDetailPage() {
                             )}
                             {task.movedToBacklog && (
                               <p className="text-xs font-medium text-orange-600 dark:text-orange-400 mt-1">
-                                Moved to Backlog
+                                Moved to backlog
                               </p>
                             )}
                           </div>
@@ -1187,7 +1187,7 @@ export default function SprintDetailPage() {
                             )}
                             {task.movedToBacklog && (
                               <Badge variant="outline" className="text-[11px] bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20">
-                                Backlog
+                                backlog
                               </Badge>
                             )}
                           </div>
@@ -1235,7 +1235,7 @@ export default function SprintDetailPage() {
                         {task.movedToBacklog && (
                           <div className="rounded-md border bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800 p-2">
                             <p className="text-xs text-muted-foreground">
-                              This task has been moved to <span className="font-medium text-orange-700 dark:text-orange-400">Backlog</span>
+                              This task has been moved to <span className="font-medium text-orange-700 dark:text-orange-400">backlog</span>
                             </p>
                           </div>
                         )}
@@ -1456,7 +1456,7 @@ export default function SprintDetailPage() {
                   ) : (
                     <>
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      Move Tasks to Backlog and Complete Sprint
+                      Move Tasks to backlog and Complete Sprint
                     </>
                   )}
                 </Button>
@@ -1614,7 +1614,7 @@ export default function SprintDetailPage() {
                 </div>
 
                 {selectedTaskIds.size === 0 ? (
-                  // No tasks selected - show "Move to Backlog" option
+                  // No tasks selected - show "Move to backlog" option
 
                   <p className="text-xs text-muted-foreground">
                     All incomplete tasks will be moved to the backlog.

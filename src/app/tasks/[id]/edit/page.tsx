@@ -15,7 +15,7 @@ import { AttachmentList } from '@/components/ui/AttachmentList'
 import { Loader2, ArrowLeft, CheckCircle, Plus, Trash2, Target, User, Clock, Calendar, Paperclip, X } from 'lucide-react'
 
 const STATUS_OPTIONS = [
-  { value: 'backlog', label: 'Backlog' },
+  { value: 'backlog', label: 'backlog' },
   { value: 'todo', label: 'To Do' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'review', label: 'Review' },

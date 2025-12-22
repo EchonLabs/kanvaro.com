@@ -143,7 +143,7 @@ interface TaskOption {
 }
 
 const defaultColumns = [
-  { id: 'backlog', title: 'Backlog', color: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200' },
+  { id: 'backlog', title: 'backlog', color: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200' },
   { id: 'todo', title: 'To Do', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' },
   { id: 'in_progress', title: 'In Progress', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
   { id: 'review', title: 'Review', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },

@@ -319,7 +319,7 @@ export default function SprintsPage() {
 
   const formatTaskStatusLabel = (status: string) => {
     const statusMap: Record<string, string> = {
-      backlog: 'Backlog',
+      backlog: 'backlog',
       todo: 'To Do',
       in_progress: 'In Progress',
       review: 'In Review',
@@ -1436,7 +1436,7 @@ export default function SprintsPage() {
                   ) : (
                     <>
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      Move Tasks to Backlog and Complete Sprint
+                      Move Tasks to backlog and Complete Sprint
                     </>
                   )}
                 </Button>
@@ -1600,7 +1600,7 @@ export default function SprintsPage() {
                 </div>
 
                 {selectedTaskIds.size === 0 ? (
-                  // No tasks selected - show "Move to Backlog" option
+                  // No tasks selected - show "Move to backlog" option
 
                   <p className="text-xs text-muted-foreground">
                     All incomplete tasks will be moved to the backlog.
@@ -1609,7 +1609,7 @@ export default function SprintsPage() {
                   // Some tasks selected - show existing/new sprint options
                   <>
                     {selectedTaskIds.size === 0 ? (
-                      // No tasks selected - show "Move to Backlog" option
+                      // No tasks selected - show "Move to backlog" option
 
                       <p className="text-xs text-muted-foreground">
                         All incomplete tasks will be moved to the backlog.

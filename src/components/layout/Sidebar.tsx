@@ -110,7 +110,7 @@ const navigationItems = [
       },
       {
         id: 'tasks-backlog',
-        label: 'Backlog',
+        label: 'backlog',
         icon: List,
         path: '/backlog',
         permission: Permission.BACKLOG_READ
@@ -290,8 +290,24 @@ const navigationItems = [
     id: 'docs',
     label: 'Documentation',
     icon: BookOpen,
-    path: '/docs'
-    // No permission required - docs page handles its own permissions
+    path: '/docs',
+    permission: Permission.DOCUMENTATION_VIEW,
+    children: [
+      {
+        id: 'docs-internal',
+        label: 'Internal Docs',
+        icon: FileText,
+        path: '/docs/internal',
+        permission: Permission.DOCUMENTATION_VIEW
+      },
+      {
+        id: 'docs-public',
+        label: 'Public Docs',
+        icon: BookOpen,
+        path: '/docs/public'
+        // No permission required for public docs
+      }
+    ]
   },
   {
     id: 'settings',

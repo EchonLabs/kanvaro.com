@@ -370,7 +370,7 @@ export function useFeaturePermissions() {
     // Kanban permissions
     canManageKanban: hasPermission(Permission.KANBAN_MANAGE),
     
-    // Backlog permissions
+    // backlog permissions
     canManageBacklog: hasPermission(Permission.BACKLOG_MANAGE),
     
     // Test management permissions
