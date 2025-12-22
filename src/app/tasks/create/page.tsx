@@ -119,7 +119,7 @@ function mapUserResponse(data: any): CurrentUser | null {
 }
 
 const SUBTASK_STATUS_OPTIONS: Array<{ value: SubtaskStatus; label: string }> = [
-  { value: 'backlog', label: 'Backlog' },
+  { value: 'backlog', label: 'backlog' },
   { value: 'todo', label: 'To Do' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'review', label: 'Review' },

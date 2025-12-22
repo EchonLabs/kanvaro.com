@@ -136,20 +136,16 @@ export default function CreateEpicPage() {
     const selectedProject = projects.find(p => p._id === formData.project)
     if (!selectedProject) return null
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    let minDate = today // Must be today or future
+    let minDate = null
     let maxDate = null
 
-    // If project has start date, due date should be after project start
+    // If project has start date, due date should be on or after project start
     if (selectedProject.startDate) {
-      const projectStart = new Date(selectedProject.startDate)
-      projectStart.setHours(0, 0, 0, 0)
-      minDate = projectStart > today ? projectStart : today
+      minDate = new Date(selectedProject.startDate)
+      minDate.setHours(0, 0, 0, 0)
     }
 
-    // If project has end date, due date should be before or on project end
+    // If project has end date, due date should be on or before project end
     if (selectedProject.endDate) {
       maxDate = new Date(selectedProject.endDate)
       maxDate.setHours(23, 59, 59, 999)

@@ -105,7 +105,7 @@ const flows = [
     caption: '2. Execute & Track',
     gradient: '#0bbcd6, #19f2a5',
     imageKey: 'tasks' as const,
-    steps: ['Backlog', 'Sprint Planning', 'In Progress', 'Review', 'Done']
+    steps: ['backlog', 'Sprint Planning', 'In Progress', 'Review', 'Done']
   },
   {
     title: 'Time & Reporting Flow',
@@ -119,14 +119,14 @@ const flows = [
 
 const showcases = [
   {
-    name: 'Tasks & Backlog',
+    name: 'Tasks & backlog',
     metric: 'Multi-view',
     detail: 'Comprehensive task management with Kanban boards, backlog grooming, my tasks view, user stories, and epics. Full agile workflow support with sprint planning and velocity tracking.',
     route: '/modules/tasks',
     icon: <ListChecks className="h-6 w-6" />,
     iconColor: 'text-emerald-600 dark:text-emerald-400',
     iconBg: 'bg-emerald-50 dark:bg-emerald-900/30',
-    submodules: ['Kanban Board', 'Backlog', 'My Tasks', 'User Stories', 'Epics', 'Sprint Planning']
+    submodules: ['Kanban Board', 'backlog', 'My Tasks', 'User Stories', 'Epics', 'Sprint Planning']
   },
   {
     name: 'Projects & Epics',
@@ -873,7 +873,7 @@ export default function LandingPage() {
             {showcases.map(showcase => {
               // Map showcase names to image keys
               const imageKeyMap: Record<string, keyof typeof images.showcaseImages> = {
-                'Tasks & Backlog': 'tasks',
+                'Tasks & backlog': 'tasks',
                 'Projects & Epics': 'projects',
                 'Team Management': 'members',
                 'Time Tracking': 'timeLogs',

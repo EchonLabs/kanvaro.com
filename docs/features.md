@@ -48,7 +48,7 @@ Kanvaro provides a comprehensive set of project management features designed spe
 - **Kanban Boards**: Visual workflow management with customizable columns
 - **Scrum Boards**: Sprint-based task organization with burndown charts
 - **Sprint Planning**: Sprint creation, planning, and management
-- **Backlog Management**: Product and sprint backlog organization
+- **backlog Management**: Product and sprint backlog organization
 - **Retrospectives**: Sprint retrospective tools and templates
 - **Daily Standups**: Standup meeting facilitation and tracking
 - **Velocity Tracking**: Team velocity measurement and prediction

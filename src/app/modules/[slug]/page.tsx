@@ -34,7 +34,7 @@ const moduleData: Record<string, {
   screenshots: string[]
 }> = {
   'tasks': {
-    name: 'Tasks & Backlog',
+    name: 'Tasks & backlog',
     tagline: 'Comprehensive Agile Task Management',
     description: 'Manage your tasks with powerful Kanban boards, backlog grooming, sprint planning, and full agile workflow support. Track user stories, epics, and tasks with customizable views and workflows.',
     icon: <ListChecks className="h-8 w-8" />,
@@ -42,7 +42,7 @@ const moduleData: Record<string, {
     iconBg: 'bg-emerald-50 dark:bg-emerald-900/30',
     submodules: [
       { name: 'Kanban Board', description: 'Visual task management with drag-and-drop columns and customizable workflows' },
-      { name: 'Backlog', description: 'Organize and prioritize your product backlog with story points and priorities' },
+      { name: 'backlog', description: 'Organize and prioritize your product backlog with story points and priorities' },
       { name: 'My Tasks', description: 'Personal task view showing all assigned tasks across projects' },
       { name: 'User Stories', description: 'Create and manage user stories with acceptance criteria and linked tasks' },
       { name: 'Epics', description: 'Group related stories and track large features across sprints' },

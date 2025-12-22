@@ -87,7 +87,7 @@ function generateBreadcrumbsFromPath(pathname: string): BreadcrumbItem[] {
     'stories': 'Stories',
     'epics': 'Epics',
     'sprints': 'Sprints',
-    'backlog': 'Backlog',
+    'backlog': 'backlog',
     'kanban': 'Kanban',
     'team': 'Team',
     'members': 'Members',

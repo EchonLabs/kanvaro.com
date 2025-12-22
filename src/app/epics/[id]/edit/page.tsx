@@ -15,8 +15,8 @@ import { Loader2, ArrowLeft, Plus, X } from 'lucide-react'
 interface EpicForm {
   title: string
   description: string
-  // Match Epic model status: Backlog | todo | inprogress | done | cancelled
-  status: 'Backlog' | 'todo' | 'inprogress' | 'done' | 'cancelled'
+  // Match Epic model status: backlog | todo | inprogress | done | cancelled
+  status: 'backlog' | 'todo' | 'inprogress' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   dueDate: string
   estimatedHours: number | string
@@ -32,7 +32,7 @@ export default function EditEpicPage() {
   const [form, setForm] = useState<EpicForm>({
     title: '',
     description: '',
-    status: 'Backlog',
+    status: 'backlog',
     priority: 'medium',
     dueDate: '',
     estimatedHours: '',
@@ -57,14 +57,14 @@ export default function EditEpicPage() {
       if (res.ok && data.success) {
         const e = data.data
         // Normalize status to match new Epic model values
-        let normalizedStatus = e?.status || 'Backlog'
+        let normalizedStatus = e?.status || 'backlog'
         if (!normalizedStatus) {
-          normalizedStatus = 'Backlog'
+          normalizedStatus = 'backlog'
         }
         // Ensure status is one of the valid form values
-        const validStatuses: EpicForm['status'][] = ['Backlog', 'todo', 'inprogress', 'done', 'cancelled']
+        const validStatuses: EpicForm['status'][] = ['backlog', 'todo', 'inprogress', 'done', 'cancelled']
         if (!validStatuses.includes(normalizedStatus as EpicForm['status'])) {
-          normalizedStatus = 'Backlog'
+          normalizedStatus = 'backlog'
         }
 
         const nextForm: EpicForm = {
@@ -148,20 +148,16 @@ export default function EditEpicPage() {
   const getValidDateRange = () => {
     if (!project) return null
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    let minDate = today // Must be today or future
+    let minDate = null
     let maxDate = null
 
-    // If project has start date, due date should be after project start
+    // If project has start date, due date should be on or after project start
     if (project.startDate) {
-      const projectStart = new Date(project.startDate)
-      projectStart.setHours(0, 0, 0, 0)
-      minDate = projectStart > today ? projectStart : today
+      minDate = new Date(project.startDate)
+      minDate.setHours(0, 0, 0, 0)
     }
 
-    // If project has end date, due date should be before or on project end
+    // If project has end date, due date should be on or before project end
     if (project.endDate) {
       maxDate = new Date(project.endDate)
       maxDate.setHours(23, 59, 59, 999)
@@ -278,7 +274,7 @@ export default function EditEpicPage() {
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Backlog">Backlog</SelectItem>
+                    <SelectItem value="backlog">backlog</SelectItem>
                     <SelectItem value="todo">Todo</SelectItem>
                     <SelectItem value="inprogress">In Progress</SelectItem>
                     <SelectItem value="done">Done</SelectItem>

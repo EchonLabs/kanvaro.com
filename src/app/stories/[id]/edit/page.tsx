@@ -40,7 +40,7 @@ interface Story {
   _id: string
   title: string
   description: string
-  status: 'Backlog' | 'todo' | 'inprogress' | 'done' | 'cancelled'
+  status: 'backlog' | 'todo' | 'inprogress' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   project?: {
     _id: string
@@ -231,14 +231,14 @@ export default function EditStoryPage() {
         const storyData = data.data
 
         // Normalize status to match Story model values
-        let normalizedStatus = storyData?.status || 'Backlog'
+        let normalizedStatus = storyData?.status || 'backlog'
         if (!normalizedStatus) {
-          normalizedStatus = 'Backlog'
+          normalizedStatus = 'backlog'
         }
         // Ensure status is one of the valid form values
-        const validStatuses: Story['status'][] = ['Backlog', 'todo', 'inprogress', 'done', 'cancelled']
+        const validStatuses: Story['status'][] = ['backlog', 'todo', 'inprogress', 'done', 'cancelled']
         if (!validStatuses.includes(normalizedStatus as Story['status'])) {
-          normalizedStatus = 'Backlog'
+          normalizedStatus = 'backlog'
         }
 
         const formattedStoryDueDate = formatDateForInput(storyData.dueDate)
@@ -619,7 +619,7 @@ export default function EditStoryPage() {
                 <Select value={story.status} onValueChange={(v) => setStory({ ...story, status: v as Story['status'] })}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Backlog">Backlog</SelectItem>
+                    <SelectItem value="backlog">backlog</SelectItem>
                     <SelectItem value="todo">Todo</SelectItem>
                     <SelectItem value="inprogress">In Progress</SelectItem>
                     <SelectItem value="done">Done</SelectItem>

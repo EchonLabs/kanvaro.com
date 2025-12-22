@@ -159,7 +159,7 @@ ProjectSchema.index({ organization: 1, owner: 1 });
 export const Project = mongoose.model<IProject>('Project', ProjectSchema);
 ```
 
-## Backlog Management
+## backlog Management
 
 ### Epic Model
 ```typescript

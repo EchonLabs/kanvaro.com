@@ -478,7 +478,7 @@ export default function StoriesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="backlog">Backlog</SelectItem>
+                      <SelectItem value="backlog">backlog</SelectItem>
                       <SelectItem value="todo">Todo</SelectItem>
                       <SelectItem value="inprogress">In Progress</SelectItem>
                       <SelectItem value="done">Done</SelectItem>

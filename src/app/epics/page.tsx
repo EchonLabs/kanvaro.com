@@ -377,7 +377,7 @@ export default function EpicsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="backlog">Backlog</SelectItem>
+                      <SelectItem value="backlog">backlog</SelectItem>
                       <SelectItem value="todo">To Do</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="done">Done</SelectItem>
