@@ -1,3 +1,10 @@
+## [1.15.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.15.1...v1.15.2) (2025-12-22)
+
+
+### Bug Fixes
+
+* add permission issue fixes ([581b70f](https://github.com/EchonLabs/kanvaro.com/commit/581b70ff9348cdd82e83bd428025069364305493))
+
 ## [1.15.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.15.0...v1.15.1) (2025-12-19)
 
 
