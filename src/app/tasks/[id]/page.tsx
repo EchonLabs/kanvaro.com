@@ -1120,9 +1120,13 @@ export default function TaskDetailPage() {
                         setSuggestionPos(null)
                       }
                     }}
-                    placeholder="Add a comment. Use @ to mention team members, # to link project tasks."
+                    placeholder=""
                     rows={4}
                   />
+                  <div className="mt-2 text-sm text-muted-foreground space-y-1">
+                    <p>Enter your comment and click the <strong>Post Comment</strong> button to submit your comment.</p>
+                    <p>Use <code className="bg-muted px-1 py-0.5 rounded text-xs">@</code> to mention team members, <code className="bg-muted px-1 py-0.5 rounded text-xs">#</code> to link project tasks.</p>
+                  </div>
               <div className="flex items-center gap-2 mt-2">
                 <TooltipProvider>
                   <Tooltip>
@@ -1457,30 +1461,32 @@ export default function TaskDetailPage() {
                 )}
                 
                 {task.assignedTo && task.assignedTo.length > 0 && (
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-2">
                     <span className="text-muted-foreground">Assigned To</span>
-                    <div className="font-medium flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-2">
                       {task.assignedTo.map((assignee: any, idx) => {
-                        // Try to get user data from populated user field first, then from denormalized fields
-                        const firstName = assignee?.user?.firstName || assignee?.firstName;
-                        const lastName = assignee?.user?.lastName || assignee?.lastName;
-                        const userId = assignee?.user?._id || assignee?.user;
+                        // Handle both string (user ID) and object formats for backward compatibility
+                        let userId: string;
+                        let displayName: string;
 
-                        if (firstName && lastName) {
-                          const displayName = `${firstName} ${lastName}`.trim();
-                          return (
-                            <span key={userId || `assignee-${idx}`}>
-                              {displayName}
-                              {idx < (task.assignedTo?.length ?? 0) - 1 && ', '}
-                            </span>
-                          );
+                        if (typeof assignee === 'string') {
+                          // New format: assignee is a string (user ID)
+                          userId = assignee;
+                          const userInfo = mentionsList.find(u => u._id === userId);
+                          displayName = userInfo?.name || 'Unknown User';
+                        } else {
+                          // Legacy format: assignee is an object
+                          userId = assignee?.user?._id || assignee?.user || assignee?._id;
+                          const firstName = assignee?.user?.firstName || assignee?.firstName;
+                          const lastName = assignee?.user?.lastName || assignee?.lastName;
+                          displayName = firstName && lastName ? `${firstName} ${lastName}`.trim() : 'Unknown User';
                         }
 
                         return (
-                          <span key={`unknown-${idx}`}>
-                            Unknown User
-                            {idx < (task.assignedTo?.length ?? 0) - 1 && ', '}
-                          </span>
+                          <Badge key={userId || `assignee-${idx}`} variant="secondary" className="text-xs">
+                            <User className="h-3 w-3 mr-1" />
+                            {displayName}
+                          </Badge>
                         );
                       })}
                     </div>

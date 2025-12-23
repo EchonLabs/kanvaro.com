@@ -124,7 +124,7 @@ export default function SortableTask({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: task._id as string })
+  } = useSortable({ id: task._id.toString() })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -197,7 +197,7 @@ export default function SortableTask({
                       <DropdownMenuItem 
                         onClick={(e) => {
                           e.stopPropagation()
-                          onDelete(task._id as string)
+                          onDelete(task._id.toString())
                         }}
                         className="text-destructive focus:text-destructive"
                       >

@@ -539,7 +539,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.DOCUMENTATION_VIEW,
     Permission.DOCUMENTATION_SEARCH,
   ],
-
+  
   [Role.PROJECT_MANAGER]: [
     // User management
     Permission.USER_CREATE,

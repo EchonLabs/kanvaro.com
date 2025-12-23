@@ -143,13 +143,7 @@ export default function CreateTaskModal({
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
   const [projectQuery, setProjectQuery] = useState('')
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
-  const [assignedTo, setAssignedTo] = useState<Array<{
-    _id: string
-    firstName: string
-    lastName: string
-    email: string
-    hourlyRate?: string
-  }>>([])
+  const [assignedTo, setAssignedTo] = useState<string[]>([])
   const [assigneeHourlyRates, setAssigneeHourlyRates] = useState<Record<string, string>>({})
   const [assigneeQuery, setAssigneeQuery] = useState('')
   const [newLabel, setNewLabel] = useState('')
@@ -528,13 +522,7 @@ export default function CreateTaskModal({
           ...formData,
           status: 'backlog',
           project: effectiveProjectId,
-          assignedTo: assignedTo.map(assignee => ({
-            user: assignee._id,
-            firstName: assignee.firstName,
-            lastName: assignee.lastName,
-            email: assignee.email,
-            hourlyRate: assignee.hourlyRate ? parseFloat(assignee.hourlyRate) : undefined
-          })),
+          assignedTo: assignedTo,
           estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined,
           dueDate: formData.dueDate || undefined,
           labels: Array.isArray(formData.labels) ? formData.labels : [],
@@ -938,18 +926,9 @@ export default function CreateTaskModal({
                     <Select
                       value=""
                       onValueChange={(value) => {
-                        if (!assignedTo.some(assignee => assignee._id === value)) {
-                          const selectedUser = projectMembers.find(u => u._id === value)
-                          if (selectedUser) {
-                            setAssignedTo(prev => [...prev, {
-                              _id: selectedUser._id,
-                              firstName: selectedUser.firstName,
-                              lastName: selectedUser.lastName,
-                              email: selectedUser.email,
-                              hourlyRate: assigneeHourlyRates[selectedUser._id] || ''
-                            }])
-                            setAssigneeQuery('')
-                          }
+                        if (!assignedTo.includes(value)) {
+                          setAssignedTo(prev => [...prev, value])
+                          setAssigneeQuery('')
                         }
                       }}
                       onOpenChange={(open) => { if (open) setAssigneeQuery(""); }}
@@ -1005,7 +984,7 @@ export default function CreateTaskModal({
                                 }
 
                                 return filtered.map(user => {
-                                  const isSelected = assignedTo.some(assignee => assignee._id === user._id)
+                                  const isSelected = assignedTo.includes(user._id)
                                   return (
                                     <SelectItem
                                       key={user._id}
@@ -1031,22 +1010,26 @@ export default function CreateTaskModal({
                     {assignedTo.length > 0 && (
                       <div className="space-y-2">
                         <div className="flex flex-wrap gap-2">
-                          {assignedTo.map(assignee => (
-                            <span
-                              key={assignee._id}
-                              className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
-                            >
-                              <span>{assignee.firstName} {assignee.lastName}</span>
-                              <button
-                                type="button"
-                                aria-label="Remove assignee"
-                                className="text-muted-foreground hover:text-foreground focus:outline-none"
-                                onClick={() => setAssignedTo(prev => prev.filter(a => a._id !== assignee._id))}
+                          {assignedTo.map(userId => {
+                            const user = projectMembers.find(u => u._id === userId)
+                            if (!user) return null
+                            return (
+                              <span
+                                key={userId}
+                                className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
                               >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </span>
-                          ))}
+                                <span>{user.firstName} {user.lastName}</span>
+                                <button
+                                  type="button"
+                                  aria-label="Remove assignee"
+                                  className="text-muted-foreground hover:text-foreground focus:outline-none"
+                                  onClick={() => setAssignedTo(prev => prev.filter(id => id !== userId))}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            )
+                          })}
                         </div>
                         {/* Hourly rate inputs for each assignee */}
                         {/* <div className="space-y-2">

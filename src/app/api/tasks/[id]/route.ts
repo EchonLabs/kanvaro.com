@@ -236,7 +236,7 @@ export async function GET(
     
     if (!hasTaskViewAll && !hasProjectViewAll) {
       taskQuery.$or = [
-        { assignedTo: userId },
+        { 'assignedTo.user': userId },
         { createdBy: userId }
       ];
     }
@@ -446,7 +446,7 @@ export async function PUT(
     
     if (!hasTaskEditAll && !hasProjectViewAll) {
       taskQuery.$or = [
-        { assignedTo: userId },
+        { 'assignedTo.user': userId },
         { createdBy: userId }
       ];
     }
@@ -529,7 +529,7 @@ export async function PUT(
     
     if (!hasTaskEditAll && !hasProjectViewAll) {
       updateQuery.$or = [
-        { assignedTo: userId },
+        { 'assignedTo.user': userId },
         { createdBy: userId }
       ];
     }

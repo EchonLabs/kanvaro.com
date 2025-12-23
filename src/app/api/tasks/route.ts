@@ -197,12 +197,12 @@ export async function GET(request: NextRequest) {
     // If user has TASK_VIEW_ALL or PROJECT_VIEW_ALL, they can view all tasks
     // Otherwise, restrict to tasks assigned to or created by the user
     if (!canViewAllTasks && !hasTaskViewAll) {
-      const userFilters: any[] = [{ assignedTo: { $in: [userId] } }, { createdBy: userId }];
+      const userFilters: any[] = [{ 'assignedTo.user': { $in: [userId] } }, { createdBy: userId }];
 
       // If assignedTo filter is provided and it's the current user, use it
       // Otherwise, ignore the filter and use default user restriction
       if (assignedTo && assignedTo === userId) {
-        filters.assignedTo = { $in: [userId] };
+        filters['assignedTo.user'] = { $in: [userId] };
       } else if (createdBy && createdBy === userId) {
         filters.createdBy = userId;
       } else {
@@ -210,7 +210,7 @@ export async function GET(request: NextRequest) {
       }
     } else {
       // User can view all tasks, so apply filters as requested
-      if (assignedTo) filters.assignedTo = { $in: [assignedTo] };
+      if (assignedTo) filters['assignedTo.user'] = { $in: [assignedTo] };
       if (createdBy) filters.createdBy = createdBy;
     }
 

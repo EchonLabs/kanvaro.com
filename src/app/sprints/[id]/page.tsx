@@ -1138,7 +1138,7 @@ export default function SprintDetailPage() {
                         className={`rounded-lg border bg-background p-3 sm:p-4 space-y-3 cursor-pointer hover:shadow-md transition-shadow ${task.archived ? 'border-dashed opacity-90' : ''
                           }`}
                       >
-                        <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               {task?.displayId && (
@@ -1153,11 +1153,22 @@ export default function SprintDetailPage() {
                                 if (!task?.assignedTo || !Array.isArray(task.assignedTo) || task.assignedTo.length === 0) {
                                   return 'Unassigned';
                                 }
-                                const assignee = task.assignedTo[0];
-                                const firstName = assignee?.user?.firstName || assignee?.firstName || '';
-                                const lastName = assignee?.user?.lastName || assignee?.lastName || '';
-                                const displayName = `${firstName} ${lastName}`.trim();
-                                return displayName || 'Unknown User';
+
+                                if (task.assignedTo.length === 1) {
+                                  // Handle both string (user ID) and object formats for backward compatibility
+                                  const assignee = task.assignedTo[0];
+                                  if (typeof assignee === 'string') {
+                                    return `Assigned to 1 person`;
+                                  } else {
+                                    // Legacy object format
+                                    const firstName = assignee?.user?.firstName || assignee?.firstName || '';
+                                    const lastName = assignee?.user?.lastName || assignee?.lastName || '';
+                                    const displayName = `${firstName} ${lastName}`.trim();
+                                    return displayName || 'Unknown User';
+                                  }
+                                } else {
+                                  return `Assigned to ${task.assignedTo.length} people`;
+                                }
                               })()}
                             </p>
                             {task.movedToSprint && (
@@ -1171,26 +1182,27 @@ export default function SprintDetailPage() {
                               </p>
                             )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-[11px] uppercase hover:bg-transparent dark:hover:bg-transparent">
-                              {formatToTitleCase(task.priority)}
+                        </div>
+
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="outline" className="text-[11px] uppercase hover:bg-transparent dark:hover:bg-transparent">
+                            {formatToTitleCase(task.priority)}
+                          </Badge>
+                          {task.archived && (
+                            <Badge variant="secondary" className="text-[11px] uppercase hover:bg-secondary dark:hover:bg-secondary">
+                              Archived
                             </Badge>
-                            {task.archived && (
-                              <Badge variant="secondary" className="text-[11px] uppercase hover:bg-secondary dark:hover:bg-secondary">
-                                Archived
-                              </Badge>
-                            )}
-                            {task.movedToSprint && (
-                              <Badge variant="outline" className="text-[11px] bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20">
-                                Spillover
-                              </Badge>
-                            )}
-                            {task.movedToBacklog && (
-                              <Badge variant="outline" className="text-[11px] bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20">
-                                backlog
-                              </Badge>
-                            )}
-                          </div>
+                          )}
+                          {task.movedToSprint && (
+                            <Badge variant="outline" className="text-[11px] bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20">
+                              Spillover
+                            </Badge>
+                          )}
+                          {task.movedToBacklog && (
+                            <Badge variant="outline" className="text-[11px] bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20">
+                              backlog
+                            </Badge>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-2">

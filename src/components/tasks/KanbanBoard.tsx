@@ -289,7 +289,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
-    const task = tasks.find(t => t._id === active.id)
+    const task = tasks.find(t => t._id?.toString() === active.id)
     setActiveTask(task || null)
   }
 
@@ -305,7 +305,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
     if (activeId === overId) return
 
     // Find the task being dragged
-    const activeTask = tasks.find(task => task._id === activeId)
+    const activeTask = tasks.find(task => task._id?.toString() === activeId)
     if (!activeTask) return
 
     // Determine the new status based on the drop target
@@ -317,7 +317,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
       newStatus = overId as any
     } else {
       // If dropped on another task, get the status of that task
-      const overTask = tasks.find(task => task._id === overId)
+      const overTask = tasks.find(task => task._id?.toString() === overId)
       if (overTask) {
         newStatus = overTask.status
       } else {
@@ -333,8 +333,8 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
     // Handle same-column reordering
     if (newStatus === activeTask.status) {
       const columnTasks = getTasksByStatus(newStatus)
-      const oldIndex = columnTasks.findIndex(task => task._id === activeId)
-      const newIndex = columnTasks.findIndex(task => task._id === overId)
+      const oldIndex = columnTasks.findIndex(task => task._id?.toString() === activeId)
+      const newIndex = columnTasks.findIndex(task => task._id?.toString() === overId)
 
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
         const reorderedTasks = arrayMove(columnTasks, oldIndex, newIndex)
@@ -359,7 +359,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
             setTasks(prevTasks => {
               const updatedTasks = [...prevTasks]
               reorderedTasks.forEach((task, index) => {
-                const taskIndex = updatedTasks.findIndex(t => t._id === task._id)
+                const taskIndex = updatedTasks.findIndex(t => t._id?.toString() === task._id?.toString())
                 if (taskIndex !== -1) {
                   updatedTasks[taskIndex] = { ...updatedTasks[taskIndex], position: index } as PopulatedTask
                 }
@@ -386,7 +386,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
 
         if (data.success) {
           setTasks(tasks.map(task =>
-            task._id === activeId ? { ...task, status: newStatus } as PopulatedTask : task
+            task._id?.toString() === activeId ? { ...task, status: newStatus } as PopulatedTask : task
           ))
         }
       } catch (error) {
