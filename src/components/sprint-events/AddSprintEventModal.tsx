@@ -235,12 +235,17 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
           []
 
         const usersData = Array.isArray(teamMembers)
-          ? teamMembers.map((member: any) => ({
-              _id: member._id,
-              firstName: member.firstName || '',
-              lastName: member.lastName || '',
-              email: member.email || ''
-            }))
+          ? teamMembers
+              .filter((member: any) => member.memberId) // Filter out any null/undefined memberIds
+              .map((member: any) => {
+                const userData = {
+                  _id: member.memberId._id,
+                  firstName: member.memberId.firstName || '',
+                  lastName: member.memberId.lastName || '',
+                  email: member.memberId.email || ''
+                }
+                return userData
+              })
           : []
 
         setUsers(usersData)
@@ -1190,36 +1195,70 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
             </div>
 
             {/* (4) Attendees */}
-            <div className="space-y-4 mt-8">
-              <h3 className="text-sm font-semibold">Attendees</h3>
-              <div className="max-h-32 overflow-y-auto border rounded-md p-2">
-                <Input
-                  value={attendeeQuery}
-                  onChange={(e) => setAttendeeQuery(e.target.value)}
-                  placeholder="Search attendees..."
-                  className="mb-2"
-                />
-                <div className="space-y-2">
-                  {filteredUsers.map((user) => (
-                    <label key={user._id} className="flex items-center space-x-2 cursor-pointer">
-                      <Checkbox
-                        checked={formData.attendees.includes(user._id)}
-                        onCheckedChange={() => handleAttendeeToggle(user._id)}
-                      />
-                      <span className="text-sm">
-                        {user.firstName} {user.lastName} ({user.email})
+            {(() => {
+          
+
+            
+
+              return (
+                <div className="space-y-4 mt-8">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Attendees</h3>
+                    {formData.attendees.length > 0 && (
+                      <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                        {formData.attendees.length} selected
                       </span>
-                    </label>
-                  ))}
-                  {filteredUsers.length === 0 && users.length > 0 && (
-                    <div className="px-2 py-1 text-sm text-muted-foreground">No matching attendees</div>
-                  )}
-                  {users.length === 0 && (
-                    <div className="px-2 py-1 text-sm text-muted-foreground">No attendees available</div>
-                  )}
+                    )}
+                  </div>
+
+                  {/* Search input - outside scrollable area */}
+                  <Input
+                    value={attendeeQuery}
+                    onChange={(e) => {
+                      setAttendeeQuery(e.target.value)
+                    }}
+                    placeholder="Search attendees..."
+                    className="w-full"
+                  />
+
+                  {/* Scrollable attendees list */}
+                  <div className="max-h-48 overflow-y-auto border rounded-md">
+                    <div className="p-3">
+                      {filteredUsers && filteredUsers.length > 0 ? (
+                        <div className="space-y-3">
+                          {filteredUsers.map((user) => (
+                            <label key={user._id} className="flex items-center space-x-3 cursor-pointer hover:bg-muted/50 p-2 rounded-md transition-colors">
+                              <Checkbox
+                                checked={formData.attendees.includes(user._id)}
+                                onCheckedChange={() => {
+                                  handleAttendeeToggle(user._id)
+                                }}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium truncate">
+                                  {user.firstName} {user.lastName}
+                                </div>
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {user.email}
+                                </div>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      ) : users && users.length > 0 ? (
+                        <div className="text-center py-8 text-sm text-muted-foreground">
+                          No attendees match your search "{attendeeQuery}"
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-sm text-muted-foreground">
+                          No attendees available
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              )
+            })()}
 
             {/* (5) Description / Notes */}
             <div className="space-y-4 mt-8">

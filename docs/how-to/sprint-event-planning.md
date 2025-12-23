@@ -91,7 +91,7 @@ Sprint events are time-boxed ceremonies in agile development that help teams:
 **Agenda Template**:
 1. **Review Sprint Goal** (15 min)
 2. **Capacity Planning** (15 min)
-3. **Backlog Review** (30 min)
+3. **backlog Review** (30 min)
 4. **Task Estimation** (45 min)
 5. **Sprint Commitment** (15 min)
 
@@ -230,7 +230,7 @@ Sprint events are time-boxed ceremonies in agile development that help teams:
 
 ### Task Management Integration
 
-- **Sprint Backlog**: Link events to sprint tasks
+- **Sprint backlog**: Link events to sprint tasks
 - **Progress Tracking**: Update task status during events
 - **Burndown Charts**: Use metrics for review presentations
 

@@ -30,7 +30,7 @@ export enum PermissionCategory {
   CALENDAR = 'calendar',
   // Kanban permissions
   KANBAN = 'kanban',
-  // Backlog permissions
+  // backlog permissions
   BACKLOG = 'backlog',
   // Test management permissions
   TEST_MANAGEMENT = 'test_management',
@@ -174,7 +174,7 @@ export enum Permission {
   KANBAN_READ = 'kanban:read',
   KANBAN_MANAGE = 'kanban:manage',
   
-  // Backlog permissions
+  // backlog permissions
   BACKLOG_READ = 'backlog:read',
   BACKLOG_MANAGE = 'backlog:manage',
   
@@ -357,7 +357,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.KANBAN_READ,
     Permission.KANBAN_MANAGE,
     
-    // Backlog
+    // backlog
     Permission.BACKLOG_READ,
     Permission.BACKLOG_MANAGE,
 
@@ -385,6 +385,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.DOCUMENTATION_VIEW,
     Permission.DOCUMENTATION_SEARCH,
     Permission.DOCUMENTATION_CREATE,
+    Permission.DOCUMENTATION_UPDATE,
+    Permission.DOCUMENTATION_DELETE,
     Permission.DOCUMENTATION_UPDATE,
     Permission.DOCUMENTATION_DELETE,
     Permission.DOCUMENTATION_MANAGE_PERMISSIONS,
@@ -511,7 +513,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.KANBAN_READ,
     Permission.KANBAN_MANAGE,
     
-    // Backlog
+    // backlog
     Permission.BACKLOG_READ,
     Permission.BACKLOG_MANAGE,
     
@@ -534,8 +536,15 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEST_EXECUTION_UPDATE,
     Permission.TEST_REPORT_VIEW,
     Permission.TEST_REPORT_EXPORT,
+
+    // Documentation
+    Permission.DOCUMENTATION_VIEW,
+    Permission.DOCUMENTATION_SEARCH,
+    Permission.DOCUMENTATION_CREATE,
+    Permission.DOCUMENTATION_UPDATE,
+    Permission.DOCUMENTATION_DELETE,
   ],
-  
+
   [Role.PROJECT_MANAGER]: [
     // User management
     Permission.USER_CREATE,
@@ -662,7 +671,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.KANBAN_READ,
     Permission.KANBAN_MANAGE,
     
-    // Backlog
+    // backlog
     Permission.BACKLOG_READ,
     Permission.BACKLOG_MANAGE,
 
@@ -689,8 +698,11 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Documentation
     Permission.DOCUMENTATION_VIEW,
     Permission.DOCUMENTATION_SEARCH,
+    Permission.DOCUMENTATION_CREATE,
+    Permission.DOCUMENTATION_UPDATE,
+    Permission.DOCUMENTATION_DELETE,
   ],
-  
+
   [Role.TEAM_MEMBER]: [
     // User management (own profile only)
     Permission.USER_READ,
@@ -744,7 +756,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Kanban (read only)
     Permission.KANBAN_READ,
     
-    // Backlog (read only)
+    // backlog (read only)
     Permission.BACKLOG_READ,
 
     // Documentation
@@ -797,7 +809,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Kanban (read only)
     Permission.KANBAN_READ,
     
-    // Backlog (read only)
+    // backlog (read only)
     Permission.BACKLOG_READ,
 
     // Documentation
@@ -850,7 +862,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Kanban (read only)
     Permission.KANBAN_READ,
     
-    // Backlog (read only)
+    // backlog (read only)
     Permission.BACKLOG_READ,
 
     // Documentation
@@ -908,7 +920,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Kanban (read only)
     Permission.KANBAN_READ,
     
-    // Backlog (read only)
+    // backlog (read only)
     Permission.BACKLOG_READ,
     
     // Test management (full test management permissions)
@@ -984,7 +996,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Kanban (read only)
     Permission.KANBAN_READ,
     
-    // Backlog (read only)
+    // backlog (read only)
     Permission.BACKLOG_READ,
     
     // Test management (execution and reporting only)

@@ -26,10 +26,11 @@ export function DateTimeProvider({ children }: { children: React.ReactNode }) {
         const response = await fetch('/api/auth/me')
         if (response.ok) {
           const userData = await response.json()
-          if (userData.preferences) {
+          if (userData.preferences || userData.timezone) {
             const userPreferences = {
-              dateFormat: userData.preferences.dateFormat || DEFAULT_DATE_TIME_PREFERENCES.dateFormat,
-              timeFormat: userData.preferences.timeFormat || DEFAULT_DATE_TIME_PREFERENCES.timeFormat
+              dateFormat: userData.preferences?.dateFormat || DEFAULT_DATE_TIME_PREFERENCES.dateFormat,
+              timeFormat: userData.preferences?.timeFormat || DEFAULT_DATE_TIME_PREFERENCES.timeFormat,
+              timezone: userData.timezone || DEFAULT_DATE_TIME_PREFERENCES.timezone
             }
             setPreferencesState(userPreferences)
             // Store in sessionStorage for faster subsequent loads

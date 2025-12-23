@@ -8,11 +8,12 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Database, TestTube, AlertCircle, CheckCircle } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useNotify } from '@/lib/notify'
 
 export function DatabaseSettings() {
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const [testing, setTesting] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   
   const [formData, setFormData] = useState({
     host: 'localhost',
@@ -53,7 +54,6 @@ export function DatabaseSettings() {
 
   const handleTest = async () => {
     setTesting(true)
-    setMessage(null)
 
     try {
       const response = await fetch('/api/setup/database/test', {
@@ -68,9 +68,15 @@ export function DatabaseSettings() {
         throw new Error('Database connection test failed')
       }
 
-      setMessage({ type: 'success', text: 'Database connection successful!' })
+      notifySuccess({
+        title: 'Database Test Successful',
+        message: 'Database connection is working correctly'
+      })
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to connect to database. Please check your configuration.' })
+      notifyError({
+        title: 'Database Test Failed',
+        message: 'Failed to connect to database. Please check your configuration.'
+      })
     } finally {
       setTesting(false)
     }
@@ -78,7 +84,6 @@ export function DatabaseSettings() {
 
   const handleSave = async () => {
     setTesting(true)
-    setMessage(null)
 
     try {
       const response = await fetch('/api/settings/database', {
@@ -93,9 +98,15 @@ export function DatabaseSettings() {
         throw new Error('Failed to update database settings')
       }
 
-      setMessage({ type: 'success', text: 'Database settings updated successfully' })
+      notifySuccess({
+        title: 'Database Settings Updated',
+        message: 'Database configuration has been updated successfully'
+      })
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update database settings' })
+      notifyError({
+        title: 'Update Failed',
+        message: error instanceof Error ? error.message : 'Failed to update database settings'
+      })
     } finally {
       setTesting(false)
     }
@@ -114,7 +125,7 @@ export function DatabaseSettings() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <Card>
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="flex items-center gap-2 text-base sm:text-2xl">
@@ -206,16 +217,6 @@ export function DatabaseSettings() {
             <Label htmlFor="db-ssl" className="text-xs sm:text-sm">Use SSL/TLS</Label>
           </div>
 
-          {message && (
-            <Alert variant={message.type === 'error' ? 'destructive' : 'default'}>
-              {message.type === 'error' ? (
-                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-              ) : (
-                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-              )}
-              <AlertDescription className="text-xs sm:text-sm break-words">{message.text}</AlertDescription>
-            </Alert>
-          )}
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-0">
             <Button 

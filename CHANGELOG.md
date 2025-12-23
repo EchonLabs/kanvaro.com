@@ -1,3 +1,24 @@
+## [1.15.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.15.3...v1.15.4) (2025-12-23)
+
+
+### Bug Fixes
+
+* add time entries changes ([0d4e4dc](https://github.com/EchonLabs/kanvaro.com/commit/0d4e4dc2e6a7754182cec0b0f824a518c71ce6b3))
+
+## [1.15.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.15.2...v1.15.3) (2025-12-23)
+
+
+### Bug Fixes
+
+* add changes in time log ([ba6187a](https://github.com/EchonLabs/kanvaro.com/commit/ba6187a2566fb9013246d3fd3363fb9d8f409057))
+
+## [1.15.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.15.1...v1.15.2) (2025-12-22)
+
+
+### Bug Fixes
+
+* add permission issue fixes ([581b70f](https://github.com/EchonLabs/kanvaro.com/commit/581b70ff9348cdd82e83bd428025069364305493))
+
 ## [1.15.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.15.0...v1.15.1) (2025-12-19)
 
 

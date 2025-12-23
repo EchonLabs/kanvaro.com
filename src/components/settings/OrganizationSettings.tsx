@@ -13,17 +13,16 @@ import { Building2, Upload, Save, AlertCircle, CheckCircle, X, Users, UserCheck,
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useCurrencies } from '@/hooks/useCurrencies'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
+import { useNotify } from '@/lib/notify'
 
 export function OrganizationSettings() {
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const { organization, loading, refetch } = useOrganization()
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay, getCurrencyByCode } = useCurrencies(true)
   const { currencySymbol } = useOrgCurrency()
   const [saving, setSaving] = useState(false)
   const [savingRegistration, setSavingRegistration] = useState(false)
   const [savingTimeTracking, setSavingTimeTracking] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [registrationMessage, setRegistrationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [timeTrackingMessage, setTimeTrackingMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   
   const [formData, setFormData] = useState({
     name: '',
@@ -269,23 +268,6 @@ export function OrganizationSettings() {
     }
   }, [organization])
 
-  useEffect(() => {
-    if (message?.type !== 'success') return
-    const timeout = setTimeout(() => setMessage(null), 5000)
-    return () => clearTimeout(timeout)
-  }, [message])
-
-  useEffect(() => {
-    if (registrationMessage?.type !== 'success') return
-    const timeout = setTimeout(() => setRegistrationMessage(null), 5000)
-    return () => clearTimeout(timeout)
-  }, [registrationMessage])
-
-  useEffect(() => {
-    if (timeTrackingMessage?.type !== 'success') return
-    const timeout = setTimeout(() => setTimeTrackingMessage(null), 5000)
-    return () => clearTimeout(timeout)
-  }, [timeTrackingMessage])
 
   const handleSave = async () => {
     if (!validateForm()) {
@@ -293,7 +275,6 @@ export function OrganizationSettings() {
     }
 
     setSaving(true)
-    setMessage(null)
 
     try {
       const formDataToSend = new FormData()
@@ -301,7 +282,7 @@ export function OrganizationSettings() {
         ...formData,
         logoMode
       }))
-      
+
       if (logo) {
         formDataToSend.append('logo', logo)
       }
@@ -331,9 +312,15 @@ export function OrganizationSettings() {
       // Clear cache and refetch organization data to show updated values (including logos)
       refetch()
 
-      setMessage({ type: 'success', text: 'Organization settings updated successfully' })
+      notifySuccess({
+        title: 'Organization Updated',
+        message: 'Organization settings have been updated successfully'
+      })
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update organization settings' })
+      notifyError({
+        title: 'Update Failed',
+        message: error instanceof Error ? error.message : 'Failed to update organization settings'
+      })
     } finally {
       setSaving(false)
     }
@@ -341,7 +328,6 @@ export function OrganizationSettings() {
 
   const handleSaveRegistrationSettings = async () => {
     setSavingRegistration(true)
-    setRegistrationMessage(null)
 
     try {
       const formDataToSend = new FormData()
@@ -361,9 +347,15 @@ export function OrganizationSettings() {
       }
 
       // No need to refetch since registration settings don't affect other parts of the form
-      setRegistrationMessage({ type: 'success', text: 'Registration settings updated successfully' })
+      notifySuccess({
+        title: 'Registration Settings Updated',
+        message: 'User registration settings have been updated successfully'
+      })
     } catch (error) {
-      setRegistrationMessage({ type: 'error', text: 'Failed to update registration settings' })
+      notifyError({
+        title: 'Update Failed',
+        message: error instanceof Error ? error.message : 'Failed to update registration settings'
+      })
     } finally {
       setSavingRegistration(false)
     }
@@ -371,7 +363,6 @@ export function OrganizationSettings() {
 
   const handleSaveTimeTrackingSettings = async () => {
     setSavingTimeTracking(true)
-    setTimeTrackingMessage(null)
 
     try {
       const response = await fetch('/api/time-tracking/settings', {
@@ -401,7 +392,7 @@ export function OrganizationSettings() {
       }
 
       const data = await response.json()
-      
+
       // Update form data with the saved settings to ensure consistency
       if (data.settings) {
         setFormData(prev => ({
@@ -411,11 +402,14 @@ export function OrganizationSettings() {
       }
 
       refetch()
-      setTimeTrackingMessage({ type: 'success', text: 'Time tracking settings updated successfully' })
+      notifySuccess({
+        title: 'Time Tracking Settings Updated',
+        message: 'Time tracking configuration has been updated successfully'
+      })
     } catch (error) {
-      setTimeTrackingMessage({ 
-        type: 'error', 
-        text: error instanceof Error ? error.message : 'Failed to update time tracking settings' 
+      notifyError({
+        title: 'Update Failed',
+        message: error instanceof Error ? error.message : 'Failed to update time tracking settings'
       })
     } finally {
       setSavingTimeTracking(false)
@@ -489,7 +483,7 @@ export function OrganizationSettings() {
             </div>
 
             {/* Logo Mode Selection */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
               <div
                 className={`p-4 sm:p-6 border-2 rounded-lg cursor-pointer transition-all ${
                   logoMode === 'single'
@@ -532,8 +526,9 @@ export function OrganizationSettings() {
               </div>
             </div>
 
-            {logoMode === 'single' ? (
-              <div className="bg-card border rounded-lg p-4 sm:p-6">
+            <div className="mt-8">
+              {logoMode === 'single' ? (
+              <div className="bg-card border rounded-lg p-4 sm:p-6 mt-8">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                   {logoPreview ? (
                     <div className="relative flex-shrink-0">
@@ -583,9 +578,9 @@ export function OrganizationSettings() {
                 </div>
               </div>
             ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-10 mt-8">
                 {/* Light Mode Logo */}
-                <div className="bg-card border rounded-lg p-4 sm:p-6">
+                <div className="bg-card border rounded-lg p-4 sm:p-6 mb-6">
                   <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                     <div className="w-3 h-3 sm:w-4 sm:h-4 bg-white border border-gray-300 rounded flex-shrink-0"></div>
                     <Label className="text-xs sm:text-sm font-medium text-foreground">Light Mode Logo</Label>
@@ -687,6 +682,7 @@ export function OrganizationSettings() {
                 </div>
               </div>
             )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
@@ -819,29 +815,6 @@ export function OrganizationSettings() {
             </div>
           </div>
 
-          {message && (
-            <Alert 
-              variant={message.type === 'error' ? 'destructive' : 'default'}
-              className={`flex items-start gap-2 ${message.type === 'success' ? 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
-            >
-              <div className="flex items-start gap-2 flex-1 min-w-0">
-                {message.type === 'error' ? (
-                  <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5" />
-                ) : (
-                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400" />
-                )}
-                <AlertDescription className="text-xs sm:text-sm break-words flex-1">{message.text}</AlertDescription>
-              </div>
-              <button
-                type="button"
-                onClick={() => setMessage(null)}
-                className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                aria-label="Dismiss notification"
-              >
-                <X className="h-3 w-3 sm:h-4 sm:w-4" />
-              </button>
-            </Alert>
-          )}
 
           <div className="flex justify-end mt-6 sm:mt-8">
             <Button onClick={handleSave} disabled={saving || !isFormValid} className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm">
@@ -892,29 +865,6 @@ export function OrganizationSettings() {
             </Select>
           </div>
 
-          {registrationMessage && (
-            <Alert 
-              variant={registrationMessage.type === 'error' ? 'destructive' : 'default'}
-              className={`flex items-start gap-2 ${registrationMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
-            >
-              <div className="flex items-start gap-2 flex-1 min-w-0">
-                {registrationMessage.type === 'error' ? (
-                  <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5" />
-                ) : (
-                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400" />
-                )}
-                <AlertDescription className="text-xs sm:text-sm break-words flex-1">{registrationMessage.text}</AlertDescription>
-              </div>
-              <button
-                type="button"
-                onClick={() => setRegistrationMessage(null)}
-                className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                aria-label="Dismiss notification"
-              >
-                <X className="h-3 w-3 sm:h-4 sm:w-4" />
-              </button>
-            </Alert>
-          )}
 
           <div className="flex justify-end mt-6 sm:mt-8">
             <Button 
@@ -1361,29 +1311,6 @@ export function OrganizationSettings() {
             </div>
           )}
 
-          {timeTrackingMessage && (
-            <Alert 
-              variant={timeTrackingMessage.type === 'error' ? 'destructive' : 'default'}
-              className={`flex items-start gap-2 ${timeTrackingMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
-            >
-              <div className="flex items-start gap-2 flex-1 min-w-0">
-                {timeTrackingMessage.type === 'error' ? (
-                  <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5" />
-                ) : (
-                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400" />
-                )}
-                <AlertDescription className="text-xs sm:text-sm break-words flex-1">{timeTrackingMessage.text}</AlertDescription>
-              </div>
-              <button
-                type="button"
-                onClick={() => setTimeTrackingMessage(null)}
-                className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                aria-label="Dismiss notification"
-              >
-                <X className="h-3 w-3 sm:h-4 sm:w-4" />
-              </button>
-            </Alert>
-          )}
 
           <div className="flex justify-end mt-6 sm:mt-8">
             <Button 

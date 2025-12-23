@@ -93,7 +93,7 @@ const navigationItems = [
       },
       {
         id: 'tasks-backlog',
-        label: 'Backlog',
+        label: 'backlog',
         icon: List,
         path: '/backlog',
         permission: Permission.BACKLOG_READ

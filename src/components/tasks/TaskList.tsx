@@ -460,7 +460,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         )}
       </div>
 
-      <div className="space-y-6 mt-8">
+      <div className="space-y-8 mt-12">
         {filteredTasks.map((task) => (
           <Card
             key={task._id}
@@ -566,7 +566,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                       <SelectItem value="todo">To Do</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="review">Review</SelectItem>
-                      <SelectItem value="backlog">Backlog</SelectItem>
+                      <SelectItem value="backlog">backlog</SelectItem>
                       <SelectItem value="testing">Testing</SelectItem>
                       <SelectItem value="done">Done</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>

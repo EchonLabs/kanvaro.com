@@ -337,7 +337,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <h3 className="text-xl sm:text-2xl font-semibold text-foreground">Product Backlog</h3>
+          <h3 className="text-xl sm:text-2xl font-semibold text-foreground">Product backlog</h3>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">
             Prioritized list of features, bugs, and improvements
           </p>
@@ -361,7 +361,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
         </Alert>
       )}
 
-      {/* Backlog Stats */}
+      {/* backlog Stats */}
       <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-4">
@@ -502,7 +502,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
         </div>
       </div>
 
-      {/* Backlog Items */}
+      {/* backlog Items */}
       <div className="space-y-6">
         {filteredAndSortedTasks.map((task, index) => (
           <Card
@@ -594,7 +594,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
                     <SelectContent>
                       <SelectItem value="todo">To Do</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="backlog">Backlog</SelectItem>
+                      <SelectItem value="backlog">backlog</SelectItem>
                       <SelectItem value="review">Review</SelectItem>
                       <SelectItem value="testing">Testing</SelectItem>
                       <SelectItem value="done">Done</SelectItem>

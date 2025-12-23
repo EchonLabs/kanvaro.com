@@ -101,7 +101,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
       },
       {
         id: 'tasks-backlog',
-        label: 'Backlog',
+        label: 'backlog',
         icon: 'List',
         path: '/tasks/backlog',
         permission: 'task:read'

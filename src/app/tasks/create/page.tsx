@@ -119,7 +119,7 @@ function mapUserResponse(data: any): CurrentUser | null {
 }
 
 const SUBTASK_STATUS_OPTIONS: Array<{ value: SubtaskStatus; label: string }> = [
-  { value: 'backlog', label: 'Backlog' },
+  { value: 'backlog', label: 'backlog' },
   { value: 'todo', label: 'To Do' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'review', label: 'Review' },
@@ -146,13 +146,7 @@ export default function CreateTaskPage() {
   const [epicQuery, setEpicQuery] = useState('')
   const today = new Date().toISOString().split('T')[0]
   const [projectQuery, setProjectQuery] = useState("");
-  const [assignedTo, setAssignedTo] = useState<Array<{
-    _id: string
-    firstName: string
-    lastName: string
-    email: string
-    hourlyRate?: string
-  }>>([])
+  const [assignedTo, setAssignedTo] = useState<string[]>([])
   const [assigneeQuery, setAssigneeQuery] = useState('');
   const [newLabel, setNewLabel] = useState('')
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
@@ -380,13 +374,7 @@ export default function CreateTaskPage() {
           story: formData.story === 'none' ? undefined : formData.story || undefined,
           epic: formData.epic === 'none' ? undefined : formData.epic || undefined,
           parentTask: formData.parentTask || undefined,
-          assignedTo: assignedTo.map(assignee => ({
-            user: assignee._id,
-            firstName: assignee.firstName,
-            lastName: assignee.lastName,
-            email: assignee.email,
-            hourlyRate: assignee.hourlyRate ? parseFloat(assignee.hourlyRate) : undefined
-          })),
+          assignedTo: assignedTo,
           priority: formData.priority,
           type: formData.type,
           status: 'backlog',
@@ -711,18 +699,9 @@ export default function CreateTaskPage() {
                               setAssignedTo([])
                               return
                             }
-                            if (!assignedTo.some(assignee => assignee._id === value)) {
-                              const selectedUser = projectMembers.find(u => u._id === value)
-                              if (selectedUser) {
-                                setAssignedTo(prev => [...prev, {
-                                  _id: selectedUser._id,
-                                  firstName: selectedUser.firstName,
-                                  lastName: selectedUser.lastName,
-                                  email: selectedUser.email,
-                                  hourlyRate: ''
-                                }])
-                                setAssigneeQuery('')
-                              }
+                            if (!assignedTo.includes(value)) {
+                              setAssignedTo(prev => [...prev, value])
+                              setAssigneeQuery('')
                             }
                           }}
                           onOpenChange={(open) => { if (open) setAssigneeQuery(""); }}
@@ -769,7 +748,7 @@ export default function CreateTaskPage() {
                                   </>
                                 ) : filteredProjectMembers.length > 0 ? (
                                   filteredProjectMembers.map(user => {
-                                    const isSelected = assignedTo.some(assignee => assignee._id === user._id);
+                                    const isSelected = assignedTo.includes(user._id);
                                     return (
                                       <SelectItem 
                                         key={user._id} 
@@ -795,22 +774,26 @@ export default function CreateTaskPage() {
                         </Select>
                         {assignedTo.length > 0 && (
                           <div className="flex flex-wrap gap-2">
-                            {assignedTo.map(assignee => (
-                              <span
-                                key={assignee._id}
-                                className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
-                              >
-                                <span>{assignee.firstName} {assignee.lastName}</span>
-                                <button
-                                  type="button"
-                                  aria-label="Remove assignee"
-                                  className="text-muted-foreground hover:text-foreground focus:outline-none"
-                                  onClick={() => setAssignedTo(prev => prev.filter(a => a._id !== assignee._id))}
+                            {assignedTo.map(userId => {
+                              const user = projectMembers.find(u => u._id.toString() === userId.toString())
+                              if (!user) return null
+                              return (
+                                <span
+                                  key={userId}
+                                  className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
                                 >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </span>
-                            ))}
+                                  <span>{user.firstName} {user.lastName}</span>
+                                  <button
+                                    type="button"
+                                    aria-label="Remove assignee"
+                                    className="text-muted-foreground hover:text-foreground focus:outline-none"
+                                    onClick={() => setAssignedTo(prev => prev.filter(id => id !== userId))}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              )
+                            })}
                           </div>
                         )}
                       </div>

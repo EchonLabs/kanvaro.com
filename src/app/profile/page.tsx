@@ -138,7 +138,8 @@ export default function ProfilePage() {
         // Update DateTimeProvider with loaded preferences
         setPreferences({
           dateFormat: loadedDateFormat as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD',
-          timeFormat: loadedTimeFormat as '12h' | '24h'
+          timeFormat: loadedTimeFormat as '12h' | '24h',
+          timezone: userData.timezone || 'UTC'
         })
 
         setAuthError('')
@@ -196,7 +197,8 @@ export default function ProfilePage() {
           // Update DateTimeProvider with loaded preferences
           setPreferences({
             dateFormat: refreshDateFormat as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD',
-            timeFormat: refreshTimeFormat as '12h' | '24h'
+            timeFormat: refreshTimeFormat as '12h' | '24h',
+            timezone: refreshData.timezone || 'UTC'
           })
 
           setAuthError('')
@@ -273,7 +275,8 @@ export default function ProfilePage() {
       // Update DateTime context with new preferences
       setPreferences({
         dateFormat: formData.dateFormat as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD',
-        timeFormat: formData.timeFormat as '12h' | '24h'
+        timeFormat: formData.timeFormat as '12h' | '24h',
+        timezone: formData.timezone || 'UTC'
       })
       // Show success toast notification
       showToast({

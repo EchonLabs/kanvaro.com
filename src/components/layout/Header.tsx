@@ -364,8 +364,8 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
       isOpen={showLogoutConfirm}
       onClose={() => setShowLogoutConfirm(false)}
       onConfirm={handleLogout}
-      title="Logout"
-      description=""
+      title="Logout Confirmation"
+      description="You are about to log out from the system. This will end your current session and you will need to log in again to access your account. Any unsaved work will be lost."
       confirmText="Logout"
       cancelText="Cancel"
     />

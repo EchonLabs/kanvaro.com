@@ -143,7 +143,7 @@ interface TaskOption {
 }
 
 const defaultColumns = [
-  { id: 'backlog', title: 'Backlog', color: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200' },
+  { id: 'backlog', title: 'backlog', color: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200' },
   { id: 'todo', title: 'To Do', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' },
   { id: 'in_progress', title: 'In Progress', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
   { id: 'review', title: 'Review', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
@@ -471,16 +471,20 @@ export default function KanbanPage() {
     const assignedByMap = new Map<string, PersonOption>()
 
     tasks.forEach((task) => {
-      if (task.assignedTo) {
-        const id = task.assignedTo._id || task.assignedTo.email || `${task.assignedTo.firstName}-${task.assignedTo.lastName}`
-        if (id) {
-          const name = `${task.assignedTo.firstName} ${task.assignedTo.lastName}`.trim()
-          assignedToMap.set(id, {
-            id,
-            name,
-            email: task.assignedTo.email
-          })
-        }
+      if (task.assignedTo && Array.isArray(task.assignedTo)) {
+        task.assignedTo.forEach((assignee: any) => {
+          if (assignee.user) {
+            const id = assignee.user._id
+            if (id) {
+              const name = `${assignee.user.firstName} ${assignee.user.lastName}`.trim()
+              assignedToMap.set(id, {
+                id,
+                name,
+                email: assignee.user.email
+              })
+            }
+          }
+        })
       }
 
       if (task.createdBy) {
@@ -701,9 +705,13 @@ export default function KanbanPage() {
     const matchesProject = projectFilter === 'all' || (task.project?._id && task.project._id === projectFilter)
     const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
     const matchesType = typeFilter === 'all' || task.type === typeFilter
-    const assignedToId = task.assignedTo?._id || task.assignedTo?.email || `${task.assignedTo?.firstName ?? ''}-${task.assignedTo?.lastName ?? ''}`
+
+    // Check if the selected user is in the assignedTo array
+    const matchesAssignedTo = assignedToFilter === 'all' ||
+      (Array.isArray(task.assignedTo) &&
+       task.assignedTo.some((assignee: any) => assignee.user?._id === assignedToFilter))
+
     const createdById = task.createdBy?._id || task.createdBy?.email || `${task.createdBy?.firstName ?? ''}-${task.createdBy?.lastName ?? ''}`
-    const matchesAssignedTo = assignedToFilter === 'all' || (assignedToId && assignedToId === assignedToFilter)
     const matchesAssignedBy = assignedByFilter === 'all' || (createdById && createdById === assignedByFilter)
     const taskIdMatches = taskNumberFilter === 'all' ||
       task._id === taskNumberFilter ||

@@ -110,7 +110,7 @@ const navigationItems = [
       },
       {
         id: 'tasks-backlog',
-        label: 'Backlog',
+        label: 'backlog',
         icon: List,
         path: '/backlog',
         permission: Permission.BACKLOG_READ
@@ -290,8 +290,24 @@ const navigationItems = [
     id: 'docs',
     label: 'Documentation',
     icon: BookOpen,
-    path: '/docs'
-    // No permission required - docs page handles its own permissions
+    path: '/docs',
+    permission: Permission.DOCUMENTATION_VIEW,
+    children: [
+      {
+        id: 'docs-internal',
+        label: 'Internal Docs',
+        icon: FileText,
+        path: '/docs/internal',
+        permission: Permission.DOCUMENTATION_VIEW
+      },
+      {
+        id: 'docs-public',
+        label: 'Public Docs',
+        icon: BookOpen,
+        path: '/docs/public'
+        // No permission required for public docs
+      }
+    ]
   },
   {
     id: 'settings',
@@ -475,8 +491,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       isOpen={showLogoutConfirm}
       onClose={() => setShowLogoutConfirm(false)}
       onConfirm={handleLogout}
-      title="Logout"
-      description="Are you sure you want to logout?"
+      title="Logout Confirmation"
+      description="You are about to log out from the system. This will end your current session and you will need to log in again to access your account. Any unsaved work will be lost."
       confirmText="Logout"
       cancelText="Cancel"
     />
@@ -556,15 +572,19 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
           )}
           title={collapsed ? item.label : undefined}
           onClick={() => {
+            console.log('Sidebar: Navigation item clicked:', item.label, 'path:', item.path, 'hasChildren:', hasChildren, 'collapsed:', collapsed)
             if (hasChildren && !collapsed) {
+              console.log('Sidebar: Expanding parent item:', item.id)
               onToggleExpanded(item.id)
               // If clicking on a parent with children, expand it and keep it expanded
               if (!expandedItems.includes(item.id)) {
                 setExpandedItems(prev => [...prev, item.id])
               }
             } else {
+              console.log('Sidebar: Navigating to path:', item.path)
               // Use startTransition for non-blocking navigation
               startTransition(() => {
+                console.log('Sidebar: Executing router.push for:', item.path)
                 router.push(item.path)
               })
             }
@@ -601,11 +621,12 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
                     )}
                     asChild
                   >
-                    <Link 
-                      href={child.path} 
-                      prefetch 
+                    <Link
+                      href={child.path}
+                      prefetch
                       onMouseEnter={() => router.prefetch(child.path)}
                       onClick={() => {
+                        console.log('Sidebar: Child navigation clicked:', child.label, 'path:', child.path)
                         // Keep parent expanded when navigating to child
                         if (!expandedItems.includes(item.id)) {
                           setExpandedItems(prev => [...prev, item.id])

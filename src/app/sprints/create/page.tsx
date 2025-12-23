@@ -140,8 +140,8 @@ export default function CreateSprintPage() {
       const response = await fetch('/api/members')
       const data = await response.json()
 
-      if (data.success && Array.isArray(data.data)) {
-        setUsers(data.data) // Initially show all users
+      if (data.success && Array.isArray(data.data?.members)) {
+        setUsers(data.data.members) // Initially show all users
       } else {
         setUsers([])
       }
@@ -153,22 +153,56 @@ export default function CreateSprintPage() {
 
   const fetchProjectDetails = async (projectId: string) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}`)
-      const data = await response.json()
+      // Fetch both project data and all members
+      const [projectResponse, membersResponse] = await Promise.all([
+        fetch(`/api/projects/${projectId}`),
+        fetch('/api/members')
+      ])
 
-      if (data.success && data.data) {
-        setSelectedProject(data.data)
-        // Use team members directly from project data (already populated with user details)
-        if (data.data.teamMembers && data.data.teamMembers.length > 0) {
-          setUsers(data.data.teamMembers)
+      if (projectResponse.ok && membersResponse.ok) {
+        const [projectData, membersData] = await Promise.all([
+          projectResponse.json(),
+          membersResponse.json()
+        ])
+
+        if (projectData.success && projectData.data) {
+          setSelectedProject(projectData.data)
+
+          // Filter members to only include project team members
+          if (membersData.success && Array.isArray(membersData.data?.members)) {
+            const teamMembers = projectData.data.teamMembers || []
+            const projectMembers = projectData.data.members || []
+
+            // Combine team members and project members
+            const projectMemberIds = new Set([
+              ...teamMembers.map((m: any) => typeof m === 'string' ? m : m._id),
+              ...projectMembers.map((m: any) => typeof m === 'string' ? m : m._id)
+            ])
+
+            // Filter organization members to only include project members
+            const filteredUsers = membersData.data.members
+              .filter((member: any) => projectMemberIds.has(member._id))
+              .map((member: any) => ({
+                _id: member._id,
+                firstName: member.firstName || '',
+                lastName: member.lastName || '',
+                email: member.email || ''
+              }))
+
+            setUsers(filteredUsers)
+          } else {
+            setUsers([])
+          }
+
+          // Clear date errors when project changes and re-validate if dates exist
+          setStartDateError('')
+          setEndDateError('')
+          if (formData.startDate || formData.endDate) {
+            runDateValidation(formData.startDate, formData.endDate, projectData.data, false)
+          }
         } else {
+          setSelectedProject(null)
           setUsers([])
-        }
-        // Clear date errors when project changes and re-validate if dates exist
-        setStartDateError('')
-        setEndDateError('')
-        if (formData.startDate || formData.endDate) {
-          runDateValidation(formData.startDate, formData.endDate, data.data, false)
         }
       } else {
         setSelectedProject(null)

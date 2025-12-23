@@ -385,18 +385,35 @@ export default function TimerPage() {
         const projectAllowsTimeTracking = project?.settings?.allowTimeTracking !== false
         if (!projectAllowsTimeTracking) return false
 
-        // Check user access
-        const createdByMatch = project?.createdBy === u.id || project?.createdBy?.id === u.id
+        // Check user access - helper function to check if user is in an array
+        const isUserInArray = (arr: any[], userId: string) => {
+          return arr.some((item: any) => {
+            if (typeof item === 'string') return item === userId
+            if (typeof item === 'object' && item !== null) {
+              return item._id === userId || item.id === userId || item._id?.toString() === userId
+            }
+            return false
+          })
+        }
+
+        // Check various access conditions
+        const createdByMatch = project?.createdBy === u.id ||
+                              project?.createdBy?.id === u.id ||
+                              project?.createdBy?._id === u.id ||
+                              project?.createdBy?._id?.toString() === u.id
+
         const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
-        const teamMatch = teamMembers.some((memberId: any) => {
-          if (typeof memberId === 'string') return memberId === u.id
-          return memberId?._id === u.id || memberId?.id === u.id
-        })
+        const teamMatch = isUserInArray(teamMembers, u.id)
 
         const members = Array.isArray(project?.members) ? project.members : []
-        const membersMatch = members.some((m: any) => (typeof m === 'string' ? m === u.id : m?.id === u.id || m?._id === u.id))
+        const membersMatch = isUserInArray(members, u.id)
 
-        return createdByMatch || teamMatch || membersMatch
+        const projectRoles = Array.isArray(project?.projectRoles) ? project.projectRoles : []
+        const roleMatch = projectRoles.some((role: any) =>
+          role.user === u.id || role.user?.id === u.id || role.user?._id === u.id
+        )
+
+        return createdByMatch || teamMatch || membersMatch || roleMatch
       })
         setProjects(filtered)
       } else {
@@ -902,7 +919,7 @@ export default function TimerPage() {
           </Alert>
         )}
 
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'timer' | 'manual')} className="space-y-8">
+        <Tabs value={activeTab} onValueChange={(value: string) => setActiveTab(value as 'timer' | 'manual')} className="space-y-8">
           <TabsList className={`grid w-full ${timeTrackingSettings?.allowManualTimeSubmission ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <TabsTrigger value="timer" className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
