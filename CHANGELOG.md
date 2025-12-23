@@ -1,3 +1,15 @@
+# [1.16.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.15.4...v1.16.0) (2025-12-23)
+
+
+### Bug Fixes
+
+* add organization changes ([8f727d7](https://github.com/EchonLabs/kanvaro.com/commit/8f727d7f7e61f9f5d78dd03f228146f8a2ec4bb9))
+
+
+### Features
+
+* remove verify email ([dbcad0c](https://github.com/EchonLabs/kanvaro.com/commit/dbcad0cfb0e15b6d7cbd2f7ea5ae5ede491fd6f9))
+
 ## [1.15.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.15.3...v1.15.4) (2025-12-23)
 
 
