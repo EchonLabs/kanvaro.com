@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useMemo } from 'react'
+import { usePathname } from 'next/navigation'
 import { Clock, Edit, Trash2, Check, X, Filter, Download, Plus, AlertTriangle, FolderOpen, Target, Loader2, Upload, FileText, User, Search, MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -82,7 +83,12 @@ export function TimeLogs({
   showSelectionAndApproval = true,
   showManualLogButtons = false
 }: TimeLogsProps) {
-  const { formatDateTimeSafe } = useDateTime()
+  const { formatDateTimeSafe, preferences } = useDateTime()
+  const pathname = usePathname()
+
+  // Debug timezone and DateTimeProvider
+  useEffect(() => {
+  }, [preferences])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -114,12 +120,13 @@ export function TimeLogs({
   const [taskSearch, setTaskSearch] = useState('')
   const [employeeSearch, setEmployeeSearch] = useState('')
   const [statusSearch, setStatusSearch] = useState('')
+  const [modalProjectSearch, setModalProjectSearch] = useState('')
 
   // Filtered lists based on search queries
   const filteredProjects = useMemo(() => {
     if (!projectSearch.trim()) return filterProjects
     const searchLower = projectSearch.toLowerCase()
-    return filterProjects.filter(project => 
+    return filterProjects.filter(project =>
       project.name?.toLowerCase().includes(searchLower)
     )
   }, [filterProjects, projectSearch])
@@ -183,6 +190,14 @@ export function TimeLogs({
   const [tasks, setTasks] = useState<any[]>([])
   const [tasksLoading, setTasksLoading] = useState(false)
   const [selectedTaskForLog, setSelectedTaskForLog] = useState('')
+
+  const filteredModalProjects = useMemo(() => {
+    if (!modalProjectSearch.trim()) return projects
+    const searchLower = modalProjectSearch.toLowerCase()
+    return projects.filter(project =>
+      project.name?.toLowerCase().includes(searchLower)
+    )
+  }, [projects, modalProjectSearch])
   const [manualLogData, setManualLogData] = useState({
     startDate: '',
     startTime: '',
@@ -441,24 +456,49 @@ export function TimeLogs({
         const response = await fetch('/api/projects')
         const data = await response.json()
         if (data.success && Array.isArray(data.data)) {
-          const filtered = data.data.filter((project: any) => {
+          // Filter by projects that allow time tracking
+          const timeTrackingEnabled = data.data.filter((project: any) => {
             const allow = project?.settings?.allowTimeTracking
-            if (!allow) return false
-            const createdByMatch = project?.createdBy === resolvedUserId || project?.createdBy?.id === resolvedUserId
-            const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
-            const teamMatch = teamMembers.some((memberId: any) => {
-              if (typeof memberId === 'string') return memberId === resolvedUserId
-              return memberId?._id === resolvedUserId || memberId?.id === resolvedUserId
-            })
-            const members = Array.isArray(project?.members) ? project.members : []
-            const membersMatch = members.some((m: any) => (typeof m === 'string' ? m === resolvedUserId : m?.id === resolvedUserId || m?._id === resolvedUserId))
-            return createdByMatch || teamMatch || membersMatch
+            return allow !== false // Default to allowing if not set
           })
-          let final = filtered
+
+          // Then check for actual task assignments in each project
+          const taskAssignmentFiltered = []
+          for (const project of timeTrackingEnabled) {
+            try {
+              // Fetch a small sample of tasks for this project to check assignments
+              const tasksResponse = await fetch(`/api/tasks?project=${project._id}&limit=50`)
+              const tasksData = await tasksResponse.json()
+
+              if (tasksData.success && Array.isArray(tasksData.data)) {
+                // Check if user is assigned to any tasks in this project
+                const hasAssignedTasks = tasksData.data.some((task: any) => {
+                  const assignedTo = task?.assignedTo
+                  if (!assignedTo) return false
+                  if (Array.isArray(assignedTo)) {
+                    // assignedTo is now an array of strings (user IDs)
+                    return assignedTo.includes(resolvedUserId)
+                  }
+                  // Legacy support for single string or object
+                  if (typeof assignedTo === 'string') return assignedTo === resolvedUserId
+                  return assignedTo?._id === resolvedUserId || assignedTo?.id === resolvedUserId
+                })
+
+                if (hasAssignedTasks) {
+                  taskAssignmentFiltered.push(project)
+                }
+              }
+            } catch (taskErr) {
+              console.warn(`Failed to check task assignments for project ${project._id}:`, taskErr)
+              // If we can't check tasks, don't include the project (be conservative)
+            }
+          }
+
+          let final = taskAssignmentFiltered
           if (isEditing && selectedEntry?.project?._id) {
-            const exists = filtered.some((p: any) => p?._id === selectedEntry.project!._id)
+            const exists = taskAssignmentFiltered.some((p: any) => p?._id === selectedEntry.project!._id)
             if (!exists) {
-              final = [...filtered, { _id: selectedEntry.project._id, name: selectedEntry.project.name }]
+              final = [...taskAssignmentFiltered, { _id: selectedEntry.project._id, name: selectedEntry.project.name }]
             }
           }
           setProjects(final)
@@ -519,6 +559,25 @@ export function TimeLogs({
       setSelectedTaskForLog('')
     }
   }, [selectedProjectForLog, resolvedUserId, isEditing, selectedEntry])
+
+  // Clear form when opening add time log modal
+  useEffect(() => {
+    if (showAddTimeLogModal && !isEditing) {
+      setManualLogData({
+        startDate: '',
+        startTime: '',
+        endDate: '',
+        endTime: '',
+        description: ''
+      })
+      setSelectedProjectForLog('')
+      setSelectedTaskForLog('')
+      setTasks([])
+      setModalProjectSearch('')
+      setError('')
+      setSessionHoursError('')
+    }
+  }, [showAddTimeLogModal, isEditing])
 
   // Helper function to combine date and time into datetime-local format
   const combineDateTime = (date: string, time: string): string => {
@@ -690,6 +749,7 @@ export function TimeLogs({
         })
         setSelectedProjectForLog('')
         setSelectedTaskForLog('')
+        setModalProjectSearch('')
         setTasks([])
         loadTimeEntries()
         onTimeEntryUpdate?.()
@@ -781,6 +841,7 @@ export function TimeLogs({
         })
         setSelectedProjectForLog('')
         setSelectedTaskForLog('')
+        setModalProjectSearch('')
         setTasks([])
         setEditInitial(null)
         loadTimeEntries()
@@ -1220,24 +1281,35 @@ export function TimeLogs({
       setTasks([])
     }
     
-    // Format dates and times for the form
+    // Format dates and times for the form - use UTC times since database stores UTC
     const start = new Date(entry.startTime)
     const end = entry.endTime ? new Date(entry.endTime) : new Date()
-    
+
+    // Get UTC time components for proper display
+    const formatUTCTime = (date: Date): string => {
+      const hours = date.getUTCHours().toString().padStart(2, '0')
+      const minutes = date.getUTCMinutes().toString().padStart(2, '0')
+      return `${hours}:${minutes}`
+    }
+
+    console.log('TimeLogs: EDIT - Original entry startTime:', entry.startTime, 'endTime:', entry.endTime)
+    console.log('TimeLogs: EDIT - Parsed start date:', start.toISOString(), 'end date:', end.toISOString())
+    console.log('TimeLogs: EDIT - UTC start time:', formatUTCTime(start), 'UTC end time:', formatUTCTime(end))
+
     setManualLogData({
-      startDate: start.toISOString().split('T')[0],
-      startTime: start.toTimeString().substring(0, 5),
-      endDate: end.toISOString().split('T')[0],
-      endTime: end.toTimeString().substring(0, 5),
+      startDate: start.toISOString().split('T')[0], // Already UTC
+      startTime: formatUTCTime(start), // Use UTC time
+      endDate: end.toISOString().split('T')[0], // Already UTC
+      endTime: formatUTCTime(end), // Use UTC time
       description: entry.description || ''
     })
     setEditInitial({
       projectId: entry.project?._id || '',
       taskId: entry.task?._id || '',
-      startDate: start.toISOString().split('T')[0],
-      startTime: start.toTimeString().substring(0, 5),
-      endDate: end.toISOString().split('T')[0],
-      endTime: end.toTimeString().substring(0, 5),
+      startDate: start.toISOString().split('T')[0], // Already UTC
+      startTime: formatUTCTime(start), // Use UTC time
+      endDate: end.toISOString().split('T')[0], // Already UTC
+      endTime: formatUTCTime(end), // Use UTC time
       description: entry.description || ''
     })
     
@@ -1763,7 +1835,7 @@ export function TimeLogs({
             {/* <Clock className="h-5 w-5" />
             Time Logs */}
           </CardTitle>
-          {canAddManualTimeLog && showManualLogButtons && (
+          {canAddManualTimeLog && showManualLogButtons && pathname === '/time-tracking/timer' && (
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <Button
                 onClick={() => setShowBulkUploadModal(true)}
@@ -1775,7 +1847,23 @@ export function TimeLogs({
                 <span className="whitespace-nowrap">Bulk Upload</span>
               </Button>
               <Button
-                onClick={() => setShowAddTimeLogModal(true)}
+                onClick={() => {
+                  // Clear form data when opening add modal
+                  setManualLogData({
+                    startDate: '',
+                    startTime: '',
+                    endDate: '',
+                    endTime: '',
+                    description: ''
+                  })
+                  setSelectedProjectForLog('')
+                  setSelectedTaskForLog('')
+                  setTasks([])
+                  setModalProjectSearch('')
+                  setError('')
+                  setSessionHoursError('')
+                  setShowAddTimeLogModal(true)
+                }}
                 size="sm"
                 className="h-8 sm:h-8 px-3 text-xs justify-start w-full sm:w-auto"
               >
@@ -2238,14 +2326,20 @@ export function TimeLogs({
                       <div>
                         <div className="text-muted-foreground">Start Time</div>
                         <div className="mt-1">
-                          <div>{formatDateTimeSafe(entry.startTime)}</div>
+                          <div>{(() => {
+                          const formatted = formatDateTimeSafe(entry.startTime)
+                          return formatted
+                        })()}</div>
                         </div>
                       </div>
                       <div>
                         <div className="text-muted-foreground">End Time</div>
                         {entry.endTime ? (
                           <div className="mt-1">
-                            <div>{formatDateTimeSafe(entry.endTime)}</div>
+                            <div>{(() => {
+                              const formatted = formatDateTimeSafe(entry.endTime)
+                              return formatted
+                            })()}</div>
                           </div>
                         ) : <div className="mt-1">-</div>}
                       </div>
@@ -2366,10 +2460,16 @@ export function TimeLogs({
                       {([entry.user?.firstName, entry.user?.lastName].filter(Boolean).join(' ') || 'Unknown')}
                     </div>
                     <div className="text-xs sm:text-sm leading-tight">
-                      {formatDateTimeSafe(entry.startTime)}
+                      {(() => {
+                        const formatted = formatDateTimeSafe(entry.startTime)
+                        return formatted
+                      })()}
                     </div>
                     <div className="text-xs sm:text-sm leading-tight">
-                      {entry.endTime ? formatDateTimeSafe(entry.endTime) : '-'}
+                      {entry.endTime ? (() => {
+                        const formatted = formatDateTimeSafe(entry.endTime)
+                        return formatted
+                      })() : '-'}
                     </div>
                     <div className="text-xs sm:text-sm">
                       {formatDuration(entry.duration)}
@@ -2527,8 +2627,8 @@ export function TimeLogs({
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="modal-project">Project *</Label>
-              <Select 
-                value={selectedProjectForLog} 
+              <Select
+                value={selectedProjectForLog}
                 onValueChange={(value) => {
                   setSelectedProjectForLog(value)
                   setSelectedTaskForLog('')
@@ -2539,14 +2639,35 @@ export function TimeLogs({
                   <SelectValue placeholder="Select a project" />
                 </SelectTrigger>
                 <SelectContent>
-                  {projects.map((project) => (
-                    <SelectItem key={project._id} value={project._id}>
-                      <div className="flex items-center space-x-2">
-                        <FolderOpen className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">{project.name}</span>
+                  <div className="p-2 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Search projects..."
+                        value={modalProjectSearch}
+                        onChange={(e) => setModalProjectSearch(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        className="h-8 pl-7 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-[200px] overflow-y-auto">
+                    {filteredModalProjects.length === 0 ? (
+                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                        No projects found
                       </div>
-                    </SelectItem>
-                  ))}
+                    ) : (
+                      filteredModalProjects.map((project) => (
+                        <SelectItem key={project._id} value={project._id} onMouseDown={(e) => e.preventDefault()}>
+                          <div className="flex items-center space-x-2">
+                            <FolderOpen className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">{project.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </div>
                 </SelectContent>
               </Select>
             </div>
@@ -2729,6 +2850,7 @@ export function TimeLogs({
               setSelectedProjectForLog('')
               setSelectedTaskForLog('')
               setTasks([])
+              setModalProjectSearch('')
               setError('')
               setSessionHoursError('')
             }}
@@ -2785,8 +2907,8 @@ export function TimeLogs({
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="edit-project">Project *</Label>
-              <Select 
-                value={selectedProjectForLog} 
+              <Select
+                value={selectedProjectForLog}
                 onValueChange={(value) => {
                   setSelectedProjectForLog(value)
                   setSelectedTaskForLog('')
@@ -2798,14 +2920,35 @@ export function TimeLogs({
                   <SelectValue placeholder="Select a project" />
                 </SelectTrigger>
                 <SelectContent>
-                  {projects.map((project) => (
-                    <SelectItem key={project._id} value={project._id}>
-                      <div className="flex items-center space-x-2">
-                        <FolderOpen className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">{project.name}</span>
+                  <div className="p-2 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Search projects..."
+                        value={modalProjectSearch}
+                        onChange={(e) => setModalProjectSearch(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        className="h-8 pl-7 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-[200px] overflow-y-auto">
+                    {filteredModalProjects.length === 0 ? (
+                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                        No projects found
                       </div>
-                    </SelectItem>
-                  ))}
+                    ) : (
+                      filteredModalProjects.map((project) => (
+                        <SelectItem key={project._id} value={project._id} onMouseDown={(e) => e.preventDefault()}>
+                          <div className="flex items-center space-x-2">
+                            <FolderOpen className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">{project.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </div>
                 </SelectContent>
               </Select>
             </div>
@@ -2969,6 +3112,7 @@ export function TimeLogs({
               setSelectedProjectForLog('')
               setSelectedTaskForLog('')
               setTasks([])
+              setModalProjectSearch('')
               setError('')
               setSessionHoursError('')
               setEditInitial(null)

@@ -73,7 +73,8 @@ export default function PreferencesPage() {
         // Sync DateTimeProvider with user preferences
         const loadedPreferences = {
           dateFormat: userData.preferences?.dateFormat || 'MM/DD/YYYY',
-          timeFormat: userData.preferences?.timeFormat || '12h'
+          timeFormat: userData.preferences?.timeFormat || '12h',
+          timezone: userData.timezone || 'UTC'
         }
         setDateTimePreferences(loadedPreferences)
 
@@ -111,7 +112,8 @@ export default function PreferencesPage() {
           // Sync DateTimeProvider with refreshed user preferences
           const refreshedPreferences = {
             dateFormat: refreshData.user.preferences?.dateFormat || 'MM/DD/YYYY',
-            timeFormat: refreshData.user.preferences?.timeFormat || '12h'
+            timeFormat: refreshData.user.preferences?.timeFormat || '12h',
+            timezone: refreshData.user.timezone || 'UTC'
           }
           setDateTimePreferences(refreshedPreferences)
 
@@ -170,8 +172,9 @@ export default function PreferencesPage() {
       // Update DateTimeProvider with new preferences
       const newPreferences = {
         dateFormat: formData.dateFormat as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD',
-        timeFormat: formData.timeFormat as '12h' | '24h'
-      } as unknown as DateTimePreferences
+        timeFormat: formData.timeFormat as '12h' | '24h',
+        timezone: formData.timezone || 'UTC'
+      }
       setDateTimePreferences(newPreferences)
 
       // Store in sessionStorage for persistence

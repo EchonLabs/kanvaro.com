@@ -175,7 +175,7 @@ export default function DashboardPage() {
   // Initial auth check on mount
   useEffect(() => {
     if (!dashboardLoaded) {
-      checkAuth()
+    checkAuth()
     }
   }, []) // Empty dependency array to run only once on mount
 

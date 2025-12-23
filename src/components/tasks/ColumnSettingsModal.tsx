@@ -528,19 +528,22 @@ export default function ColumnSettingsModal({
     }
   }
 
+  // Show notification when column cannot be deleted due to tasks and no migration columns
+  useEffect(() => {
+    if (isOpen && !checkingTasks && tasksInColumn > 0 && columns.length > 0) {
+      const availableMigrationColumns = columns.filter((col, i) => i !== columnToDelete)
+      if (availableMigrationColumns.length === 0 && deleteConfirmOpen) {
+        notifyError({
+          title: 'Cannot Delete Column',
+          message: `Cannot delete this column because it contains ${tasksInColumn} task${tasksInColumn !== 1 ? 's' : ''} and there are no other columns to move them to. Please create another column first.`
+        })
+      }
+    }
+  }, [isOpen, checkingTasks, tasksInColumn, columns, columnToDelete, deleteConfirmOpen, notifyError])
+
   if (!isOpen) return null
 
   const availableMigrationColumns = columns.filter((col, i) => i !== columnToDelete)
-
-  // Show notification when column cannot be deleted due to tasks and no migration columns
-  useEffect(() => {
-    if (!checkingTasks && tasksInColumn > 0 && availableMigrationColumns.length === 0 && deleteConfirmOpen) {
-      notifyError({
-        title: 'Cannot Delete Column',
-        message: `Cannot delete this column because it contains ${tasksInColumn} task${tasksInColumn !== 1 ? 's' : ''} and there are no other columns to move them to. Please create another column first.`
-      })
-    }
-  }, [checkingTasks, tasksInColumn, availableMigrationColumns.length, deleteConfirmOpen, notifyError])
 
   return (
     <>

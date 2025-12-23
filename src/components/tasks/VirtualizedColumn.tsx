@@ -97,7 +97,7 @@ export default function VirtualizedColumn({
       </div>
       
         <SortableContext
-          items={tasks.map(task => task._id as string)}
+          items={tasks.map(task => task._id.toString())}
           strategy={verticalListSortingStrategy}
         >
         <div 
