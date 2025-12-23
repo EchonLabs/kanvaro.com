@@ -32,7 +32,6 @@ export function OrganizationSettings() {
     language: 'en',
     industry: '',
     size: 'small' as 'startup' | 'small' | 'medium' | 'enterprise',
-    requireEmailVerification: true,
     defaultUserRole: 'team_member',
         timeTracking: {
           allowTimeTracking: true,
@@ -71,6 +70,7 @@ export function OrganizationSettings() {
   const [darkLogoPreview, setDarkLogoPreview] = useState<string | null>(null)
   const [logoMode, setLogoMode] = useState<'single' | 'dual'>('single')
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [currencySearchQuery, setCurrencySearchQuery] = useState('')
 
   const timezones = [
     'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
@@ -173,7 +173,6 @@ export function OrganizationSettings() {
         language: organization.language || 'en',
         industry: organization.industry || '',
         size: organization.size || 'small',
-        requireEmailVerification: organization.settings?.requireEmailVerification ?? true,
         defaultUserRole: organization.settings?.defaultUserRole || 'team_member',
         timeTracking: {
           allowTimeTracking: true,
@@ -332,7 +331,6 @@ export function OrganizationSettings() {
     try {
       const formDataToSend = new FormData()
       formDataToSend.append('data', JSON.stringify({
-        requireEmailVerification: formData.requireEmailVerification,
         defaultUserRole: formData.defaultUserRole
       }))
 
@@ -427,6 +425,20 @@ export function OrganizationSettings() {
       </Card>
     )
   }
+
+  // Filter and sort currencies based on search query
+  const filteredCurrencies = currencies
+    .filter(currency => {
+      if (!currencySearchQuery.trim()) return true
+      const query = currencySearchQuery.toLowerCase()
+      return (
+        currency.code.toLowerCase().includes(query) ||
+        currency.name.toLowerCase().includes(query) ||
+        currency.country.toLowerCase().includes(query) ||
+        currency.symbol.toLowerCase().includes(query)
+      )
+    })
+    .sort((a, b) => a.code.localeCompare(b.code)) // Sort by currency code in ascending order
 
   return (
     <div className="space-y-8">
@@ -702,15 +714,51 @@ export function OrganizationSettings() {
 
             <div className="space-y-2">
               <Label htmlFor="currency" className="text-xs sm:text-sm">Currency</Label>
-              <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
+              <Select value={formData.currency} onValueChange={(value) => {
+                setFormData({ ...formData, currency: value })
+                // Clear search when selecting an option
+                setCurrencySearchQuery('')
+              }}>
                 <SelectTrigger className="text-xs sm:text-sm">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
+                  <div className="p-2 border-b">
+                    <Input
+                      ref={(input) => {
+                        // Auto-focus the search input when dropdown opens
+                        if (input && !currencySearchQuery) {
+                          setTimeout(() => input.focus(), 100)
+                        }
+                      }}
+                      type="text"
+                      placeholder="Search currencies..."
+                      value={currencySearchQuery}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        setCurrencySearchQuery(e.target.value)
+                      }}
+                      className="text-xs sm:text-sm h-8"
+                      onKeyDown={(e) => {
+                        e.stopPropagation()
+                        // Allow normal typing behavior
+                        if (e.key === 'Escape') {
+                          setCurrencySearchQuery('')
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      onFocus={(e) => e.stopPropagation()}
+                      autoComplete="off"
+                    />
+                  </div>
                   {currenciesLoading ? (
                     <SelectItem value="__loading__" disabled className="text-xs sm:text-sm">Loading currencies...</SelectItem>
+                  ) : filteredCurrencies.length === 0 ? (
+                    <SelectItem value="__no-results__" disabled className="text-xs sm:text-sm">
+                      {currencySearchQuery ? 'No currencies found' : 'Start typing to search...'}
+                    </SelectItem>
                   ) : (
-                    currencies.map((currency) => (
+                    filteredCurrencies.map((currency) => (
                       <SelectItem key={currency.code} value={currency.code} className="text-xs sm:text-sm">
                         {formatCurrencyDisplay(currency)}
                       </SelectItem>
@@ -837,20 +885,6 @@ export function OrganizationSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-            <div className="space-y-0.5 flex-1 min-w-0">
-              <Label className="text-xs sm:text-sm">Require Email Verification</Label>
-              <p className="text-xs sm:text-sm text-muted-foreground break-words">
-                Require users to verify their email address before accessing the system
-              </p>
-            </div>
-            <Switch
-              checked={formData.requireEmailVerification}
-              onCheckedChange={(checked) => setFormData({ ...formData, requireEmailVerification: checked })}
-              className="flex-shrink-0"
-            />
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="defaultRole" className="text-xs sm:text-sm">Default User Role</Label>
             <Select value={formData.defaultUserRole} onValueChange={(value) => setFormData({ ...formData, defaultUserRole: value })}>

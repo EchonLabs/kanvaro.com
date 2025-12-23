@@ -89,24 +89,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Check email verification if required by organization
-    const Organization = (await import('@/models/Organization')).Organization
-    const organization = await Organization.findById(user.organization)
-
-    
-
-    const requireEmailVerification = organization?.settings?.requireEmailVerification ?? true
-
-    if (requireEmailVerification && !user.emailVerified) {
-      return NextResponse.json(
-        {
-          error: 'Email verification required',
-          requiresVerification: true,
-          email: user.email
-        },
-        { status: 403 }
-      )
-    }
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password)

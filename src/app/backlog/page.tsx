@@ -99,7 +99,7 @@ interface SprintOption {
   } | null
 }
 
-const ALLOWED_BACKLOG_STATUSES: string[] = ['backlog', 'todo', 'inprogress', 'done', 'cancelled']
+const ALLOWED_BACKLOG_STATUSES: string[] = ['backlog', 'todo', 'inprogress', 'review','done', 'cancelled']
 
 const TASK_STATUS_VALUES = ['backlog', 'todo', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const
 const EPIC_STORY_STATUSES: string[] = ['backlog', 'todo', 'inprogress', 'done', 'cancelled']
@@ -1350,7 +1350,7 @@ export default function BacklogPage() {
       <div className="space-y-8 sm:space-y-10">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Product backlog</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Product Backlog</h1>
             <p className="text-sm sm:text-base text-muted-foreground">Manage your product backlog and sprint planning</p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
@@ -1375,7 +1375,7 @@ export default function BacklogPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>backlog Items</CardTitle>
+                  <CardTitle>Backlog Items</CardTitle>
                   <CardDescription>
                     {filteredAndSortedItems.length} item{filteredAndSortedItems.length !== 1 ? 's' : ''} found
                   </CardDescription>
