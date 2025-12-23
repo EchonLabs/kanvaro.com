@@ -1452,7 +1452,7 @@ export default function ProjectDetailPage() {
                       <Switch
                         id="allow-billable-time"
                         checked={settingsForm.allowBillableTime && (globalTimeTrackingSettings?.allowBillableTime ?? true)}
-                        //disabled={!globalTimeTrackingSettings?.allowBillableTime}
+                        disabled={!globalTimeTrackingSettings?.allowBillableTime}
                         onCheckedChange={(checked) =>
                           setSettingsForm((prev) => ({
                             ...prev,
@@ -1476,7 +1476,7 @@ export default function ProjectDetailPage() {
                       <Switch
                         id="allow-time-tracking"
                         checked={settingsForm.allowTimeTracking && (globalTimeTrackingSettings?.allowTimeTracking ?? true)}
-                        //disabled={!globalTimeTrackingSettings?.allowTimeTracking}
+                        disabled={!globalTimeTrackingSettings?.allowTimeTracking}
                         onCheckedChange={(checked) =>
                           setSettingsForm((prev) => ({
                             ...prev,
@@ -1504,7 +1504,7 @@ export default function ProjectDetailPage() {
                           <Switch
                             id="allow-manual-time-submission"
                             checked={settingsForm.allowManualTimeSubmission && (globalTimeTrackingSettings?.allowManualTimeSubmission ?? true)}
-                            //disabled={!globalTimeTrackingSettings?.allowManualTimeSubmission}
+                            disabled={!globalTimeTrackingSettings?.allowManualTimeSubmission}
                             onCheckedChange={(checked) =>
                               setSettingsForm((prev) => ({
                                 ...prev,
@@ -1548,7 +1548,7 @@ export default function ProjectDetailPage() {
                       <Switch
                         id="require-approval"
                         checked={settingsForm.requireApproval && (globalTimeTrackingSettings?.requireApproval ?? true)}
-                        //disabled={!globalTimeTrackingSettings?.requireApproval}
+                        disabled={!globalTimeTrackingSettings?.requireApproval}
                         onCheckedChange={(checked) =>
                           setSettingsForm((prev) => ({
                             ...prev,
