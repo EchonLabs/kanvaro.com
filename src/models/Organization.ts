@@ -13,7 +13,6 @@ export interface IOrganization extends Document {
   size: 'startup' | 'small' | 'medium' | 'enterprise'
   settings: {
     allowSelfRegistration: boolean
-    requireEmailVerification: boolean
     defaultUserRole: string
     projectTemplates: mongoose.Types.ObjectId[]
     timeTracking: {
@@ -115,7 +114,6 @@ const OrganizationSchema = new Schema<IOrganization>({
   },
   settings: {
     allowSelfRegistration: { type: Boolean, default: false },
-    requireEmailVerification: { type: Boolean, default: true },
     defaultUserRole: { type: String, default: 'team_member' },
     projectTemplates: [{ type: Schema.Types.ObjectId, ref: 'ProjectTemplate' }],
     timeTracking: {

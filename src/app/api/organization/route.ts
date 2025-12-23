@@ -82,7 +82,6 @@ export async function GET() {
         size: 'small',
         settings: {
           allowSelfRegistration: false,
-          requireEmailVerification: true,
           defaultUserRole: 'team_member',
           projectTemplates: [],
           timeTracking: {
@@ -121,7 +120,6 @@ export async function GET() {
         size: 'small',
         settings: {
           allowSelfRegistration: false,
-          requireEmailVerification: true,
           defaultUserRole: 'team_member',
           projectTemplates: [],
           timeTracking: {
@@ -279,7 +277,6 @@ export async function PUT(request: NextRequest) {
             industry: form.get('industry') ?? parsed.industry ?? undefined,
             size: form.get('size') ?? parsed.size ?? undefined,
             allowSelfRegistration: toBool(form.get('allowSelfRegistration') ?? form.get('settings.allowSelfRegistration') ?? (parsed.settings?.allowSelfRegistration ?? parsed.allowSelfRegistration ?? null)),
-            requireEmailVerification: toBool(form.get('requireEmailVerification') ?? form.get('settings.requireEmailVerification') ?? (parsed.settings?.requireEmailVerification ?? parsed.requireEmailVerification ?? null)),
             defaultUserRole: (form.get('defaultUserRole') ?? form.get('settings.defaultUserRole') ?? parsed.settings?.defaultUserRole ?? parsed.defaultUserRole) ?? undefined,
             timeTracking: parsed.timeTracking ?? {
               allowTimeTracking: toBool(form.get('timeTracking.allowTimeTracking') ?? form.get('settings.timeTracking.allowTimeTracking') ?? (parsed.settings?.timeTracking?.allowTimeTracking ?? parsed.timeTracking?.allowTimeTracking ?? null)),
@@ -344,7 +341,6 @@ export async function PUT(request: NextRequest) {
       industry: updateData.industry,
       size: updateData.size,
       allowSelfRegistration: updateData.allowSelfRegistration ?? updateData.settings?.allowSelfRegistration,
-      requireEmailVerification: updateData.requireEmailVerification ?? updateData.settings?.requireEmailVerification,
       defaultUserRole: updateData.defaultUserRole ?? updateData.settings?.defaultUserRole,
       timeTracking: sourceTimeTracking ? {
         allowTimeTracking: sourceTimeTracking.allowTimeTracking ?? undefined,
@@ -400,7 +396,6 @@ export async function PUT(request: NextRequest) {
     setIfDefined('industry', normalized.industry)
     setIfDefined('size', normalized.size)
     setIfDefined('settings.allowSelfRegistration', normalized.allowSelfRegistration)
-    setIfDefined('settings.requireEmailVerification', normalized.requireEmailVerification)
     setIfDefined('settings.defaultUserRole', normalized.defaultUserRole)
     
     // Only set timeTracking fields if timeTracking object exists

@@ -50,18 +50,6 @@ export async function POST(request: NextRequest) {
     const userFirstName = firstName || invitation.firstName || ''
     const userLastName = lastName || invitation.lastName || ''
 
-    // Check if email verification is required for this organization
-    const requireEmailVerification = invitation.organization?.settings?.requireEmailVerification ?? true
-
-    // Generate email verification token if required
-    let emailVerificationToken = undefined
-    let emailVerificationExpiry = undefined
-
-    if (requireEmailVerification) {
-      emailVerificationToken = crypto.randomBytes(32).toString('hex')
-      emailVerificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-      console.log('Generated verification token for user:', invitation.email, 'Token length:', emailVerificationToken.length, 'Token starts with:', emailVerificationToken.substring(0, 10))
-    }
 
     const userData: any = {
       firstName: userFirstName,
@@ -71,9 +59,7 @@ export async function POST(request: NextRequest) {
       role: invitation.role,
       organization: invitation.organization._id,
       isActive: true,
-      emailVerified: !requireEmailVerification, // Set to false if verification is required, true if not required
-      emailVerificationToken: emailVerificationToken,
-      emailVerificationExpiry: emailVerificationExpiry
+      emailVerified: true
     }
 
     // Add customRole if it exists in the invitation
@@ -84,13 +70,6 @@ export async function POST(request: NextRequest) {
     const user = new User(userData)
     const savedUser = await user.save()
 
-    if (requireEmailVerification) {
-      console.log('User saved with verification token:', savedUser.emailVerificationToken ? 'Token present' : 'No token')
-      if (savedUser.emailVerificationToken) {
-        console.log('Saved token starts with:', savedUser.emailVerificationToken.substring(0, 10))
-        console.log('Token expiry:', savedUser.emailVerificationExpiry)
-      }
-    }
 
     // Generate and save avatar image
     try {
@@ -135,49 +114,26 @@ export async function POST(request: NextRequest) {
         baseUrl = `${protocol}://${hostValue}`
       }
 
-      if (requireEmailVerification) {
-        // Send email verification email
-        const verificationUrl = `${baseUrl}/verify-email?token=${emailVerificationToken}`
+      // Send welcome email
+      const loginUrl = `${baseUrl}/login`
 
-        const verificationEmailHtml = emailService.generateEmailVerificationEmail(
-          user.firstName,
-          user.lastName,
-          user.email,
-          roleDisplayName,
-          organizationName,
-          verificationUrl
-        )
+      const welcomeEmailHtml = emailService.generateWelcomeEmail(
+        user.firstName,
+        user.lastName,
+        user.email,
+        roleDisplayName,
+        organizationName,
+        loginUrl
+      )
 
-        emailService.sendEmail({
-          to: user.email,
-          subject: `Verify your email for ${organizationName}`,
-          html: verificationEmailHtml
-        }).catch((emailError) => {
-          console.error('Failed to send verification email (non-blocking):', emailError)
-          // Don't fail the account creation if email fails
-        })
-      } else {
-        // Send welcome email (original behavior)
-        const loginUrl = `${baseUrl}/login`
-
-        const welcomeEmailHtml = emailService.generateWelcomeEmail(
-          user.firstName,
-          user.lastName,
-          user.email,
-          roleDisplayName,
-          organizationName,
-          loginUrl
-        )
-
-        emailService.sendEmail({
-          to: user.email,
-          subject: `Welcome to ${organizationName}! Your Account is Ready 🎉`,
-          html: welcomeEmailHtml
-        }).catch((emailError) => {
-          console.error('Failed to send welcome email (non-blocking):', emailError)
-          // Don't fail the account creation if email fails
-        })
-      }
+      emailService.sendEmail({
+        to: user.email,
+        subject: `Welcome to ${organizationName}! Your Account is Ready 🎉`,
+        html: welcomeEmailHtml
+      }).catch((emailError) => {
+        console.error('Failed to send welcome email (non-blocking):', emailError)
+        // Don't fail the account creation if email fails
+      })
     } catch (emailError) {
       console.error('Error preparing email (non-blocking):', emailError)
       // Don't fail the account creation if email preparation fails

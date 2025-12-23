@@ -574,10 +574,17 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                         size={48}
                         className="h-12 w-12 flex-shrink-0"
                       />
-                      <div className="min-w-0">
-                        <p className="font-medium text-foreground truncate">
-                          {firstName} {lastName}
-                        </p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-foreground truncate">
+                            {firstName} {lastName}
+                          </p>
+                          {organizationRole && (
+                            <Badge className={`${getOrganizationRoleColor(organizationRole)} border-none text-xs`}>
+                              {formatOrganizationRole(organizationRole)}
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground truncate">{email}</p>
                       </div>
                     </div>
@@ -640,12 +647,6 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                         </div>
                       )}
 
-                      {/* Organization role badge (read-only) */}
-                      {organizationRole && (
-                        <Badge className={`${getOrganizationRoleColor(organizationRole)} border-none`}>
-                          {formatOrganizationRole(organizationRole)}
-                        </Badge>
-                      )}
 
                       <PermissionGate permission={Permission.PROJECT_MANAGE_TEAM} projectId={projectId}>
                         <DropdownMenu>

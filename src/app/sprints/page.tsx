@@ -228,7 +228,7 @@ export default function SprintsPage() {
   useEffect(() => {
     const successParam = searchParams?.get('success')
     if (successParam === 'sprint-created') {
-      showSuccess('Sprint created successfully.')
+      notifySuccess({ title: 'Sprint created successfully' })
       router.replace('/sprints', { scroll: false })
     }
   }, [searchParams, showSuccess, router])
@@ -522,7 +522,7 @@ export default function SprintsPage() {
       }
 
       setSprints(prev => prev.map(s => (s._id === sprintId ? data.data : s)))
-      showSuccess(action === 'start' ? 'Sprint started successfully.' : 'Sprint completed successfully.')
+      notifySuccess({ title: action === 'start' ? 'Sprint started successfully' : 'Sprint completed successfully' })
     } catch (err) {
       console.error(`${action} sprint error:`, err)
       setError(`Failed to ${action} sprint`)
@@ -571,7 +571,7 @@ export default function SprintsPage() {
 
       return updated
     })
-    showSuccess('Sprint completed successfully.')
+    notifySuccess({ title: 'Sprint completed successfully' })
     setCompleteModalOpen(false)
     setCompletingSprintId(null)
     setIncompleteTasks([])

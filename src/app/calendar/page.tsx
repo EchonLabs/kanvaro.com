@@ -402,7 +402,7 @@ export default function CalendarPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 sm:space-y-8 lg:space-y-10">
+      <div className="space-y-8 sm:space-y-10 lg:space-y-10">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
           <div className="min-w-0 flex-1">
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">Calendar</h1>
@@ -424,7 +424,7 @@ export default function CalendarPage() {
 
         {/* Real-time connection status */}
         {isConnected && (
-          <Alert className="mb-4">
+          <Alert className="mb-6">
             <div className="flex items-center">
               <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
               <span className="text-sm">Real-time sync active</span>
@@ -434,7 +434,7 @@ export default function CalendarPage() {
 
         <Card>
           <CardHeader className="p-4 sm:p-6">
-            <div className="space-y-3 sm:space-y-4">
+            <div className="space-y-4 sm:space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
                   <CardTitle className="text-lg sm:text-xl">Calendar View</CardTitle>
@@ -453,7 +453,7 @@ export default function CalendarPage() {
                     className="pl-10 w-full text-sm sm:text-base"
                   />
                 </div>
-                <div className="flex flex-wrap gap-2 sm:gap-3">
+                <div className="flex flex-wrap gap-3 sm:gap-4">
                   <Select value={typeFilter} onValueChange={setTypeFilter}>
                     <SelectTrigger className="w-full sm:w-[140px] text-sm">
                       <SelectValue placeholder="Type" />
@@ -517,7 +517,7 @@ export default function CalendarPage() {
             </div>
           </CardHeader>
           <CardContent className="p-4 sm:p-6">
-            <div className="space-y-4 sm:space-y-6">
+            <div className="space-y-6 sm:space-y-8">
               {/* Calendar Navigation */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
                 <div className="flex items-center justify-between w-full sm:w-auto gap-2 sm:gap-4">
@@ -666,7 +666,7 @@ export default function CalendarPage() {
                             )}
                           </div>
                           
-                          <div className="space-y-1.5 sm:space-y-2">
+                          <div className="space-y-2 sm:space-y-3">
                             {dayEvents.map(event => (
                               <div 
                                 key={event._id}
@@ -735,7 +735,7 @@ export default function CalendarPage() {
                       )}
                     </div>
                     
-                    <div className="space-y-2 sm:space-y-3">
+                    <div className="space-y-3 sm:space-y-4">
                       {getEventsForDate(currentDate).length > 0 ? (
                         getEventsForDate(currentDate).map(event => (
                           <div 

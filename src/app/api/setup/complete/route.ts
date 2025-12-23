@@ -201,7 +201,6 @@ export async function POST(request: NextRequest) {
       size: setupData.organization.size,
       settings: {
         allowSelfRegistration: false,
-        requireEmailVerification: true,
         defaultUserRole: 'team_member',
         projectTemplates: []
       },

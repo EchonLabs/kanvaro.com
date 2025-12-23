@@ -21,8 +21,6 @@ export interface IUser extends Document {
   lastLogin?: Date
   emailVerified: boolean
   twoFactorEnabled: boolean
-  emailVerificationToken?: string
-  emailVerificationExpiry?: Date
   passwordResetOtp?: string
   passwordResetExpiry?: Date
   passwordResetToken?: string
@@ -76,8 +74,6 @@ const UserSchema = new Schema<IUser>({
   lastLogin: Date,
   emailVerified: { type: Boolean, default: false },
   twoFactorEnabled: { type: Boolean, default: false },
-  emailVerificationToken: String,
-  emailVerificationExpiry: Date,
   passwordResetOtp: String,
   passwordResetExpiry: Date,
   passwordResetToken: String,

@@ -1076,7 +1076,7 @@ export default function TaskDetailPage() {
                   <span className="flex-shrink-0">{getTypeIcon(task.type)}</span>
                   <span className="break-words overflow-wrap-anywhere">{task.title} {task.displayId}</span>
                 </h1>
-                <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
+                <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap ml-auto justify-end">
                   <Button
                     variant="outline"
                     disabled={!editAllowed}
