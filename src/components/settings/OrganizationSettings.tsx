@@ -71,6 +71,7 @@ export function OrganizationSettings() {
   const [darkLogoPreview, setDarkLogoPreview] = useState<string | null>(null)
   const [logoMode, setLogoMode] = useState<'single' | 'dual'>('single')
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [currencySearchQuery, setCurrencySearchQuery] = useState('')
 
   const timezones = [
     'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
@@ -428,6 +429,20 @@ export function OrganizationSettings() {
     )
   }
 
+  // Filter and sort currencies based on search query
+  const filteredCurrencies = currencies
+    .filter(currency => {
+      if (!currencySearchQuery.trim()) return true
+      const query = currencySearchQuery.toLowerCase()
+      return (
+        currency.code.toLowerCase().includes(query) ||
+        currency.name.toLowerCase().includes(query) ||
+        currency.country.toLowerCase().includes(query) ||
+        currency.symbol.toLowerCase().includes(query)
+      )
+    })
+    .sort((a, b) => a.code.localeCompare(b.code)) // Sort by currency code in ascending order
+
   return (
     <div className="space-y-8">
       <Card>
@@ -702,15 +717,51 @@ export function OrganizationSettings() {
 
             <div className="space-y-2">
               <Label htmlFor="currency" className="text-xs sm:text-sm">Currency</Label>
-              <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
+              <Select value={formData.currency} onValueChange={(value) => {
+                setFormData({ ...formData, currency: value })
+                // Clear search when selecting an option
+                setCurrencySearchQuery('')
+              }}>
                 <SelectTrigger className="text-xs sm:text-sm">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
+                  <div className="p-2 border-b">
+                    <Input
+                      ref={(input) => {
+                        // Auto-focus the search input when dropdown opens
+                        if (input && !currencySearchQuery) {
+                          setTimeout(() => input.focus(), 100)
+                        }
+                      }}
+                      type="text"
+                      placeholder="Search currencies..."
+                      value={currencySearchQuery}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        setCurrencySearchQuery(e.target.value)
+                      }}
+                      className="text-xs sm:text-sm h-8"
+                      onKeyDown={(e) => {
+                        e.stopPropagation()
+                        // Allow normal typing behavior
+                        if (e.key === 'Escape') {
+                          setCurrencySearchQuery('')
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      onFocus={(e) => e.stopPropagation()}
+                      autoComplete="off"
+                    />
+                  </div>
                   {currenciesLoading ? (
                     <SelectItem value="__loading__" disabled className="text-xs sm:text-sm">Loading currencies...</SelectItem>
+                  ) : filteredCurrencies.length === 0 ? (
+                    <SelectItem value="__no-results__" disabled className="text-xs sm:text-sm">
+                      {currencySearchQuery ? 'No currencies found' : 'Start typing to search...'}
+                    </SelectItem>
                   ) : (
-                    currencies.map((currency) => (
+                    filteredCurrencies.map((currency) => (
                       <SelectItem key={currency.code} value={currency.code} className="text-xs sm:text-sm">
                         {formatCurrencyDisplay(currency)}
                       </SelectItem>
