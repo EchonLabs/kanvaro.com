@@ -10,12 +10,13 @@ import { Switch } from '@/components/ui/switch'
 import { useOrganization } from '@/hooks/useOrganization'
 import { Mail, Send, AlertCircle, CheckCircle, TestTube, XCircle, X } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { useNotify } from '@/lib/notify'
 
 export function EmailSettings() {
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const { organization, loading } = useOrganization()
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   
   const [formData, setFormData] = useState({
     provider: 'smtp' as 'smtp' | 'azure' | 'sendgrid' | 'mailgun' | 'skip',
@@ -122,13 +123,25 @@ export function EmailSettings() {
       if (response.ok) {
         setTestResult('success')
         setTestMessage('Email configuration test successful!')
+        notifySuccess({
+          title: 'Email Test Successful',
+          message: 'Email configuration is working correctly'
+        })
       } else {
         setTestResult('error')
         setTestMessage(result.error || 'Email test failed')
+        notifyError({
+          title: 'Email Test Failed',
+          message: result.error || 'Email configuration test failed'
+        })
       }
     } catch (error) {
       setTestResult('error')
       setTestMessage('Email test failed')
+      notifyError({
+        title: 'Test Failed',
+        message: 'Network error during email test'
+      })
     } finally {
       setTesting(false)
     }
@@ -141,7 +154,6 @@ export function EmailSettings() {
     }
 
     setSaving(true)
-    setMessage(null)
 
     try {
       const response = await fetch('/api/settings/email', {
@@ -156,9 +168,15 @@ export function EmailSettings() {
         throw new Error('Failed to update email settings')
       }
 
-      setMessage({ type: 'success', text: 'Email settings updated successfully' })
+      notifySuccess({
+        title: 'Email Settings Updated',
+        message: 'Email configuration has been updated successfully'
+      })
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update email settings' })
+      notifyError({
+        title: 'Update Failed',
+        message: error instanceof Error ? error.message : 'Failed to update email settings'
+      })
     } finally {
       setSaving(false)
     }
@@ -184,7 +202,7 @@ export function EmailSettings() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <Card>
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
@@ -254,8 +272,8 @@ export function EmailSettings() {
           </div>
 
           {formData.provider === 'smtp' && (
-            <div className="space-y-3 sm:space-y-4">
-              <Alert>
+            <div className="space-y-3 sm:space-y-4 mt-4">
+              <Alert className="mt-4 mb-4">
                 <Mail className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                 <AlertTitle className="text-xs sm:text-sm">SMTP Configuration</AlertTitle>
                 <AlertDescription className="text-xs sm:text-sm break-words">
@@ -390,7 +408,7 @@ export function EmailSettings() {
 
           {formData.provider === 'azure' && (
             <div className="space-y-3 sm:space-y-4">
-              <Alert>
+              <Alert className="mt-4 mb-4">
                 <Mail className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                 <AlertTitle className="text-xs sm:text-sm">Azure App Configuration</AlertTitle>
                 <AlertDescription className="text-xs sm:text-sm break-words">
@@ -494,13 +512,15 @@ export function EmailSettings() {
           )}
 
           {formData.provider === 'skip' && (
-            <Alert>
-              <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-              <AlertDescription className="text-xs sm:text-sm">
-                <p className="font-medium">Email notifications disabled</p>
-                <p className="break-words">Email functionality will be disabled for this organization.</p>
-              </AlertDescription>
-            </Alert>
+            <div className="py-6">
+              <Alert>
+                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <AlertDescription className="text-xs sm:text-sm">
+                  <p className="font-medium">Email notifications disabled</p>
+                  <p className="break-words">Email functionality will be disabled for this organization.</p>
+                </AlertDescription>
+              </Alert>
+            </div>
           )}
 
           {formData.provider !== 'skip' && (
@@ -519,45 +539,10 @@ export function EmailSettings() {
                 {testing ? 'Testing...' : 'Test Email'}
               </Button>
 
-              {testResult && (
-                <Alert variant={testResult === 'success' ? 'default' : 'destructive'} className="flex-1 min-w-0">
-                  {testResult === 'success' ? (
-                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                  ) : (
-                    <XCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                  )}
-                  <AlertDescription className="text-xs sm:text-sm break-words">
-                    {testMessage}
-                  </AlertDescription>
-                </Alert>
-              )}
+              
             </div>
           )}
 
-          {message && (
-            <Alert 
-              variant={message.type === 'error' ? 'destructive' : 'default'}
-              className={message.type === 'success' ? 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}
-            >
-              <div className="flex items-start justify-between w-full">
-                <div className="flex items-start gap-2 flex-1 min-w-0">
-                  {message.type === 'error' ? (
-                    <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5" />
-                  ) : (
-                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400" />
-                  )}
-                  <AlertDescription className="text-xs sm:text-sm break-words flex-1">{message.text}</AlertDescription>
-                </div>
-                <button
-                  onClick={() => setMessage(null)}
-                  className="ml-2 flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Close message"
-                >
-                  <X className="h-3 w-3 sm:h-4 sm:w-4" />
-                </button>
-              </div>
-            </Alert>
-          )}
 
           <div className="flex justify-end">
             <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm">

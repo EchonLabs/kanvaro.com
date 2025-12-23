@@ -32,6 +32,17 @@ function csvResponse(csv: string, filename: string) {
   })
 }
 
+// Helper function to get projects that don't require approval
+async function getProjectsWithoutApprovalRequirement(organizationId: string) {
+  const projects = await Project.find({
+    organization: organizationId,
+    'settings.requireApproval': false,
+    archived: false
+  }).select('_id')
+
+  return projects.map(p => p._id)
+}
+
 export async function GET(request: NextRequest) {
   try {
     await connectDB()
@@ -54,12 +65,24 @@ export async function GET(request: NextRequest) {
     const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Default to last 30 days
     const end = endDate ? new Date(endDate) : new Date()
 
-    // Build base query - Reports should only show approved time entries
+    // Build base query - Reports should show approved time entries or entries from projects that don't require approval
     const baseQuery: any = {
       organization: organizationId,
       startTime: { $gte: start, $lte: end },
       status: 'completed',
-      isApproved: true  // Only show approved entries in reports
+      $or: [
+        { isApproved: true }, // Explicitly approved entries
+        // Entries from projects that don't require approval (auto-approved)
+        {
+          $and: [
+            {
+              project: {
+                $in: await getProjectsWithoutApprovalRequirement(organizationId)
+              }
+            }
+          ]
+        }
+      ]
     }
 
     if (projectId) baseQuery.project = projectId
@@ -90,8 +113,8 @@ export async function GET(request: NextRequest) {
 }
 
 async function getSummaryReport(query: any, format: string) {
-  // Summary report should only include approved entries
-  const approvedQuery = { ...query, isApproved: true }
+  // Summary report includes approved entries or entries from projects that don't require approval
+  const approvedQuery = { ...query }
   
   const summary = await TimeEntry.aggregate([
     { $match: approvedQuery },
@@ -161,8 +184,8 @@ async function getSummaryReport(query: any, format: string) {
 }
 
 async function getUserReport(query: any, format: string) {
-  // User report should only include approved entries
-  const approvedQuery = { ...query, isApproved: true }
+  // User report includes approved entries or entries from projects that don't require approval
+  const approvedQuery = { ...query }
   
   const userReport = await TimeEntry.aggregate([
     { $match: approvedQuery },
@@ -221,8 +244,8 @@ async function getUserReport(query: any, format: string) {
 }
 
 async function getProjectReport(query: any, format: string) {
-  // Project report should only include approved entries
-  const approvedQuery = { ...query, isApproved: true }
+  // Project report includes approved entries or entries from projects that don't require approval
+  const approvedQuery = { ...query }
   
   const projectReport = await TimeEntry.aggregate([
     { $match: approvedQuery },
@@ -279,8 +302,8 @@ async function getProjectReport(query: any, format: string) {
 }
 
 async function getTaskReport(query: any, format: string) {
-  // Task report should only include approved entries
-  const approvedQuery = { ...query, isApproved: true, task: { $exists: true, $ne: null } }
+  // Task report includes approved entries or entries from projects that don't require approval
+  const approvedQuery = { ...query, task: { $exists: true, $ne: null } }
   
   const taskReport = await TimeEntry.aggregate([
     { $match: approvedQuery },
@@ -337,8 +360,8 @@ async function getTaskReport(query: any, format: string) {
 }
 
 async function getBillableReport(query: any, format: string) {
-  // Billable report should only include approved entries
-  const billableQuery = { ...query, isBillable: true, isApproved: true }
+  // Billable report includes approved entries or entries from projects that don't require approval
+  const billableQuery = { ...query, isBillable: true }
   
   const billableReport = await TimeEntry.aggregate([
     { $match: billableQuery },
@@ -407,8 +430,8 @@ async function getBillableReport(query: any, format: string) {
 }
 
 async function getDetailedEntriesReport(query: any, format: string) {
-  // Detailed entries report should only include approved entries
-  const approvedQuery = { ...query, isApproved: true }
+  // Detailed entries report includes approved entries or entries from projects that don't require approval
+  const approvedQuery = { ...query }
   
   // Fetch organization to get currency and default rate
   const organization = await Organization.findById(query.organization).lean()

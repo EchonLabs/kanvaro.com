@@ -387,6 +387,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.DOCUMENTATION_CREATE,
     Permission.DOCUMENTATION_UPDATE,
     Permission.DOCUMENTATION_DELETE,
+    Permission.DOCUMENTATION_UPDATE,
+    Permission.DOCUMENTATION_DELETE,
     Permission.DOCUMENTATION_MANAGE_PERMISSIONS,
   ],
 
@@ -538,8 +540,11 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Documentation
     Permission.DOCUMENTATION_VIEW,
     Permission.DOCUMENTATION_SEARCH,
+    Permission.DOCUMENTATION_CREATE,
+    Permission.DOCUMENTATION_UPDATE,
+    Permission.DOCUMENTATION_DELETE,
   ],
-  
+
   [Role.PROJECT_MANAGER]: [
     // User management
     Permission.USER_CREATE,
@@ -693,8 +698,11 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Documentation
     Permission.DOCUMENTATION_VIEW,
     Permission.DOCUMENTATION_SEARCH,
+    Permission.DOCUMENTATION_CREATE,
+    Permission.DOCUMENTATION_UPDATE,
+    Permission.DOCUMENTATION_DELETE,
   ],
-  
+
   [Role.TEAM_MEMBER]: [
     // User management (own profile only)
     Permission.USER_READ,

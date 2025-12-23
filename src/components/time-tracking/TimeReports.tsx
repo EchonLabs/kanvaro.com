@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { BarChart3, PieChart, TrendingUp, Download, Calendar, Users, DollarSign, Clock, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/Badge'
@@ -708,6 +708,9 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
         <Card>
           <CardHeader>
             <CardTitle>Approved Time Entries</CardTitle>
+            <CardDescription>
+              Shows approved entries and entries from projects that don't require approval
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {/* Results Count */}
@@ -742,7 +745,10 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
 
             {reportData.detailedEntries.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No approved time entries found for the selected filters.
+                No time entries found for the selected filters.
+                <div className="text-sm mt-2">
+                  This includes both approved entries and entries from projects that don't require approval.
+                </div>
               </div>
             ) : (
               <div className="overflow-x-auto">

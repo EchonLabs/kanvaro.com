@@ -28,9 +28,14 @@ const DEFAULT_ALLOWED_TYPES = [
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   // Archives
   'application/zip',
+  'application/x-zip-compressed', // Common browser MIME type for ZIP files
   'application/x-rar-compressed',
-  'application/x-7z-compressed'
+  'application/x-7z-compressed',
+  'application/x-compressed' // Common browser MIME type for 7Z files
 ]
+
+// File extensions that should be allowed even if MIME type detection fails
+const ALLOWED_EXTENSIONS = ['.md', '.zip', '.7z']
 
 const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024 // 25MB
 
@@ -61,12 +66,15 @@ export async function POST(request: NextRequest) {
     }
 
     const fileType = file.type || 'application/octet-stream'
-    if (!DEFAULT_ALLOWED_TYPES.includes(fileType)) {
-      // Provide more specific error message based on file extension
-      const fileExtension = file.name.includes('.')
-        ? file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
-        : ''
+    const fileExtension = file.name.includes('.')
+      ? file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
+      : ''
 
+    // Check MIME type first, then fallback to extension for problematic file types
+    const isMimeTypeAllowed = DEFAULT_ALLOWED_TYPES.includes(fileType)
+    const isExtensionAllowed = ALLOWED_EXTENSIONS.includes(fileExtension)
+
+    if (!isMimeTypeAllowed && !isExtensionAllowed) {
       const supportedExtensions = {
         '.jpg': 'JPEG images',
         '.jpeg': 'JPEG images',
