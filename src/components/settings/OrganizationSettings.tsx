@@ -32,7 +32,6 @@ export function OrganizationSettings() {
     language: 'en',
     industry: '',
     size: 'small' as 'startup' | 'small' | 'medium' | 'enterprise',
-    requireEmailVerification: true,
     defaultUserRole: 'team_member',
         timeTracking: {
           allowTimeTracking: true,
@@ -174,7 +173,6 @@ export function OrganizationSettings() {
         language: organization.language || 'en',
         industry: organization.industry || '',
         size: organization.size || 'small',
-        requireEmailVerification: organization.settings?.requireEmailVerification ?? true,
         defaultUserRole: organization.settings?.defaultUserRole || 'team_member',
         timeTracking: {
           allowTimeTracking: true,
@@ -333,7 +331,6 @@ export function OrganizationSettings() {
     try {
       const formDataToSend = new FormData()
       formDataToSend.append('data', JSON.stringify({
-        requireEmailVerification: formData.requireEmailVerification,
         defaultUserRole: formData.defaultUserRole
       }))
 
@@ -888,20 +885,6 @@ export function OrganizationSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-            <div className="space-y-0.5 flex-1 min-w-0">
-              <Label className="text-xs sm:text-sm">Require Email Verification</Label>
-              <p className="text-xs sm:text-sm text-muted-foreground break-words">
-                Require users to verify their email address before accessing the system
-              </p>
-            </div>
-            <Switch
-              checked={formData.requireEmailVerification}
-              onCheckedChange={(checked) => setFormData({ ...formData, requireEmailVerification: checked })}
-              className="flex-shrink-0"
-            />
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="defaultRole" className="text-xs sm:text-sm">Default User Role</Label>
             <Select value={formData.defaultUserRole} onValueChange={(value) => setFormData({ ...formData, defaultUserRole: value })}>

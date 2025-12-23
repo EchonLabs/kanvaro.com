@@ -337,7 +337,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <h3 className="text-xl sm:text-2xl font-semibold text-foreground">Product backlog</h3>
+          <h3 className="text-xl sm:text-2xl font-semibold text-foreground">Product Backlog</h3>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">
             Prioritized list of features, bugs, and improvements
           </p>

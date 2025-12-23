@@ -16,7 +16,6 @@ interface Organization {
   size?: 'startup' | 'small' | 'medium' | 'enterprise'
   settings?: {
     allowSelfRegistration?: boolean
-    requireEmailVerification?: boolean
     defaultUserRole?: string
     timeTracking?: {
       allowTimeTracking?: boolean

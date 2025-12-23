@@ -160,7 +160,6 @@ export async function PUT(request: NextRequest) {
         size: 'small',
         settings: {
           allowSelfRegistration: false,
-          requireEmailVerification: true,
           defaultUserRole: 'team_member',
           projectTemplates: [],
           timeTracking: {
