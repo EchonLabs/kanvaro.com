@@ -1,3 +1,10 @@
+## [1.15.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.15.3...v1.15.4) (2025-12-23)
+
+
+### Bug Fixes
+
+* add time entries changes ([0d4e4dc](https://github.com/EchonLabs/kanvaro.com/commit/0d4e4dc2e6a7754182cec0b0f824a518c71ce6b3))
+
 ## [1.15.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.15.2...v1.15.3) (2025-12-23)
 
 
