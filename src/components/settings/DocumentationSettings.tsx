@@ -158,8 +158,12 @@ export function DocumentationSettings() {
     setShowDeleteModal(true)
   }
 
+  const validateForm = () => {
+    return formData.title.trim() !== '' && formData.slug.trim() !== ''
+  }
+
   const handleSaveArticle = async () => {
-    if (!formData.title.trim() || !formData.slug.trim()) {
+    if (!validateForm()) {
       notifyError({ title: 'Validation Error', message: 'Title and slug are required' })
       return
     }
@@ -249,7 +253,7 @@ export function DocumentationSettings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <Card>
         <CardHeader>
@@ -460,7 +464,7 @@ export function DocumentationSettings() {
 
       {/* Create Article Modal */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto mt-8 mb-8">
           <DialogHeader>
             <DialogTitle>Create Documentation Article</DialogTitle>
             <DialogDescription>
@@ -476,13 +480,14 @@ export function DocumentationSettings() {
             onCancel={() => setShowCreateModal(false)}
             saving={saving}
             isEdit={false}
+            isValid={validateForm()}
           />
         </DialogContent>
       </Dialog>
 
       {/* Edit Article Modal */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto mt-8 mb-8">
           <DialogHeader>
             <DialogTitle>Edit Documentation Article</DialogTitle>
             <DialogDescription>
@@ -498,6 +503,7 @@ export function DocumentationSettings() {
             onCancel={() => setShowEditModal(false)}
             saving={saving}
             isEdit={true}
+            isValid={validateForm()}
           />
         </DialogContent>
       </Dialog>
@@ -536,11 +542,12 @@ interface ArticleFormProps {
   onCancel: () => void
   saving: boolean
   isEdit: boolean
+  isValid: boolean
 }
 
-function ArticleForm({ formData, setFormData, toggleAudience, onSave, onCancel, saving, isEdit }: ArticleFormProps) {
+function ArticleForm({ formData, setFormData, toggleAudience, onSave, onCancel, saving, isEdit, isValid }: ArticleFormProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <Tabs defaultValue="metadata" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="metadata">Metadata</TabsTrigger>
@@ -662,11 +669,11 @@ function ArticleForm({ formData, setFormData, toggleAudience, onSave, onCancel, 
         </TabsContent>
       </Tabs>
 
-      <div className="flex justify-end gap-3">
+      <div className="flex justify-end gap-3 pt-4 border-t">
         <Button variant="outline" onClick={onCancel} disabled={saving}>
           Cancel
         </Button>
-        <Button onClick={onSave} disabled={saving}>
+        <Button onClick={onSave} disabled={saving || !isValid}>
           {saving ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
