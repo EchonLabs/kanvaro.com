@@ -30,6 +30,7 @@ interface TeamMember {
   firstName: string
   lastName: string
   email: string
+  isActive?: boolean
 }
 
 interface Project {
@@ -85,7 +86,8 @@ export default function EditSprintPage() {
             _id: member._id,
             firstName: member.firstName,
             lastName: member.lastName,
-            email: member.email
+            email: member.email,
+            isActive: member.isActive !== false
           }
         }
       })
@@ -117,19 +119,98 @@ export default function EditSprintPage() {
     try {
       setMembersLoading(true)
       setMembersError('')
-      const res = await fetch(`/api/projects/${projectId}`)
-      const data = await res.json()
+      const [projectResponse, membersResponse] = await Promise.all([
+        fetch(`/api/projects/${projectId}`),
+        fetch('/api/members')
+      ])
 
-      if (res.ok && data.success && data.data) {
-        setSelectedProject(data.data)
-        if (data.data?.teamMembers) {
-          setAvailableMembers(data.data.teamMembers)
-          storeMemberDetails(data.data.teamMembers)
+      const projectData = await projectResponse.json()
+      const membersData = await membersResponse.json().catch(() => ({ success: false }))
+
+      if (projectResponse.ok && projectData.success && projectData.data) {
+        setSelectedProject(projectData.data)
+
+        const directoryMembers =
+          membersResponse.ok && membersData.success && Array.isArray(membersData.data?.members)
+            ? membersData.data.members
+            : []
+        const directoryMap = new Map<string, any>()
+        directoryMembers.forEach((member: any) => {
+          if (member?._id) directoryMap.set(member._id, member)
+        })
+
+        const collectMemberId = (entry: any): string | null => {
+          if (!entry) return null
+          if (typeof entry === 'string') return entry
+          if (entry.memberId) return collectMemberId(entry.memberId)
+          if (entry._id) return entry._id
+          return null
         }
+
+        const normalizeMember = (raw: any): TeamMember | null => {
+          if (!raw) return null
+          if (typeof raw === 'string') {
+            const fromDirectory = directoryMap.get(raw)
+            if (fromDirectory) return normalizeMember(fromDirectory)
+            return {
+              _id: raw,
+              firstName: 'Unknown',
+              lastName: '',
+              email: '',
+              isActive: true
+            }
+          }
+          if (raw.memberId) return normalizeMember(raw.memberId)
+          if (!raw._id) return null
+          return {
+            _id: raw._id,
+            firstName: raw.firstName || '',
+            lastName: raw.lastName || '',
+            email: raw.email || '',
+            isActive: raw.isActive !== false
+          }
+        }
+
+        const normalizedMembersMap = new Map<string, TeamMember>()
+        const addMember = (entry: any) => {
+          const normalized = normalizeMember(entry)
+          if (normalized) normalizedMembersMap.set(normalized._id, normalized)
+        }
+
+        const projectTeamMembers = Array.isArray(projectData.data.teamMembers)
+          ? projectData.data.teamMembers
+          : []
+        const projectMembersList = Array.isArray(projectData.data.members)
+          ? projectData.data.members
+          : []
+
+        projectTeamMembers.forEach((member: any) => addMember(member))
+        projectMembersList.forEach((member: any) => addMember(member))
+
+        if (normalizedMembersMap.size === 0 && directoryMap.size > 0) {
+          const projectMemberIds = new Set<string>()
+          projectTeamMembers.forEach((member: any) => {
+            const id = collectMemberId(member)
+            if (id) projectMemberIds.add(id)
+          })
+          projectMembersList.forEach((member: any) => {
+            const id = collectMemberId(member)
+            if (id) projectMemberIds.add(id)
+          })
+
+          projectMemberIds.forEach((memberId) => {
+            const directoryEntry = directoryMap.get(memberId)
+            if (directoryEntry) addMember(directoryEntry)
+          })
+        }
+
+        const normalizedMembers = Array.from(normalizedMembersMap.values())
+        setAvailableMembers(normalizedMembers)
+        storeMemberDetails(normalizedMembers)
       } else {
         setAvailableMembers([])
         setSelectedProject(null)
-        setMembersError(data.error || 'Failed to load project team members')
+        setMembersError(projectData.error || 'Failed to load project team members')
       }
     } catch (err) {
       console.error('Failed to fetch project members:', err)
@@ -373,9 +454,14 @@ export default function EditSprintPage() {
     }
   }
 
+  const activeAvailableMembers = useMemo(
+    () => availableMembers.filter((member) => member.isActive !== false),
+    [availableMembers]
+  )
+
   const filteredTeamOptions = useMemo(() => {
     // First, exclude already selected members
-    const unselectedMembers = availableMembers.filter(
+    const unselectedMembers = activeAvailableMembers.filter(
       (member) => !teamMembers.includes(member._id)
     )
     
@@ -390,9 +476,9 @@ export default function EditSprintPage() {
         (member.email ? member.email.toLowerCase().includes(query) : false)
       )
     })
-  }, [availableMembers, teamMembers, teamMemberQuery])
+  }, [activeAvailableMembers, teamMembers, teamMemberQuery])
 
-  const isSelectDisabled = membersLoading || availableMembers.length === 0
+  const isSelectDisabled = membersLoading || activeAvailableMembers.length === 0
 
   const handleRemoveMember = (memberId: string) => {
     setTeamMembers((prev) => prev.filter((id) => id !== memberId))
@@ -723,8 +809,8 @@ export default function EditSprintPage() {
                       placeholder={
                         membersLoading
                           ? 'Loading team members...'
-                          : availableMembers.length === 0
-                            ? 'No team members for this project'
+                          : activeAvailableMembers.length === 0
+                            ? 'No active team members for this project'
                             : 'Search team members'
                       }
                     />
@@ -743,9 +829,9 @@ export default function EditSprintPage() {
                               <Loader2 className="h-4 w-4 animate-spin" />
                               <span>Loading members...</span>
                             </div>
-                          ) : availableMembers.length === 0 ? (
+                          ) : activeAvailableMembers.length === 0 ? (
                             <div className="px-2 py-1 text-xs text-muted-foreground">
-                              No team members available
+                              No active team members available
                             </div>
                           ) : filteredTeamOptions.length === 0 ? (
                             <div className="px-2 py-1 text-xs text-muted-foreground">
@@ -774,9 +860,9 @@ export default function EditSprintPage() {
                       </div>
                     </SelectContent>
                   </Select>
-                  {!membersLoading && availableMembers.length === 0 && (
+                  {!membersLoading && activeAvailableMembers.length === 0 && (
                     <p className="text-xs text-muted-foreground italic">
-                      No team members available for this sprint&apos;s project.
+                      No active team members available for this sprint&apos;s project.
                     </p>
                   )}
                 </div>

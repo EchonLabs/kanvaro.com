@@ -194,6 +194,28 @@ async function sendEventCreationEmails(
   }
 }
 
+// Test endpoint to check sprint data
+export async function HEAD(req: NextRequest) {
+  try {
+    await connectDB()
+
+    // Check if we can find the specific sprint mentioned by user
+    const Sprint = (await import('@/models/Sprint')).Sprint
+    const testSprint = await Sprint.findById('694b864fa38e971b507ccc24')
+    console.log('Test sprint lookup:', testSprint ? {
+      _id: testSprint._id,
+      name: testSprint.name,
+      status: testSprint.status,
+      project: testSprint.project
+    } : 'Sprint not found')
+
+    return new Response('Test completed - check console logs', { status: 200 })
+  } catch (error) {
+    console.error('Test endpoint error:', error)
+    return new Response('Test failed', { status: 500 })
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
     await connectDB()
@@ -258,12 +280,92 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // First get raw events to check sprint references
+    const rawSprintEvents = await SprintEvent.find(query).sort({ scheduledDate: 1 })
+
+    console.log('Raw sprint events before population:', rawSprintEvents.map(event => ({
+      _id: event._id,
+      title: event.title,
+      sprint: event.sprint, // Raw ObjectId
+      project: event.project
+    })))
+
     const sprintEvents = await SprintEvent.find(query)
       .populate('sprint', 'name status')
       .populate('project', 'name')
       .populate('facilitator', 'firstName lastName email')
       .populate('attendees', 'firstName lastName email')
       .sort({ scheduledDate: 1 })
+
+    // Debug sprint population and fix data integrity issues
+    for (const event of sprintEvents) {
+      console.log('Event sprint status:', {
+        eventId: event._id,
+        eventTitle: event.title,
+        sprint: event.sprint,
+        sprintType: typeof event.sprint,
+        hasName: event.sprint?.name ? true : false
+      })
+
+      // If sprint is not populated (still an ObjectId or missing name), try to populate manually
+      if (!event.sprint || (typeof event.sprint === 'object' && !event.sprint.name)) {
+        const rawEvent = rawSprintEvents.find(re => re._id.toString() === event._id.toString())
+        const sprintObjectId = rawEvent?.sprint
+
+        console.log('Attempting manual sprint population:', {
+          eventId: event._id,
+          rawSprintId: sprintObjectId
+        })
+
+        if (sprintObjectId) {
+          try {
+            const Sprint = (await import('@/models/Sprint')).Sprint
+            const sprintData = await Sprint.findById(sprintObjectId).select('name status')
+            if (sprintData) {
+              event.sprint = sprintData
+              console.log('Successfully populated sprint:', {
+                eventId: event._id,
+                sprintName: sprintData.name,
+                sprintStatus: sprintData.status
+              })
+            } else {
+              console.log('Sprint not found in database:', sprintObjectId)
+              // Try to find any sprint for this project as fallback
+              if (event.project && typeof event.project === 'object' && event.project._id) {
+                const fallbackSprint = await Sprint.findOne({
+                  project: event.project._id,
+                  status: { $in: ['planning', 'active'] }
+                }).select('name status').sort({ createdAt: -1 })
+
+                if (fallbackSprint) {
+                  event.sprint = fallbackSprint
+                  console.log('Used fallback sprint:', {
+                    eventId: event._id,
+                    sprintName: fallbackSprint.name
+                  })
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error during manual sprint population:', error)
+          }
+        }
+      }
+    }
+
+    console.log('Sprint Events Final Results:', sprintEvents.map(event => ({
+      _id: event._id,
+      title: event.title,
+      sprint: event.sprint, // Check if populated
+      sprintName: event.sprint?.name || 'No sprint name',
+      project: event.project?.name,
+      sprintType: typeof event.sprint
+    })))
+
+    // Also log a summary
+    const populatedCount = sprintEvents.filter(e => e.sprint?.name).length
+    const totalCount = sprintEvents.length
+    console.log(`Sprint population summary: ${populatedCount}/${totalCount} events have sprint names`)
 
     return NextResponse.json(sprintEvents)
   } catch (error) {
@@ -359,6 +461,12 @@ export async function POST(req: NextRequest) {
       notificationReminder15Min: true
     }
 
+    // Ensure facilitator is included in attendees
+    const attendeesWithFacilitator = Array.isArray(attendees) ? Array.from(new Set([...attendees, authResult.user.id])) : [authResult.user.id]
+
+    console.log('Attendees from request:', attendees)
+    console.log('Attendees with facilitator:', attendeesWithFacilitator)
+
     // Handle recurring events
     let createdEvents = []
     const baseEventDate = new Date(scheduledDate)
@@ -386,7 +494,7 @@ export async function POST(req: NextRequest) {
         endTime,
         duration,
         status: status || 'scheduled',
-        attendees,
+        attendees: attendeesWithFacilitator,
         facilitator: authResult.user.id,
         location,
         meetingLink,
@@ -428,7 +536,7 @@ export async function POST(req: NextRequest) {
           endTime,
           duration,
           status: status || 'scheduled',
-          attendees,
+          attendees: attendeesWithFacilitator,
           facilitator: authResult.user.id,
           location,
           meetingLink,
@@ -462,7 +570,7 @@ export async function POST(req: NextRequest) {
       endTime,
       duration,
       status: status || 'scheduled',
-      attendees,
+      attendees: attendeesWithFacilitator,
       facilitator: authResult.user.id,
       location,
       meetingLink,

@@ -1378,6 +1378,7 @@ interface SortableTaskProps {
 }
 
 function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOverlay = false, onEdit, onDelete }: SortableTaskProps) {
+  const { formatDate } = useDateTime()
   const {
     attributes,
     listeners,
@@ -1486,10 +1487,10 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
                 <span className="text-foreground text-sm line-clamp-2">{task?.project?.name}</span>
               </TruncateTooltip>
             </div>
-            {task.dueDate && (task.dueDate) && (
+            {task.dueDate && (
               <div className="flex items-center space-x-1 mb-1">
                 <Calendar className="h-3 w-3" />
-                <span>Due {(task.dueDate)}</span>
+                <span>Due {formatDate(task.dueDate)}</span>
               </div>
             )}
             {task.storyPoints && (

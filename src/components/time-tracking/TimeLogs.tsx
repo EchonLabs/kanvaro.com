@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useMemo } from 'react'
 import { usePathname } from 'next/navigation'
-import { Clock, Edit, Trash2, Check, X, Filter, Download, Plus, AlertTriangle, FolderOpen, Target, Loader2, Upload, FileText, User, Search, MoreHorizontal } from 'lucide-react'
+import { Clock, Edit, Trash2, Check, X, Filter, Download, Plus, AlertTriangle, FolderOpen, Target, Loader2, Upload, FileText, User, Search, MoreHorizontal, DollarSign } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -54,7 +54,7 @@ interface TimeEntry {
   notes?: string
   isApproved: boolean
   approvedBy?: { firstName: string; lastName: string }
-  project?: { _id: string; name: string } | null
+  project?: { _id: string; name: string; settings?: any } | null
   task?: { _id: string; title: string } | null
   __isActive?: boolean
 }
@@ -375,9 +375,13 @@ export function TimeLogs({
   }, [canViewEmployeeFilter, resolvedOrgId])
 
   // Fetch organization settings for application-level allowManualTimeSubmission
+  // Load settings immediately to ensure buttons show based on actual settings
   useEffect(() => {
     if (organization?.settings?.timeTracking) {
       setOrganizationSettings(organization.settings.timeTracking)
+    } else if (organization) {
+      // If organization exists but no timeTracking settings, use defaults (allowManualTimeSubmission defaults to true)
+      setOrganizationSettings({ allowManualTimeSubmission: true })
     }
   }, [organization])
 
@@ -432,9 +436,9 @@ export function TimeLogs({
 
   // Check if manual time submission is enabled at both levels
   const canAddManualTimeLog = useMemo(() => {
-    // Application level (organization settings)
-    const orgLevelEnabled = organizationSettings?.allowManualTimeSubmission ?? false
-    
+    // Application level (organization settings) - default to true (database default)
+    const orgLevelEnabled = organizationSettings?.allowManualTimeSubmission ?? true
+
     // Project level - check project.settings.allowManualTimeSubmission if projectId is provided
     let projectLevelEnabled = true // Default to true if no project
     if (projectId) {
@@ -444,7 +448,7 @@ export function TimeLogs({
       // No project context, use timeTrackingSettings (organization-level)
       projectLevelEnabled = timeTrackingSettings?.allowManualTimeSubmission ?? true
     }
-    
+
     return orgLevelEnabled && projectLevelEnabled
   }, [organizationSettings, timeTrackingSettings, projectSettings, projectId])
 
@@ -456,49 +460,31 @@ export function TimeLogs({
         const response = await fetch('/api/projects')
         const data = await response.json()
         if (data.success && Array.isArray(data.data)) {
-          // Filter by projects that allow time tracking
-          const timeTrackingEnabled = data.data.filter((project: any) => {
-            const allow = project?.settings?.allowTimeTracking
-            return allow !== false // Default to allowing if not set
+          // Filter projects by strict requirements (matching timer page):
+          // 1. project.settings.allowTimeTracking === true (explicitly enabled)
+          // 2. project.teamMembers contains logged user as memberId
+          const eligibleProjects = data.data.filter((project: any) => {
+            // Check project-level time tracking setting - must be explicitly true
+            const projectAllowsTimeTracking = project?.settings?.allowTimeTracking === true
+            if (!projectAllowsTimeTracking) return false
+
+            // Check if user is in teamMembers array as memberId
+            const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
+            const isUserTeamMember = teamMembers.some((member: any) => {
+              if (typeof member === 'object' && member !== null) {
+                return member.memberId === resolvedUserId || member.memberId?._id === resolvedUserId || member.memberId?.id === resolvedUserId
+              }
+              return false
+            })
+
+            return isUserTeamMember
           })
 
-          // Then check for actual task assignments in each project
-          const taskAssignmentFiltered = []
-          for (const project of timeTrackingEnabled) {
-            try {
-              // Fetch a small sample of tasks for this project to check assignments
-              const tasksResponse = await fetch(`/api/tasks?project=${project._id}&limit=50`)
-              const tasksData = await tasksResponse.json()
-
-              if (tasksData.success && Array.isArray(tasksData.data)) {
-                // Check if user is assigned to any tasks in this project
-                const hasAssignedTasks = tasksData.data.some((task: any) => {
-                  const assignedTo = task?.assignedTo
-                  if (!assignedTo) return false
-                  if (Array.isArray(assignedTo)) {
-                    // assignedTo is now an array of strings (user IDs)
-                    return assignedTo.includes(resolvedUserId)
-                  }
-                  // Legacy support for single string or object
-                  if (typeof assignedTo === 'string') return assignedTo === resolvedUserId
-                  return assignedTo?._id === resolvedUserId || assignedTo?.id === resolvedUserId
-                })
-
-                if (hasAssignedTasks) {
-                  taskAssignmentFiltered.push(project)
-                }
-              }
-            } catch (taskErr) {
-              console.warn(`Failed to check task assignments for project ${project._id}:`, taskErr)
-              // If we can't check tasks, don't include the project (be conservative)
-            }
-          }
-
-          let final = taskAssignmentFiltered
+          let final = eligibleProjects
           if (isEditing && selectedEntry?.project?._id) {
-            const exists = taskAssignmentFiltered.some((p: any) => p?._id === selectedEntry.project!._id)
+            const exists = eligibleProjects.some((p: any) => p?._id === selectedEntry.project!._id)
             if (!exists) {
-              final = [...taskAssignmentFiltered, { _id: selectedEntry.project._id, name: selectedEntry.project.name }]
+              final = [...eligibleProjects, { _id: selectedEntry.project._id, name: selectedEntry.project.name }]
             }
           }
           setProjects(final)
@@ -514,46 +500,8 @@ export function TimeLogs({
 
   // Fetch tasks when project is selected
   useEffect(() => {
-    const fetchTasks = async () => {
-      if (!selectedProjectForLog || !resolvedUserId) {
-        setTasks([])
-        setTasksLoading(false)
-        return
-      }
-
-      setTasksLoading(true)
-      try {
-        const url = isEditing
-          ? `/api/tasks?project=${selectedProjectForLog}&limit=500`
-          : `/api/tasks?project=${selectedProjectForLog}&assignedTo=${resolvedUserId}&limit=200`
-        const response = await fetch(url)
-        const data = await response.json()
-        let list: any[] = []
-        if (data.success && Array.isArray(data.data)) list = data.data
-        else if (Array.isArray(data)) list = data
-        else if (Array.isArray(data.tasks)) list = data.tasks
-        if (!isEditing) {
-          list = list.filter((t: any) => {
-            const at = t?.assignedTo
-            if (!at) return false
-            if (typeof at === 'string') return at === resolvedUserId
-            return at?._id === resolvedUserId || at?.id === resolvedUserId
-          })
-        }
-        if (isEditing && selectedEntry?.task && !list.some((t: any) => t?._id === selectedEntry.task!._id)) {
-          list = [...list, selectedEntry.task]
-        }
-        setTasks(list)
-      } catch (err) {
-        console.error('Failed to fetch tasks:', err)
-        setTasks([])
-      } finally {
-        setTasksLoading(false)
-      }
-    }
-
     if (selectedProjectForLog) {
-      fetchTasks()
+      loadTasksForProject(selectedProjectForLog)
     } else {
       setTasks([])
       setSelectedTaskForLog('')
@@ -1247,10 +1195,18 @@ export function TimeLogs({
 
     setTasksLoading(true)
     try {
-      const url = isEditing
-        ? `/api/tasks?project=${projectId}&limit=500`
-        : `/api/tasks?project=${projectId}&assignedTo=${resolvedUserId}&limit=200`
-      const res = await fetch(url)
+      // Fetch tasks for the selected project where user is assigned (matching timer page)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout (matching timer page)
+
+      const url = `/api/tasks?project=${projectId}&assignedTo=${resolvedUserId}&limit=50&minimal=true`
+
+      const res = await fetch(url, {
+        cache: 'no-store',
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
       const data = await res.json()
       let list: any[] = []
       if (data?.success && Array.isArray(data.data)) list = data.data
@@ -1366,8 +1322,8 @@ export function TimeLogs({
       return value
     }
 
-    const headers = ['Project Name', 'Task Title', 'Start Date (YYYY-MM-DD)', 'Start Time (HH:MM)', 'End Date (YYYY-MM-DD)', 'End Time (HH:MM)', 'Description', 'Is Billable (true/false)']
-    const exampleRow = ['My Project', 'Task 1', '2024-01-15', '09:00', '2024-01-15', '17:00', 'Worked on feature', '']
+    const headers = ['Task No', 'Start Date', 'Start Time', 'End Date', 'End Time', 'Description']
+    const exampleRow = ['20.7', '2024-01-15', '09:00', '2024-01-15', '17:00', 'Worked on feature']
     
     const csvContent = [
       headers.map(escapeCSV).join(','),
@@ -1428,7 +1384,7 @@ export function TimeLogs({
     }
 
     const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim())
-    const requiredHeaders = ['Project Name', 'Task Title', 'Start Date (YYYY-MM-DD)', 'Start Time (HH:MM)', 'End Date (YYYY-MM-DD)', 'End Time (HH:MM)']
+    const requiredHeaders = ['Task No', 'Start Date', 'Start Time', 'End Date', 'End Time']
     
     // Validate CSV format - check if all required headers are present
     const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
@@ -1470,36 +1426,29 @@ export function TimeLogs({
   }
 
   // Validate CSV row
-  const validateCSVRow = (row: Record<string, string>, rowIndex: number, projectMap: Map<string, string>, taskMap: Map<string, string>): { valid: boolean; error?: string; data?: any } => {
-    const projectName = row['Project Name']?.trim()
-    const taskTitle = row['Task Title']?.trim()
-    const startDate = row['Start Date (YYYY-MM-DD)']?.trim()
-    const startTime = row['Start Time (HH:MM)']?.trim()
-    const endDate = row['End Date (YYYY-MM-DD)']?.trim()
-    const endTime = row['End Time (HH:MM)']?.trim()
+  const validateCSVRow = (row: Record<string, string>, rowIndex: number, taskMap: Map<string, { projectId: string; taskId: string }>): { valid: boolean; error?: string; data?: any } => {
+    const taskNo = row['Task No']?.trim()
+    const startDate = row['Start Date']?.trim()
+    const startTime = row['Start Time']?.trim()
+    const endDate = row['End Date']?.trim()
+    const endTime = row['End Time']?.trim()
     const description = row['Description']?.trim() || ''
-    const isBillable = row['Is Billable (true/false)']?.trim().toLowerCase()
 
-    // Validate Project Name (required)
-    if (!projectName) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Project Name is required` }
+    // Validate Task No (required)
+    if (!taskNo) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Task No is required` }
     }
 
-    // Validate Task Title (required)
-    if (!taskTitle) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Task Title is required` }
-    }
-
-    // Validate Project exists
-    const projectId = projectMap.get(projectName)
-    if (!projectId) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Project "${projectName}" not found` }
+    // Validate Task No format (should be like "20.7")
+    const taskNoRegex = /^\d+\.\d+$/
+    if (!taskNoRegex.test(taskNo)) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Task No must be in format "ProjectNumber.TaskNumber" (e.g., "20.7")` }
     }
 
     // Validate Task exists
-    const taskId = taskMap.get(`${projectId}:${taskTitle}`)
-    if (!taskId) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Task "${taskTitle}" not found in project "${projectName}"` }
+    const taskData = taskMap.get(taskNo)
+    if (!taskData) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Task "${taskNo}" not found or not assigned to you` }
     }
 
     // Validate Start Date (required)
@@ -1578,15 +1527,8 @@ export function TimeLogs({
       return { valid: false, error: `Row ${rowIndex + 1}: Description is required` }
     }
 
-    // Validate Is Billable (optional - only validate if provided)
-    let billable = true // Default to true if not provided
-    if (isBillable && isBillable !== '') {
-      const normalizedBillable = isBillable.toLowerCase().trim()
-      if (normalizedBillable !== 'true' && normalizedBillable !== 'false') {
-        return { valid: false, error: `Row ${rowIndex + 1}: Is Billable must be "true" or "false" (case-insensitive)` }
-      }
-      billable = normalizedBillable === 'true'
-    }
+    // Set billable to true by default (no Is Billable column in new format)
+    const billable = true
 
     // Check future time
     if (!timeTrackingSettings?.allowFutureTime && start > new Date()) {
@@ -1637,35 +1579,42 @@ export function TimeLogs({
       const csvText = await bulkUploadFile.text()
       const rows = parseCSV(csvText)
 
-      // Build project and task maps
-      const projectMap = new Map<string, string>()
-      const taskMap = new Map<string, string>()
+      // Build task map using Task No (displayId)
+      const taskMap = new Map<string, { projectId: string; taskId: string }>()
 
-      // Fetch all projects
+      // Fetch all projects that allow manual time submission and user is a team member
       const projectsResponse = await fetch('/api/projects')
       const projectsData = await projectsResponse.json()
       if (projectsData.success && Array.isArray(projectsData.data)) {
-        projectsData.data.forEach((project: any) => {
-          projectMap.set(project.name, project._id)
+        // Filter projects that allow manual time submission and user is a team member
+        const eligibleProjects = projectsData.data.filter((project: any) => {
+          const allowManualSubmission = project?.settings?.allowManualTimeSubmission === true
+          const isTeamMember = Array.isArray(project?.teamMembers) &&
+            project.teamMembers.some((member: any) => {
+              const memberId = typeof member === 'string' ? member : member?.memberId
+              return memberId === resolvedUserId
+            })
+          return allowManualSubmission && isTeamMember
         })
-      }
 
-      // Fetch tasks for each unique project (fetch all tasks, not just assigned ones)
-      const uniqueProjects = Array.from(new Set(rows.map(row => row['Project Name']?.trim()).filter(Boolean)))
-      for (const projectName of uniqueProjects) {
-        const projectId = projectMap.get(projectName)
-        if (projectId) {
+        // Fetch tasks for eligible projects that are assigned to the user
+        for (const project of eligibleProjects) {
           try {
-            const tasksResponse = await fetch(`/api/tasks?project=${projectId}&limit=500`)
+            const tasksResponse = await fetch(`/api/tasks?project=${project._id}&assignedTo=${resolvedUserId}&limit=500`)
             const tasksData = await tasksResponse.json()
             if (tasksData.success && Array.isArray(tasksData.data)) {
               tasksData.data.forEach((task: any) => {
-                // Use projectId:taskTitle as key to handle duplicate task titles across projects
-                taskMap.set(`${projectId}:${task.title}`, task._id)
+                // Use displayId as key (e.g., "20.7")
+                if (task.displayId) {
+                  taskMap.set(task.displayId, {
+                    projectId: project._id,
+                    taskId: task._id
+                  })
+                }
               })
             }
           } catch (err) {
-            console.error(`Failed to fetch tasks for project ${projectName}:`, err)
+            console.error(`Failed to fetch tasks for project ${project.name}:`, err)
           }
         }
       }
@@ -1675,7 +1624,7 @@ export function TimeLogs({
       const errors: Array<{ row: number; error: string }> = []
 
       rows.forEach((row, index) => {
-        const validation = validateCSVRow(row, index, projectMap, taskMap)
+        const validation = validateCSVRow(row, index, taskMap)
         if (validation.valid && validation.data) {
           validatedRows.push({ rowIndex: index, data: validation.data })
         } else {
@@ -1835,7 +1784,7 @@ export function TimeLogs({
             {/* <Clock className="h-5 w-5" />
             Time Logs */}
           </CardTitle>
-          {canAddManualTimeLog && showManualLogButtons && pathname === '/time-tracking/timer' && (
+          {showManualLogButtons && pathname === '/time-tracking/timer' && canAddManualTimeLog && (
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <Button
                 onClick={() => setShowBulkUploadModal(true)}
@@ -1929,8 +1878,21 @@ export function TimeLogs({
                         onChange={(e) => setProjectSearch(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
-                        className="h-8 pl-7 text-xs"
+                        className="h-8 pl-7 pr-7 text-xs"
                       />
+                      {projectSearch && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setProjectSearch('')
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label="Clear search"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="max-h-[200px] overflow-y-auto">
@@ -1989,9 +1951,22 @@ export function TimeLogs({
                         onChange={(e) => setTaskSearch(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
-                        className="h-8 pl-7 text-xs"
+                        className="h-8 pl-7 pr-7 text-xs"
                         disabled={!filters.projectId}
                       />
+                      {taskSearch && !(!filters.projectId) && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setTaskSearch('')
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label="Clear search"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="max-h-[200px] overflow-y-auto">
@@ -2045,8 +2020,21 @@ export function TimeLogs({
                           onChange={(e) => setEmployeeSearch(e.target.value)}
                           onClick={(e) => e.stopPropagation()}
                           onKeyDown={(e) => e.stopPropagation()}
-                          className="h-8 pl-7 text-xs"
+                          className="h-8 pl-7 pr-7 text-xs"
                         />
+                        {employeeSearch && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setEmployeeSearch('')
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                            aria-label="Clear search"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className="max-h-[200px] overflow-y-auto">
@@ -2116,8 +2104,21 @@ export function TimeLogs({
                         onChange={(e) => setStatusSearch(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
-                        className="h-8 pl-7 text-xs"
+                        className="h-8 pl-7 pr-7 text-xs"
                       />
+                      {statusSearch && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setStatusSearch('')
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label="Clear search"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="max-h-[200px] overflow-y-auto">
@@ -2365,12 +2366,22 @@ export function TimeLogs({
                       <div>
                         <div className="text-muted-foreground">Approval</div>
                         <div className="mt-1">
-                          <Badge 
-                            variant={entry.isApproved ? 'default' : 'secondary'} 
-                            className="text-xs"
-                          >
-                            {entry.isApproved ? 'Approved' : 'Pending'}
-                          </Badge>
+                          {(() => {
+
+                            // If project doesn't require approval, always show as Approved
+                            const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
+
+                            const isApproved = projectRequiresApproval ? entry.isApproved : true;                            console.log('Badge will show:', isApproved ? 'Approved' : 'Pending');
+
+                            return (
+                              <Badge
+                                variant={isApproved ? 'default' : 'secondary'}
+                                className="text-xs"
+                              >
+                                {isApproved ? 'Approved' : 'Pending'}
+                              </Badge>
+                            );
+                          })()}
                         </div>
                       </div>
                     )}
@@ -2648,8 +2659,21 @@ export function TimeLogs({
                         onChange={(e) => setModalProjectSearch(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
-                        className="h-8 pl-7 text-xs"
+                        className="h-8 pl-7 pr-7 text-xs"
                       />
+                      {modalProjectSearch && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setModalProjectSearch('')
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label="Clear search"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="max-h-[200px] overflow-y-auto">
@@ -2701,20 +2725,24 @@ export function TimeLogs({
                     tasks.map((task) => {
                       const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
                       return (
-                        <SelectItem 
-                          key={task._id} 
+                        <SelectItem
+                          key={task._id}
                           value={task._id}
                           disabled={isBillableDisabled}
                         >
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 min-w-0 w-full">
                             <Target className="h-4 w-4 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">{task.title}</div>
-                              {isBillableDisabled && (
-                                <div className="text-xs text-muted-foreground">
-                                  Billable time not allowed
-                                </div>
-                              )}
+                            <div className="flex-1 min-w-0 overflow-hidden">
+                              <div className="font-medium truncate flex items-center gap-2 min-w-0">
+                                <span className="truncate">{task.title}</span>
+                                {task.isBillable && (
+                                  <DollarSign className="h-3 w-3 text-green-600 flex-shrink-0" />
+                                )}
+                              </div>
+                              <div className="text-xs sm:text-sm text-muted-foreground truncate">
+                                {task.status} • {task.priority}
+                                {isBillableDisabled && ' • Billable time not allowed'}
+                              </div>
                             </div>
                           </div>
                         </SelectItem>
@@ -2929,8 +2957,21 @@ export function TimeLogs({
                         onChange={(e) => setModalProjectSearch(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
-                        className="h-8 pl-7 text-xs"
+                        className="h-8 pl-7 pr-7 text-xs"
                       />
+                      {modalProjectSearch && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setModalProjectSearch('')
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label="Clear search"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="max-h-[200px] overflow-y-auto">
@@ -3351,11 +3392,10 @@ export function TimeLogs({
               <AlertDescription className="text-xs">
                 <div className="font-semibold mb-1">CSV Format Requirements:</div>
                 <ul className="list-disc list-inside space-y-1">
-                  <li>Required columns: Project Name, Task Title, Start Date (YYYY-MM-DD), Start Time (HH:MM), End Date (YYYY-MM-DD), End Time (HH:MM)</li>
-                  <li>Optional columns: Description, Is Billable (true/false - leave empty or use "true"/"false")</li>
-                  <li>Date format: YYYY-MM-DD (e.g., 2024-01-15)</li>
-                  <li>Time format: HH:MM (e.g., 09:00, must be between 00:00 and 23:59)</li>
-                  <li>Projects and tasks must exist in the system</li>
+                  <li>Required columns: Task No, Start Date, Start Time, End Date, End Time</li>
+                  <li>Optional columns: Description</li>
+                  <li>Task No format: ProjectNumber.TaskNumber (e.g., 20.7)</li>
+                  <li>Task ID must be correct</li>
                   <li>End Date/Time must be after Start Date/Time</li>
                 </ul>
               </AlertDescription>

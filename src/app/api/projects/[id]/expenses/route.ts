@@ -213,3 +213,233 @@ export async function POST(
   }
 }
 
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await connectDB()
+
+    const authResult = await authenticateUser()
+    if ('error' in authResult) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { user } = authResult
+    const projectId = params.id
+
+    // Check if user can access this project
+    const canAccessProject = await PermissionService.canAccessProject(user.id, projectId)
+    if (!canAccessProject) {
+      return NextResponse.json(
+        { error: 'Access denied to project' },
+        { status: 403 }
+      )
+    }
+
+    const body = await request.json()
+    const {
+      expenseId,
+      name,
+      description,
+      unitPrice,
+      quantity,
+      fullAmount,
+      expenseDate,
+      category,
+      isBillable,
+      paidStatus,
+      paidBy,
+      attachments
+    } = body
+
+    if (!expenseId) {
+      return NextResponse.json(
+        { error: 'Expense ID is required' },
+        { status: 400 }
+      )
+    }
+
+    // Find and validate expense belongs to this project
+    const expense = await Expense.findOne({ _id: expenseId, project: projectId })
+    if (!expense) {
+      return NextResponse.json(
+        { error: 'Expense not found or access denied' },
+        { status: 404 }
+      )
+    }
+
+    // Get the old amount for budget adjustment
+    const oldFullAmount = expense.fullAmount
+    const oldCategory = expense.category
+
+    // Update expense fields
+    if (name !== undefined) expense.name = name
+    if (description !== undefined) expense.description = description
+    if (unitPrice !== undefined) expense.unitPrice = unitPrice
+    if (quantity !== undefined) expense.quantity = quantity
+    if (fullAmount !== undefined) expense.fullAmount = fullAmount
+    if (expenseDate !== undefined) expense.expenseDate = new Date(expenseDate)
+    if (category !== undefined) expense.category = category
+    if (isBillable !== undefined) expense.isBillable = isBillable
+    if (paidStatus !== undefined) expense.paidStatus = paidStatus
+    if (paidBy !== undefined || paidStatus === 'unpaid') {
+      expense.paidBy = paidStatus === 'paid' && paidBy ? paidBy : undefined
+    }
+
+    // Process attachments if provided
+    if (attachments !== undefined) {
+      const processedAttachments = attachments.map((att: any) => ({
+        name: att.name,
+        url: att.url,
+        size: att.size,
+        type: att.type,
+        uploadedBy: att.uploadedBy || user.id,
+        uploadedAt: att.uploadedAt ? new Date(att.uploadedAt) : new Date()
+      }))
+      expense.attachments = processedAttachments
+    }
+
+    await expense.save()
+
+    // Update project budget if amount or category changed
+    if (oldFullAmount !== fullAmount || oldCategory !== category) {
+      const project = await Project.findById(projectId)
+      if (project?.budget) {
+        // Subtract old amount from old category
+        const oldBudgetCategoryMap: Record<string, 'materials' | 'overhead' | 'external'> = {
+          'labor': 'materials',
+          'materials': 'materials',
+          'overhead': 'overhead',
+          'external': 'external',
+          'other': 'materials'
+        }
+        const oldBudgetCategory = oldBudgetCategoryMap[oldCategory] || 'materials'
+        const currentOldAmount = (project.budget.categories as any)[oldBudgetCategory] || 0
+        ;(project.budget.categories as any)[oldBudgetCategory] = Math.max(0, currentOldAmount - oldFullAmount)
+
+        // Add new amount to new category
+        const newBudgetCategory = oldBudgetCategoryMap[category] || 'materials'
+        const currentNewAmount = (project.budget.categories as any)[newBudgetCategory] || 0
+        ;(project.budget.categories as any)[newBudgetCategory] = currentNewAmount + fullAmount
+
+        // Update total spent
+        project.budget.spent = (project.budget.spent || 0) - oldFullAmount + fullAmount
+        project.budget.lastUpdated = new Date()
+        project.budget.updatedBy = user.id
+        await project.save()
+      }
+    }
+
+    // Populate and return updated expense
+    const populatedExpense = await Expense.findById(expense._id)
+      .populate('addedBy', 'firstName lastName email')
+      .populate('paidBy', 'firstName lastName email')
+
+    return NextResponse.json({
+      success: true,
+      data: populatedExpense
+    })
+
+  } catch (error) {
+    console.error('Update expense error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await connectDB()
+
+    const authResult = await authenticateUser()
+    if ('error' in authResult) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { user } = authResult
+    const projectId = params.id
+
+    // Check if user can access this project
+    const canAccessProject = await PermissionService.canAccessProject(user.id, projectId)
+    if (!canAccessProject) {
+      return NextResponse.json(
+        { error: 'Access denied to project' },
+        { status: 403 }
+      )
+    }
+
+    const { searchParams } = new URL(request.url)
+    const expenseId = searchParams.get('expenseId')
+
+    if (!expenseId) {
+      return NextResponse.json(
+        { error: 'Expense ID is required' },
+        { status: 400 }
+      )
+    }
+
+    // Find and validate expense belongs to this project
+    const expense = await Expense.findOne({ _id: expenseId, project: projectId })
+    if (!expense) {
+      return NextResponse.json(
+        { error: 'Expense not found or access denied' },
+        { status: 404 }
+      )
+    }
+
+    // Store expense data for budget adjustment
+    const expenseAmount = expense.fullAmount
+    const expenseCategory = expense.category
+
+    // Delete the expense
+    await Expense.findByIdAndDelete(expenseId)
+
+    // Update project budget
+    const project = await Project.findById(projectId)
+    if (project?.budget) {
+      // Map expense categories to budget categories
+      const budgetCategoryMap: Record<string, 'materials' | 'overhead' | 'external'> = {
+        'labor': 'materials',
+        'materials': 'materials',
+        'overhead': 'overhead',
+        'external': 'external',
+        'other': 'materials'
+      }
+
+      const budgetCategory = budgetCategoryMap[expenseCategory] || 'materials'
+      const currentAmount = (project.budget.categories as any)[budgetCategory] || 0
+      ;(project.budget.categories as any)[budgetCategory] = Math.max(0, currentAmount - expenseAmount)
+
+      // Update total spent
+      project.budget.spent = Math.max(0, (project.budget.spent || 0) - expenseAmount)
+      project.budget.lastUpdated = new Date()
+      project.budget.updatedBy = user.id
+      await project.save()
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Expense deleted successfully'
+    })
+
+  } catch (error) {
+    console.error('Delete expense error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+

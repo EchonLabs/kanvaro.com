@@ -31,9 +31,11 @@ interface SprintEvent {
     email: string
   }
   attendees: Array<{
+    _id?: string
     firstName: string
     lastName: string
     email: string
+    isActive?: boolean
   }>
   outcomes?: {
     decisions: string[]
@@ -65,6 +67,7 @@ interface User {
   firstName: string
   lastName: string
   email: string
+  isActive?: boolean
 }
 
 interface EditSprintEventModalProps {
@@ -85,6 +88,10 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
     event.actualDate ? new Date(event.actualDate) : undefined
   )
   const { success: notifySuccess, error: notifyError } = useNotify()
+  const attendeeIds = event.attendees
+    .map(a => (a as any)._id)
+    .filter((id): id is string => Boolean(id))
+ 
   
   // Store initial state to compare changes
   const initialFormData = {
@@ -92,7 +99,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
     description: event.description || '',
     duration: event.duration,
     status: event.status,
-    attendees: event.attendees.map(a => (a as any)._id).sort(),
+    attendees: [...attendeeIds].sort(),
     location: event.location || '',
     meetingLink: event.meetingLink || '',
     outcomes: event.outcomes || {
@@ -111,7 +118,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
     description: event.description || '',
     duration: event.duration,
     status: event.status,
-    attendees: event.attendees.map(a => (a as any)._id),
+    attendees: attendeeIds,
     location: event.location || '',
     meetingLink: event.meetingLink || '',
     outcomes: event.outcomes || {
@@ -122,6 +129,42 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
       capacity: undefined
     }
   })
+
+  const normalizeMembers = (members: any[]): User[] => {
+    if (!Array.isArray(members)) return []
+    return members
+      .filter((member: any) => member && member._id)
+      .map((member: any) => ({
+        _id: member._id,
+        firstName: member.firstName || '',
+        lastName: member.lastName || '',
+        email: member.email || '',
+        isActive: member.isActive !== false
+      }))
+  }
+
+  const includeExistingAttendees = (members: User[]): User[] => {
+    const memberMap = new Map<string, User>()
+    members.forEach(member => {
+      if (member?._id) {
+        memberMap.set(member._id, member)
+      }
+    })
+
+    formData.attendees.forEach(attendeeId => {
+      if (!attendeeId || memberMap.has(attendeeId)) return
+      const fallbackAttendee = event.attendees.find(att => att._id === attendeeId)
+      memberMap.set(attendeeId, {
+        _id: attendeeId,
+        firstName: fallbackAttendee?.firstName || 'Unknown',
+        lastName: fallbackAttendee?.lastName || '',
+        email: fallbackAttendee?.email || '',
+        isActive: false
+      })
+    })
+
+    return Array.from(memberMap.values())
+  }
 
   useEffect(() => {
     fetchUsers()
@@ -144,18 +187,50 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
         } else if (Array.isArray(data)) {
           members = data
         }
-        setUsers(Array.isArray(members) ? members : [])
+        const normalizedMembers = normalizeMembers(members)
+        const activeMembers = normalizedMembers.filter(member => member.isActive !== false)
+
+        console.log('All Loaded Users:', normalizedMembers.map(u => ({
+          _id: u._id,
+          name: `${u.firstName} ${u.lastName}`,
+          email: u.email,
+          isActive: u.isActive
+        })))
+        console.log('Active Members Only:', activeMembers.map(u => ({
+          _id: u._id,
+          name: `${u.firstName} ${u.lastName}`,
+          email: u.email,
+          isActive: u.isActive
+        })))
+
+        setUsers(includeExistingAttendees(activeMembers))
       } else {
         // Fallback to /api/users
         const fallbackResponse = await fetch('/api/users')
         if (fallbackResponse.ok) {
           const usersData = await fallbackResponse.json()
-          setUsers(Array.isArray(usersData) ? usersData : [])
+          const normalizedFallback = normalizeMembers(Array.isArray(usersData) ? usersData : [])
+          const activeFallback = normalizedFallback.filter(member => member.isActive !== false)
+
+          console.log('Fallback - All Loaded Users:', normalizedFallback.map(u => ({
+            _id: u._id,
+            name: `${u.firstName} ${u.lastName}`,
+            email: u.email,
+            isActive: u.isActive
+          })))
+          console.log('Fallback - Active Members Only:', activeFallback.map(u => ({
+            _id: u._id,
+            name: `${u.firstName} ${u.lastName}`,
+            email: u.email,
+            isActive: u.isActive
+          })))
+
+          setUsers(includeExistingAttendees(activeFallback))
         }
       }
     } catch (error) {
       console.error('Error fetching users:', error)
-      setUsers([])
+      setUsers(includeExistingAttendees([]))
     } finally {
       setLoadingUsers(false)
     }
@@ -255,19 +330,26 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
   }
 
   const getSelectedAttendees = () => {
-    return users.filter(user => formData.attendees.includes(user._id))
+    const selected = users.filter(user => formData.attendees.includes(user._id))
+  
+    return selected
   }
 
   const getAvailableAttendees = () => {
     const query = attendeeSearchQuery.toLowerCase()
-    return users.filter(user => {
+    const available = users.filter(user => {
       const isNotSelected = !formData.attendees.includes(user._id)
-      const matchesSearch = !query || 
+      const matchesSearch = !query ||
         user.firstName.toLowerCase().includes(query) ||
         user.lastName.toLowerCase().includes(query) ||
         user.email.toLowerCase().includes(query)
-      return isNotSelected && matchesSearch
+      const isActive = user.isActive !== false
+      return isActive && isNotSelected && matchesSearch
     })
+
+  
+
+    return available
   }
 
   const addDecision = () => {
@@ -598,7 +680,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
                     getAvailableAttendees().map((user) => (
                       <label key={user._id} className="flex items-center space-x-2 p-2 hover:bg-muted rounded cursor-pointer">
                         <Checkbox
-                          checked={false}
+                          checked={formData.attendees.includes(user._id)}
                           onCheckedChange={() => handleAttendeeToggle(user._id)}
                         />
                         <span className="text-sm flex-1">

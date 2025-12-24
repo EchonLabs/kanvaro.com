@@ -114,11 +114,18 @@ function ToastItem({ toast, onRemove }: { toast: Toast, onRemove: (id: string) =
 
   const Icon = icons[toast.type]
 
+  const closeButtonStyles = {
+    success: 'text-green-700 hover:text-green-900 hover:bg-green-100 dark:text-green-100 dark:hover:text-green-50 dark:hover:bg-green-800/50',
+    error: 'text-red-700 hover:text-red-900 hover:bg-red-100 dark:text-red-100 dark:hover:text-red-50 dark:hover:bg-red-800/50',
+    warning: 'text-yellow-700 hover:text-yellow-900 hover:bg-yellow-100 dark:text-yellow-100 dark:hover:text-yellow-50 dark:hover:bg-yellow-800/50',
+    info: 'text-blue-700 hover:text-blue-900 hover:bg-blue-100 dark:text-blue-100 dark:hover:text-blue-50 dark:hover:bg-blue-800/50'
+  }
+
   return (
     <div
       className={`
         ${colors[toast.type]}
-        border rounded-lg shadow-lg p-4 flex items-start gap-3
+        border rounded-lg shadow-lg p-4 flex items-center gap-3
         transition-all duration-300 ease-in-out
         ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
         pointer-events-auto
@@ -126,7 +133,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast, onRemove: (id: string) =
       role="alert"
     >
       <Icon className={`h-5 w-5 flex-shrink-0 mt-0.5 ${iconColors[toast.type]}`} />
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 self-start">
         <h4 className="font-semibold text-sm mb-1">{toast.title}</h4>
         {toast.message && (
           <p className="text-sm opacity-90 break-words">{toast.message}</p>
@@ -136,7 +143,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast, onRemove: (id: string) =
         variant="ghost"
         size="sm"
         onClick={handleRemove}
-        className="h-6 w-6 p-0 flex-shrink-0 opacity-70 hover:opacity-100"
+        className={`h-7 w-7 p-0 flex-shrink-0 rounded-full transition-colors ${closeButtonStyles[toast.type]}`}
         aria-label="Close notification"
       >
         <X className="h-4 w-4" />

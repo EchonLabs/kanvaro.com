@@ -39,6 +39,7 @@ interface User {
   lastName: string
   email: string
   projectHourlyRate?: number
+  isActive?: boolean
 }
 
 interface CurrentUser {
@@ -191,13 +192,16 @@ export default function CreateTaskModal({
         const members = Array.isArray(projectData.teamMembers) ? projectData.teamMembers : []
 
         // Transform populated team members data
-        const populatedMembers = members.map((member: any) => ({
-          _id: member.memberId._id,
-          firstName: member.memberId.firstName,
-          lastName: member.memberId.lastName,
-          email: member.memberId.email,
-          projectHourlyRate: member.hourlyRate
-        }))
+        const populatedMembers = members
+          .map((member: any) => ({
+            _id: member.memberId._id,
+            firstName: member.memberId.firstName,
+            lastName: member.memberId.lastName,
+            email: member.memberId.email,
+            projectHourlyRate: member.hourlyRate,
+            isActive: member.memberId.isActive !== false
+          }))
+          .filter((member: any) => member.isActive)
 
         setProjectMembers(populatedMembers)
 
@@ -513,6 +517,16 @@ export default function CreateTaskModal({
         isCompleted: false
       }))
 
+      const assignedToPayload = assignedTo.map(userId => {
+        const member = projectMembers.find(m => m._id.toString() === userId.toString())
+        return {
+          user: userId,
+          firstName: member?.firstName,
+          lastName: member?.lastName,
+          email: member?.email
+        }
+      })
+
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: {
@@ -522,7 +536,7 @@ export default function CreateTaskModal({
           ...formData,
           status: 'backlog',
           project: effectiveProjectId,
-          assignedTo: assignedTo,
+          assignedTo: assignedToPayload,
           estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined,
           dueDate: formData.dueDate || undefined,
           labels: Array.isArray(formData.labels) ? formData.labels : [],
@@ -970,8 +984,9 @@ export default function CreateTaskModal({
                               <div className="px-2 py-1 text-sm text-muted-foreground">No team members found for this project</div>
                             ) : (
                               (() => {
+                                const activeMembers = projectMembers.filter(member => member.isActive !== false)
                                 const q = assigneeQuery.toLowerCase().trim()
-                                const filtered = projectMembers.filter(u =>
+                                const filtered = activeMembers.filter(u =>
                                   !q ||
                                   `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
                                   u.email.toLowerCase().includes(q)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { formatToTitleCase } from '@/lib/utils'
@@ -214,6 +214,11 @@ export default function TaskDetailPage() {
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
   const commentFileInputRef = useRef<HTMLInputElement | null>(null)
   const replyFileInputRef = useRef<HTMLInputElement | null>(null)
+  const composerContainerRef = useRef<HTMLDivElement | null>(null)
+  const suggestionMenuRef = useRef<HTMLDivElement | null>(null)
+  const measurementCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [suggestionPosition, setSuggestionPosition] = useState<{ top: number; left: number; flip: boolean }>({ top: 0, left: 0, flip: false })
+  const [editorScrollTop, setEditorScrollTop] = useState(0)
   const { success: notifySuccess, error: notifyError } = useNotify()
   const { hasPermission } = usePermissions()
 
@@ -470,6 +475,91 @@ export default function TaskDetailPage() {
     setSuggestionMode(null)
     setSuggestionQuery('')
   }
+
+  const getCaretOffsets = useCallback((textarea: HTMLTextAreaElement) => {
+    const selectionEnd = textarea.selectionEnd ?? textarea.value.length
+    const computed = window.getComputedStyle(textarea)
+    const beforeText = textarea.value.slice(0, selectionEnd)
+    const lines = beforeText.split('\n')
+    const currentLine = lines[lines.length - 1] ?? ''
+    const lineIndex = Math.max(0, lines.length - 1)
+    const fontSize = parseFloat(computed.fontSize) || 16
+    const lineHeightValue = parseFloat(computed.lineHeight)
+    const lineHeight = Number.isFinite(lineHeightValue) ? lineHeightValue : fontSize * 1.4
+    const paddingLeft = parseFloat(computed.paddingLeft) || 0
+    const paddingTop = parseFloat(computed.paddingTop) || 0
+    const borderLeft = parseFloat(computed.borderLeftWidth) || 0
+    const borderTop = parseFloat(computed.borderTopWidth) || 0
+
+    const canvas = measurementCanvasRef.current || document.createElement('canvas')
+    if (!measurementCanvasRef.current) {
+      measurementCanvasRef.current = canvas
+    }
+    const ctx = measurementCanvasRef.current.getContext('2d')
+    let lineWidth = 0
+    if (ctx) {
+      const fontParts = [computed.fontStyle, computed.fontVariant, computed.fontWeight, computed.fontSize, computed.fontFamily]
+        .filter(Boolean)
+        .join(' ')
+        .trim()
+      ctx.font = fontParts.length ? fontParts : `${fontSize}px sans-serif`
+      lineWidth = ctx.measureText(currentLine).width
+    } else {
+      lineWidth = currentLine.length * fontSize * 0.6
+    }
+
+    const top = lineIndex * lineHeight - textarea.scrollTop + paddingTop + borderTop
+    const left = lineWidth - textarea.scrollLeft + paddingLeft + borderLeft
+
+    return {
+      top: Math.max(paddingTop + borderTop, top),
+      left: Math.max(paddingLeft + borderLeft + 2, left),
+      lineHeight
+    }
+  }, [])
+
+  const updateSuggestionPosition = useCallback(() => {
+    if (!suggestionMode) return
+    const textarea = editorRef.current
+    const container = composerContainerRef.current
+    if (!textarea || !container) return
+
+    const caret = getCaretOffsets(textarea)
+    const textareaRect = textarea.getBoundingClientRect()
+    const containerRect = container.getBoundingClientRect()
+    const rawTop = textareaRect.top - containerRect.top + caret.top
+    const rawLeft = textareaRect.left - containerRect.left + caret.left
+
+    const containerWidth = container.clientWidth || containerRect.width || 0
+    const containerHeight = container.clientHeight || containerRect.height || 0
+    const menuWidth = suggestionMenuRef.current?.offsetWidth || 240
+    const menuHeight = suggestionMenuRef.current?.offsetHeight || 196
+    const halfMenu = menuWidth / 2
+
+    const minLeft = halfMenu + 8
+    const maxLeft = Math.max(minLeft, containerWidth - halfMenu - 8)
+    const boundedLeft = Math.min(Math.max(rawLeft, minLeft), maxLeft)
+
+    const minTop = 12
+    const maxTop = Math.max(minTop, containerHeight - minTop)
+    const boundedTop = Math.min(Math.max(rawTop, minTop), maxTop)
+
+    const flip = boundedTop + menuHeight + 12 > containerHeight
+
+    setSuggestionPosition({ top: boundedTop, left: boundedLeft, flip })
+  }, [composerContainerRef, editorRef, getCaretOffsets, suggestionMenuRef, suggestionMode])
+
+  const scheduleSuggestionPositionUpdate = useCallback(() => {
+    if (!suggestionMode) return
+    requestAnimationFrame(() => {
+      updateSuggestionPosition()
+    })
+  }, [suggestionMode, updateSuggestionPosition])
+
+  useLayoutEffect(() => {
+    if (!suggestionMode) return
+    updateSuggestionPosition()
+  }, [suggestionMode, suggestionQuery, filteredSuggestions, editorScrollTop, updateSuggestionPosition])
   const buildMentionAndIssueIds = (text: string) => {
     const mentionIds: string[] = []
     mentionsList.forEach(m => {
@@ -1137,7 +1227,7 @@ export default function TaskDetailPage() {
                 </Button>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="relative" style={{ position: 'relative' }}>
+                <div ref={composerContainerRef} className="relative">
                   <Textarea
                     ref={editorRef}
                     value={commentContent}
@@ -1223,6 +1313,12 @@ export default function TaskDetailPage() {
                           break
                       }
                     }}
+                    onKeyUp={scheduleSuggestionPositionUpdate}
+                    onClick={scheduleSuggestionPositionUpdate}
+                    onScroll={(e) => {
+                      setEditorScrollTop(e.currentTarget.scrollTop)
+                      scheduleSuggestionPositionUpdate()
+                    }}
                     onBlur={() => {
                       // Close suggestions when textarea loses focus
                       setTimeout(() => {
@@ -1291,7 +1387,17 @@ export default function TaskDetailPage() {
                 )}
               </div>
                   {suggestionMode && (
-                    <div className="absolute z-50 w-full rounded-md border bg-background shadow-lg border-border overflow-hidden">
+                    <div
+                      ref={suggestionMenuRef}
+                      className="absolute z-50 rounded-md border bg-background shadow-lg border-border overflow-hidden"
+                      style={{
+                        top: suggestionPosition.top,
+                        left: suggestionPosition.left,
+                        minWidth: 240,
+                        transform: suggestionPosition.flip ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+                        marginTop: suggestionPosition.flip ? '-8px' : '8px'
+                      }}
+                    >
                       <div className="max-h-48 overflow-y-auto py-1">
                         {isLoadingSuggestions ? (
                           <div className="px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
