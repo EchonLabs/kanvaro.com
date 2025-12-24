@@ -184,6 +184,7 @@ async function stopTimerAndBuildResponse(
   const category = options.category ?? activeTimer.category
   const tags = options.tags ?? activeTimer.tags
   const projectValue = (activeTimer.project as any)?._id ?? activeTimer.project
+  console.log('-8794651234455',projectValue);
   const taskValue = (activeTimer.task as any)?._id ?? activeTimer.task
 
   const timeEntry = new TimeEntry({
@@ -214,7 +215,7 @@ async function stopTimerAndBuildResponse(
 
   // Only send notifications if time was actually logged
   // Notifications should only be sent when timer stops with logged time
-  const project = projectValue ? await Project.findById(projectValue).select('name') : null
+  const project = projectValue ? await Project.findById(projectValue).select('name settings') : null
   const projectName = project?.name || 'Unknown Project'
   const hoursFormatted = `${Math.floor(hoursLogged)}h ${Math.round((hoursLogged % 1) * 60)}m`
   const projectUrl = '/time-tracking/logs'
@@ -284,8 +285,10 @@ async function stopTimerAndBuildResponse(
     }
   }
 
-  // Approval Required notification - only if approval is required AND time was logged
-  if (requiresApproval && hasTimeLogged && !isZeroDurationDisplay) {
+  // Approval Required  notification - only if approval is required AND time was logged
+ 
+const projectRequiresApproval = project?.settings?.requireApproval === true;
+  if (projectRequiresApproval && hasTimeLogged && !isZeroDurationDisplay) {
     const approvalNeededEnabled = await isNotificationEnabled(
       organizationId,
       'onApprovalNeeded',

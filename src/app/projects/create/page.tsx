@@ -138,6 +138,9 @@ const [overheadInput, setOverheadInput] = useState('')
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const [attachmentsPage, setAttachmentsPage] = useState(1)
   const attachmentsPerPage = 10
+  const [figmaLinksPage, setFigmaLinksPage] = useState(1)
+  const [docLinksPage, setDocLinksPage] = useState(1)
+  const linkPaginationSize = 5
   const [currentUser, setCurrentUser] = useState<{ firstName: string; lastName: string; email: string; id: string } | null>(null)
   const [newFigmaLink, setNewFigmaLink] = useState('')
   const [newDocLink, setNewDocLink] = useState('')
@@ -188,6 +191,20 @@ const [overheadInput, setOverheadInput] = useState('')
     }
   })
   const [budgetTotalInput, setBudgetTotalInput] = useState('0')
+  const figmaLinks = formData.externalLinks?.figma ?? []
+  const documentationLinks = formData.externalLinks?.documentation ?? []
+  const figmaTotalPages = Math.max(1, Math.ceil(figmaLinks.length / linkPaginationSize))
+  const documentationTotalPages = Math.max(1, Math.ceil(documentationLinks.length / linkPaginationSize))
+  const currentFigmaPage = Math.min(Math.max(figmaLinksPage, 1), figmaTotalPages)
+  const currentDocumentationPage = Math.min(Math.max(docLinksPage, 1), documentationTotalPages)
+  const figmaSliceStart = (currentFigmaPage - 1) * linkPaginationSize
+  const docSliceStart = (currentDocumentationPage - 1) * linkPaginationSize
+  const paginatedFigmaLinks = figmaLinks.slice(figmaSliceStart, figmaSliceStart + linkPaginationSize)
+  const paginatedDocumentationLinks = documentationLinks.slice(docSliceStart, docSliceStart + linkPaginationSize)
+  const figmaShowingStart = figmaLinks.length ? figmaSliceStart + 1 : 0
+  const figmaShowingEnd = figmaLinks.length ? Math.min(figmaSliceStart + linkPaginationSize, figmaLinks.length) : 0
+  const documentationShowingStart = documentationLinks.length ? docSliceStart + 1 : 0
+  const documentationShowingEnd = documentationLinks.length ? Math.min(docSliceStart + linkPaginationSize, documentationLinks.length) : 0
 
   const steps = [
     { id: 1, title: 'Basic Information', description: 'Project name and description' },
@@ -717,8 +734,45 @@ const [overheadInput, setOverheadInput] = useState('')
     }))
   }
 
+  const handleRemoveFigmaLink = (index: number) => {
+    setFormData(prev => {
+      const updatedFigmaLinks = prev.externalLinks.figma.filter((_, i) => i !== index)
+      setFigmaLinksPage(prevPage => {
+        const maxPage = Math.max(1, Math.ceil(updatedFigmaLinks.length / linkPaginationSize) || 1)
+        const nextPage = Math.min(Math.max(prevPage, 1), maxPage)
+        return nextPage
+      })
+      return {
+        ...prev,
+        externalLinks: {
+          ...prev.externalLinks,
+          figma: updatedFigmaLinks
+        }
+      }
+    })
+  }
+
+  const handleRemoveDocumentationLink = (index: number) => {
+    setFormData(prev => {
+      const updatedDocumentationLinks = prev.externalLinks.documentation.filter((_, i) => i !== index)
+      setDocLinksPage(prevPage => {
+        const maxPage = Math.max(1, Math.ceil(updatedDocumentationLinks.length / linkPaginationSize) || 1)
+        const nextPage = Math.min(Math.max(prevPage, 1), maxPage)
+        return nextPage
+      })
+      return {
+        ...prev,
+        externalLinks: {
+          ...prev.externalLinks,
+          documentation: updatedDocumentationLinks
+        }
+      }
+    })
+  }
+
   // Filter members based on search and exclude already added members
   const filteredMembers = availableMembers.filter(member => {
+    if (member && member.isActive === false) return false
     const searchTerm = memberSearchQuery.toLowerCase()
     const matchesSearch = (
       member.firstName.toLowerCase().includes(searchTerm) ||
@@ -736,6 +790,7 @@ const [overheadInput, setOverheadInput] = useState('')
 
   // Filter clients based on search and exclude already selected client
   const filteredClients = availableMembers.filter(member => {
+    if (member && member.isActive === false) return false
     const searchTerm = clientSearchQuery.toLowerCase()
     const matchesSearch = (
       member.firstName.toLowerCase().includes(searchTerm) ||
@@ -1968,42 +2023,68 @@ const [overheadInput, setOverheadInput] = useState('')
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
-                    {formData.externalLinks.figma.length > 0 && (
-                      <div className="space-y-1">
-                        {formData.externalLinks.figma.map((link, index) => {
-                          // Ensure URL has protocol for proper external link handling
-                          const formattedLink = link.startsWith('http://') || link.startsWith('https://')
-                            ? link
-                            : `https://${link}`
-                          return (
-                            <div key={index} className="flex items-center justify-between p-2 border rounded-lg bg-muted/50">
-                              <a
-                                href={formattedLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-primary hover:underline flex-1 truncate"
-                              >
-                                {link}
-                              </a>
+                    {figmaLinks.length > 0 && (
+                      <div className="space-y-3">
+                        {figmaLinks.length > linkPaginationSize && (
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>
+                              Showing {figmaShowingStart} to {figmaShowingEnd} of {figmaLinks.length} Figma links
+                            </span>
+                            <div className="flex items-center gap-2">
                               <Button
                                 type="button"
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                onClick={() => {
-                                  setFormData(prev => ({
-                                    ...prev,
-                                    externalLinks: {
-                                      ...prev.externalLinks,
-                                      figma: prev.externalLinks.figma.filter((_, i) => i !== index)
-                                    }
-                                  }))
-                                }}
+                                onClick={() => setFigmaLinksPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentFigmaPage === 1}
                               >
-                                <X className="h-4 w-4" />
+                                <ArrowLeft className="h-4 w-4" />
+                                Previous
+                              </Button>
+                              <span className="px-2.5 py-1 bg-muted rounded text-[11px]">
+                                {currentFigmaPage} of {figmaTotalPages}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setFigmaLinksPage(prev => Math.min(prev + 1, figmaTotalPages))}
+                                disabled={currentFigmaPage === figmaTotalPages}
+                              >
+                                Next
+                                <ArrowRight className="h-4 w-4" />
                               </Button>
                             </div>
-                          )
-                        })}
+                          </div>
+                        )}
+                        <div className="space-y-1">
+                          {paginatedFigmaLinks.map((link, index) => {
+                            const actualIndex = figmaSliceStart + index
+                            const formattedLink = link.startsWith('http://') || link.startsWith('https://')
+                              ? link
+                              : `https://${link}`
+                            return (
+                              <div key={actualIndex} className="flex items-center justify-between p-2 border rounded-lg bg-muted/50">
+                                <a
+                                  href={formattedLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-primary hover:underline flex-1 truncate"
+                                >
+                                  {link}
+                                </a>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveFigmaLink(actualIndex)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2064,42 +2145,68 @@ const [overheadInput, setOverheadInput] = useState('')
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
-                    {formData.externalLinks.documentation.length > 0 && (
-                      <div className="space-y-1">
-                        {formData.externalLinks.documentation.map((link, index) => {
-                          // Ensure URL has protocol for proper external link handling
-                          const formattedLink = link.startsWith('http://') || link.startsWith('https://')
-                            ? link
-                            : `https://${link}`
-                          return (
-                            <div key={index} className="flex items-center justify-between p-2 border rounded-lg bg-muted/50">
-                              <a
-                                href={formattedLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-primary hover:underline flex-1 truncate"
-                              >
-                                {link}
-                              </a>
+                    {documentationLinks.length > 0 && (
+                      <div className="space-y-3">
+                        {documentationLinks.length > linkPaginationSize && (
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>
+                              Showing {documentationShowingStart} to {documentationShowingEnd} of {documentationLinks.length} documentation links
+                            </span>
+                            <div className="flex items-center gap-2">
                               <Button
                                 type="button"
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                onClick={() => {
-                                  setFormData(prev => ({
-                                    ...prev,
-                                    externalLinks: {
-                                      ...prev.externalLinks,
-                                      documentation: prev.externalLinks.documentation.filter((_, i) => i !== index)
-                                    }
-                                  }))
-                                }}
+                                onClick={() => setDocLinksPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentDocumentationPage === 1}
                               >
-                                <X className="h-4 w-4" />
+                                <ArrowLeft className="h-4 w-4" />
+                                Previous
+                              </Button>
+                              <span className="px-2.5 py-1 bg-muted rounded text-[11px]">
+                                {currentDocumentationPage} of {documentationTotalPages}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setDocLinksPage(prev => Math.min(prev + 1, documentationTotalPages))}
+                                disabled={currentDocumentationPage === documentationTotalPages}
+                              >
+                                Next
+                                <ArrowRight className="h-4 w-4" />
                               </Button>
                             </div>
-                          )
-                        })}
+                          </div>
+                        )}
+                        <div className="space-y-1">
+                          {paginatedDocumentationLinks.map((link, index) => {
+                            const actualIndex = docSliceStart + index
+                            const formattedLink = link.startsWith('http://') || link.startsWith('https://')
+                              ? link
+                              : `https://${link}`
+                            return (
+                              <div key={actualIndex} className="flex items-center justify-between p-2 border rounded-lg bg-muted/50">
+                                <a
+                                  href={formattedLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-primary hover:underline flex-1 truncate"
+                                >
+                                  {link}
+                                </a>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveDocumentationLink(actualIndex)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>

@@ -42,6 +42,7 @@ import {
   Zap,
   Download,
   Edit,
+  MoreVertical,
   UserPlus,
   Save,
   Trash2,
@@ -57,6 +58,7 @@ import EditTaskModal from '@/components/tasks/EditTaskModal'
 import { AddExpenseDialog } from '@/components/projects/AddExpenseDialog'
 import ViewTaskModal from '@/components/tasks/ViewTaskModal'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import TaskList from '@/components/tasks/TaskList'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
 import CalendarView from '@/components/tasks/CalendarView'
@@ -194,6 +196,9 @@ export default function ProjectDetailPage() {
   const [showAddExpenseDialog, setShowAddExpenseDialog] = useState(false)
   const [expensesLoading, setExpensesLoading] = useState(false)
   const [editingSuite, setEditingSuite] = useState<any | null>(null)
+  const [editingExpense, setEditingExpense] = useState<any | null>(null)
+  const [showDeleteExpenseConfirmModal, setShowDeleteExpenseConfirmModal] = useState(false)
+  const [expenseToDelete, setExpenseToDelete] = useState<any | null>(null)
   const [parentSuiteIdForCreate, setParentSuiteIdForCreate] = useState<string | undefined>(undefined)
   const [suitesRefreshCounter, setSuitesRefreshCounter] = useState(0)
   const [testCaseDialogOpen, setTestCaseDialogOpen] = useState(false)
@@ -259,6 +264,46 @@ export default function ProjectDetailPage() {
       console.error('Error fetching expenses:', error)
     } finally {
       setExpensesLoading(false)
+    }
+  }
+
+  const handleExpenseAdded = () => {
+    fetchExpenses()
+    setShowAddExpenseDialog(false)
+  }
+
+  const handleExpenseUpdated = () => {
+    fetchExpenses()
+    setEditingExpense(null)
+  }
+
+  const handleExpenseDeleted = async (expenseId: string, expenseName: string) => {
+    console.log('Delete triggered for expense:', expenseName)
+    setExpenseToDelete({ id: expenseId, name: expenseName })
+    setShowDeleteExpenseConfirmModal(true)
+  }
+
+  const confirmDeleteExpense = async () => {
+    if (!expenseToDelete) return
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/expenses?expenseId=${expenseToDelete.id}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        notifySuccess({ title: 'Expense Deleted', message: 'Expense has been deleted successfully' })
+        fetchExpenses()
+      } else {
+        const errorData = await response.json()
+        notifyError({ title: 'Delete Failed', message: errorData.error || 'Failed to delete expense' })
+      }
+    } catch (error) {
+      console.error('Error deleting expense:', error)
+      notifyError({ title: 'Delete Failed', message: 'Failed to delete expense. Please try again.' })
+    } finally {
+      setShowDeleteExpenseConfirmModal(false)
+      setExpenseToDelete(null)
     }
   }
 
@@ -1173,10 +1218,54 @@ export default function ProjectDetailPage() {
                               <div className="flex-1">
                                 <h4 className="font-semibold text-sm mb-1">{expense.name}</h4>
                                 {expense.description && (
-                                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{expense.description}</p>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <p className="text-xs text-muted-foreground line-clamp-2 mb-2 cursor-help">{expense.description}</p>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-xs">
+                                        <p className="text-sm">{expense.description}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
                                 )}
                               </div>
-                              <Badge variant={expense.paidStatus === 'paid' ? 'default' : 'secondary'} className="ml-2">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={(e) => {
+                                    e.stopPropagation()
+                                    setEditingExpense(expense)
+                                  }}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit Expense
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleExpenseDeleted(expense._id, expense.name)
+                                    }}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+
+                            <div className="flex items-center justify-start mb-2">
+                              <Badge variant={expense.paidStatus === 'paid' ? 'default' : 'secondary'}>
                                 {expense.paidStatus === 'paid' ? 'Paid' : 'Unpaid'}
                               </Badge>
                             </div>
@@ -1876,6 +1965,33 @@ export default function ProjectDetailPage() {
             fetchExpenses()
             fetchProject() // Refresh project to update budget
           }}
+        />
+
+        <AddExpenseDialog
+          open={!!editingExpense}
+          onClose={() => setEditingExpense(null)}
+          projectId={projectId}
+          expense={editingExpense}
+          onSuccess={() => {
+            notifySuccess({ title: 'Expense Updated', message: 'Expense has been updated successfully' })
+            fetchExpenses()
+            fetchProject() // Refresh project to update budget
+          }}
+        />
+
+        {/* Delete Expense Confirmation Modal */}
+        <ConfirmationModal
+          isOpen={showDeleteExpenseConfirmModal}
+          onClose={() => {
+            setShowDeleteExpenseConfirmModal(false)
+            setExpenseToDelete(null)
+          }}
+          onConfirm={confirmDeleteExpense}
+          title="Delete Expense"
+          description={`Are you sure you want to delete "${expenseToDelete?.name}"? This action cannot be undone.`}
+          confirmText="Delete Expense"
+          cancelText="Cancel"
+          variant="destructive"
         />
       </div>
     </MainLayout>
