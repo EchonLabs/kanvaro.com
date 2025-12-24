@@ -1,3 +1,10 @@
+## [1.16.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.16.0...v1.16.1) (2025-12-24)
+
+
+### Bug Fixes
+
+* add chnges in time tracking ([d1b29b8](https://github.com/EchonLabs/kanvaro.com/commit/d1b29b8d2829cb53a32795bbc9aef75f45f97739))
+
 # [1.16.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.15.4...v1.16.0) (2025-12-23)
 
 

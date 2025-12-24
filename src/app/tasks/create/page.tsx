@@ -32,6 +32,7 @@ interface User {
   lastName: string
   email: string
   projectHourlyRate?: number
+  isActive?: boolean
 }
 
 interface Story {
@@ -298,13 +299,16 @@ export default function CreateTaskPage() {
         const members = Array.isArray(data.data.teamMembers) ? data.data.teamMembers : []
 
         // Transform populated team members data
-        const populatedMembers = members.map((member: any) => ({
-          _id: member.memberId._id,
-          firstName: member.memberId.firstName,
-          lastName: member.memberId.lastName,
-          email: member.memberId.email,
-          projectHourlyRate: member.hourlyRate
-        }))
+        const populatedMembers = members
+          .map((member: any) => ({
+            _id: member.memberId._id,
+            firstName: member.memberId.firstName,
+            lastName: member.memberId.lastName,
+            email: member.memberId.email,
+            projectHourlyRate: member.hourlyRate,
+            isActive: member.memberId.isActive !== false
+          }))
+          .filter((member: any) => member.isActive)
 
         setProjectMembers(populatedMembers)
 
@@ -361,6 +365,16 @@ export default function CreateTaskPage() {
         isCompleted: false
       }))
 
+      const assignedToPayload = assignedTo.map(userId => {
+        const member = projectMembers.find(m => m._id.toString() === userId.toString())
+        return {
+          user: userId,
+          firstName: member?.firstName,
+          lastName: member?.lastName,
+          email: member?.email
+        }
+      })
+
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: {
@@ -374,7 +388,7 @@ export default function CreateTaskPage() {
           story: formData.story === 'none' ? undefined : formData.story || undefined,
           epic: formData.epic === 'none' ? undefined : formData.epic || undefined,
           parentTask: formData.parentTask || undefined,
-          assignedTo: assignedTo,
+          assignedTo: assignedToPayload,
           priority: formData.priority,
           type: formData.type,
           status: 'backlog',
@@ -561,9 +575,10 @@ export default function CreateTaskPage() {
 
   // Memoize filtered project members to avoid recalculating on every render
   const filteredProjectMembers = useMemo(() => {
-    if (!assigneeQuery.trim()) return projectMembers
+    const activeMembers = projectMembers.filter(member => member.isActive !== false)
+    if (!assigneeQuery.trim()) return activeMembers
     const q = assigneeQuery.toLowerCase().trim()
-    return projectMembers.filter(u =>
+    return activeMembers.filter(u =>
       `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
       u.email.toLowerCase().includes(q)
     )

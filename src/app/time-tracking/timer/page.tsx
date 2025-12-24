@@ -135,6 +135,7 @@ export default function TimerPage() {
   const [submittingManualLog, setSubmittingManualLog] = useState(false)
   const [sessionHoursError, setSessionHoursError] = useState('')
   const [activeTab, setActiveTab] = useState<'timer' | 'manual'>('timer')
+  const autoStopNotifiedRef = useRef(false)
 
   // Helper function to combine date and time into datetime-local format
   const combineDateTime = (date: string, time: string): string => {
@@ -375,47 +376,42 @@ export default function TimerPage() {
       const data = await response.json()
       if (data.success && Array.isArray(data.data)) {
         const effectiveUser = currentUser ?? user
-      // Filter projects by user access and project-level time tracking settings
+      // Filter projects by strict requirements:
+      // 1. project.settings.allowTimeTracking === true (explicitly enabled)
+      // 2. project.teamMembers contains logged user as memberId
       const filtered = data.data.filter((project: any) => {
         const u = effectiveUser
         if (!u) return false
 
-        // Check project-level time tracking setting
-        // If not set (undefined), default to allowing time tracking
-        const projectAllowsTimeTracking = project?.settings?.allowTimeTracking !== false
+        // Check project-level time tracking setting - must be explicitly true
+        const projectAllowsTimeTracking = project?.settings?.allowTimeTracking === true
         if (!projectAllowsTimeTracking) return false
 
-        // Check user access - helper function to check if user is in an array
-        const isUserInArray = (arr: any[], userId: string) => {
-          return arr.some((item: any) => {
-            if (typeof item === 'string') return item === userId
-            if (typeof item === 'object' && item !== null) {
-              return item._id === userId || item.id === userId || item._id?.toString() === userId
-            }
-            return false
-          })
-        }
-
-        // Check various access conditions
-        const createdByMatch = project?.createdBy === u.id ||
-                              project?.createdBy?.id === u.id ||
-                              project?.createdBy?._id === u.id ||
-                              project?.createdBy?._id?.toString() === u.id
-
+        // Check if user is in teamMembers array as memberId
         const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
-        const teamMatch = isUserInArray(teamMembers, u.id)
+        const isUserTeamMember = teamMembers.some((member: any) => {
+          if (typeof member === 'object' && member !== null) {
+            return member.memberId === u.id || member.memberId?._id === u.id || member.memberId?.id === u.id
+          }
+          return false
+        })
 
-        const members = Array.isArray(project?.members) ? project.members : []
-        const membersMatch = isUserInArray(members, u.id)
-
-        const projectRoles = Array.isArray(project?.projectRoles) ? project.projectRoles : []
-        const roleMatch = projectRoles.some((role: any) =>
-          role.user === u.id || role.user?.id === u.id || role.user?._id === u.id
-        )
-
-        return createdByMatch || teamMatch || membersMatch || roleMatch
+        return isUserTeamMember
       })
-        setProjects(filtered)
+
+      console.log('Time tracking - Filtered projects:', {
+        userId: effectiveUser?.id,
+        totalProjects: data.data.length,
+        filteredProjects: filtered.length,
+        projects: filtered.map((p: any) => ({
+          _id: p._id,
+          name: p.name,
+          allowTimeTracking: p.settings?.allowTimeTracking,
+          teamMembers: p.teamMembers?.map((tm: any) => tm.memberId)
+        }))
+      })
+
+      setProjects(filtered)
       } else {
         setProjects([])
       }
@@ -433,19 +429,19 @@ export default function TimerPage() {
     }
 
     setTasksLoading(true)
-    
+
     try {
-      // Optimize API call: only fetch essential fields and filter on server side
+      // Fetch tasks for the selected project where user is assigned
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 8000) // 8 second timeout
-      
-      const response = await fetch(`/api/tasks?project=${projectId}&assignedTo=${user.id}&limit=200`, {
+      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout (reduced since query is optimized)
+
+      const response = await fetch(`/api/tasks?project=${projectId}&assignedTo=${user.id}&limit=50&minimal=true`, {
         cache: 'no-store',
         signal: controller.signal
       })
-      
+
       clearTimeout(timeoutId)
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -453,14 +449,40 @@ export default function TimerPage() {
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
-        // Server already filters by assignedTo, but double-check for safety
-        const assignedOnly = data.data.filter((t: any) => {
-          const at = t?.assignedTo
-          if (!at) return false
-          if (typeof at === 'string') return at === user.id
-          return at?._id === user.id || at?.id === user.id
+        // Double-check filtering: ensure task.project matches selectedProject AND user is in assignedTo
+        const validTasks = data.data.filter((task: any) => {
+          // Check project match
+          const projectMatch = task?.project === projectId ||
+                              task?.project?._id === projectId ||
+                              task?.project?.id === projectId
+
+          if (!projectMatch) return false
+
+          // Check user assignment - look for user in assignedTo array
+          const assignedTo = Array.isArray(task?.assignedTo) ? task.assignedTo : []
+          const userAssigned = assignedTo.some((assignment: any) => {
+            if (typeof assignment === 'object' && assignment !== null) {
+              return assignment.user === user.id ||
+                     assignment.user?._id === user.id ||
+                     assignment.user?.id === user.id ||
+                     assignment._id === user.id ||
+                     assignment.id === user.id
+            }
+            return false
+          })
+
+          return userAssigned
         })
-        setTasks(assignedOnly)
+
+        console.log('Filtered tasks for project:', {
+          projectId,
+          userId: user.id,
+          totalTasks: data.data.length,
+          validTasks: validTasks.length,
+          tasks: validTasks.map((t: any) => ({ _id: t._id, title: t.title, assignedTo: t.assignedTo }))
+        })
+
+        setTasks(validTasks)
       } else {
         setTasks([])
       }
@@ -679,25 +701,61 @@ export default function TimerPage() {
       const response = await fetch(`/api/time-tracking/timer?${params.toString()}`)
       const data = await response.json()
 
-      if (response.ok && data?.activeTimer) {
-        setActiveTimerSnapshot(data.activeTimer)
-        setLiveActiveTimer(data.activeTimer)
+      if (response.ok) {
+        // Check if this is an auto-stop response (when max session limit is reached)
+        if (data.activeTimer === null && data.hasTimeLogged !== undefined) {
+          // Timer was auto-stopped due to max session limit
+          setActiveTimerSnapshot(null)
+          setLiveActiveTimer(null)
+          setPendingActiveProject(null)
+          setPendingActiveTask(null)
+          setPendingActiveDescription('')
+          setInitializedFromActive(true)
 
-        const projectId = data.activeTimer.project?._id || null
-        const taskId = data.activeTimer.task?._id || null
-        const timerDescription = data.activeTimer.description || ''
+          // Show notification for auto-stop (only once per auto-stop event)
+          if (timeTrackingSettings?.notifications?.onTimerStop && data.autoStopped && !autoStopNotifiedRef.current) {
+            autoStopNotifiedRef.current = true
+            showToast({
+              type: 'warning',
+              title: 'Timer Auto-Stopped',
+              message: data.message || 'Timer automatically stopped. Maximum session limit reached.',
+              duration: 5000
+            })
+          }
 
-        if (projectId) {
-          setPendingActiveProject(projectId)
+          // Refresh time logs to show the completed entry
+          setTimeLogsRefreshKey(prev => prev + 1)
+          fetchDailyHoursLogged()
+        } else if (data?.activeTimer) {
+          // Normal active timer
+          setActiveTimerSnapshot(data.activeTimer)
+          setLiveActiveTimer(data.activeTimer)
+
+          const projectId = data.activeTimer.project?._id || null
+          const taskId = data.activeTimer.task?._id || null
+          const timerDescription = data.activeTimer.description || ''
+
+          if (projectId) {
+            setPendingActiveProject(projectId)
+          }
+          if (taskId) {
+            setPendingActiveTask(taskId)
+          }
+          if (timerDescription) {
+            setPendingActiveDescription(timerDescription)
+          }
+          setInitializedFromActive(false)
+        } else {
+          // No active timer
+          setActiveTimerSnapshot(null)
+          setLiveActiveTimer(null)
+          setPendingActiveProject(null)
+          setPendingActiveTask(null)
+          setPendingActiveDescription('')
+          setInitializedFromActive(true)
         }
-        if (taskId) {
-          setPendingActiveTask(taskId)
-        }
-        if (timerDescription) {
-          setPendingActiveDescription(timerDescription)
-        }
-        setInitializedFromActive(false)
       } else {
+        console.error('Failed to fetch active timer:', data)
         setActiveTimerSnapshot(null)
         setLiveActiveTimer(null)
         setPendingActiveProject(null)
@@ -1104,6 +1162,8 @@ export default function TimerPage() {
                               duration: 5000
                             })
                           }
+                          // Reset auto-stop notification flag when timer starts
+                          autoStopNotifiedRef.current = false
                         }
                         setTimeLogsRefreshKey((prev) => prev + 1)
                       }}

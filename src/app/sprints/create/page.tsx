@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -11,12 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useNotify } from '@/lib/notify'
 import { validateSprintDates } from '@/lib/sprintDateValidation'
+import { Badge } from '@/components/ui/Badge'
 import {
   ArrowLeft,
   Save,
   Loader2,
   AlertTriangle,
-  Zap
+  Zap,
+  X
 } from 'lucide-react'
 
 interface Project {
@@ -29,6 +31,7 @@ interface User {
   firstName: string
   lastName: string
   email: string
+  isActive?: boolean
 }
 
 export default function CreateSprintPage() {
@@ -39,6 +42,8 @@ export default function CreateSprintPage() {
   const [authError, setAuthError] = useState('')
   const [projects, setProjects] = useState<Project[]>([])
   const [users, setUsers] = useState<User[]>([])
+  const [teamMemberQuery, setTeamMemberQuery] = useState('')
+  const [membersLoading, setMembersLoading] = useState(false)
   const [selectedProject, setSelectedProject] = useState<any>(null)
   const [projectQuery, setProjectQuery] = useState("")
   const [startDateError, setStartDateError] = useState('')
@@ -141,7 +146,15 @@ export default function CreateSprintPage() {
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data?.members)) {
-        setUsers(data.data.members) // Initially show all users
+        setUsers(
+          data.data.members.map((member: any) => ({
+            _id: member._id,
+            firstName: member.firstName || '',
+            lastName: member.lastName || '',
+            email: member.email || '',
+            isActive: member.isActive !== false
+          }))
+        )
       } else {
         setUsers([])
       }
@@ -153,6 +166,7 @@ export default function CreateSprintPage() {
 
   const fetchProjectDetails = async (projectId: string) => {
     try {
+      setMembersLoading(true)
       // Fetch both project data and all members
       const [projectResponse, membersResponse] = await Promise.all([
         fetch(`/api/projects/${projectId}`),
@@ -168,31 +182,81 @@ export default function CreateSprintPage() {
         if (projectData.success && projectData.data) {
           setSelectedProject(projectData.data)
 
-          // Filter members to only include project team members
-          if (membersData.success && Array.isArray(membersData.data?.members)) {
-            const teamMembers = projectData.data.teamMembers || []
-            const projectMembers = projectData.data.members || []
+          const directoryMembers =
+            membersData.success && Array.isArray(membersData.data?.members)
+              ? membersData.data.members
+              : []
+          const directoryMap = new Map<string, any>()
+          directoryMembers.forEach((member: any) => {
+            if (member?._id) directoryMap.set(member._id, member)
+          })
 
-            // Combine team members and project members
-            const projectMemberIds = new Set([
-              ...teamMembers.map((m: any) => typeof m === 'string' ? m : m._id),
-              ...projectMembers.map((m: any) => typeof m === 'string' ? m : m._id)
-            ])
-
-            // Filter organization members to only include project members
-            const filteredUsers = membersData.data.members
-              .filter((member: any) => projectMemberIds.has(member._id))
-              .map((member: any) => ({
-                _id: member._id,
-                firstName: member.firstName || '',
-                lastName: member.lastName || '',
-                email: member.email || ''
-              }))
-
-            setUsers(filteredUsers)
-          } else {
-            setUsers([])
+          const collectMemberId = (entry: any): string | null => {
+            if (!entry) return null
+            if (typeof entry === 'string') return entry
+            if (entry.memberId) return collectMemberId(entry.memberId)
+            if (typeof entry === 'object') {
+              if (entry._id && (entry.firstName || entry.lastName || entry.email)) return entry._id
+              if (typeof entry._id === 'string' && entry._id.length === 24 && !entry.memberId) {
+                return entry._id
+              }
+            }
+            return null
           }
+
+          const normalizeMember = (raw: any): User | null => {
+            if (!raw) return null
+            if (typeof raw === 'string') {
+              const fromDirectory = directoryMap.get(raw)
+              if (fromDirectory) return normalizeMember(fromDirectory)
+              return {
+                _id: raw,
+                firstName: 'Unknown',
+                lastName: '',
+                email: '',
+                isActive: true
+              }
+            }
+            if (raw.memberId) return normalizeMember(raw.memberId)
+            if (!raw._id) return null
+            return {
+              _id: raw._id,
+              firstName: raw.firstName || '',
+              lastName: raw.lastName || '',
+              email: raw.email || '',
+              isActive: raw.isActive !== false
+            }
+          }
+
+          const normalizedMembersMap = new Map<string, User>()
+          const addMember = (entry: any) => {
+            const normalized = normalizeMember(entry)
+            if (normalized) normalizedMembersMap.set(normalized._id, normalized)
+          }
+
+          const teamMembers = projectData.data.teamMembers || []
+          const projectMembers = projectData.data.members || []
+
+          teamMembers.forEach((member: any) => addMember(member))
+          projectMembers.forEach((member: any) => addMember(member))
+
+          if (normalizedMembersMap.size === 0 && directoryMap.size > 0) {
+            const projectMemberIds = new Set<string>()
+            teamMembers.forEach((member: any) => {
+              const id = collectMemberId(member)
+              if (id) projectMemberIds.add(id)
+            })
+            projectMembers.forEach((member: any) => {
+              const id = collectMemberId(member)
+              if (id) projectMemberIds.add(id)
+            })
+            projectMemberIds.forEach((memberId) => {
+              const directoryEntry = directoryMap.get(memberId)
+              if (directoryEntry) addMember(directoryEntry)
+            })
+          }
+
+          setUsers(Array.from(normalizedMembersMap.values()))
 
           // Clear date errors when project changes and re-validate if dates exist
           setStartDateError('')
@@ -212,6 +276,8 @@ export default function CreateSprintPage() {
       console.error('Failed to fetch project details:', err)
       setSelectedProject(null)
       setUsers([])
+    } finally {
+      setMembersLoading(false)
     }
   }
 
@@ -307,6 +373,7 @@ export default function CreateSprintPage() {
         } else {
           setSelectedProject(null)
           setUsers([]) // Clear users when no project selected
+          setMembersLoading(false)
         }
         // Clear team members selection when project changes
         newData.teamMembers = []
@@ -315,6 +382,7 @@ export default function CreateSprintPage() {
         newData.endDate = ''
         setStartDateError('')
         setEndDateError('')
+        setTeamMemberQuery('')
       }
 
       // Validate dates when they change
@@ -349,6 +417,15 @@ export default function CreateSprintPage() {
       formData.startDate !== '' &&
       formData.endDate !== ''
   }
+
+  const activeUsers = useMemo(() => users.filter((user) => user.isActive !== false), [users])
+
+  const memberLookup = useMemo(() => {
+    return users.reduce<Record<string, User>>((acc, user) => {
+      acc[user._id] = user
+      return acc
+    }, {})
+  }, [users])
 
   if (authError) {
     return (
@@ -572,34 +649,169 @@ export default function CreateSprintPage() {
                 />
               </div>
 
-              <div>
+              <div className="space-y-3">
                 <label className="text-sm font-medium text-foreground">Team Members</label>
-                <div className="grid gap-2 mt-2 max-h-40 overflow-y-auto">
-                  {!formData.project ? (
-                    <p className="text-xs sm:text-sm text-muted-foreground italic">
-                      Please select a project to see available team members
-                    </p>
-                  ) : Array.isArray(users) && users.length > 0 ? (
-                    users.map((user) => (
-                      <div key={user._id} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id={user._id}
-                          checked={formData.teamMembers.includes(user._id)}
-                          onChange={() => handleTeamMemberToggle(user._id)}
-                          className="rounded flex-shrink-0"
+                {!formData.project ? (
+                  <p className="text-xs sm:text-sm text-muted-foreground italic">
+                    Please select a project to see available team members
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    <Select
+                      value=""
+                      onValueChange={(value) => {
+                        if (!formData.teamMembers.includes(value)) {
+                          setFormData((prev) => ({
+                            ...prev,
+                            teamMembers: [...prev.teamMembers, value]
+                          }))
+                          setTeamMemberQuery('')
+                        }
+                      }}
+                      onOpenChange={(open) => {
+                        if (open) setTeamMemberQuery('')
+                      }}
+                      disabled={membersLoading || activeUsers.length === 0}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue
+                          placeholder={
+                            membersLoading
+                              ? 'Loading team members...'
+                              : activeUsers.length === 0
+                                ? 'No active team members for this project'
+                                : 'Search team members'
+                          }
                         />
-                        <label htmlFor={user._id} className="text-xs sm:text-sm break-words flex-1 min-w-0">
-                          {user.firstName} {user.lastName} ({user.email})
-                        </label>
+                      </SelectTrigger>
+                      <SelectContent className="z-[10050] p-0 w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
+                        <div className="p-2">
+                          <div className="relative mb-2">
+                            <Input
+                              value={teamMemberQuery}
+                              onChange={(e) => setTeamMemberQuery(e.target.value)}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              placeholder={
+                                membersLoading ? 'Loading members...' : 'Type to search team members'
+                              }
+                              className="pr-8"
+                            />
+                            {teamMemberQuery && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setTeamMemberQuery('')
+                                }}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-sm p-0.5"
+                                aria-label="Clear search"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                          <div className="max-h-56 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                            {membersLoading ? (
+                              <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                                <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                                <span className="truncate">Loading members...</span>
+                              </div>
+                            ) : activeUsers.length === 0 ? (
+                              <div className="px-2 py-1 text-sm text-muted-foreground">
+                                No active team members found for this project
+                              </div>
+                            ) : (
+                              (() => {
+                                const query = teamMemberQuery.toLowerCase().trim()
+                                const filteredMembers = activeUsers.filter((member) => {
+                                  if (formData.teamMembers.includes(member._id)) return false
+                                  if (!query) return true
+                                  const fullName = `${member.firstName} ${member.lastName}`.toLowerCase()
+                                  return (
+                                    fullName.includes(query) ||
+                                    (member.email ? member.email.toLowerCase().includes(query) : false)
+                                  )
+                                })
+
+                                if (filteredMembers.length === 0) {
+                                  return (
+                                    <div className="px-2 py-1 text-sm text-muted-foreground">
+                                      No matching members
+                                    </div>
+                                  )
+                                }
+
+                                return filteredMembers.map((member) => (
+                                  <SelectItem
+                                    key={member._id}
+                                    value={member._id}
+                                    disabled={formData.teamMembers.includes(member._id)}
+                                    className={formData.teamMembers.includes(member._id) ? 'opacity-50 cursor-not-allowed' : ''}
+                                  >
+                                    <div className="flex items-center justify-between w-full min-w-0">
+                                      <span className="truncate min-w-0">
+                                        {member.firstName} {member.lastName}{' '}
+                                        <span className="text-muted-foreground">({member.email})</span>
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ))
+                              })()
+                            )}
+                          </div>
+                        </div>
+                      </SelectContent>
+                    </Select>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          Assigned members ({formData.teamMembers.length})
+                        </p>
+                        {formData.teamMembers.length > 4 && (
+                          <span className="text-[10px] text-muted-foreground">Scroll to view all</span>
+                        )}
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-xs sm:text-sm text-muted-foreground italic">
-                      No team members found for the selected project
-                    </p>
-                  )}
-                </div>
+                      {formData.teamMembers.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic">No members assigned yet.</p>
+                      ) : (
+                        <div className="max-h-40 overflow-y-auto rounded-md border border-dashed bg-muted/20 p-2">
+                          <div className="flex flex-wrap gap-2">
+                            {formData.teamMembers.map((memberId) => {
+                              const member = memberLookup[memberId]
+                              const memberLabel = member
+                                ? `${member.firstName} ${member.lastName}`.trim() || member.email
+                                : 'Member unavailable'
+                              return (
+                                <Badge
+                                  key={memberId}
+                                  variant="secondary"
+                                  className="flex items-center gap-1 px-3 py-1 text-xs bg-background border"
+                                  title={
+                                    member
+                                      ? `${member.firstName} ${member.lastName} (${member.email})`
+                                      : undefined
+                                  }
+                                >
+                                  <span className="truncate max-w-[150px]">{memberLabel}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleTeamMemberToggle(memberId)}
+                                    className="ml-1 rounded-full p-0.5 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                  >
+                                    <X className="h-3 w-3" />
+                                    <span className="sr-only">Remove {memberLabel}</span>
+                                  </button>
+                                </Badge>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 pt-6 mt-8 border-t border-muted">

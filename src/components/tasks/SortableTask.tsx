@@ -239,7 +239,7 @@ export default function SortableTask({
             {task.dueDate &&  (
               <div className="flex items-center space-x-1">
                 <Calendar className="h-3 w-3 flex-shrink-0" />
-                <span className="whitespace-nowrap">Due { new Date(task.dueDate).toLocaleDateString()}</span>   
+                <span className="whitespace-nowrap">Due {formatDate(task.dueDate)}</span>
               </div>
             )}
             {task.storyPoints && (

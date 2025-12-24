@@ -171,7 +171,7 @@ export async function GET(request: NextRequest) {
     // Get time entries with pagination
     const skip = (page - 1) * limit
     const timeEntries = await TimeEntry.find(query)
-      .populate('project', 'name')
+      .populate('project', 'name settings')
       .populate({ path: 'task', model: Task, select: 'title' })
       .populate('user', 'firstName lastName email')
       .populate('approvedBy', 'firstName lastName')
@@ -185,7 +185,11 @@ export async function GET(request: NextRequest) {
     const normalizedEntries = timeEntries.map((entry: any) => {
       // Check if project exists (populate returns null if document deleted)
       const project = entry.project && typeof entry.project === 'object' && entry.project.name
-        ? { _id: entry.project._id || entry.project, name: entry.project.name }
+        ? {
+            _id: entry.project._id || entry.project,
+            name: entry.project.name,
+            settings: entry.project.settings || {}
+          }
         : null
       
       // Check if task exists (populate returns null if document deleted)

@@ -348,7 +348,7 @@ export default function EpicDetailPage() {
                 <Layers className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-purple-600 flex-shrink-0" />
                   <span className="break-words overflow-wrap-anywhere">{epic?.title}</span>
               </h1>
-                <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
+                <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap ml-auto">
             <Button
               variant="outline"
               disabled={!editAllowed}

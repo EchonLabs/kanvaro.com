@@ -288,12 +288,21 @@ export async function GET(request: NextRequest) {
       { path: 'movedFromSprint', select: '_id name' }
     ];
 
+    // Add performance logging for task queries
+    const queryStartTime = Date.now();
+
+    console.log('Task query filters:', JSON.stringify(taskQueryFilters, null, 2));
+    console.log('Task query minimal:', minimal, 'limit:', PAGE_SIZE);
+
     const items = await Task.find(taskQueryFilters)
       .populate(populatePaths)
       .sort(sort)
       .skip((page - 1) * PAGE_SIZE)
       .limit(PAGE_SIZE)
       .lean();
+
+    const queryTime = Date.now() - queryStartTime;
+    console.log(`Task query completed in ${queryTime}ms, found ${items.length} items`);
 
     // Exclude tasks whose project no longer exists (or is outside scope)
     const filteredItems = items.filter((t: any) => !!t.project)

@@ -31,7 +31,13 @@ export async function GET(request: NextRequest) {
 
     // Check if user can view all projects (admin permission)
     const canViewAllProjects = await PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL)
-    
+
+    console.log('Projects API - User permissions:', {
+      userId,
+      canViewAllProjects,
+      hasProjectRead: await PermissionService.hasPermission(userId, Permission.PROJECT_READ)
+    })
+
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
@@ -61,14 +67,24 @@ export async function GET(request: NextRequest) {
     }
 
     let projectQuery: any = { ...filters }
-    
+
     // If user can't view all projects, filter by access
     if (!canViewAllProjects) {
       projectQuery.$or = [
         { createdBy: userId },
-        { teamMembers: userId },
+        { "teamMembers.memberId": userId }, // Check teamMembers array for memberId
         { client: userId }
       ]
+      console.log('Projects API - Restricted query for team member:', {
+        userId,
+        baseFilters: filters,
+        finalQuery: projectQuery
+      })
+    } else {
+      console.log('Projects API - Unrestricted query for admin:', {
+        userId,
+        query: projectQuery
+      })
     }
 
     const projects = await Project.find(projectQuery)
@@ -81,6 +97,20 @@ export async function GET(request: NextRequest) {
       .limit(limit)
 
     const total = await Project.countDocuments(projectQuery)
+
+    console.log('Projects API - Query results:', {
+      query: projectQuery,
+      totalProjectsFound: total,
+      projectsReturned: projects.length,
+      projects: projects.map(p => ({
+        _id: p._id,
+        name: p.name,
+        createdBy: p.createdBy?._id,
+        teamMembers: p.teamMembers?.map((tm: any) => tm.memberId),
+        isUserCreator: p.createdBy?._id?.toString() === userId,
+        isUserTeamMember: p.teamMembers?.some((tm: any) => tm.memberId?.toString() === userId)
+      }))
+    })
 
     // Calculate progress for each project
     const projectsWithProgress = await Promise.all(

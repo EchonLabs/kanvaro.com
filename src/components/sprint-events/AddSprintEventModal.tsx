@@ -33,6 +33,7 @@ interface User {
   firstName: string
   lastName: string
   email: string
+  isActive?: boolean
 }
 
 interface Project {
@@ -54,6 +55,8 @@ interface AddSprintEventModalProps {
   onClose: () => void
   onSuccess: () => void
 }
+
+const MIN_DURATION_MINUTES = 15
 
 export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprintEventModalProps) {
   const router = useRouter()
@@ -86,7 +89,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
   const cacheRef = useRef<{
     projects?: { data: Project[]; timestamp: number }
     sprints?: { data: Sprint[]; projectId: string; timestamp: number }
-    users?: { data: User[]; projectId: string; timestamp: number }
+    users?: { data: User[]; timestamp: number }
   }>({})
   const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
@@ -208,56 +211,47 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     }
   }, [])
 
-  const fetchUsers = useCallback(async (projId?: string, signal?: AbortSignal) => {
-    const activeProjectId = projId || ''
-    if (!activeProjectId) {
-      setUsers([])
-      return
-    }
-
-    // Check cache first
+  const fetchUsers = useCallback(async (signal?: AbortSignal) => {
     const cached = cacheRef.current.users
-    if (cached && cached.projectId === activeProjectId && Date.now() - cached.timestamp < CACHE_DURATION) {
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
       setUsers(cached.data)
       return
     }
 
     try {
-      // Prefer project-scoped team members to avoid showing all users
-      const response = await fetch(`/api/projects/${activeProjectId}`, { signal })
+      const response = await fetch('/api/members?limit=1000', { signal })
       if (signal?.aborted) return
 
       if (response.ok) {
         const data = await response.json()
-        const teamMembers =
-          data?.data?.teamMembers ||
-          data?.project?.teamMembers ||
-          []
+        const members =
+          data?.data?.members ??
+          data?.data ??
+          data?.members ??
+          (Array.isArray(data) ? data : [])
 
-        const usersData = Array.isArray(teamMembers)
-          ? teamMembers
-              .filter((member: any) => member.memberId) // Filter out any null/undefined memberIds
-              .map((member: any) => {
-                const userData = {
-                  _id: member.memberId._id,
-                  firstName: member.memberId.firstName || '',
-                  lastName: member.memberId.lastName || '',
-                  email: member.memberId.email || ''
-                }
-                return userData
-              })
+        const normalizedMembers = Array.isArray(members)
+          ? members
+              .filter((member: any) => member && member._id)
+              .map((member: any) => ({
+                _id: member._id,
+                firstName: member.firstName || '',
+                lastName: member.lastName || '',
+                email: member.email || '',
+                isActive: member.isActive !== false
+              }))
           : []
 
-        setUsers(usersData)
-        cacheRef.current.users = { data: usersData, projectId: activeProjectId, timestamp: Date.now() }
-        return
-      }
+        const activeMembers = normalizedMembers.filter(member => member.isActive !== false)
 
-      // If project endpoint fails, do not fall back to global users to avoid leaking unrelated members
-      setUsers([])
+        setUsers(activeMembers)
+        cacheRef.current.users = { data: activeMembers, timestamp: Date.now() }
+      } else {
+        setUsers([])
+      }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return
-      console.error('Error fetching project users:', error)
+      console.error('Error fetching organization members:', error)
       setUsers([])
     }
   }, [])
@@ -276,13 +270,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     const fetchAllData = async () => {
       const promises: Promise<void>[] = []
 
-      // Fetch users only when a project context exists
-      const activeProjectId = projectId
-      if (activeProjectId) {
-        promises.push(fetchUsers(activeProjectId, signal))
-      } else {
-        setUsers([])
-      }
+      promises.push(fetchUsers(signal))
 
       if (projectId) {
         promises.push(fetchSprints(projectId, signal))
@@ -301,20 +289,6 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
       }
     }
   }, [projectId, fetchUsers, fetchSprints, fetchProjects])
-
-  // Refresh users when the selected project changes (for modal without preset project)
-  useEffect(() => {
-    if (projectId) return // already handled by initial fetch
-    const activeProjectId = formData.projectId
-    if (!activeProjectId) {
-      setUsers([])
-      return
-    }
-
-    const controller = new AbortController()
-    fetchUsers(activeProjectId, controller.signal)
-    return () => controller.abort()
-  }, [projectId, formData.projectId, fetchUsers])
 
   useEffect(() => {
     if (formData.projectId && !projectId) {
@@ -572,14 +546,11 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
       const start = startHours * 60 + startMinutes
       const end = endHours * 60 + endMinutes
       const duration = end - start
-      if (duration > 0) {
-        setFormData(prev => ({ ...prev, duration }))
-      } else {
-        setFormData(prev => ({ ...prev, duration: 0 }))
-      }
+      const clampedDuration = duration > 0 ? Math.max(duration, MIN_DURATION_MINUTES) : MIN_DURATION_MINUTES
+      setFormData(prev => ({ ...prev, duration: clampedDuration }))
     } else {
-      // Reset duration if times are not both provided or there are errors
-      setFormData(prev => ({ ...prev, duration: 0 }))
+      // When times are missing or invalid, keep the duration at backend minimum to avoid validation errors
+      setFormData(prev => ({ ...prev, duration: MIN_DURATION_MINUTES }))
     }
   }
 
@@ -601,7 +572,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
   // Get the calculated duration display value
   const getDurationDisplay = () => {
-    if (formData.startTime && formData.endTime && !startTimeError && !endTimeError && formData.duration > 0) {
+    if (formData.startTime && formData.endTime && !startTimeError && !endTimeError && formData.duration >= MIN_DURATION_MINUTES) {
       return formatDuration(formData.duration)
     }
     return 'Enter start and end time to calculate'
@@ -625,12 +596,12 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     // If both times are provided, they must be valid (no timeError) and duration must be > 0
     const hasValidTime =
       (!formData.startTime && !formData.endTime) || // Both empty is OK (optional)
-      (formData.startTime && formData.endTime && !startTimeError && !endTimeError && formData.duration > 0) // Both filled and valid
+      (formData.startTime && formData.endTime && !startTimeError && !endTimeError && formData.duration >= MIN_DURATION_MINUTES) // Both filled and valid
 
     // Check date validation - date must be valid if selected
     const hasValidDate = !dateError || (selectedDate && (!selectedSprint || validateDate(selectedDate)))
 
-    return hasRequiredFields && hasValidTime && hasValidDate
+    return hasRequiredFields && hasValidTime && hasValidDate && formData.duration >= MIN_DURATION_MINUTES
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -785,15 +756,19 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     return statusOptions.filter(so => so.label.toLowerCase().includes(query))
   }, [statusQuery])
 
-  const filteredUsers = useMemo(() => {
+  const activeUsers = useMemo(() => {
     if (!Array.isArray(users)) return []
-    if (!debouncedAttendeeQuery.trim()) return users
+    return users.filter(user => user.isActive !== false)
+  }, [users])
+
+  const filteredUsers = useMemo(() => {
+    if (!debouncedAttendeeQuery.trim()) return activeUsers
     const query = debouncedAttendeeQuery.toLowerCase()
-    return users.filter((u: User) => {
+    return activeUsers.filter((u: User) => {
       const fullName = `${u.firstName} ${u.lastName}`.toLowerCase()
       return fullName.includes(query) || u.email.toLowerCase().includes(query)
     })
-  }, [users, debouncedAttendeeQuery])
+  }, [activeUsers, debouncedAttendeeQuery])
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
