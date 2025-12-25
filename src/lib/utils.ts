@@ -84,11 +84,22 @@ export function applyRoundingRules(
   }
 
   const increment = roundingRules.increment
+
+  // Convert total minutes to hours and minutes
+  const totalHours = Math.floor(duration / 60)
+  const remainingMinutes = duration % 60
+
+  // Round the minute component
+  let roundedMinutes: number
   if (roundingRules.roundUp) {
     // Round up to nearest increment
-    return Math.ceil(duration / increment) * increment
+    roundedMinutes = Math.ceil(remainingMinutes / increment) * increment
+    // If rounding up minutes exceeds 60, it will carry over to hours in the display
   } else {
     // Round down to nearest increment
-    return Math.floor(duration / increment) * increment
+    roundedMinutes = Math.floor(remainingMinutes / increment) * increment
   }
+
+  // Convert back to total minutes
+  return totalHours * 60 + roundedMinutes
 }

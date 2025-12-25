@@ -30,17 +30,13 @@ export default function SettingsPage() {
 
   const checkAuth = useCallback(async () => {
     try {
-      console.log('Settings: Checking authentication...')
       const response = await fetch('/api/auth/me')
-      console.log('Settings: Auth response status:', response.status)
       
       if (response.ok) {
         const userData = await response.json()
-        console.log('Settings: User data received:', userData)
         setUser(userData)
         setAuthError('')
       } else if (response.status === 401) {
-        console.log('Settings: 401 response, trying refresh token')
         // Try to refresh token
         const refreshResponse = await fetch('/api/auth/refresh', {
           method: 'POST'
