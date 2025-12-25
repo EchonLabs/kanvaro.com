@@ -630,7 +630,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
 
               <div>
                 <label className="text-sm font-medium text-foreground">Status</label>
-                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value as SubtaskStatus })}>
+                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value as SubtaskStatus })} disabled={!task?.sprint}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
