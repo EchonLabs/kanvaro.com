@@ -392,9 +392,9 @@ export default function TimerPage() {
         const isUserTeamMember = teamMembers.some((member: any) => {
           if (typeof member === 'object' && member !== null) {
             return member.memberId === u.id || member.memberId?._id === u.id || member.memberId?.id === u.id
-          }
-          return false
-        })
+            }
+            return false
+          })
 
         return isUserTeamMember
       })
@@ -411,7 +411,7 @@ export default function TimerPage() {
         }))
       })
 
-      setProjects(filtered)
+        setProjects(filtered)
       } else {
         setProjects([])
       }
@@ -429,19 +429,19 @@ export default function TimerPage() {
     }
 
     setTasksLoading(true)
-
+    
     try {
       // Fetch tasks for the selected project where user is assigned
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout (reduced since query is optimized)
-
+      
       const response = await fetch(`/api/tasks?project=${projectId}&assignedTo=${user.id}&limit=50&minimal=true`, {
         cache: 'no-store',
         signal: controller.signal
       })
-
+      
       clearTimeout(timeoutId)
-
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -728,24 +728,24 @@ export default function TimerPage() {
           fetchDailyHoursLogged()
         } else if (data?.activeTimer) {
           // Normal active timer
-          setActiveTimerSnapshot(data.activeTimer)
-          setLiveActiveTimer(data.activeTimer)
+        setActiveTimerSnapshot(data.activeTimer)
+        setLiveActiveTimer(data.activeTimer)
 
-          const projectId = data.activeTimer.project?._id || null
-          const taskId = data.activeTimer.task?._id || null
-          const timerDescription = data.activeTimer.description || ''
+        const projectId = data.activeTimer.project?._id || null
+        const taskId = data.activeTimer.task?._id || null
+        const timerDescription = data.activeTimer.description || ''
 
-          if (projectId) {
-            setPendingActiveProject(projectId)
-          }
-          if (taskId) {
-            setPendingActiveTask(taskId)
-          }
-          if (timerDescription) {
-            setPendingActiveDescription(timerDescription)
-          }
-          setInitializedFromActive(false)
-        } else {
+        if (projectId) {
+          setPendingActiveProject(projectId)
+        }
+        if (taskId) {
+          setPendingActiveTask(taskId)
+        }
+        if (timerDescription) {
+          setPendingActiveDescription(timerDescription)
+        }
+        setInitializedFromActive(false)
+      } else {
           // No active timer
           setActiveTimerSnapshot(null)
           setLiveActiveTimer(null)

@@ -758,8 +758,8 @@ export function OrganizationSettings() {
                       {currencySearchQuery ? 'No currencies found' : 'Start typing to search...'}
                     </SelectItem>
                   ) : (
-                    filteredCurrencies.map((currency) => (
-                      <SelectItem key={currency.code} value={currency.code} className="text-xs sm:text-sm">
+                    filteredCurrencies.map((currency, index) => (
+                      <SelectItem key={`${currency.code}-${index}`} value={currency.code} className="text-xs sm:text-sm">
                         {formatCurrencyDisplay(currency)}
                       </SelectItem>
                     ))

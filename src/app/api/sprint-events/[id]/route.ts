@@ -156,18 +156,18 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     }
 
     const body = await req.json()
-    const {
-      title,
-      description,
+    const { 
+      title, 
+      description, 
       scheduledDate,
       startTime,
       endTime,
-      actualDate,
-      duration,
-      attendees,
-      status,
-      outcomes,
-      location,
+      actualDate, 
+      duration, 
+      attendees, 
+      status, 
+      outcomes, 
+      location, 
       meetingLink,
       attachments,
       notificationSettings
@@ -176,7 +176,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     // Ensure facilitator is included in attendees when updating
     const attendeesWithFacilitator = Array.isArray(attendees) ? Array.from(new Set([...attendees, authResult.user.id])) : [authResult.user.id]
 
-    
+
     const sprintEvent = await SprintEvent.findById(params.id)
     if (!sprintEvent) {
       return NextResponse.json({ error: 'Sprint event not found' }, { status: 404 })

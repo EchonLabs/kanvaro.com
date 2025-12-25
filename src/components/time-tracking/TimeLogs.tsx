@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useMemo } from 'react'
 import { usePathname } from 'next/navigation'
-import { Clock, Edit, Trash2, Check, X, Filter, Download, Plus, AlertTriangle, FolderOpen, Target, Loader2, Upload, FileText, User, Search, MoreHorizontal, DollarSign } from 'lucide-react'
+import { Clock, Edit, Trash2, Check, X, Filter, Download, Plus, AlertTriangle, FolderOpen, Target, Loader2, Upload, FileText, User, Search, MoreHorizontal, DollarSign, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -206,7 +206,10 @@ export function TimeLogs({
     description: ''
   })
   const [submittingManualLog, setSubmittingManualLog] = useState(false)
-  const [sessionHoursError, setSessionHoursError] = useState('')
+  const [startDateError, setStartDateError] = useState('')
+  const [startTimeError, setStartTimeError] = useState('')
+  const [endDateError, setEndDateError] = useState('')
+  const [endTimeError, setEndTimeError] = useState('')
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
   const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null)
   const [bulkUploadProgress, setBulkUploadProgress] = useState<{ total: number; processed: number; successful: number; failed: number } | null>(null)
@@ -322,13 +325,22 @@ export function TimeLogs({
     fetchFilterProjects()
   }, [resolvedOrgId, resolvedUserId, canViewEmployeeFilter])
 
-  // Fetch tasks for filter when project is selected
+  // Fetch tasks for filter when project is selected or for all projects
   useEffect(() => {
     const fetchFilterTasks = async () => {
-      if (!filters.projectId || !resolvedOrgId) {
+      if (!resolvedOrgId) {
         setFilterTasks([])
         return
       }
+
+      // If no specific project is selected (All projects), we don't load tasks
+      // Users can still search manually or the task filter will show "All tasks"
+      if (!filters.projectId) {
+        setFilterTasks([])
+        setFilterTasksLoading(false)
+        return
+      }
+
       setFilterTasksLoading(true)
       try {
         const response = await fetch(`/api/tasks?project=${filters.projectId}&limit=500`)
@@ -523,7 +535,7 @@ export function TimeLogs({
       setTasks([])
       setModalProjectSearch('')
       setError('')
-      setSessionHoursError('')
+      clearFieldErrors()
     }
   }, [showAddTimeLogModal, isEditing])
 
@@ -531,6 +543,14 @@ export function TimeLogs({
   const combineDateTime = (date: string, time: string): string => {
     if (!date || !time) return ''
     return `${date}T${time}`
+  }
+
+  // Helper function to clear all field validation errors
+  const clearFieldErrors = () => {
+    setStartDateError('')
+    setStartTimeError('')
+    setEndDateError('')
+    setEndTimeError('')
   }
 
   // Helper function to get billable status from selected task
@@ -541,7 +561,11 @@ export function TimeLogs({
 
   // Validate maxSessionHours and future time when dates/times change
   const validateSessionHours = useCallback(() => {
-    setSessionHoursError('')
+    // Clear all field-specific errors
+    setStartDateError('')
+    setStartTimeError('')
+    setEndDateError('')
+    setEndTimeError('')
 
     if (!manualLogData.startDate || !manualLogData.startTime || !manualLogData.endDate || !manualLogData.endTime) {
       return
@@ -562,7 +586,7 @@ export function TimeLogs({
     }
 
     if (end <= start) {
-      setSessionHoursError('End time must be after start time')
+      setEndTimeError('End time must be after start time')
       return
     }
 
@@ -571,11 +595,20 @@ export function TimeLogs({
     // Check for future time logging
     if (!timeTrackingSettings?.allowFutureTime) {
       if (start > now) {
-        setSessionHoursError('Future time not allowed. Please select a time that is today or in the past.')
+        setStartDateError('Future time not allowed. Please select a time that is today or in the past.')
         return
       }
       if (end > now) {
-        setSessionHoursError('Future time not allowed. Please select a time that is today or in the past.')
+        setEndDateError('Future time not allowed. Please select a time that is today or in the past.')
+        return
+      }
+    }
+
+    // Check past time limit when past time is allowed
+    if (timeTrackingSettings?.allowPastTime === true && timeTrackingSettings?.pastTimeLimitDays) {
+      const daysDiff = Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+      if (daysDiff > timeTrackingSettings.pastTimeLimitDays) {
+        setStartDateError(`Past time logging not allowed beyond ${timeTrackingSettings.pastTimeLimitDays} days. Please select a more recent date.`)
         return
       }
     }
@@ -587,7 +620,7 @@ export function TimeLogs({
       const maxHours = timeTrackingSettings.maxSessionHours
 
       if (durationHours > maxHours) {
-        setSessionHoursError(`Session duration (${durationHours.toFixed(2)}h) exceeds maximum allowed (${maxHours}h).`)
+        setEndTimeError(`Session duration (${durationHours.toFixed(2)}h) exceeds maximum allowed (${maxHours}h).`)
         return
       }
     }
@@ -661,7 +694,7 @@ export function TimeLogs({
       return
     }
 
-    if (sessionHoursError) {
+    if (startDateError || startTimeError || endDateError || endTimeError) {
       return
     }
 
@@ -753,7 +786,7 @@ export function TimeLogs({
       return
     }
 
-    if (sessionHoursError) {
+    if (startDateError || startTimeError || endDateError || endTimeError) {
       return
     }
 
@@ -808,7 +841,7 @@ export function TimeLogs({
   const formatDuration = (minutes: number) => {
     // Apply rounding rules if enabled
     let displayMinutes = minutes
-    const roundingRules = organization?.settings?.timeTracking?.roundingRules
+    const roundingRules = timeTrackingSettings?.roundingRules
     if (roundingRules?.enabled) {
       displayMinutes = applyRoundingRules(minutes, {
         enabled: roundingRules.enabled,
@@ -1248,9 +1281,6 @@ export function TimeLogs({
       return `${hours}:${minutes}`
     }
 
-    console.log('TimeLogs: EDIT - Original entry startTime:', entry.startTime, 'endTime:', entry.endTime)
-    console.log('TimeLogs: EDIT - Parsed start date:', start.toISOString(), 'end date:', end.toISOString())
-    console.log('TimeLogs: EDIT - UTC start time:', formatUTCTime(start), 'UTC end time:', formatUTCTime(end))
 
     setManualLogData({
       startDate: start.toISOString().split('T')[0], // Already UTC
@@ -1535,10 +1565,12 @@ export function TimeLogs({
       return { valid: false, error: `Row ${rowIndex + 1}: Future time logging not allowed` }
     }
 
-    // Check past time limit
-    const daysDiff = Math.ceil((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-    if (!timeTrackingSettings?.allowPastTime && daysDiff > (timeTrackingSettings?.pastTimeLimitDays || 30)) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Past time logging not allowed beyond limit` }
+    // Check past time limit when past time is allowed
+    if (timeTrackingSettings?.allowPastTime === true && timeTrackingSettings?.pastTimeLimitDays) {
+      const daysDiff = Math.ceil((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+      if (daysDiff > timeTrackingSettings.pastTimeLimitDays) {
+        return { valid: false, error: `Row ${rowIndex + 1}: Past time logging not allowed beyond ${timeTrackingSettings.pastTimeLimitDays} days` }
+      }
     }
 
     // Check max session hours
@@ -1810,7 +1842,7 @@ export function TimeLogs({
                   setTasks([])
                   setModalProjectSearch('')
                   setError('')
-                  setSessionHoursError('')
+                  clearFieldErrors()
                   setShowAddTimeLogModal(true)
                 }}
                 size="sm"
@@ -1868,7 +1900,7 @@ export function TimeLogs({
                 <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-project">
                   <SelectValue placeholder="All projects" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[200px]">
                   <div className="p-2 border-b">
                     <div className="relative">
                       <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -1895,53 +1927,49 @@ export function TimeLogs({
                       )}
                     </div>
                   </div>
-                  <div className="max-h-[200px] overflow-y-auto">
-                    <SelectItem value="all" onMouseDown={(e) => e.preventDefault()}>
-                      All projects
+                  <SelectItem value="all" onMouseDown={(e) => e.preventDefault()}>
+                    All projects
+                  </SelectItem>
+                  {filterProjectsLoading ? (
+                    <SelectItem value="loading" disabled>
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Loading...
+                      </div>
                     </SelectItem>
-                    {filterProjectsLoading ? (
-                      <SelectItem value="loading" disabled>
+                  ) : filteredProjects.length === 0 ? (
+                    <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                      No projects found
+                    </div>
+                  ) : (
+                    filteredProjects.map((project) => (
+                      <SelectItem key={project._id} value={project._id} onMouseDown={(e) => e.preventDefault()}>
                         <div className="flex items-center gap-2">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Loading...
+                          <FolderOpen className="h-3 w-3" />
+                          <span className="truncate">{project.name}</span>
                         </div>
                       </SelectItem>
-                    ) : filteredProjects.length === 0 ? (
-                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-                        No projects found
-                      </div>
-                    ) : (
-                      filteredProjects.map((project) => (
-                        <SelectItem key={project._id} value={project._id} onMouseDown={(e) => e.preventDefault()}>
-                          <div className="flex items-center gap-2">
-                            <FolderOpen className="h-3 w-3" />
-                            <span className="truncate">{project.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))
-                    )}
-                  </div>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1.5 sm:space-y-2 min-w-0">
               <Label htmlFor="filter-task" className="text-xs sm:text-sm font-medium">Task</Label>
-              <Select 
-                value={filters.taskId || 'all'} 
+              <Select
+                value={filters.taskId || 'all'}
                 onValueChange={(value) => handleFilterChange('taskId', value === 'all' ? '' : value)}
-                disabled={!filters.projectId || filterTasksLoading}
+                disabled={filterTasksLoading}
               >
                 <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-task">
                   <SelectValue placeholder={
-                    !filters.projectId 
-                      ? 'Select project first' 
-                      : filterTasksLoading 
-                        ? 'Loading...' 
-                        : 'All tasks'
+                    filterTasksLoading
+                      ? 'Loading...'
+                      : 'All tasks'
                   } />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[200px]">
                   <div className="p-2 border-b">
                     <div className="relative">
                       <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -1969,30 +1997,28 @@ export function TimeLogs({
                       )}
                     </div>
                   </div>
-                  <div className="max-h-[200px] overflow-y-auto">
-                    <SelectItem value="all">All tasks</SelectItem>
-                    {filterTasksLoading ? (
-                      <SelectItem value="loading" disabled>
+                  <SelectItem value="all">All tasks</SelectItem>
+                  {filterTasksLoading ? (
+                    <SelectItem value="loading" disabled>
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Loading...
+                      </div>
+                    </SelectItem>
+                  ) : filteredTasks.length === 0 ? (
+                    <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                      {!filters.projectId ? 'Select a project first' : 'No tasks found'}
+                    </div>
+                  ) : (
+                    filteredTasks.map((task) => (
+                      <SelectItem key={task._id} value={task._id} onMouseDown={(e) => e.preventDefault()}>
                         <div className="flex items-center gap-2">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Loading...
+                          <Target className="h-3 w-3" />
+                          <span className="truncate">{task.title}</span>
                         </div>
                       </SelectItem>
-                    ) : filteredTasks.length === 0 ? (
-                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-                        {!filters.projectId ? 'Select a project first' : 'No tasks found'}
-                      </div>
-                    ) : (
-                      filteredTasks.map((task) => (
-                        <SelectItem key={task._id} value={task._id} onMouseDown={(e) => e.preventDefault()}>
-                          <div className="flex items-center gap-2">
-                            <Target className="h-3 w-3" />
-                            <span className="truncate">{task.title}</span>
-                          </div>
-                        </SelectItem>
-                      ))
-                    )}
-                  </div>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -2010,7 +2036,7 @@ export function TimeLogs({
                       filterEmployeesLoading ? 'Loading...' : 'All employees'
                     } />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[200px]">
                     <div className="p-2 border-b">
                       <div className="relative">
                         <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -2037,32 +2063,30 @@ export function TimeLogs({
                         )}
                       </div>
                     </div>
-                    <div className="max-h-[200px] overflow-y-auto">
-                      <SelectItem value="all">All employees</SelectItem>
-                      {filterEmployeesLoading ? (
-                        <SelectItem value="loading" disabled>
+                    <SelectItem value="all">All employees</SelectItem>
+                    {filterEmployeesLoading ? (
+                      <SelectItem value="loading" disabled>
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Loading...
+                        </div>
+                      </SelectItem>
+                    ) : filteredEmployees.length === 0 ? (
+                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                        No employees found
+                      </div>
+                    ) : (
+                      filteredEmployees.map((employee) => (
+                        <SelectItem key={employee._id} value={employee._id} onMouseDown={(e) => e.preventDefault()}>
                           <div className="flex items-center gap-2">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            Loading...
+                            <User className="h-3 w-3" />
+                            <span className="truncate">
+                              {employee.firstName} {employee.lastName}
+                            </span>
                           </div>
                         </SelectItem>
-                      ) : filteredEmployees.length === 0 ? (
-                        <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-                          No employees found
-                        </div>
-                      ) : (
-                        filteredEmployees.map((employee) => (
-                          <SelectItem key={employee._id} value={employee._id} onMouseDown={(e) => e.preventDefault()}>
-                            <div className="flex items-center gap-2">
-                              <User className="h-3 w-3" />
-                              <span className="truncate">
-                                {employee.firstName} {employee.lastName}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))
-                      )}
-                    </div>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -2094,7 +2118,7 @@ export function TimeLogs({
                 <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[200px]">
                   <div className="p-2 border-b">
                     <div className="relative">
                       <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -2143,7 +2167,7 @@ export function TimeLogs({
                 <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
                   <SelectValue placeholder="All" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[200px]">
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="true">Billable</SelectItem>
                   <SelectItem value="false">Non-billable</SelectItem>
@@ -2157,7 +2181,7 @@ export function TimeLogs({
                   <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[200px]">
                     <SelectItem value="all">All</SelectItem>
                     <SelectItem value="true">Approved</SelectItem>
                     <SelectItem value="false">Pending</SelectItem>
@@ -2168,8 +2192,7 @@ export function TimeLogs({
           </div>
 
           {/* Clear Filters Button */}
-          {(filters.projectId || filters.taskId || filters.employeeId || filters.startDate || filters.endDate || filters.status !== '' || filters.isBillable !== '' || (showSelectionAndApproval && filters.isApproved !== '')) && (
-            <div className="flex justify-start sm:justify-end pt-2">
+          <div className="flex justify-start sm:justify-end pt-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -2192,12 +2215,11 @@ export function TimeLogs({
                   setPagination(prev => ({ ...prev, page: 1 }))
                 }}
                 className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
+                title="Clear all filters"
               >
-                <X className="h-4 w-4 mr-2" />
-                Clear Filters
+                <RotateCcw className="h-4 w-4" />
               </Button>
-            </div>
-          )}
+          </div>
         </div>
 
         {/* Bulk Actions */}
@@ -2371,7 +2393,7 @@ export function TimeLogs({
                             // If project doesn't require approval, always show as Approved
                             const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
 
-                            const isApproved = projectRequiresApproval ? entry.isApproved : true;                            console.log('Badge will show:', isApproved ? 'Approved' : 'Pending');
+                            const isApproved = projectRequiresApproval ? entry.isApproved : true;                            
 
                             return (
                               <Badge
@@ -2582,7 +2604,7 @@ export function TimeLogs({
                   <SelectTrigger className="w-16 h-8">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[200px]">
                     <SelectItem value="10">10</SelectItem>
                     <SelectItem value="50">50</SelectItem>
                     <SelectItem value="100">100</SelectItem>
@@ -2649,7 +2671,7 @@ export function TimeLogs({
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a project" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[200px]">
                   <div className="p-2 border-b">
                     <div className="relative">
                       <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -2715,7 +2737,7 @@ export function TimeLogs({
                 {tasksLoading && (
                   <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                 )}
-                <SelectContent>
+                <SelectContent className="max-h-[200px]">
                   {tasksLoading ? (
                     <div className="flex items-center justify-center p-4">
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -2766,8 +2788,14 @@ export function TimeLogs({
                   setError('')
                 }}
                 disabled={!selectedProjectForLog}
-                className="w-full"
+                className={`w-full ${startDateError ? 'border-destructive' : ''}`}
               />
+              {startDateError && (
+                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{startDateError}</p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -2781,8 +2809,14 @@ export function TimeLogs({
                   setError('')
                 }}
                 disabled={!selectedProjectForLog}
-                className="w-full"
+                className={`w-full ${startTimeError ? 'border-destructive' : ''}`}
               />
+              {startTimeError && (
+                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{startTimeError}</p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -2796,8 +2830,14 @@ export function TimeLogs({
                   setError('')
                 }}
                 disabled={!selectedProjectForLog}
-                className="w-full"
+                className={`w-full ${endDateError ? 'border-destructive' : ''}`}
               />
+              {endDateError && (
+                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{endDateError}</p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -2811,12 +2851,12 @@ export function TimeLogs({
                   setError('')
                 }}
                 disabled={!selectedProjectForLog}
-                className={`w-full ${sessionHoursError ? 'border-destructive' : ''}`}
+                className={`w-full ${endTimeError ? 'border-destructive' : ''}`}
               />
-              {sessionHoursError && (
+              {endTimeError && (
                 <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
                   <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-destructive font-medium leading-relaxed">{sessionHoursError}</p>
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{endTimeError}</p>
                 </div>
               )}
             </div>
@@ -2832,7 +2872,7 @@ export function TimeLogs({
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
-                  {timeTrackingSettings?.maxSessionHours && !sessionHoursError && (
+                  {timeTrackingSettings?.maxSessionHours && !(startDateError || startTimeError || endDateError || endTimeError) && (
                     <span className="ml-1">
                       (Max: {timeTrackingSettings.maxSessionHours}h)
                     </span>
@@ -2880,7 +2920,7 @@ export function TimeLogs({
               setTasks([])
               setModalProjectSearch('')
               setError('')
-              setSessionHoursError('')
+              clearFieldErrors()
             }}
             disabled={submittingManualLog}
           >
@@ -2896,7 +2936,7 @@ export function TimeLogs({
               !manualLogData.startTime ||
               !manualLogData.endDate ||
               !manualLogData.endTime ||
-              !!sessionHoursError ||
+              !!(startDateError || startTimeError || endDateError || endTimeError) ||
               (timeTrackingSettings?.requireDescription === true && !manualLogData.description.trim())
             }
           >
@@ -2943,11 +2983,12 @@ export function TimeLogs({
                   setTasks([])
                   loadTasksForProject(value)
                 }}
+                disabled={true}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a project" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[200px]">
                   <div className="p-2 border-b">
                     <div className="relative">
                       <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -2958,6 +2999,7 @@ export function TimeLogs({
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
                         className="h-8 pl-7 pr-7 text-xs"
+                        disabled={true}
                       />
                       {modalProjectSearch && (
                         <button
@@ -3013,7 +3055,7 @@ export function TimeLogs({
                 {tasksLoading && (
                   <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                 )}
-                <SelectContent>
+                <SelectContent className="max-h-[200px]">
                   {tasksLoading ? (
                     <div className="flex items-center justify-center p-4">
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -3045,8 +3087,14 @@ export function TimeLogs({
                   setManualLogData(prev => ({ ...prev, startDate: e.target.value }))
                   setError('')
                 }}
-                className="w-full"
+                className={`w-full ${startDateError ? 'border-destructive' : ''}`}
               />
+              {startDateError && (
+                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{startDateError}</p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -3059,8 +3107,14 @@ export function TimeLogs({
                   setManualLogData(prev => ({ ...prev, startTime: e.target.value }))
                   setError('')
                 }}
-                className="w-full"
+                className={`w-full ${startTimeError ? 'border-destructive' : ''}`}
               />
+              {startTimeError && (
+                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{startTimeError}</p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -3073,8 +3127,14 @@ export function TimeLogs({
                   setManualLogData(prev => ({ ...prev, endDate: e.target.value }))
                   setError('')
                 }}
-                className="w-full"
+                className={`w-full ${endDateError ? 'border-destructive' : ''}`}
               />
+              {endDateError && (
+                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{endDateError}</p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -3087,12 +3147,12 @@ export function TimeLogs({
                   setManualLogData(prev => ({ ...prev, endTime: e.target.value }))
                   setError('')
                 }}
-                className={`w-full ${sessionHoursError ? 'border-destructive' : ''}`}
+                className={`w-full ${endTimeError ? 'border-destructive' : ''}`}
               />
-              {sessionHoursError && (
+              {endTimeError && (
                 <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
                   <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-destructive font-medium leading-relaxed">{sessionHoursError}</p>
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{endTimeError}</p>
                 </div>
               )}
             </div>
@@ -3108,7 +3168,7 @@ export function TimeLogs({
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
-                  {timeTrackingSettings?.maxSessionHours && !sessionHoursError && (
+                  {timeTrackingSettings?.maxSessionHours && !(startDateError || startTimeError || endDateError || endTimeError) && (
                     <span className="ml-1">
                       (Max: {timeTrackingSettings.maxSessionHours}h)
                     </span>
@@ -3155,7 +3215,7 @@ export function TimeLogs({
               setTasks([])
               setModalProjectSearch('')
               setError('')
-              setSessionHoursError('')
+              clearFieldErrors()
               setEditInitial(null)
             }}
             disabled={submittingManualLog}
@@ -3172,7 +3232,7 @@ export function TimeLogs({
               !manualLogData.startTime ||
               !manualLogData.endDate ||
               !manualLogData.endTime ||
-              !!sessionHoursError ||
+              !!(startDateError || startTimeError || endDateError || endTimeError) ||
               !hasEditChanges ||
               (timeTrackingSettings?.requireDescription === true && !manualLogData.description.trim())
             }
@@ -3442,3 +3502,4 @@ export function TimeLogs({
     </>
   )
 }
+

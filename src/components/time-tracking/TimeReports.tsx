@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { BarChart3, PieChart, TrendingUp, Download, Calendar, Users, DollarSign, Clock, X } from 'lucide-react'
+import { BarChart3, PieChart, TrendingUp, Download, Calendar, Users, DollarSign, Clock, X, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -353,7 +353,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   const formatDuration = (minutes: number) => {
     // Apply rounding rules if enabled
     let displayMinutes = minutes
-    const roundingRules = organization?.settings?.timeTracking?.roundingRules
+    const roundingRules = (organization?.settings as any)?.roundingRules
     if (roundingRules?.enabled) {
       displayMinutes = applyRoundingRules(minutes, {
         enabled: roundingRules.enabled,
@@ -637,7 +637,29 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
               </Select>
             </div>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setFilters({
+                  startDate: '',
+                  endDate: '',
+                  reportType: 'detailed',
+                  projectId: 'all',
+                  taskId: 'all',
+                  assignedTo: 'all',
+                  assignedBy: 'all'
+                })
+                setProjectFilterQuery('')
+                setTaskFilterQuery('')
+                setAssignedToFilterQuery('')
+                setAssignedByFilterQuery('')
+              }}
+              title="Clear all filters"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
             <Button onClick={handleExport}>
               <Download className="h-4 w-4 mr-2" />
               Export CSV
