@@ -1,3 +1,17 @@
+# [1.18.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.17.1...v1.18.0) (2025-12-25)
+
+
+### Features
+
+* add chnges in sprint ([25a435c](https://github.com/EchonLabs/kanvaro.com/commit/25a435c028ae314f7b6457e8fe8d5aa59e1f5927))
+
+## [1.17.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.17.0...v1.17.1) (2025-12-25)
+
+
+### Bug Fixes
+
+* add chnges in project ([96d8a4d](https://github.com/EchonLabs/kanvaro.com/commit/96d8a4d205349b61545d0acf70851cd529b4c74b))
+
 # [1.17.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.16.1...v1.17.0) (2025-12-25)
 
 

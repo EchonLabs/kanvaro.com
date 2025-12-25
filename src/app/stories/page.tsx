@@ -819,6 +819,7 @@ export default function StoriesPage() {
                                           value as Story['status']
                                         )
                                       }
+                                      disabled={!story.sprint}
                                     >
                                       <SelectTrigger className="h-7 w-[120px] text-[11px]">
                                         <SelectValue placeholder="Status" />

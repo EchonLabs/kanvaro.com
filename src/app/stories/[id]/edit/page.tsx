@@ -616,7 +616,11 @@ export default function EditStoryPage() {
 
               <div>
                 <label className="text-sm font-medium">Status</label>
-                <Select value={story.status} onValueChange={(v) => setStory({ ...story, status: v as Story['status'] })}>
+                <Select
+                  value={story.status}
+                  onValueChange={(v) => setStory({ ...story, status: v as Story['status'] })}
+                  disabled={!story.sprint}
+                >
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="backlog">backlog</SelectItem>
