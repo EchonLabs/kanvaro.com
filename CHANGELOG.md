@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.16.1...v1.17.0) (2025-12-25)
+
+
+### Features
+
+* add changers in time log ([b2a31c0](https://github.com/EchonLabs/kanvaro.com/commit/b2a31c000cb3641e8366019604f302adcb44471e))
+
 ## [1.16.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.16.0...v1.16.1) (2025-12-24)
 
 
