@@ -448,21 +448,21 @@ export default function SprintEventsPage() {
           <CardContent className="p-3 sm:p-4">
             <div className="space-y-4">
               {/* Search Input */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search events..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search events..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
 
               {/* Filter Controls */}
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 {!projectId && (
-                  <Select
-                    value={filterProject}
+                  <Select 
+                    value={filterProject} 
                     onValueChange={setFilterProject}
                     onOpenChange={(open) => { if (open) setProjectQuery('') }}
                   >
@@ -483,8 +483,8 @@ export default function SprintEventsPage() {
                             All Projects
                           </SelectItem>
                           {projects
-                            .filter(p =>
-                              !projectQuery.trim() ||
+                            .filter(p => 
+                              !projectQuery.trim() || 
                               p.name.toLowerCase().includes(projectQuery.toLowerCase())
                             )
                             .map((project) => (
@@ -492,8 +492,8 @@ export default function SprintEventsPage() {
                                 {project.name}
                               </SelectItem>
                             ))}
-                          {projects.filter(p =>
-                            !projectQuery.trim() ||
+                          {projects.filter(p => 
+                            !projectQuery.trim() || 
                             p.name.toLowerCase().includes(projectQuery.toLowerCase())
                           ).length === 0 && projectQuery.trim() && (
                             <div className="px-2 py-1 text-sm text-muted-foreground">No matching projects</div>
@@ -582,8 +582,8 @@ export default function SprintEventsPage() {
                 <TabsContent value="grid" className="space-y-4 sm:space-y-6">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {paginatedEvents.map((event) => (
-                      <Card
-                        key={event._id}
+                      <Card 
+                        key={event._id} 
                         className="hover:shadow-md transition-shadow cursor-pointer"
                         onClick={() => router.push(`/sprint-events/${event._id}`)}
                       >
@@ -601,47 +601,47 @@ export default function SprintEventsPage() {
                                   </p>
                                 </div>
                               </div>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
                                     className="h-8 w-8 p-0 flex-shrink-0"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation()
-                                    router.push(`/sprint-events/${event._id}`)
-                                  }}>
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    View Event
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation()
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation()
+                            router.push(`/sprint-events/${event._id}`)
+                          }}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Event
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation()
                                     // Find the current event data by ID to ensure we have fresh data
                                     const currentEvent = events.find(ev => ev._id === event._id)
                                     setEditingEvent(currentEvent || event)
-                                  }}>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit Event
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleEventDeleted(event._id)
-                                    }}
-                                    className="text-destructive"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                          }}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Event
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleEventDeleted(event._id)
+                            }}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                             </div>
 
                             <div className="flex items-center gap-2 flex-wrap">
@@ -673,8 +673,8 @@ export default function SprintEventsPage() {
                 <TabsContent value="list" className="space-y-4 sm:space-y-6">
                   <div className="space-y-4 sm:space-y-6">
                     {paginatedEvents.map((event) => (
-              <Card
-                key={event._id}
+              <Card 
+                key={event._id} 
                 className="hover:shadow-md transition-shadow cursor-pointer"
                 onClick={() => router.push(`/sprint-events/${event._id}`)}
               >
@@ -684,7 +684,7 @@ export default function SprintEventsPage() {
                       <div className="flex-shrink-0 mt-1">
                         {getEventTypeIcon(event.eventType)}
                       </div>
-                      <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
                           <h3 className="text-base sm:text-lg font-semibold truncate">{event.title}</h3>
                           <div className="flex items-center gap-2 flex-wrap">
@@ -773,54 +773,54 @@ export default function SprintEventsPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                       <div className="flex items-center gap-2">
-                        <span>Items per page:</span>
-                        <Select
-                          value={pageSize.toString()}
-                          onValueChange={(value) => {
-                            const newSize = parseInt(value)
-                            setPageSize(newSize)
-                            setCurrentPage(1)
-                          }}
-                        >
+                    <span>Items per page:</span>
+                    <Select
+                      value={pageSize.toString()}
+                      onValueChange={(value) => {
+                        const newSize = parseInt(value)
+                        setPageSize(newSize)
+                        setCurrentPage(1)
+                      }}
+                    >
                           <SelectTrigger className="w-16 sm:w-20 h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="10">10</SelectItem>
-                            <SelectItem value="20">20</SelectItem>
-                            <SelectItem value="50">50</SelectItem>
-                            <SelectItem value="100">100</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
                       </div>
                       <span className="text-center sm:text-left">
-                        Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}
-                      </span>
-                    </div>
+                      Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}
+                    </span>
+                  </div>
 
                     {/* Navigation buttons */}
                     <div className="flex items-center justify-center sm:justify-end gap-2">
-                      <Button
-                        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                        disabled={currentPage === 1 || loading}
-                        variant="outline"
-                        size="sm"
+                    <Button
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1 || loading}
+                      variant="outline"
+                      size="sm"
                         className="min-w-[80px]"
-                      >
-                        Previous
-                      </Button>
+                    >
+                      Previous
+                    </Button>
                       <span className="text-xs sm:text-sm text-muted-foreground px-2 min-w-fit">
-                        Page {currentPage} of {totalPages}
-                      </span>
-                      <Button
-                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                        disabled={currentPage >= totalPages || loading}
-                        variant="outline"
-                        size="sm"
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage >= totalPages || loading}
+                      variant="outline"
+                      size="sm"
                         className="min-w-[80px]"
-                      >
-                        Next
-                      </Button>
+                    >
+                      Next
+                    </Button>
                     </div>
                   </div>
                 </div>

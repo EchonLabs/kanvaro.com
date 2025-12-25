@@ -424,8 +424,8 @@ export const OrganizationSetup = ({ onNext, onBack, initialData }: OrganizationS
                   {currenciesLoading ? (
                     <SelectItem value="loading" disabled>Loading currencies...</SelectItem>
                   ) : (
-                    currencies.map((currency) => (
-                      <SelectItem key={currency.code} value={currency.code}>
+                    currencies.map((currency, index) => (
+                      <SelectItem key={`${currency.code}-${index}`} value={currency.code}>
                         {formatCurrencyDisplay(currency)}
                       </SelectItem>
                     ))

@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       canViewAllProjects,
       hasProjectRead: await PermissionService.hasPermission(userId, Permission.PROJECT_READ)
     })
-
+    
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     }
 
     let projectQuery: any = { ...filters }
-
+    
     // If user can't view all projects, filter by access
     if (!canViewAllProjects) {
       projectQuery.$or = [
