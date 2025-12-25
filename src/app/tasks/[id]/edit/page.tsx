@@ -283,6 +283,7 @@ export default function EditTaskPage() {
 
   const [task, setTask] = useState<TaskFormState | null>(null)
   const [originalTask, setOriginalTask] = useState<TaskFormState | null>(null)
+  const [taskHasSprint, setTaskHasSprint] = useState(false)
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
   const [originalSubtasks, setOriginalSubtasks] = useState<Subtask[]>([])
   const [users, setUsers] = useState<User[]>([])
@@ -368,6 +369,7 @@ export default function EditTaskPage() {
 
         setTask(normalizedTask)
         setOriginalTask(normalizedTask)
+        setTaskHasSprint(!!data.data?.sprint)
         setSubtasks(mappedSubtasks)
         setOriginalSubtasks(mappedSubtasks)
         setAttachments(mappedAttachments)
@@ -988,7 +990,7 @@ export default function EditTaskPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="text-sm font-medium">Status</label>
-                  <Select value={task.status} onValueChange={(v) => setTask((prev) => prev ? ({ ...prev, status: v as TaskStatus }) : prev)}>
+                  <Select value={task.status} onValueChange={(v) => setTask((prev) => prev ? ({ ...prev, status: v as TaskStatus }) : prev)} disabled={!taskHasSprint}>
                     <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {STATUS_OPTIONS.map((option) => (

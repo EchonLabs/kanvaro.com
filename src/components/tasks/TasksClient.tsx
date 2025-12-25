@@ -102,6 +102,10 @@ interface Task {
     estimatedHours?: number
     actualHours?: number
     labels: string[]
+    sprint?: {
+        _id: string
+        name: string
+    } | null
     createdAt: string
     updatedAt: string
 }
@@ -1283,7 +1287,7 @@ export default function TasksClient({
                                                                                         onValueChange={(value) =>
                                                                                             handleInlineStatusChange(task, value as Task['status'])
                                                                                         }
-                                                                                        disabled={statusUpdatingId === task._id}
+                                                                                        disabled={statusUpdatingId === task._id || !task.sprint}
                                                                                         //onClick={(e) => e.stopPropagation()}
                                                                                     >
                                                                                         <SelectTrigger className="h-7 w-full sm:w-[150px] text-xs">
