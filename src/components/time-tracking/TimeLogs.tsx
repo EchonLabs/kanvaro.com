@@ -2528,12 +2528,21 @@ export function TimeLogs({
                     </div>
                     {showSelectionAndApproval && (
                       <div>
-                        <Badge 
-                          variant={entry.isApproved ? 'default' : 'secondary'} 
-                          className="text-xs"
-                        >
-                          {entry.isApproved ? 'Approved' : 'Pending'}
-                        </Badge>
+                        {(() => {
+                          // If project doesn't require approval, always show as Approved
+                          const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
+
+                          const isApproved = projectRequiresApproval ? entry.isApproved : true;
+
+                          return (
+                            <Badge
+                              variant={isApproved ? 'default' : 'secondary'}
+                              className="text-xs"
+                            >
+                              {isApproved ? 'Approved' : 'Pending'}
+                            </Badge>
+                          );
+                        })()}
                         {entry.approvedBy && (
                           <div className="text-xs text-muted-foreground mt-1">
                             by {entry.approvedBy.firstName} {entry.approvedBy.lastName}

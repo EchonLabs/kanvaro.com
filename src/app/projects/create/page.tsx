@@ -163,7 +163,7 @@ const [overheadInput, setOverheadInput] = useState('')
     budget: {
       total: 0,
       currency: orgCurrency,
-      defaultHourlyRate: 0,
+      defaultHourlyRate: organization?.settings?.timeTracking?.defaultHourlyRate || 0,
       categories: {
         materials: 0,
         overhead: 0
@@ -1179,24 +1179,33 @@ const [overheadInput, setOverheadInput] = useState('')
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="totalBudget">Total Budget</Label>
-                    <Input
-                      id="totalBudget"
-                      type="number"
-                      value={budgetTotalInput}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        const parsedValue = parseFloat(value)
-                        setBudgetTotalInput(value)
-                        setFormData(prev => ({
-                          ...prev,
-                          budget: {
-                            ...prev.budget,
-                            total: value === '' || Number.isNaN(parsedValue) ? 0 : parsedValue
-                          }
-                        }))
-                      }}
-                      placeholder="0.00"
-                    />
+                    <div className="flex rounded-md shadow-sm">
+                      <span className="flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm font-medium">
+                        {(() => {
+                          if (!organization?.currency) return 'USD'
+                          return organization.currency
+                        })()}
+                      </span>
+                      <Input
+                        id="totalBudget"
+                        type="number"
+                        value={budgetTotalInput}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          const parsedValue = parseFloat(value)
+                          setBudgetTotalInput(value)
+                          setFormData(prev => ({
+                            ...prev,
+                            budget: {
+                              ...prev.budget,
+                              total: value === '' || Number.isNaN(parsedValue) ? 0 : parsedValue
+                            }
+                          }))
+                        }}
+                        placeholder="0.00"
+                        className="rounded-l-none pl-3"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -1255,13 +1264,20 @@ const [overheadInput, setOverheadInput] = useState('')
 
 <div className="space-y-2">
   <Label htmlFor="materials">Materials</Label>
-  <Input
-    id="materials"
-    type="number"
-    value={materialsInput}
-    onChange={(e) => {
-      const value = e.target.value
-      const parsedValue = parseFloat(value)
+  <div className="flex rounded-md shadow-sm">
+    <span className="flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm font-medium">
+      {(() => {
+        if (!organization?.currency) return 'USD'
+        return organization.currency
+      })()}
+    </span>
+    <Input
+      id="materials"
+      type="number"
+      value={materialsInput}
+      onChange={(e) => {
+        const value = e.target.value
+        const parsedValue = parseFloat(value)
 
       setMaterialsInput(value)
 
@@ -1280,19 +1296,28 @@ const [overheadInput, setOverheadInput] = useState('')
       }))
     }}
     placeholder="0.00"
+    className="rounded-l-none pl-3"
   />
+</div>
 </div>
 
 
 <div className="space-y-2">
   <Label htmlFor="overhead">Overhead</Label>
-  <Input
-    id="overhead"
-    type="number"
-    value={overheadInput}
-    onChange={(e) => {
-      const value = e.target.value
-      const parsedValue = parseFloat(value)
+  <div className="flex rounded-md shadow-sm">
+    <span className="flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm font-medium">
+      {(() => {
+        if (!organization?.currency) return 'USD'
+        return organization.currency
+      })()}
+    </span>
+    <Input
+      id="overhead"
+      type="number"
+      value={overheadInput}
+      onChange={(e) => {
+        const value = e.target.value
+        const parsedValue = parseFloat(value)
 
       setOverheadInput(value)
 
@@ -1311,7 +1336,9 @@ const [overheadInput, setOverheadInput] = useState('')
       }))
     }}
     placeholder="0.00"
+    className="rounded-l-none pl-3"
   />
+</div>
 </div>
 
                   </div>
