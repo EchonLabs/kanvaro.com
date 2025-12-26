@@ -45,6 +45,10 @@ interface Organization {
         onTimeSubmitted?: boolean
       }
     }
+    notifications?: {
+      retentionDays?: number
+      autoCleanup?: boolean
+    }
   }
   emailConfig?: {
     provider: 'smtp' | 'azure' | 'sendgrid' | 'mailgun'

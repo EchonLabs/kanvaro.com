@@ -1419,6 +1419,17 @@ export default function BacklogPage() {
                       </div>
                     </SelectContent>
                   </Select>
+                  <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <SelectTrigger className="w-full sm:w-32">
+                      <SelectValue placeholder="Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="epic">Epics</SelectItem>
+                      <SelectItem value="story">Stories</SelectItem>
+                      <SelectItem value="task">Tasks</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger className="w-full sm:w-32">
                       <SelectValue placeholder="Status" />
@@ -1430,17 +1441,6 @@ export default function BacklogPage() {
                           {formatToTitleCase(status.replace('_', ' '))}
                         </SelectItem>
                       ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={typeFilter} onValueChange={setTypeFilter}>
-                    <SelectTrigger className="w-full sm:w-32">
-                      <SelectValue placeholder="Type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="epic">Epics</SelectItem>
-                      <SelectItem value="story">Stories</SelectItem>
-                      <SelectItem value="task">Tasks</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={priorityFilter} onValueChange={setPriorityFilter}>
