@@ -716,8 +716,30 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                   value={selectedMemberId || ''}
                   onValueChange={(value) => setSelectedMemberId(value)}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a team member" />
+                  <SelectTrigger className="h-12">
+                    <SelectValue placeholder="Choose a team member">
+                      {selectedMemberId && (() => {
+                        const member = availableMembers.find(m => m._id === selectedMemberId)
+                        return member ? (
+                          <div className="flex flex-col text-left">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium truncate">
+                                {member.firstName} {member.lastName}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={`text-xs ${getOrganizationRoleColor(member.role)} border-none`}
+                              >
+                                {formatOrganizationRole(member.role)}
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground truncate">
+                              {member.email}
+                            </span>
+                          </div>
+                        ) : null
+                      })()}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="z-[10050] p-0">
                     <div className="p-2">
@@ -725,7 +747,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                         value={memberSearchQuery}
                         onChange={(e) => setMemberSearchQuery(e.target.value)}
                         placeholder="Type to search team members"
-                        className="mb-2"
+                        className="mb-2 h-10"
                         onKeyDown={(e) => e.stopPropagation()}
                       />
                       <div className="max-h-56 overflow-y-auto">

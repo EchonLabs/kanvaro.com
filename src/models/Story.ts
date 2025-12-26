@@ -126,4 +126,12 @@ StorySchema.index({ sprint: 1, status: 1 })
 StorySchema.index({ archived: 1 })
 StorySchema.index({ project: 1, archived: 1 })
 
-export const Story = mongoose.models.Story || mongoose.model<IStory>('Story', StorySchema)
+// Check if model already exists to avoid re-registration
+let Story: mongoose.Model<IStory>
+try {
+  Story = mongoose.model<IStory>('Story')
+} catch {
+  Story = mongoose.model<IStory>('Story', StorySchema)
+}
+
+export { Story }
