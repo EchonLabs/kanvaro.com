@@ -430,7 +430,7 @@ export async function GET(request: NextRequest) {
             metadata: {
               status: story.status,
               priority: story.priority,
-              project: getProjectName(story.projectId),
+              project: getProjectName(story.project),
               createdAt: story.createdAt.toISOString(),
               updatedAt: story.updatedAt.toISOString()
             }
