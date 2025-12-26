@@ -43,6 +43,9 @@ export async function GET(request: NextRequest) {
       filters.updatedAt = { $gt: new Date(lastModified) }
     }
 
+    // Ensure Story model is registered
+    const { Story } = await import('@/models/Story')
+
     // Get tasks that have been updated since the last sync
     const tasks = await Task.find(filters)
       .populate('project', '_id name')

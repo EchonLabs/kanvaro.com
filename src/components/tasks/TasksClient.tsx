@@ -1152,9 +1152,7 @@ export default function TasksClient({
                                         </Button>
                                     </div>
                                 </div>
-                            </div>
-                            {hasActiveFilters && (
-                              <div className="flex justify-end mt-2">
+                              <div className="flex justify-end ml-auto">
                                 <TooltipProvider>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
@@ -1166,7 +1164,6 @@ export default function TasksClient({
                                         aria-label="Reset all filters"
                                       >
                                         <RotateCcw className="h-4 w-4 mr-1" />
-                                        Reset Filters
                                       </Button>
                                     </TooltipTrigger>
                                     <TooltipContent>
@@ -1175,7 +1172,7 @@ export default function TasksClient({
                                   </Tooltip>
                                 </TooltipProvider>
                               </div>
-                            )}
+                            </div>
                         </div>
                     </div>
                 </CardHeader>
