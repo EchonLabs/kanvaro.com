@@ -105,7 +105,7 @@ export default function NotificationsPage() {
               onClick={() => markAllAsRead()}
               disabled={loading}
             >
-              Mark all read
+              Mark All as Read
             </Button>
           </div>
         </div>

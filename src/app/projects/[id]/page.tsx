@@ -233,6 +233,11 @@ export default function ProjectDetailPage() {
   const [attachmentsPage, setAttachmentsPage] = useState(1)
   const attachmentsPerPage = 10
 
+  // Links pagination
+  const [figmaLinksPage, setFigmaLinksPage] = useState(1)
+  const [docLinksPage, setDocLinksPage] = useState(1)
+  const linkPaginationSize = 5
+
   // Use the notification hook
   const { success: notifySuccess, error: notifyError } = useNotify()
 
@@ -240,6 +245,23 @@ export default function ProjectDetailPage() {
     () => expenses.reduce((sum, exp) => sum + (exp.fullAmount || 0), 0),
     [expenses]
   )
+
+  // Links pagination computed values
+  const figmaLinks = useMemo(() => project?.externalLinks?.figma || [], [project?.externalLinks?.figma])
+  const documentationLinks = useMemo(() => project?.externalLinks?.documentation || [], [project?.externalLinks?.documentation])
+
+  const figmaTotalPages = Math.max(1, Math.ceil(figmaLinks.length / linkPaginationSize))
+  const documentationTotalPages = Math.max(1, Math.ceil(documentationLinks.length / linkPaginationSize))
+  const currentFigmaPage = Math.min(Math.max(figmaLinksPage, 1), figmaTotalPages)
+  const currentDocumentationPage = Math.min(Math.max(docLinksPage, 1), documentationTotalPages)
+  const figmaSliceStart = (currentFigmaPage - 1) * linkPaginationSize
+  const docSliceStart = (currentDocumentationPage - 1) * linkPaginationSize
+  const paginatedFigmaLinks = figmaLinks.slice(figmaSliceStart, figmaSliceStart + linkPaginationSize)
+  const paginatedDocumentationLinks = documentationLinks.slice(docSliceStart, docSliceStart + linkPaginationSize)
+  const figmaShowingStart = figmaLinks.length ? figmaSliceStart + 1 : 0
+  const figmaShowingEnd = figmaLinks.length ? Math.min(figmaSliceStart + linkPaginationSize, figmaLinks.length) : 0
+  const documentationShowingStart = documentationLinks.length ? docSliceStart + 1 : 0
+  const documentationShowingEnd = documentationLinks.length ? Math.min(docSliceStart + linkPaginationSize, documentationLinks.length) : 0
 
   useEffect(() => {
     if (projectId) {
@@ -1038,29 +1060,71 @@ export default function ProjectDetailPage() {
                       </Badge>
                     )}
                   </Label>
-                  {project.externalLinks?.figma && project.externalLinks.figma.length > 0 ? (
-                    <div className="space-y-1 sm:space-y-2">
-                      {project.externalLinks.figma.map((link, index) => {
-                        // Ensure URL has protocol
-                        const formattedLink = link.startsWith('http://') || link.startsWith('https://')
-                          ? link
-                          : `https://${link}`
-
-                        return (
-                          <a
-                            key={index}
-                            href={formattedLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
-                          >
-                            <span className="text-xs sm:text-sm text-primary group-hover:underline flex-1 truncate break-all sm:break-normal">
-                              {link}
+                  {figmaLinks.length > 0 ? (
+                    <div className="space-y-3">
+                      {figmaLinks.length > linkPaginationSize && (
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            Showing {figmaShowingStart} to {figmaShowingEnd} of {figmaLinks.length} Figma links
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setFigmaLinksPage(prev => Math.max(1, prev - 1))}
+                              disabled={currentFigmaPage === 1}
+                            >
+                              <ArrowLeft className="h-4 w-4" />
+                              Previous
+                            </Button>
+                            <span className="px-2.5 py-1 bg-muted rounded text-[11px]">
+                              {currentFigmaPage} of {figmaTotalPages}
                             </span>
-                            <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors self-start sm:self-auto" />
-                          </a>
-                        )
-                      })}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setFigmaLinksPage(prev => Math.min(prev + 1, figmaTotalPages))}
+                              disabled={currentFigmaPage === figmaTotalPages}
+                            >
+                              Next
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      <div className="space-y-1 sm:space-y-2">
+                        {paginatedFigmaLinks.map((link, index) => {
+                          const actualIndex = figmaSliceStart + index
+                          // Ensure URL has protocol
+                          const formattedLink = link.startsWith('http://') || link.startsWith('https://')
+                            ? link
+                            : `https://${link}`
+
+                          return (
+                            <a
+                              key={actualIndex}
+                              href={formattedLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
+                            >
+                              <span className="text-xs sm:text-sm text-primary group-hover:underline flex-1 truncate break-all sm:break-normal">
+                                {link}
+                              </span>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors self-start sm:self-auto cursor-pointer" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Open link</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </a>
+                          )
+                        })}
+                      </div>
                     </div>
                   ) : (
                     <div className="border-2 border-dashed border-muted rounded-lg p-4 sm:p-6 text-center">
@@ -1081,29 +1145,71 @@ export default function ProjectDetailPage() {
                       </Badge>
                     )}
                   </Label>
-                  {project.externalLinks?.documentation && project.externalLinks.documentation.length > 0 ? (
-                    <div className="space-y-1 sm:space-y-2">
-                      {project.externalLinks.documentation.map((link, index) => {
-                        // Ensure URL has protocol
-                        const formattedLink = link.startsWith('http://') || link.startsWith('https://')
-                          ? link
-                          : `https://${link}`
-
-                        return (
-                          <a
-                            key={index}
-                            href={formattedLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
-                          >
-                            <span className="text-xs sm:text-sm text-primary group-hover:underline flex-1 truncate break-all sm:break-normal">
-                              {link}
+                  {documentationLinks.length > 0 ? (
+                    <div className="space-y-3">
+                      {documentationLinks.length > linkPaginationSize && (
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            Showing {documentationShowingStart} to {documentationShowingEnd} of {documentationLinks.length} documentation links
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setDocLinksPage(prev => Math.max(1, prev - 1))}
+                              disabled={currentDocumentationPage === 1}
+                            >
+                              <ArrowLeft className="h-4 w-4" />
+                              Previous
+                            </Button>
+                            <span className="px-2.5 py-1 bg-muted rounded text-[11px]">
+                              {currentDocumentationPage} of {documentationTotalPages}
                             </span>
-                            <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors self-start sm:self-auto" />
-                          </a>
-                        )
-                      })}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setDocLinksPage(prev => Math.min(prev + 1, documentationTotalPages))}
+                              disabled={currentDocumentationPage === documentationTotalPages}
+                            >
+                              Next
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      <div className="space-y-1 sm:space-y-2">
+                        {paginatedDocumentationLinks.map((link, index) => {
+                          const actualIndex = docSliceStart + index
+                          // Ensure URL has protocol
+                          const formattedLink = link.startsWith('http://') || link.startsWith('https://')
+                            ? link
+                            : `https://${link}`
+
+                          return (
+                            <a
+                              key={actualIndex}
+                              href={formattedLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
+                            >
+                              <span className="text-xs sm:text-sm text-primary group-hover:underline flex-1 truncate break-all sm:break-normal">
+                                {link}
+                              </span>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors self-start sm:self-auto cursor-pointer" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Open link</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </a>
+                          )
+                        })}
+                      </div>
                     </div>
                   ) : (
                     <div className="border-2 border-dashed border-muted rounded-lg p-4 sm:p-6 text-center">

@@ -39,7 +39,8 @@ import {
   Gauge,
   Zap,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  CheckSquare
 } from 'lucide-react'
 
 interface Sprint {
@@ -953,6 +954,36 @@ export default function SprintDetailPage() {
                   <span className="break-words overflow-wrap-anywhere" title={sprint?.name}>{sprint?.name}</span>
                 </h1>
                 <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap ml-auto">
+                  {sprint?.status === 'planning' && canStartSprint && (
+                    <Button
+                      variant="default"
+                      onClick={handleStartSprint}
+                      disabled={startingSprint}
+                      className="min-h-[36px] w-full sm:w-auto bg-green-600 hover:bg-green-700"
+                    >
+                      {startingSprint ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Play className="h-4 w-4 mr-2" />
+                      )}
+                      {startingSprint ? 'Starting...' : 'Start Sprint'}
+                    </Button>
+                  )}
+                  {sprint?.status === 'active' && canCompleteSprint && (
+                    <Button
+                      variant="default"
+                      onClick={handleCompleteSprintClick}
+                      disabled={completingSprint}
+                      className="min-h-[36px] w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+                    >
+                      {completingSprint ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <CheckSquare className="h-4 w-4 mr-2" />
+                      )}
+                      {completingSprint ? 'Completing...' : 'Complete Sprint'}
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     onClick={() => {

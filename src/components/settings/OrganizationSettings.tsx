@@ -23,6 +23,7 @@ export function OrganizationSettings() {
   const [saving, setSaving] = useState(false)
   const [savingRegistration, setSavingRegistration] = useState(false)
   const [savingTimeTracking, setSavingTimeTracking] = useState(false)
+  const [savingNotifications, setSavingNotifications] = useState(false)
   
   const [formData, setFormData] = useState({
     name: '',
@@ -60,6 +61,10 @@ export function OrganizationSettings() {
         onApprovalNeeded: true,
         onTimeSubmitted: true
       }
+    },
+    notifications: {
+      retentionDays: 30,
+      autoCleanup: true
     }
   })
   const [roundingIncrementInput, setRoundingIncrementInput] = useState('15')
@@ -201,6 +206,10 @@ export function OrganizationSettings() {
             onApprovalNeeded: true,
             onTimeSubmitted: true
           }
+        },
+        notifications: {
+          retentionDays: organization.settings?.notifications?.retentionDays ?? 30,
+          autoCleanup: organization.settings?.notifications?.autoCleanup ?? true
         }
       })
 
@@ -411,6 +420,45 @@ export function OrganizationSettings() {
       })
     } finally {
       setSavingTimeTracking(false)
+    }
+  }
+
+  const handleSaveNotificationSettings = async () => {
+    setSavingNotifications(true)
+
+    try {
+      const response = await fetch('/api/organization', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          settings: {
+            notifications: {
+              retentionDays: formData.notifications?.retentionDays || 30,
+              autoCleanup: formData.notifications?.autoCleanup ?? true
+            }
+          }
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to update notification settings')
+      }
+
+      refetch()
+      notifySuccess({
+        title: 'Notification Settings Updated',
+        message: 'Notification retention settings have been updated successfully'
+      })
+    } catch (error) {
+      notifyError({
+        title: 'Update Failed',
+        message: error instanceof Error ? error.message : 'Failed to update notification settings'
+      })
+    } finally {
+      setSavingNotifications(false)
     }
   }
 
@@ -1239,7 +1287,7 @@ export function OrganizationSettings() {
               </div>
 
               <div className="space-y-3 sm:space-y-4">
-                <h4 className="text-sm sm:text-base font-medium">Notifications</h4>
+                <h4 className="text-sm sm:text-base font-medium">Time Tracking Notifications</h4>
                 <div className="space-y-3 sm:space-y-4">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
                     <div className="space-y-0.5 flex-1 min-w-0">
@@ -1358,6 +1406,84 @@ export function OrganizationSettings() {
                 <Save className="h-3 w-3 sm:h-4 sm:w-4" />
               )}
               {savingTimeTracking ? 'Saving...' : 'Save Time Tracking Information'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Notification Settings */}
+      <Card>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-base sm:text-lg">Notification Settings</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
+            Configure notification retention and cleanup settings for your organization.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
+          <div className="space-y-3 sm:space-y-4">
+            <h4 className="text-sm sm:text-base font-medium">Retention Settings</h4>
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                <div className="space-y-0.5 flex-1 min-w-0">
+                  <Label className="text-xs sm:text-sm">Auto Cleanup</Label>
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words">
+                    Automatically remove old notifications to save space
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.notifications?.autoCleanup ?? true}
+                  onCheckedChange={(checked) => setFormData({
+                    ...formData,
+                    notifications: {
+                      ...formData.notifications,
+                      autoCleanup: checked
+                    }
+                  })}
+                  className="flex-shrink-0"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                <div className="space-y-0.5 flex-1 min-w-0">
+                  <Label className="text-xs sm:text-sm">Retention Period</Label>
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words">
+                    Days to keep notifications before automatic cleanup
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Input
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={formData.notifications?.retentionDays ?? 30}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      notifications: {
+                        ...formData.notifications,
+                        retentionDays: parseInt(e.target.value) || 30
+                      }
+                    })}
+                    className="w-20 text-center"
+                    disabled={!formData.notifications?.autoCleanup}
+                  />
+                  <span className="text-xs text-muted-foreground">days</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end mt-6 sm:mt-8">
+            <Button
+              onClick={handleSaveNotificationSettings}
+              disabled={savingNotifications}
+              className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm"
+            >
+              {savingNotifications ? (
+                <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
+              ) : (
+                <Save className="h-3 w-3 sm:h-4 sm:w-4" />
+              )}
+              {savingNotifications ? 'Saving...' : 'Save Notification Settings'}
             </Button>
           </div>
         </CardContent>

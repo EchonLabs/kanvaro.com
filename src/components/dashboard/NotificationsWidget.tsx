@@ -81,7 +81,7 @@ export function NotificationsWidget() {
               onClick={handleMarkAllAsRead}
               className="h-8 text-xs"
             >
-              Mark all read
+              Mark All as Read
             </Button>
           )}
         </div>
