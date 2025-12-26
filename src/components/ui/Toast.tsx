@@ -125,7 +125,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast, onRemove: (id: string) =
     <div
       className={`
         ${colors[toast.type]}
-        border rounded-lg shadow-lg p-4 flex items-center gap-3
+        border rounded-lg shadow-lg p-4 flex items-start gap-3
         transition-all duration-300 ease-in-out
         ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
         pointer-events-auto
@@ -133,7 +133,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast, onRemove: (id: string) =
       role="alert"
     >
       <Icon className={`h-5 w-5 flex-shrink-0 mt-0.5 ${iconColors[toast.type]}`} />
-      <div className="flex-1 min-w-0 self-start">
+      <div className="flex-1 min-w-0">
         <h4 className="font-semibold text-sm mb-1">{toast.title}</h4>
         {toast.message && (
           <p className="text-sm opacity-90 break-words">{toast.message}</p>
@@ -143,7 +143,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast, onRemove: (id: string) =
         variant="ghost"
         size="sm"
         onClick={handleRemove}
-        className={`h-7 w-7 p-0 flex-shrink-0 rounded-full transition-colors ${closeButtonStyles[toast.type]}`}
+        className={`h-7 w-7 p-0 flex-shrink-0 rounded-full transition-colors mt-0.5 ${closeButtonStyles[toast.type]}`}
         aria-label="Close notification"
       >
         <X className="h-4 w-4" />

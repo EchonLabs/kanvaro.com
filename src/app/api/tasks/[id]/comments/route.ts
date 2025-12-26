@@ -129,7 +129,7 @@ export async function POST(
       PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
       PermissionService.hasPermission(userId, Permission.TASK_UPDATE, taskId)
     ])
-    const isAssignee = task.assignedTo && task.assignedTo.toString() === userId
+    const isAssignee = Array.isArray(task.assignedTo) && task.assignedTo.some(assignee => assignee.user?.toString() === userId.toString())
     const isCreator = task.createdBy && task.createdBy.toString() === userId
 
     if (!canTaskViewAll && !canProjectViewAll && !canTaskUpdate && !isAssignee && !isCreator) {
@@ -172,11 +172,16 @@ export async function POST(
       { $push: { comments: comment } }
     )
 
-    // Prepare notification recipients: mentioned users + assignee + parent author (if replying)
+    // Prepare notification recipients: mentioned users + assignees + parent author (if replying)
     const notifyUserIds = new Set<string>()
     mentions.forEach(id => notifyUserIds.add(id))
-    if (task.assignedTo && task.assignedTo.toString() !== userId) {
-      notifyUserIds.add(task.assignedTo.toString())
+    // Add all assignees to notifications
+    if (Array.isArray(task.assignedTo)) {
+      task.assignedTo.forEach(assignee => {
+        if (assignee.user && assignee.user.toString() !== userId) {
+          notifyUserIds.add(assignee.user.toString())
+        }
+      })
     }
     if (parentAuthorId && parentAuthorId !== userId) {
       notifyUserIds.add(parentAuthorId)
