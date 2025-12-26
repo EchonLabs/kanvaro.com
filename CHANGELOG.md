@@ -1,3 +1,10 @@
+## [1.18.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.0...v1.18.1) (2025-12-26)
+
+
+### Bug Fixes
+
+* sprint changes ([212a287](https://github.com/EchonLabs/kanvaro.com/commit/212a287a0970e9d4128453af7a27230db58cb311))
+
 # [1.18.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.17.1...v1.18.0) (2025-12-25)
 
 
