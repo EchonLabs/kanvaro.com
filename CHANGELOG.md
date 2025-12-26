@@ -1,3 +1,10 @@
+## [1.18.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.1...v1.18.2) (2025-12-26)
+
+
+### Bug Fixes
+
+* fix build fail ([37dcdd5](https://github.com/EchonLabs/kanvaro.com/commit/37dcdd583db10a33c20f49b45513c50f1adbc73e))
+
 ## [1.18.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.0...v1.18.1) (2025-12-26)
 
 
