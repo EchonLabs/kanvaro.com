@@ -552,6 +552,10 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
                   }}
                   onEditTask={onEditTask}
                   onDeleteTask={onDeleteTask}
+                  canDragTask={(task) => {
+                    // Allow dragging if task is not in backlog, or if it is in backlog but assigned to a sprint
+                    return task.status !== 'backlog' || !!task.sprint
+                  }}
                 />
               )
             })}

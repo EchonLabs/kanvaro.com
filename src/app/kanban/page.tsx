@@ -159,7 +159,8 @@ function ColumnDropZone({
   onCreateTask,
   onEditTask,
   onDeleteTask,
-  pendingUpdates
+  pendingUpdates,
+  canDragTask
 }: {
   column: any,
   tasks: Task[],
@@ -167,6 +168,7 @@ function ColumnDropZone({
   onEditTask?: (task: Task) => void,
   onDeleteTask?: (taskId: string) => void,
   pendingUpdates?: Set<string>
+  canDragTask?: (task: Task) => boolean
 }) {
   const router = useRouter()
   const { setNodeRef, isOver } = useDroppable({
@@ -253,6 +255,7 @@ function ColumnDropZone({
                 onEdit={onEditTask}
                 onDelete={onDeleteTask}
                 isUpdating={pendingUpdates?.has(task._id)}
+                isDraggable={canDragTask ? canDragTask(task) : true}
               />
             ))
           )}
@@ -1408,6 +1411,10 @@ export default function KanbanPage() {
                       onEditTask={handleEditTask}
                       onDeleteTask={handleDeleteTask}
                       pendingUpdates={pendingUpdates}
+                      canDragTask={(task) => {
+                        // Allow dragging if task is not in backlog, or if it is in backlog but assigned to a sprint
+                        return task.status !== 'backlog' || !!task.sprint
+                      }}
                     />
                   )
                 })}
@@ -1509,11 +1516,12 @@ interface SortableTaskProps {
   getTypeColor: (type: string) => string
   isDragOverlay?: boolean
   isUpdating?: boolean
+  isDraggable?: boolean
   onEdit?: (task: Task) => void
   onDelete?: (taskId: string) => void
 }
 
-function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOverlay = false, isUpdating = false, onEdit, onDelete }: SortableTaskProps) {
+function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOverlay = false, isUpdating = false, isDraggable = true, onEdit, onDelete }: SortableTaskProps) {
   const { formatDate } = useDateTime()
   const {
     attributes,
@@ -1533,7 +1541,9 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
     <Card
       ref={setNodeRef}
       style={style}
-      className={`hover:shadow-md transition-shadow cursor-pointer relative ${
+      className={`hover:shadow-md transition-shadow relative ${
+        isDraggable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'
+      } ${
         isDragging ? 'opacity-50' : ''
       } ${isDragOverlay ? 'rotate-3 shadow-lg' : ''} ${
         isUpdating ? 'ring-2 ring-blue-500/50 ring-offset-1' : ''
@@ -1554,16 +1564,18 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
               </h4>
             </TruncateTooltip>
             <div className="flex items-center space-x-1">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-6 w-6 p-0 cursor-grab active:cursor-grabbing"
-                {...attributes}
-                {...listeners}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <GripVertical className="h-3 w-3" />
-              </Button>
+              {isDraggable && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 cursor-grab active:cursor-grabbing"
+                  {...attributes}
+                  {...listeners}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <GripVertical className="h-3 w-3" />
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
