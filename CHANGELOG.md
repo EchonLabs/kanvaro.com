@@ -1,3 +1,10 @@
+## [1.18.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.3...v1.18.4) (2025-12-30)
+
+
+### Bug Fixes
+
+* add changes in tasks and stories ([1c71ef7](https://github.com/EchonLabs/kanvaro.com/commit/1c71ef7b74a72fe586b3ac7537e46191927699b4))
+
 ## [1.18.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.2...v1.18.3) (2025-12-26)
 
 
