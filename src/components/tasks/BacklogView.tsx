@@ -503,7 +503,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
       </div>
 
       {/* backlog Items */}
-      <div className="space-y-6">
+      <div className="space-y-8">
         {filteredAndSortedTasks.map((task, index) => (
           <Card
             key={task._id}
