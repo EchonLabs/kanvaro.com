@@ -450,7 +450,7 @@ export function TimeLogs({
   const canAddManualTimeLog = useMemo(() => {
     // Application level (organization settings) - default to true (database default)
     const orgLevelEnabled = organizationSettings?.allowManualTimeSubmission ?? true
-
+    
     // Project level - check project.settings.allowManualTimeSubmission if projectId is provided
     let projectLevelEnabled = true // Default to true if no project
     if (projectId) {
@@ -460,7 +460,7 @@ export function TimeLogs({
       // No project context, use timeTrackingSettings (organization-level)
       projectLevelEnabled = timeTrackingSettings?.allowManualTimeSubmission ?? true
     }
-
+    
     return orgLevelEnabled && projectLevelEnabled
   }, [organizationSettings, timeTrackingSettings, projectSettings, projectId])
 
@@ -1567,7 +1567,7 @@ export function TimeLogs({
 
     // Check past time limit when past time is allowed
     if (timeTrackingSettings?.allowPastTime === true && timeTrackingSettings?.pastTimeLimitDays) {
-      const daysDiff = Math.ceil((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+    const daysDiff = Math.ceil((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
       if (daysDiff > timeTrackingSettings.pastTimeLimitDays) {
         return { valid: false, error: `Row ${rowIndex + 1}: Past time logging not allowed beyond ${timeTrackingSettings.pastTimeLimitDays} days` }
       }
@@ -1927,46 +1927,46 @@ export function TimeLogs({
                       )}
                     </div>
                   </div>
-                  <SelectItem value="all" onMouseDown={(e) => e.preventDefault()}>
-                    All projects
-                  </SelectItem>
-                  {filterProjectsLoading ? (
-                    <SelectItem value="loading" disabled>
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Loading...
-                      </div>
+                    <SelectItem value="all" onMouseDown={(e) => e.preventDefault()}>
+                      All projects
                     </SelectItem>
-                  ) : filteredProjects.length === 0 ? (
-                    <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-                      No projects found
-                    </div>
-                  ) : (
-                    filteredProjects.map((project) => (
-                      <SelectItem key={project._id} value={project._id} onMouseDown={(e) => e.preventDefault()}>
+                    {filterProjectsLoading ? (
+                      <SelectItem value="loading" disabled>
                         <div className="flex items-center gap-2">
-                          <FolderOpen className="h-3 w-3" />
-                          <span className="truncate">{project.name}</span>
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Loading...
                         </div>
                       </SelectItem>
-                    ))
-                  )}
+                    ) : filteredProjects.length === 0 ? (
+                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                        No projects found
+                      </div>
+                    ) : (
+                      filteredProjects.map((project) => (
+                        <SelectItem key={project._id} value={project._id} onMouseDown={(e) => e.preventDefault()}>
+                          <div className="flex items-center gap-2">
+                            <FolderOpen className="h-3 w-3" />
+                            <span className="truncate">{project.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1.5 sm:space-y-2 min-w-0">
               <Label htmlFor="filter-task" className="text-xs sm:text-sm font-medium">Task</Label>
-              <Select
-                value={filters.taskId || 'all'}
+              <Select 
+                value={filters.taskId || 'all'} 
                 onValueChange={(value) => handleFilterChange('taskId', value === 'all' ? '' : value)}
                 disabled={filterTasksLoading}
               >
                 <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-task">
                   <SelectValue placeholder={
                     filterTasksLoading
-                      ? 'Loading...'
-                      : 'All tasks'
+                        ? 'Loading...' 
+                        : 'All tasks'
                   } />
                 </SelectTrigger>
                 <SelectContent className="max-h-[200px]">
@@ -1997,28 +1997,28 @@ export function TimeLogs({
                       )}
                     </div>
                   </div>
-                  <SelectItem value="all">All tasks</SelectItem>
-                  {filterTasksLoading ? (
-                    <SelectItem value="loading" disabled>
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Loading...
-                      </div>
-                    </SelectItem>
-                  ) : filteredTasks.length === 0 ? (
-                    <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-                      {!filters.projectId ? 'Select a project first' : 'No tasks found'}
-                    </div>
-                  ) : (
-                    filteredTasks.map((task) => (
-                      <SelectItem key={task._id} value={task._id} onMouseDown={(e) => e.preventDefault()}>
+                    <SelectItem value="all">All tasks</SelectItem>
+                    {filterTasksLoading ? (
+                      <SelectItem value="loading" disabled>
                         <div className="flex items-center gap-2">
-                          <Target className="h-3 w-3" />
-                          <span className="truncate">{task.title}</span>
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Loading...
                         </div>
                       </SelectItem>
-                    ))
-                  )}
+                    ) : filteredTasks.length === 0 ? (
+                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                        {!filters.projectId ? 'Select a project first' : 'No tasks found'}
+                      </div>
+                    ) : (
+                      filteredTasks.map((task) => (
+                        <SelectItem key={task._id} value={task._id} onMouseDown={(e) => e.preventDefault()}>
+                          <div className="flex items-center gap-2">
+                            <Target className="h-3 w-3" />
+                            <span className="truncate">{task.title}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
                 </SelectContent>
               </Select>
             </div>
@@ -2063,30 +2063,30 @@ export function TimeLogs({
                         )}
                       </div>
                     </div>
-                    <SelectItem value="all">All employees</SelectItem>
-                    {filterEmployeesLoading ? (
-                      <SelectItem value="loading" disabled>
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Loading...
-                        </div>
-                      </SelectItem>
-                    ) : filteredEmployees.length === 0 ? (
-                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-                        No employees found
-                      </div>
-                    ) : (
-                      filteredEmployees.map((employee) => (
-                        <SelectItem key={employee._id} value={employee._id} onMouseDown={(e) => e.preventDefault()}>
+                      <SelectItem value="all">All employees</SelectItem>
+                      {filterEmployeesLoading ? (
+                        <SelectItem value="loading" disabled>
                           <div className="flex items-center gap-2">
-                            <User className="h-3 w-3" />
-                            <span className="truncate">
-                              {employee.firstName} {employee.lastName}
-                            </span>
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Loading...
                           </div>
                         </SelectItem>
-                      ))
-                    )}
+                      ) : filteredEmployees.length === 0 ? (
+                        <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                          No employees found
+                        </div>
+                      ) : (
+                        filteredEmployees.map((employee) => (
+                          <SelectItem key={employee._id} value={employee._id} onMouseDown={(e) => e.preventDefault()}>
+                            <div className="flex items-center gap-2">
+                              <User className="h-3 w-3" />
+                              <span className="truncate">
+                                {employee.firstName} {employee.lastName}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
                   </SelectContent>
                 </Select>
               </div>
@@ -2192,7 +2192,7 @@ export function TimeLogs({
           </div>
 
           {/* Clear Filters Button */}
-          <div className="flex justify-start sm:justify-end pt-2">
+            <div className="flex justify-start sm:justify-end pt-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -2219,7 +2219,7 @@ export function TimeLogs({
               >
                 <RotateCcw className="h-4 w-4" />
               </Button>
-          </div>
+            </div>
         </div>
 
         {/* Bulk Actions */}
@@ -2349,20 +2349,14 @@ export function TimeLogs({
                       <div>
                         <div className="text-muted-foreground">Start Time</div>
                         <div className="mt-1">
-                          <div>{(() => {
-                          const formatted = formatDateTimeSafe(entry.startTime)
-                          return formatted
-                        })()}</div>
+                          <div>{formatDateTimeSafe(entry.startTime)}</div>
                         </div>
                       </div>
                       <div>
                         <div className="text-muted-foreground">End Time</div>
                         {entry.endTime ? (
                           <div className="mt-1">
-                            <div>{(() => {
-                              const formatted = formatDateTimeSafe(entry.endTime)
-                              return formatted
-                            })()}</div>
+                            <div>{formatDateTimeSafe(entry.endTime)}</div>
                           </div>
                         ) : <div className="mt-1">-</div>}
                       </div>
@@ -2396,12 +2390,12 @@ export function TimeLogs({
                             const isApproved = projectRequiresApproval ? entry.isApproved : true;                            
 
                             return (
-                              <Badge
+                          <Badge 
                                 variant={isApproved ? 'default' : 'secondary'}
-                                className="text-xs"
-                              >
+                            className="text-xs"
+                          >
                                 {isApproved ? 'Approved' : 'Pending'}
-                              </Badge>
+                          </Badge>
                             );
                           })()}
                         </div>
@@ -2535,12 +2529,12 @@ export function TimeLogs({
                           const isApproved = projectRequiresApproval ? entry.isApproved : true;
 
                           return (
-                            <Badge
+                        <Badge 
                               variant={isApproved ? 'default' : 'secondary'}
-                              className="text-xs"
-                            >
+                          className="text-xs"
+                        >
                               {isApproved ? 'Approved' : 'Pending'}
-                            </Badge>
+                        </Badge>
                           );
                         })()}
                         {entry.approvedBy && (
@@ -2756,8 +2750,8 @@ export function TimeLogs({
                     tasks.map((task) => {
                       const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
                       return (
-                        <SelectItem
-                          key={task._id}
+                        <SelectItem 
+                          key={task._id} 
                           value={task._id}
                           disabled={isBillableDisabled}
                         >
@@ -2773,7 +2767,7 @@ export function TimeLogs({
                               <div className="text-xs sm:text-sm text-muted-foreground truncate">
                                 {task.status} • {task.priority}
                                 {isBillableDisabled && ' • Billable time not allowed'}
-                              </div>
+                                </div>
                             </div>
                           </div>
                         </SelectItem>

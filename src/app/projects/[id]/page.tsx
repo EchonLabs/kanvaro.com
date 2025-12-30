@@ -569,7 +569,7 @@ export default function ProjectDetailPage() {
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
                 <h1
-                  className="text-2xl sm:text-3xl font-bold text-foreground truncate max-w-full"
+                  className="text-2xl sm:text-3xl font-bold text-foreground line-clamp-2 max-w-full"
                   title={project.name}
                 >
                   {project.name}
@@ -588,16 +588,7 @@ export default function ProjectDetailPage() {
                 </Badge>
               </div>
               <p className="text-sm sm:text-base text-muted-foreground mt-1 break-words whitespace-normal" title={project.description || 'No description'}>
-                <span className="sm:hidden">
-                  {project.description && project.description.length > 25
-                    ? `${project.description.substring(0, 25)}...`
-                    : (project.description || 'No description')}
-                </span>
-                <span className="hidden sm:inline">
-                  {project.description && project.description.length > 100
-                    ? `${project.description.substring(0, 100)}...`
-                    : (project.description || 'No description')}
-                </span>
+                {project.description || 'No description'}
               </p>
             </div>
           </div>
@@ -1094,25 +1085,25 @@ export default function ProjectDetailPage() {
                           </div>
                         </div>
                       )}
-                      <div className="space-y-1 sm:space-y-2">
+                    <div className="space-y-1 sm:space-y-2">
                         {paginatedFigmaLinks.map((link, index) => {
                           const actualIndex = figmaSliceStart + index
-                          // Ensure URL has protocol
-                          const formattedLink = link.startsWith('http://') || link.startsWith('https://')
-                            ? link
-                            : `https://${link}`
+                        // Ensure URL has protocol
+                        const formattedLink = link.startsWith('http://') || link.startsWith('https://')
+                          ? link
+                          : `https://${link}`
 
-                          return (
-                            <a
+                        return (
+                          <a
                               key={actualIndex}
-                              href={formattedLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
-                            >
-                              <span className="text-xs sm:text-sm text-primary group-hover:underline flex-1 truncate break-all sm:break-normal">
-                                {link}
-                              </span>
+                            href={formattedLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
+                          >
+                            <span className="text-xs sm:text-sm text-primary group-hover:underline flex-1 truncate break-all sm:break-normal">
+                              {link}
+                            </span>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors self-start sm:self-auto cursor-pointer" />
@@ -1121,9 +1112,9 @@ export default function ProjectDetailPage() {
                                   <p>Open link</p>
                                 </TooltipContent>
                               </Tooltip>
-                            </a>
-                          )
-                        })}
+                          </a>
+                        )
+                      })}
                       </div>
                     </div>
                   ) : (
@@ -1179,25 +1170,25 @@ export default function ProjectDetailPage() {
                           </div>
                         </div>
                       )}
-                      <div className="space-y-1 sm:space-y-2">
+                    <div className="space-y-1 sm:space-y-2">
                         {paginatedDocumentationLinks.map((link, index) => {
                           const actualIndex = docSliceStart + index
-                          // Ensure URL has protocol
-                          const formattedLink = link.startsWith('http://') || link.startsWith('https://')
-                            ? link
-                            : `https://${link}`
+                        // Ensure URL has protocol
+                        const formattedLink = link.startsWith('http://') || link.startsWith('https://')
+                          ? link
+                          : `https://${link}`
 
-                          return (
-                            <a
+                        return (
+                          <a
                               key={actualIndex}
-                              href={formattedLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
-                            >
-                              <span className="text-xs sm:text-sm text-primary group-hover:underline flex-1 truncate break-all sm:break-normal">
-                                {link}
-                              </span>
+                            href={formattedLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
+                          >
+                            <span className="text-xs sm:text-sm text-primary group-hover:underline flex-1 truncate break-all sm:break-normal">
+                              {link}
+                            </span>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors self-start sm:self-auto cursor-pointer" />
@@ -1206,9 +1197,9 @@ export default function ProjectDetailPage() {
                                   <p>Open link</p>
                                 </TooltipContent>
                               </Tooltip>
-                            </a>
-                          )
-                        })}
+                          </a>
+                        )
+                      })}
                       </div>
                     </div>
                   ) : (

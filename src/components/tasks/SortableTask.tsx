@@ -39,6 +39,7 @@ interface SortableTaskProps {
   getPriorityColor: (priority: string) => string
   getTypeColor: (type: string) => string
   isDragOverlay?: boolean
+  isDraggable?: boolean
   onEdit?: (task: PopulatedTask) => void
   onDelete?: (taskId: string) => void
 }
@@ -49,6 +50,7 @@ export default function SortableTask({
   getPriorityColor,
   getTypeColor,
   isDragOverlay = false,
+  isDraggable = true,
   onEdit,
   onDelete
 }: SortableTaskProps) {
@@ -92,13 +94,22 @@ export default function SortableTask({
 
   // Helper function to get assignee data
   const getAssigneeData = (assignee: any) => {
+    // Check if assignee.user is populated (from backend populate)
+    if (typeof assignee === 'object' && assignee.user && typeof assignee.user === 'object' && assignee.user.firstName) {
+      return {
+        firstName: assignee.user.firstName,
+        lastName: assignee.user.lastName,
+        email: assignee.user.email
+      }
+    }
+
+    // Check if assignee itself has the user data (stored directly)
     if (typeof assignee === 'object' && assignee.firstName) {
-      // Already populated
       return assignee
     }
 
     // Need to look up from fetched user data
-    const userId = typeof assignee === 'string' ? assignee : assignee._id || assignee
+    const userId = typeof assignee === 'string' ? assignee : assignee._id || assignee.user || assignee
     const userInfo = userData[userId]
 
     if (userInfo) {
@@ -135,9 +146,13 @@ export default function SortableTask({
     <Card
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      className={`hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing select-none hover:bg-muted/20 ${
+      {...(isDraggable ? attributes : {})}
+      {...(isDraggable ? listeners : {})}
+      className={`hover:shadow-md transition-shadow select-none hover:bg-muted/20 ${
+        isDraggable
+          ? 'cursor-grab active:cursor-grabbing'
+          : 'cursor-not-allowed opacity-60'
+      } ${
         isDragging ? 'opacity-50 shadow-lg scale-105' : ''
       } ${isDragOverlay ? 'shadow-2xl scale-105' : ''}`}
       onClick={(e) => {

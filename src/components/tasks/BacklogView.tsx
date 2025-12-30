@@ -503,7 +503,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
       </div>
 
       {/* backlog Items */}
-      <div className="space-y-6">
+      <div className="space-y-8">
         {filteredAndSortedTasks.map((task, index) => (
           <Card
             key={task._id}
@@ -553,10 +553,16 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
                       {task.description || 'No description'}
                     </p>
                     <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                      {task.assignedTo && (
+                      {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && (
                         <div className="flex items-center space-x-1">
                           <User className="h-4 w-4" />
-                          <span>{task.assignedTo.firstName} {task.assignedTo.lastName}</span>
+                          <span>
+                            {(() => {
+                              const firstAssignee = task.assignedTo[0];
+                              const userData = firstAssignee.user || firstAssignee;
+                              return `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Unknown User';
+                            })()}
+                          </span>
                         </div>
                       )}
                       {task.dueDate && (

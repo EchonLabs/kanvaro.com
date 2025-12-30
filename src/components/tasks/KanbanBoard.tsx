@@ -340,6 +340,19 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
         const reorderedTasks = arrayMove(columnTasks, oldIndex, newIndex)
         const orderedTaskIds = reorderedTasks.map(task => task._id)
 
+        // Optimistic update - update UI immediately
+        setTasks(prevTasks => {
+          const updatedTasks = [...prevTasks]
+          reorderedTasks.forEach((task, index) => {
+            const taskIndex = updatedTasks.findIndex(t => t._id?.toString() === task._id?.toString())
+            if (taskIndex !== -1) {
+              updatedTasks[taskIndex] = { ...updatedTasks[taskIndex], position: index } as PopulatedTask
+            }
+          })
+          return updatedTasks
+        })
+
+        // Background API call
         try {
           const response = await fetch('/api/tasks/reorder', {
             method: 'POST',
@@ -354,25 +367,28 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
           })
 
           const data = await response.json()
-          if (data.success) {
-            // Update local state
-            setTasks(prevTasks => {
-              const updatedTasks = [...prevTasks]
-              reorderedTasks.forEach((task, index) => {
-                const taskIndex = updatedTasks.findIndex(t => t._id?.toString() === task._id?.toString())
-                if (taskIndex !== -1) {
-                  updatedTasks[taskIndex] = { ...updatedTasks[taskIndex], position: index } as PopulatedTask
-                }
-              })
-              return updatedTasks
-            })
+          if (!data.success) {
+            // Revert optimistic update on failure
+            console.error('Failed to reorder tasks:', data.error)
+            // Refetch to get correct state
+            fetchTasks()
           }
         } catch (error) {
           console.error('Failed to reorder tasks:', error)
+          // Revert optimistic update on network failure
+          fetchTasks() // Refetch to get correct state
         }
       }
     } else {
       // Handle cross-column moves
+      const originalStatus = activeTask.status
+
+      // Optimistic update - update UI immediately
+      setTasks(tasks.map(task =>
+        task._id?.toString() === activeId ? { ...task, status: newStatus } as PopulatedTask : task
+      ))
+
+      // Background API call
       try {
         const response = await fetch(`/api/tasks/${activeId}`, {
           method: 'PUT',
@@ -384,13 +400,19 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
 
         const data = await response.json()
 
-        if (data.success) {
+        if (!data.success) {
+          // Revert optimistic update on failure
+          console.error('Failed to update task status:', data.error)
           setTasks(tasks.map(task =>
-            task._id?.toString() === activeId ? { ...task, status: newStatus } as PopulatedTask : task
+            task._id?.toString() === activeId ? { ...task, status: originalStatus } as PopulatedTask : task
           ))
         }
       } catch (error) {
         console.error('Failed to update task status:', error)
+        // Revert optimistic update on network failure
+        setTasks(tasks.map(task =>
+          task._id?.toString() === activeId ? { ...task, status: originalStatus } as PopulatedTask : task
+        ))
       }
     }
   }
@@ -530,6 +552,10 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
                   }}
                   onEditTask={onEditTask}
                   onDeleteTask={onDeleteTask}
+                  canDragTask={(task) => {
+                    // Allow dragging if task is not in backlog, or if it is in backlog but assigned to a sprint
+                    return task.status !== 'backlog' || !!task.sprint
+                  }}
                 />
               )
             })}

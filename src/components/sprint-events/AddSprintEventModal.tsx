@@ -902,7 +902,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
             {/* (3) Schedule */}
             <div className="space-y-4 mt-8">
-              <h3 className="text-sm font-semibold">Schedule</h3>
+              <h3 className="text-sm font-semibold mt-4">Schedule</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="scheduledDate">Date *</Label>
@@ -1178,7 +1178,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
               return (
                 <div className="space-y-4 mt-8">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">Attendees</h3>
+                    <h3 className="text-sm font-semibold mt-4">Attendees</h3>
                     {formData.attendees.length > 0 && (
                       <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                         {formData.attendees.length} selected
@@ -1237,7 +1237,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
             {/* (5) Description / Notes */}
             <div className="space-y-4 mt-8">
-              <h3 className="text-sm font-semibold">Description / Notes</h3>
+              <h3 className="text-sm font-semibold mt-4">Description / Notes</h3>
               <Textarea
                 id="description"
                 value={formData.description}
@@ -1250,7 +1250,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
             {/* (6) Attachments */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Attachments (Optional)</h3>
+              <h3 className="text-sm font-semibold mt-4">Attachments (Optional)</h3>
               <FileUploader onUpload={handleFileUpload} />
 
               {attachments.length > 0 && (
@@ -1277,7 +1277,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
             {/* (7) Notification Settings */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Notification & Reminder Settings</h3>
+              <h3 className="text-sm font-semibold mt-4">Notification & Reminder Settings</h3>
               <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
                 <label className="flex items-center space-x-2">
                   <Checkbox
@@ -1345,8 +1345,8 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
             </div>
 
             {/* Location and Meeting Link */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-4 mt-8">
+              <div className="space-y-2 mt-4">
                 <Label htmlFor="location">Location</Label>
                 <Input
                   id="location"
@@ -1355,7 +1355,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                   placeholder="Meeting room, office, etc."
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 mt-4">
                 <Label htmlFor="meetingLink">Meeting Link</Label>
                 <Input
                   id="meetingLink"

@@ -539,15 +539,32 @@ export default function ProfilePage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="UTC">UTC</SelectItem>
-                          <SelectItem value="America/New_York">Eastern Time</SelectItem>
-                          <SelectItem value="America/Chicago">Central Time</SelectItem>
-                          <SelectItem value="America/Denver">Mountain Time</SelectItem>
-                          <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
-                          <SelectItem value="Europe/London">London</SelectItem>
-                          <SelectItem value="Europe/Paris">Paris</SelectItem>
-                          <SelectItem value="Asia/Tokyo">Tokyo</SelectItem>
+                          <SelectItem value="America/New_York">Eastern Time (UTC-5)</SelectItem>
+                          <SelectItem value="America/Chicago">Central Time (UTC-6)</SelectItem>
+                          <SelectItem value="America/Denver">Mountain Time (UTC-7)</SelectItem>
+                          <SelectItem value="America/Los_Angeles">Pacific Time (UTC-8)</SelectItem>
+                          <SelectItem value="Europe/London">London (UTC+0)</SelectItem>
+                          <SelectItem value="Europe/Paris">Paris (UTC+1)</SelectItem>
+                          <SelectItem value="Asia/Colombo">Sri Lanka (UTC+5:30)</SelectItem>
+                          <SelectItem value="Asia/Kolkata">India (UTC+5:30)</SelectItem>
+                          <SelectItem value="Asia/Dhaka">Bangladesh (UTC+6)</SelectItem>
+                          <SelectItem value="Asia/Tokyo">Tokyo (UTC+9)</SelectItem>
+                          <SelectItem value="Australia/Sydney">Sydney (UTC+10)</SelectItem>
+                          <SelectItem value="Pacific/Auckland">Auckland (UTC+12)</SelectItem>
                         </SelectContent>
                       </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+                          setFormData(prev => ({ ...prev, timezone: browserTimezone }))
+                        }}
+                        className="mt-2 text-xs"
+                      >
+                        Auto-detect from browser
+                      </Button>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="language">Language</Label>

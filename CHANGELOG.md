@@ -1,3 +1,25 @@
+## [1.18.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.5...v1.18.6) (2025-12-30)
+
+
+### Bug Fixes
+
+* add chngesa in sprint event ([fbbb626](https://github.com/EchonLabs/kanvaro.com/commit/fbbb626a925e155f24499f1c0db16ef019cd9010))
+* fix build fail ([487141b](https://github.com/EchonLabs/kanvaro.com/commit/487141b69ebbb91130dca4743f9e115af4dbba83))
+
+## [1.18.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.4...v1.18.5) (2025-12-30)
+
+
+### Bug Fixes
+
+* backlog issue fixes ([2a61e00](https://github.com/EchonLabs/kanvaro.com/commit/2a61e0069ee2b470005286a9b297a8d773ae0fd3))
+
+## [1.18.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.3...v1.18.4) (2025-12-30)
+
+
+### Bug Fixes
+
+* add changes in tasks and stories ([1c71ef7](https://github.com/EchonLabs/kanvaro.com/commit/1c71ef7b74a72fe586b3ac7537e46191927699b4))
+
 ## [1.18.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.2...v1.18.3) (2025-12-26)
 
 

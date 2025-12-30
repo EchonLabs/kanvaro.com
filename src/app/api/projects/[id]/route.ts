@@ -27,15 +27,6 @@ export async function GET(
     const organizationId = user.organization
     const projectId = params.id
 
-    // Check if user can access this project
-    const canAccessProject = await PermissionService.canAccessProject(userId, projectId)
-    if (!canAccessProject) {
-      return NextResponse.json(
-        { error: 'Access denied to project' },
-        { status: 403 }
-      )
-    }
-
     // Find project (only non-deleted projects)
     const project = await Project.findOne({
       _id: projectId,
@@ -45,6 +36,30 @@ export async function GET(
       .populate('createdBy', 'firstName lastName email')
       .populate('teamMembers.memberId', 'firstName lastName email')
       .populate('client', 'firstName lastName email')
+
+    if (!project) {
+      return NextResponse.json(
+        { error: 'Project not found' },
+        { status: 404 }
+      )
+    }
+    console.log('project.teamMembers', project.teamMembers)
+    console.log('authResult.user.id', authResult.user.id)
+    
+    // Check if user can access this project
+    const hasAccess = project.teamMembers.some((member: any) => member.memberId._id.toString() === userId.toString()) ||
+                     project.createdBy._id.toString() === userId.toString() ||
+                     project.projectRoles.some((role: any) =>
+                       role.user.toString() === userId.toString() &&
+                       ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)
+                     )
+
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: 'Access denied to project' },
+        { status: 403 }
+      )
+    }
 
     if (!project) {
       return NextResponse.json(

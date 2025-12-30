@@ -62,28 +62,23 @@ export default function DashboardPage() {
   const loadDashboardData = useCallback(async (force = false) => {
     // Prevent multiple simultaneous dashboard loads
     if (!force && dashboardLoaded && !isRefreshing) {
-      console.log('Dashboard: Skipping dashboard load - already loaded')
       return
     }
 
     try {
-      console.log('Dashboard: Loading dashboard data...')
       const response = await fetch('/api/dashboard')
       if (response.ok) {
         const data = await response.json()
         setDashboardData(data.data)
         setDashboardLoaded(true)
         setDataError('')
-        console.log('Dashboard: Dashboard data loaded successfully')
 
         // Quick refresh of permissions after dashboard loads to ensure they're current
         if (!permissionsRefreshed) {
-          console.log('Dashboard: Scheduling permission refresh after dashboard load')
           setTimeout(async () => {
             try {
               await refreshPermissions()
               setPermissionsRefreshed(true)
-              console.log('Dashboard: Permissions refreshed successfully')
             } catch (error) {
               console.error('Dashboard: Failed to refresh permissions:', error)
             }
@@ -101,16 +96,12 @@ export default function DashboardPage() {
   const checkAuth = useCallback(async (forceLoadDashboard = false) => {
     // Prevent multiple simultaneous auth checks
     if (isAuthChecking && !forceLoadDashboard) {
-      console.log('Dashboard: Auth check already in progress, skipping')
       return
     }
 
     try {
       setIsAuthChecking(true)
-      console.log('Dashboard: Checking authentication...')
-      console.log('Dashboard: Permissions loading:', permissionsLoading, 'Permissions available:', !!permissions)
       const response = await fetch('/api/auth/me')
-      console.log('Dashboard: Auth response status:', response.status)
 
       if (response.ok) {
         const userData = await response.json()
@@ -120,9 +111,7 @@ export default function DashboardPage() {
         // Only load dashboard data if not already loaded or if forced
         if (!dashboardLoaded || forceLoadDashboard) {
           await loadDashboardData(forceLoadDashboard)
-        } else {
-          console.log('Dashboard: Skipping dashboard load - already loaded')
-        }
+        } 
       } else if (response.status === 401) {
         // Try to refresh token
         const refreshResponse = await fetch('/api/auth/refresh', {
@@ -137,9 +126,7 @@ export default function DashboardPage() {
           // Only load dashboard data if not already loaded or if forced
           if (!dashboardLoaded || forceLoadDashboard) {
             await loadDashboardData(forceLoadDashboard)
-          } else {
-            console.log('Dashboard: Skipping dashboard load after token refresh - already loaded')
-          }
+          } 
         } else {
           // Both access and refresh tokens are invalid
           setAuthError('Session expired')
@@ -182,14 +169,12 @@ export default function DashboardPage() {
   // Ensure permissions are current when component mounts
   useEffect(() => {
     if (!permissionsLoading && permissions && !initialPermissionCheckDone) {
-      console.log('Dashboard: Ensuring permissions are current on mount')
       // Quick check to refresh permissions if needed
       const timer = setTimeout(async () => {
         try {
           await refreshPermissions()
           setPermissionsRefreshed(true)
           setInitialPermissionCheckDone(true)
-          console.log('Dashboard: Initial permission refresh completed')
         } catch (error) {
           console.error('Dashboard: Failed initial permission refresh:', error)
           setInitialPermissionCheckDone(true) // Prevent infinite retries
@@ -203,7 +188,6 @@ export default function DashboardPage() {
   // Set up periodic auth check to handle token expiration (less frequent)
   useEffect(() => {
     const interval = setInterval(() => {
-      console.log('Dashboard: Periodic auth check')
       checkAuth(true) // Force dashboard reload on periodic checks
     }, 10 * 60 * 1000) // Check every 10 minutes instead of 5
 
