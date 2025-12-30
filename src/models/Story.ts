@@ -35,8 +35,7 @@ const StorySchema = new Schema<IStory>({
   title: {
     type: String,
     required: true,
-    trim: true,
-    maxlength: 200
+    trim: true
   },
   description: {
     type: String,

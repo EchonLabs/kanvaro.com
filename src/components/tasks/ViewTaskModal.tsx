@@ -162,8 +162,12 @@ export default function ViewTaskModal({ isOpen, onClose, task, onEdit, onDelete 
               <div className="mt-1 flex items-center space-x-2">
                 <User className="h-4 w-4 text-muted-foreground" />
                 <span>
-                  {task.assignedTo ? 
-                    `${task.assignedTo.firstName} ${task.assignedTo.lastName}` : 
+                  {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 ?
+                    (() => {
+                      const firstAssignee = task.assignedTo[0];
+                      const userData = firstAssignee.user || firstAssignee;
+                      return `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Unknown User';
+                    })() :
                     'Unassigned'
                   }
                 </span>

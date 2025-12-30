@@ -668,17 +668,17 @@ export default function CreateTaskPage() {
                             placeholder="Type to search projects"
                             className="mb-2"
                           />
-                          <div className="max-h-56 overflow-y-auto">
-                            {filteredProjects.length > 0 ? (
-                              filteredProjects.map((project) => (
-                                <SelectItem key={project._id} value={project._id}>
+                          {filteredProjects.length > 0 ? (
+                            filteredProjects.map((project) => (
+                              <SelectItem key={project._id} value={project._id} title={project.name}>
+                                <div className="truncate max-w-xs" title={project.name}>
                                   {project.name}
-                                </SelectItem>
-                              ))
-                            ) : (
-                              <div className="px-2 py-1 text-sm text-muted-foreground">No matching projects</div>
-                            )}
-                          </div>
+                                </div>
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="px-2 py-1 text-sm text-muted-foreground">No matching projects</div>
+                          )}
                         </div>
                       </SelectContent>
                     </Select>
@@ -756,9 +756,7 @@ export default function CreateTaskPage() {
                                   </div>
                                 ) : projectMembers.length === 0 ? (
                                   <>
-                                    <SelectItem value="__unassigned">
-                                      Unassigned
-                                    </SelectItem>
+                                   
                                     <div className="px-2 py-1 text-sm text-muted-foreground">No team members found for this project</div>
                                   </>
                                 ) : filteredProjectMembers.length > 0 ? (

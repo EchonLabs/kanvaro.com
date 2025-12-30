@@ -105,6 +105,7 @@ interface Task {
   estimatedHours?: number
   actualHours?: number
   labels: string[]
+  position?: number
   createdAt: string
   updatedAt: string
 }
@@ -152,18 +153,20 @@ const defaultColumns = [
 ]
 
 // Column Drop Zone Component
-function ColumnDropZone({ 
-  column, 
-  tasks, 
+function ColumnDropZone({
+  column,
+  tasks,
   onCreateTask,
-  onEditTask, 
-  onDeleteTask 
-}: { 
-  column: any, 
-  tasks: Task[], 
+  onEditTask,
+  onDeleteTask,
+  pendingUpdates
+}: {
+  column: any,
+  tasks: Task[],
   onCreateTask?: (status?: string) => void,
   onEditTask?: (task: Task) => void,
-  onDeleteTask?: (taskId: string) => void
+  onDeleteTask?: (taskId: string) => void,
+  pendingUpdates?: Set<string>
 }) {
   const router = useRouter()
   const { setNodeRef, isOver } = useDroppable({
@@ -241,15 +244,15 @@ function ColumnDropZone({
             </div>
           ) : (
             tasks.map((task) => (
-              <SortableTask 
-              
-                key={task._id} 
+              <SortableTask
+                key={`${task._id}-${task.status}-${task.position}`}
                 task={task}
                 onClick={() => router.push(`/tasks/${task._id}`)}
                 getPriorityColor={getPriorityColor}
                 getTypeColor={getTypeColor}
                 onEdit={onEditTask}
                 onDelete={onDeleteTask}
+                isUpdating={pendingUpdates?.has(task._id)}
               />
             ))
           )}
@@ -291,6 +294,7 @@ export default function KanbanPage() {
   const [taskNumberFilter, setTaskNumberFilter] = useState('all')
   const [taskNumberFilterQuery, setTaskNumberFilterQuery] = useState('')
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  const [pendingUpdates, setPendingUpdates] = useState<Set<string>>(new Set())
   const hasFetchedProjects = useRef(false)
 
   // Check if any filters are active
@@ -750,7 +754,7 @@ export default function KanbanPage() {
 
     if (!over) return
 
-    const activeId = active.id
+    const activeId = active.id as string
     const overId = over.id
 
     if (activeId === overId) return
@@ -759,28 +763,151 @@ export default function KanbanPage() {
     const activeTask = tasks.find(task => task._id === activeId)
     if (!activeTask) return
 
-    // Determine the new status based on the drop target
     const columns = getColumns()
     let newStatus = activeTask.status
+    let shouldReorder = false
+    let newPosition = activeTask.position || 0
+
+    // Determine the drop target type and new status
     if (typeof overId === 'string' && columns.some(col => col.id === overId)) {
+      // Dropped directly on a column (empty column)
       newStatus = overId as any
-    } else {
-      // If dropped on another task, get the status of that task
+      // Set position to end of the column
+      const columnTasks = tasks.filter(t => t.status === newStatus)
+      newPosition = columnTasks.length
+    } else if (typeof overId === 'string') {
+      // Dropped on another task - get its status
       const overTask = tasks.find(task => task._id === overId)
       if (overTask) {
         newStatus = overTask.status
+        // Calculate new position based on drop location
+        const columnTasks = tasks.filter(t => t.status === newStatus)
+        const overIndex = columnTasks.findIndex(t => t._id === overId)
+
+        if (newStatus === activeTask.status) {
+          // Same column reordering
+          shouldReorder = true
+          const activeIndex = columnTasks.findIndex(t => t._id === activeId)
+          if (activeIndex < overIndex) {
+            newPosition = overIndex
+          } else {
+            newPosition = overIndex
+          }
+        } else {
+          // Cross-column move - place at end
+          newPosition = columnTasks.length
+        }
       }
     }
 
-    // Update the task status with optimistic updates
-    if (newStatus !== activeTask.status) {
+    // Optimistic update - update UI immediately
+    const originalTask = { ...activeTask }
+
+    if (newStatus !== activeTask.status || shouldReorder) {
+      // Mark task as having pending update
+      setPendingUpdates(prev => new Set(prev).add(activeId))
+
+      // Update local state immediately for instant visual feedback
+      setTasks(prevTasks => {
+        const updatedTasks = [...prevTasks]
+        const taskIndex = updatedTasks.findIndex(t => t._id === activeId)
+
+        if (taskIndex !== -1) {
+          // Update the task
+          updatedTasks[taskIndex] = {
+            ...updatedTasks[taskIndex],
+            status: newStatus,
+            position: newPosition
+          }
+
+          // If reordering within same column, reorder the array
+          if (shouldReorder && newStatus === activeTask.status) {
+            const columnTasks = updatedTasks.filter(t => t.status === newStatus)
+            const otherTasks = updatedTasks.filter(t => t.status !== newStatus)
+
+            // Remove the moved task and reinsert at new position
+            const movedTask = columnTasks.find(t => t._id === activeId)
+            const remainingTasks = columnTasks.filter(t => t._id !== activeId)
+
+            remainingTasks.splice(newPosition, 0, movedTask!)
+
+            return [...otherTasks, ...remainingTasks]
+          }
+        }
+
+        return updatedTasks
+      })
+
+      // Background sync with server
       try {
-        await updateTaskOptimistically(activeId as string, {
-          status: newStatus
+        if (shouldReorder) {
+          // Handle reordering
+          const columnTasks = tasks.filter(t => t.status === newStatus)
+          const orderedTaskIds = columnTasks
+            .filter(t => t._id !== activeId)
+            .slice(0, newPosition)
+            .concat([activeId])
+            .concat(columnTasks.filter(t => t._id !== activeId).slice(newPosition))
+            .map(t => t._id)
+
+          await fetch('/api/tasks/reorder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: projectFilter === 'all' ? null : projectFilter,
+              status: newStatus,
+              orderedTaskIds
+            })
+          })
+        } else {
+          // Handle status change
+          const response = await fetch(`/api/tasks/${activeId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status: newStatus,
+              position: newPosition
+            })
+          })
+
+          if (!response.ok) {
+            throw new Error('Failed to update task')
+          }
+        }
+
+        // Success - remove from pending updates
+        setPendingUpdates(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(activeId)
+          return newSet
         })
       } catch (error) {
-        console.error('Failed to update task status:', error)
-        notifyError({ title: 'Failed to Update Task', message: 'Failed to update task status. Please try again.' })
+        console.error('Failed to sync task update:', error)
+
+        // Revert optimistic update on failure
+        setTasks(prevTasks => {
+          const updatedTasks = [...prevTasks]
+          const taskIndex = updatedTasks.findIndex(t => t._id === activeId)
+
+          if (taskIndex !== -1) {
+            // Restore original task data
+            updatedTasks[taskIndex] = originalTask
+          }
+
+          return updatedTasks
+        })
+
+        // Remove from pending updates
+        setPendingUpdates(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(activeId)
+          return newSet
+        })
+
+        notifyError({
+          title: 'Update Failed',
+          message: 'Failed to update task. Changes have been reverted.'
+        })
       }
     }
   }
@@ -1260,19 +1387,27 @@ export default function KanbanPage() {
               collisionDetection={closestCorners}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
+              onDragOver={(event) => {
+                // Optional: Add visual feedback during drag
+                const { over } = event
+                if (over) {
+                  // Could add hover effects here if needed
+                }
+              }}
             >
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                 {getColumns().map((column) => {
                   const columnTasks = getTasksByStatus(column.id)
                   
                   return (
-                    <ColumnDropZone 
-                      key={column.id} 
-                      column={column} 
+                    <ColumnDropZone
+                      key={column.id}
+                      column={column}
                       tasks={columnTasks}
                       onCreateTask={handleCreateTask}
                       onEditTask={handleEditTask}
                       onDeleteTask={handleDeleteTask}
+                      pendingUpdates={pendingUpdates}
                     />
                   )
                 })}
@@ -1373,11 +1508,12 @@ interface SortableTaskProps {
   getPriorityColor: (priority: string) => string
   getTypeColor: (type: string) => string
   isDragOverlay?: boolean
+  isUpdating?: boolean
   onEdit?: (task: Task) => void
   onDelete?: (taskId: string) => void
 }
 
-function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOverlay = false, onEdit, onDelete }: SortableTaskProps) {
+function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOverlay = false, isUpdating = false, onEdit, onDelete }: SortableTaskProps) {
   const { formatDate } = useDateTime()
   const {
     attributes,
@@ -1394,15 +1530,22 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
   }
 
   return (
-    <Card 
+    <Card
       ref={setNodeRef}
       style={style}
-      className={`hover:shadow-md transition-shadow cursor-pointer ${
+      className={`hover:shadow-md transition-shadow cursor-pointer relative ${
         isDragging ? 'opacity-50' : ''
-      } ${isDragOverlay ? 'rotate-3 shadow-lg' : ''}`}
+      } ${isDragOverlay ? 'rotate-3 shadow-lg' : ''} ${
+        isUpdating ? 'ring-2 ring-blue-500/50 ring-offset-1' : ''
+      }`}
       onClick={onClick}
     >
       <CardContent className="p-4">
+        {isUpdating && (
+          <div className="absolute top-2 right-2">
+            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+          </div>
+        )}
         <div className="space-y-3">
           <div className="flex items-start justify-between">
             <TruncateTooltip text={task.title}>

@@ -289,12 +289,18 @@ export default function TasksClient({
                     name: task.project.name,
                 })
             }
-            if (task.assignedTo?._id) {
-                assignedToMap.set(task.assignedTo._id, {
-                    _id: task.assignedTo._id,
-                    firstName: task.assignedTo.firstName,
-                    lastName: task.assignedTo.lastName,
-                    email: task.assignedTo.email,
+            if (task.assignedTo && Array.isArray(task.assignedTo)) {
+                task.assignedTo.forEach((assignee) => {
+                    const userId = assignee.user?._id || assignee.user || assignee._id || assignee;
+                    const userData = assignee.user || assignee;
+                    if (userId && userData) {
+                        assignedToMap.set(userId.toString(), {
+                            _id: userId.toString(),
+                            firstName: userData.firstName || '',
+                            lastName: userData.lastName || '',
+                            email: userData.email || '',
+                        })
+                    }
                 })
             }
             if (task.createdBy?._id) {
@@ -1354,9 +1360,13 @@ export default function TasksClient({
                                                                             </div>
                                                                         </div>
                                                                         <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-2">
-                                                                            {task?.assignedTo && (
+                                                                            {task?.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && (
                                                                                 <div className="text-xs sm:text-sm text-muted-foreground truncate">
-                                                                                    {task?.assignedTo?.firstName} {task?.assignedTo?.lastName}
+                                                                                    {(() => {
+                                                                                        const firstAssignee = task.assignedTo[0];
+                                                                                        const userData = firstAssignee.user || firstAssignee;
+                                                                                        return `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Unknown User';
+                                                                                    })()}
                                                                                 </div>
                                                                             )}
                                                                             <DropdownMenu>
