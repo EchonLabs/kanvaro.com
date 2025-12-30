@@ -708,10 +708,16 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                             <Badge className={`text-xs ${getStatusColor(task.status)}`}>
                               {formatToTitleCase(task.status)}
                             </Badge>
-                            {task.assignedTo && (
+                            {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && (
                               <div className="flex items-center space-x-1 text-xs text-muted-foreground">
                                 <User className="h-3 w-3" />
-                                <span>{task.assignedTo.firstName} {task.assignedTo.lastName}</span>
+                                <span>
+                                  {(() => {
+                                    const firstAssignee = task.assignedTo[0];
+                                    const userData = firstAssignee.user || firstAssignee;
+                                    return `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Unknown User';
+                                  })()}
+                                </span>
                               </div>
                             )}
                           </div>

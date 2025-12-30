@@ -23,7 +23,6 @@ export async function GET(
     if (!project) {
       return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
     }
-
     const hasAccess = project.teamMembers.includes(authResult.user.id) || 
                      project.createdBy.toString() === authResult.user.id ||
                      project.projectRoles.some((role: any) => 

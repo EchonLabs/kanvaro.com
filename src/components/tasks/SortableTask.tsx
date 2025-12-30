@@ -92,13 +92,22 @@ export default function SortableTask({
 
   // Helper function to get assignee data
   const getAssigneeData = (assignee: any) => {
+    // Check if assignee.user is populated (from backend populate)
+    if (typeof assignee === 'object' && assignee.user && typeof assignee.user === 'object' && assignee.user.firstName) {
+      return {
+        firstName: assignee.user.firstName,
+        lastName: assignee.user.lastName,
+        email: assignee.user.email
+      }
+    }
+
+    // Check if assignee itself has the user data (stored directly)
     if (typeof assignee === 'object' && assignee.firstName) {
-      // Already populated
       return assignee
     }
 
     // Need to look up from fetched user data
-    const userId = typeof assignee === 'string' ? assignee : assignee._id || assignee
+    const userId = typeof assignee === 'string' ? assignee : assignee._id || assignee.user || assignee
     const userInfo = userData[userId]
 
     if (userInfo) {

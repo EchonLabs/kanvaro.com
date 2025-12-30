@@ -1186,25 +1186,25 @@ const [overheadInput, setOverheadInput] = useState('')
                           return organization.currency
                         })()}
                       </span>
-                      <Input
-                        id="totalBudget"
-                        type="number"
-                        value={budgetTotalInput}
-                        onChange={(e) => {
-                          const value = e.target.value
-                          const parsedValue = parseFloat(value)
-                          setBudgetTotalInput(value)
-                          setFormData(prev => ({
-                            ...prev,
-                            budget: {
-                              ...prev.budget,
-                              total: value === '' || Number.isNaN(parsedValue) ? 0 : parsedValue
-                            }
-                          }))
-                        }}
-                        placeholder="0.00"
+                    <Input
+                      id="totalBudget"
+                      type="number"
+                      value={budgetTotalInput}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        const parsedValue = parseFloat(value)
+                        setBudgetTotalInput(value)
+                        setFormData(prev => ({
+                          ...prev,
+                          budget: {
+                            ...prev.budget,
+                            total: value === '' || Number.isNaN(parsedValue) ? 0 : parsedValue
+                          }
+                        }))
+                      }}
+                      placeholder="0.00"
                         className="rounded-l-none pl-3"
-                      />
+                    />
                     </div>
                   </div>
 
@@ -1271,13 +1271,13 @@ const [overheadInput, setOverheadInput] = useState('')
         return organization.currency
       })()}
     </span>
-    <Input
-      id="materials"
-      type="number"
-      value={materialsInput}
-      onChange={(e) => {
-        const value = e.target.value
-        const parsedValue = parseFloat(value)
+  <Input
+    id="materials"
+    type="number"
+    value={materialsInput}
+    onChange={(e) => {
+      const value = e.target.value
+      const parsedValue = parseFloat(value)
 
       setMaterialsInput(value)
 
@@ -1311,13 +1311,13 @@ const [overheadInput, setOverheadInput] = useState('')
         return organization.currency
       })()}
     </span>
-    <Input
-      id="overhead"
-      type="number"
-      value={overheadInput}
-      onChange={(e) => {
-        const value = e.target.value
-        const parsedValue = parseFloat(value)
+  <Input
+    id="overhead"
+    type="number"
+    value={overheadInput}
+    onChange={(e) => {
+      const value = e.target.value
+      const parsedValue = parseFloat(value)
 
       setOverheadInput(value)
 
@@ -2360,9 +2360,9 @@ const [overheadInput, setOverheadInput] = useState('')
                       </div>
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                          <div className="flex items-center justify-between">
+                          <div className="flex flex-col gap-1">
                             <span className="text-sm font-medium text-muted-foreground">Project Name</span>
-                            <span className="text-sm text-foreground font-medium">{formData.name || 'Not set'}</span>
+                            <span className="text-sm text-foreground font-medium break-words whitespace-normal">{formData.name || 'Not set'}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-muted-foreground">Project Number</span>
