@@ -1,3 +1,10 @@
+## [1.18.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.4...v1.18.5) (2025-12-30)
+
+
+### Bug Fixes
+
+* backlog issue fixes ([2a61e00](https://github.com/EchonLabs/kanvaro.com/commit/2a61e0069ee2b470005286a9b297a8d773ae0fd3))
+
 ## [1.18.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.3...v1.18.4) (2025-12-30)
 
 
