@@ -1413,7 +1413,7 @@ export default function KanbanPage() {
                       pendingUpdates={pendingUpdates}
                       canDragTask={(task) => {
                         // Allow dragging if task is not in backlog, or if it is in backlog but assigned to a sprint
-                        return task.status !== 'backlog' || !!task.sprint
+                        return task.status !== 'backlog'
                       }}
                     />
                   )

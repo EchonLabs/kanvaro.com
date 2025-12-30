@@ -437,7 +437,7 @@ export default function SprintEventsPage() {
           <Button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             <span className="hidden xs:inline">Create Event</span>
-            <span className="xs:hidden">Create</span>
+            <span className="xs:hidden">Create Event</span>
           </Button>
         </div>
 
