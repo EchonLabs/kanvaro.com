@@ -1,3 +1,10 @@
+## [1.18.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.6...v1.18.7) (2025-12-31)
+
+
+### Bug Fixes
+
+* add time log changes ([109bd3e](https://github.com/EchonLabs/kanvaro.com/commit/109bd3e51223cfeb210eefd2f461dd75e0ec7b7e))
+
 ## [1.18.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.5...v1.18.6) (2025-12-30)
 
 
