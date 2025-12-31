@@ -273,7 +273,9 @@ export default function CreateEpicPage() {
                           <div className="max-h-56 overflow-y-auto">
                             {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).map((project) => (
                               <SelectItem key={project._id} value={project._id}>
-                                {project.name}
+                                <span className="truncate block max-w-[200px]" title={project.name}>
+                                  {project.name}
+                                </span>
                               </SelectItem>
                             ))}
                             {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).length === 0 && (
@@ -306,7 +308,15 @@ export default function CreateEpicPage() {
                       type="date"
                       value={formData.dueDate}
                       onChange={(e) => handleChange('dueDate', e.target.value)}
-                      min={getValidDateRange()?.minDate?.toISOString().split('T')[0]}
+                      min={(() => {
+                        const minDate = getValidDateRange()?.minDate;
+                        if (minDate) {
+                          const nextDay = new Date(minDate);
+                          nextDay.setDate(nextDay.getDate() + 1);
+                          return nextDay.toISOString().split('T')[0];
+                        }
+                        return undefined;
+                      })()}
                       max={getValidDateRange()?.maxDate?.toISOString().split('T')[0]}
                       required
                     />

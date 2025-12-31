@@ -1,7 +1,23 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { DateTimePreferences, DEFAULT_DATE_TIME_PREFERENCES, formatDate, formatTime, formatDateTimeSafe, getDatePlaceholder, getTimePlaceholder } from '@/lib/dateTimeUtils'
+import {
+  DateTimePreferences,
+  DEFAULT_DATE_TIME_PREFERENCES,
+  formatDate,
+  formatTime,
+  formatDateTimeSafe,
+  getDatePlaceholder,
+  getTimePlaceholder,
+  utcToUserTimezone,
+  userTimezoneToUtc,
+  getCurrentTimeInUserTimezone,
+  formatUtcInUserTimezone,
+  formatDuration,
+  calculateDurationInUserTimezone,
+  getCurrentUtcTime,
+  isValidTimezone
+} from '@/lib/dateTimeUtils'
 
 interface DateTimeContextType {
   formatDate: (date: Date | string) => string
@@ -11,6 +27,15 @@ interface DateTimeContextType {
   getTimePlaceholder: () => string
   preferences: DateTimePreferences
   setPreferences: (prefs: DateTimePreferences) => void
+  // Timezone utilities
+  utcToUserTimezone: (utcDate: Date | string) => Date
+  userTimezoneToUtc: (userDate: Date | string) => Date
+  getCurrentTimeInUserTimezone: () => Date
+  formatUtcInUserTimezone: (utcDate: Date | string, formatStr?: string) => string
+  formatDuration: (minutes: number) => string
+  calculateDurationInUserTimezone: (startUtc: Date | string, endUtc: Date | string) => number
+  getCurrentUtcTime: () => Date
+  isValidTimezone: (timezone: string) => boolean
 }
 
 const DateTimeContext = createContext<DateTimeContextType | undefined>(undefined)
@@ -77,7 +102,16 @@ export function DateTimeProvider({ children }: { children: React.ReactNode }) {
     getDatePlaceholder: () => getDatePlaceholder(preferences),
     getTimePlaceholder: () => getTimePlaceholder(preferences),
     preferences,
-    setPreferences
+    setPreferences,
+    // Timezone utilities
+    utcToUserTimezone: (utcDate: Date | string) => utcToUserTimezone(utcDate, preferences.timezone),
+    userTimezoneToUtc: (userDate: Date | string) => userTimezoneToUtc(userDate, preferences.timezone),
+    getCurrentTimeInUserTimezone: () => getCurrentTimeInUserTimezone(preferences.timezone),
+    formatUtcInUserTimezone: (utcDate: Date | string, formatStr?: string) => formatUtcInUserTimezone(utcDate, preferences.timezone, formatStr),
+    formatDuration,
+    calculateDurationInUserTimezone: (startUtc: Date | string, endUtc: Date | string) => calculateDurationInUserTimezone(startUtc, endUtc, preferences.timezone),
+    getCurrentUtcTime,
+    isValidTimezone
   }
 
   return (
@@ -101,7 +135,16 @@ export function useDateTime() {
       preferences: DEFAULT_DATE_TIME_PREFERENCES,
       setPreferences: () => {
         console.warn('DateTimeProvider not available, cannot set preferences')
-      }
+      },
+      // Timezone utilities fallback
+      utcToUserTimezone: (utcDate: Date | string) => utcToUserTimezone(utcDate, DEFAULT_DATE_TIME_PREFERENCES.timezone),
+      userTimezoneToUtc: (userDate: Date | string) => userTimezoneToUtc(userDate, DEFAULT_DATE_TIME_PREFERENCES.timezone),
+      getCurrentTimeInUserTimezone: () => getCurrentTimeInUserTimezone(DEFAULT_DATE_TIME_PREFERENCES.timezone),
+      formatUtcInUserTimezone: (utcDate: Date | string, formatStr?: string) => formatUtcInUserTimezone(utcDate, DEFAULT_DATE_TIME_PREFERENCES.timezone, formatStr),
+      formatDuration,
+      calculateDurationInUserTimezone: (startUtc: Date | string, endUtc: Date | string) => calculateDurationInUserTimezone(startUtc, endUtc, DEFAULT_DATE_TIME_PREFERENCES.timezone),
+      getCurrentUtcTime,
+      isValidTimezone
     }
   }
 

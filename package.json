@@ -51,6 +51,7 @@
     "cors": "^2.8.5",
     "critters": "^0.0.23",
     "date-fns": "^2.30.0",
+    "date-fns-tz": "^2.0.0",
     "express-rate-limit": "^7.1.5",
     "framer-motion": "^10.16.5",
     "gray-matter": "^4.0.3",
