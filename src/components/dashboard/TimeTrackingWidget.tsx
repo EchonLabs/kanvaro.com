@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Timer } from '@/components/time-tracking/Timer'
 import { useOrganization } from '@/hooks/useOrganization'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { applyRoundingRules } from '@/lib/utils'
 
 interface TimeTrackingWidgetProps {
@@ -48,6 +49,7 @@ interface TimeStats {
 export function TimeTrackingWidget({ userId, organizationId, timeStats: propTimeStats }: TimeTrackingWidgetProps) {
   const router = useRouter()
   const { organization } = useOrganization()
+  const { formatDuration: formatDurationUtil } = useDateTime()
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null)
   const [timeStats, setTimeStats] = useState<TimeStats | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -131,18 +133,9 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
   }, [loadActiveTimer, loadTimeStats, propTimeStats])
 
   // Format duration for active timer - NO rounding (shows actual elapsed time)
+  // Uses timezone-aware duration formatting
   const formatActiveTimerDuration = (minutes: number) => {
-    const totalSeconds = Math.floor(minutes * 60)
-    const hours = Math.floor(totalSeconds / 3600)
-    const mins = Math.floor((totalSeconds % 3600) / 60)
-    const secs = totalSeconds % 60
-    
-    // Format as HH:MM:SS (e.g., "00:08:43")
-    const paddedHours = String(hours).padStart(2, '0')
-    const paddedMins = String(mins).padStart(2, '0')
-    const paddedSecs = String(secs).padStart(2, '0')
-    
-    return `${paddedHours}:${paddedMins}:${paddedSecs}`
+    return formatDurationUtil(minutes)
   }
 
   // Update display time based on server currentDuration; tick only when not paused

@@ -2,6 +2,8 @@
  * Date and time formatting utilities based on user preferences
  */
 
+import { format, formatInTimeZone, zonedTimeToUtc, utcToZonedTime } from 'date-fns-tz'
+
 export interface DateTimePreferences {
   dateFormat: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD'
   timeFormat: '12h' | '24h'
@@ -126,5 +128,88 @@ export const getDatePlaceholder = (preferences: DateTimePreferences): string => 
     case 'MM/DD/YYYY':
     default:
       return 'MM/DD/YYYY'
+  }
+}
+
+// ============================================================================
+// TIMEZONE CONVERSION UTILITIES
+// ============================================================================
+
+/**
+ * Convert a UTC date to user's timezone
+ */
+export const utcToUserTimezone = (utcDate: Date | string, timezone: string): Date => {
+  const date = typeof utcDate === 'string' ? new Date(utcDate) : utcDate
+  return utcToZonedTime(date, timezone)
+}
+
+/**
+ * Convert a date from user's timezone to UTC
+ */
+export const userTimezoneToUtc = (userDate: Date | string, timezone: string): Date => {
+  const date = typeof userDate === 'string' ? new Date(userDate) : userDate
+  return zonedTimeToUtc(date, timezone)
+}
+
+/**
+ * Get current date/time in user's timezone
+ */
+export const getCurrentTimeInUserTimezone = (timezone: string): Date => {
+  return utcToZonedTime(new Date(), timezone)
+}
+
+/**
+ * Format a UTC date in user's timezone for display
+ */
+export const formatUtcInUserTimezone = (
+  utcDate: Date | string,
+  timezone: string,
+  formatStr: string = 'yyyy-MM-dd HH:mm:ss'
+): string => {
+  const date = typeof utcDate === 'string' ? new Date(utcDate) : utcDate
+  return formatInTimeZone(date, timezone, formatStr)
+}
+
+/**
+ * Format time duration in HH:MM:SS format (for timer display)
+ * This doesn't need timezone conversion as it's just a duration
+ */
+export const formatDuration = (minutes: number): string => {
+  const hours = Math.floor(minutes / 60)
+  const mins = Math.floor(minutes % 60)
+  const secs = Math.floor((minutes % 1) * 60)
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+}
+
+/**
+ * Calculate duration between two UTC timestamps in user's timezone context
+ * This is useful for displaying elapsed time that considers the user's timezone
+ */
+export const calculateDurationInUserTimezone = (
+  startUtc: Date | string,
+  endUtc: Date | string,
+  timezone: string
+): number => {
+  const startUser = utcToUserTimezone(startUtc, timezone)
+  const endUser = utcToUserTimezone(endUtc, timezone)
+  return (endUser.getTime() - startUser.getTime()) / (1000 * 60) // minutes
+}
+
+/**
+ * Get the current UTC time (useful for API calls)
+ */
+export const getCurrentUtcTime = (): Date => {
+  return new Date()
+}
+
+/**
+ * Check if a timezone is valid
+ */
+export const isValidTimezone = (timezone: string): boolean => {
+  try {
+    Intl.DateTimeFormat('en-US', { timeZone: timezone }).format()
+    return true
+  } catch {
+    return false
   }
 }

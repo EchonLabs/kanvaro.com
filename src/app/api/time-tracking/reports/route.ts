@@ -463,6 +463,7 @@ async function getDetailedEntriesReport(query: any, format: string) {
     
     // Calculate effective hourly rate
     let effectiveHourlyRate = 0
+    let rateSource = 'organization' // Default fallback
     const userId = entry.user?._id || entry.user
 
     // 1. Check if employee has project-specific hourly rate
@@ -472,18 +473,22 @@ async function getDetailedEntriesReport(query: any, format: string) {
 
     if (projectMemberRate && projectMemberRate.hourlyRate !== undefined && projectMemberRate.hourlyRate !== null) {
       effectiveHourlyRate = projectMemberRate.hourlyRate
+      rateSource = 'project-member'
     }
     // 2. Check project default hourly rate
     else if (entry.project?.budget?.defaultHourlyRate !== undefined && entry.project?.budget?.defaultHourlyRate !== null) {
       effectiveHourlyRate = entry.project.budget.defaultHourlyRate
+      rateSource = 'project'
     }
     // 3. Check user's default hourly rate
     else if (entry.user?.hourlyRate !== undefined && entry.user?.hourlyRate !== null) {
       effectiveHourlyRate = entry.user.hourlyRate
+      rateSource = 'user'
     }
     // 4. Fallback to organization default rate
     else {
       effectiveHourlyRate = orgDefaultRate
+      rateSource = 'organization'
     }
 
     const hourlyRate = effectiveHourlyRate
@@ -506,11 +511,12 @@ async function getDetailedEntriesReport(query: any, format: string) {
       endTime,
       duration,
       hourlyRate,
+      rateSource,
       cost,
       notes,
       isBillable,
       approvedBy: entry.approvedBy?._id || entry.approvedBy,
-      approvedByName: entry.approvedBy 
+      approvedByName: entry.approvedBy
         ? `${entry.approvedBy.firstName || ''} ${entry.approvedBy.lastName || ''}`.trim() || entry.approvedBy.email
         : ''
     }

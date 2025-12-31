@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 
 interface TimerProps {
   userId: string
@@ -49,6 +50,7 @@ export function Timer({
   onTimerUpdate,
   onAutoStop
 }: TimerProps) {
+  const { formatDuration, preferences } = useDateTime()
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -78,11 +80,9 @@ export function Timer({
 
   // Format time display - NO rounding for real-time timer display
   // Rounding is only applied when saving the time entry
+  // Uses timezone-aware duration formatting
   const formatTime = (minutes: number) => {
-    const hours = Math.floor(minutes / 60)
-    const mins = Math.floor(minutes % 60)
-    const secs = Math.floor((minutes % 1) * 60)
-    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    return formatDuration(minutes)
   }
 
   // Update display time based on server currentDuration; tick only when not paused
@@ -145,6 +145,10 @@ export function Timer({
 
       if (response.ok) {
         setActiveTimer(data.activeTimer)
+        // Log timezone info for debugging
+        if (data.userTimezone) {
+          console.log('Timer: User timezone loaded:', data.userTimezone)
+        }
       } else {
         console.error('Failed to load active timer:', data?.error)
       }

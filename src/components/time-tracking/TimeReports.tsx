@@ -89,6 +89,7 @@ interface ReportData {
     endTime: string
     duration: number
     hourlyRate: number
+    rateSource: string
     cost: number
     notes: string
     isBillable: boolean
@@ -100,7 +101,23 @@ interface ReportData {
 export function TimeReports({ userId, organizationId, projectId }: TimeReportsProps) {
   const { organization } = useOrganization()
   const { formatCurrency } = useOrgCurrency()
-  const { formatDate, formatTime } = useDateTime()
+  const { formatDate, formatTime, formatDuration: formatDurationUtil } = useDateTime()
+
+  // Function to determine hourly rate source explanation
+  const getHourlyRateSource = (entry: any) => {
+    switch (entry.rateSource) {
+      case 'project-member':
+        return 'Project member rate'
+      case 'project':
+        return 'Project default rate'
+      case 'user':
+        return 'User default rate'
+      case 'organization':
+        return 'Organization default rate'
+      default:
+        return 'Rate applied'
+    }
+  }
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -777,18 +794,19 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 <div className="min-w-full">
                   {/* Desktop Table View */}
                   <div className="hidden md:block">
-                    <div className="grid grid-cols-10 gap-4 p-4 border-b font-semibold text-sm text-muted-foreground">
+                    <div className="grid grid-cols-11 gap-4 p-4 border-b font-semibold text-sm text-muted-foreground">
                       <div className="col-span-2">Employee</div>
                       <div className="col-span-3">Project (Task)</div>
                       <div className="col-span-1">Date</div>
                       <div className="col-span-1">Start</div>
                       <div className="col-span-1">End</div>
                       <div className="col-span-1">Duration</div>
+                      <div className="col-span-1">Rate</div>
                       <div className="col-span-1">Cost</div>
                       <div className="col-span-1">Billable</div>
                     </div>
                     {getPaginatedDetailedEntries.map((entry) => (
-                      <div key={entry._id} className="grid grid-cols-10 gap-4 p-4 border-b hover:bg-muted/50">
+                      <div key={entry._id} className="grid grid-cols-11 gap-4 p-4 border-b hover:bg-muted/50">
                         <div className="col-span-2">
                           <div className="font-medium text-sm">{entry.userName}</div>
                           <div className="text-xs text-muted-foreground">{entry.userEmail}</div>
@@ -809,7 +827,15 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                           {entry.endTime ? formatTime(entry.endTime) : '-'}
                         </div>
                         <div className="col-span-1 text-sm font-medium">
-                          {formatDuration(entry.duration)}
+                          {formatDurationUtil(entry.duration)}
+                        </div>
+                        <div className="col-span-1 text-sm">
+                          <div className="flex flex-col">
+                            <span className="font-medium">{formatCurrency(entry.hourlyRate, orgCurrency)}/hr</span>
+                            <span className="text-xs text-muted-foreground">
+                              {getHourlyRateSource(entry)}
+                            </span>
+                          </div>
                         </div>
                         <div className="col-span-1 text-sm font-medium">
                           {formatCurrency(entry.cost, orgCurrency)}
@@ -855,15 +881,22 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                           </div>
                           <div>
                             <span className="text-muted-foreground">Duration: </span>
-                            <span className="font-medium">{formatDuration(entry.duration)}</span>
+                            <span className="font-medium">{formatDurationUtil(entry.duration)}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Rate: </span>
+                            <span className="font-medium">{formatCurrency(entry.hourlyRate, orgCurrency)}/hr</span>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Start: </span>
                             <span>{entry.startTime ? formatTime(entry.startTime) : '-'}</span>
                           </div>
-                          <div>
+                          <div className="col-span-2">
                             <span className="text-muted-foreground">Cost: </span>
                             <span className="font-medium">{formatCurrency(entry.cost, orgCurrency)}</span>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Cost = {formatDurationUtil(entry.duration)} × {formatCurrency(entry.hourlyRate, orgCurrency)}/hr
+                            </div>
                           </div>
                         </div>
                       </div>
