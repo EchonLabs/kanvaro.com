@@ -200,7 +200,7 @@ export default function TimeTrackingPage() {
           </div>
 
           {/* Quick Stats */}
-          <div className="space-y-6">
+          <div className="flex flex-col gap-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -224,7 +224,7 @@ export default function TimeTrackingPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card >
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Calendar className="h-5 w-5" />
