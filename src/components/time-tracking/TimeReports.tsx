@@ -440,7 +440,62 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
 
   const handleExport = async () => {
     try {
-      // Always export detailed entries format
+      if (reportData?.detailedEntries && reportData.detailedEntries.length > 0) {
+        const headers = [
+          'Employee Name',
+          'Employee Email',
+          'Project',
+          'Task',
+          'Date',
+          'Start Time',
+          'End Time',
+          'Duration',
+          'Hourly Rate',
+          'Rate Source',
+          'Cost',
+          'Billable',
+          'Notes'
+        ]
+
+        const sanitize = (value: string | number | null | undefined) => {
+          if (value === null || value === undefined) return ''
+          return String(value).replace(/"/g, '""')
+        }
+
+        const rows = reportData.detailedEntries.map(entry => [
+          sanitize(entry.userName),
+          sanitize(entry.userEmail),
+          sanitize(entry.projectName),
+          sanitize(entry.taskTitle || ''),
+          sanitize(formatDate(entry.date)),
+          sanitize(entry.startTime ? formatTime(entry.startTime) : '-'),
+          sanitize(entry.endTime ? formatTime(entry.endTime) : '-'),
+          sanitize(formatDurationUtil(entry.duration)),
+          sanitize(`${formatCurrency(entry.hourlyRate, orgCurrency)}/hr`),
+          sanitize(getHourlyRateSource(entry)),
+          sanitize(formatCurrency(entry.cost, orgCurrency)),
+          sanitize(entry.isBillable ? 'Yes' : 'No'),
+          sanitize(entry.notes || '')
+        ])
+
+        const csvContent = [headers, ...rows]
+          .map(row => row.map(value => `"${value}"`).join(','))
+          .join('\r\n')
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+        a.download = `All_time_log_${timestamp}.csv`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        return
+      }
+
+      // Fallback to server export if no detailed entries are loaded yet
       const params = new URLSearchParams({
         organizationId,
         reportType: 'detailed',
@@ -654,7 +709,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
               </Select>
             </div>
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 pt-2">
             <Button
               variant="outline"
               size="sm"
