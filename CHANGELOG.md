@@ -1,3 +1,10 @@
+## [1.19.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.19.3...v1.19.4) (2026-01-01)
+
+
+### Bug Fixes
+
+* add changes ([af5f5a2](https://github.com/EchonLabs/kanvaro.com/commit/af5f5a22e46cd3ce7d9edad7144c97c45aee63c2))
+
 ## [1.19.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.19.2...v1.19.3) (2026-01-01)
 
 
