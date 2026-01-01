@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Clock, Square, User, FolderOpen, Loader2, RefreshCw, Search } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -29,10 +29,12 @@ interface ActiveTimer {
   }
   description: string
   startTime: string
+  createdAt?: string
   currentDuration: number
   isPaused: boolean
   isBillable: boolean
   hourlyRate?: number
+  totalPausedDuration?: number
 }
 
 interface Member {
@@ -51,6 +53,12 @@ interface ActiveTimersWidgetProps {
   organizationId: string
 }
 
+interface TimerBaseline {
+  baseMinutes: number
+  tickStartMs: number | null
+  isPaused: boolean
+}
+
 export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) {
   const { hasPermission, loading: permissionsLoading } = usePermissions()
   const { showToast } = useToast()
@@ -64,38 +72,88 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
   const [isLoading, setIsLoading] = useState(false)
   const [isStopping, setIsStopping] = useState<string | null>(null)
   const [displayTimes, setDisplayTimes] = useState<Record<string, string>>({})
+  const timerBaselinesRef = useRef<Record<string, TimerBaseline>>({})
 
   const canViewAllTimers = hasPermission(Permission.TIME_TRACKING_VIEW_ALL_TIMER)
 
   // Format duration to HH:MM:SS
-  const formatDuration = (minutes: number): string => {
+  const formatDuration = useCallback((minutes: number): string => {
     const hours = Math.floor(minutes / 60)
     const mins = Math.floor(minutes % 60)
     const secs = Math.floor((minutes % 1) * 60)
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-  }
+  }, [])
 
-  // Update display times for running timers
+  const deriveTimerMinutes = useCallback((timer: ActiveTimer): number => {
+    const baselineIso = timer.createdAt || timer.startTime
+    const baselineMs = baselineIso ? new Date(baselineIso).getTime() : NaN
+    if (Number.isNaN(baselineMs)) {
+      return Math.max(0, timer.currentDuration || 0)
+    }
+
+    const elapsedMinutes = (Date.now() - baselineMs) / 60000
+    const pausedMinutes = timer.totalPausedDuration || 0
+    const derivedMinutes = elapsedMinutes - pausedMinutes
+    const fallbackMinutes = timer.currentDuration || 0
+    return Math.max(0, Number.isFinite(derivedMinutes) ? derivedMinutes : fallbackMinutes)
+  }, [])
+
+  const updateDisplayTimesFromBaselines = useCallback(() => {
+    const baselines = timerBaselinesRef.current
+
+    if (!baselines || Object.keys(baselines).length === 0) {
+      setDisplayTimes({})
+      return
+    }
+
+    const updatedTimes: Record<string, string> = {}
+    Object.entries(baselines).forEach(([timerId, baseline]) => {
+      const elapsed = !baseline.isPaused && baseline.tickStartMs
+        ? (Date.now() - baseline.tickStartMs) / 60000
+        : 0
+      const totalMinutes = Math.max(0, baseline.baseMinutes + elapsed)
+      updatedTimes[timerId] = formatDuration(totalMinutes)
+    })
+    setDisplayTimes(updatedTimes)
+  }, [formatDuration])
+
+  const syncTimerBaselines = useCallback((timersList: ActiveTimer[]) => {
+    if (!timersList.length) {
+      timerBaselinesRef.current = {}
+      setDisplayTimes({})
+      return
+    }
+
+    const nextBaselines: Record<string, TimerBaseline> = {}
+    const now = Date.now()
+
+    timersList.forEach(timer => {
+      const derivedMinutes = deriveTimerMinutes(timer)
+      nextBaselines[timer._id] = {
+        baseMinutes: derivedMinutes,
+        tickStartMs: timer.isPaused ? null : now,
+        isPaused: timer.isPaused
+      }
+    })
+
+    timerBaselinesRef.current = nextBaselines
+    updateDisplayTimesFromBaselines()
+  }, [deriveTimerMinutes, updateDisplayTimesFromBaselines])
+
+  // Tick display times locally for all timers
   useEffect(() => {
-    if (!canViewAllTimers || timers.length === 0) return
+    if (!canViewAllTimers) {
+      return
+    }
+
+    updateDisplayTimesFromBaselines()
 
     const interval = setInterval(() => {
-      const updatedTimes: Record<string, string> = {}
-      timers.forEach(timer => {
-        if (!timer.isPaused) {
-          // Calculate elapsed time since last fetch
-          const elapsed = 1 / 60 // 1 second in minutes
-          const newDuration = timer.currentDuration + elapsed
-          updatedTimes[timer._id] = formatDuration(newDuration)
-        } else {
-          updatedTimes[timer._id] = formatDuration(timer.currentDuration)
-        }
-      })
-      setDisplayTimes(updatedTimes)
+      updateDisplayTimesFromBaselines()
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [timers, canViewAllTimers])
+  }, [canViewAllTimers, updateDisplayTimesFromBaselines])
 
   // Fetch members for filter
   const fetchMembers = useCallback(async () => {
@@ -150,12 +208,7 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
       if (response.ok && data.success) {
         const timersList = data.data?.timers || []
         setTimers(timersList)
-        // Initialize display times
-        const initialTimes: Record<string, string> = {}
-        timersList.forEach((timer: ActiveTimer) => {
-          initialTimes[timer._id] = formatDuration(timer.currentDuration)
-        })
-        setDisplayTimes(initialTimes)
+        syncTimerBaselines(timersList)
       } else {
         // Silently handle errors - don't show toast if permission denied
         if (response.status !== 403) {
@@ -168,7 +221,7 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
     } finally {
       setIsLoading(false)
     }
-  }, [canViewAllTimers, permissionsLoading, selectedEmployeeId, selectedProjectId, organizationId])
+  }, [canViewAllTimers, permissionsLoading, selectedEmployeeId, selectedProjectId, organizationId, syncTimerBaselines])
 
   // Stop a timer
   const handleStopTimer = async (timerId: string) => {
@@ -385,7 +438,8 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
         ) : (
           <div className="space-y-3 max-h-[400px] overflow-y-auto">
             {filteredTimers.map(timer => {
-              const displayTime = displayTimes[timer._id] || formatDuration(timer.currentDuration)
+              const derivedMinutes = deriveTimerMinutes(timer)
+              const displayTime = displayTimes[timer._id] || formatDuration(derivedMinutes)
               return (
                 <div
                   key={timer._id}

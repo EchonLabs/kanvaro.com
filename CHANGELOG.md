@@ -1,3 +1,24 @@
+## [1.19.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.19.0...v1.19.1) (2026-01-01)
+
+
+### Bug Fixes
+
+* add timer fixes ([f1ce967](https://github.com/EchonLabs/kanvaro.com/commit/f1ce9675b8c11ba493e16c3f07f5416071ff557b))
+
+# [1.19.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.7...v1.19.0) (2026-01-01)
+
+
+### Features
+
+* add changes ([77ea40c](https://github.com/EchonLabs/kanvaro.com/commit/77ea40cd993e31dba9b1fabd69b718da418f7dc5))
+
+## [1.18.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.6...v1.18.7) (2025-12-31)
+
+
+### Bug Fixes
+
+* add time log changes ([109bd3e](https://github.com/EchonLabs/kanvaro.com/commit/109bd3e51223cfeb210eefd2f461dd75e0ec7b7e))
+
 ## [1.18.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.5...v1.18.6) (2025-12-30)
 
 
