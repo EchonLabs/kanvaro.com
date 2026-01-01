@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -100,6 +100,7 @@ export default function EpicsPage() {
   const [pageSize, setPageSize] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
   const [currentUserId, setCurrentUserId] = useState<string>('')
+  const filtersInitializedRef = useRef(false)
 
   const { hasPermission } = usePermissions()
   const { success: notifySuccess, error: notifyError } = useNotify()
@@ -184,19 +185,38 @@ export default function EpicsPage() {
     }
   }, [currentPage, pageSize])
 
+  // Fetch when filters change
+  useEffect(() => {
+    if (!filtersInitializedRef.current) {
+      filtersInitializedRef.current = true
+      return
+    }
+    if (authError) return
+    if (currentPage === 1) {
+      fetchEpics()
+    } else {
+      setCurrentPage(1)
+    }
+  }, [searchQuery, statusFilter, priorityFilter])
+
   const fetchEpics = async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
       params.set('page', currentPage.toString())
       params.set('limit', pageSize.toString())
+      const trimmedSearch = searchQuery.trim()
+      if (trimmedSearch) params.set('search', trimmedSearch)
+      if (statusFilter !== 'all') params.set('status', statusFilter)
+      if (priorityFilter !== 'all') params.set('priority', priorityFilter)
       
       const response = await fetch(`/api/epics?${params.toString()}`)
       const data = await response.json()
 
       if (data.success) {
-        setEpics(data.data)
-        setTotalCount(data.pagination?.total || data.data.length)
+        const epicData = Array.isArray(data.data) ? data.data : []
+        setEpics(epicData)
+        setTotalCount(data.pagination?.total ?? epicData.length)
       } else {
         console.error('Failed to fetch epics:', data)
         notifyError({ title: 'Failed to Load Epics', message: data.error || 'Failed to fetch epics' })
@@ -270,17 +290,11 @@ export default function EpicsPage() {
     }
   }
 
-  const filteredEpics = epics.filter(epic => {
-    const matchesSearch = !searchQuery || 
-      epic?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      epic?.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      epic?.project?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    const matchesStatus = statusFilter === 'all' || epic?.status === statusFilter
-    const matchesPriority = priorityFilter === 'all' || epic?.priority === priorityFilter
-
-    return matchesSearch && matchesStatus && matchesPriority
-  })
+  const displayedEpics = epics
+  const totalEpicsCount = totalCount ?? displayedEpics.length
+  const totalPages = Math.max(1, Math.ceil((totalEpicsCount || 0) / pageSize) || 1)
+  const pageStartIndex = totalEpicsCount === 0 ? 0 : ((currentPage - 1) * pageSize) + 1
+  const pageEndIndex = totalEpicsCount === 0 ? 0 : Math.min(currentPage * pageSize, totalEpicsCount)
 
   const isCreator = (epic: Epic) => {
     const creatorId = (epic as any)?.createdBy?._id || (epic as any)?.createdBy?.id
@@ -356,7 +370,7 @@ export default function EpicsPage() {
                 <div>
                   <CardTitle>All Epics</CardTitle>
                   <CardDescription>
-                    {filteredEpics.length} epic{filteredEpics.length !== 1 ? 's' : ''} found
+                    {totalEpicsCount} epic{totalEpicsCount !== 1 ? 's' : ''} found
                   </CardDescription>
                 </div>
               </div>
@@ -409,7 +423,7 @@ export default function EpicsPage() {
               
               <TabsContent value="grid" className="space-y-4">
                 <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredEpics.map((epic) => {
+                  {displayedEpics.map((epic) => {
                     const epicIsCreator = isCreator(epic)
                     const viewAllowed = canViewEpic(epic)
                     const editAllowed = canEditEpic(epic)
@@ -550,7 +564,7 @@ export default function EpicsPage() {
 
               <TabsContent value="list" className="space-y-4">
                 <div className="space-y-4">
-                  {filteredEpics.map((epic) => {
+                  {displayedEpics.map((epic) => {
                     const viewAllowed = canViewEpic(epic)
                     const editAllowed = canEditEpic(epic)
                     const deleteAllowed = canDeleteEpic(epic)
@@ -695,7 +709,7 @@ export default function EpicsPage() {
             </Tabs>
 
             {/* Pagination Controls */}
-            {filteredEpics.length > 0 && (
+            {totalEpicsCount > 0 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>Items per page:</span>
@@ -714,7 +728,7 @@ export default function EpicsPage() {
                     </SelectContent>
                   </Select>
                   <span>
-                    Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredEpics.length)} of {filteredEpics.length}
+                    Showing {pageStartIndex} to {pageEndIndex} of {totalEpicsCount}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -727,11 +741,11 @@ export default function EpicsPage() {
                     Previous
                   </Button>
                   <span className="text-sm text-muted-foreground px-2">
-                    Page {currentPage} of {Math.ceil(filteredEpics.length / pageSize) || 1}
+                    Page {currentPage} of {totalPages}
                   </span>
                   <Button
                     onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage >= Math.ceil(filteredEpics.length / pageSize) || loading}
+                    disabled={currentPage >= totalPages || loading}
                     variant="outline"
                     size="sm"
                   >

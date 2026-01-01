@@ -143,7 +143,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast, onRemove: (id: string) =
         variant="ghost"
         size="sm"
         onClick={handleRemove}
-        className={`h-7 w-7 p-0 flex-shrink-0 rounded-full transition-colors mt-0.5 ${closeButtonStyles[toast.type]}`}
+        className={`h-7 w-7 p-0 flex-shrink-0 rounded-full transition-colors self-start ${closeButtonStyles[toast.type]}`}
         aria-label="Close notification"
       >
         <X className="h-4 w-4" />

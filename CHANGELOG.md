@@ -1,3 +1,17 @@
+## [1.19.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.19.3...v1.19.4) (2026-01-01)
+
+
+### Bug Fixes
+
+* add changes ([af5f5a2](https://github.com/EchonLabs/kanvaro.com/commit/af5f5a22e46cd3ce7d9edad7144c97c45aee63c2))
+
+## [1.19.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.19.2...v1.19.3) (2026-01-01)
+
+
+### Bug Fixes
+
+* fix epic issues ([ae32f74](https://github.com/EchonLabs/kanvaro.com/commit/ae32f74b1c42fe99c20646cdd42a08aafe101e58))
+
 ## [1.19.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.19.1...v1.19.2) (2026-01-01)
 
 
