@@ -346,7 +346,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
 
     setLoadingEpics(true)
     try {
-      const response = await fetch(`/api/epics?project=${projectId}`)
+      const response = await fetch(`/api/epics?project=${encodeURIComponent(projectId)}&limit=100`)
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
