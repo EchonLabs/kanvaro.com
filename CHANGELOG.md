@@ -1,3 +1,10 @@
+## [1.19.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.19.0...v1.19.1) (2026-01-01)
+
+
+### Bug Fixes
+
+* add timer fixes ([f1ce967](https://github.com/EchonLabs/kanvaro.com/commit/f1ce9675b8c11ba493e16c3f07f5416071ff557b))
+
 # [1.19.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.18.7...v1.19.0) (2026-01-01)
 
 
