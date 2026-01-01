@@ -613,6 +613,27 @@ export function TimeLogs({
       }
     }
 
+    // Check maxSessionHours when overtime is NOT allowed
+    if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxSessionHours) {
+      const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
+      const durationHours = durationMinutes / 60
+      const maxHours = timeTrackingSettings.maxSessionHours
+
+      if (durationHours > maxHours) {
+        setEndTimeError(`Overtime not allowed. Session duration (${durationHours.toFixed(2)}h) exceeds maximum allowed (${maxHours}h). Please reduce the time or contact your administrator to enable overtime.`)
+        return
+      }
+    }
+
+    // Validate billable time settings
+    if (selectedTaskForLog) {
+      const selectedTask = tasks.find(task => task._id === selectedTaskForLog)
+      if (selectedTask?.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime) {
+        setEndTimeError('Billable time logging is not allowed for this organization. Please select a non-billable task or contact your administrator.')
+        return
+      }
+    }
+
     // Check maxSessionHours only when overtime is allowed
     if (timeTrackingSettings?.allowOvertime === true && timeTrackingSettings?.maxSessionHours) {
       const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
@@ -624,7 +645,7 @@ export function TimeLogs({
         return
       }
     }
-  }, [manualLogData.startDate, manualLogData.startTime, manualLogData.endDate, manualLogData.endTime, timeTrackingSettings])
+  }, [manualLogData.startDate, manualLogData.startTime, manualLogData.endDate, manualLogData.endTime, timeTrackingSettings, selectedTaskForLog, tasks])
 
   useEffect(() => {
     validateSessionHours()

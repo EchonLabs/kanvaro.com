@@ -43,14 +43,12 @@ export async function GET(
         { status: 404 }
       )
     }
-    console.log('project.teamMembers', project.teamMembers)
-    console.log('authResult.user.id', authResult.user.id)
-    
+
     // Check if user can access this project
-    const hasAccess = project.teamMembers.some((member: any) => member.memberId._id.toString() === userId.toString()) ||
+    const hasAccess = project.teamMembers.some((member: any) => member.memberId?._id?.toString() === userId.toString()) ||
                      project.createdBy._id.toString() === userId.toString() ||
                      project.projectRoles.some((role: any) =>
-                       role.user.toString() === userId.toString() &&
+                       role.user?.toString() === userId.toString() &&
                        ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)
                      )
 

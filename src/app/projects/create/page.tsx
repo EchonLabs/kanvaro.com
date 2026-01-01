@@ -118,6 +118,8 @@ export default function CreateProjectPage() {
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay, error: currenciesError } = useCurrencies(true)
   const { organization } = useOrganization()
   const { success: notifySuccess, error: notifyError } = useNotify()
+
+  // Debug organization time tracking settings
   const { formatDate } = useDateTime()
   const orgCurrency = organization?.currency || 'USD'
   const [currentStep, setCurrentStep] = useState(1)
@@ -2318,13 +2320,21 @@ const [overheadInput, setOverheadInput] = useState('')
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <div>
+                    <div className="flex-1">
                       <Label>Require Approval</Label>
-                      <p className="text-sm text-muted-foreground">Require approval for time entries and expenses</p>
+                      <p className="text-sm text-muted-foreground">
+                        Require approval for time entries and expenses
+                        {organization?.settings?.timeTracking?.requireApproval === false && (
+                          <span className="block text-xs text-amber-600 dark:text-amber-400 mt-1">
+                            ⚠️ Disabled globally in Application Settings
+                          </span>
+                        )}
+                      </p>
                     </div>
                     <input
                       type="checkbox"
                       checked={formData.settings.requireApproval}
+                      disabled={organization?.settings?.timeTracking?.requireApproval === false}
                       onChange={(e) => setFormData(prev => ({
                         ...prev,
                         settings: { ...prev.settings, requireApproval: e.target.checked }
