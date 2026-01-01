@@ -267,7 +267,7 @@ export default function CreateTaskModal({
 
     setLoadingEpics(true)
     try {
-      const response = await fetch(`/api/epics?project=${projectIdParam}`)
+      const response = await fetch(`/api/epics?project=${encodeURIComponent(projectIdParam)}&limit=100`)
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
