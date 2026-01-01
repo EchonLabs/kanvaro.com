@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
       .populate('project', 'name')
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
-      .sort({ priority: 1, createdAt: -1 })
+      .sort({ createdAt: -1 })
       .skip((page - 1) * PAGE_SIZE)
       .limit(PAGE_SIZE)
       .lean()
