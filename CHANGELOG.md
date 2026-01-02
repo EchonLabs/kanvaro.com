@@ -1,3 +1,10 @@
+# [1.20.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.19.4...v1.20.0) (2026-01-02)
+
+
+### Features
+
+* add changes in permission changes ([c611fe5](https://github.com/EchonLabs/kanvaro.com/commit/c611fe523006e56bb6f6640598ae5f40f571086f))
+
 ## [1.19.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.19.3...v1.19.4) (2026-01-01)
 
 

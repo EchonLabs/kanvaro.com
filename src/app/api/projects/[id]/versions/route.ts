@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db-config'
 import { Project } from '@/models'
+import { Permission, Role, ROLE_PERMISSIONS } from '@/lib/permissions/permission-definitions'
 import { authenticateUser } from '@/lib/auth-utils'
 
 export async function GET(
@@ -22,12 +23,21 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
     }
 
+    const userRole = (authResult.user.role || '').toString() as Role
+    const rolePermissions = ROLE_PERMISSIONS[userRole] || []
+    const roleHasProjectViewAll = rolePermissions.includes(Permission.PROJECT_VIEW_ALL)
+
+    const hasProjectRoleAccess = Array.isArray(project.projectRoles)
+      ? project.projectRoles.some((role: any) => role.user?.toString() === authResult.user.id)
+      : false
+
     // Check if user has access to this project
-    const hasAccess = Array.isArray(project.teamMembers)
-      ? project.teamMembers.some((m: any) => (m.memberId || m).toString() === authResult.user.id)
-      : project.teamMembers?.toString() === authResult.user.id ||
+    const hasAccess = roleHasProjectViewAll ||
+      (Array.isArray(project.teamMembers)
+        ? project.teamMembers.some((m: any) => (m.memberId || m).toString() === authResult.user.id)
+        : project.teamMembers?.toString() === authResult.user.id) ||
         project.createdBy.toString() === authResult.user.id ||
-        project.projectRoles.some((role: any) => role.user.toString() === authResult.user.id)
+        hasProjectRoleAccess
 
     if (!hasAccess) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 })
@@ -75,14 +85,22 @@ export async function POST(
     }
 
     // Check if user has permission to manage project
-    const hasPermission = Array.isArray(project.teamMembers)
+    const userRole = (authResult.user.role || '').toString() as Role
+    const rolePermissions = ROLE_PERMISSIONS[userRole] || []
+    const roleHasProjectViewAll = rolePermissions.includes(Permission.PROJECT_VIEW_ALL)
+
+    const teamMembershipCheck = Array.isArray(project.teamMembers)
       ? project.teamMembers.some((m: any) => (m.memberId || m).toString() === authResult.user.id)
-      : project.teamMembers?.toString() === authResult.user.id ||
-        project.createdBy.toString() === authResult.user.id ||
-        project.projectRoles.some((role: any) =>
-          role.user.toString() === authResult.user.id &&
-          ['project_manager', 'project_qa_lead'].includes(role.role)
-        )
+      : project.teamMembers?.toString() === authResult.user.id
+
+    const hasProjectRoleAccess = Array.isArray(project.projectRoles)
+      ? project.projectRoles.some((role: any) => role.user?.toString() === authResult.user.id)
+      : false
+
+    const hasPermission = roleHasProjectViewAll ||
+      teamMembershipCheck ||
+      project.createdBy.toString() === authResult.user.id ||
+      hasProjectRoleAccess
 
     if (!hasPermission) {
       return NextResponse.json({ success: false, error: 'Permission denied' }, { status: 403 })

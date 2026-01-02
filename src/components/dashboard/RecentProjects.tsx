@@ -16,6 +16,8 @@ interface RecentProjectsProps {
 
 const getStatusColor = (status: string) => {
   switch (status) {
+    case 'draft':
+      return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900'
     case 'active':
       return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
     case 'planning':
