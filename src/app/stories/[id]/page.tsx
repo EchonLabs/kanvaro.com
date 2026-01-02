@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, KeyboardEvent } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
@@ -374,6 +374,27 @@ export default function StoryDetailPage() {
 
   const editAllowed = story ? canEditStory(story) : false
   const deleteAllowed = story ? canDeleteStory(story) : false
+  const epicDetailHref = story?.epic?._id ? `/epics/${story.epic._id}` : null
+  const sprintDetailHref = story?.sprint?._id ? `/sprints/${story.sprint._id}` : null
+
+  const getInteractiveCardProps = (path: string | null, label: string): Record<string, unknown> => {
+    if (!path) return {}
+    return {
+      role: 'button',
+      tabIndex: 0,
+      onClick: () => router.push(path),
+      onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          router.push(path)
+        }
+      },
+      'aria-label': label
+    }
+  }
+
+  const getCardClassName = (isInteractive: boolean) =>
+    `overflow-x-hidden ${isInteractive ? 'transition-shadow hover:shadow-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2' : ''}`
 
   return (
     <MainLayout>
@@ -397,7 +418,7 @@ export default function StoryDetailPage() {
                   <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-blue-600 flex-shrink-0" />
                   <span className="break-words overflow-wrap-anywhere">{story.title}</span>
                 </h1>
-                <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
+                <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap w-full sm:w-auto sm:ml-auto justify-end">
                   <Button
                     variant="outline"
                     disabled={!editAllowed}
@@ -462,7 +483,13 @@ export default function StoryDetailPage() {
             )}
 
             {story.epic && (
-              <Card className="overflow-x-hidden">
+              <Card
+                className={getCardClassName(Boolean(epicDetailHref))}
+                {...getInteractiveCardProps(
+                  epicDetailHref,
+                  story.epic.title ? `View epic ${story.epic.title}` : 'View epic details'
+                )}
+              >
                 <CardHeader>
                   <CardTitle>Epic</CardTitle>
                   <CardDescription>Linked epic details</CardDescription>
@@ -553,7 +580,13 @@ export default function StoryDetailPage() {
             )}
 
             {story.sprint && (
-              <Card className="overflow-x-hidden">
+              <Card
+                className={getCardClassName(Boolean(sprintDetailHref))}
+                {...getInteractiveCardProps(
+                  sprintDetailHref,
+                  story.sprint.name ? `View sprint ${story.sprint.name}` : 'View sprint details'
+                )}
+              >
                 <CardHeader>
                   <CardTitle>Sprint</CardTitle>
                   <CardDescription>Linked sprint details</CardDescription>

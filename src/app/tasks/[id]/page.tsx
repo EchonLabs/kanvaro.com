@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { formatToTitleCase } from '@/lib/utils'
@@ -76,14 +76,19 @@ interface Task {
   story?: {
     _id: string
     title: string
+    status?: string
     epic?: {
       _id: string
       title: string
+      status?: string
     }
   }
   sprint?: {
     _id: string
     name: string
+    status?: string
+    startDate?: string
+    endDate?: string
   }
   parentTask?: {
     _id: string
@@ -221,6 +226,27 @@ export default function TaskDetailPage() {
   const [editorScrollTop, setEditorScrollTop] = useState(0)
   const { success: notifySuccess, error: notifyError } = useNotify()
   const { hasPermission } = usePermissions()
+
+  const handleRelatedNavigation = (path: string) => {
+    if (!path) return
+    router.push(path)
+  }
+
+  const handleRelatedKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>, path: string) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      handleRelatedNavigation(path)
+    }
+  }
+
+  const sprintDetails = task?.sprint
+  const storyDetails = task?.story
+  const epicDetails = storyDetails?.epic
+  const hasRelatedEntities = Boolean(
+    (sprintDetails && sprintDetails._id) ||
+    (storyDetails && storyDetails._id) ||
+    (epicDetails && epicDetails._id)
+  )
 
   const checkAuth = useCallback(async () => {
     try {
@@ -1211,6 +1237,103 @@ export default function TaskDetailPage() {
               </CardContent>
             </Card>
 
+            {hasRelatedEntities && (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {sprintDetails?._id && (
+                  <Card
+                    role="button"
+                    tabIndex={0}
+                    className="cursor-pointer transition-shadow hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                    onClick={() => handleRelatedNavigation(`/sprints/${sprintDetails._id}`)}
+                    onKeyDown={(event) => handleRelatedKeyDown(event, `/sprints/${sprintDetails._id}`)}
+                    aria-label={sprintDetails.name ? `View sprint ${sprintDetails.name}` : 'View sprint details'}
+                  >
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Target className="h-4 w-4" />
+                        <span>Sprint</span>
+                      </CardTitle>
+                      <CardDescription>{sprintDetails.name || 'View sprint details'}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                      {sprintDetails.status && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Status</span>
+                          <Badge variant="outline">{formatToTitleCase(sprintDetails.status)}</Badge>
+                        </div>
+                      )}
+                      {(sprintDetails.startDate || sprintDetails.endDate) && (
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          <span>Schedule</span>
+                          <div className="font-medium text-foreground">
+                            {sprintDetails.startDate ? formatDate(sprintDetails.startDate) : 'TBD'}
+                            {' '}
+                            &ndash;
+                            {' '}
+                            {sprintDetails.endDate ? formatDate(sprintDetails.endDate) : 'TBD'}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {storyDetails?._id && (
+                  <Card
+                    role="button"
+                    tabIndex={0}
+                    className="cursor-pointer transition-shadow hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                    onClick={() => handleRelatedNavigation(`/stories/${storyDetails._id}`)}
+                    onKeyDown={(event) => handleRelatedKeyDown(event, `/stories/${storyDetails._id}`)}
+                    aria-label={storyDetails.title ? `View story ${storyDetails.title}` : 'View user story'}
+                  >
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Layers className="h-4 w-4" />
+                        <span>User Story</span>
+                      </CardTitle>
+                      <CardDescription>{storyDetails.title || 'View story details'}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Status</span>
+                      {storyDetails.status ? (
+                        <Badge variant="outline">{formatToTitleCase(storyDetails.status)}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {epicDetails?._id && (
+                  <Card
+                    role="button"
+                    tabIndex={0}
+                    className="cursor-pointer transition-shadow hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                    onClick={() => handleRelatedNavigation(`/epics/${epicDetails._id}`)}
+                    onKeyDown={(event) => handleRelatedKeyDown(event, `/epics/${epicDetails._id}`)}
+                    aria-label={epicDetails.title ? `View epic ${epicDetails.title}` : 'View epic details'}
+                  >
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Star className="h-4 w-4" />
+                        <span>Epic</span>
+                      </CardTitle>
+                      <CardDescription>{epicDetails.title || 'View epic details'}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Status</span>
+                      {epicDetails.status ? (
+                        <Badge variant="outline">{formatToTitleCase(epicDetails.status)}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+
             <Card>
               <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle className="flex items-center gap-2">
@@ -1549,7 +1672,7 @@ export default function TaskDetailPage() {
                 </CardContent>
               </Card>
             )}
-
+{/* 
             {task.story && (
               <Card>
                 <CardHeader>
@@ -1562,7 +1685,7 @@ export default function TaskDetailPage() {
                   </div>
                 </CardContent>
               </Card>
-            )}
+            )} */}
 
             {task.subtasks && task.subtasks.length > 0 && (
               <Card>
