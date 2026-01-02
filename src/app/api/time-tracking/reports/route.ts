@@ -66,10 +66,12 @@ export async function GET(request: NextRequest) {
     const end = endDate ? new Date(endDate) : new Date()
 
     // Build base query - Reports should show approved time entries or entries from projects that don't require approval
+    // Excluding rejected entries
     const baseQuery: any = {
       organization: organizationId,
       startTime: { $gte: start, $lte: end },
       status: 'completed',
+      isReject: { $ne: true }, // Exclude rejected entries
       $or: [
         { isApproved: true }, // Explicitly approved entries
         // Entries from projects that don't require approval (auto-approved)

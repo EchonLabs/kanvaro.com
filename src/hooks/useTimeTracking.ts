@@ -57,6 +57,7 @@ interface TimeEntry {
   tags: string[]
   notes?: string
   isApproved: boolean
+  isReject: boolean
   project: { _id: string; name: string }
   task?: { _id: string; title: string }
 }
