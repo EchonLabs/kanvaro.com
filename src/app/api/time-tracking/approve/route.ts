@@ -54,8 +54,10 @@ export async function POST(request: NextRequest) {
 
     if (action === 'approve') {
       updateData.isApproved = true
-    } else {
+      updateData.isReject = false
+    } else if (action === 'reject') {
       updateData.isApproved = false
+      updateData.isReject = true
     }
 
     const result = await TimeEntry.updateMany(
