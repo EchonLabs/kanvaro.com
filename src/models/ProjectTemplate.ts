@@ -11,7 +11,7 @@ export interface IProjectTemplate extends Document {
   template: {
     name: string
     description: string
-    status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled'
+    status: 'draft' | 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled'
     startDate: Date
     endDate?: Date
     budget?: {
@@ -118,11 +118,11 @@ const ProjectTemplateSchema = new Schema<IProjectTemplate>({
   template: {
     name: { type: String, required: true },
     description: String,
-    status: {
-      type: String,
-      enum: ['planning', 'active', 'on_hold', 'completed', 'cancelled'],
-      default: 'planning'
-    },
+      status: {
+        type: String,
+        enum: ['draft', 'planning', 'active', 'on_hold', 'completed', 'cancelled'],
+        default: 'planning'
+      },
     startDate: { type: Date, required: true },
     endDate: Date,
     budget: {

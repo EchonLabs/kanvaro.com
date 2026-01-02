@@ -285,7 +285,7 @@ export async function POST(request: NextRequest) {
       const project = new Project({
         name: name || 'Untitled Project',
         description,
-        status: status || 'planning',
+        status: status || 'planning' || 'draft',
         isDraft: isDraft || false,
         isBillableByDefault: isBillableByDefault !== undefined ? Boolean(isBillableByDefault) : true,
         is_deleted: false, // Ensure new projects are not deleted
@@ -334,10 +334,7 @@ export async function POST(request: NextRequest) {
       project.externalLinks = processedExternalLinks
       
       // Debug: Log what we're about to save
-      console.log('Received externalLinks:', JSON.stringify(externalLinks, null, 2))
-      console.log('Processed externalLinks:', JSON.stringify(processedExternalLinks, null, 2))
-      console.log('Project externalLinks before save:', JSON.stringify(project.externalLinks, null, 2))
-
+   
       // Explicitly mark externalLinks as modified to ensure it's saved
       project.markModified('externalLinks')
       project.markModified('externalLinks.figma')

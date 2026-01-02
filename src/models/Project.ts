@@ -3,7 +3,7 @@ import mongoose, { Schema, Document } from 'mongoose'
 export interface IProject extends Document {
   name: string
   description: string
-  status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled'
+  status: 'draft' | 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   isDraft: boolean
   isBillableByDefault: boolean
@@ -92,7 +92,7 @@ const ProjectSchema = new Schema<IProject>({
   description: String,
   status: { 
     type: String, 
-    enum: ['planning', 'active', 'on_hold', 'completed', 'cancelled'],
+    enum: ['draft', 'planning', 'active', 'on_hold', 'completed', 'cancelled'],
     default: 'planning'
   },
   priority: {

@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/db-config'
 import { TestCase, TestSuite, Project } from '@/models'
 // import { getServerSession } from 'next-auth'
 import { authenticateUser } from '@/lib/auth-utils'
+import { Permission, Role, ROLE_PERMISSIONS } from '@/lib/permissions/permission-definitions'
 
 export async function GET(req: NextRequest) {
   try {
@@ -113,10 +114,7 @@ export async function POST(req: NextRequest) {
     } = await req.json()
 
     const suiteId = testSuiteId || testSuite
-console.log("title",title);
-console.log("description",description);
-console.log("projectId",projectId);
-console.log("suiteId",suiteId);
+
 
     if (!title || !description || !projectId || !suiteId) {
       return NextResponse.json(
@@ -133,15 +131,14 @@ console.log("suiteId",suiteId);
 
     const userIdStr = authResult.user.id?.toString?.() || String(authResult.user.id)
     const createdByStr = project?.createdBy?.toString?.()
+    const userRole = (authResult.user.role || '').toString() as Role
+    const rolePermissions = ROLE_PERMISSIONS[userRole] || []
+    const roleHasTestCasePermission = rolePermissions.includes(Permission.TEST_CASE_CREATE) ||
+      rolePermissions.includes(Permission.TEST_CASE_UPDATE)
     const teamHasUser = Array.isArray(project?.teamMembers)
       ? project.teamMembers.some((m: any) => m?.toString?.() === userIdStr)
       : false
-    const roleHasUser = Array.isArray(project?.projectRoles)
-      ? project.projectRoles.some(
-          (role: any) => role?.user?.toString?.() === userIdStr && ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)
-        )
-      : false
-    const hasAccess = !!project && (createdByStr === userIdStr || teamHasUser || roleHasUser)
+    const hasAccess = !!project && (createdByStr === userIdStr || teamHasUser || roleHasTestCasePermission)
 
     if (!hasAccess) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 })

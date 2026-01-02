@@ -4,7 +4,7 @@ import { Project } from '@/models/Project'
 import { Task } from '@/models/Task'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
-import { Permission } from '@/lib/permissions/permission-definitions'
+import { Permission, Role, ROLE_PERMISSIONS } from '@/lib/permissions/permission-definitions'
 import { Types } from 'mongoose'
 
 export async function GET(
@@ -43,14 +43,19 @@ export async function GET(
         { status: 404 }
       )
     }
-
     // Check if user can access this project
-    const hasAccess = project.teamMembers.some((member: any) => member.memberId?._id?.toString() === userId.toString()) ||
+    const userRole = (user.role || '').toString() as Role
+    const rolePermissions = ROLE_PERMISSIONS[userRole] || []
+    const roleHasProjectViewAll = rolePermissions.includes(Permission.PROJECT_VIEW_ALL)
+
+    const hasProjectRoleAccess = Array.isArray(project.projectRoles) && project.projectRoles.some((role: any) =>
+      role.user?.toString() === userId.toString()
+    )
+
+    const hasAccess = roleHasProjectViewAll ||
+                     project.teamMembers.some((member: any) => member.memberId?._id?.toString() === userId.toString()) ||
                      project.createdBy._id.toString() === userId.toString() ||
-                     project.projectRoles.some((role: any) =>
-                       role.user?.toString() === userId.toString() &&
-                       ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)
-                     )
+                     hasProjectRoleAccess
 
     if (!hasAccess) {
       return NextResponse.json(
