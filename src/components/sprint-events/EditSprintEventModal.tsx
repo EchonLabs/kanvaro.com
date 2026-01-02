@@ -10,11 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogBody } from '@/components/ui/Dialog'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
-import { CalendarIcon, Loader2, CheckCircle, AlertCircle, X, UserPlus } from 'lucide-react'
+import { CalendarIcon, Loader2, X, UserPlus } from 'lucide-react'
 import { format } from 'date-fns'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/Badge'
 import { Checkbox } from '@/components/ui/Checkbox'
+import { useNotify } from '@/lib/notify'
 
 interface SprintEvent {
   _id: string
@@ -31,9 +31,11 @@ interface SprintEvent {
     email: string
   }
   attendees: Array<{
+    _id?: string
     firstName: string
     lastName: string
     email: string
+    isActive?: boolean
   }>
   outcomes?: {
     decisions: string[]
@@ -65,6 +67,7 @@ interface User {
   firstName: string
   lastName: string
   email: string
+  isActive?: boolean
 }
 
 interface EditSprintEventModalProps {
@@ -76,8 +79,6 @@ interface EditSprintEventModalProps {
 export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEventModalProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState('')
-  const [error, setError] = useState('')
   const [users, setUsers] = useState<User[]>([])
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [showAddAttendees, setShowAddAttendees] = useState(false)
@@ -86,6 +87,11 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
   const [actualDate, setActualDate] = useState<Date | undefined>(
     event.actualDate ? new Date(event.actualDate) : undefined
   )
+  const { success: notifySuccess, error: notifyError } = useNotify()
+  const attendeeIds = event.attendees
+    .map(a => (a as any)._id)
+    .filter((id): id is string => Boolean(id))
+ 
   
   // Store initial state to compare changes
   const initialFormData = {
@@ -93,7 +99,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
     description: event.description || '',
     duration: event.duration,
     status: event.status,
-    attendees: event.attendees.map(a => (a as any)._id).sort(),
+    attendees: [...attendeeIds].sort(),
     location: event.location || '',
     meetingLink: event.meetingLink || '',
     outcomes: event.outcomes || {
@@ -112,7 +118,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
     description: event.description || '',
     duration: event.duration,
     status: event.status,
-    attendees: event.attendees.map(a => (a as any)._id),
+    attendees: attendeeIds,
     location: event.location || '',
     meetingLink: event.meetingLink || '',
     outcomes: event.outcomes || {
@@ -123,6 +129,42 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
       capacity: undefined
     }
   })
+
+  const normalizeMembers = (members: any[]): User[] => {
+    if (!Array.isArray(members)) return []
+    return members
+      .filter((member: any) => member && member._id)
+      .map((member: any) => ({
+        _id: member._id,
+        firstName: member.firstName || '',
+        lastName: member.lastName || '',
+        email: member.email || '',
+        isActive: member.isActive !== false
+      }))
+  }
+
+  const includeExistingAttendees = (members: User[]): User[] => {
+    const memberMap = new Map<string, User>()
+    members.forEach(member => {
+      if (member?._id) {
+        memberMap.set(member._id, member)
+      }
+    })
+
+    formData.attendees.forEach(attendeeId => {
+      if (!attendeeId || memberMap.has(attendeeId)) return
+      const fallbackAttendee = event.attendees.find(att => att._id === attendeeId)
+      memberMap.set(attendeeId, {
+        _id: attendeeId,
+        firstName: fallbackAttendee?.firstName || 'Unknown',
+        lastName: fallbackAttendee?.lastName || '',
+        email: fallbackAttendee?.email || '',
+        isActive: false
+      })
+    })
+
+    return Array.from(memberMap.values())
+  }
 
   useEffect(() => {
     fetchUsers()
@@ -145,18 +187,50 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
         } else if (Array.isArray(data)) {
           members = data
         }
-        setUsers(Array.isArray(members) ? members : [])
+        const normalizedMembers = normalizeMembers(members)
+        const activeMembers = normalizedMembers.filter(member => member.isActive !== false)
+
+        console.log('All Loaded Users:', normalizedMembers.map(u => ({
+          _id: u._id,
+          name: `${u.firstName} ${u.lastName}`,
+          email: u.email,
+          isActive: u.isActive
+        })))
+        console.log('Active Members Only:', activeMembers.map(u => ({
+          _id: u._id,
+          name: `${u.firstName} ${u.lastName}`,
+          email: u.email,
+          isActive: u.isActive
+        })))
+
+        setUsers(includeExistingAttendees(activeMembers))
       } else {
         // Fallback to /api/users
         const fallbackResponse = await fetch('/api/users')
         if (fallbackResponse.ok) {
           const usersData = await fallbackResponse.json()
-          setUsers(Array.isArray(usersData) ? usersData : [])
+          const normalizedFallback = normalizeMembers(Array.isArray(usersData) ? usersData : [])
+          const activeFallback = normalizedFallback.filter(member => member.isActive !== false)
+
+          console.log('Fallback - All Loaded Users:', normalizedFallback.map(u => ({
+            _id: u._id,
+            name: `${u.firstName} ${u.lastName}`,
+            email: u.email,
+            isActive: u.isActive
+          })))
+          console.log('Fallback - Active Members Only:', activeFallback.map(u => ({
+            _id: u._id,
+            name: `${u.firstName} ${u.lastName}`,
+            email: u.email,
+            isActive: u.isActive
+          })))
+
+          setUsers(includeExistingAttendees(activeFallback))
         }
       }
     } catch (error) {
       console.error('Error fetching users:', error)
-      setUsers([])
+      setUsers(includeExistingAttendees([]))
     } finally {
       setLoadingUsers(false)
     }
@@ -191,28 +265,33 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
       })
 
       if (response.ok) {
-        setSuccess('Sprint Event updated successfully')
-        setError('')
+        notifySuccess({
+          title: 'Sprint Event Updated',
+          message: 'Sprint Event updated successfully'
+        })
         setLoading(false)
         onSuccess()
-        // Show success message briefly before closing and redirecting
+        // Close modal and redirect after showing success notification
         setTimeout(() => {
-          setSuccess('')
           onClose()
           router.push('/sprint-events?success=updated')
-        }, 3000)
+        }, 1000)
       } else {
         const errorData = await response.json()
         const errorMessage = errorData.error || 'Failed to update event'
         console.error('Error updating sprint event:', errorData)
-        setError(errorMessage)
-        setSuccess('')
+        notifyError({
+          title: 'Failed to Update Sprint Event',
+          message: errorMessage
+        })
         setLoading(false)
       }
     } catch (err) {
       console.error('Error updating sprint event:', err)
-      setError('Failed to update event. Please try again.')
-      setSuccess('')
+      notifyError({
+        title: 'Failed to Update Sprint Event',
+        message: 'Failed to update event. Please try again.'
+      })
       setLoading(false)
     }
   }
@@ -251,19 +330,26 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
   }
 
   const getSelectedAttendees = () => {
-    return users.filter(user => formData.attendees.includes(user._id))
+    const selected = users.filter(user => formData.attendees.includes(user._id))
+  
+    return selected
   }
 
   const getAvailableAttendees = () => {
     const query = attendeeSearchQuery.toLowerCase()
-    return users.filter(user => {
+    const available = users.filter(user => {
       const isNotSelected = !formData.attendees.includes(user._id)
-      const matchesSearch = !query || 
+      const matchesSearch = !query ||
         user.firstName.toLowerCase().includes(query) ||
         user.lastName.toLowerCase().includes(query) ||
         user.email.toLowerCase().includes(query)
-      return isNotSelected && matchesSearch
+      const isActive = user.isActive !== false
+      return isActive && isNotSelected && matchesSearch
     })
+
+  
+
+    return available
   }
 
   const addDecision = () => {
@@ -423,31 +509,6 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
 
         <DialogBody className="flex-1 overflow-y-auto px-4 sm:px-6">
           <form onSubmit={handleSubmit} className="space-y-4" id="edit-sprint-event-form">
-            {success && (
-              <Alert variant="success" className="flex items-center justify-between pr-2">
-                <AlertDescription className="flex-1 flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4" />
-                  {success}
-                </AlertDescription>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40"
-                  onClick={() => {
-                    setSuccess('')
-                    onClose()
-                  }}
-                >
-                  <X className="h-4 w-4 text-green-700 dark:text-green-300" />
-                </Button>
-              </Alert>
-            )}
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="title">Event Title *</Label>
@@ -619,7 +680,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
                     getAvailableAttendees().map((user) => (
                       <label key={user._id} className="flex items-center space-x-2 p-2 hover:bg-muted rounded cursor-pointer">
                         <Checkbox
-                          checked={false}
+                          checked={formData.attendees.includes(user._id)}
                           onCheckedChange={() => handleAttendeeToggle(user._id)}
                         />
                         <span className="text-sm flex-1">

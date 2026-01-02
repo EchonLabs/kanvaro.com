@@ -64,7 +64,7 @@ The Kanvaro permission system provides comprehensive role-based access control (
 - **Stories**: `STORY_CREATE`, `STORY_READ`, `STORY_UPDATE`, `STORY_DELETE`
 - **Calendar**: `CALENDAR_READ`, `CALENDAR_CREATE`, `CALENDAR_UPDATE`, `CALENDAR_DELETE`
 - **Kanban**: `KANBAN_READ`, `KANBAN_MANAGE`
-- **Backlog**: `BACKLOG_READ`, `BACKLOG_MANAGE`
+- **backlog**: `BACKLOG_READ`, `BACKLOG_MANAGE`
 
 ### Own Permissions
 - **User Profile**: `USER_READ`, `USER_UPDATE`

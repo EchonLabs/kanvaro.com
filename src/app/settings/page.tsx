@@ -8,11 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { OrganizationSettings } from '@/components/settings/OrganizationSettings'
 import { EmailSettings } from '@/components/settings/EmailSettings'
 import { DatabaseSettings } from '@/components/settings/DatabaseSettings'
-import { 
-  Building2, 
-  Mail, 
+import { DocumentationSettings } from '@/components/settings/DocumentationSettings'
+import {
+  Building2,
+  Mail,
   Database,
   Settings as SettingsIcon,
+  BookOpen,
   Loader2
 } from 'lucide-react'
 import { usePermissions } from '@/lib/permissions/permission-context'
@@ -28,17 +30,13 @@ export default function SettingsPage() {
 
   const checkAuth = useCallback(async () => {
     try {
-      console.log('Settings: Checking authentication...')
       const response = await fetch('/api/auth/me')
-      console.log('Settings: Auth response status:', response.status)
       
       if (response.ok) {
         const userData = await response.json()
-        console.log('Settings: User data received:', userData)
         setUser(userData)
         setAuthError('')
       } else if (response.status === 401) {
-        console.log('Settings: 401 response, trying refresh token')
         // Try to refresh token
         const refreshResponse = await fetch('/api/auth/refresh', {
           method: 'POST'
@@ -116,6 +114,7 @@ export default function SettingsPage() {
   }
 
   const canViewSettings = hasPermission(Permission.SETTINGS_READ)
+  const canManageDocumentation = hasPermission(Permission.DOCUMENTATION_MANAGE_PERMISSIONS)
 
   if (!permissionsLoading && !canViewSettings) {
     return (
@@ -134,7 +133,7 @@ export default function SettingsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 sm:space-y-8 px-4 sm:px-6">
+      <div className="space-y-8 px-4 sm:px-6">
         {/* Settings Header */}
         <div className="border-b border-border pb-4 sm:pb-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
@@ -153,9 +152,9 @@ export default function SettingsPage() {
         </div>
 
         {/* Settings Content */}
-        <div className="space-y-4 sm:space-y-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-            <TabsList className="grid w-full grid-cols-3 gap-1 overflow-x-auto">
+        <div className="space-y-6 sm:space-y-8">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 sm:space-y-8">
+            <TabsList className={`grid w-full gap-1 overflow-x-auto mb-4 ${canManageDocumentation ? 'grid-cols-4' : 'grid-cols-3'}`}>
               <TabsTrigger value="organization" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
                 <Building2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                 <span className="truncate">Organization</span>
@@ -168,6 +167,12 @@ export default function SettingsPage() {
                 <Database className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                 <span className="truncate">Database</span>
               </TabsTrigger>
+              {canManageDocumentation && (
+                <TabsTrigger value="documentation" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">Documentation</span>
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="organization" className="space-y-4 sm:space-y-6">
@@ -181,6 +186,12 @@ export default function SettingsPage() {
             <TabsContent value="database" className="space-y-4 sm:space-y-6">
               <DatabaseSettings />
             </TabsContent>
+
+            {canManageDocumentation && (
+              <TabsContent value="documentation" className="space-y-4 sm:space-y-6">
+                <DocumentationSettings />
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </div>

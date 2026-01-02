@@ -4,12 +4,15 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { useNotify } from '@/lib/notify'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Progress } from '@/components/ui/Progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -17,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import {
   ArrowLeft,
+  ArrowRight,
   Calendar,
   Users,
   DollarSign,
@@ -38,6 +42,7 @@ import {
   Zap,
   Download,
   Edit,
+  MoreVertical,
   UserPlus,
   Save,
   Trash2,
@@ -53,6 +58,7 @@ import EditTaskModal from '@/components/tasks/EditTaskModal'
 import { AddExpenseDialog } from '@/components/projects/AddExpenseDialog'
 import ViewTaskModal from '@/components/tasks/ViewTaskModal'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import TaskList from '@/components/tasks/TaskList'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
 import CalendarView from '@/components/tasks/CalendarView'
@@ -75,6 +81,7 @@ interface Project {
   isDraft: boolean
   startDate: string
   endDate?: string
+  isBillableByDefault: boolean
   projectNumber?: number
   budget?: {
     total: number
@@ -93,9 +100,18 @@ interface Project {
     email: string
   }
   teamMembers: Array<{
-    firstName: string
-    lastName: string
-    email: string
+    _id?: string
+    memberId?: {
+      firstName: string
+      lastName: string
+      email: string
+      role?: string
+    }
+    firstName?: string
+    lastName?: string
+    email?: string
+    role?: string
+    hourlyRate?: number
   }>
   client?: {
     firstName: string
@@ -164,6 +180,7 @@ export default function ProjectDetailPage() {
   const { organization } = useOrganization()
   const orgCurrency = organization?.currency || 'USD'
   const { formatCurrency } = useOrgCurrency()
+  const { formatDate } = useDateTime()
 
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
@@ -179,6 +196,9 @@ export default function ProjectDetailPage() {
   const [showAddExpenseDialog, setShowAddExpenseDialog] = useState(false)
   const [expensesLoading, setExpensesLoading] = useState(false)
   const [editingSuite, setEditingSuite] = useState<any | null>(null)
+  const [editingExpense, setEditingExpense] = useState<any | null>(null)
+  const [showDeleteExpenseConfirmModal, setShowDeleteExpenseConfirmModal] = useState(false)
+  const [expenseToDelete, setExpenseToDelete] = useState<any | null>(null)
   const [parentSuiteIdForCreate, setParentSuiteIdForCreate] = useState<string | undefined>(undefined)
   const [suitesRefreshCounter, setSuitesRefreshCounter] = useState(0)
   const [testCaseDialogOpen, setTestCaseDialogOpen] = useState(false)
@@ -190,6 +210,7 @@ export default function ProjectDetailPage() {
     allowTimeTracking: false,
     allowManualTimeSubmission: false,
     allowExpenseTracking: false,
+    allowBillableTime: false,
     requireApproval: false,
     notifications: {
       taskUpdates: false,
@@ -205,16 +226,42 @@ export default function ProjectDetailPage() {
   } | null>(null)
   const [statusForm, setStatusForm] = useState<Project['status']>('planning')
   const [priorityForm, setPriorityForm] = useState<Project['priority']>('medium')
-  const [settingsSuccess, setSettingsSuccess] = useState('')
-  const [settingsError, setSettingsError] = useState('')
   const [savingSettings, setSavingSettings] = useState(false)
   const settingsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [expenseSuccess, setExpenseSuccess] = useState('')
-  const expenseSuccessTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Attachments pagination
+  const [attachmentsPage, setAttachmentsPage] = useState(1)
+  const attachmentsPerPage = 10
+
+  // Links pagination
+  const [figmaLinksPage, setFigmaLinksPage] = useState(1)
+  const [docLinksPage, setDocLinksPage] = useState(1)
+  const linkPaginationSize = 5
+
+  // Use the notification hook
+  const { success: notifySuccess, error: notifyError } = useNotify()
+
   const totalExpenses = useMemo(
     () => expenses.reduce((sum, exp) => sum + (exp.fullAmount || 0), 0),
     [expenses]
   )
+
+  // Links pagination computed values
+  const figmaLinks = useMemo(() => project?.externalLinks?.figma || [], [project?.externalLinks?.figma])
+  const documentationLinks = useMemo(() => project?.externalLinks?.documentation || [], [project?.externalLinks?.documentation])
+
+  const figmaTotalPages = Math.max(1, Math.ceil(figmaLinks.length / linkPaginationSize))
+  const documentationTotalPages = Math.max(1, Math.ceil(documentationLinks.length / linkPaginationSize))
+  const currentFigmaPage = Math.min(Math.max(figmaLinksPage, 1), figmaTotalPages)
+  const currentDocumentationPage = Math.min(Math.max(docLinksPage, 1), documentationTotalPages)
+  const figmaSliceStart = (currentFigmaPage - 1) * linkPaginationSize
+  const docSliceStart = (currentDocumentationPage - 1) * linkPaginationSize
+  const paginatedFigmaLinks = figmaLinks.slice(figmaSliceStart, figmaSliceStart + linkPaginationSize)
+  const paginatedDocumentationLinks = documentationLinks.slice(docSliceStart, docSliceStart + linkPaginationSize)
+  const figmaShowingStart = figmaLinks.length ? figmaSliceStart + 1 : 0
+  const figmaShowingEnd = figmaLinks.length ? Math.min(figmaSliceStart + linkPaginationSize, figmaLinks.length) : 0
+  const documentationShowingStart = documentationLinks.length ? docSliceStart + 1 : 0
+  const documentationShowingEnd = documentationLinks.length ? Math.min(docSliceStart + linkPaginationSize, documentationLinks.length) : 0
 
   useEffect(() => {
     if (projectId) {
@@ -242,6 +289,46 @@ export default function ProjectDetailPage() {
     }
   }
 
+  const handleExpenseAdded = () => {
+    fetchExpenses()
+    setShowAddExpenseDialog(false)
+  }
+
+  const handleExpenseUpdated = () => {
+    fetchExpenses()
+    setEditingExpense(null)
+  }
+
+  const handleExpenseDeleted = async (expenseId: string, expenseName: string) => {
+    console.log('Delete triggered for expense:', expenseName)
+    setExpenseToDelete({ id: expenseId, name: expenseName })
+    setShowDeleteExpenseConfirmModal(true)
+  }
+
+  const confirmDeleteExpense = async () => {
+    if (!expenseToDelete) return
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/expenses?expenseId=${expenseToDelete.id}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        notifySuccess({ title: 'Expense Deleted', message: 'Expense has been deleted successfully' })
+        fetchExpenses()
+      } else {
+        const errorData = await response.json()
+        notifyError({ title: 'Delete Failed', message: errorData.error || 'Failed to delete expense' })
+      }
+    } catch (error) {
+      console.error('Error deleting expense:', error)
+      notifyError({ title: 'Delete Failed', message: 'Failed to delete expense. Please try again.' })
+    } finally {
+      setShowDeleteExpenseConfirmModal(false)
+      setExpenseToDelete(null)
+    }
+  }
+
   useEffect(() => {
     if (project && project.settings?.allowExpenseTracking) {
       fetchExpenses()
@@ -256,12 +343,14 @@ export default function ProjectDetailPage() {
       // Respect global settings - if global is OFF, project must be OFF too
       const allowTimeTracking = (project.settings?.allowTimeTracking ?? false) && (globalTimeTrackingSettings?.allowTimeTracking ?? true)
       const allowManualTimeSubmission = (project.settings?.allowManualTimeSubmission ?? false) && (globalTimeTrackingSettings?.allowManualTimeSubmission ?? true)
+      const allowBillableTime = (project.isBillableByDefault ?? false) && (globalTimeTrackingSettings?.allowBillableTime ?? true)
       const requireApproval = (project.settings?.requireApproval ?? false) && (globalTimeTrackingSettings?.requireApproval ?? true)
 
       setSettingsForm({
         allowTimeTracking,
         allowManualTimeSubmission,
         allowExpenseTracking: project.settings?.allowExpenseTracking ?? false,
+        allowBillableTime,
         requireApproval,
         notifications: {
           taskUpdates: project.settings?.notifications?.taskUpdates ?? false,
@@ -277,39 +366,20 @@ export default function ProjectDetailPage() {
       if (settingsTimeoutRef.current) {
         clearTimeout(settingsTimeoutRef.current)
       }
-      if (expenseSuccessTimeoutRef.current) {
-        clearTimeout(expenseSuccessTimeoutRef.current)
-      }
     }
   }, [])
 
   const showSettingsSuccess = (message: string) => {
-    setSettingsSuccess(message)
-    if (settingsTimeoutRef.current) {
-      clearTimeout(settingsTimeoutRef.current)
-    }
-    settingsTimeoutRef.current = setTimeout(() => {
-      setSettingsSuccess('')
-      settingsTimeoutRef.current = null
-    }, 3000)
+    notifySuccess({ title: 'Settings Updated', message })
   }
 
   const showExpenseSuccess = (message: string) => {
-    setExpenseSuccess(message)
-    if (expenseSuccessTimeoutRef.current) {
-      clearTimeout(expenseSuccessTimeoutRef.current)
-    }
-    expenseSuccessTimeoutRef.current = setTimeout(() => {
-      setExpenseSuccess('')
-      expenseSuccessTimeoutRef.current = null
-    }, 3000)
+    notifySuccess({ title: 'Expense Updated', message })
   }
 
   const handleSaveSettings = async () => {
     if (!projectId) return
     setSavingSettings(true)
-    setSettingsError('')
-    setSettingsSuccess('')
 
     try {
       // Ensure project settings respect global settings
@@ -328,6 +398,7 @@ export default function ProjectDetailPage() {
         },
         body: JSON.stringify({
           settings: finalSettings,
+          isBillableByDefault: settingsForm.allowBillableTime,
           status: statusForm,
           priority: priorityForm,
         }),
@@ -339,11 +410,11 @@ export default function ProjectDetailPage() {
         setProject(data.data)
         showSettingsSuccess('Project settings updated successfully.')
       } else {
-        setSettingsError(data.error || 'Failed to update project settings')
+        notifyError({ title: 'Failed to Update Settings', message: data.error || 'Failed to update project settings' })
       }
     } catch (error) {
       console.error('Failed to update project settings:', error)
-      setSettingsError('Failed to update project settings')
+      notifyError({ title: 'Failed to Update Settings', message: 'Failed to update project settings' })
     } finally {
       setSavingSettings(false)
     }
@@ -428,6 +499,7 @@ export default function ProjectDetailPage() {
     settingsForm.allowTimeTracking !== (project.settings?.allowTimeTracking ?? false) ||
     settingsForm.allowManualTimeSubmission !== (project.settings?.allowManualTimeSubmission ?? false) ||
     settingsForm.allowExpenseTracking !== (project.settings?.allowExpenseTracking ?? false) ||
+    settingsForm.allowBillableTime !== (project.isBillableByDefault ?? false) ||
     settingsForm.requireApproval !== (project.settings?.requireApproval ?? false)
   ) : false
 
@@ -484,8 +556,9 @@ export default function ProjectDetailPage() {
   }
 
   return (
-    <MainLayout>
-      <div className="space-y-6">
+    <TooltipProvider>
+      <MainLayout>
+      <div className="space-y-8 mt-4">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-1 min-w-0">
@@ -496,7 +569,7 @@ export default function ProjectDetailPage() {
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
                 <h1
-                  className="text-2xl sm:text-3xl font-bold text-foreground truncate max-w-full"
+                  className="text-2xl sm:text-3xl font-bold text-foreground line-clamp-2 max-w-full"
                   title={project.name}
                 >
                   {project.name}
@@ -515,20 +588,11 @@ export default function ProjectDetailPage() {
                 </Badge>
               </div>
               <p className="text-sm sm:text-base text-muted-foreground mt-1 break-words whitespace-normal" title={project.description || 'No description'}>
-                <span className="sm:hidden">
-                  {project.description && project.description.length > 25
-                    ? `${project.description.substring(0, 25)}...`
-                    : (project.description || 'No description')}
-                </span>
-                <span className="hidden sm:inline">
-                  {project.description && project.description.length > 100
-                    ? `${project.description.substring(0, 100)}...`
-                    : (project.description || 'No description')}
-                </span>
+                {project.description || 'No description'}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto sm:mt-4 lg:mt-6">
             <Button
               variant="outline"
               size="sm"
@@ -546,7 +610,7 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* Project Stats */}
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mt-8">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center space-x-2">
@@ -623,8 +687,8 @@ export default function ProjectDetailPage() {
           const newSearchParams = new URLSearchParams(searchParams.toString())
           newSearchParams.set('tab', value)
           router.push(`/projects/${projectId}?${newSearchParams.toString()}`)
-        }} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-11 gap-1 overflow-x-auto">
+        }} className="space-y-8">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-11 gap-1 overflow-x-auto mt-2">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
             <TabsTrigger value="team" className="text-xs sm:text-sm">Team</TabsTrigger>
             <TabsTrigger value="attachments" className="text-xs sm:text-sm">Attachments</TabsTrigger>
@@ -632,17 +696,17 @@ export default function ProjectDetailPage() {
             <TabsTrigger value="tasks" className="text-xs sm:text-sm">Tasks</TabsTrigger>
             <TabsTrigger value="kanban" className="text-xs sm:text-sm">Kanban</TabsTrigger>
             <TabsTrigger value="calendar" className="text-xs sm:text-sm">Calendar</TabsTrigger>
-            <TabsTrigger value="backlog" className="text-xs sm:text-sm">Backlog</TabsTrigger>
+            <TabsTrigger value="backlog" className="text-xs sm:text-sm">backlog</TabsTrigger>
             <TabsTrigger value="testing" className="text-xs sm:text-sm">Testing</TabsTrigger>
             <TabsTrigger value="reports" className="text-xs sm:text-sm">Reports</TabsTrigger>
             <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2 space-y-6">
+          <TabsContent value="overview" className="space-y-8">
+            <div className="grid gap-8 lg:grid-cols-3">
+              <div className="lg:col-span-2 space-y-8">
                 {/* Project Details */}
-                <Card>
+                <Card className="mt-2">
                   <CardHeader>
                     <CardTitle>Project Details</CardTitle>
                   </CardHeader>
@@ -652,13 +716,13 @@ export default function ProjectDetailPage() {
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-muted-foreground">Start Date</span>
                           <span className="text-sm text-foreground">
-                            {new Date(project.startDate).toLocaleDateString()}
+                            {formatDate(project.startDate)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-muted-foreground">End Date</span>
                           <span className="text-sm text-foreground">
-                            {project.endDate ? new Date(project.endDate).toLocaleDateString() : 'Not set'}
+                            {project.endDate ? formatDate(project.endDate) : 'Not set'}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
@@ -682,7 +746,7 @@ export default function ProjectDetailPage() {
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-muted-foreground">Created</span>
                           <span className="text-sm text-foreground">
-                            {new Date(project.createdAt).toLocaleDateString()}
+                            {formatDate(project.createdAt)}
                           </span>
                         </div>
                       </div>
@@ -692,7 +756,7 @@ export default function ProjectDetailPage() {
 
                 {/* Budget Breakdown */}
                 {project.budget && (
-                  <Card className="mt-6">
+                  <Card>
                     <CardHeader>
                       <CardTitle>Budget Breakdown</CardTitle>
                     </CardHeader>
@@ -768,31 +832,40 @@ export default function ProjectDetailPage() {
                 )}
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-8 mt-8 lg:mt-0 pt-2">
                 {/* Team Members */}
-                <Card className="mt-6">
+                <Card>
                   <CardHeader>
                     <CardTitle>Team Members</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {project.teamMembers.map((member, index) => (
-                      <div key={index} className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-medium">
-                          {member.firstName[0]}{member.lastName[0]}
+                    {project.teamMembers.map((member, index) => {
+                      // teamMembers are populated: member = { memberId: userObject, hourlyRate, _id }
+                      const user = member.memberId;
+                      return (
+                        <div key={member._id || index} className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-medium">
+                            {user?.firstName?.[0]}{user?.lastName?.[0]}
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-foreground">
+                              {user?.firstName} {user?.lastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{user?.email}</p>
+                            {member.hourlyRate && (
+                              <p className="text-xs text-muted-foreground">
+                                ${member.hourlyRate}/hr
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-foreground">
-                            {member.firstName} {member.lastName}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{member.email}</p>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </CardContent>
                 </Card>
 
                 {/* Quick Actions */}
-                <Card className="mt-6">
+                <Card>
                   <CardHeader>
                     <CardTitle>Quick Actions</CardTitle>
                   </CardHeader>
@@ -834,13 +907,13 @@ export default function ProjectDetailPage() {
             </div>
           </TabsContent>
 
-          <TabsContent value="team" className="space-y-6">
+          <TabsContent value="team" className="space-y-8">
             <ProjectTeamTab projectId={projectId} project={project} onUpdate={fetchProject} />
           </TabsContent>
 
-          <TabsContent value="attachments" className="space-y-4 sm:space-y-6">
+          <TabsContent value="attachments" className="space-y-8">
             {/* Combined Attachments Card */}
-            <Card className="mt-6">
+            <Card className="mt-4">
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                   <Paperclip className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -850,7 +923,7 @@ export default function ProjectDetailPage() {
                   Uploaded files, Figma designs, and documentation links
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+              <CardContent className="space-y-6 p-4 sm:p-6">
                 {/* File Attachments */}
                 <div className="space-y-2 sm:space-y-3">
                   <div className="flex items-center justify-between">
@@ -865,43 +938,99 @@ export default function ProjectDetailPage() {
                     </Label>
                   </div>
                   {project.attachments && project.attachments.length > 0 ? (
-                    <div className="space-y-2">
-                      {project.attachments.map((attachment, index) => (
-                        <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-                          <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
-                            {attachment.type.startsWith('image/') ? (
-                              <Image className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0" />
-                            ) : (
-                              <File className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0" />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-xs sm:text-sm truncate">{attachment.name}</p>
-                              <p className="text-xs text-muted-foreground break-words sm:break-normal">
-                                <span className="whitespace-nowrap">{(attachment.size / 1024).toFixed(2)} KB</span>
-                                {attachment.uploadedBy && (
-                                  <span className="hidden sm:inline">
-                                    {` • ${attachment.uploadedBy.firstName} ${attachment.uploadedBy.lastName}`}
-                                  </span>
-                                )}
-                                {attachment.uploadedAt && (
-                                  <span className="hidden sm:inline">
-                                    {` • ${new Date(attachment.uploadedAt).toLocaleDateString()}`}
-                                  </span>
-                                )}
-                              </p>
-                            </div>
+                    <div className="space-y-4">
+                      {/* Pagination Info */}
+                      {project.attachments && project.attachments.length > attachmentsPerPage && (
+                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                          <span>
+                            Showing {((attachmentsPage - 1) * attachmentsPerPage) + 1} to {Math.min(attachmentsPage * attachmentsPerPage, project.attachments?.length || 0)} of {project.attachments?.length || 0} attachments
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setAttachmentsPage(prev => Math.max(1, prev - 1));
+                              }}
+                              disabled={attachmentsPage === 1}
+                            >
+                              <ArrowLeft className="h-4 w-4" />
+                              Previous
+                            </Button>
+                            <span className="px-3 py-1 bg-muted rounded text-xs">
+                              {attachmentsPage} of {Math.ceil((project.attachments?.length || 0) / attachmentsPerPage)}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setAttachmentsPage(prev => Math.min(Math.ceil((project.attachments?.length || 0) / attachmentsPerPage), prev + 1));
+                              }}
+                              disabled={attachmentsPage === Math.ceil((project.attachments?.length || 0) / attachmentsPerPage)}
+                            >
+                              Next
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(attachment.url, '_blank')}
-                            className="w-full sm:w-auto self-start sm:self-auto"
-                          >
-                            <ExternalLink className="h-4 w-4 mr-2 sm:mr-0" />
-                            <span className="sm:hidden">Open</span>
-                          </Button>
                         </div>
-                      ))}
+                      )}
+
+                      {/* Attachments List */}
+                      <div className="space-y-2">
+                        {project.attachments
+                          .slice((attachmentsPage - 1) * attachmentsPerPage, attachmentsPage * attachmentsPerPage)
+                          .map((attachment, index) => {
+                            const actualIndex = (attachmentsPage - 1) * attachmentsPerPage + index;
+                            return (
+                              <div key={actualIndex} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                                <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+                                  {attachment.type.startsWith('image/') ? (
+                                    <Image className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0" />
+                                  ) : (
+                                    <File className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0" />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-xs sm:text-sm truncate">{attachment.name}</p>
+                                    <p className="text-xs text-muted-foreground break-words sm:break-normal">
+                                      <span className="whitespace-nowrap">{(attachment.size / 1024).toFixed(2)} KB</span>
+                                      {attachment.uploadedBy && (
+                                        <span className="hidden sm:inline">
+                                          {` • ${attachment.uploadedBy.firstName} ${attachment.uploadedBy.lastName}`}
+                                        </span>
+                                      )}
+                                      {attachment.uploadedAt && (
+                                        <span className="hidden sm:inline">
+                                          {` • ${formatDate(attachment.uploadedAt)}`}
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => window.open(attachment.url, '_blank')}
+                                      className="w-full sm:w-auto self-start sm:self-auto"
+                                    >
+                                      <ExternalLink className="h-4 w-4 mr-2 sm:mr-0" />
+                                      <span className="sm:hidden">Open</span>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Open file</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
+                            );
+                          })}
+                      </div>
+
                     </div>
                   ) : (
                     <div className="border-2 border-dashed border-muted rounded-lg p-4 sm:p-6 text-center">
@@ -922,9 +1051,43 @@ export default function ProjectDetailPage() {
                       </Badge>
                     )}
                   </Label>
-                  {project.externalLinks?.figma && project.externalLinks.figma.length > 0 ? (
+                  {figmaLinks.length > 0 ? (
+                    <div className="space-y-3">
+                      {figmaLinks.length > linkPaginationSize && (
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            Showing {figmaShowingStart} to {figmaShowingEnd} of {figmaLinks.length} Figma links
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setFigmaLinksPage(prev => Math.max(1, prev - 1))}
+                              disabled={currentFigmaPage === 1}
+                            >
+                              <ArrowLeft className="h-4 w-4" />
+                              Previous
+                            </Button>
+                            <span className="px-2.5 py-1 bg-muted rounded text-[11px]">
+                              {currentFigmaPage} of {figmaTotalPages}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setFigmaLinksPage(prev => Math.min(prev + 1, figmaTotalPages))}
+                              disabled={currentFigmaPage === figmaTotalPages}
+                            >
+                              Next
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     <div className="space-y-1 sm:space-y-2">
-                      {project.externalLinks.figma.map((link, index) => {
+                        {paginatedFigmaLinks.map((link, index) => {
+                          const actualIndex = figmaSliceStart + index
                         // Ensure URL has protocol
                         const formattedLink = link.startsWith('http://') || link.startsWith('https://')
                           ? link
@@ -932,7 +1095,7 @@ export default function ProjectDetailPage() {
 
                         return (
                           <a
-                            key={index}
+                              key={actualIndex}
                             href={formattedLink}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -941,10 +1104,18 @@ export default function ProjectDetailPage() {
                             <span className="text-xs sm:text-sm text-primary group-hover:underline flex-1 truncate break-all sm:break-normal">
                               {link}
                             </span>
-                            <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors self-start sm:self-auto" />
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors self-start sm:self-auto cursor-pointer" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Open link</p>
+                                </TooltipContent>
+                              </Tooltip>
                           </a>
                         )
                       })}
+                      </div>
                     </div>
                   ) : (
                     <div className="border-2 border-dashed border-muted rounded-lg p-4 sm:p-6 text-center">
@@ -965,9 +1136,43 @@ export default function ProjectDetailPage() {
                       </Badge>
                     )}
                   </Label>
-                  {project.externalLinks?.documentation && project.externalLinks.documentation.length > 0 ? (
+                  {documentationLinks.length > 0 ? (
+                    <div className="space-y-3">
+                      {documentationLinks.length > linkPaginationSize && (
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            Showing {documentationShowingStart} to {documentationShowingEnd} of {documentationLinks.length} documentation links
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setDocLinksPage(prev => Math.max(1, prev - 1))}
+                              disabled={currentDocumentationPage === 1}
+                            >
+                              <ArrowLeft className="h-4 w-4" />
+                              Previous
+                            </Button>
+                            <span className="px-2.5 py-1 bg-muted rounded text-[11px]">
+                              {currentDocumentationPage} of {documentationTotalPages}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setDocLinksPage(prev => Math.min(prev + 1, documentationTotalPages))}
+                              disabled={currentDocumentationPage === documentationTotalPages}
+                            >
+                              Next
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     <div className="space-y-1 sm:space-y-2">
-                      {project.externalLinks.documentation.map((link, index) => {
+                        {paginatedDocumentationLinks.map((link, index) => {
+                          const actualIndex = docSliceStart + index
                         // Ensure URL has protocol
                         const formattedLink = link.startsWith('http://') || link.startsWith('https://')
                           ? link
@@ -975,7 +1180,7 @@ export default function ProjectDetailPage() {
 
                         return (
                           <a
-                            key={index}
+                              key={actualIndex}
                             href={formattedLink}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -984,10 +1189,18 @@ export default function ProjectDetailPage() {
                             <span className="text-xs sm:text-sm text-primary group-hover:underline flex-1 truncate break-all sm:break-normal">
                               {link}
                             </span>
-                            <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors self-start sm:self-auto" />
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0 group-hover:text-primary transition-colors self-start sm:self-auto cursor-pointer" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Open link</p>
+                                </TooltipContent>
+                              </Tooltip>
                           </a>
                         )
                       })}
+                      </div>
                     </div>
                   ) : (
                     <div className="border-2 border-dashed border-muted rounded-lg p-4 sm:p-6 text-center">
@@ -1011,7 +1224,7 @@ export default function ProjectDetailPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="budget" className="space-y-6">
+          <TabsContent value="budget" className="space-y-8">
             {/* Budget Overview */}
             {project.budget && (
               <Card>
@@ -1019,7 +1232,7 @@ export default function ProjectDetailPage() {
                   <CardTitle>Budget Overview</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-muted-foreground">Total Budget</p>
                       <p className="text-2xl font-bold text-foreground">
@@ -1042,7 +1255,7 @@ export default function ProjectDetailPage() {
 
                   <div className="space-y-2 pt-4 border-t">
                     <p className="text-sm font-medium text-muted-foreground mb-3">Budget by Category</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
 
                       <div>
                         <p className="text-xs text-muted-foreground">Materials</p>
@@ -1081,14 +1294,6 @@ export default function ProjectDetailPage() {
                   </div>
                 </CardHeader>
 
-                {expenseSuccess && (
-                  <div className="px-6 pt-4">
-                    <Alert variant="success" className="animate-in fade-in slide-in-from-top-2">
-                      <CheckCircle className="h-4 w-4" />
-                      <AlertDescription>{expenseSuccess}</AlertDescription>
-                    </Alert>
-                  </div>
-                )}
 
                 <CardContent>
                   {expensesLoading ? (
@@ -1102,7 +1307,7 @@ export default function ProjectDetailPage() {
                       <p className="text-sm mt-1">Click "Add Expense" to get started</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {expenses.map((expense: any) => (
                         <Card key={expense._id} className="hover:shadow-md transition-shadow">
                           <CardContent className="p-4">
@@ -1110,10 +1315,54 @@ export default function ProjectDetailPage() {
                               <div className="flex-1">
                                 <h4 className="font-semibold text-sm mb-1">{expense.name}</h4>
                                 {expense.description && (
-                                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{expense.description}</p>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <p className="text-xs text-muted-foreground line-clamp-2 mb-2 cursor-help">{expense.description}</p>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-xs">
+                                        <p className="text-sm">{expense.description}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
                                 )}
                               </div>
-                              <Badge variant={expense.paidStatus === 'paid' ? 'default' : 'secondary'} className="ml-2">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={(e) => {
+                                    e.stopPropagation()
+                                    setEditingExpense(expense)
+                                  }}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit Expense
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleExpenseDeleted(expense._id, expense.name)
+                                    }}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+
+                            <div className="flex items-center justify-start mb-2">
+                              <Badge variant={expense.paidStatus === 'paid' ? 'default' : 'secondary'}>
                                 {expense.paidStatus === 'paid' ? 'Paid' : 'Unpaid'}
                               </Badge>
                             </div>
@@ -1131,7 +1380,7 @@ export default function ProjectDetailPage() {
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-muted-foreground">Date:</span>
-                                <span>{new Date(expense.expenseDate).toLocaleDateString()}</span>
+                                <span>{formatDate(expense.expenseDate)}</span>
                               </div>
                               {expense.isBillable && (
                                 <Badge variant="outline" className="mt-1">Billable</Badge>
@@ -1153,14 +1402,14 @@ export default function ProjectDetailPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="tasks" className="space-y-4">
+          <TabsContent value="tasks" className="space-y-8">
             <TaskList
               projectId={projectId}
               onCreateTask={() => setShowCreateTaskModal(true)}
             />
           </TabsContent>
 
-          <TabsContent value="kanban" className="space-y-4">
+          <TabsContent value="kanban" className="space-y-8">
             <KanbanBoard
               projectId={projectId}
               onCreateTask={() => setShowCreateTaskModal(true)}
@@ -1178,22 +1427,22 @@ export default function ProjectDetailPage() {
             />
           </TabsContent>
 
-          <TabsContent value="calendar" className="space-y-4">
+          <TabsContent value="calendar" className="space-y-8">
             <CalendarView
               projectId={projectId}
               onCreateTask={() => setShowCreateTaskModal(true)}
             />
           </TabsContent>
 
-          <TabsContent value="backlog" className="space-y-4">
+          <TabsContent value="backlog" className="space-y-8">
             <BacklogView
               projectId={projectId}
               onCreateTask={() => setShowCreateTaskModal(true)}
             />
           </TabsContent>
 
-          <TabsContent value="testing" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <TabsContent value="testing" className="space-y-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-1">
                 <TestSuiteTree
                   key={`${projectId}-${suitesRefreshCounter}`}
@@ -1230,8 +1479,8 @@ export default function ProjectDetailPage() {
             </div>
           </TabsContent>
 
-          <TabsContent value="reports" className="space-y-6">
-            <div className="space-y-6">
+          <TabsContent value="reports" className="space-y-8">
+            <div className="space-y-8">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <h3 className="text-xl sm:text-2xl font-semibold text-foreground">Project Reports</h3>
@@ -1251,7 +1500,7 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
 
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Project Progress</CardTitle>
@@ -1292,7 +1541,7 @@ export default function ProjectDetailPage() {
                 </Card>
               </div>
 
-              <div className="grid gap-6 lg:grid-cols-2">
+              <div className="grid gap-8 lg:grid-cols-2">
                 <Card>
                   <CardHeader>
                     <CardTitle>Recent Activity</CardTitle>
@@ -1305,7 +1554,7 @@ export default function ProjectDetailPage() {
                         <div className="flex-1 space-y-1">
                           <p className="text-sm font-medium">Project created</p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(project?.createdAt).toLocaleDateString()}
+                            {formatDate(project?.createdAt)}
                           </p>
                         </div>
                       </div>
@@ -1327,20 +1576,28 @@ export default function ProjectDetailPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {project?.teamMembers?.slice(0, 3).map((member: any, index: number) => (
-                        <div key={index} className="flex items-center space-x-4">
-                          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
-                            {member.firstName?.[0]}{member.lastName?.[0]}
+                      {project?.teamMembers?.slice(0, 3).map((member: any, index: number) => {
+                        const user = member.memberId;
+                        return (
+                          <div key={member._id || index} className="flex items-center space-x-4">
+                            <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
+                              {user?.firstName?.[0]}{user?.lastName?.[0]}
+                            </div>
+                            <div className="flex-1 space-y-1">
+                              <p className="text-sm font-medium">
+                                {user?.firstName} {user?.lastName}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{user?.role ? formatToTitleCase(user.role.replace(/_/g, ' ')) : ''}</p>
+                              {member.hourlyRate && (
+                                <p className="text-xs text-muted-foreground">
+                                  ${member.hourlyRate}/hr
+                                </p>
+                              )}
+                            </div>
+                            <Badge variant="secondary" className="hover:bg-secondary dark:hover:bg-secondary">Active</Badge>
                           </div>
-                          <div className="flex-1 space-y-1">
-                            <p className="text-sm font-medium">
-                              {member.firstName} {member.lastName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{member.role}</p>
-                          </div>
-                          <Badge variant="secondary" className="hover:bg-secondary dark:hover:bg-secondary">Active</Badge>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </CardContent>
                 </Card>
@@ -1357,19 +1614,6 @@ export default function ProjectDetailPage() {
                 </p>
               </div>
 
-              {settingsError && (
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>{settingsError}</AlertDescription>
-                </Alert>
-              )}
-
-              {settingsSuccess && (
-                <Alert variant="success">
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>{settingsSuccess}</AlertDescription>
-                </Alert>
-              )}
 
               <div className="grid gap-6 lg:grid-cols-2">
                 <Card className="lg:col-span-2">
@@ -1378,6 +1622,31 @@ export default function ProjectDetailPage() {
                     <CardDescription>Control how work is tracked and approved</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    
+                  <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <Label htmlFor="allow-billable-time">Billable Project</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Mark this project as billable for time tracking and invoicing
+                          {globalTimeTrackingSettings && !globalTimeTrackingSettings.allowBillableTime && (
+                            <span className="block text-xs text-amber-600 dark:text-amber-400 mt-1">
+                              ⚠️ Disabled globally in Application Settings
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <Switch
+                        id="allow-billable-time"
+                        checked={settingsForm.allowBillableTime && (globalTimeTrackingSettings?.allowBillableTime ?? true)}
+                        disabled={!globalTimeTrackingSettings?.allowBillableTime}
+                        onCheckedChange={(checked) =>
+                          setSettingsForm((prev) => ({
+                            ...prev,
+                            allowBillableTime: checked,
+                          }))
+                        }
+                      />
+                    </div>
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex-1">
                         <Label htmlFor="allow-time-tracking">Allow Time Tracking</Label>
@@ -1474,9 +1743,12 @@ export default function ProjectDetailPage() {
                         }
                       />
                     </div>
+
                   </CardContent>
                   <CardFooter className="justify-end">
-                    <Button onClick={handleSaveSettings} disabled={savingSettings || !trackingSettingsChanged}>
+                    <Button onClick={handleSaveSettings}
+                      disabled={savingSettings || !trackingSettingsChanged}
+                    >
                       {savingSettings ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1791,7 +2063,35 @@ export default function ProjectDetailPage() {
             fetchProject() // Refresh project to update budget
           }}
         />
+
+        <AddExpenseDialog
+          open={!!editingExpense}
+          onClose={() => setEditingExpense(null)}
+          projectId={projectId}
+          expense={editingExpense}
+          onSuccess={() => {
+            notifySuccess({ title: 'Expense Updated', message: 'Expense has been updated successfully' })
+            fetchExpenses()
+            fetchProject() // Refresh project to update budget
+          }}
+        />
+
+        {/* Delete Expense Confirmation Modal */}
+        <ConfirmationModal
+          isOpen={showDeleteExpenseConfirmModal}
+          onClose={() => {
+            setShowDeleteExpenseConfirmModal(false)
+            setExpenseToDelete(null)
+          }}
+          onConfirm={confirmDeleteExpense}
+          title="Delete Expense"
+          description={`Are you sure you want to delete "${expenseToDelete?.name}"? This action cannot be undone.`}
+          confirmText="Delete Expense"
+          cancelText="Cancel"
+          variant="destructive"
+        />
       </div>
     </MainLayout>
+    </TooltipProvider>
   )
 }

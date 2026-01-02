@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Upload, Image as ImageIcon, CheckCircle, Loader2 } from 'lucide-react'
+import { Upload, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { useCurrencies } from '@/hooks/useCurrencies'
+import { useNotify } from '@/lib/notify'
 
 interface OrganizationData {
   _id: string
@@ -27,11 +27,10 @@ interface OrganizationData {
 
 export default function OrganizationSettingsPage() {
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay } = useCurrencies(true)
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const [organization, setOrganization] = useState<OrganizationData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [darkLogoFile, setDarkLogoFile] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string>('')
@@ -73,10 +72,10 @@ export default function OrganizationSettingsPage() {
         setLogoPreview(data.data.logo || '')
         setDarkLogoPreview(data.data.darkLogo || '')
       } else {
-        setError(data.error || 'Failed to fetch organization data')
+        notifyError({ title: 'Failed to Load Organization', message: data.error || 'Failed to fetch organization data' })
       }
     } catch (err) {
-      setError('Failed to fetch organization data')
+      notifyError({ title: 'Failed to Load Organization', message: 'Failed to fetch organization data' })
     } finally {
       setLoading(false)
     }
@@ -108,8 +107,6 @@ export default function OrganizationSettingsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
-    setSuccess('')
 
     try {
       setSaving(true)
@@ -139,14 +136,13 @@ export default function OrganizationSettingsPage() {
       const data = await response.json()
 
       if (data.success) {
-        setSuccess('Organization settings updated successfully!')
-        setTimeout(() => setSuccess(''), 3000)
+        notifySuccess({ title: 'Settings Updated', message: 'Organization settings updated successfully!' })
         fetchOrganization()
       } else {
-        setError(data.error || 'Failed to update organization settings')
+        notifyError({ title: 'Failed to Update Settings', message: data.error || 'Failed to update organization settings' })
       }
     } catch (err) {
-      setError('Failed to update organization settings')
+      notifyError({ title: 'Failed to Update Settings', message: 'Failed to update organization settings' })
     } finally {
       setSaving(false)
     }
@@ -170,18 +166,6 @@ export default function OrganizationSettingsPage() {
           <p className="text-muted-foreground">Manage your organization's branding and settings</p>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {success && (
-          <Alert variant="default">
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>{success}</AlertDescription>
-          </Alert>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information */}
@@ -241,8 +225,8 @@ export default function OrganizationSettingsPage() {
                       {currenciesLoading ? (
                         <SelectItem value="loading" disabled>Loading currencies...</SelectItem>
                       ) : (
-                        currencies.map((currency) => (
-                          <SelectItem key={currency.code} value={currency.code}>
+                          currencies.map((currency, index) => (
+                          <SelectItem key={`${currency.code}-${index}`} value={currency.code}>
                             {formatCurrencyDisplay(currency)}
                           </SelectItem>
                         ))

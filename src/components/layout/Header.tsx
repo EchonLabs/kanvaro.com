@@ -97,6 +97,14 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
 
   const handleLogout = async () => {
     try {
+      // Clear permission cache before logout
+      try {
+        sessionStorage.removeItem('kanvaro_permissions')
+        sessionStorage.removeItem('kanvaro_permissions_timestamp')
+      } catch (cacheError) {
+        console.error('Error clearing permission cache:', cacheError)
+      }
+
       const response = await fetch('/api/auth/logout', { method: 'POST' })
       if (response.ok) {
         // Clear any client-side state if needed
@@ -356,8 +364,8 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
       isOpen={showLogoutConfirm}
       onClose={() => setShowLogoutConfirm(false)}
       onConfirm={handleLogout}
-      title="Logout"
-      description=""
+      title="Logout Confirmation"
+      description="You are about to log out from the system. This will end your current session and you will need to log in again to access your account. Any unsaved work will be lost."
       confirmText="Logout"
       cancelText="Cancel"
     />

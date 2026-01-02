@@ -122,9 +122,9 @@ export function TeamProductivityReport({ members, productivityTrends, filters }:
     .slice(0, 3)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Productivity Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Avg Productivity</CardTitle>
@@ -188,7 +188,7 @@ export function TeamProductivityReport({ members, productivityTrends, filters }:
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
         {/* Individual Productivity */}
         <Card>
           <CardHeader>
@@ -309,9 +309,9 @@ export function TeamProductivityReport({ members, productivityTrends, filters }:
           <CardDescription className="text-xs sm:text-sm">Most productive team members</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {topPerformers.map((performer, index) => (
-              <div key={performer._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+              <div key={performer._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
                 <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
                   <div className="flex items-center space-x-2 flex-shrink-0">
                     <Badge variant="outline" className="w-6 h-6 rounded-full flex items-center justify-center">
@@ -372,9 +372,9 @@ export function TeamProductivityReport({ members, productivityTrends, filters }:
           <CardDescription className="text-xs sm:text-sm">Detailed productivity metrics for all team members</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {members.map((member) => (
-              <div key={member._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+              <div key={member._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
                 <div className="flex-1 min-w-0 w-full sm:w-auto">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
                     <div className="flex items-center space-x-2">
@@ -399,7 +399,7 @@ export function TeamProductivityReport({ members, productivityTrends, filters }:
                     </Badge>
                   </div>
                   
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-3 space-y-3">
                     <div>
                       <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
                         <span>Productivity Score</span>
@@ -408,7 +408,7 @@ export function TeamProductivityReport({ members, productivityTrends, filters }:
                       <Progress value={member.stats.productivityScore} className="h-2" />
                     </div>
                     
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-xs sm:text-sm">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-5 text-xs sm:text-sm">
                       <div>
                         <div className="text-muted-foreground">Tasks Completed</div>
                         <div className="font-medium break-words">{member.stats.tasksCompleted}</div>

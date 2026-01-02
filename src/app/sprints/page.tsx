@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
+import { useNotify } from '@/lib/notify'
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -15,6 +17,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Label } from '@/components/ui/label'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { Permission } from '@/lib/permissions/permission-definitions'
 import {
   Plus,
   Search,
@@ -43,8 +48,10 @@ import {
   Trash2,
   ChevronDown,
   ChevronRight,
-  X
+  X,
+  RotateCcw
 } from 'lucide-react'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 
 interface Sprint {
   _id: string
@@ -108,6 +115,20 @@ export default function SprintsPage() {
   const [projectFilterQuery, setProjectFilterQuery] = useState('')
   const [projectOptions, setProjectOptions] = useState<Array<{ _id: string; name: string }>>([])
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const { formatDate } = useDateTime()
+
+  // Check if any filters are active
+  const hasActiveFilters = searchQuery !== '' ||
+                          statusFilter !== 'all' ||
+                          projectFilter !== 'all'
+
+  // Reset all filters
+  const resetFilters = () => {
+    setSearchQuery('')
+    setStatusFilter('all')
+    setProjectFilter('all')
+    setProjectFilterQuery('')
+  }
   const [success, setSuccess] = useState('')
   const [updatingSprintId, setUpdatingSprintId] = useState<string | null>(null)
   const [completeModalOpen, setCompleteModalOpen] = useState(false)
@@ -116,6 +137,11 @@ export default function SprintsPage() {
   const [availableSprints, setAvailableSprints] = useState<Sprint[]>([])
   const [availableSprintsLoading, setAvailableSprintsLoading] = useState(false)
   const [selectedTargetSprintId, setSelectedTargetSprintId] = useState('')
+  const { success: notifySuccess, error: notifyError } = useNotify()
+  const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null)
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  
   const [completeError, setCompleteError] = useState('')
   const [incompleteTasks, setIncompleteTasks] = useState<Array<{
     _id: string
@@ -142,6 +168,14 @@ export default function SprintsPage() {
   const [totalCount, setTotalCount] = useState(0)
 
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { hasPermission } = usePermissions()
+
+  const canCreateSprint = hasPermission(Permission.SPRINT_CREATE)
+  const canViewSprint = hasPermission(Permission.SPRINT_VIEW) || hasPermission(Permission.SPRINT_READ)
+  const canEditSprint = hasPermission(Permission.SPRINT_EDIT) && hasPermission(Permission.SPRINT_CREATE)
+  const canDeleteSprint = hasPermission(Permission.SPRINT_DELETE)
+  const canStartSprint = hasPermission(Permission.SPRINT_START)
+  const canCompleteSprint = hasPermission(Permission.SPRINT_COMPLETE)
 
   const showSuccess = useCallback((message: string) => {
     setSuccess(message)
@@ -194,7 +228,7 @@ export default function SprintsPage() {
   useEffect(() => {
     const successParam = searchParams?.get('success')
     if (successParam === 'sprint-created') {
-      showSuccess('Sprint created successfully.')
+      notifySuccess({ title: 'Sprint created successfully' })
       router.replace('/sprints', { scroll: false })
     }
   }, [searchParams, showSuccess, router])
@@ -237,21 +271,45 @@ export default function SprintsPage() {
     }
   }
 
-  const handleDeleteSprint = async (sprintId: string) => {
+  const handleDeleteClick = (sprintId: string) => {
+    if (!canDeleteSprint) {
+      setError('You do not have permission to delete sprints.')
+      return
+    }
+    setSelectedSprintId(sprintId)
+    setShowDeleteConfirmModal(true)
+  }
+  
+  const handleDeleteConfirm = async () => {
+    if (!selectedSprintId) return
+  
     try {
-      const res = await fetch(`/api/sprints/${sprintId}`, { method: 'DELETE' })
+      setDeleting(true)
+  
+      const res = await fetch(`/api/sprints/${selectedSprintId}`, {
+        method: 'DELETE'
+      })
       const data = await res.json()
+  
       if (res.ok && data.success) {
-        setSprints(prev => prev.filter(s => s._id !== sprintId))
-        showSuccess('Sprint deleted successfully.')
+        setSprints(prev => prev.filter(s => s._id !== selectedSprintId))
+        notifySuccess({ title: 'Sprint deleted successfully' })
+        setShowDeleteConfirmModal(false)
+        setSelectedSprintId(null)
       } else {
         setError(data.error || 'Failed to delete sprint')
+        notifyError({ title: data.error || 'Failed to delete sprint' })
+        setShowDeleteConfirmModal(false)
       }
     } catch (e) {
       setError('Failed to delete sprint')
+      notifyError({ title: 'Failed to delete sprint' })
+      setShowDeleteConfirmModal(false)
+    } finally {
+      setDeleting(false)
     }
   }
-
+  
   const formatDateInputValue = (date: Date): string => {
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -261,7 +319,7 @@ export default function SprintsPage() {
 
   const formatTaskStatusLabel = (status: string) => {
     const statusMap: Record<string, string> = {
-      backlog: 'Backlog',
+      backlog: 'backlog',
       todo: 'To Do',
       in_progress: 'In Progress',
       review: 'In Review',
@@ -366,7 +424,19 @@ export default function SprintsPage() {
     }
   }
 
-  const handleSprintLifecycleAction = async (sprintId: string, action: 'start' | 'complete') => {
+  const handleSprintLifecycleAction = async (sprintId: string, action: 'start' | 'complete', hasTasks = true) => {
+    if (action === 'start' && !canStartSprint) {
+      setError('You do not have permission to start sprints.')
+      return
+    }
+    if (action === 'complete' && !canCompleteSprint) {
+      setError('You do not have permission to complete sprints.')
+      return
+    }
+    if (!hasTasks) {
+      setError('Add tasks to this sprint before performing this action.')
+      return
+    }
     if (action === 'complete') {
       const incomplete = await checkSprintForIncompleteTasks(sprintId)
 
@@ -452,7 +522,7 @@ export default function SprintsPage() {
       }
 
       setSprints(prev => prev.map(s => (s._id === sprintId ? data.data : s)))
-      showSuccess(action === 'start' ? 'Sprint started successfully.' : 'Sprint completed successfully.')
+      notifySuccess({ title: action === 'start' ? 'Sprint started successfully' : 'Sprint completed successfully' })
     } catch (err) {
       console.error(`${action} sprint error:`, err)
       setError(`Failed to ${action} sprint`)
@@ -501,7 +571,7 @@ export default function SprintsPage() {
 
       return updated
     })
-    showSuccess('Sprint completed successfully.')
+    notifySuccess({ title: 'Sprint completed successfully' })
     setCompleteModalOpen(false)
     setCompletingSprintId(null)
     setIncompleteTasks([])
@@ -740,25 +810,21 @@ export default function SprintsPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Sprints</h1>
             <p className="text-sm sm:text-base text-muted-foreground">Manage your agile sprints and iterations</p>
           </div>
-          <Button onClick={() => router.push('/sprints/create')} className="w-full sm:w-auto">
+          <Button
+            onClick={() => {
+              if (!canCreateSprint) return
+              router.push('/sprints/create')
+            }}
+            disabled={!canCreateSprint}
+            title={!canCreateSprint ? 'You need sprint:create permission to create a sprint.' : undefined}
+            className="w-full sm:w-auto"
+          >
             <Plus className="h-4 w-4 mr-2" />
             New Sprint
           </Button>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {success && (
-          <Alert variant="success">
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>{success}</AlertDescription>
-          </Alert>
-        )}
+       
 
         <Card className="overflow-x-hidden">
           <CardHeader>
@@ -840,6 +906,27 @@ export default function SprintsPage() {
                       </div>
                     </SelectContent>
                   </Select>
+                  {hasActiveFilters && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={resetFilters}
+                            className="text-xs"
+                            aria-label="Reset all filters"
+                          >
+                            <RotateCcw className="h-4 w-4 mr-1" />
+                            Reset Filters
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Reset filters</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
               </div>
             </div>
@@ -878,8 +965,11 @@ export default function SprintsPage() {
                     return (
                       <Card
                         key={sprint._id}
-                        className="hover:shadow-md transition-shadow cursor-pointer overflow-x-hidden"
-                        onClick={() => router.push(`/sprints/${sprint._id}`)}
+                        className={`hover:shadow-md transition-shadow overflow-x-hidden ${canViewSprint ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                        onClick={() => {
+                          if (!canViewSprint) return
+                          router.push(`/sprints/${sprint._id}`)
+                        }}
                       >
                         <CardHeader className="p-3 sm:p-6">
                           <div className="flex items-start justify-between gap-2">
@@ -898,10 +988,14 @@ export default function SprintsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/sprints/${sprint._id}`)
-                                }}>
+                                <DropdownMenuItem
+                                  disabled={!canViewSprint}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!canViewSprint) return
+                                    router.push(`/sprints/${sprint._id}`)
+                                  }}
+                                >
                                   <Zap className="h-4 w-4 mr-2" />
                                   View Sprint
                                 </DropdownMenuItem>
@@ -912,20 +1006,25 @@ export default function SprintsPage() {
                                 <Settings className="h-4 w-4 mr-2" />
                                 Settings
                               </DropdownMenuItem> */}
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/sprints/${sprint._id}/edit`)
-                                }}>
+                                <DropdownMenuItem
+                                  disabled={!canEditSprint}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!canEditSprint) return
+                                    router.push(`/sprints/${sprint._id}/edit`)
+                                  }}
+                                >
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit Sprint
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
+                                  disabled={!canDeleteSprint}
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    if (confirm('Are you sure you want to delete this sprint? This action cannot be undone.')) {
-                                      handleDeleteSprint(sprint._id)
-                                    }
+                                    if (!canDeleteSprint) return
+                                    handleDeleteClick(sprint._id)
+
                                   }}
                                   className="text-destructive focus:text-destructive"
                                 >
@@ -1005,13 +1104,13 @@ export default function SprintsPage() {
                             </div>
                             <div className="flex items-center space-x-1 flex-shrink-0">
                               <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span className="whitespace-nowrap">{new Date(sprint?.startDate).toLocaleDateString()}</span>
+                              <span className="whitespace-nowrap">{formatDate(sprint?.startDate)}</span>
                             </div>
                           </div>
 
                           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 text-xs sm:text-sm">
                             <div className="text-muted-foreground truncate">
-                              {new Date(sprint?.startDate).toLocaleDateString()} - {new Date(sprint?.endDate).toLocaleDateString()}
+                              {formatDate(sprint?.startDate)} - {formatDate(sprint?.endDate)}
                             </div>
                             <div className="text-muted-foreground whitespace-nowrap flex-shrink-0">
                               {Math.ceil((new Date(sprint?.endDate).getTime() - new Date(sprint?.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
@@ -1024,10 +1123,17 @@ export default function SprintsPage() {
                                 size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  handleSprintLifecycleAction(sprint._id, 'start')
+                                  if (!canStartSprint || !hasTasks) return
+                                  handleSprintLifecycleAction(sprint._id, 'start', hasTasks)
                                 }}
-                                disabled={updatingSprintId === sprint._id || !hasTasks}
-                                title={!hasTasks ? 'Add tasks to this sprint before starting it.' : undefined}
+                                disabled={updatingSprintId === sprint._id || !hasTasks || !canStartSprint}
+                                title={
+                                  !hasTasks
+                                    ? 'Add tasks to this sprint before starting it.'
+                                    : !canStartSprint
+                                      ? 'You need sprint:start permission to start a sprint.'
+                                      : undefined
+                                }
                               >
                                 <Play className="h-4 w-4 mr-1" />
                                 {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
@@ -1039,9 +1145,17 @@ export default function SprintsPage() {
                                 variant="secondary"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  handleSprintLifecycleAction(sprint._id, 'complete')
+                                  if (!canCompleteSprint || !hasTasks) return
+                                  handleSprintLifecycleAction(sprint._id, 'complete', hasTasks)
                                 }}
-                                disabled={updatingSprintId === sprint._id}
+                                disabled={updatingSprintId === sprint._id || !hasTasks || !canCompleteSprint}
+                                title={
+                                  !hasTasks
+                                    ? 'Add tasks to this sprint before completing it.'
+                                    : !canCompleteSprint
+                                      ? 'You need sprint:complete permission to complete a sprint.'
+                                      : undefined
+                                }
                               >
                                 <CheckCircle className="h-4 w-4 mr-1" />
                                 {updatingSprintId === sprint._id ? 'Completing...' : 'Complete Sprint'}
@@ -1082,8 +1196,11 @@ export default function SprintsPage() {
                     return (
                       <Card
                         key={sprint?._id}
-                        className="hover:shadow-md transition-shadow cursor-pointer overflow-x-hidden"
-                        onClick={() => router.push(`/sprints/${sprint?._id}`)}
+                        className={`hover:shadow-md transition-shadow overflow-x-hidden ${canViewSprint ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                        onClick={() => {
+                          if (!canViewSprint || !sprint?._id) return
+                          router.push(`/sprints/${sprint?._id}`)
+                        }}
                       >
                         <CardContent className="p-3 sm:p-4">
                           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
@@ -1130,7 +1247,7 @@ export default function SprintsPage() {
                                 <div className="flex items-center space-x-1 min-w-0">
                                   <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                                   <span className="truncate">
-                                    {new Date(sprint?.startDate).toLocaleDateString()} - {new Date(sprint?.endDate).toLocaleDateString()}
+                                    {formatDate(sprint?.startDate)} - {formatDate(sprint?.endDate)}
                                   </span>
                                 </div>
                                 <div className="flex items-center space-x-1 flex-shrink-0 whitespace-nowrap">
@@ -1144,10 +1261,17 @@ export default function SprintsPage() {
                                     size="sm"
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      handleSprintLifecycleAction(sprint._id, 'start')
+                                  if (!canStartSprint || !hasTasks) return
+                                  handleSprintLifecycleAction(sprint._id, 'start', hasTasks)
                                     }}
-                                    disabled={updatingSprintId === sprint._id || !hasTasks}
-                                    title={!hasTasks ? 'Add tasks to this sprint before starting it.' : undefined}
+                                disabled={updatingSprintId === sprint._id || !hasTasks || !canStartSprint}
+                                title={
+                                  !hasTasks
+                                    ? 'Add tasks to this sprint before starting it.'
+                                    : !canStartSprint
+                                      ? 'You need sprint:start permission to start a sprint.'
+                                      : undefined
+                                }
                                   >
                                     <Play className="h-4 w-4 mr-1" />
                                     {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
@@ -1159,9 +1283,17 @@ export default function SprintsPage() {
                                     variant="secondary"
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      handleSprintLifecycleAction(sprint._id, 'complete')
+                                  if (!canCompleteSprint || !hasTasks) return
+                                  handleSprintLifecycleAction(sprint._id, 'complete', hasTasks)
                                     }}
-                                    disabled={updatingSprintId === sprint._id}
+                                disabled={updatingSprintId === sprint._id || !hasTasks || !canCompleteSprint}
+                                title={
+                                  !hasTasks
+                                    ? 'Add tasks to this sprint before completing it.'
+                                    : !canCompleteSprint
+                                      ? 'You need sprint:complete permission to complete a sprint.'
+                                      : undefined
+                                }
                                   >
                                     <CheckCircle className="h-4 w-4 mr-1" />
                                     {updatingSprintId === sprint._id ? 'Completing...' : 'Complete Sprint'}
@@ -1201,27 +1333,36 @@ export default function SprintsPage() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation()
-                                    router.push(`/sprints/${sprint._id}`)
-                                  }}>
+                                  <DropdownMenuItem
+                                    disabled={!canViewSprint}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (!canViewSprint) return
+                                      router.push(`/sprints/${sprint._id}`)
+                                    }}
+                                  >
                                     <Zap className="h-4 w-4 mr-2" />
                                     View Sprint
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation()
-                                    router.push(`/sprints/${sprint._id}/edit`)
-                                  }}>
+                                  <DropdownMenuItem
+                                    disabled={!canEditSprint}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (!canEditSprint) return
+                                      router.push(`/sprints/${sprint._id}/edit`)
+                                    }}
+                                  >
                                     <Edit className="h-4 w-4 mr-2" />
                                     Edit Sprint
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
+                                    disabled={!canDeleteSprint}
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      if (confirm('Are you sure you want to delete this sprint? This action cannot be undone.')) {
-                                        handleDeleteSprint(sprint._id)
-                                      }
+                                      if (!canDeleteSprint) return
+                                      handleDeleteClick(sprint._id)
+
                                     }}
                                     className="text-destructive focus:text-destructive"
                                   >
@@ -1295,7 +1436,7 @@ export default function SprintsPage() {
                   ) : (
                     <>
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      Move Tasks to Backlog and Complete Sprint
+                      Move Tasks to backlog and Complete Sprint
                     </>
                   )}
                 </Button>
@@ -1459,7 +1600,7 @@ export default function SprintsPage() {
                 </div>
 
                 {selectedTaskIds.size === 0 ? (
-                  // No tasks selected - show "Move to Backlog" option
+                  // No tasks selected - show "Move to backlog" option
 
                   <p className="text-xs text-muted-foreground">
                     All incomplete tasks will be moved to the backlog.
@@ -1468,7 +1609,7 @@ export default function SprintsPage() {
                   // Some tasks selected - show existing/new sprint options
                   <>
                     {selectedTaskIds.size === 0 ? (
-                      // No tasks selected - show "Move to Backlog" option
+                      // No tasks selected - show "Move to backlog" option
 
                       <p className="text-xs text-muted-foreground">
                         All incomplete tasks will be moved to the backlog.
@@ -1653,6 +1794,20 @@ export default function SprintsPage() {
           )
         }
       </div >
+      <ConfirmationModal
+  isOpen={showDeleteConfirmModal}
+  onClose={() => {
+    setShowDeleteConfirmModal(false)
+    setSelectedSprintId(null)
+  }}
+  onConfirm={handleDeleteConfirm}
+  title="Delete Sprint"
+  description="Are you sure you want to delete this sprint? This action cannot be undone."
+  confirmText={deleting ? 'Deleting...' : 'Delete'}
+  cancelText="Cancel"
+  variant="destructive"
+/>
+
     </MainLayout >
   )
 }

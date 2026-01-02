@@ -101,7 +101,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
       },
       {
         id: 'tasks-backlog',
-        label: 'Backlog',
+        label: 'backlog',
         icon: 'List',
         path: '/tasks/backlog',
         permission: 'task:read'
@@ -607,7 +607,7 @@ export function Header() {
               <div className="flex items-center justify-between">
                 <h4 className="font-medium">Notifications</h4>
                 <Button variant="ghost" size="sm">
-                  Mark all read
+                  Mark All as Read
                 </Button>
               </div>
               <div className="space-y-2">

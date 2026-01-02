@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
@@ -15,6 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { useProjectKanbanStatuses } from '@/hooks/useProjectKanbanStatuses'
 import { DEFAULT_TASK_STATUS_OPTIONS, DEFAULT_TASK_STATUS_BADGE_MAP, type TaskStatusOption } from '@/constants/taskStatuses'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { useNotify } from '@/lib/notify'
 import {
   ArrowLeft,
   Calendar,
@@ -36,7 +39,8 @@ import {
   Gauge,
   Zap,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  CheckSquare
 } from 'lucide-react'
 
 interface Sprint {
@@ -84,18 +88,24 @@ interface Sprint {
   tasks?: Array<{
     _id: string
     title: string
+    displayId?: string
     status: string
     storyPoints: number
     estimatedHours: number
     actualHours: number
     priority: string
     type: string
-    assignedTo: {
-      _id: string
-      firstName: string
-      lastName: string
-      email: string
-    } | null
+    assignedTo?: Array<{
+      user?: {
+        _id: string
+        firstName: string
+        lastName: string
+        email: string
+      }
+      firstName?: string
+      lastName?: string
+      email?: string
+    }>
     archived?: boolean
     movedToSprint?: {
       _id: string
@@ -181,6 +191,8 @@ export default function SprintDetailPage() {
   const router = useRouter()
   const params = useParams()
   const sprintId = params.id as string
+  const { success: notifySuccess, error: notifyError } = useNotify()
+  const { formatDate } = useDateTime()
 
   const [sprint, setSprint] = useState<Sprint | null>(null)
   const [loading, setLoading] = useState(true)
@@ -196,8 +208,9 @@ export default function SprintDetailPage() {
   const [completionMode, setCompletionMode] = useState<'existing' | 'new'>('existing')
   const [availableSprints, setAvailableSprints] = useState<SprintOption[]>([])
   const [availableSprintsLoading, setAvailableSprintsLoading] = useState(false)
+  const [sprintTasksCurrentPage, setSprintTasksCurrentPage] = useState(1)
+  const [sprintTasksPageSize, setSprintTasksPageSize] = useState(5)
   const [selectedTargetSprintId, setSelectedTargetSprintId] = useState('')
-  const [completeError, setCompleteError] = useState('')
   const [incompleteTasks, setIncompleteTasks] = useState<Array<{
     _id: string
     title: string
@@ -219,16 +232,36 @@ export default function SprintDetailPage() {
     capacity: ''
   })
   const [taskStatusUpdating, setTaskStatusUpdating] = useState<string | null>(null)
-  const [taskStatusError, setTaskStatusError] = useState('')
   const { getStatusesForProject } = useProjectKanbanStatuses()
+
+  const { hasPermission } = usePermissions()
+
+  const sprintTasks = sprint?.tasks || []
+
+  // Pagination logic for sprint tasks
+  const paginatedSprintTasks = useMemo(() => {
+    const startIndex = (sprintTasksCurrentPage - 1) * sprintTasksPageSize
+    const endIndex = startIndex + sprintTasksPageSize
+    return sprintTasks.slice(startIndex, endIndex)
+  }, [sprintTasks, sprintTasksCurrentPage, sprintTasksPageSize])
+
+  const sprintTasksTotalPages = Math.ceil(sprintTasks.length / sprintTasksPageSize)
+
+  const canCreateSprint = hasPermission(Permission.SPRINT_CREATE)
+  const canViewSprint = hasPermission(Permission.SPRINT_VIEW) || hasPermission(Permission.SPRINT_READ)
+  const canEditSprint = hasPermission(Permission.SPRINT_EDIT) && canCreateSprint
+  const canDeleteSprint = hasPermission(Permission.SPRINT_DELETE)
+  const canStartSprint = hasPermission(Permission.SPRINT_START)
+  const canCompleteSprint = hasPermission(Permission.SPRINT_COMPLETE)
+
+  const totalTasks = sprint?.progress?.totalTasks ?? sprintTasks.length
+  const hasTasks = (totalTasks ?? 0) > 0
 
   useEffect(() => {
     if (!successMessage) return
     const timeout = setTimeout(() => setSuccessMessage(''), 3000)
     return () => clearTimeout(timeout)
   }, [successMessage])
-
-  const sprintTasks = sprint?.tasks || []
 
   const projectStatusOptions = useMemo<TaskStatusOption[]>(() => {
     if (!sprint?.project?._id) {
@@ -487,7 +520,7 @@ export default function SprintDetailPage() {
     } catch (err) {
       console.error('Failed to load sprints list:', err)
       setAvailableSprints([])
-      setCompleteError(err instanceof Error ? err.message : 'Failed to load sprints')
+      notifyError({ title: 'Failed to Load Sprints', message: err instanceof Error ? err.message : 'Failed to load sprints' })
     } finally {
       setAvailableSprintsLoading(false)
     }
@@ -495,7 +528,6 @@ export default function SprintDetailPage() {
 
   useEffect(() => {
     if (!completeModalOpen) {
-      setCompleteError('')
       setSelectedTargetSprintId('')
       setCompletionMode('existing')
       setIncompleteTasks([])
@@ -506,18 +538,27 @@ export default function SprintDetailPage() {
   }, [completeModalOpen])
 
   const handleDelete = async () => {
+    if (!canDeleteSprint) {
+      setActionError('You do not have permission to delete this sprint.')
+      notifyError({ title: 'You do not have permission to delete this sprint.' })
+      setShowDeleteConfirm(false)
+      return
+    }
     try {
       setDeleting(true)
       setActionError('')
       const res = await fetch(`/api/sprints/${sprintId}`, { method: 'DELETE' })
       const data = await res.json()
       if (res.ok && data.success) {
+        notifySuccess({ title: 'Sprint deleted successfully' })
         router.push('/sprints')
       } else {
         setActionError(data?.error || 'Failed to delete sprint')
+        notifyError({ title: data?.error || 'Failed to delete sprint' })
       }
     } catch (e) {
       setActionError('Failed to delete sprint')
+      notifyError({ title: 'Failed to delete sprint' })
     } finally {
       setDeleting(false)
       setShowDeleteConfirm(false)
@@ -525,6 +566,16 @@ export default function SprintDetailPage() {
   }
 
   const handleStartSprint = async () => {
+    if (!canStartSprint) {
+      setActionError('You do not have permission to start this sprint.')
+      notifyError({ title: 'You do not have permission to start this sprint.' })
+      return
+    }
+    if (!hasTasks) {
+      setActionError('Add tasks to this sprint before starting it.')
+      notifyError({ title: 'Add tasks to this sprint before starting it.' })
+      return
+    }
     try {
       setStartingSprint(true)
       setActionError('')
@@ -534,9 +585,11 @@ export default function SprintDetailPage() {
         throw new Error(data.error || 'Failed to start sprint')
       }
       setSuccessMessage('Sprint started successfully.')
+      notifySuccess({ title: 'Sprint started successfully' })
       await fetchSprint({ silent: true })
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to start sprint')
+      notifyError({ title: err instanceof Error ? err.message : 'Failed to start sprint' })
     } finally {
       setStartingSprint(false)
     }
@@ -560,17 +613,27 @@ export default function SprintDetailPage() {
     }
 
     setSuccessMessage('Sprint completed successfully.')
+    notifySuccess({ title: 'Sprint completed successfully' })
     setCompleteModalOpen(false)
     setIncompleteTasks([])
     setSelectedTaskIds(new Set())
     setSelectedTargetSprintId('')
-    setCompleteError('')
     setExpandedTasks(new Set())
     await fetchSprint({ silent: true })
   }
 
   const handleCompleteSprintClick = async () => {
     if (!sprint) return
+    if (!canCompleteSprint) {
+      setActionError('You do not have permission to complete this sprint.')
+      notifyError({ title: 'You do not have permission to complete this sprint.' })
+      return
+    }
+    if (!hasTasks) {
+      setActionError('Add tasks to this sprint before completing it.')
+      notifyError({ title: 'Add tasks to this sprint before completing it.' })
+      return
+    }
 
     const incomplete = await checkSprintForIncompleteTasks(sprintId)
 
@@ -642,6 +705,7 @@ export default function SprintDetailPage() {
       await finalizeCompleteSprint()
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to complete sprint')
+      notifyError({ title: err instanceof Error ? err.message : 'Failed to complete sprint' })
     } finally {
       setCompletingSprint(false)
     }
@@ -653,7 +717,7 @@ export default function SprintDetailPage() {
         setCompletingSprint(true)
         await finalizeCompleteSprint()
       } catch (err) {
-        setCompleteError(err instanceof Error ? err.message : 'Failed to complete sprint')
+        notifyError({ title: 'Failed to Complete Sprint', message: err instanceof Error ? err.message : 'Failed to complete sprint' })
       } finally {
         setCompletingSprint(false)
       }
@@ -666,7 +730,7 @@ export default function SprintDetailPage() {
         setCompletingSprint(true)
         await finalizeCompleteSprint() // No targetSprintId means move all to backlog
       } catch (err) {
-        setCompleteError(err instanceof Error ? err.message : 'Failed to complete sprint')
+        notifyError({ title: 'Failed to Complete Sprint', message: err instanceof Error ? err.message : 'Failed to complete sprint' })
       } finally {
         setCompletingSprint(false)
       }
@@ -675,14 +739,14 @@ export default function SprintDetailPage() {
 
     if (completionMode === 'existing') {
       if (!selectedTargetSprintId) {
-        setCompleteError('Select a sprint to move the remaining tasks into.')
+        notifyError({ title: 'Sprint Selection Required', message: 'Select a sprint to move the remaining tasks into.' })
         return
       }
       try {
         setCompletingSprint(true)
         await finalizeCompleteSprint(selectedTargetSprintId)
       } catch (err) {
-        setCompleteError(err instanceof Error ? err.message : 'Failed to move tasks to the selected sprint')
+        notifyError({ title: 'Failed to Move Tasks', message: err instanceof Error ? err.message : 'Failed to move tasks to the selected sprint' })
       } finally {
         setCompletingSprint(false)
       }
@@ -690,12 +754,12 @@ export default function SprintDetailPage() {
     }
 
     if (!newSprintForm.name || !newSprintForm.startDate || !newSprintForm.endDate) {
-      setCompleteError('Provide a name and date range for the new sprint.')
+      notifyError({ title: 'Validation Error', message: 'Provide a name and date range for the new sprint.' })
       return
     }
 
     if (!sprint?.project?._id) {
-      setCompleteError('Sprint project information is missing.')
+      notifyError({ title: 'Project Information Missing', message: 'Sprint project information is missing.' })
       return
     }
 
@@ -756,7 +820,7 @@ export default function SprintDetailPage() {
 
       await finalizeCompleteSprint(newSprintId, newSprint)
     } catch (err) {
-      setCompleteError(err instanceof Error ? err.message : 'Failed to create sprint')
+      notifyError({ title: 'Failed to Create Sprint', message: err instanceof Error ? err.message : 'Failed to create sprint' })
     } finally {
       setCompletingSprint(false)
     }
@@ -765,11 +829,10 @@ export default function SprintDetailPage() {
   const handleTaskStatusChange = async (taskId: string, newStatus: string) => {
     try {
       if (!projectStatusOptions.some(option => option.value === newStatus)) {
-        setTaskStatusError('Selected status is not available for this project.')
+        notifyError({ title: 'Invalid Status', message: 'Selected status is not available for this project.' })
         return
       }
       setTaskStatusUpdating(taskId)
-      setTaskStatusError('')
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -793,8 +856,9 @@ export default function SprintDetailPage() {
           progress: updatedProgress
         }
       })
+      notifySuccess({ title: 'Task status updated' })
     } catch (err) {
-      setTaskStatusError(err instanceof Error ? err.message : 'Failed to update task status')
+      notifyError({ title: 'Failed to Update Task', message: err instanceof Error ? err.message : 'Failed to update task status' })
     } finally {
       setTaskStatusUpdating(null)
     }
@@ -872,77 +936,85 @@ export default function SprintDetailPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 overflow-x-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto min-w-0">
-            <Button variant="ghost" onClick={() => router.push('/sprints')} className="w-full sm:w-auto flex-shrink-0">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <div className="flex-1 min-w-0 w-full sm:w-auto">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0">
-                <Zap className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-blue-600 flex-shrink-0" />
-                <span className="truncate min-w-0" title={sprint?.name}>{sprint?.name}</span>
-              </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">Sprint Details</p>
+      <div className="space-y-8 sm:space-y-10 lg:space-y-12 overflow-x-hidden">
+        <div className="border-b border-border/40 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+              <Button
+                variant="ghost"
+                onClick={() => router.push('/sprints')}
+                className="self-start text-sm hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-3"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                <h1 className="text-2xl font-semibold leading-snug text-foreground flex items-start gap-2 min-w-0 flex-wrap max-w-[70ch] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden break-words overflow-wrap-anywhere">
+                  <Zap className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-blue-600 flex-shrink-0" />
+                  <span className="break-words overflow-wrap-anywhere" title={sprint?.name}>{sprint?.name}</span>
+                </h1>
+                <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap ml-auto">
+                  {sprint?.status === 'planning' && canStartSprint && (
+                    <Button
+                      variant="default"
+                      onClick={handleStartSprint}
+                      disabled={startingSprint}
+                      className="min-h-[36px] w-full sm:w-auto bg-green-600 hover:bg-green-700"
+                    >
+                      {startingSprint ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Play className="h-4 w-4 mr-2" />
+                      )}
+                      {startingSprint ? 'Starting...' : 'Start Sprint'}
+                    </Button>
+                  )}
+                  {sprint?.status === 'active' && canCompleteSprint && (
+                    <Button
+                      variant="default"
+                      onClick={handleCompleteSprintClick}
+                      disabled={completingSprint}
+                      className="min-h-[36px] w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+                    >
+                      {completingSprint ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <CheckSquare className="h-4 w-4 mr-2" />
+                      )}
+                      {completingSprint ? 'Completing...' : 'Complete Sprint'}
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (!canEditSprint) return
+                      router.push(`/sprints/${sprintId}/edit`)
+                    }}
+                    className="min-h-[36px] w-full sm:w-auto"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      if (!canDeleteSprint) return
+                      setShowDeleteConfirm(true)
+                    }}
+                    className="min-h-[36px] w-full sm:w-auto"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-shrink-0">
-            <Button variant="outline" onClick={() => router.push(`/sprints/${sprintId}/edit`)} className="w-full sm:w-auto">
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-            <Button variant="destructive" onClick={() => setShowDeleteConfirm(true)} disabled={deleting} className="w-full sm:w-auto">
-              <Trash2 className="h-4 w-4 mr-2" />
-              {deleting ? 'Deleting...' : 'Delete'}
-            </Button>
-            {sprint.status === 'planning' && (
-              <Button
-                onClick={handleStartSprint}
-                disabled={startingSprint}
-                className="w-full sm:w-auto"
-              >
-                {startingSprint ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Play className="h-4 w-4 mr-2" />
-                )}
-                {startingSprint ? 'Starting...' : 'Start Sprint'}
-              </Button>
-            )}
-            {sprint.status === 'active' && (
-              <Button
-                onClick={handleCompleteSprintClick}
-                disabled={completingSprint}
-                className="w-full sm:w-auto"
-              >
-                {completingSprint ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                )}
-                {completingSprint ? 'Completing...' : 'Complete Sprint'}
-              </Button>
-            )}
+            <p className="text-sm text-muted-foreground">Sprint Details</p>
           </div>
         </div>
 
-        {actionError && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{actionError}</AlertDescription>
-          </Alert>
-        )}
-
-        {successMessage && (
-          <Alert variant="success">
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>{successMessage}</AlertDescription>
-          </Alert>
-        )}
-
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-3">
-          <div className="md:col-span-2 space-y-4 sm:space-y-6">
+        <div className="grid gap-8 grid-cols-1 md:grid-cols-3">
+          <div className="md:col-span-2 space-y-8">
             <Card className="overflow-x-hidden">
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-base sm:text-lg">Description</CardTitle>
@@ -990,19 +1062,12 @@ export default function SprintDetailPage() {
                     />
                   </div>
                 </div>
+                <br />
 
-                {!sprint?.progress?.totalTasks && (
-                  <Alert variant="default" className="border-dashed border-muted-foreground/40 bg-muted/40">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription className="text-xs sm:text-sm">
-                      Assign tasks to this sprint to start tracking progress, story points, and burn-down metrics.
-                    </AlertDescription>
-                  </Alert>
-                )}
 
                 {sprint?.progress?.totalTasks ? (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                       <div className="rounded-lg border bg-background p-3">
                         <div className="flex items-center justify-between text-xs uppercase text-muted-foreground tracking-wide">
                           <span>Tasks Completed</span>
@@ -1023,7 +1088,7 @@ export default function SprintDetailPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="rounded-lg border bg-background p-3">
                         <div className="flex items-center justify-between text-xs uppercase text-muted-foreground tracking-wide">
                           <span>Estimated Hours</span>
@@ -1090,34 +1155,52 @@ export default function SprintDetailPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 sm:p-6 pt-0 space-y-4">
-                {taskStatusError && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{taskStatusError}</AlertDescription>
-                  </Alert>
-                )}
-
                 {sprintTasks.length === 0 ? (
                   <p className="text-sm sm:text-base text-muted-foreground">
                     No tasks {sprint?.status === 'completed' ? 'were' : 'are currently'} assigned to this sprint.
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                    {sprintTasks.map(task => (
+                    {paginatedSprintTasks.map(task => {
+                      return (
                       <div
                         key={task._id}
                         onClick={() => router.push(`/tasks/${task._id}`)}
                         className={`rounded-lg border bg-background p-3 sm:p-4 space-y-3 cursor-pointer hover:shadow-md transition-shadow ${task.archived ? 'border-dashed opacity-90' : ''
                           }`}
                       >
-                        <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2">
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm sm:text-base truncate" title={task.title}>
-                              {task.title}
-                            </p>
+                            <div className="flex items-center gap-2 mb-1">
+                              {task?.displayId && (
+                                <Badge variant="outline" className="text-xs">#{task.displayId}</Badge>
+                              )}
+                              <h4 className="font-medium text-sm sm:text-base truncate flex-1" title={task.title}>
+                                {task?.title || 'Untitled Task'}
+                              </h4>
+                            </div>
                             <p className="text-xs text-muted-foreground">
-                              {task.assignedTo
-                                ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}`
-                                : 'Unassigned'}
+                              {(() => {
+                                if (!task?.assignedTo || !Array.isArray(task.assignedTo) || task.assignedTo.length === 0) {
+                                  return 'Unassigned';
+                                }
+
+                                if (task.assignedTo.length === 1) {
+                                  // Handle both string (user ID) and object formats for backward compatibility
+                                  const assignee = task.assignedTo[0];
+                                  if (typeof assignee === 'string') {
+                                    return `Assigned to 1 person`;
+                                  } else {
+                                    // Legacy object format
+                                    const firstName = assignee?.user?.firstName || assignee?.firstName || '';
+                                    const lastName = assignee?.user?.lastName || assignee?.lastName || '';
+                                    const displayName = `${firstName} ${lastName}`.trim();
+                                    return displayName || 'Unknown User';
+                                  }
+                                } else {
+                                  return `Assigned to ${task.assignedTo.length} people`;
+                                }
+                              })()}
                             </p>
                             {task.movedToSprint && (
                               <p className="text-xs font-medium text-orange-600 dark:text-orange-400 mt-1">
@@ -1126,30 +1209,31 @@ export default function SprintDetailPage() {
                             )}
                             {task.movedToBacklog && (
                               <p className="text-xs font-medium text-orange-600 dark:text-orange-400 mt-1">
-                                Moved to Backlog
+                                Moved to backlog
                               </p>
                             )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-[11px] uppercase hover:bg-transparent dark:hover:bg-transparent">
-                              {formatToTitleCase(task.priority)}
+                        </div>
+
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="outline" className="text-[11px] uppercase hover:bg-transparent dark:hover:bg-transparent">
+                            {formatToTitleCase(task.priority)}
+                          </Badge>
+                          {task.archived && (
+                            <Badge variant="secondary" className="text-[11px] uppercase hover:bg-secondary dark:hover:bg-secondary">
+                              Archived
                             </Badge>
-                            {task.archived && (
-                              <Badge variant="secondary" className="text-[11px] uppercase hover:bg-secondary dark:hover:bg-secondary">
-                                Archived
-                              </Badge>
-                            )}
-                            {task.movedToSprint && (
-                              <Badge variant="outline" className="text-[11px] bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20">
-                                Spillover
-                              </Badge>
-                            )}
-                            {task.movedToBacklog && (
-                              <Badge variant="outline" className="text-[11px] bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20">
-                                Backlog
-                              </Badge>
-                            )}
-                          </div>
+                          )}
+                          {task.movedToSprint && (
+                            <Badge variant="outline" className="text-[11px] bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20">
+                              Spillover
+                            </Badge>
+                          )}
+                          {task.movedToBacklog && (
+                            <Badge variant="outline" className="text-[11px] bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20">
+                              backlog
+                            </Badge>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -1194,19 +1278,70 @@ export default function SprintDetailPage() {
                         {task.movedToBacklog && (
                           <div className="rounded-md border bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800 p-2">
                             <p className="text-xs text-muted-foreground">
-                              This task has been moved to <span className="font-medium text-orange-700 dark:text-orange-400">Backlog</span>
+                              This task has been moved to <span className="font-medium text-orange-700 dark:text-orange-400">backlog</span>
                             </p>
                           </div>
                         )}
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </CardContent>
+
+              {/* Pagination Controls */}
+              {sprintTasks.length > sprintTasksPageSize && (
+                <Card className="mt-4">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Items per page:</span>
+                        <select
+                          value={sprintTasksPageSize}
+                          onChange={(e) => {
+                            setSprintTasksPageSize(parseInt(e.target.value))
+                            setSprintTasksCurrentPage(1)
+                          }}
+                          className="px-2 py-1 border rounded text-sm bg-background"
+                        >
+                          <option value="5">5</option>
+                          <option value="10">10</option>
+                          <option value="50">50</option>
+                          <option value="100">100</option>
+                        </select>
+                        <span>
+                          Showing {((sprintTasksCurrentPage - 1) * sprintTasksPageSize) + 1} to {Math.min(sprintTasksCurrentPage * sprintTasksPageSize, sprintTasks.length)} of {sprintTasks.length}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => setSprintTasksCurrentPage(sprintTasksCurrentPage - 1)}
+                          disabled={sprintTasksCurrentPage === 1}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm text-muted-foreground px-2">
+                          Page {sprintTasksCurrentPage} of {sprintTasksTotalPages || 1}
+                        </span>
+                        <Button
+                          onClick={() => setSprintTasksCurrentPage(sprintTasksCurrentPage + 1)}
+                          disabled={sprintTasksCurrentPage >= sprintTasksTotalPages}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </Card>
           </div>
 
-          <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-8">
             <Card className="overflow-x-hidden">
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-base sm:text-lg">Details</CardTitle>
@@ -1240,14 +1375,14 @@ export default function SprintDetailPage() {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <span className="text-xs sm:text-sm text-muted-foreground">Start Date</span>
                   <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
-                    {new Date(sprint?.startDate).toLocaleDateString()}
+                    {formatDate(sprint?.startDate)}
                   </span>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <span className="text-xs sm:text-sm text-muted-foreground">End Date</span>
                   <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
-                    {new Date(sprint?.endDate).toLocaleDateString()}
+                    {formatDate(sprint?.endDate)}
                   </span>
                 </div>
 
@@ -1301,7 +1436,7 @@ export default function SprintDetailPage() {
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {new Date(sprint?.createdAt).toLocaleDateString()}
+                  {formatDate(sprint?.createdAt)}
                 </p>
               </CardContent>
             </Card>
@@ -1326,7 +1461,6 @@ export default function SprintDetailPage() {
           onOpenChange={(open) => {
             if (!open) {
               setCompleteModalOpen(false)
-              setCompleteError('')
               setSelectedTargetSprintId('')
               setCompletionMode('existing')
               setIncompleteTasks([])
@@ -1365,7 +1499,7 @@ export default function SprintDetailPage() {
                   ) : (
                     <>
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      Move Tasks to Backlog and Complete Sprint
+                      Move Tasks to backlog and Complete Sprint
                     </>
                   )}
                 </Button>
@@ -1391,12 +1525,6 @@ export default function SprintDetailPage() {
           }
         >
           <div className="space-y-4">
-            {completeError && (
-              <Alert variant="destructive">
-                <AlertDescription>{completeError}</AlertDescription>
-              </Alert>
-            )}
-
             {incompleteTasks.length > 0 ? (
               <div className="space-y-3">
                 <div>
@@ -1529,7 +1657,7 @@ export default function SprintDetailPage() {
                 </div>
 
                 {selectedTaskIds.size === 0 ? (
-                  // No tasks selected - show "Move to Backlog" option
+                  // No tasks selected - show "Move to backlog" option
 
                   <p className="text-xs text-muted-foreground">
                     All incomplete tasks will be moved to the backlog.
@@ -1545,7 +1673,6 @@ export default function SprintDetailPage() {
                         onClick={() => {
                           setCompletionMode('existing')
                           setSelectedTargetSprintId('')
-                          setCompleteError('')
                         }}
                       >
                         Move to Next Sprint
@@ -1556,7 +1683,6 @@ export default function SprintDetailPage() {
                         size="sm"
                         onClick={() => {
                           setCompletionMode('new')
-                          setCompleteError('')
                         }}
                       >
                         Create New Sprint

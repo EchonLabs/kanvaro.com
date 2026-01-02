@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { User, Project, Task, Story, Epic, Sprint } from '@/models'
+import { DocsLoader } from '@/lib/docs/loader'
+import { authenticateUser } from '@/lib/auth-utils'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 interface SearchFilters {
   type?: string[]
@@ -26,7 +29,7 @@ interface SearchResult {
   id: string
   title: string
   description?: string
-  type: 'project' | 'task' | 'story' | 'epic' | 'sprint' | 'user'
+  type: 'project' | 'task' | 'story' | 'epic' | 'sprint' | 'user' | 'documentation'
   url: string
   score: number
   highlights: string[]
@@ -37,6 +40,8 @@ interface SearchResult {
     project?: string
     createdAt: string
     updatedAt: string
+    category?: string
+    audience?: string
   }
 }
 
@@ -48,6 +53,8 @@ interface SearchResponse {
     statuses: Record<string, number>
     priorities: Record<string, number>
     projects: Record<string, number>
+    categories?: Record<string, number>
+    audiences?: Record<string, number>
   }
   suggestions: string[]
   took: number
@@ -183,13 +190,17 @@ export async function GET(request: NextRequest) {
   try {
     const startTime = Date.now()
     const { searchParams } = new URL(request.url)
-    
+
     const query = (searchParams.get('q') || '').trim()
     const limit = parseInt(searchParams.get('limit') || '20')
     const offset = parseInt(searchParams.get('offset') || '0')
     const sortBy = searchParams.get('sortBy') || 'score'
     const sortOrder = (searchParams.get('sortOrder') || 'desc') as 'asc' | 'desc'
     const includeArchived = searchParams.get('includeArchived') === 'true'
+
+    // Authenticate user for documentation search
+    const auth = await authenticateUser()
+    const hasDocSearchPermission = auth && !('error' in auth) // Any authenticated user can search docs
 
     const isProjectNumber = /^\d+$/.test(query)
     const isTaskDisplayId = /^\d+\.\d+$/.test(query)
@@ -312,6 +323,31 @@ export async function GET(request: NextRequest) {
       }
     }
     
+    // Preload user and project names for display
+    const [allUsers, allProjects] = await Promise.all([
+      User.find({}, 'firstName lastName email').lean(),
+      Project.find({}, 'name').lean()
+    ])
+    const userNameMap = new Map<string, string>()
+    allUsers.forEach((u: any) => {
+      const name = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email || ''
+      userNameMap.set((u._id as any).toString(), name || (u._id as any).toString())
+    })
+    const projectNameMap = new Map<string, string>()
+    allProjects.forEach((p: any) => {
+      projectNameMap.set((p._id as any).toString(), p.name || (p._id as any).toString())
+    })
+    const getUserName = (id?: any) => {
+      if (!id) return undefined
+      const key = id.toString()
+      return userNameMap.get(key) || key
+    }
+    const getProjectName = (id?: any) => {
+      if (!id) return undefined
+      const key = id.toString()
+      return projectNameMap.get(key) || key
+    }
+
     // Search Tasks
     if (!filters.type || filters.type.includes('task')) {
       const taskQuery: any = {
@@ -352,8 +388,8 @@ export async function GET(request: NextRequest) {
             metadata: {
               status: task.status,
               priority: task.priority,
-              assignee: (task as any).assignedTo ? ((task as any).assignedTo?._id?.toString?.() || (task as any).assignedTo?.toString?.()) : undefined,
-              project: (task as any).project?.toString?.(),
+              assignee: getUserName((task as any).assignedTo),
+              project: getProjectName((task as any).project),
               createdAt: task.createdAt.toISOString(),
               updatedAt: task.updatedAt.toISOString()
             }
@@ -394,7 +430,7 @@ export async function GET(request: NextRequest) {
             metadata: {
               status: story.status,
               priority: story.priority,
-              project: story.projectId?.toString(),
+              project: getProjectName(story.project),
               createdAt: story.createdAt.toISOString(),
               updatedAt: story.updatedAt.toISOString()
             }
@@ -435,7 +471,7 @@ export async function GET(request: NextRequest) {
             metadata: {
               status: epic.status,
               priority: epic.priority,
-              project: (epic as any).project?.toString?.(),
+              project: getProjectName((epic as any).project),
               createdAt: epic.createdAt.toISOString(),
               updatedAt: epic.updatedAt.toISOString()
             }
@@ -519,7 +555,40 @@ export async function GET(request: NextRequest) {
         }
       }
     }
-    
+
+    // Search Documentation (if user has permission)
+    if (!filters.type || filters.type.includes('documentation')) {
+      if (hasDocSearchPermission && searchText.length >= 2) {
+        try {
+          const docResults = await DocsLoader.searchDocs(searchText, 'internal')
+
+          for (const doc of docResults) {
+            const score = calculateScore(searchText, doc.title, 'documentation')
+            if (score > 0) {
+              results.push({
+                id: doc.slug,
+                title: doc.title,
+                description: doc.summary,
+                type: 'documentation',
+                url: `/docs/internal/${doc.slug}`,
+                score,
+                highlights: generateHighlights(searchText, doc.title),
+                metadata: {
+                  createdAt: doc.updated,
+                  updatedAt: doc.updated,
+                  category: doc.category,
+                  audience: doc.audiences.join(', ')
+                }
+              })
+            }
+          }
+        } catch (error) {
+          console.error('Documentation search error:', error)
+          // Continue without documentation results if there's an error
+        }
+      }
+    }
+
     // Sort results
     results.sort((a, b) => {
       if (sortBy === 'score') {
@@ -541,9 +610,11 @@ export async function GET(request: NextRequest) {
       types: {} as Record<string, number>,
       statuses: {} as Record<string, number>,
       priorities: {} as Record<string, number>,
-      projects: {} as Record<string, number>
+      projects: {} as Record<string, number>,
+      categories: {} as Record<string, number>,
+      audiences: {} as Record<string, number>
     }
-    
+
     for (const result of results) {
       aggregations.types[result.type] = (aggregations.types[result.type] || 0) + 1
       if (result.metadata.status) {
@@ -554,6 +625,12 @@ export async function GET(request: NextRequest) {
       }
       if (result.metadata.project) {
         aggregations.projects[result.metadata.project] = (aggregations.projects[result.metadata.project] || 0) + 1
+      }
+      if (result.metadata.category) {
+        aggregations.categories[result.metadata.category] = (aggregations.categories[result.metadata.category] || 0) + 1
+      }
+      if (result.metadata.audience) {
+        aggregations.audiences[result.metadata.audience] = (aggregations.audiences[result.metadata.audience] || 0) + 1
       }
     }
     

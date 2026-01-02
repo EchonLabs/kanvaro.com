@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { formatToTitleCase, cn } from '@/lib/utils'
 import { useTaskSync, useTaskState } from '@/hooks/useTaskSync'
+import { useNotify } from '@/lib/notify'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { Calendar as DateRangeCalendar } from '@/components/ui/calendar'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -43,7 +45,6 @@ import {
   Calendar, 
   Clock,
   CheckCircle,
-  AlertTriangle,
   Pause,
   XCircle,
   Play,
@@ -63,7 +64,8 @@ import {
   Eye,
   Edit,
   Trash2,
-  X
+  X,
+  RotateCcw
 } from 'lucide-react'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
 import EditTaskModal from '@/components/tasks/EditTaskModal'
@@ -103,6 +105,7 @@ interface Task {
   estimatedHours?: number
   actualHours?: number
   labels: string[]
+  position?: number
   createdAt: string
   updatedAt: string
 }
@@ -141,7 +144,7 @@ interface TaskOption {
 }
 
 const defaultColumns = [
-  { id: 'backlog', title: 'Backlog', color: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200' },
+  { id: 'backlog', title: 'backlog', color: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200' },
   { id: 'todo', title: 'To Do', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' },
   { id: 'in_progress', title: 'In Progress', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
   { id: 'review', title: 'Review', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
@@ -150,18 +153,22 @@ const defaultColumns = [
 ]
 
 // Column Drop Zone Component
-function ColumnDropZone({ 
-  column, 
-  tasks, 
+function ColumnDropZone({
+  column,
+  tasks,
   onCreateTask,
-  onEditTask, 
-  onDeleteTask 
-}: { 
-  column: any, 
-  tasks: Task[], 
+  onEditTask,
+  onDeleteTask,
+  pendingUpdates,
+  canDragTask
+}: {
+  column: any,
+  tasks: Task[],
   onCreateTask?: (status?: string) => void,
   onEditTask?: (task: Task) => void,
-  onDeleteTask?: (taskId: string) => void
+  onDeleteTask?: (taskId: string) => void,
+  pendingUpdates?: Set<string>
+  canDragTask?: (task: Task) => boolean
 }) {
   const router = useRouter()
   const { setNodeRef, isOver } = useDroppable({
@@ -239,15 +246,16 @@ function ColumnDropZone({
             </div>
           ) : (
             tasks.map((task) => (
-              <SortableTask 
-              
-                key={task._id} 
+              <SortableTask
+                key={`${task._id}-${task.status}-${task.position}`}
                 task={task}
                 onClick={() => router.push(`/tasks/${task._id}`)}
                 getPriorityColor={getPriorityColor}
                 getTypeColor={getTypeColor}
                 onEdit={onEditTask}
                 onDelete={onDeleteTask}
+                isUpdating={pendingUpdates?.has(task._id)}
+                isDraggable={canDragTask ? canDragTask(task) : true}
               />
             ))
           )}
@@ -260,9 +268,10 @@ function ColumnDropZone({
 
 export default function KanbanPage() {
   const router = useRouter()
+  const { formatDate } = useDateTime()
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const [searchQuery, setSearchQuery] = useState('')
   const [projectFilter, setProjectFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
@@ -288,7 +297,34 @@ export default function KanbanPage() {
   const [taskNumberFilter, setTaskNumberFilter] = useState('all')
   const [taskNumberFilterQuery, setTaskNumberFilterQuery] = useState('')
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  const [pendingUpdates, setPendingUpdates] = useState<Set<string>>(new Set())
   const hasFetchedProjects = useRef(false)
+
+  // Check if any filters are active
+  const hasActiveFilters = projectFilter !== 'all' ||
+                          priorityFilter !== 'all' ||
+                          typeFilter !== 'all' ||
+                          assignedToFilter !== 'all' ||
+                          assignedByFilter !== 'all' ||
+                          taskNumberFilter !== 'all' ||
+                          dateRangeFilter !== undefined
+
+  // Reset all filters
+  const resetFilters = () => {
+    setProjectFilter('all')
+    setPriorityFilter('all')
+    setTypeFilter('all')
+    setAssignedToFilter('all')
+    setAssignedByFilter('all')
+    setTaskNumberFilter('all')
+    setDateRangeFilter(undefined)
+    setProjectFilterQuery('')
+    setPriorityFilterQuery('')
+    setTypeFilterQuery('')
+    setAssignedToFilterQuery('')
+    setAssignedByFilterQuery('')
+    setTaskNumberFilterQuery('')
+  }
 
   // Use the task state management hook
   const {
@@ -301,6 +337,7 @@ export default function KanbanPage() {
     handleTaskCreate,
     handleTaskDelete
   } = useTaskState([])
+  // Use the notification hook
 
   // Use the task synchronization hook
   const {
@@ -331,10 +368,10 @@ export default function KanbanPage() {
       if (data.success) {
         setTasks(data.data)
       } else {
-        setError(data.error || 'Failed to fetch tasks')
+        notifyError({ title: 'Failed to Load Tasks', message: data.error || 'Failed to fetch tasks' })
       }
     } catch (err) {
-      setError('Failed to fetch tasks')
+      notifyError({ title: 'Failed to Load Tasks', message: 'Failed to fetch tasks' })
     } finally {
       setLoading(false)
     }
@@ -441,16 +478,20 @@ export default function KanbanPage() {
     const assignedByMap = new Map<string, PersonOption>()
 
     tasks.forEach((task) => {
-      if (task.assignedTo) {
-        const id = task.assignedTo._id || task.assignedTo.email || `${task.assignedTo.firstName}-${task.assignedTo.lastName}`
-        if (id) {
-          const name = `${task.assignedTo.firstName} ${task.assignedTo.lastName}`.trim()
-          assignedToMap.set(id, {
-            id,
-            name,
-            email: task.assignedTo.email
-          })
-        }
+      if (task.assignedTo && Array.isArray(task.assignedTo)) {
+        task.assignedTo.forEach((assignee: any) => {
+          if (assignee.user) {
+            const id = assignee.user._id
+            if (id) {
+              const name = `${assignee.user.firstName} ${assignee.user.lastName}`.trim()
+              assignedToMap.set(id, {
+                id,
+                name,
+                email: assignee.user.email
+              })
+            }
+          }
+        })
       }
 
       if (task.createdBy) {
@@ -534,6 +575,13 @@ export default function KanbanPage() {
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
+
+  // Handle task errors from the task state hook
+  useEffect(() => {
+    if (taskError) {
+      notifyError({ title: 'Task Synchronization Error', message: taskError })
+    }
+  }, [taskError, notifyError])
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -664,9 +712,13 @@ export default function KanbanPage() {
     const matchesProject = projectFilter === 'all' || (task.project?._id && task.project._id === projectFilter)
     const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
     const matchesType = typeFilter === 'all' || task.type === typeFilter
-    const assignedToId = task.assignedTo?._id || task.assignedTo?.email || `${task.assignedTo?.firstName ?? ''}-${task.assignedTo?.lastName ?? ''}`
+
+    // Check if the selected user is in the assignedTo array
+    const matchesAssignedTo = assignedToFilter === 'all' ||
+      (Array.isArray(task.assignedTo) &&
+       task.assignedTo.some((assignee: any) => assignee.user?._id === assignedToFilter))
+
     const createdById = task.createdBy?._id || task.createdBy?.email || `${task.createdBy?.firstName ?? ''}-${task.createdBy?.lastName ?? ''}`
-    const matchesAssignedTo = assignedToFilter === 'all' || (assignedToId && assignedToId === assignedToFilter)
     const matchesAssignedBy = assignedByFilter === 'all' || (createdById && createdById === assignedByFilter)
     const taskIdMatches = taskNumberFilter === 'all' ||
       task._id === taskNumberFilter ||
@@ -705,7 +757,7 @@ export default function KanbanPage() {
 
     if (!over) return
 
-    const activeId = active.id
+    const activeId = active.id as string
     const overId = over.id
 
     if (activeId === overId) return
@@ -714,28 +766,151 @@ export default function KanbanPage() {
     const activeTask = tasks.find(task => task._id === activeId)
     if (!activeTask) return
 
-    // Determine the new status based on the drop target
     const columns = getColumns()
     let newStatus = activeTask.status
+    let shouldReorder = false
+    let newPosition = activeTask.position || 0
+
+    // Determine the drop target type and new status
     if (typeof overId === 'string' && columns.some(col => col.id === overId)) {
+      // Dropped directly on a column (empty column)
       newStatus = overId as any
-    } else {
-      // If dropped on another task, get the status of that task
+      // Set position to end of the column
+      const columnTasks = tasks.filter(t => t.status === newStatus)
+      newPosition = columnTasks.length
+    } else if (typeof overId === 'string') {
+      // Dropped on another task - get its status
       const overTask = tasks.find(task => task._id === overId)
       if (overTask) {
         newStatus = overTask.status
+        // Calculate new position based on drop location
+        const columnTasks = tasks.filter(t => t.status === newStatus)
+        const overIndex = columnTasks.findIndex(t => t._id === overId)
+
+        if (newStatus === activeTask.status) {
+          // Same column reordering
+          shouldReorder = true
+          const activeIndex = columnTasks.findIndex(t => t._id === activeId)
+          if (activeIndex < overIndex) {
+            newPosition = overIndex
+          } else {
+            newPosition = overIndex
+          }
+        } else {
+          // Cross-column move - place at end
+          newPosition = columnTasks.length
+        }
       }
     }
 
-    // Update the task status with optimistic updates
-    if (newStatus !== activeTask.status) {
+    // Optimistic update - update UI immediately
+    const originalTask = { ...activeTask }
+
+    if (newStatus !== activeTask.status || shouldReorder) {
+      // Mark task as having pending update
+      setPendingUpdates(prev => new Set(prev).add(activeId))
+
+      // Update local state immediately for instant visual feedback
+      setTasks(prevTasks => {
+        const updatedTasks = [...prevTasks]
+        const taskIndex = updatedTasks.findIndex(t => t._id === activeId)
+
+        if (taskIndex !== -1) {
+          // Update the task
+          updatedTasks[taskIndex] = {
+            ...updatedTasks[taskIndex],
+            status: newStatus,
+            position: newPosition
+          }
+
+          // If reordering within same column, reorder the array
+          if (shouldReorder && newStatus === activeTask.status) {
+            const columnTasks = updatedTasks.filter(t => t.status === newStatus)
+            const otherTasks = updatedTasks.filter(t => t.status !== newStatus)
+
+            // Remove the moved task and reinsert at new position
+            const movedTask = columnTasks.find(t => t._id === activeId)
+            const remainingTasks = columnTasks.filter(t => t._id !== activeId)
+
+            remainingTasks.splice(newPosition, 0, movedTask!)
+
+            return [...otherTasks, ...remainingTasks]
+          }
+        }
+
+        return updatedTasks
+      })
+
+      // Background sync with server
       try {
-        await updateTaskOptimistically(activeId as string, {
-          status: newStatus
+        if (shouldReorder) {
+          // Handle reordering
+          const columnTasks = tasks.filter(t => t.status === newStatus)
+          const orderedTaskIds = columnTasks
+            .filter(t => t._id !== activeId)
+            .slice(0, newPosition)
+            .concat([activeId])
+            .concat(columnTasks.filter(t => t._id !== activeId).slice(newPosition))
+            .map(t => t._id)
+
+          await fetch('/api/tasks/reorder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: projectFilter === 'all' ? null : projectFilter,
+              status: newStatus,
+              orderedTaskIds
+            })
+          })
+        } else {
+          // Handle status change
+          const response = await fetch(`/api/tasks/${activeId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status: newStatus,
+              position: newPosition
+            })
+          })
+
+          if (!response.ok) {
+            throw new Error('Failed to update task')
+          }
+        }
+
+        // Success - remove from pending updates
+        setPendingUpdates(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(activeId)
+          return newSet
         })
       } catch (error) {
-        console.error('Failed to update task status:', error)
-        setError('Failed to update task status. Please try again.')
+        console.error('Failed to sync task update:', error)
+
+        // Revert optimistic update on failure
+        setTasks(prevTasks => {
+          const updatedTasks = [...prevTasks]
+          const taskIndex = updatedTasks.findIndex(t => t._id === activeId)
+
+          if (taskIndex !== -1) {
+            // Restore original task data
+            updatedTasks[taskIndex] = originalTask
+          }
+
+          return updatedTasks
+        })
+
+        // Remove from pending updates
+        setPendingUpdates(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(activeId)
+          return newSet
+        })
+
+        notifyError({
+          title: 'Update Failed',
+          message: 'Failed to update task. Changes have been reverted.'
+        })
       }
     }
   }
@@ -776,7 +951,7 @@ export default function KanbanPage() {
         setSelectedTask(null)
       } catch (error) {
         console.error('Failed to delete task:', error)
-        setError('Failed to delete task. Please try again.')
+        notifyError({ title: 'Failed to Delete Task', message: 'Failed to delete task. Please try again.' })
       }
     }
   }
@@ -822,12 +997,6 @@ export default function KanbanPage() {
           </Button>
         </div>
 
-        {(error || taskError) && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error || taskError}</AlertDescription>
-          </Alert>
-        )}
 
         {/* Real-time connection status */}
         {isConnected && (
@@ -1190,6 +1359,29 @@ export default function KanbanPage() {
                 </div>
                 </div>
               </div>
+              {hasActiveFilters && (
+                <div className="flex justify-start mt-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={resetFilters}
+                          className="text-xs"
+                          aria-label="Reset all filters"
+                        >
+                          <RotateCcw className="h-4 w-4 mr-1" />
+                          Reset Filters
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Reset filters</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -1198,19 +1390,31 @@ export default function KanbanPage() {
               collisionDetection={closestCorners}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
+              onDragOver={(event) => {
+                // Optional: Add visual feedback during drag
+                const { over } = event
+                if (over) {
+                  // Could add hover effects here if needed
+                }
+              }}
             >
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                 {getColumns().map((column) => {
                   const columnTasks = getTasksByStatus(column.id)
                   
                   return (
-                    <ColumnDropZone 
-                      key={column.id} 
-                      column={column} 
+                    <ColumnDropZone
+                      key={column.id}
+                      column={column}
                       tasks={columnTasks}
                       onCreateTask={handleCreateTask}
                       onEditTask={handleEditTask}
                       onDeleteTask={handleDeleteTask}
+                      pendingUpdates={pendingUpdates}
+                      canDragTask={(task) => {
+                        // Allow dragging if task is not in backlog, or if it is in backlog but assigned to a sprint
+                        return task.status !== 'backlog'
+                      }}
                     />
                   )
                 })}
@@ -1311,11 +1515,14 @@ interface SortableTaskProps {
   getPriorityColor: (priority: string) => string
   getTypeColor: (type: string) => string
   isDragOverlay?: boolean
+  isUpdating?: boolean
+  isDraggable?: boolean
   onEdit?: (task: Task) => void
   onDelete?: (taskId: string) => void
 }
 
-function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOverlay = false, onEdit, onDelete }: SortableTaskProps) {
+function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOverlay = false, isUpdating = false, isDraggable = true, onEdit, onDelete }: SortableTaskProps) {
+  const { formatDate } = useDateTime()
   const {
     attributes,
     listeners,
@@ -1331,15 +1538,24 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
   }
 
   return (
-    <Card 
+    <Card
       ref={setNodeRef}
       style={style}
-      className={`hover:shadow-md transition-shadow cursor-pointer ${
+      className={`hover:shadow-md transition-shadow relative ${
+        isDraggable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'
+      } ${
         isDragging ? 'opacity-50' : ''
-      } ${isDragOverlay ? 'rotate-3 shadow-lg' : ''}`}
+      } ${isDragOverlay ? 'rotate-3 shadow-lg' : ''} ${
+        isUpdating ? 'ring-2 ring-blue-500/50 ring-offset-1' : ''
+      }`}
       onClick={onClick}
     >
       <CardContent className="p-4">
+        {isUpdating && (
+          <div className="absolute top-2 right-2">
+            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+          </div>
+        )}
         <div className="space-y-3">
           <div className="flex items-start justify-between">
             <TruncateTooltip text={task.title}>
@@ -1348,16 +1564,18 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
               </h4>
             </TruncateTooltip>
             <div className="flex items-center space-x-1">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-6 w-6 p-0 cursor-grab active:cursor-grabbing"
-                {...attributes}
-                {...listeners}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <GripVertical className="h-3 w-3" />
-              </Button>
+              {isDraggable && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 cursor-grab active:cursor-grabbing"
+                  {...attributes}
+                  {...listeners}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <GripVertical className="h-3 w-3" />
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
@@ -1427,7 +1645,7 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
             {task.dueDate && (
               <div className="flex items-center space-x-1 mb-1">
                 <Calendar className="h-3 w-3" />
-                <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>
+                <span>Due {formatDate(task.dueDate)}</span>
               </div>
             )}
             {task.storyPoints && (
@@ -1444,18 +1662,15 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
             )}
           </div>
           
-          {task.assignedTo && (
-            <div className="flex items-center space-x-2">
-              <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
-                {task?.assignedTo?.firstName[0]}{task?.assignedTo?.lastName[0]}
-              </div>
+          <div className="text-xs text-muted-foreground">
+            {task.assignedTo ? (
               <TruncateTooltip text={`${task?.assignedTo?.firstName} ${task?.assignedTo?.lastName}`}>
-                <span className="text-xs text-muted-foreground">
-                  {task?.assignedTo?.firstName} {task?.assignedTo?.lastName}
-                </span>
+                <span>{task?.assignedTo?.firstName} {task?.assignedTo?.lastName}</span>
               </TruncateTooltip>
-            </div>
-          )}
+            ) : (
+              <span>Not assigned</span>
+            )}
+          </div>
           
           {task?.labels?.length > 0 && (
             <div className="flex items-center gap-1 overflow-hidden flex-nowrap">

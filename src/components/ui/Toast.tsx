@@ -30,8 +30,8 @@ export function useToast() {
   return context
 }
 
-// Consistent toast duration across the system (3 seconds)
-export const TOAST_DURATION = 3000
+// Consistent toast duration across the system (5 seconds)
+export const TOAST_DURATION = 5000
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -70,7 +70,7 @@ function ToastContainer({ toasts, removeToast }: { toasts: Toast[], removeToast:
   if (toasts.length === 0) return null
 
   return (
-    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 w-full max-w-sm sm:max-w-md">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] flex flex-col items-center gap-3 w-full max-w-lg px-4 pointer-events-none">
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
       ))}
@@ -99,10 +99,10 @@ function ToastItem({ toast, onRemove }: { toast: Toast, onRemove: (id: string) =
   }
 
   const colors = {
-    success: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200',
-    error: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200',
-    warning: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200',
-    info: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200'
+    success: 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200',
+    error: 'bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200',
+    warning: 'bg-yellow-50 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200',
+    info: 'bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200'
   }
 
   const iconColors = {
@@ -114,13 +114,21 @@ function ToastItem({ toast, onRemove }: { toast: Toast, onRemove: (id: string) =
 
   const Icon = icons[toast.type]
 
+  const closeButtonStyles = {
+    success: 'text-green-700 hover:text-green-900 hover:bg-green-100 dark:text-green-100 dark:hover:text-green-50 dark:hover:bg-green-800/50',
+    error: 'text-red-700 hover:text-red-900 hover:bg-red-100 dark:text-red-100 dark:hover:text-red-50 dark:hover:bg-red-800/50',
+    warning: 'text-yellow-700 hover:text-yellow-900 hover:bg-yellow-100 dark:text-yellow-100 dark:hover:text-yellow-50 dark:hover:bg-yellow-800/50',
+    info: 'text-blue-700 hover:text-blue-900 hover:bg-blue-100 dark:text-blue-100 dark:hover:text-blue-50 dark:hover:bg-blue-800/50'
+  }
+
   return (
     <div
       className={`
         ${colors[toast.type]}
         border rounded-lg shadow-lg p-4 flex items-start gap-3
         transition-all duration-300 ease-in-out
-        ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full'}
+        ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
+        pointer-events-auto
       `}
       role="alert"
     >
@@ -135,7 +143,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast, onRemove: (id: string) =
         variant="ghost"
         size="sm"
         onClick={handleRemove}
-        className="h-6 w-6 p-0 flex-shrink-0 opacity-70 hover:opacity-100"
+        className={`h-7 w-7 p-0 flex-shrink-0 rounded-full transition-colors self-start ${closeButtonStyles[toast.type]}`}
         aria-label="Close notification"
       >
         <X className="h-4 w-4" />

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useMemo } from 'react'
-import { Clock, Edit, Trash2, Check, X, Filter, Download, Plus, AlertTriangle, FolderOpen, Target, Loader2, Upload, FileText, User, Search, MoreHorizontal } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { Clock, Edit, Trash2, Check, X, Filter, Download, Plus, AlertTriangle, FolderOpen, Target, Loader2, Upload, FileText, User, Search, MoreHorizontal, DollarSign, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -16,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules } from '@/lib/utils'
 import { useFeaturePermissions, usePermissions } from '@/lib/permissions/permission-context'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { toast } from 'sonner'
@@ -52,7 +54,7 @@ interface TimeEntry {
   notes?: string
   isApproved: boolean
   approvedBy?: { firstName: string; lastName: string }
-  project?: { _id: string; name: string } | null
+  project?: { _id: string; name: string; settings?: any } | null
   task?: { _id: string; title: string } | null
   __isActive?: boolean
 }
@@ -81,6 +83,12 @@ export function TimeLogs({
   showSelectionAndApproval = true,
   showManualLogButtons = false
 }: TimeLogsProps) {
+  const { formatDateTimeSafe, preferences } = useDateTime()
+  const pathname = usePathname()
+
+  // Debug timezone and DateTimeProvider
+  useEffect(() => {
+  }, [preferences])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -112,12 +120,13 @@ export function TimeLogs({
   const [taskSearch, setTaskSearch] = useState('')
   const [employeeSearch, setEmployeeSearch] = useState('')
   const [statusSearch, setStatusSearch] = useState('')
+  const [modalProjectSearch, setModalProjectSearch] = useState('')
 
   // Filtered lists based on search queries
   const filteredProjects = useMemo(() => {
     if (!projectSearch.trim()) return filterProjects
     const searchLower = projectSearch.toLowerCase()
-    return filterProjects.filter(project => 
+    return filterProjects.filter(project =>
       project.name?.toLowerCase().includes(searchLower)
     )
   }, [filterProjects, projectSearch])
@@ -181,16 +190,26 @@ export function TimeLogs({
   const [tasks, setTasks] = useState<any[]>([])
   const [tasksLoading, setTasksLoading] = useState(false)
   const [selectedTaskForLog, setSelectedTaskForLog] = useState('')
+
+  const filteredModalProjects = useMemo(() => {
+    if (!modalProjectSearch.trim()) return projects
+    const searchLower = modalProjectSearch.toLowerCase()
+    return projects.filter(project =>
+      project.name?.toLowerCase().includes(searchLower)
+    )
+  }, [projects, modalProjectSearch])
   const [manualLogData, setManualLogData] = useState({
     startDate: '',
     startTime: '',
     endDate: '',
     endTime: '',
-    description: '',
-    isBillable: false
+    description: ''
   })
   const [submittingManualLog, setSubmittingManualLog] = useState(false)
-  const [sessionHoursError, setSessionHoursError] = useState('')
+  const [startDateError, setStartDateError] = useState('')
+  const [startTimeError, setStartTimeError] = useState('')
+  const [endDateError, setEndDateError] = useState('')
+  const [endTimeError, setEndTimeError] = useState('')
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
   const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null)
   const [bulkUploadProgress, setBulkUploadProgress] = useState<{ total: number; processed: number; successful: number; failed: number } | null>(null)
@@ -211,7 +230,6 @@ export function TimeLogs({
     endDate: string
     endTime: string
     description: string
-    isBillable: boolean
   } | null>(null)
 
   // Resolve auth if props are missing
@@ -245,6 +263,12 @@ export function TimeLogs({
   const { organization } = useOrganization()
   const { canApproveTime } = useFeaturePermissions()
   const { hasPermission } = usePermissions()
+
+  // Permission checks for time tracking operations
+  const canViewAllTime = hasPermission(Permission.TIME_TRACKING_VIEW_ALL)
+  const canUpdateTime = hasPermission(Permission.TIME_TRACKING_UPDATE)
+  const canDeleteTime = hasPermission(Permission.TIME_TRACKING_DELETE)
+  const canApproveTimeLogs = hasPermission(Permission.TIME_TRACKING_APPROVE)
 
   // Check if user can view employee filter using permission
   const canViewEmployeeFilter = useMemo(() => {
@@ -301,13 +325,22 @@ export function TimeLogs({
     fetchFilterProjects()
   }, [resolvedOrgId, resolvedUserId, canViewEmployeeFilter])
 
-  // Fetch tasks for filter when project is selected
+  // Fetch tasks for filter when project is selected or for all projects
   useEffect(() => {
     const fetchFilterTasks = async () => {
-      if (!filters.projectId || !resolvedOrgId) {
+      if (!resolvedOrgId) {
         setFilterTasks([])
         return
       }
+
+      // If no specific project is selected (All projects), we don't load tasks
+      // Users can still search manually or the task filter will show "All tasks"
+      if (!filters.projectId) {
+        setFilterTasks([])
+        setFilterTasksLoading(false)
+        return
+      }
+
       setFilterTasksLoading(true)
       try {
         const response = await fetch(`/api/tasks?project=${filters.projectId}&limit=500`)
@@ -354,9 +387,13 @@ export function TimeLogs({
   }, [canViewEmployeeFilter, resolvedOrgId])
 
   // Fetch organization settings for application-level allowManualTimeSubmission
+  // Load settings immediately to ensure buttons show based on actual settings
   useEffect(() => {
     if (organization?.settings?.timeTracking) {
       setOrganizationSettings(organization.settings.timeTracking)
+    } else if (organization) {
+      // If organization exists but no timeTracking settings, use defaults (allowManualTimeSubmission defaults to true)
+      setOrganizationSettings({ allowManualTimeSubmission: true })
     }
   }, [organization])
 
@@ -411,8 +448,8 @@ export function TimeLogs({
 
   // Check if manual time submission is enabled at both levels
   const canAddManualTimeLog = useMemo(() => {
-    // Application level (organization settings)
-    const orgLevelEnabled = organizationSettings?.allowManualTimeSubmission ?? false
+    // Application level (organization settings) - default to true (database default)
+    const orgLevelEnabled = organizationSettings?.allowManualTimeSubmission ?? true
     
     // Project level - check project.settings.allowManualTimeSubmission if projectId is provided
     let projectLevelEnabled = true // Default to true if no project
@@ -435,24 +472,31 @@ export function TimeLogs({
         const response = await fetch('/api/projects')
         const data = await response.json()
         if (data.success && Array.isArray(data.data)) {
-          const filtered = data.data.filter((project: any) => {
-            const allow = project?.settings?.allowTimeTracking
-            if (!allow) return false
-            const createdByMatch = project?.createdBy === resolvedUserId || project?.createdBy?.id === resolvedUserId
+          // Filter projects by strict requirements (matching timer page):
+          // 1. project.settings.allowTimeTracking === true (explicitly enabled)
+          // 2. project.teamMembers contains logged user as memberId
+          const eligibleProjects = data.data.filter((project: any) => {
+            // Check project-level time tracking setting - must be explicitly true
+            const projectAllowsTimeTracking = project?.settings?.allowTimeTracking === true
+            if (!projectAllowsTimeTracking) return false
+
+            // Check if user is in teamMembers array as memberId
             const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
-            const teamMatch = teamMembers.some((memberId: any) => {
-              if (typeof memberId === 'string') return memberId === resolvedUserId
-              return memberId?._id === resolvedUserId || memberId?.id === resolvedUserId
+            const isUserTeamMember = teamMembers.some((member: any) => {
+              if (typeof member === 'object' && member !== null) {
+                return member.memberId === resolvedUserId || member.memberId?._id === resolvedUserId || member.memberId?.id === resolvedUserId
+              }
+              return false
             })
-            const members = Array.isArray(project?.members) ? project.members : []
-            const membersMatch = members.some((m: any) => (typeof m === 'string' ? m === resolvedUserId : m?.id === resolvedUserId || m?._id === resolvedUserId))
-            return createdByMatch || teamMatch || membersMatch
+
+            return isUserTeamMember
           })
-          let final = filtered
+
+          let final = eligibleProjects
           if (isEditing && selectedEntry?.project?._id) {
-            const exists = filtered.some((p: any) => p?._id === selectedEntry.project!._id)
+            const exists = eligibleProjects.some((p: any) => p?._id === selectedEntry.project!._id)
             if (!exists) {
-              final = [...filtered, { _id: selectedEntry.project._id, name: selectedEntry.project.name }]
+              final = [...eligibleProjects, { _id: selectedEntry.project._id, name: selectedEntry.project.name }]
             }
           }
           setProjects(final)
@@ -468,51 +512,32 @@ export function TimeLogs({
 
   // Fetch tasks when project is selected
   useEffect(() => {
-    const fetchTasks = async () => {
-      if (!selectedProjectForLog || !resolvedUserId) {
-        setTasks([])
-        setTasksLoading(false)
-        return
-      }
-
-      setTasksLoading(true)
-      try {
-        const url = isEditing
-          ? `/api/tasks?project=${selectedProjectForLog}&limit=500`
-          : `/api/tasks?project=${selectedProjectForLog}&assignedTo=${resolvedUserId}&limit=200`
-        const response = await fetch(url)
-        const data = await response.json()
-        let list: any[] = []
-        if (data.success && Array.isArray(data.data)) list = data.data
-        else if (Array.isArray(data)) list = data
-        else if (Array.isArray(data.tasks)) list = data.tasks
-        if (!isEditing) {
-          list = list.filter((t: any) => {
-            const at = t?.assignedTo
-            if (!at) return false
-            if (typeof at === 'string') return at === resolvedUserId
-            return at?._id === resolvedUserId || at?.id === resolvedUserId
-          })
-        }
-        if (isEditing && selectedEntry?.task && !list.some((t: any) => t?._id === selectedEntry.task!._id)) {
-          list = [...list, selectedEntry.task]
-        }
-        setTasks(list)
-      } catch (err) {
-        console.error('Failed to fetch tasks:', err)
-        setTasks([])
-      } finally {
-        setTasksLoading(false)
-      }
-    }
-
     if (selectedProjectForLog) {
-      fetchTasks()
+      loadTasksForProject(selectedProjectForLog)
     } else {
       setTasks([])
       setSelectedTaskForLog('')
     }
   }, [selectedProjectForLog, resolvedUserId, isEditing, selectedEntry])
+
+  // Clear form when opening add time log modal
+  useEffect(() => {
+    if (showAddTimeLogModal && !isEditing) {
+      setManualLogData({
+        startDate: '',
+        startTime: '',
+        endDate: '',
+        endTime: '',
+        description: ''
+      })
+      setSelectedProjectForLog('')
+      setSelectedTaskForLog('')
+      setTasks([])
+      setModalProjectSearch('')
+      setError('')
+      clearFieldErrors()
+    }
+  }, [showAddTimeLogModal, isEditing])
 
   // Helper function to combine date and time into datetime-local format
   const combineDateTime = (date: string, time: string): string => {
@@ -520,9 +545,27 @@ export function TimeLogs({
     return `${date}T${time}`
   }
 
+  // Helper function to clear all field validation errors
+  const clearFieldErrors = () => {
+    setStartDateError('')
+    setStartTimeError('')
+    setEndDateError('')
+    setEndTimeError('')
+  }
+
+  // Helper function to get billable status from selected task
+  const getBillableFromTask = (taskId: string): boolean => {
+    const selectedTask = tasks.find(task => task._id === taskId)
+    return selectedTask?.isBillable ?? false
+  }
+
   // Validate maxSessionHours and future time when dates/times change
   const validateSessionHours = useCallback(() => {
-    setSessionHoursError('')
+    // Clear all field-specific errors
+    setStartDateError('')
+    setStartTimeError('')
+    setEndDateError('')
+    setEndTimeError('')
 
     if (!manualLogData.startDate || !manualLogData.startTime || !manualLogData.endDate || !manualLogData.endTime) {
       return
@@ -543,7 +586,7 @@ export function TimeLogs({
     }
 
     if (end <= start) {
-      setSessionHoursError('End time must be after start time')
+      setEndTimeError('End time must be after start time')
       return
     }
 
@@ -552,27 +595,57 @@ export function TimeLogs({
     // Check for future time logging
     if (!timeTrackingSettings?.allowFutureTime) {
       if (start > now) {
-        setSessionHoursError('Future time not allowed. Please select a time that is today or in the past.')
+        setStartDateError('Future time not allowed. Please select a time that is today or in the past.')
         return
       }
       if (end > now) {
-        setSessionHoursError('Future time not allowed. Please select a time that is today or in the past.')
+        setEndDateError('Future time not allowed. Please select a time that is today or in the past.')
         return
       }
     }
 
-    // Check maxSessionHours only when overtime is disabled
+    // Check past time limit when past time is allowed
+    if (timeTrackingSettings?.allowPastTime === true && timeTrackingSettings?.pastTimeLimitDays) {
+      const daysDiff = Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+      if (daysDiff > timeTrackingSettings.pastTimeLimitDays) {
+        setStartDateError(`Past time logging not allowed beyond ${timeTrackingSettings.pastTimeLimitDays} days. Please select a more recent date.`)
+        return
+      }
+    }
+
+    // Check maxSessionHours when overtime is NOT allowed
     if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxSessionHours) {
       const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
       const durationHours = durationMinutes / 60
       const maxHours = timeTrackingSettings.maxSessionHours
 
       if (durationHours > maxHours) {
-        setSessionHoursError(`Session duration (${durationHours.toFixed(2)}h) exceeds maximum allowed (${maxHours}h). Overtime is not allowed.`)
+        setEndTimeError(`Overtime not allowed. Session duration (${durationHours.toFixed(2)}h) exceeds maximum allowed (${maxHours}h). Please reduce the time or contact your administrator to enable overtime.`)
         return
       }
     }
-  }, [manualLogData.startDate, manualLogData.startTime, manualLogData.endDate, manualLogData.endTime, timeTrackingSettings])
+
+    // Validate billable time settings
+    if (selectedTaskForLog) {
+      const selectedTask = tasks.find(task => task._id === selectedTaskForLog)
+      if (selectedTask?.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime) {
+        setEndTimeError('Billable time logging is not allowed for this organization. Please select a non-billable task or contact your administrator.')
+        return
+      }
+    }
+
+    // Check maxSessionHours only when overtime is allowed
+    if (timeTrackingSettings?.allowOvertime === true && timeTrackingSettings?.maxSessionHours) {
+      const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
+      const durationHours = durationMinutes / 60
+      const maxHours = timeTrackingSettings.maxSessionHours
+
+      if (durationHours > maxHours) {
+        setEndTimeError(`Session duration (${durationHours.toFixed(2)}h) exceeds maximum allowed (${maxHours}h).`)
+        return
+      }
+    }
+  }, [manualLogData.startDate, manualLogData.startTime, manualLogData.endDate, manualLogData.endTime, timeTrackingSettings, selectedTaskForLog, tasks])
 
   useEffect(() => {
     validateSessionHours()
@@ -642,7 +715,7 @@ export function TimeLogs({
       return
     }
 
-    if (sessionHoursError) {
+    if (startDateError || startTimeError || endDateError || endTimeError) {
       return
     }
 
@@ -661,7 +734,7 @@ export function TimeLogs({
           description: manualLogData.description || undefined,
           startTime: startDateTime,
           endTime: endDateTime,
-          isBillable: manualLogData.isBillable && timeTrackingSettings?.allowBillableTime
+          isBillable: getBillableFromTask(selectedTaskForLog) && timeTrackingSettings?.allowBillableTime
         })
       })
 
@@ -674,11 +747,11 @@ export function TimeLogs({
           startTime: '',
           endDate: '',
           endTime: '',
-          description: '',
-          isBillable: false
+          description: ''
         })
         setSelectedProjectForLog('')
         setSelectedTaskForLog('')
+        setModalProjectSearch('')
         setTasks([])
         loadTimeEntries()
         onTimeEntryUpdate?.()
@@ -734,7 +807,7 @@ export function TimeLogs({
       return
     }
 
-    if (sessionHoursError) {
+    if (startDateError || startTimeError || endDateError || endTimeError) {
       return
     }
 
@@ -753,7 +826,7 @@ export function TimeLogs({
           description: manualLogData.description || undefined,
           startTime: startDateTime,
           endTime: endDateTime,
-          isBillable: manualLogData.isBillable && timeTrackingSettings?.allowBillableTime
+          isBillable: getBillableFromTask(selectedTaskForLog) && timeTrackingSettings?.allowBillableTime
         })
       })
 
@@ -766,11 +839,11 @@ export function TimeLogs({
           startTime: '',
           endDate: '',
           endTime: '',
-          description: '',
-          isBillable: false
+          description: ''
         })
         setSelectedProjectForLog('')
         setSelectedTaskForLog('')
+        setModalProjectSearch('')
         setTasks([])
         setEditInitial(null)
         loadTimeEntries()
@@ -789,7 +862,7 @@ export function TimeLogs({
   const formatDuration = (minutes: number) => {
     // Apply rounding rules if enabled
     let displayMinutes = minutes
-    const roundingRules = organization?.settings?.timeTracking?.roundingRules
+    const roundingRules = timeTrackingSettings?.roundingRules
     if (roundingRules?.enabled) {
       displayMinutes = applyRoundingRules(minutes, {
         enabled: roundingRules.enabled,
@@ -977,25 +1050,7 @@ export function TimeLogs({
     }
   }, [authResolving, loadTimeEntries, loadActiveTimer, refreshKey])
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
 
-  const formatDateParts = (dateString: string) => {
-    const d = new Date(dateString)
-    const yyyy = d.getFullYear()
-    const mm = String(d.getMonth() + 1).padStart(2, '0')
-    const dd = String(d.getDate()).padStart(2, '0')
-    const date = `${yyyy}-${mm}-${dd}`
-    const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-    return { date, time }
-  }
 
   const handleDeleteEntry = async (entryId: string) => {
     if (!confirm('Are you sure you want to delete this time entry?')) return
@@ -1194,10 +1249,18 @@ export function TimeLogs({
 
     setTasksLoading(true)
     try {
-      const url = isEditing
-        ? `/api/tasks?project=${projectId}&limit=500`
-        : `/api/tasks?project=${projectId}&assignedTo=${resolvedUserId}&limit=200`
-      const res = await fetch(url)
+      // Fetch tasks for the selected project where user is assigned (matching timer page)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout (matching timer page)
+
+      const url = `/api/tasks?project=${projectId}&assignedTo=${resolvedUserId}&limit=50&minimal=true`
+
+      const res = await fetch(url, {
+        cache: 'no-store',
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
       const data = await res.json()
       let list: any[] = []
       if (data?.success && Array.isArray(data.data)) list = data.data
@@ -1228,27 +1291,33 @@ export function TimeLogs({
       setTasks([])
     }
     
-    // Format dates and times for the form
+    // Format dates and times for the form - use UTC times since database stores UTC
     const start = new Date(entry.startTime)
     const end = entry.endTime ? new Date(entry.endTime) : new Date()
-    
+
+    // Get UTC time components for proper display
+    const formatUTCTime = (date: Date): string => {
+      const hours = date.getUTCHours().toString().padStart(2, '0')
+      const minutes = date.getUTCMinutes().toString().padStart(2, '0')
+      return `${hours}:${minutes}`
+    }
+
+
     setManualLogData({
-      startDate: start.toISOString().split('T')[0],
-      startTime: start.toTimeString().substring(0, 5),
-      endDate: end.toISOString().split('T')[0],
-      endTime: end.toTimeString().substring(0, 5),
-      description: entry.description || '',
-      isBillable: entry.isBillable || false
+      startDate: start.toISOString().split('T')[0], // Already UTC
+      startTime: formatUTCTime(start), // Use UTC time
+      endDate: end.toISOString().split('T')[0], // Already UTC
+      endTime: formatUTCTime(end), // Use UTC time
+      description: entry.description || ''
     })
     setEditInitial({
       projectId: entry.project?._id || '',
       taskId: entry.task?._id || '',
-      startDate: start.toISOString().split('T')[0],
-      startTime: start.toTimeString().substring(0, 5),
-      endDate: end.toISOString().split('T')[0],
-      endTime: end.toTimeString().substring(0, 5),
-      description: entry.description || '',
-      isBillable: entry.isBillable || false
+      startDate: start.toISOString().split('T')[0], // Already UTC
+      startTime: formatUTCTime(start), // Use UTC time
+      endDate: end.toISOString().split('T')[0], // Already UTC
+      endTime: formatUTCTime(end), // Use UTC time
+      description: entry.description || ''
     })
     
     // Load tasks if project is set
@@ -1268,8 +1337,7 @@ export function TimeLogs({
       editInitial.startTime !== manualLogData.startTime ||
       editInitial.endDate !== manualLogData.endDate ||
       editInitial.endTime !== manualLogData.endTime ||
-      editInitial.description !== manualLogData.description ||
-      editInitial.isBillable !== manualLogData.isBillable
+      editInitial.description !== manualLogData.description
     )
   }, [isEditing, editInitial, selectedProjectForLog, selectedTaskForLog, manualLogData])
 
@@ -1305,8 +1373,8 @@ export function TimeLogs({
       return value
     }
 
-    const headers = ['Project Name', 'Task Title', 'Start Date (YYYY-MM-DD)', 'Start Time (HH:MM)', 'End Date (YYYY-MM-DD)', 'End Time (HH:MM)', 'Description', 'Is Billable (true/false)']
-    const exampleRow = ['My Project', 'Task 1', '2024-01-15', '09:00', '2024-01-15', '17:00', 'Worked on feature', '']
+    const headers = ['Task No', 'Start Date', 'Start Time', 'End Date', 'End Time', 'Description']
+    const exampleRow = ['20.7', '2024-01-15', '09:00', '2024-01-15', '17:00', 'Worked on feature']
     
     const csvContent = [
       headers.map(escapeCSV).join(','),
@@ -1367,7 +1435,7 @@ export function TimeLogs({
     }
 
     const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim())
-    const requiredHeaders = ['Project Name', 'Task Title', 'Start Date (YYYY-MM-DD)', 'Start Time (HH:MM)', 'End Date (YYYY-MM-DD)', 'End Time (HH:MM)']
+    const requiredHeaders = ['Task No', 'Start Date', 'Start Time', 'End Date', 'End Time']
     
     // Validate CSV format - check if all required headers are present
     const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
@@ -1409,36 +1477,29 @@ export function TimeLogs({
   }
 
   // Validate CSV row
-  const validateCSVRow = (row: Record<string, string>, rowIndex: number, projectMap: Map<string, string>, taskMap: Map<string, string>): { valid: boolean; error?: string; data?: any } => {
-    const projectName = row['Project Name']?.trim()
-    const taskTitle = row['Task Title']?.trim()
-    const startDate = row['Start Date (YYYY-MM-DD)']?.trim()
-    const startTime = row['Start Time (HH:MM)']?.trim()
-    const endDate = row['End Date (YYYY-MM-DD)']?.trim()
-    const endTime = row['End Time (HH:MM)']?.trim()
+  const validateCSVRow = (row: Record<string, string>, rowIndex: number, taskMap: Map<string, { projectId: string; taskId: string }>): { valid: boolean; error?: string; data?: any } => {
+    const taskNo = row['Task No']?.trim()
+    const startDate = row['Start Date']?.trim()
+    const startTime = row['Start Time']?.trim()
+    const endDate = row['End Date']?.trim()
+    const endTime = row['End Time']?.trim()
     const description = row['Description']?.trim() || ''
-    const isBillable = row['Is Billable (true/false)']?.trim().toLowerCase()
 
-    // Validate Project Name (required)
-    if (!projectName) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Project Name is required` }
+    // Validate Task No (required)
+    if (!taskNo) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Task No is required` }
     }
 
-    // Validate Task Title (required)
-    if (!taskTitle) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Task Title is required` }
-    }
-
-    // Validate Project exists
-    const projectId = projectMap.get(projectName)
-    if (!projectId) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Project "${projectName}" not found` }
+    // Validate Task No format (should be like "20.7")
+    const taskNoRegex = /^\d+\.\d+$/
+    if (!taskNoRegex.test(taskNo)) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Task No must be in format "ProjectNumber.TaskNumber" (e.g., "20.7")` }
     }
 
     // Validate Task exists
-    const taskId = taskMap.get(`${projectId}:${taskTitle}`)
-    if (!taskId) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Task "${taskTitle}" not found in project "${projectName}"` }
+    const taskData = taskMap.get(taskNo)
+    if (!taskData) {
+      return { valid: false, error: `Row ${rowIndex + 1}: Task "${taskNo}" not found or not assigned to you` }
     }
 
     // Validate Start Date (required)
@@ -1517,31 +1578,26 @@ export function TimeLogs({
       return { valid: false, error: `Row ${rowIndex + 1}: Description is required` }
     }
 
-    // Validate Is Billable (optional - only validate if provided)
-    let billable = true // Default to true if not provided
-    if (isBillable && isBillable !== '') {
-      const normalizedBillable = isBillable.toLowerCase().trim()
-      if (normalizedBillable !== 'true' && normalizedBillable !== 'false') {
-        return { valid: false, error: `Row ${rowIndex + 1}: Is Billable must be "true" or "false" (case-insensitive)` }
-      }
-      billable = normalizedBillable === 'true'
-    }
+    // Set billable to true by default (no Is Billable column in new format)
+    const billable = true
 
     // Check future time
     if (!timeTrackingSettings?.allowFutureTime && start > new Date()) {
       return { valid: false, error: `Row ${rowIndex + 1}: Future time logging not allowed` }
     }
 
-    // Check past time limit
+    // Check past time limit when past time is allowed
+    if (timeTrackingSettings?.allowPastTime === true && timeTrackingSettings?.pastTimeLimitDays) {
     const daysDiff = Math.ceil((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-    if (!timeTrackingSettings?.allowPastTime && daysDiff > (timeTrackingSettings?.pastTimeLimitDays || 30)) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Past time logging not allowed beyond limit` }
+      if (daysDiff > timeTrackingSettings.pastTimeLimitDays) {
+        return { valid: false, error: `Row ${rowIndex + 1}: Past time logging not allowed beyond ${timeTrackingSettings.pastTimeLimitDays} days` }
+      }
     }
 
     // Check max session hours
     const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
     const durationHours = durationMinutes / 60
-    if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxSessionHours && durationHours > timeTrackingSettings.maxSessionHours) {
+    if (timeTrackingSettings?.allowOvertime === true && timeTrackingSettings?.maxSessionHours && durationHours > timeTrackingSettings.maxSessionHours) {
       return { valid: false, error: `Row ${rowIndex + 1}: Session duration exceeds maximum allowed (${timeTrackingSettings.maxSessionHours}h)` }
     }
 
@@ -1576,35 +1632,42 @@ export function TimeLogs({
       const csvText = await bulkUploadFile.text()
       const rows = parseCSV(csvText)
 
-      // Build project and task maps
-      const projectMap = new Map<string, string>()
-      const taskMap = new Map<string, string>()
+      // Build task map using Task No (displayId)
+      const taskMap = new Map<string, { projectId: string; taskId: string }>()
 
-      // Fetch all projects
+      // Fetch all projects that allow manual time submission and user is a team member
       const projectsResponse = await fetch('/api/projects')
       const projectsData = await projectsResponse.json()
       if (projectsData.success && Array.isArray(projectsData.data)) {
-        projectsData.data.forEach((project: any) => {
-          projectMap.set(project.name, project._id)
+        // Filter projects that allow manual time submission and user is a team member
+        const eligibleProjects = projectsData.data.filter((project: any) => {
+          const allowManualSubmission = project?.settings?.allowManualTimeSubmission === true
+          const isTeamMember = Array.isArray(project?.teamMembers) &&
+            project.teamMembers.some((member: any) => {
+              const memberId = typeof member === 'string' ? member : member?.memberId
+              return memberId === resolvedUserId
+            })
+          return allowManualSubmission && isTeamMember
         })
-      }
 
-      // Fetch tasks for each unique project (fetch all tasks, not just assigned ones)
-      const uniqueProjects = Array.from(new Set(rows.map(row => row['Project Name']?.trim()).filter(Boolean)))
-      for (const projectName of uniqueProjects) {
-        const projectId = projectMap.get(projectName)
-        if (projectId) {
+        // Fetch tasks for eligible projects that are assigned to the user
+        for (const project of eligibleProjects) {
           try {
-            const tasksResponse = await fetch(`/api/tasks?project=${projectId}&limit=500`)
+            const tasksResponse = await fetch(`/api/tasks?project=${project._id}&assignedTo=${resolvedUserId}&limit=500`)
             const tasksData = await tasksResponse.json()
             if (tasksData.success && Array.isArray(tasksData.data)) {
               tasksData.data.forEach((task: any) => {
-                // Use projectId:taskTitle as key to handle duplicate task titles across projects
-                taskMap.set(`${projectId}:${task.title}`, task._id)
+                // Use displayId as key (e.g., "20.7")
+                if (task.displayId) {
+                  taskMap.set(task.displayId, {
+                    projectId: project._id,
+                    taskId: task._id
+                  })
+                }
               })
             }
           } catch (err) {
-            console.error(`Failed to fetch tasks for project ${projectName}:`, err)
+            console.error(`Failed to fetch tasks for project ${project.name}:`, err)
           }
         }
       }
@@ -1614,7 +1677,7 @@ export function TimeLogs({
       const errors: Array<{ row: number; error: string }> = []
 
       rows.forEach((row, index) => {
-        const validation = validateCSVRow(row, index, projectMap, taskMap)
+        const validation = validateCSVRow(row, index, taskMap)
         if (validation.valid && validation.data) {
           validatedRows.push({ rowIndex: index, data: validation.data })
         } else {
@@ -1774,7 +1837,7 @@ export function TimeLogs({
             {/* <Clock className="h-5 w-5" />
             Time Logs */}
           </CardTitle>
-          {canAddManualTimeLog && showManualLogButtons && (
+          {showManualLogButtons && pathname === '/time-tracking/timer' && canAddManualTimeLog && (
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <Button
                 onClick={() => setShowBulkUploadModal(true)}
@@ -1786,7 +1849,23 @@ export function TimeLogs({
                 <span className="whitespace-nowrap">Bulk Upload</span>
               </Button>
               <Button
-                onClick={() => setShowAddTimeLogModal(true)}
+                onClick={() => {
+                  // Clear form data when opening add modal
+                  setManualLogData({
+                    startDate: '',
+                    startTime: '',
+                    endDate: '',
+                    endTime: '',
+                    description: ''
+                  })
+                  setSelectedProjectForLog('')
+                  setSelectedTaskForLog('')
+                  setTasks([])
+                  setModalProjectSearch('')
+                  setError('')
+                  clearFieldErrors()
+                  setShowAddTimeLogModal(true)
+                }}
                 size="sm"
                 className="h-8 sm:h-8 px-3 text-xs justify-start w-full sm:w-auto"
               >
@@ -1842,7 +1921,7 @@ export function TimeLogs({
                 <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-project">
                   <SelectValue placeholder="All projects" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[200px]">
                   <div className="p-2 border-b">
                     <div className="relative">
                       <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -1852,11 +1931,23 @@ export function TimeLogs({
                         onChange={(e) => setProjectSearch(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
-                        className="h-8 pl-7 text-xs"
+                        className="h-8 pl-7 pr-7 text-xs"
                       />
+                      {projectSearch && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setProjectSearch('')
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label="Clear search"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="max-h-[200px] overflow-y-auto">
                     <SelectItem value="all" onMouseDown={(e) => e.preventDefault()}>
                       All projects
                     </SelectItem>
@@ -1881,7 +1972,6 @@ export function TimeLogs({
                         </SelectItem>
                       ))
                     )}
-                  </div>
                 </SelectContent>
               </Select>
             </div>
@@ -1891,18 +1981,16 @@ export function TimeLogs({
               <Select 
                 value={filters.taskId || 'all'} 
                 onValueChange={(value) => handleFilterChange('taskId', value === 'all' ? '' : value)}
-                disabled={!filters.projectId || filterTasksLoading}
+                disabled={filterTasksLoading}
               >
                 <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-task">
                   <SelectValue placeholder={
-                    !filters.projectId 
-                      ? 'Select project first' 
-                      : filterTasksLoading 
+                    filterTasksLoading
                         ? 'Loading...' 
                         : 'All tasks'
                   } />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[200px]">
                   <div className="p-2 border-b">
                     <div className="relative">
                       <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -1912,12 +2000,24 @@ export function TimeLogs({
                         onChange={(e) => setTaskSearch(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
-                        className="h-8 pl-7 text-xs"
+                        className="h-8 pl-7 pr-7 text-xs"
                         disabled={!filters.projectId}
                       />
+                      {taskSearch && !(!filters.projectId) && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setTaskSearch('')
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label="Clear search"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="max-h-[200px] overflow-y-auto">
                     <SelectItem value="all">All tasks</SelectItem>
                     {filterTasksLoading ? (
                       <SelectItem value="loading" disabled>
@@ -1940,7 +2040,6 @@ export function TimeLogs({
                         </SelectItem>
                       ))
                     )}
-                  </div>
                 </SelectContent>
               </Select>
             </div>
@@ -1958,7 +2057,7 @@ export function TimeLogs({
                       filterEmployeesLoading ? 'Loading...' : 'All employees'
                     } />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[200px]">
                     <div className="p-2 border-b">
                       <div className="relative">
                         <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -1968,11 +2067,23 @@ export function TimeLogs({
                           onChange={(e) => setEmployeeSearch(e.target.value)}
                           onClick={(e) => e.stopPropagation()}
                           onKeyDown={(e) => e.stopPropagation()}
-                          className="h-8 pl-7 text-xs"
+                          className="h-8 pl-7 pr-7 text-xs"
                         />
+                        {employeeSearch && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setEmployeeSearch('')
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                            aria-label="Clear search"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
                     </div>
-                    <div className="max-h-[200px] overflow-y-auto">
                       <SelectItem value="all">All employees</SelectItem>
                       {filterEmployeesLoading ? (
                         <SelectItem value="loading" disabled>
@@ -1997,7 +2108,6 @@ export function TimeLogs({
                           </SelectItem>
                         ))
                       )}
-                    </div>
                   </SelectContent>
                 </Select>
               </div>
@@ -2029,7 +2139,7 @@ export function TimeLogs({
                 <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[200px]">
                   <div className="p-2 border-b">
                     <div className="relative">
                       <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -2039,8 +2149,21 @@ export function TimeLogs({
                         onChange={(e) => setStatusSearch(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
-                        className="h-8 pl-7 text-xs"
+                        className="h-8 pl-7 pr-7 text-xs"
                       />
+                      {statusSearch && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setStatusSearch('')
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label="Clear search"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="max-h-[200px] overflow-y-auto">
@@ -2065,7 +2188,7 @@ export function TimeLogs({
                 <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
                   <SelectValue placeholder="All" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[200px]">
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="true">Billable</SelectItem>
                   <SelectItem value="false">Non-billable</SelectItem>
@@ -2079,7 +2202,7 @@ export function TimeLogs({
                   <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[200px]">
                     <SelectItem value="all">All</SelectItem>
                     <SelectItem value="true">Approved</SelectItem>
                     <SelectItem value="false">Pending</SelectItem>
@@ -2090,7 +2213,6 @@ export function TimeLogs({
           </div>
 
           {/* Clear Filters Button */}
-          {(filters.projectId || filters.taskId || filters.employeeId || filters.startDate || filters.endDate || filters.status !== '' || filters.isBillable !== '' || (showSelectionAndApproval && filters.isApproved !== '')) && (
             <div className="flex justify-start sm:justify-end pt-2">
               <Button
                 variant="outline"
@@ -2114,12 +2236,11 @@ export function TimeLogs({
                   setPagination(prev => ({ ...prev, page: 1 }))
                 }}
                 className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
+                title="Clear all filters"
               >
-                <X className="h-4 w-4 mr-2" />
-                Clear Filters
+                <RotateCcw className="h-4 w-4" />
               </Button>
             </div>
-          )}
         </div>
 
         {/* Bulk Actions */}
@@ -2166,7 +2287,7 @@ export function TimeLogs({
             <div className="space-y-2 w-full overflow-x-hidden">
               {/* Table Header - Hidden on mobile */}
               <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium overflow-x-auto ${
-                showSelectionAndApproval && canApproveTime 
+                showSelectionAndApproval && canApproveTimeLogs 
                   ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]' 
                   : showSelectionAndApproval
                     ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]'
@@ -2248,21 +2369,17 @@ export function TimeLogs({
                       </div>
                       <div>
                         <div className="text-muted-foreground">Start Time</div>
-                        {(() => { const p = formatDateParts(entry.startTime); return (
-                          <div className="mt-1">
-                            <div>{p.date}</div>
-                            <div className="text-muted-foreground">{p.time}</div>
-                          </div>
-                        ) })()}
+                        <div className="mt-1">
+                          <div>{formatDateTimeSafe(entry.startTime)}</div>
+                        </div>
                       </div>
                       <div>
                         <div className="text-muted-foreground">End Time</div>
-                        {entry.endTime ? (() => { const p = formatDateParts(entry.endTime as string); return (
+                        {entry.endTime ? (
                           <div className="mt-1">
-                            <div>{p.date}</div>
-                            <div className="text-muted-foreground">{p.time}</div>
+                            <div>{formatDateTimeSafe(entry.endTime)}</div>
                           </div>
-                        ) })() : <div className="mt-1">-</div>}
+                        ) : <div className="mt-1">-</div>}
                       </div>
                       <div>
                         <div className="text-muted-foreground">Duration</div>
@@ -2286,12 +2403,22 @@ export function TimeLogs({
                       <div>
                         <div className="text-muted-foreground">Approval</div>
                         <div className="mt-1">
+                          {(() => {
+
+                            // If project doesn't require approval, always show as Approved
+                            const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
+
+                            const isApproved = projectRequiresApproval ? entry.isApproved : true;                            
+
+                            return (
                           <Badge 
-                            variant={entry.isApproved ? 'default' : 'secondary'} 
+                                variant={isApproved ? 'default' : 'secondary'}
                             className="text-xs"
                           >
-                            {entry.isApproved ? 'Approved' : 'Pending'}
+                                {isApproved ? 'Approved' : 'Pending'}
                           </Badge>
+                            );
+                          })()}
                         </div>
                       </div>
                     )}
@@ -2325,7 +2452,7 @@ export function TimeLogs({
 
                   {/* Desktop Table View */}
                   <div className={`hidden md:grid gap-2 p-3 overflow-x-auto ${
-                    showSelectionAndApproval && canApproveTime 
+                    showSelectionAndApproval && canApproveTimeLogs 
                       ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]' 
                       : showSelectionAndApproval
                         ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]'
@@ -2381,18 +2508,16 @@ export function TimeLogs({
                       {([entry.user?.firstName, entry.user?.lastName].filter(Boolean).join(' ') || 'Unknown')}
                     </div>
                     <div className="text-xs sm:text-sm leading-tight">
-                      {(() => { const p = formatDateParts(entry.startTime); return (
-                        <>
-                          <div>{p.date}</div>
-                          <div className="text-muted-foreground">{p.time}</div>
-                        </>
-                      )})()}
+                      {(() => {
+                        const formatted = formatDateTimeSafe(entry.startTime)
+                        return formatted
+                      })()}
                     </div>
                     <div className="text-xs sm:text-sm leading-tight">
-                      {entry.endTime ? (() => { const p = formatDateParts(entry.endTime as string); return (<>
-                        <div>{p.date}</div>
-                        <div className="text-muted-foreground">{p.time}</div>
-                      </>) })() : '-'}
+                      {entry.endTime ? (() => {
+                        const formatted = formatDateTimeSafe(entry.endTime)
+                        return formatted
+                      })() : '-'}
                     </div>
                     <div className="text-xs sm:text-sm">
                       {formatDuration(entry.duration)}
@@ -2418,12 +2543,21 @@ export function TimeLogs({
                     </div>
                     {showSelectionAndApproval && (
                       <div>
+                        {(() => {
+                          // If project doesn't require approval, always show as Approved
+                          const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
+
+                          const isApproved = projectRequiresApproval ? entry.isApproved : true;
+
+                          return (
                         <Badge 
-                          variant={entry.isApproved ? 'default' : 'secondary'} 
+                              variant={isApproved ? 'default' : 'secondary'}
                           className="text-xs"
                         >
-                          {entry.isApproved ? 'Approved' : 'Pending'}
+                              {isApproved ? 'Approved' : 'Pending'}
                         </Badge>
+                          );
+                        })()}
                         {entry.approvedBy && (
                           <div className="text-xs text-muted-foreground mt-1">
                             by {entry.approvedBy.firstName} {entry.approvedBy.lastName}
@@ -2445,20 +2579,24 @@ export function TimeLogs({
                         </DropdownMenu.Trigger>
                         <DropdownMenu.Portal>
                           <DropdownMenu.Content className="min-w-[120px] bg-popover dark:bg-popover rounded-md p-1 shadow-lg border border-border dark:border-border z-50">
-                            <DropdownMenu.Item 
-                              className="flex items-center px-2 py-1.5 text-sm rounded hover:bg-accent dark:hover:bg-accent hover:text-accent-foreground dark:hover:text-accent-foreground cursor-pointer outline-none text-foreground dark:text-foreground"
-                              onSelect={() => handleEdit(entry)}
-                            >
-                              <Edit className="mr-2 h-4 w-4" />
-                              <span>Edit</span>
-                            </DropdownMenu.Item>
-                            <DropdownMenu.Item 
-                              className="flex items-center px-2 py-1.5 text-sm rounded text-destructive dark:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 cursor-pointer outline-none"
-                              onSelect={() => handleDeleteClick(entry)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              <span>Delete</span>
-                            </DropdownMenu.Item>
+                            {canUpdateTime && (
+                              <DropdownMenu.Item
+                                className="flex items-center px-2 py-1.5 text-sm rounded hover:bg-accent dark:hover:bg-accent hover:text-accent-foreground dark:hover:text-accent-foreground cursor-pointer outline-none text-foreground dark:text-foreground"
+                                onSelect={() => handleEdit(entry)}
+                              >
+                                <Edit className="mr-2 h-4 w-4" />
+                                <span>Edit</span>
+                              </DropdownMenu.Item>
+                            )}
+                            {canDeleteTime && (
+                              <DropdownMenu.Item
+                                className="flex items-center px-2 py-1.5 text-sm rounded text-destructive dark:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 cursor-pointer outline-none"
+                                onSelect={() => handleDeleteClick(entry)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>Delete</span>
+                              </DropdownMenu.Item>
+                            )}
                           </DropdownMenu.Content>
                         </DropdownMenu.Portal>
                       </DropdownMenu.Root>
@@ -2471,27 +2609,53 @@ export function TimeLogs({
         </div>
 
         {/* Pagination */}
-        {pagination.pages > 1 && (
+        {pagination.total > 0 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
-              Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} entries
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm text-muted-foreground">Items per page:</span>
+                <Select
+                  value={pagination.limit.toString()}
+                  onValueChange={(value) => {
+                    const newLimit = parseInt(value)
+                    setPagination(prev => ({
+                      ...prev,
+                      limit: newLimit,
+                      page: 1 // Reset to first page when changing limit
+                    }))
+                  }}
+                >
+                  <SelectTrigger className="w-16 h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px]">
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-xs sm:text-sm text-muted-foreground">
+                Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+              </div>
             </div>
-            <div className="flex gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handlePageChange(pagination.page - 1)}
                 disabled={pagination.page === 1}
-                className="flex-1 sm:flex-initial"
               >
                 Previous
               </Button>
+              <span className="text-xs sm:text-sm text-muted-foreground">
+                Page {pagination.page} of {pagination.pages}
+              </span>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handlePageChange(pagination.page + 1)}
                 disabled={pagination.page === pagination.pages}
-                className="flex-1 sm:flex-initial"
               >
                 Next
               </Button>
@@ -2520,8 +2684,8 @@ export function TimeLogs({
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="modal-project">Project *</Label>
-              <Select 
-                value={selectedProjectForLog} 
+              <Select
+                value={selectedProjectForLog}
                 onValueChange={(value) => {
                   setSelectedProjectForLog(value)
                   setSelectedTaskForLog('')
@@ -2531,15 +2695,49 @@ export function TimeLogs({
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a project" />
                 </SelectTrigger>
-                <SelectContent>
-                  {projects.map((project) => (
-                    <SelectItem key={project._id} value={project._id}>
-                      <div className="flex items-center space-x-2">
-                        <FolderOpen className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">{project.name}</span>
+                <SelectContent className="max-h-[200px]">
+                  <div className="p-2 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Search projects..."
+                        value={modalProjectSearch}
+                        onChange={(e) => setModalProjectSearch(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        className="h-8 pl-7 pr-7 text-xs"
+                      />
+                      {modalProjectSearch && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setModalProjectSearch('')
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label="Clear search"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="max-h-[200px] overflow-y-auto">
+                    {filteredModalProjects.length === 0 ? (
+                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                        No projects found
                       </div>
-                    </SelectItem>
-                  ))}
+                    ) : (
+                      filteredModalProjects.map((project) => (
+                        <SelectItem key={project._id} value={project._id} onMouseDown={(e) => e.preventDefault()}>
+                          <div className="flex items-center space-x-2">
+                            <FolderOpen className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">{project.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </div>
                 </SelectContent>
               </Select>
             </div>
@@ -2563,7 +2761,7 @@ export function TimeLogs({
                 {tasksLoading && (
                   <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                 )}
-                <SelectContent>
+                <SelectContent className="max-h-[200px]">
                   {tasksLoading ? (
                     <div className="flex items-center justify-center p-4">
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -2578,15 +2776,19 @@ export function TimeLogs({
                           value={task._id}
                           disabled={isBillableDisabled}
                         >
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 min-w-0 w-full">
                             <Target className="h-4 w-4 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">{task.title}</div>
-                              {isBillableDisabled && (
-                                <div className="text-xs text-muted-foreground">
-                                  Billable time not allowed
+                            <div className="flex-1 min-w-0 overflow-hidden">
+                              <div className="font-medium truncate flex items-center gap-2 min-w-0">
+                                <span className="truncate">{task.title}</span>
+                                {task.isBillable && (
+                                  <DollarSign className="h-3 w-3 text-green-600 flex-shrink-0" />
+                                )}
+                              </div>
+                              <div className="text-xs sm:text-sm text-muted-foreground truncate">
+                                {task.status} • {task.priority}
+                                {isBillableDisabled && ' • Billable time not allowed'}
                                 </div>
-                              )}
                             </div>
                           </div>
                         </SelectItem>
@@ -2610,8 +2812,14 @@ export function TimeLogs({
                   setError('')
                 }}
                 disabled={!selectedProjectForLog}
-                className="w-full"
+                className={`w-full ${startDateError ? 'border-destructive' : ''}`}
               />
+              {startDateError && (
+                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{startDateError}</p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -2625,8 +2833,14 @@ export function TimeLogs({
                   setError('')
                 }}
                 disabled={!selectedProjectForLog}
-                className="w-full"
+                className={`w-full ${startTimeError ? 'border-destructive' : ''}`}
               />
+              {startTimeError && (
+                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{startTimeError}</p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -2640,8 +2854,14 @@ export function TimeLogs({
                   setError('')
                 }}
                 disabled={!selectedProjectForLog}
-                className="w-full"
+                className={`w-full ${endDateError ? 'border-destructive' : ''}`}
               />
+              {endDateError && (
+                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{endDateError}</p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -2655,12 +2875,12 @@ export function TimeLogs({
                   setError('')
                 }}
                 disabled={!selectedProjectForLog}
-                className={`w-full ${sessionHoursError ? 'border-destructive' : ''}`}
+                className={`w-full ${endTimeError ? 'border-destructive' : ''}`}
               />
-              {sessionHoursError && (
+              {endTimeError && (
                 <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
                   <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-destructive font-medium leading-relaxed">{sessionHoursError}</p>
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{endTimeError}</p>
                 </div>
               )}
             </div>
@@ -2676,7 +2896,7 @@ export function TimeLogs({
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
-                  {timeTrackingSettings?.maxSessionHours && !sessionHoursError && (
+                  {timeTrackingSettings?.maxSessionHours && !(startDateError || startTimeError || endDateError || endTimeError) && (
                     <span className="ml-1">
                       (Max: {timeTrackingSettings.maxSessionHours}h)
                     </span>
@@ -2706,18 +2926,6 @@ export function TimeLogs({
             />
           </div>
 
-          {timeTrackingSettings?.allowBillableTime && (
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="modal-billable"
-                checked={manualLogData.isBillable}
-                onCheckedChange={(checked) => setManualLogData(prev => ({ ...prev, isBillable: checked as boolean }))}
-              />
-              <Label htmlFor="modal-billable" className="text-sm font-normal cursor-pointer">
-                Mark as billable
-              </Label>
-            </div>
-          )}
         </DialogBody>
         <DialogFooter>
           <Button
@@ -2729,14 +2937,14 @@ export function TimeLogs({
                 startTime: '',
                 endDate: '',
                 endTime: '',
-                description: '',
-                isBillable: false
+                description: ''
               })
               setSelectedProjectForLog('')
               setSelectedTaskForLog('')
               setTasks([])
+              setModalProjectSearch('')
               setError('')
-              setSessionHoursError('')
+              clearFieldErrors()
             }}
             disabled={submittingManualLog}
           >
@@ -2752,7 +2960,7 @@ export function TimeLogs({
               !manualLogData.startTime ||
               !manualLogData.endDate ||
               !manualLogData.endTime ||
-              !!sessionHoursError ||
+              !!(startDateError || startTimeError || endDateError || endTimeError) ||
               (timeTrackingSettings?.requireDescription === true && !manualLogData.description.trim())
             }
           >
@@ -2791,27 +2999,63 @@ export function TimeLogs({
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="edit-project">Project *</Label>
-              <Select 
-                value={selectedProjectForLog} 
+              <Select
+                value={selectedProjectForLog}
                 onValueChange={(value) => {
                   setSelectedProjectForLog(value)
                   setSelectedTaskForLog('')
                   setTasks([])
                   loadTasksForProject(value)
                 }}
+                disabled={true}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a project" />
                 </SelectTrigger>
-                <SelectContent>
-                  {projects.map((project) => (
-                    <SelectItem key={project._id} value={project._id}>
-                      <div className="flex items-center space-x-2">
-                        <FolderOpen className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">{project.name}</span>
+                <SelectContent className="max-h-[200px]">
+                  <div className="p-2 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Search projects..."
+                        value={modalProjectSearch}
+                        onChange={(e) => setModalProjectSearch(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        className="h-8 pl-7 pr-7 text-xs"
+                        disabled={true}
+                      />
+                      {modalProjectSearch && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setModalProjectSearch('')
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label="Clear search"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="max-h-[200px] overflow-y-auto">
+                    {filteredModalProjects.length === 0 ? (
+                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                        No projects found
                       </div>
-                    </SelectItem>
-                  ))}
+                    ) : (
+                      filteredModalProjects.map((project) => (
+                        <SelectItem key={project._id} value={project._id} onMouseDown={(e) => e.preventDefault()}>
+                          <div className="flex items-center space-x-2">
+                            <FolderOpen className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">{project.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </div>
                 </SelectContent>
               </Select>
             </div>
@@ -2835,7 +3079,7 @@ export function TimeLogs({
                 {tasksLoading && (
                   <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                 )}
-                <SelectContent>
+                <SelectContent className="max-h-[200px]">
                   {tasksLoading ? (
                     <div className="flex items-center justify-center p-4">
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -2867,8 +3111,14 @@ export function TimeLogs({
                   setManualLogData(prev => ({ ...prev, startDate: e.target.value }))
                   setError('')
                 }}
-                className="w-full"
+                className={`w-full ${startDateError ? 'border-destructive' : ''}`}
               />
+              {startDateError && (
+                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{startDateError}</p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -2881,8 +3131,14 @@ export function TimeLogs({
                   setManualLogData(prev => ({ ...prev, startTime: e.target.value }))
                   setError('')
                 }}
-                className="w-full"
+                className={`w-full ${startTimeError ? 'border-destructive' : ''}`}
               />
+              {startTimeError && (
+                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{startTimeError}</p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -2895,8 +3151,14 @@ export function TimeLogs({
                   setManualLogData(prev => ({ ...prev, endDate: e.target.value }))
                   setError('')
                 }}
-                className="w-full"
+                className={`w-full ${endDateError ? 'border-destructive' : ''}`}
               />
+              {endDateError && (
+                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{endDateError}</p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -2909,12 +3171,12 @@ export function TimeLogs({
                   setManualLogData(prev => ({ ...prev, endTime: e.target.value }))
                   setError('')
                 }}
-                className={`w-full ${sessionHoursError ? 'border-destructive' : ''}`}
+                className={`w-full ${endTimeError ? 'border-destructive' : ''}`}
               />
-              {sessionHoursError && (
+              {endTimeError && (
                 <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
                   <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-destructive font-medium leading-relaxed">{sessionHoursError}</p>
+                  <p className="text-xs text-destructive font-medium leading-relaxed">{endTimeError}</p>
                 </div>
               )}
             </div>
@@ -2930,7 +3192,7 @@ export function TimeLogs({
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
-                  {timeTrackingSettings?.maxSessionHours && !sessionHoursError && (
+                  {timeTrackingSettings?.maxSessionHours && !(startDateError || startTimeError || endDateError || endTimeError) && (
                     <span className="ml-1">
                       (Max: {timeTrackingSettings.maxSessionHours}h)
                     </span>
@@ -2959,18 +3221,6 @@ export function TimeLogs({
             />
           </div>
 
-          {timeTrackingSettings?.allowBillableTime && (
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="edit-billable"
-                checked={manualLogData.isBillable}
-                onCheckedChange={(checked) => setManualLogData(prev => ({ ...prev, isBillable: checked as boolean }))}
-              />
-              <Label htmlFor="edit-billable" className="text-sm font-normal cursor-pointer">
-                Mark as billable
-              </Label>
-            </div>
-          )}
         </DialogBody>
         <DialogFooter>
           <Button
@@ -2982,14 +3232,14 @@ export function TimeLogs({
                 startTime: '',
                 endDate: '',
                 endTime: '',
-                description: '',
-                isBillable: false
+                description: ''
               })
               setSelectedProjectForLog('')
               setSelectedTaskForLog('')
               setTasks([])
+              setModalProjectSearch('')
               setError('')
-              setSessionHoursError('')
+              clearFieldErrors()
               setEditInitial(null)
             }}
             disabled={submittingManualLog}
@@ -3006,7 +3256,7 @@ export function TimeLogs({
               !manualLogData.startTime ||
               !manualLogData.endDate ||
               !manualLogData.endTime ||
-              !!sessionHoursError ||
+              !!(startDateError || startTimeError || endDateError || endTimeError) ||
               !hasEditChanges ||
               (timeTrackingSettings?.requireDescription === true && !manualLogData.description.trim())
             }
@@ -3226,11 +3476,10 @@ export function TimeLogs({
               <AlertDescription className="text-xs">
                 <div className="font-semibold mb-1">CSV Format Requirements:</div>
                 <ul className="list-disc list-inside space-y-1">
-                  <li>Required columns: Project Name, Task Title, Start Date (YYYY-MM-DD), Start Time (HH:MM), End Date (YYYY-MM-DD), End Time (HH:MM)</li>
-                  <li>Optional columns: Description, Is Billable (true/false - leave empty or use "true"/"false")</li>
-                  <li>Date format: YYYY-MM-DD (e.g., 2024-01-15)</li>
-                  <li>Time format: HH:MM (e.g., 09:00, must be between 00:00 and 23:59)</li>
-                  <li>Projects and tasks must exist in the system</li>
+                  <li>Required columns: Task No, Start Date, Start Time, End Date, End Time</li>
+                  <li>Optional columns: Description</li>
+                  <li>Task No format: ProjectNumber.TaskNumber (e.g., 20.7)</li>
+                  <li>Task ID must be correct</li>
                   <li>End Date/Time must be after Start Date/Time</li>
                 </ul>
               </AlertDescription>
@@ -3277,3 +3526,4 @@ export function TimeLogs({
     </>
   )
 }
+

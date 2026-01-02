@@ -5,21 +5,23 @@ import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { formatToTitleCase } from '@/lib/utils'
 import { useTaskSync, useTaskState } from '@/hooks/useTaskSync'
+import { useNotify } from '@/lib/notify'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreHorizontal, 
-  Calendar, 
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  Plus,
+  Search,
+  Filter,
+  MoreHorizontal,
+  Calendar,
   Clock,
   CheckCircle,
-  AlertTriangle,
   Pause,
   XCircle,
   Play,
@@ -36,7 +38,8 @@ import {
   Star,
   Layers,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  RotateCcw
 } from 'lucide-react'
 
 interface CalendarEvent {
@@ -69,8 +72,8 @@ interface CalendarEvent {
 
 export default function CalendarPage() {
   const router = useRouter()
+  const { formatDate } = useDateTime()
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -78,6 +81,20 @@ export default function CalendarPage() {
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month')
   const [currentDate, setCurrentDate] = useState(new Date())
+
+  // Check if any filters are active
+  const hasActiveFilters = searchQuery !== '' ||
+                          typeFilter !== 'all' ||
+                          statusFilter !== 'all' ||
+                          priorityFilter !== 'all'
+
+  // Reset all filters
+  const resetFilters = () => {
+    setSearchQuery('')
+    setTypeFilter('all')
+    setStatusFilter('all')
+    setPriorityFilter('all')
+  }
 
   // Use the task state management hook for calendar events
   const {
@@ -89,6 +106,9 @@ export default function CalendarPage() {
     handleTaskCreate,
     handleTaskDelete
   } = useTaskState([])
+
+  // Use the notification hook
+  const { error: notifyError } = useNotify()
 
   // Use the task synchronization hook
   const {
@@ -110,15 +130,17 @@ export default function CalendarPage() {
 
       if (data.success) {
         setEvents(data.data)
+        // Optional: Add success notification for initial load if desired
+        // notifySuccess({ title: 'Calendar Loaded', message: 'Calendar events loaded successfully' })
       } else {
-        setError(data.error || 'Failed to fetch calendar events')
+        notifyError({ title: 'Failed to Load Calendar', message: data.error || 'Failed to fetch calendar events' })
       }
     } catch (err) {
-      setError('Failed to fetch calendar events')
+      notifyError({ title: 'Failed to Load Calendar', message: 'Failed to fetch calendar events' })
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [notifyError])
 
   // Check auth and fetch events only once on mount
   useEffect(() => {
@@ -188,6 +210,13 @@ export default function CalendarPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Only run once on mount - fetchEvents, startPolling, stopPolling, router are stable
+
+  // Handle task errors from the task state hook
+  useEffect(() => {
+    if (taskError) {
+      notifyError({ title: 'Task Synchronization Error', message: taskError })
+    }
+  }, [taskError, notifyError])
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -373,7 +402,7 @@ export default function CalendarPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 sm:space-y-8 lg:space-y-10">
+      <div className="space-y-8 sm:space-y-10 lg:space-y-10">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
           <div className="min-w-0 flex-1">
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">Calendar</h1>
@@ -392,16 +421,10 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {(error || taskError) && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error || taskError}</AlertDescription>
-          </Alert>
-        )}
 
         {/* Real-time connection status */}
         {isConnected && (
-          <Alert className="mb-4">
+          <Alert className="mb-6">
             <div className="flex items-center">
               <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
               <span className="text-sm">Real-time sync active</span>
@@ -411,7 +434,7 @@ export default function CalendarPage() {
 
         <Card>
           <CardHeader className="p-4 sm:p-6">
-            <div className="space-y-3 sm:space-y-4">
+            <div className="space-y-4 sm:space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
                   <CardTitle className="text-lg sm:text-xl">Calendar View</CardTitle>
@@ -430,7 +453,7 @@ export default function CalendarPage() {
                     className="pl-10 w-full text-sm sm:text-base"
                   />
                 </div>
-                <div className="flex flex-wrap gap-2 sm:gap-3">
+                <div className="flex flex-wrap gap-3 sm:gap-4">
                   <Select value={typeFilter} onValueChange={setTypeFilter}>
                     <SelectTrigger className="w-full sm:w-[140px] text-sm">
                       <SelectValue placeholder="Type" />
@@ -468,12 +491,33 @@ export default function CalendarPage() {
                       <SelectItem value="critical">Critical</SelectItem>
                     </SelectContent>
                   </Select>
+                  {hasActiveFilters && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={resetFilters}
+                            className="text-xs"
+                            aria-label="Reset all filters"
+                          >
+                            <RotateCcw className="h-4 w-4 mr-1" />
+                            Reset Filters
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Reset filters</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
               </div>
             </div>
           </CardHeader>
           <CardContent className="p-4 sm:p-6">
-            <div className="space-y-4 sm:space-y-6">
+            <div className="space-y-6 sm:space-y-8">
               {/* Calendar Navigation */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
                 <div className="flex items-center justify-between w-full sm:w-auto gap-2 sm:gap-4">
@@ -622,7 +666,7 @@ export default function CalendarPage() {
                             )}
                           </div>
                           
-                          <div className="space-y-1.5 sm:space-y-2">
+                          <div className="space-y-2 sm:space-y-3">
                             {dayEvents.map(event => (
                               <div 
                                 key={event._id}
@@ -691,7 +735,7 @@ export default function CalendarPage() {
                       )}
                     </div>
                     
-                    <div className="space-y-2 sm:space-y-3">
+                    <div className="space-y-3 sm:space-y-4">
                       {getEventsForDate(currentDate).length > 0 ? (
                         getEventsForDate(currentDate).map(event => (
                           <div 

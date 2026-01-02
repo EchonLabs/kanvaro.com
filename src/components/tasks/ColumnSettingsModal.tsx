@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/Button'
+import { useNotify } from '@/lib/notify'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import {
@@ -141,11 +141,10 @@ export default function ColumnSettingsModal({
   currentColumns, 
   onColumnsUpdated 
 }: ColumnSettingsModalProps) {
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const [columns, setColumns] = useState(currentColumns)
   const [originalColumns, setOriginalColumns] = useState(currentColumns)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [newColumnTitle, setNewColumnTitle] = useState('')
   const [newColumnKey, setNewColumnKey] = useState('')
   const contentRef = useRef<HTMLDivElement>(null)
@@ -177,22 +176,13 @@ export default function ColumnSettingsModal({
       )
       setColumns(normalizedColumns)
       setOriginalColumns(JSON.parse(JSON.stringify(normalizedColumns))) // Deep copy
-      setError('')
-      setSuccess('')
-      
+
       // Show informational message if projectId is missing (shouldn't happen if button is properly disabled)
       if (!projectId || projectId.trim() === '' || projectId === 'all') {
-        setError('Column settings can only be managed for a specific project. Please select a project from the dropdown above.')
+        notifyError({ title: 'Error', message: 'Column settings can only be managed for a specific project. Please select a project from the dropdown above.' })
       }
     }
   }, [isOpen, currentColumns, projectId])
-
-  // Scroll to top when error or success message appears
-  useEffect(() => {
-    if ((error || success) && contentRef.current) {
-      contentRef.current.scrollTop = 0
-    }
-  }, [error, success])
 
   // Color palette for new columns - distinct colors that work well in light and dark modes
   // Removed slate (too similar to gray) and reordered for better visual distinction
@@ -264,8 +254,7 @@ export default function ColumnSettingsModal({
     // Check if key already exists
     const keyExists = columns.some(col => col.key === newColumnKey.toLowerCase().replace(/\s+/g, '_'))
     if (keyExists) {
-      setError('A column with this key already exists. Please use a different key.')
-      setSuccess('')
+      notifyError({ title: 'Error', message: 'A column with this key already exists. Please use a different key.' })
       return
     }
 
@@ -282,7 +271,6 @@ export default function ColumnSettingsModal({
     setColumns([...columns, newColumn])
     setNewColumnTitle('')
     setNewColumnKey('')
-    setError('')
   }
 
   const checkTasksInColumn = async (columnKey: string): Promise<number> => {
@@ -310,7 +298,6 @@ export default function ColumnSettingsModal({
     setMigrationColumn('')
     setDeleteConfirmOpen(true)
     setCheckingTasks(true)
-    setError('')
     setTaskIdsInColumn([])
     
     try {
@@ -324,7 +311,7 @@ export default function ColumnSettingsModal({
       }
     } catch (error) {
       console.error('Error checking tasks:', error)
-      setError('Failed to check tasks in column')
+      notifyError({ title: 'Error', message: 'Failed to check tasks in column' })
     } finally {
       setCheckingTasks(false)
     }
@@ -337,12 +324,11 @@ export default function ColumnSettingsModal({
     
     // If there are tasks and no migration column selected, show error
     if (tasksInColumn > 0 && !migrationColumn) {
-      setError('Please select a destination column to move tasks to')
+      notifyError({ title: 'Error', message: 'Please select a destination column to move tasks to' })
       return
     }
 
     setMigratingTasks(true)
-    setError('')
 
     try {
       // If there are tasks, migrate them first
@@ -435,14 +421,14 @@ export default function ColumnSettingsModal({
       const successMessage = totalTasksMoved > 0 && migrationColumnTitle
         ? `Column "${column.title}" has been deleted successfully and ${totalTasksMoved} task${totalTasksMoved !== 1 ? 's' : ''} ${totalTasksMoved !== 1 ? 'were' : 'was'} moved to "${migrationColumnTitle}". The status has been completely removed from this project.`
         : `Column "${column.title}" has been deleted successfully. The status has been completely removed from this project.`
-      setSuccess(successMessage)
-      setError('')
-      
+
+      notifySuccess({ title: 'Success', message: successMessage })
+
       // Refresh the columns in the parent component
       onColumnsUpdated()
     } catch (error) {
       console.error('Delete error:', error)
-      setError(error instanceof Error ? error.message : 'Failed to delete column')
+      notifyError({ title: 'Error', message: error instanceof Error ? error.message : 'Failed to delete column' })
       // Don't close the dialog on error so user can retry
     } finally {
       setMigratingTasks(false)
@@ -455,7 +441,6 @@ export default function ColumnSettingsModal({
     setTasksInColumn(0)
     setMigrationColumn('')
     setTaskIdsInColumn([])
-    setError('')
   }
 
   const removeColumn = (index: number) => {
@@ -494,14 +479,11 @@ export default function ColumnSettingsModal({
 
   const handleSave = async () => {
     if (!projectId || projectId.trim() === '') {
-      setError('Project ID is missing. Please select a project to save column settings.')
-      setSuccess('')
+      notifyError({ title: 'Error', message: 'Project ID is missing. Please select a project to save column settings.' })
       return
     }
 
     setLoading(true)
-    setError('')
-    setSuccess('')
 
     try {
       // Ensure columns are sorted by order before saving
@@ -528,26 +510,36 @@ export default function ColumnSettingsModal({
       
       if (data.success) {
         setOriginalColumns(JSON.parse(JSON.stringify(columns))) // Update original to match current
-        setSuccess('Column settings saved successfully!')
-        setError('')
-        
+        notifySuccess({ title: 'Success', message: 'Column settings saved successfully!' })
+
         // Wait a bit to show success message before closing
         setTimeout(() => {
           onColumnsUpdated()
           onClose()
         }, 1500)
       } else {
-        setError(data.error || 'Failed to update columns')
-        setSuccess('')
+        notifyError({ title: 'Error', message: data.error || 'Failed to update columns' })
       }
     } catch (error) {
       console.error('Save error:', error)
-      setError(error instanceof Error ? error.message : 'Failed to update columns')
-      setSuccess('')
+      notifyError({ title: 'Error', message: error instanceof Error ? error.message : 'Failed to update columns' })
     } finally {
       setLoading(false)
     }
   }
+
+  // Show notification when column cannot be deleted due to tasks and no migration columns
+  useEffect(() => {
+    if (isOpen && !checkingTasks && tasksInColumn > 0 && columns.length > 0) {
+      const availableMigrationColumns = columns.filter((col, i) => i !== columnToDelete)
+      if (availableMigrationColumns.length === 0 && deleteConfirmOpen) {
+        notifyError({
+          title: 'Cannot Delete Column',
+          message: `Cannot delete this column because it contains ${tasksInColumn} task${tasksInColumn !== 1 ? 's' : ''} and there are no other columns to move them to. Please create another column first.`
+        })
+      }
+    }
+  }, [isOpen, checkingTasks, tasksInColumn, columns, columnToDelete, deleteConfirmOpen, notifyError])
 
   if (!isOpen) return null
 
@@ -603,14 +595,6 @@ export default function ColumnSettingsModal({
               </div>
             )}
 
-            {!checkingTasks && tasksInColumn > 0 && availableMigrationColumns.length === 0 && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  Cannot delete this column because it contains {tasksInColumn} task{tasksInColumn !== 1 ? 's' : ''} and there are no other columns to move them to. Please create another column first.
-                </AlertDescription>
-              </Alert>
-            )}
           </div>
 
           <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-2">
@@ -658,19 +642,6 @@ export default function ColumnSettingsModal({
         </CardHeader>
         <CardContent ref={contentRef} className="flex-1 overflow-y-auto">
           <div className="space-y-6">
-            {error && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            {success && (
-              <Alert variant="success">
-                <CheckCircle className="h-4 w-4" />
-                <AlertDescription>{success}</AlertDescription>
-              </Alert>
-            )}
-
             {/* Add new column */}
             <div className="space-y-4">
               <h4 className="text-lg font-medium">Add New Column</h4>

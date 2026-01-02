@@ -11,6 +11,10 @@ import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { useOrganization } from '@/hooks/useOrganization'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
+import { useAuth } from '@/hooks/useAuth'
+import { useNotify } from '@/lib/notify'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -81,12 +85,14 @@ interface Project {
 export default function ProjectsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { user } = useAuth()
   const { organization } = useOrganization()
+  const { formatCurrency } = useOrgCurrency()
+  const { success: notifySuccess, error: notifyError } = useNotify()
+  const { formatDate } = useDateTime()
   const orgCurrency = organization?.currency || 'USD'
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -192,13 +198,25 @@ export default function ProjectsPage() {
       const data = await response.json()
 
       if (data.success) {
+        console.log('Projects page - received projects:', {
+          total: data.pagination?.total || data.data.length,
+          currentUserId: user?.id,
+          projects: data.data.map((p: any) => ({
+            _id: p._id,
+            name: p.name,
+            createdBy: p.createdBy?._id,
+            teamMembers: p.teamMembers?.map((tm: any) => tm.memberId?._id),
+            isCurrentUserCreator: p.createdBy?._id === user?.id,
+            isCurrentUserTeamMember: p.teamMembers?.some((tm: any) => tm.memberId?._id === user?.id)
+          }))
+        })
         setProjects(data.data)
         setTotalCount(data.pagination?.total || data.data.length)
       } else {
-        setError(data.error || 'Failed to fetch projects')
+        notifyError({ title: 'Error', message: data.error || 'Failed to fetch projects' })
       }
     } catch (err) {
-      setError('Failed to fetch projects')
+      notifyError({ title: 'Error', message: 'Failed to fetch projects' })
     } finally {
       setLoading(false)
     }
@@ -217,20 +235,20 @@ export default function ProjectsPage() {
       const response = await fetch(`/api/projects/${projectToDelete}`, {
         method: 'DELETE'
       })
+
       const data = await response.json()
 
       if (data.success) {
         setProjects(projects.filter(p => p._id !== projectToDelete))
         setDeleteModalOpen(false)
         setProjectToDelete(null)
-        setError('')
-        setSuccess('Project deleted successfully.')
-        setTimeout(() => setSuccess(''), 3000)
+        notifySuccess({ title: 'Success', message: 'Project deleted successfully.' })
       } else {
-        setError(data.error || 'Failed to delete project')
+        notifyError({ title: 'Error', message: data.error || 'Failed to delete project' })
       }
     } catch (err) {
-      setError('Failed to delete project')
+      console.error('Delete error:', err)
+      notifyError({ title: 'Error', message: 'Failed to delete project' })
     } finally {
       setIsDeleting(false)
     }
@@ -322,12 +340,6 @@ export default function ProjectsPage() {
         </PermissionGate>
       </div>
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
 
       <Card>
         <CardHeader className="p-4 sm:p-6">
@@ -387,12 +399,6 @@ export default function ProjectsPage() {
               <TabsTrigger value="list" className="text-xs sm:text-sm">List View</TabsTrigger>
             </TabsList>
 
-            {success && (
-              <Alert variant="success" className="mt-4">
-                <CheckCircle className="h-4 w-4" />
-                <AlertDescription>{success}</AlertDescription>
-              </Alert>
-            )}
 
             <TabsContent value="grid" className="space-y-4 mt-0">
               <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -529,11 +535,11 @@ export default function ProjectsPage() {
                       <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm pt-1">
                         <div className="flex items-center space-x-1.5 text-gray-500 dark:text-gray-400">
                           <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                          <span className="whitespace-nowrap">{new Date(project.startDate).toLocaleDateString()}</span>
+                          <span className="whitespace-nowrap">{formatDate(project.startDate)}</span>
                         </div>
                         {project.endDate && (
                           <div className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm whitespace-nowrap">
-                            Due {new Date(project.endDate).toLocaleDateString()}
+                            Due {formatDate(project.endDate)}
                           </div>
                         )}
                       </div>
@@ -594,13 +600,15 @@ export default function ProjectsPage() {
                             </div>
                             <div className="flex items-center space-x-1.5">
                               <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                              <span className="whitespace-nowrap">{new Date(project.startDate).toLocaleDateString()}</span>
+                              <span className="whitespace-nowrap">{formatDate(project.startDate)}</span>
                             </div>
                             {project.budget && (
-                              <div className="flex items-center space-x-1.5">
-                                <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                                <span className="whitespace-nowrap">{project.budget.currency} {project.budget.total.toLocaleString()}</span>
-                              </div>
+                            <div className="flex items-center space-x-1.5">
+                              <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                              <span className="whitespace-nowrap">
+                                {formatCurrency(project.budget.total, project.budget.currency || orgCurrency)}
+                              </span>
+                            </div>
                             )}
                           </div>
                         </div>

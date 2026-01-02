@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { Checkbox } from '@/components/ui/Checkbox'
 import { useToast } from '@/components/ui/Toast'
 import { formatToTitleCase } from '@/lib/utils'
 import { Calendar, User, ArrowRight, CheckCircle } from 'lucide-react'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { useRouter } from 'next/navigation'
 
 interface RecentTasksProps {
@@ -53,51 +53,8 @@ const getPriorityColor = (priority: string) => {
 export function RecentTasks({ tasks, isLoading, onTaskUpdate }: RecentTasksProps) {
   const router = useRouter()
   const { showToast } = useToast()
-  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
-
-  const handleCheckboxChange = async (taskId: string, checked: boolean) => {
-    setUpdatingTaskId(taskId)
-    try {
-      const newStatus = checked ? 'done' : 'todo'
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      })
-
-      const data = await response.json()
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to update task status')
-      }
-
-      // Show success message in header
-      setSuccessMessage('Task updated successfully')
-
-      // Refresh dashboard data if callback is provided
-      if (onTaskUpdate) {
-        onTaskUpdate()
-      }
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccessMessage(null)
-      }, 3000)
-    } catch (error) {
-      console.error('Failed to update task status:', error)
-      // Show error toast
-      showToast({
-        type: 'error',
-        title: 'Failed to update task',
-        message: error instanceof Error ? error.message : 'An error occurred while updating the task status',
-        duration: 5000
-      })
-    } finally {
-      setUpdatingTaskId(null)
-    }
-  }
+  const { formatDate } = useDateTime()
+  // Selection controls removed per request; tasks are view-only here.
 
   if (isLoading) {
     return (
@@ -186,12 +143,6 @@ export function RecentTasks({ tasks, isLoading, onTaskUpdate }: RecentTasksProps
               <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1" />
             </Button>
           </div>
-          {successMessage && (
-            <div className="flex items-center gap-2 px-3 py-2 mt-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md text-sm text-green-700 dark:text-green-400 animate-in fade-in slide-in-from-top-1 duration-300">
-              <CheckCircle className="h-4 w-4 flex-shrink-0" />
-              <span className="font-medium">{successMessage}</span>
-            </div>
-          )}
         </div>
       </CardHeader>
       <CardContent className="p-4 sm:p-6 pt-0">
@@ -201,15 +152,6 @@ export function RecentTasks({ tasks, isLoading, onTaskUpdate }: RecentTasksProps
               key={task._id}
               className="flex items-start sm:items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors overflow-x-hidden"
             >
-              <Checkbox
-                checked={task.status === 'done'}
-                disabled={updatingTaskId === task._id}
-                className="flex-shrink-0 mt-1 sm:mt-0"
-                onCheckedChange={(checked) => {
-                  handleCheckboxChange(task._id, Boolean(checked))
-                }}
-              />
-
               <div className="flex-1 min-w-0">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1 min-w-0">
                   <h4
@@ -244,7 +186,7 @@ export function RecentTasks({ tasks, isLoading, onTaskUpdate }: RecentTasksProps
                   {task.dueDate && (
                     <div className="flex items-center whitespace-nowrap">
                       <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
-                      <span className="truncate">{new Date(task.dueDate).toLocaleDateString()}</span>
+                      <span className="truncate">{formatDate(task.dueDate)}</span>
                     </div>
                   )}
                 </div>

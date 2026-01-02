@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { TestExecutionForm } from '@/components/test-management/TestExecutionForm'
 import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmDialog'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Play, Calendar, User, Clock, CheckCircle, XCircle, AlertCircle, SkipForward, Edit, Eye, Trash2, MoreVertical } from 'lucide-react'
 
 interface TestExecution {
@@ -39,6 +40,7 @@ export default function TestExecutionsPage() {
   const [loading, setLoading] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const { formatDate, formatTime } = useDateTime()
 
   useEffect(() => {
     // Set breadcrumb
@@ -95,14 +97,8 @@ export default function TestExecutionsPage() {
     return `${minutes}m ${remainingSeconds}s`
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+  const formatDateTime = (dateString: string) => {
+    return `${formatDate(dateString)} ${formatTime(dateString)}`
   }
 
   const handleExecuteTest = () => {
@@ -180,7 +176,7 @@ export default function TestExecutionsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold">Test Executions</h1>
@@ -194,7 +190,7 @@ export default function TestExecutionsPage() {
           </Button>
         </div>
 
-        <div className="grid gap-4">
+        <div className="grid gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Recent Test Executions</CardTitle>
@@ -256,7 +252,7 @@ export default function TestExecutionsPage() {
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           <Calendar className="h-4 w-4" />
-                          <span>{execution?.executedAt ? formatDate(execution.executedAt) : '—'}</span>
+                          <span>{execution?.executedAt ? formatDateTime(execution.executedAt) : '—'}</span>
                         </div>
                       </TableCell>
                       <TableCell>{execution.version}</TableCell>

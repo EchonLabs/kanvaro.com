@@ -127,14 +127,14 @@ const navigationItems = [
         label: 'Sprints',
         icon: Zap,
         path: '/sprints',
-        permission: Permission.SPRINT_READ
+        permission: Permission.SPRINT_VIEW
       },
       {
         id: 'tasks-epics',
         label: 'Epics',
         icon: Columns,
         path: '/epics',
-        permission: Permission.EPIC_READ
+        permission: Permission.EPIC_VIEW
       },
       {
         id: 'tasks-sprint-events',
@@ -194,7 +194,7 @@ const navigationItems = [
         label: 'Reports',
         icon: BarChart,
         path: '/time-tracking/reports',
-        permission: Permission.TIME_TRACKING_READ
+        permission: Permission.TIME_LOG_REPORT_ACCESS
       }
     ]
   },
@@ -291,7 +291,23 @@ const navigationItems = [
     label: 'Documentation',
     icon: BookOpen,
     path: '/docs',
-    permission: Permission.SETTINGS_READ
+    permission: Permission.DOCUMENTATION_VIEW,
+    children: [
+      {
+        id: 'docs-internal',
+        label: 'Internal Docs',
+        icon: FileText,
+        path: '/docs/internal',
+        permission: Permission.DOCUMENTATION_VIEW
+      },
+      {
+        id: 'docs-public',
+        label: 'Public Docs',
+        icon: BookOpen,
+        path: '/docs/public'
+        // No permission required for public docs
+      }
+    ]
   },
   {
     id: 'settings',
@@ -350,6 +366,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const handleLogout = async () => {
     try {
+      // Clear permission cache before logout
+      try {
+        sessionStorage.removeItem('kanvaro_permissions')
+        sessionStorage.removeItem('kanvaro_permissions_timestamp')
+      } catch (cacheError) {
+        console.error('Error clearing permission cache:', cacheError)
+      }
+
       const response = await fetch('/api/auth/logout', { method: 'POST' })
       if (response.ok) {
         // Clear any client-side state if needed
@@ -413,8 +437,21 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <div className="flex-1 overflow-y-auto px-2 py-4">
         <nav className="space-y-1">
           {navigationItems.map((item) => (
-            <PermissionGate key={item.id} permission={item.permission}>
+            item.permission ? (
+              <PermissionGate key={item.id} permission={item.permission}>
+                <NavigationItem
+                  item={item}
+                  collapsed={collapsed}
+                  pathname={pathname}
+                  expandedItems={expandedItems}
+                  onToggleExpanded={toggleExpanded}
+                  setExpandedItems={setExpandedItems}
+                  router={router}
+                />
+              </PermissionGate>
+            ) : (
               <NavigationItem
+                key={item.id}
                 item={item}
                 collapsed={collapsed}
                 pathname={pathname}
@@ -423,7 +460,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 setExpandedItems={setExpandedItems}
                 router={router}
               />
-            </PermissionGate>
+            )
           ))}
         </nav>
       </div>
@@ -445,7 +482,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           onClick={() => setShowLogoutConfirm(true)}
         >
           <LogOut className={cn('h-4 w-4', collapsed ? 'mx-auto' : 'mr-2')} />
-          {!collapsed && 'Sign Out'}
+          {!collapsed && 'Logout'}
         </Button>
       </div>
     </div>
@@ -454,9 +491,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       isOpen={showLogoutConfirm}
       onClose={() => setShowLogoutConfirm(false)}
       onConfirm={handleLogout}
-      title="Sign Out"
-      description="Are you sure you want to sign out?"
-      confirmText="Sign Out"
+      title="Logout Confirmation"
+      description="You are about to log out from the system. This will end your current session and you will need to log in again to access your account. Any unsaved work will be lost."
+      confirmText="Logout"
       cancelText="Cancel"
     />
     </>
@@ -535,15 +572,19 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
           )}
           title={collapsed ? item.label : undefined}
           onClick={() => {
+            console.log('Sidebar: Navigation item clicked:', item.label, 'path:', item.path, 'hasChildren:', hasChildren, 'collapsed:', collapsed)
             if (hasChildren && !collapsed) {
+              console.log('Sidebar: Expanding parent item:', item.id)
               onToggleExpanded(item.id)
               // If clicking on a parent with children, expand it and keep it expanded
               if (!expandedItems.includes(item.id)) {
                 setExpandedItems(prev => [...prev, item.id])
               }
             } else {
+              console.log('Sidebar: Navigating to path:', item.path)
               // Use startTransition for non-blocking navigation
               startTransition(() => {
+                console.log('Sidebar: Executing router.push for:', item.path)
                 router.push(item.path)
               })
             }
@@ -580,11 +621,12 @@ function NavigationItem({ item, collapsed, pathname, expandedItems, onToggleExpa
                     )}
                     asChild
                   >
-                    <Link 
-                      href={child.path} 
-                      prefetch 
+                    <Link
+                      href={child.path}
+                      prefetch
                       onMouseEnter={() => router.prefetch(child.path)}
                       onClick={() => {
+                        console.log('Sidebar: Child navigation clicked:', child.label, 'path:', child.path)
                         // Keep parent expanded when navigating to child
                         if (!expandedItems.includes(item.id)) {
                           setExpandedItems(prev => [...prev, item.id])

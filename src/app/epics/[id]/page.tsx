@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
@@ -11,6 +11,8 @@ import { Progress } from '@/components/ui/Progress'
 import { formatToTitleCase } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { useNotify } from '@/lib/notify'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { 
   ArrowLeft,
   Calendar,
@@ -31,6 +33,9 @@ import {
   Layers,
   BookOpen
 } from 'lucide-react'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { extractUserId } from '@/lib/auth/user-utils'
 
 interface Epic {
   _id: string
@@ -72,6 +77,8 @@ export default function EpicDetailPage() {
   const params = useParams()
   const epicId = params.id as string
   const { setItems } = useBreadcrumb()
+  const { success: notifySuccess, error: notifyError } = useNotify()
+  const { formatDate } = useDateTime()
   
   const [epic, setEpic] = useState<Epic | null>(null)
   const [loading, setLoading] = useState(true)
@@ -81,10 +88,34 @@ export default function EpicDetailPage() {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [stories, setStories] = useState<any[]>([])
   const [storiesLoading, setStoriesLoading] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string>('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(5)
+
+  // Pagination logic for stories (must be called before any conditional returns)
+  const paginatedStories = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    return stories.slice(startIndex, endIndex)
+  }, [stories, currentPage, pageSize])
+
+  const totalPages = Math.ceil(stories.length / pageSize)
+
+  const { hasPermission } = usePermissions()
+
+  const fetchAndSetCurrentUser = useCallback(async () => {
+    const response = await fetch('/api/auth/me')
+    if (response.ok) {
+      const data = await response.json().catch(() => ({}))
+      const userId = extractUserId(data)
+      if (userId) setCurrentUserId(userId.toString())
+    }
+    return response
+  }, [])
 
   const checkAuth = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/me')
+      const response = await fetchAndSetCurrentUser()
       
       if (response.ok) {
         setAuthError('')
@@ -96,7 +127,15 @@ export default function EpicDetailPage() {
         
         if (refreshResponse.ok) {
           setAuthError('')
-          await fetchEpic()
+          const meAfterRefresh = await fetchAndSetCurrentUser()
+          if (meAfterRefresh.ok) {
+            await fetchEpic()
+          } else {
+            setAuthError('Session expired')
+            setTimeout(() => {
+              router.push('/login')
+            }, 2000)
+          }
         } else {
           setAuthError('Session expired')
           setTimeout(() => {
@@ -113,7 +152,7 @@ export default function EpicDetailPage() {
         router.push('/login')
       }, 2000)
     }
-  }, [router, epicId])
+  }, [router, epicId, fetchAndSetCurrentUser])
 
   useEffect(() => {
     // Set breadcrumb immediately on mount
@@ -179,14 +218,18 @@ export default function EpicDetailPage() {
       const data = await res.json()
       if (res.ok && data.success) {
         setShowDeleteConfirmModal(false)
+        notifySuccess({ title: 'Epic deleted successfully' })
         router.push('/epics')
       } else {
-        setError(data?.error || 'Failed to delete epic')
+        const message = data?.error || 'Failed to delete epic'
+        setError(message)
         setShowDeleteConfirmModal(false)
+        notifyError({ title: message })
       }
     } catch (e) {
       setError('Failed to delete epic')
       setShowDeleteConfirmModal(false)
+      notifyError({ title: 'Failed to delete epic' })
     } finally {
       setDeleting(false)
     }
@@ -226,6 +269,21 @@ export default function EpicDetailPage() {
     }
   }
 
+  const isCreator = (epic: Epic) => {
+    const creatorId = (epic as any)?.createdBy?._id || (epic as any)?.createdBy?.id
+    return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
+  }
+
+  const canEditEpic = (epic: Epic) =>
+    hasPermission(Permission.EPIC_EDIT) || isCreator(epic)
+
+  const canDeleteEpic = (epic: Epic) =>
+    hasPermission(Permission.EPIC_DELETE) || isCreator(epic)
+
+  const editAllowed = epic ? canEditEpic(epic) : false
+  const deleteAllowed = epic ? canDeleteEpic(epic) : false
+
+  // Loading states
   if (loading) {
     return (
       <MainLayout>
@@ -270,38 +328,60 @@ export default function EpicDetailPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 overflow-x-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto min-w-0">
-            <Button variant="ghost" onClick={() => router.back()} className="w-full sm:w-auto flex-shrink-0">
+      <div className="space-y-8 sm:space-y-10 lg:space-y-12 overflow-x-hidden">
+        <div className="border-b border-border/40 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+              <Button
+                variant="ghost"
+                onClick={() => router.back()}
+                className="self-start text-sm hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-3"
+              >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div className="flex-1 min-w-0 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
               <h1
-                className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0"
+                  className="text-2xl font-semibold leading-snug text-foreground flex items-start gap-2 min-w-0 flex-wrap max-w-[70ch] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden break-words overflow-wrap-anywhere"
                 title={epic?.title}
               >
                 <Layers className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-purple-600 flex-shrink-0" />
-                <span className="truncate min-w-0">{epic?.title}</span>
+                  <span className="break-words overflow-wrap-anywhere">{epic?.title}</span>
               </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">Epic Details</p>
-            </div>
-          </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-shrink-0">
-           <Button variant="outline" onClick={() => router.push(`/epics/${epicId}/edit`)} className="w-full sm:w-auto">
-             <Edit className="h-4 w-4 mr-2" />
-             Edit
-           </Button>
-            <Button variant="destructive" onClick={handleDeleteClick} disabled={deleting} className="w-full sm:w-auto">
-              <Trash2 className="h-4 w-4 mr-2" />
-              {deleting ? 'Deleting...' : 'Delete'}
+                <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap ml-auto">
+            <Button
+              variant="outline"
+              disabled={!editAllowed}
+              onClick={() => {
+                if (!editAllowed) return
+                router.push(`/epics/${epicId}/edit`)
+              }}
+                    className="min-h-[36px] w-full sm:w-auto"
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
             </Button>
+            <Button
+              variant="destructive"
+                    disabled={!deleteAllowed}
+              onClick={() => {
+                      if (!deleteAllowed) return
+                      setShowDeleteConfirmModal(true)
+              }}
+                    className="min-h-[36px] w-full sm:w-auto"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+            </Button>
+                </div>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">Epic Details</p>
           </div>
         </div>
 
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-3">
-          <div className="md:col-span-2 space-y-4 sm:space-y-6">
+        <div className="grid gap-8 grid-cols-1 md:grid-cols-3">
+          <div className="md:col-span-2 space-y-8">
             <Card className="overflow-x-hidden">
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-base sm:text-lg">Description</CardTitle>
@@ -384,7 +464,7 @@ export default function EpicDetailPage() {
                   <p className="text-sm text-muted-foreground text-center py-8">No stories found for this epic.</p>
                 ) : (
                   <div className="space-y-3">
-                    {stories.map((story) => (
+                    {paginatedStories.map((story: any) => (
                       <Card
                         key={story._id}
                         className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-blue-500"
@@ -423,10 +503,60 @@ export default function EpicDetailPage() {
                   </div>
                 )}
               </CardContent>
+
+              {/* Pagination Controls */}
+              {stories.length > pageSize && (
+                <Card className="mt-4">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Items per page:</span>
+                        <select
+                          value={pageSize}
+                          onChange={(e) => {
+                            setPageSize(parseInt(e.target.value))
+                            setCurrentPage(1)
+                          }}
+                          className="px-2 py-1 border rounded text-sm bg-background"
+                        >
+                          <option value="5">5</option>
+                          <option value="10">10</option>
+                          <option value="50">50</option>
+                          <option value="100">100</option>
+                        </select>
+                        <span>
+                          Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, stories.length)} of {stories.length}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => setCurrentPage(currentPage - 1)}
+                          disabled={currentPage === 1 || storiesLoading}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm text-muted-foreground px-2">
+                          Page {currentPage} of {totalPages || 1}
+                        </span>
+                        <Button
+                          onClick={() => setCurrentPage(currentPage + 1)}
+                          disabled={currentPage >= totalPages || storiesLoading}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </Card>
           </div>
 
-          <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-8">
             <Card className="overflow-x-hidden">
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-base sm:text-lg">Details</CardTitle>
@@ -470,7 +600,7 @@ export default function EpicDetailPage() {
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                     <span className="text-xs sm:text-sm text-muted-foreground">Due Date</span>
                     <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
-                      {new Date(epic?.dueDate).toLocaleDateString()}
+                      {formatDate(epic?.dueDate)}
                     </span>
                   </div>
                 )}
@@ -521,7 +651,7 @@ export default function EpicDetailPage() {
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {new Date(epic?.createdAt).toLocaleDateString()}
+                  {formatDate(epic?.createdAt)}
                 </p>
               </CardContent>
             </Card>

@@ -8,12 +8,12 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useNotify } from '@/lib/notify'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { 
   ArrowLeft,
   Save,
   Loader2,
-  AlertTriangle,
   BookOpen,
   Plus,
   X
@@ -38,7 +38,6 @@ interface Sprint {
 export default function CreateStoryPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
   const [projects, setProjects] = useState<Project[]>([])
   const [epics, setEpics] = useState<Epic[]>([])
@@ -48,6 +47,10 @@ export default function CreateStoryPage() {
   const [sprintQuery, setSprintQuery] = useState('')
   const [selectedEpicDueDate, setSelectedEpicDueDate] = useState<string | null>(null)
   const [dueDateError, setDueDateError] = useState('')
+
+  // Use the notification hook
+  const { error: notifyError } = useNotify()
+  const { formatDate } = useDateTime()
 
   const [formData, setFormData] = useState({
     title: '',
@@ -126,7 +129,7 @@ export default function CreateStoryPage() {
     }
 
     try {
-      const response = await fetch(`/api/epics?project=${projectId}`)
+      const response = await fetch(`/api/epics?project=${encodeURIComponent(projectId)}&limit=100`)
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
@@ -215,12 +218,11 @@ export default function CreateStoryPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError('')
     setDueDateError('')
 
     // Validate epic field - REQUIRED
     if (!formData.epic || formData.epic === 'none') {
-      setError('Please select an epic for this story')
+      notifyError({ title: 'Validation Error', message: 'Please select an epic for this story' })
       setLoading(false)
       return
     }
@@ -254,10 +256,10 @@ export default function CreateStoryPage() {
       if (data.success) {
         router.push('/stories?success=story-created')
       } else {
-        setError(data.error || 'Failed to create story')
+        notifyError({ title: 'Failed to Create Story', message: data.error || 'Failed to create story' })
       }
     } catch (err) {
-      setError('Failed to create story')
+      notifyError({ title: 'Failed to Create Story', message: 'Failed to create story' })
     } finally {
       setLoading(false)
     }
@@ -373,12 +375,6 @@ export default function CreateStoryPage() {
           </div>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
 
         <Card>
           <CardHeader>
@@ -574,7 +570,7 @@ export default function CreateStoryPage() {
                     )}
                     {selectedEpicDueDate && !dueDateError && (
                       <p className="text-xs text-muted-foreground mt-1">
-                        Epic Due Date: {new Date(selectedEpicDueDate + 'T00:00:00').toLocaleDateString()}
+                        Epic Due Date: {formatDate(selectedEpicDueDate + 'T00:00:00')}
                       </p>
                     )}
                   </div>

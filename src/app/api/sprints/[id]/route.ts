@@ -11,7 +11,6 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-        console.log('GET sprints');
 
     await connectDB()
 
@@ -27,6 +26,18 @@ export async function GET(
     const userId = user.id
     const organizationId = user.organization
     const sprintId = params.id
+
+    const canViewSprint = await PermissionService.hasAnyPermission(
+      userId.toString(),
+      [Permission.SPRINT_VIEW, Permission.SPRINT_READ]
+    )
+
+    if (!canViewSprint) {
+      return NextResponse.json(
+        { error: 'You do not have permission to view this sprint' },
+        { status: 403 }
+      )
+    }
 
     // Check if user has permission to view all sprints
     const hasSprintViewAll = await PermissionService.hasPermission(
@@ -57,13 +68,17 @@ export async function GET(
     // This includes tasks that may have been moved to another sprint
     const sprintTaskIds = sprint.tasks || []
     
+
     const taskDocs = await Task.find({
       _id: { $in: sprintTaskIds },
       organization: organizationId
     })
-      .select('title status storyPoints estimatedHours actualHours priority type assignedTo archived subtasks sprint movedFromSprint')
-      .populate('assignedTo', 'firstName lastName email')
-      .populate('sprint', 'name _id')
+      .select('title displayId status storyPoints estimatedHours actualHours priority type assignedTo archived subtasks sprint movedFromSprint')
+      .populate([
+        { path: 'assignedTo.user', select: '_id firstName lastName email' },
+        { path: 'sprint', select: 'name _id' }
+      ])
+
 
     // Get current sprint tasks (tasks still assigned to this sprint)
     const currentSprintTaskIds = taskDocs
@@ -72,15 +87,17 @@ export async function GET(
 
     const tasks = taskDocs.map(task => {
       const taskObj = task.toObject()
+      
       const isInCurrentSprint = taskObj.sprint && taskObj.sprint._id.toString() === sprintId
       const movedToSprint = !isInCurrentSprint && taskObj.sprint ? {
         _id: taskObj.sprint._id.toString(),
         name: taskObj.sprint.name
       } : null
 
-      return {
+      const processedTask = {
         _id: taskObj._id,
         title: taskObj.title,
+        displayId: taskObj.displayId,
         status: taskObj.status,
         storyPoints: taskObj.storyPoints ?? 0,
         estimatedHours: taskObj.estimatedHours ?? 0,
@@ -89,18 +106,17 @@ export async function GET(
         type: taskObj.type,
         archived: taskObj.archived ?? false,
         subtasks: Array.isArray(taskObj.subtasks) ? taskObj.subtasks : [],
-        assignedTo: taskObj.assignedTo
-          ? {
-              _id: taskObj.assignedTo._id,
-              firstName: taskObj.assignedTo.firstName,
-              lastName: taskObj.assignedTo.lastName,
-              email: taskObj.assignedTo.email
-            }
-          : null,
+        assignedTo: taskObj.assignedTo,
         movedToSprint, // Indicates if task was moved to another sprint
         movedToBacklog: !taskObj.sprint && taskObj.movedFromSprint && taskObj.movedFromSprint.toString() === sprintId
       }
+
+     
+
+      return processedTask
     })
+
+   
 
     // Calculate progress from ALL tasks that were in this sprint (including moved ones)
     const totalTasks = tasks.length
@@ -152,6 +168,7 @@ export async function GET(
       }
     })
 
+   
   } catch (error) {
     console.error('Get sprint error:', error)
     return NextResponse.json(
@@ -184,6 +201,41 @@ export async function PUT(
     const updateData = await request.json()
 
     // Update sprint by id only (visibility/auth policy relaxed for PUT by id)
+    const existingSprint = await Sprint.findById(sprintId)
+
+    if (!existingSprint) {
+      return NextResponse.json(
+        { error: 'Sprint not found or unauthorized' },
+        { status: 404 }
+      )
+    }
+
+    if (existingSprint.organization?.toString() !== organizationId.toString()) {
+      return NextResponse.json(
+        { error: 'Unauthorized to update this sprint' },
+        { status: 403 }
+      )
+    }
+
+    const sprintProjectId = existingSprint.project?.toString?.()
+    const hasEditPermission = await PermissionService.hasAnyPermission(
+      userId,
+      [Permission.SPRINT_EDIT, Permission.SPRINT_UPDATE, Permission.SPRINT_MANAGE],
+      sprintProjectId
+    )
+    const hasCreatePermission = await PermissionService.hasPermission(
+      userId.toString(),
+      Permission.SPRINT_CREATE,
+      sprintProjectId
+    )
+
+    if (!hasEditPermission || !hasCreatePermission) {
+      return NextResponse.json(
+        { error: 'You do not have permission to edit this sprint' },
+        { status: 403 }
+      )
+    }
+
     const updatePayload: any = { ...updateData }
     if (Object.prototype.hasOwnProperty.call(updateData, 'teamMembers')) {
       updatePayload.teamMembers = Array.isArray(updateData.teamMembers)
@@ -242,8 +294,7 @@ export async function DELETE(
     const organizationId = user.organization
     const sprintId = params.id
 
-    // Delete sprint by id only (visibility/auth policy relaxed for DELETE by id)
-    const sprint = await Sprint.findByIdAndDelete(sprintId)
+    const sprint = await Sprint.findById(sprintId)
 
     if (!sprint) {
       return NextResponse.json(
@@ -251,6 +302,29 @@ export async function DELETE(
         { status: 404 }
       )
     }
+
+    if (sprint.organization?.toString() !== organizationId.toString()) {
+      return NextResponse.json(
+        { error: 'Unauthorized to delete this sprint' },
+        { status: 403 }
+      )
+    }
+
+    const sprintProjectId = sprint.project?.toString?.()
+    const canDeleteSprint = await PermissionService.hasPermission(
+      userId.toString(),
+      Permission.SPRINT_DELETE,
+      sprintProjectId
+    )
+
+    if (!canDeleteSprint) {
+      return NextResponse.json(
+        { error: 'You do not have permission to delete this sprint' },
+        { status: 403 }
+      )
+    }
+
+    await Sprint.findByIdAndDelete(sprintId)
 
     return NextResponse.json({
       success: true,

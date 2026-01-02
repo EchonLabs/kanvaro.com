@@ -54,11 +54,12 @@ interface PopulatedTask extends Omit<ITask, 'assignedTo' | 'project'> {
     _id: string
     name: string
   }
-  assignedTo?: {
+  assignedTo?: Array<{
     firstName: string
     lastName: string
     email: string
-  }
+    hourlyRate?: number
+  }>
 }
 
 // Dynamically import heavy modals
@@ -110,7 +111,7 @@ export interface KanbanBoardProps {
 }
 
 const defaultColumns = [
-  { key: 'backlog', title: 'Backlog', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
+  { key: 'backlog', title: 'backlog', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
   { key: 'todo', title: 'To Do', color: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200' },
   { key: 'in_progress', title: 'In Progress', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
   { key: 'review', title: 'Review', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
@@ -288,7 +289,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
-    const task = tasks.find(t => t._id === active.id)
+    const task = tasks.find(t => t._id?.toString() === active.id)
     setActiveTask(task || null)
   }
 
@@ -304,7 +305,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
     if (activeId === overId) return
 
     // Find the task being dragged
-    const activeTask = tasks.find(task => task._id === activeId)
+    const activeTask = tasks.find(task => task._id?.toString() === activeId)
     if (!activeTask) return
 
     // Determine the new status based on the drop target
@@ -316,7 +317,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
       newStatus = overId as any
     } else {
       // If dropped on another task, get the status of that task
-      const overTask = tasks.find(task => task._id === overId)
+      const overTask = tasks.find(task => task._id?.toString() === overId)
       if (overTask) {
         newStatus = overTask.status
       } else {
@@ -332,13 +333,26 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
     // Handle same-column reordering
     if (newStatus === activeTask.status) {
       const columnTasks = getTasksByStatus(newStatus)
-      const oldIndex = columnTasks.findIndex(task => task._id === activeId)
-      const newIndex = columnTasks.findIndex(task => task._id === overId)
+      const oldIndex = columnTasks.findIndex(task => task._id?.toString() === activeId)
+      const newIndex = columnTasks.findIndex(task => task._id?.toString() === overId)
 
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
         const reorderedTasks = arrayMove(columnTasks, oldIndex, newIndex)
         const orderedTaskIds = reorderedTasks.map(task => task._id)
 
+        // Optimistic update - update UI immediately
+        setTasks(prevTasks => {
+          const updatedTasks = [...prevTasks]
+          reorderedTasks.forEach((task, index) => {
+            const taskIndex = updatedTasks.findIndex(t => t._id?.toString() === task._id?.toString())
+            if (taskIndex !== -1) {
+              updatedTasks[taskIndex] = { ...updatedTasks[taskIndex], position: index } as PopulatedTask
+            }
+          })
+          return updatedTasks
+        })
+
+        // Background API call
         try {
           const response = await fetch('/api/tasks/reorder', {
             method: 'POST',
@@ -353,25 +367,28 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
           })
 
           const data = await response.json()
-          if (data.success) {
-            // Update local state
-            setTasks(prevTasks => {
-              const updatedTasks = [...prevTasks]
-              reorderedTasks.forEach((task, index) => {
-                const taskIndex = updatedTasks.findIndex(t => t._id === task._id)
-                if (taskIndex !== -1) {
-                  updatedTasks[taskIndex] = { ...updatedTasks[taskIndex], position: index } as PopulatedTask
-                }
-              })
-              return updatedTasks
-            })
+          if (!data.success) {
+            // Revert optimistic update on failure
+            console.error('Failed to reorder tasks:', data.error)
+            // Refetch to get correct state
+            fetchTasks()
           }
         } catch (error) {
           console.error('Failed to reorder tasks:', error)
+          // Revert optimistic update on network failure
+          fetchTasks() // Refetch to get correct state
         }
       }
     } else {
       // Handle cross-column moves
+      const originalStatus = activeTask.status
+
+      // Optimistic update - update UI immediately
+      setTasks(tasks.map(task =>
+        task._id?.toString() === activeId ? { ...task, status: newStatus } as PopulatedTask : task
+      ))
+
+      // Background API call
       try {
         const response = await fetch(`/api/tasks/${activeId}`, {
           method: 'PUT',
@@ -383,13 +400,19 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
 
         const data = await response.json()
 
-        if (data.success) {
+        if (!data.success) {
+          // Revert optimistic update on failure
+          console.error('Failed to update task status:', data.error)
           setTasks(tasks.map(task =>
-            task._id === activeId ? { ...task, status: newStatus } as PopulatedTask : task
+            task._id?.toString() === activeId ? { ...task, status: originalStatus } as PopulatedTask : task
           ))
         }
       } catch (error) {
         console.error('Failed to update task status:', error)
+        // Revert optimistic update on network failure
+        setTasks(tasks.map(task =>
+          task._id?.toString() === activeId ? { ...task, status: originalStatus } as PopulatedTask : task
+        ))
       }
     }
   }
@@ -475,7 +498,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
               <span className="hidden sm:inline">Manage Columns</span>
               <span className="sm:hidden">Columns</span>
             </Button>
-            <Button
+            {/* <Button
               onClick={() => handleCreateTask()}
               disabled={selectedProjectId === 'all'}
               title={selectedProjectId === 'all' ? 'Please select a specific project to create tasks' : 'Add a new task'}
@@ -483,7 +506,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Task
-            </Button>
+            </Button> */}
           </div>
         </div>
       </div>
@@ -529,6 +552,10 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
                   }}
                   onEditTask={onEditTask}
                   onDeleteTask={onDeleteTask}
+                  canDragTask={(task) => {
+                    // Allow dragging if task is not in backlog, or if it is in backlog but assigned to a sprint
+                    return task.status !== 'backlog' || !!task.sprint
+                  }}
                 />
               )
             })}
@@ -543,7 +570,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
               getPriorityColor={getPriorityColor}
               getTypeColor={getTypeColor}
               isDragOverlay
-              onEdit={onEditTask}
+            //  onEdit={onEditTask}
               onDelete={onDeleteTask}
             />
           ) : null}

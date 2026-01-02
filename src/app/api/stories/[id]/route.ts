@@ -46,25 +46,27 @@ export async function GET(
       ];
     }
 
+    // Optimize population to only fetch what's needed for the UI
     const story = await Story.findOne(storyQuery)
-      .populate('project', 'name')
+      .populate('project', '_id name') // Include _id for permission checks
       .populate({
         path: 'epic',
-        select: 'title description status priority dueDate tags project createdBy',
+        select: '_id title description status priority dueDate tags project createdBy',
         populate: [
-          { path: 'project', select: 'name' },
-          { path: 'createdBy', select: 'firstName lastName email' }
+          { path: 'project', select: '_id name' },
+          { path: 'createdBy', select: '_id firstName lastName email' }
         ]
       })
-      .populate('assignedTo', 'firstName lastName email')
-      .populate('createdBy', 'firstName lastName email')
+      .populate('assignedTo', '_id firstName lastName email') // Include _id for permission checks
+      .populate('createdBy', '_id firstName lastName email') // Include _id for permission checks
       .populate({
         path: 'sprint',
-        select: 'name description status startDate endDate goal project',
+        select: '_id name description status startDate endDate goal project',
         populate: [
-          { path: 'project', select: 'name' }
+          { path: 'project', select: '_id name' }
         ]
       })
+      .lean() // Use lean for better performance
 
     if (!story) {
       return NextResponse.json(
@@ -109,45 +111,61 @@ export async function PUT(
 
     const updateData = await request.json()
 
-    // Find and update story
-    const story = await Story.findOneAndUpdate(
-      {
-        _id: storyId,
-      },
-      updateData,
-      { new: true }
-    )
-      .populate('project', 'name')
-      .populate({
-        path: 'epic',
-        select: 'title description status priority dueDate tags project createdBy',
-        populate: [
-          { path: 'project', select: 'name' },
-          { path: 'createdBy', select: 'firstName lastName email' }
-        ]
-      })
-      .populate('assignedTo', 'firstName lastName email')
-      .populate('createdBy', 'firstName lastName email')
-      .populate({
-        path: 'sprint',
-        select: 'name description status startDate endDate goal project',
-        populate: [
-          { path: 'project', select: 'name' }
-        ]
-      })
+    // Only fetch essential data for permission check and update validation
+    const existingStory = await Story.findById(storyId)
+      .populate('project', '_id')
+      .populate('createdBy', '_id')
 
-    if (!story) {
+    if (!existingStory) {
       return NextResponse.json(
         { error: 'Story not found or unauthorized' },
         { status: 404 }
       )
     }
 
+    const isCreator = existingStory.createdBy?._id?.toString?.() === userId.toString()
+    const canEditStory = isCreator || await PermissionService.hasPermission(
+      userId.toString(),
+      Permission.STORY_UPDATE
+    )
+
+    if (!canEditStory) {
+      return NextResponse.json(
+        { error: 'You do not have permission to edit this story' },
+        { status: 403 }
+      )
+    }
+
+    const story: any = await Story.findByIdAndUpdate(
+      storyId,
+      updateData,
+      { new: true }
+    )
+      .populate('project', '_id name')
+      .populate({
+        path: 'epic',
+        select: '_id title description status priority dueDate tags project createdBy',
+        populate: [
+          { path: 'project', select: '_id name' },
+          { path: 'createdBy', select: '_id firstName lastName email' }
+        ]
+      })
+      .populate('assignedTo', '_id firstName lastName email')
+      .populate('createdBy', '_id firstName lastName email')
+      .populate({
+        path: 'sprint',
+        select: '_id name description status startDate endDate goal project',
+        populate: [
+          { path: 'project', select: '_id name' }
+        ]
+      })
+      .lean()
+
     // If this story belongs to an epic, check if epic should be completed
     // Use the completion service to ensure consistent logic
-    if (story.epic) {
+    if (story?.epic) {
       const { CompletionService } = await import('@/lib/completion-service')
-      CompletionService.checkEpicCompletion(story.epic.toString()).catch(error => {
+      CompletionService.checkEpicCompletion(story?.epic.toString()).catch(error => {
         console.error('Error checking epic completion:', error)
       })
     }
@@ -187,11 +205,7 @@ export async function DELETE(
     const organizationId = user.organization
     const storyId = params.id
 
-    // Find and delete story (only creator can delete)
-    const story = await Story.findOneAndDelete({
-      _id: storyId,
-      createdBy: userId
-    })
+    const story = await Story.findById(storyId)
 
     if (!story) {
       return NextResponse.json(
@@ -199,6 +213,21 @@ export async function DELETE(
         { status: 404 }
       )
     }
+
+    const isCreator = story.createdBy?.toString?.() === userId.toString()
+    const canDeleteStory = isCreator || await PermissionService.hasPermission(
+      userId,
+      Permission.STORY_DELETE
+    )
+
+    if (!canDeleteStory) {
+      return NextResponse.json(
+        { error: 'You do not have permission to delete this story' },
+        { status: 403 }
+      )
+    }
+
+    await Story.findByIdAndDelete(storyId)
 
     return NextResponse.json({
       success: true,

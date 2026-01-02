@@ -12,18 +12,18 @@ import { useOrganization } from '@/hooks/useOrganization'
 import { Building2, Upload, Save, AlertCircle, CheckCircle, X, Users, UserCheck, Building, Crown } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useCurrencies } from '@/hooks/useCurrencies'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
+import { useNotify } from '@/lib/notify'
 
 export function OrganizationSettings() {
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const { organization, loading, refetch } = useOrganization()
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay, getCurrencyByCode } = useCurrencies(true)
-  const orgCurrency = organization?.currency || 'USD'
-  const currencySymbol = getCurrencyByCode(orgCurrency)?.symbol || '$'
+  const { currencySymbol } = useOrgCurrency()
   const [saving, setSaving] = useState(false)
   const [savingRegistration, setSavingRegistration] = useState(false)
   const [savingTimeTracking, setSavingTimeTracking] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [registrationMessage, setRegistrationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [timeTrackingMessage, setTimeTrackingMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [savingNotifications, setSavingNotifications] = useState(false)
   
   const [formData, setFormData] = useState({
     name: '',
@@ -33,28 +33,27 @@ export function OrganizationSettings() {
     language: 'en',
     industry: '',
     size: 'small' as 'startup' | 'small' | 'medium' | 'enterprise',
-    requireEmailVerification: true,
     defaultUserRole: 'team_member',
-    timeTracking: {
-      allowTimeTracking: true,
-      allowManualTimeSubmission: true,
-      requireApproval: false,
-      allowBillableTime: true,
-      defaultHourlyRate: 0,
-      maxDailyHours: 12,
-      maxWeeklyHours: 60,
-      maxSessionHours: 8,
-      allowOvertime: false,
-      requireDescription: true,
-      requireCategory: false,
-      allowFutureTime: false,
-      allowPastTime: true,
-      pastTimeLimitDays: 30,
-      roundingRules: {
-        enabled: false,
-        increment: 15,
-        roundUp: true
-      },
+        timeTracking: {
+          allowTimeTracking: true,
+          allowManualTimeSubmission: true,
+          requireApproval: false,
+          allowBillableTime: true,
+          defaultHourlyRate: '0',
+          maxDailyHours: '12',
+          maxWeeklyHours: '60',
+          maxSessionHours: '8',
+          allowOvertime: false,
+          requireDescription: true,
+          requireCategory: false,
+          allowFutureTime: false,
+          allowPastTime: true,
+          pastTimeLimitDays: '30',
+          roundingRules: {
+            enabled: false,
+            increment: '15',
+            roundUp: true
+          },
       notifications: {
         onTimerStart: false,
         onTimerStop: true,
@@ -62,6 +61,10 @@ export function OrganizationSettings() {
         onApprovalNeeded: true,
         onTimeSubmitted: true
       }
+    },
+    notifications: {
+      retentionDays: 30,
+      autoCleanup: true
     }
   })
   const [roundingIncrementInput, setRoundingIncrementInput] = useState('15')
@@ -72,6 +75,7 @@ export function OrganizationSettings() {
   const [darkLogoPreview, setDarkLogoPreview] = useState<string | null>(null)
   const [logoMode, setLogoMode] = useState<'single' | 'dual'>('single')
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [currencySearchQuery, setCurrencySearchQuery] = useState('')
 
   const timezones = [
     'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
@@ -174,26 +178,25 @@ export function OrganizationSettings() {
         language: organization.language || 'en',
         industry: organization.industry || '',
         size: organization.size || 'small',
-        requireEmailVerification: organization.settings?.requireEmailVerification || true,
         defaultUserRole: organization.settings?.defaultUserRole || 'team_member',
         timeTracking: {
           allowTimeTracking: true,
           allowManualTimeSubmission: true,
           requireApproval: false,
           allowBillableTime: true,
-          defaultHourlyRate: 0,
-          maxDailyHours: 12,
-          maxWeeklyHours: 60,
-          maxSessionHours: 8,
+          defaultHourlyRate: '0',
+          maxDailyHours: '12',
+          maxWeeklyHours: '60',
+          maxSessionHours: '8',
           allowOvertime: false,
           requireDescription: true,
           requireCategory: false,
           allowFutureTime: false,
           allowPastTime: true,
-          pastTimeLimitDays: 30,
+          pastTimeLimitDays: '30',
           roundingRules: {
             enabled: false,
-            increment: 15,
+            increment: '15',
             roundUp: true
           },
           notifications: {
@@ -203,6 +206,10 @@ export function OrganizationSettings() {
             onApprovalNeeded: true,
             onTimeSubmitted: true
           }
+        },
+        notifications: {
+          retentionDays: organization.settings?.notifications?.retentionDays ?? 30,
+          autoCleanup: organization.settings?.notifications?.autoCleanup ?? true
         }
       })
 
@@ -269,23 +276,6 @@ export function OrganizationSettings() {
     }
   }, [organization])
 
-  useEffect(() => {
-    if (message?.type !== 'success') return
-    const timeout = setTimeout(() => setMessage(null), 5000)
-    return () => clearTimeout(timeout)
-  }, [message])
-
-  useEffect(() => {
-    if (registrationMessage?.type !== 'success') return
-    const timeout = setTimeout(() => setRegistrationMessage(null), 5000)
-    return () => clearTimeout(timeout)
-  }, [registrationMessage])
-
-  useEffect(() => {
-    if (timeTrackingMessage?.type !== 'success') return
-    const timeout = setTimeout(() => setTimeTrackingMessage(null), 5000)
-    return () => clearTimeout(timeout)
-  }, [timeTrackingMessage])
 
   const handleSave = async () => {
     if (!validateForm()) {
@@ -293,7 +283,6 @@ export function OrganizationSettings() {
     }
 
     setSaving(true)
-    setMessage(null)
 
     try {
       const formDataToSend = new FormData()
@@ -301,7 +290,7 @@ export function OrganizationSettings() {
         ...formData,
         logoMode
       }))
-      
+
       if (logo) {
         formDataToSend.append('logo', logo)
       }
@@ -331,9 +320,15 @@ export function OrganizationSettings() {
       // Clear cache and refetch organization data to show updated values (including logos)
       refetch()
 
-      setMessage({ type: 'success', text: 'Organization settings updated successfully' })
+      notifySuccess({
+        title: 'Organization Updated',
+        message: 'Organization settings have been updated successfully'
+      })
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update organization settings' })
+      notifyError({
+        title: 'Update Failed',
+        message: error instanceof Error ? error.message : 'Failed to update organization settings'
+      })
     } finally {
       setSaving(false)
     }
@@ -341,12 +336,10 @@ export function OrganizationSettings() {
 
   const handleSaveRegistrationSettings = async () => {
     setSavingRegistration(true)
-    setRegistrationMessage(null)
 
     try {
       const formDataToSend = new FormData()
       formDataToSend.append('data', JSON.stringify({
-        requireEmailVerification: formData.requireEmailVerification,
         defaultUserRole: formData.defaultUserRole
       }))
 
@@ -360,10 +353,16 @@ export function OrganizationSettings() {
         throw new Error(errorData.error || 'Failed to update registration settings')
       }
 
-      refetch()
-      setRegistrationMessage({ type: 'success', text: 'Registration settings updated successfully' })
+      // No need to refetch since registration settings don't affect other parts of the form
+      notifySuccess({
+        title: 'Registration Settings Updated',
+        message: 'User registration settings have been updated successfully'
+      })
     } catch (error) {
-      setRegistrationMessage({ type: 'error', text: 'Failed to update registration settings' })
+      notifyError({
+        title: 'Update Failed',
+        message: error instanceof Error ? error.message : 'Failed to update registration settings'
+      })
     } finally {
       setSavingRegistration(false)
     }
@@ -371,7 +370,6 @@ export function OrganizationSettings() {
 
   const handleSaveTimeTrackingSettings = async () => {
     setSavingTimeTracking(true)
-    setTimeTrackingMessage(null)
 
     try {
       const response = await fetch('/api/time-tracking/settings', {
@@ -380,7 +378,18 @@ export function OrganizationSettings() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          settings: formData.timeTracking
+          settings: {
+            ...formData.timeTracking,
+            defaultHourlyRate: parseFloat(formData.timeTracking.defaultHourlyRate) || 0,
+            maxDailyHours: parseInt(formData.timeTracking.maxDailyHours) || 12,
+            maxWeeklyHours: parseInt(formData.timeTracking.maxWeeklyHours) || 60,
+            maxSessionHours: parseInt(formData.timeTracking.maxSessionHours) || 8,
+            pastTimeLimitDays: parseInt(formData.timeTracking.pastTimeLimitDays?.toString()) || 30,
+            roundingRules: {
+              ...formData.timeTracking.roundingRules,
+              increment: parseInt(formData.timeTracking.roundingRules?.increment?.toString()) || 15
+            }
+          }
         }),
       })
 
@@ -390,7 +399,7 @@ export function OrganizationSettings() {
       }
 
       const data = await response.json()
-      
+
       // Update form data with the saved settings to ensure consistency
       if (data.settings) {
         setFormData(prev => ({
@@ -400,14 +409,56 @@ export function OrganizationSettings() {
       }
 
       refetch()
-      setTimeTrackingMessage({ type: 'success', text: 'Time tracking settings updated successfully' })
+      notifySuccess({
+        title: 'Time Tracking Settings Updated',
+        message: 'Time tracking configuration has been updated successfully'
+      })
     } catch (error) {
-      setTimeTrackingMessage({ 
-        type: 'error', 
-        text: error instanceof Error ? error.message : 'Failed to update time tracking settings' 
+      notifyError({
+        title: 'Update Failed',
+        message: error instanceof Error ? error.message : 'Failed to update time tracking settings'
       })
     } finally {
       setSavingTimeTracking(false)
+    }
+  }
+
+  const handleSaveNotificationSettings = async () => {
+    setSavingNotifications(true)
+
+    try {
+      const response = await fetch('/api/organization', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          settings: {
+            notifications: {
+              retentionDays: formData.notifications?.retentionDays || 30,
+              autoCleanup: formData.notifications?.autoCleanup ?? true
+            }
+          }
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to update notification settings')
+      }
+
+      refetch()
+      notifySuccess({
+        title: 'Notification Settings Updated',
+        message: 'Notification retention settings have been updated successfully'
+      })
+    } catch (error) {
+      notifyError({
+        title: 'Update Failed',
+        message: error instanceof Error ? error.message : 'Failed to update notification settings'
+      })
+    } finally {
+      setSavingNotifications(false)
     }
   }
 
@@ -423,8 +474,22 @@ export function OrganizationSettings() {
     )
   }
 
+  // Filter and sort currencies based on search query
+  const filteredCurrencies = currencies
+    .filter(currency => {
+      if (!currencySearchQuery.trim()) return true
+      const query = currencySearchQuery.toLowerCase()
+      return (
+        currency.code.toLowerCase().includes(query) ||
+        currency.name.toLowerCase().includes(query) ||
+        currency.country.toLowerCase().includes(query) ||
+        currency.symbol.toLowerCase().includes(query)
+      )
+    })
+    .sort((a, b) => a.code.localeCompare(b.code)) // Sort by currency code in ascending order
+
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-8">
       <Card>
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
@@ -435,7 +500,7 @@ export function OrganizationSettings() {
             Update your organization's basic information and settings.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
+        <CardContent className="space-y-6 sm:space-y-8 p-4 sm:p-6 pt-0">
           <div className="space-y-2">
             <Label htmlFor="name" className="text-xs sm:text-sm">Organization Name *</Label>
             <Input
@@ -478,7 +543,7 @@ export function OrganizationSettings() {
             </div>
 
             {/* Logo Mode Selection */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
               <div
                 className={`p-4 sm:p-6 border-2 rounded-lg cursor-pointer transition-all ${
                   logoMode === 'single'
@@ -521,8 +586,9 @@ export function OrganizationSettings() {
               </div>
             </div>
 
-            {logoMode === 'single' ? (
-              <div className="bg-card border rounded-lg p-4 sm:p-6">
+            <div className="mt-8">
+              {logoMode === 'single' ? (
+              <div className="bg-card border rounded-lg p-4 sm:p-6 mt-8">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                   {logoPreview ? (
                     <div className="relative flex-shrink-0">
@@ -572,9 +638,9 @@ export function OrganizationSettings() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-10 mt-8">
                 {/* Light Mode Logo */}
-                <div className="bg-card border rounded-lg p-4 sm:p-6">
+                <div className="bg-card border rounded-lg p-4 sm:p-6 mb-6">
                   <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                     <div className="w-3 h-3 sm:w-4 sm:h-4 bg-white border border-gray-300 rounded flex-shrink-0"></div>
                     <Label className="text-xs sm:text-sm font-medium text-foreground">Light Mode Logo</Label>
@@ -676,6 +742,7 @@ export function OrganizationSettings() {
                 </div>
               </div>
             )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
@@ -695,16 +762,52 @@ export function OrganizationSettings() {
 
             <div className="space-y-2">
               <Label htmlFor="currency" className="text-xs sm:text-sm">Currency</Label>
-              <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
+              <Select value={formData.currency} onValueChange={(value) => {
+                setFormData({ ...formData, currency: value })
+                // Clear search when selecting an option
+                setCurrencySearchQuery('')
+              }}>
                 <SelectTrigger className="text-xs sm:text-sm">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
+                  <div className="p-2 border-b">
+                    <Input
+                      ref={(input) => {
+                        // Auto-focus the search input when dropdown opens
+                        if (input && !currencySearchQuery) {
+                          setTimeout(() => input.focus(), 100)
+                        }
+                      }}
+                      type="text"
+                      placeholder="Search currencies..."
+                      value={currencySearchQuery}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        setCurrencySearchQuery(e.target.value)
+                      }}
+                      className="text-xs sm:text-sm h-8"
+                      onKeyDown={(e) => {
+                        e.stopPropagation()
+                        // Allow normal typing behavior
+                        if (e.key === 'Escape') {
+                          setCurrencySearchQuery('')
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      onFocus={(e) => e.stopPropagation()}
+                      autoComplete="off"
+                    />
+                  </div>
                   {currenciesLoading ? (
                     <SelectItem value="__loading__" disabled className="text-xs sm:text-sm">Loading currencies...</SelectItem>
+                  ) : filteredCurrencies.length === 0 ? (
+                    <SelectItem value="__no-results__" disabled className="text-xs sm:text-sm">
+                      {currencySearchQuery ? 'No currencies found' : 'Start typing to search...'}
+                    </SelectItem>
                   ) : (
-                    currencies.map((currency) => (
-                      <SelectItem key={currency.code} value={currency.code} className="text-xs sm:text-sm">
+                    filteredCurrencies.map((currency, index) => (
+                      <SelectItem key={`${currency.code}-${index}`} value={currency.code} className="text-xs sm:text-sm">
                         {formatCurrencyDisplay(currency)}
                       </SelectItem>
                     ))
@@ -750,7 +853,7 @@ export function OrganizationSettings() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6">
               {organizationSizes.map((size) => {
                 const getIcon = () => {
                   switch (size.value) {
@@ -808,29 +911,6 @@ export function OrganizationSettings() {
             </div>
           </div>
 
-          {message && (
-            <Alert 
-              variant={message.type === 'error' ? 'destructive' : 'default'}
-              className={`flex items-start gap-2 ${message.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
-            >
-              <div className="flex items-start gap-2 flex-1 min-w-0">
-                {message.type === 'error' ? (
-                  <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5" />
-                ) : (
-                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400" />
-                )}
-                <AlertDescription className="text-xs sm:text-sm break-words flex-1">{message.text}</AlertDescription>
-              </div>
-              <button
-                type="button"
-                onClick={() => setMessage(null)}
-                className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                aria-label="Dismiss notification"
-              >
-                <X className="h-3 w-3 sm:h-4 sm:w-4" />
-              </button>
-            </Alert>
-          )}
 
           <div className="flex justify-end mt-6 sm:mt-8">
             <Button onClick={handleSave} disabled={saving || !isFormValid} className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm">
@@ -853,20 +933,6 @@ export function OrganizationSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-            <div className="space-y-0.5 flex-1 min-w-0">
-              <Label className="text-xs sm:text-sm">Require Email Verification</Label>
-              <p className="text-xs sm:text-sm text-muted-foreground break-words">
-                Require users to verify their email address before accessing the system
-              </p>
-            </div>
-            <Switch
-              checked={formData.requireEmailVerification}
-              onCheckedChange={(checked) => setFormData({ ...formData, requireEmailVerification: checked })}
-              className="flex-shrink-0"
-            />
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="defaultRole" className="text-xs sm:text-sm">Default User Role</Label>
             <Select value={formData.defaultUserRole} onValueChange={(value) => setFormData({ ...formData, defaultUserRole: value })}>
@@ -881,29 +947,6 @@ export function OrganizationSettings() {
             </Select>
           </div>
 
-          {registrationMessage && (
-            <Alert 
-              variant={registrationMessage.type === 'error' ? 'destructive' : 'default'}
-              className={`flex items-start gap-2 ${registrationMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
-            >
-              <div className="flex items-start gap-2 flex-1 min-w-0">
-                {registrationMessage.type === 'error' ? (
-                  <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5" />
-                ) : (
-                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400" />
-                )}
-                <AlertDescription className="text-xs sm:text-sm break-words flex-1">{registrationMessage.text}</AlertDescription>
-              </div>
-              <button
-                type="button"
-                onClick={() => setRegistrationMessage(null)}
-                className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                aria-label="Dismiss notification"
-              >
-                <X className="h-3 w-3 sm:h-4 sm:w-4" />
-              </button>
-            </Alert>
-          )}
 
           <div className="flex justify-end mt-6 sm:mt-8">
             <Button 
@@ -1007,9 +1050,9 @@ export function OrganizationSettings() {
                     id="defaultHourlyRate"
                     type="number"
                     value={formData.timeTracking.defaultHourlyRate}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      timeTracking: { ...formData.timeTracking, defaultHourlyRate: Number(e.target.value) }
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      timeTracking: { ...formData.timeTracking, defaultHourlyRate: e.target.value }
                     })}
                     placeholder="0.00"
                     step="0.01"
@@ -1026,9 +1069,9 @@ export function OrganizationSettings() {
                     id="maxDailyHours"
                     type="number"
                     value={formData.timeTracking.maxDailyHours}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      timeTracking: { ...formData.timeTracking, maxDailyHours: Number(e.target.value) }
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      timeTracking: { ...formData.timeTracking, maxDailyHours: e.target.value }
                     })}
                     min="1"
                     max="24"
@@ -1041,9 +1084,9 @@ export function OrganizationSettings() {
                     id="maxWeeklyHours"
                     type="number"
                     value={formData.timeTracking.maxWeeklyHours}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      timeTracking: { ...formData.timeTracking, maxWeeklyHours: Number(e.target.value) }
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      timeTracking: { ...formData.timeTracking, maxWeeklyHours: e.target.value }
                     })}
                     min="1"
                     max="168"
@@ -1056,9 +1099,9 @@ export function OrganizationSettings() {
                     id="maxSessionHours"
                     type="number"
                     value={formData.timeTracking.maxSessionHours}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      timeTracking: { ...formData.timeTracking, maxSessionHours: Number(e.target.value) }
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      timeTracking: { ...formData.timeTracking, maxSessionHours: e.target.value }
                     })}
                     min="1"
                     max="24"
@@ -1159,9 +1202,9 @@ export function OrganizationSettings() {
                     id="pastTimeLimitDays"
                     type="number"
                     value={formData.timeTracking.pastTimeLimitDays}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      timeTracking: { ...formData.timeTracking, pastTimeLimitDays: Number(e.target.value) }
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      timeTracking: { ...formData.timeTracking, pastTimeLimitDays: e.target.value }
                     })}
                     min="1"
                     max="365"
@@ -1170,7 +1213,7 @@ export function OrganizationSettings() {
                 </div>
               )}
 
-              <div className="space-y-3 sm:space-y-4">
+          <div className="space-y-5">
                 <h4 className="text-sm sm:text-base font-medium">Rounding Rules</h4>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
                   <div className="space-y-0.5 flex-1 min-w-0">
@@ -1193,7 +1236,7 @@ export function OrganizationSettings() {
                 </div>
 
                 {formData.timeTracking.roundingRules.enabled && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6">
                     <div>
                       <Label htmlFor="roundingIncrement" className="text-xs sm:text-sm">Increment (minutes)</Label>
                       <Input
@@ -1208,9 +1251,9 @@ export function OrganizationSettings() {
                             ...formData, 
                             timeTracking: { 
                               ...formData.timeTracking, 
-                              roundingRules: { 
-                                ...formData.timeTracking.roundingRules, 
-                                increment: value === '' || Number.isNaN(parsedValue) ? 0 : parsedValue 
+                              roundingRules: {
+                                ...formData.timeTracking.roundingRules,
+                                increment: value
                               }
                             }
                           })
@@ -1244,7 +1287,7 @@ export function OrganizationSettings() {
               </div>
 
               <div className="space-y-3 sm:space-y-4">
-                <h4 className="text-sm sm:text-base font-medium">Notifications</h4>
+                <h4 className="text-sm sm:text-base font-medium">Time Tracking Notifications</h4>
                 <div className="space-y-3 sm:space-y-4">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
                     <div className="space-y-0.5 flex-1 min-w-0">
@@ -1350,29 +1393,6 @@ export function OrganizationSettings() {
             </div>
           )}
 
-          {timeTrackingMessage && (
-            <Alert 
-              variant={timeTrackingMessage.type === 'error' ? 'destructive' : 'default'}
-              className={`flex items-start gap-2 ${timeTrackingMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : ''}`}
-            >
-              <div className="flex items-start gap-2 flex-1 min-w-0">
-                {timeTrackingMessage.type === 'error' ? (
-                  <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5" />
-                ) : (
-                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400" />
-                )}
-                <AlertDescription className="text-xs sm:text-sm break-words flex-1">{timeTrackingMessage.text}</AlertDescription>
-              </div>
-              <button
-                type="button"
-                onClick={() => setTimeTrackingMessage(null)}
-                className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                aria-label="Dismiss notification"
-              >
-                <X className="h-3 w-3 sm:h-4 sm:w-4" />
-              </button>
-            </Alert>
-          )}
 
           <div className="flex justify-end mt-6 sm:mt-8">
             <Button 
@@ -1386,6 +1406,84 @@ export function OrganizationSettings() {
                 <Save className="h-3 w-3 sm:h-4 sm:w-4" />
               )}
               {savingTimeTracking ? 'Saving...' : 'Save Time Tracking Information'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Notification Settings */}
+      <Card>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-base sm:text-lg">Notification Settings</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
+            Configure notification retention and cleanup settings for your organization.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
+          <div className="space-y-3 sm:space-y-4">
+            <h4 className="text-sm sm:text-base font-medium">Retention Settings</h4>
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                <div className="space-y-0.5 flex-1 min-w-0">
+                  <Label className="text-xs sm:text-sm">Auto Cleanup</Label>
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words">
+                    Automatically remove old notifications to save space
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.notifications?.autoCleanup ?? true}
+                  onCheckedChange={(checked) => setFormData({
+                    ...formData,
+                    notifications: {
+                      ...formData.notifications,
+                      autoCleanup: checked
+                    }
+                  })}
+                  className="flex-shrink-0"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                <div className="space-y-0.5 flex-1 min-w-0">
+                  <Label className="text-xs sm:text-sm">Retention Period</Label>
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words">
+                    Days to keep notifications before automatic cleanup
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Input
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={formData.notifications?.retentionDays ?? 30}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      notifications: {
+                        ...formData.notifications,
+                        retentionDays: parseInt(e.target.value) || 30
+                      }
+                    })}
+                    className="w-20 text-center"
+                    disabled={!formData.notifications?.autoCleanup}
+                  />
+                  <span className="text-xs text-muted-foreground">days</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end mt-6 sm:mt-8">
+            <Button
+              onClick={handleSaveNotificationSettings}
+              disabled={savingNotifications}
+              className="flex items-center gap-2 w-full sm:w-auto text-xs sm:text-sm"
+            >
+              {savingNotifications ? (
+                <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
+              ) : (
+                <Save className="h-3 w-3 sm:h-4 sm:w-4" />
+              )}
+              {savingNotifications ? 'Saving...' : 'Save Notification Settings'}
             </Button>
           </div>
         </CardContent>

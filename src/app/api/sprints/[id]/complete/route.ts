@@ -3,6 +3,8 @@ import connectDB from '@/lib/db-config'
 import { Sprint } from '@/models/Sprint'
 import { Task } from '@/models/Task'
 import { authenticateUser } from '@/lib/auth-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 export async function POST(
   request: NextRequest,
@@ -21,6 +23,7 @@ export async function POST(
 
     const { user } = authResult
     const organizationId = user.organization
+    const userId = user.id
     const sprintId = params.id
 
     if (!sprintId) {
@@ -52,6 +55,32 @@ export async function POST(
     if (sprint.status !== 'active') {
       return NextResponse.json(
         { error: 'Only active sprints can be completed' },
+        { status: 400 }
+      )
+    }
+
+    const sprintProjectId = sprint.project?.toString?.()
+    const canCompleteSprint = await PermissionService.hasPermission(
+      userId,
+      Permission.SPRINT_COMPLETE,
+      sprintProjectId
+    )
+
+    if (!canCompleteSprint) {
+      return NextResponse.json(
+        { error: 'You do not have permission to complete this sprint' },
+        { status: 403 }
+      )
+    }
+
+    const activeTaskCount = await Task.countDocuments({
+      sprint: sprintId,
+      archived: { $ne: true }
+    })
+
+    if (activeTaskCount === 0) {
+      return NextResponse.json(
+        { error: 'Add tasks to this sprint before completing it' },
         { status: 400 }
       )
     }

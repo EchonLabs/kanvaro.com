@@ -24,7 +24,7 @@ import {
   ExternalLink,
   Target
 } from 'lucide-react'
-import { format } from 'date-fns'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { EditSprintEventModal } from '@/components/sprint-events/EditSprintEventModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 
@@ -90,8 +90,11 @@ export default function SprintEventDetailsPage() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth()
   const eventId = params.id as string
   const [event, setEvent] = useState<SprintEvent | null>(null)
+  const [fullProject, setFullProject] = useState<{ _id: string; name: string } | null>(null)
+const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [editingEvent, setEditingEvent] = useState<SprintEvent | null>(null)
+  const { formatDate, formatTime } = useDateTime()
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -113,6 +116,16 @@ export default function SprintEventDetailsPage() {
       if (response.ok) {
         const data = await response.json()
         setEvent(data)
+console.log('data', data)
+          // Fetch full project
+      const projectRes = await fetch(`/api/projects/${data?.project?._id}`)
+      const projectData = projectRes.ok ? await projectRes.json() : null
+      setFullProject(projectData)
+
+      // Fetch full sprint
+      const sprintRes = await fetch(`/api/sprints/${data?.sprint?._id}`)
+      const sprintData = sprintRes.ok ? await sprintRes.json() : null
+      setFullSprint(sprintData)
       }
     } catch (error) {
       console.error('Error fetching sprint event:', error)
@@ -304,7 +317,7 @@ export default function SprintEventDetailsPage() {
             <div>
               <h1 className="text-3xl font-bold">{event.title}</h1>
               <p className="text-muted-foreground">
-                {event.project.name} • {event.sprint.name}
+                {event.project?.name} • {event.sprint?.name}
               </p>
             </div>
           </div>
@@ -371,7 +384,7 @@ export default function SprintEventDetailsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Sprint</p>
-                    <p className="font-medium">{event.sprint.name}</p>
+                    <p className="font-medium">{event.sprint?.name}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Created By</p>
@@ -382,7 +395,7 @@ export default function SprintEventDetailsPage() {
                   <div>
                     <p className="text-sm text-muted-foreground">Created Date(Time)</p>
                     <p className="font-medium">
-                      {format(new Date(event.createdAt), 'MMM dd, yyyy')} ({format(new Date(event.createdAt), 'HH:mm')})
+                      {formatDate(event.createdAt)} ({formatTime(event.createdAt)})
                     </p>
                   </div>
                 </div>
@@ -399,7 +412,7 @@ export default function SprintEventDetailsPage() {
                   <div>
                     <p className="text-sm text-muted-foreground">Date</p>
                     <p className="font-medium">
-                      {format(new Date(event.scheduledDate), 'MMM dd, yyyy')}
+                      {formatDate(event.scheduledDate)}
                     </p>
                   </div>
                   <div>
@@ -511,7 +524,7 @@ export default function SprintEventDetailsPage() {
                                 {item.dueDate && (
                                   <div className="flex items-center gap-1">
                                     <Calendar className="h-3 w-3" />
-                                    <span>Due {format(new Date(item.dueDate), 'MMM dd, yyyy')}</span>
+                                    <span>Due {formatDate(item.dueDate)}</span>
                                   </div>
                                 )}
                                 {item.status && (

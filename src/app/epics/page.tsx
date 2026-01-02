@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -11,10 +11,14 @@ import { formatToTitleCase } from '@/lib/utils'
 import { Progress } from '@/components/ui/Progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { useNotify } from '@/lib/notify'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { extractUserId } from '@/lib/auth/user-utils'
 import { 
   Plus, 
   Search, 
@@ -23,7 +27,6 @@ import {
   Calendar, 
   Clock,
   CheckCircle,
-  AlertTriangle,
   Pause,
   XCircle,
   Play,
@@ -85,7 +88,6 @@ export default function EpicsPage() {
   const searchParams = useSearchParams()
   const [epics, setEpics] = useState<Epic[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -94,33 +96,46 @@ export default function EpicsPage() {
   const [selectedEpic, setSelectedEpic] = useState<Epic | null>(null)
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [successMessage, setSuccessMessage] = useState('')
-  const [showSuccessAlert, setShowSuccessAlert] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
+  const [currentUserId, setCurrentUserId] = useState<string>('')
+  const filtersInitializedRef = useRef(false)
 
-  // Check for success message from query params
+  const { hasPermission } = usePermissions()
+  const { success: notifySuccess, error: notifyError } = useNotify()
+  const { formatDate } = useDateTime()
+
+  // Show success when redirected with ?updated=true
   useEffect(() => {
     const updated = searchParams.get('updated')
     if (updated === 'true') {
-      setSuccessMessage('Epic updated successfully')
-      setShowSuccessAlert(true)
-      // Clear the query parameter from URL
+      notifySuccess({ title: 'Epic updated successfully' })
       router.replace('/epics', { scroll: false })
-      // Auto-hide after 5 seconds
-      const timer = setTimeout(() => {
-        setShowSuccessAlert(false)
-        setSuccessMessage('')
-      }, 5000)
-      return () => clearTimeout(timer)
     }
+    // notifySuccess is stable enough; omit from deps to avoid re-run loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, router])
+
+  const fetchAndSetCurrentUser = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/me')
+      if (response.ok) {
+        const data = await response.json().catch(() => ({}))
+        const userId = extractUserId(data)
+        if (userId) setCurrentUserId(userId.toString())
+      }
+      return response
+    } catch (error) {
+      console.error('Auth check failed:', error)
+      throw error
+    }
+  }, [])
 
   const checkAuth = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/me')
-      
+      const response = await fetchAndSetCurrentUser()
+
       if (response.ok) {
         setAuthError('')
         await fetchEpics()
@@ -130,8 +145,16 @@ export default function EpicsPage() {
         })
         
         if (refreshResponse.ok) {
-          setAuthError('')
-          await fetchEpics()
+          const meResponse = await fetchAndSetCurrentUser()
+          if (meResponse.ok) {
+            setAuthError('')
+            await fetchEpics()
+          } else {
+            setAuthError('Session expired')
+            setTimeout(() => {
+              router.push('/login')
+            }, 2000)
+          }
         } else {
           setAuthError('Session expired')
           setTimeout(() => {
@@ -148,11 +171,12 @@ export default function EpicsPage() {
         router.push('/login')
       }, 2000)
     }
-  }, [router])
+  }, [router, fetchAndSetCurrentUser])
 
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
+
 
   // Fetch when pagination changes (after initial load)
   useEffect(() => {
@@ -161,26 +185,45 @@ export default function EpicsPage() {
     }
   }, [currentPage, pageSize])
 
+  // Fetch when filters change
+  useEffect(() => {
+    if (!filtersInitializedRef.current) {
+      filtersInitializedRef.current = true
+      return
+    }
+    if (authError) return
+    if (currentPage === 1) {
+      fetchEpics()
+    } else {
+      setCurrentPage(1)
+    }
+  }, [searchQuery, statusFilter, priorityFilter])
+
   const fetchEpics = async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
       params.set('page', currentPage.toString())
       params.set('limit', pageSize.toString())
+      const trimmedSearch = searchQuery.trim()
+      if (trimmedSearch) params.set('search', trimmedSearch)
+      if (statusFilter !== 'all') params.set('status', statusFilter)
+      if (priorityFilter !== 'all') params.set('priority', priorityFilter)
       
       const response = await fetch(`/api/epics?${params.toString()}`)
       const data = await response.json()
 
       if (data.success) {
-        setEpics(data.data)
-        setTotalCount(data.pagination?.total || data.data.length)
+        const epicData = Array.isArray(data.data) ? data.data : []
+        setEpics(epicData)
+        setTotalCount(data.pagination?.total ?? epicData.length)
       } else {
         console.error('Failed to fetch epics:', data)
-        setError(data.error || 'Failed to fetch epics')
+        notifyError({ title: 'Failed to Load Epics', message: data.error || 'Failed to fetch epics' })
       }
     } catch (err) {
       console.error('Fetch epics error:', err)
-      setError('Failed to fetch epics')
+      notifyError({ title: 'Failed to Load Epics', message: 'Failed to fetch epics' })
     } finally {
       setLoading(false)
     }
@@ -202,12 +245,13 @@ export default function EpicsPage() {
         setEpics(prev => prev.filter(e => e._id !== selectedEpic._id))
         setShowDeleteConfirmModal(false)
         setSelectedEpic(null)
+        notifySuccess({ title: 'Epic deleted successfully' })
       } else {
-        setError(data.error || 'Failed to delete epic')
+        notifyError({ title: 'Failed to Delete Epic', message: data.error || 'Failed to delete epic' })
         setShowDeleteConfirmModal(false)
       }
     } catch (e) {
-      setError('Failed to delete epic')
+      notifyError({ title: 'Failed to Delete Epic', message: 'Failed to delete epic' })
       setShowDeleteConfirmModal(false)
     } finally {
       setDeleting(false)
@@ -217,10 +261,8 @@ export default function EpicsPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'backlog': return 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900'
-      case 'todo': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
-      case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
-      case 'review': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900'
-      case 'testing': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900'
+      case 'todo': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900'
+      case 'inprogress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
       case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
       case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
@@ -231,9 +273,7 @@ export default function EpicsPage() {
     switch (status) {
       case 'backlog': return <Layers className="h-4 w-4" />
       case 'todo': return <Target className="h-4 w-4" />
-      case 'in_progress': return <Play className="h-4 w-4" />
-      case 'review': return <AlertTriangle className="h-4 w-4" />
-      case 'testing': return <Zap className="h-4 w-4" />
+      case 'inprogress': return <Play className="h-4 w-4" />
       case 'done': return <CheckCircle className="h-4 w-4" />
       case 'cancelled': return <XCircle className="h-4 w-4" />
       default: return <Target className="h-4 w-4" />
@@ -250,17 +290,29 @@ export default function EpicsPage() {
     }
   }
 
-  const filteredEpics = epics.filter(epic => {
-    const matchesSearch = !searchQuery || 
-      epic?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      epic?.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      epic?.project?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    const matchesStatus = statusFilter === 'all' || epic?.status === statusFilter
-    const matchesPriority = priorityFilter === 'all' || epic?.priority === priorityFilter
+  const displayedEpics = epics
+  const totalEpicsCount = totalCount ?? displayedEpics.length
+  const totalPages = Math.max(1, Math.ceil((totalEpicsCount || 0) / pageSize) || 1)
+  const pageStartIndex = totalEpicsCount === 0 ? 0 : ((currentPage - 1) * pageSize) + 1
+  const pageEndIndex = totalEpicsCount === 0 ? 0 : Math.min(currentPage * pageSize, totalEpicsCount)
 
-    return matchesSearch && matchesStatus && matchesPriority
-  })
+  const isCreator = (epic: Epic) => {
+    const creatorId = (epic as any)?.createdBy?._id || (epic as any)?.createdBy?.id
+    return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
+  }
+
+  const canViewEpic = (epic: Epic) =>
+    hasPermission(Permission.EPIC_VIEW) ||
+    hasPermission(Permission.EPIC_READ) ||
+    isCreator(epic)
+
+  const canEditEpic = (epic: Epic) =>
+    hasPermission(Permission.EPIC_EDIT) || isCreator(epic)
+
+  const canDeleteEpic = (epic: Epic) =>
+    hasPermission(Permission.EPIC_DELETE) || isCreator(epic)
+
+  const canCreateEpic = hasPermission(Permission.EPIC_CREATE)
 
   if (loading) {
     return (
@@ -296,18 +348,20 @@ export default function EpicsPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Epics</h1>
             <p className="text-sm sm:text-base text-muted-foreground">Manage your product epics and large features</p>
           </div>
-          <Button onClick={() => router.push('/epics/create')} className="w-full sm:w-auto">
+          <Button
+            onClick={() => {
+              if (!canCreateEpic) return
+              router.push('/epics/create')
+            }}
+            disabled={!canCreateEpic}
+            title={!canCreateEpic ? 'You need epic:create permission to create an epic.' : undefined}
+            className="w-full sm:w-auto"
+          >
             <Plus className="h-4 w-4 mr-2" />
             New Epic
           </Button>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
 
         <Card className="overflow-x-hidden">
           <CardHeader>
@@ -316,7 +370,7 @@ export default function EpicsPage() {
                 <div>
                   <CardTitle>All Epics</CardTitle>
                   <CardDescription>
-                    {filteredEpics.length} epic{filteredEpics.length !== 1 ? 's' : ''} found
+                    {totalEpicsCount} epic{totalEpicsCount !== 1 ? 's' : ''} found
                   </CardDescription>
                 </div>
               </div>
@@ -337,11 +391,9 @@ export default function EpicsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="backlog">Backlog</SelectItem>
+                      <SelectItem value="backlog">backlog</SelectItem>
                       <SelectItem value="todo">To Do</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="review">Review</SelectItem>
-                      <SelectItem value="testing">Testing</SelectItem>
                       <SelectItem value="done">Done</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
@@ -369,37 +421,21 @@ export default function EpicsPage() {
                 <TabsTrigger value="list">List View</TabsTrigger>
               </TabsList>
               
-              {showSuccessAlert && successMessage && (
-                <Alert className="mt-4 border-green-500 bg-green-50 dark:bg-green-900/20">
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
-                      <AlertDescription className="text-green-800 dark:text-green-200 flex-1">
-                        {successMessage}
-                      </AlertDescription>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40 ml-auto flex-shrink-0"
-                      onClick={() => {
-                        setShowSuccessAlert(false)
-                        setSuccessMessage('')
-                      }}
-                    >
-                      <X className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    </Button>
-                  </div>
-                </Alert>
-              )}
-
               <TabsContent value="grid" className="space-y-4">
                 <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredEpics.map((epic) => (
+                  {displayedEpics.map((epic) => {
+                    const epicIsCreator = isCreator(epic)
+                    const viewAllowed = canViewEpic(epic)
+                    const editAllowed = canEditEpic(epic)
+                    const deleteAllowed = canDeleteEpic(epic)
+                    return (
                     <Card 
                       key={epic?._id} 
-                      className="hover:shadow-md transition-shadow cursor-pointer overflow-x-hidden"
-                      onClick={() => router.push(`/epics/${epic?._id}`)}
+                      className={`hover:shadow-md transition-shadow overflow-x-hidden ${viewAllowed ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                      onClick={() => {
+                        if (!viewAllowed) return
+                        router.push(`/epics/${epic?._id}`)
+                      }}
                     >
                       <CardHeader className="p-3 sm:p-6">
                         <div className="flex items-start justify-between gap-2">
@@ -419,24 +455,32 @@ export default function EpicsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/epics/${epic._id}`)
-                                }}>
+                                <DropdownMenuItem
+                                  disabled={!viewAllowed}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!viewAllowed) return
+                                    router.push(`/epics/${epic._id}`)
+                                  }}>
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Epic
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/epics/${epic._id}/edit`)
-                                }}>
+                                <DropdownMenuItem
+                                  disabled={!editAllowed}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!editAllowed) return
+                                    router.push(`/epics/${epic._id}/edit`)
+                                  }}>
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit Epic
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem 
+                                  disabled={!deleteAllowed}
                                   onClick={(e) => {
                                     e.stopPropagation()
+                                    if (!deleteAllowed) return
                                     handleDeleteClick(epic)
                                   }}
                                   className="text-destructive focus:text-destructive"
@@ -492,7 +536,7 @@ export default function EpicsPage() {
                           {epic?.dueDate && (
                             <div className="flex items-center space-x-1 flex-shrink-0 whitespace-nowrap">
                               <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span>Due {new Date(epic?.dueDate).toLocaleDateString()}</span>
+                              <span>Due {formatDate(epic?.dueDate)}</span>
                             </div>
                           )}
                         </div>
@@ -513,17 +557,25 @@ export default function EpicsPage() {
                         )}
                       </CardContent>
                     </Card>
-                  ))}
+                    )
+                  })}
                 </div>
               </TabsContent>
 
               <TabsContent value="list" className="space-y-4">
                 <div className="space-y-4">
-                  {filteredEpics.map((epic) => (
+                  {displayedEpics.map((epic) => {
+                    const viewAllowed = canViewEpic(epic)
+                    const editAllowed = canEditEpic(epic)
+                    const deleteAllowed = canDeleteEpic(epic)
+                    return (
                     <Card 
                       key={epic?._id} 
-                      className="hover:shadow-md transition-shadow cursor-pointer overflow-x-hidden"
-                      onClick={() => router.push(`/epics/${epic?._id}`)}
+                      className={`hover:shadow-md transition-shadow overflow-x-hidden ${viewAllowed ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                      onClick={() => {
+                        if (!viewAllowed) return
+                        router.push(`/epics/${epic?._id}`)
+                      }}
                     >
                       <CardContent className="p-3 sm:p-4">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
@@ -570,7 +622,7 @@ export default function EpicsPage() {
                               {epic?.dueDate && (
                                 <div className="flex items-center space-x-1 flex-shrink-0 whitespace-nowrap">
                                   <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span>Due {new Date(epic?.dueDate).toLocaleDateString()}</span>
+                                  <span>Due {formatDate(epic?.dueDate)}</span>
                                 </div>
                               )}
                               {epic?.storyPoints && (
@@ -611,24 +663,32 @@ export default function EpicsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/epics/${epic._id}`)
-                                }}>
+                                <DropdownMenuItem
+                                  disabled={!viewAllowed}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!viewAllowed) return
+                                    router.push(`/epics/${epic._id}`)
+                                  }}>
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Epic
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/epics/${epic._id}/edit`)
-                                }}>
+                                <DropdownMenuItem
+                                  disabled={!editAllowed}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!editAllowed) return
+                                    router.push(`/epics/${epic._id}/edit`)
+                                  }}>
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit Epic
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem 
+                                  disabled={!deleteAllowed}
                                   onClick={(e) => {
                                     e.stopPropagation()
+                                    if (!deleteAllowed) return
                                     handleDeleteClick(epic)
                                   }}
                                   className="text-destructive focus:text-destructive"
@@ -642,13 +702,14 @@ export default function EpicsPage() {
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
+                    )
+                  })}
                 </div>
               </TabsContent>
             </Tabs>
 
             {/* Pagination Controls */}
-            {filteredEpics.length > 0 && (
+            {totalEpicsCount > 0 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>Items per page:</span>
@@ -667,7 +728,7 @@ export default function EpicsPage() {
                     </SelectContent>
                   </Select>
                   <span>
-                    Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredEpics.length)} of {filteredEpics.length}
+                    Showing {pageStartIndex} to {pageEndIndex} of {totalEpicsCount}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -680,11 +741,11 @@ export default function EpicsPage() {
                     Previous
                   </Button>
                   <span className="text-sm text-muted-foreground px-2">
-                    Page {currentPage} of {Math.ceil(filteredEpics.length / pageSize) || 1}
+                    Page {currentPage} of {totalPages}
                   </span>
                   <Button
                     onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage >= Math.ceil(filteredEpics.length / pageSize) || loading}
+                    disabled={currentPage >= totalPages || loading}
                     variant="outline"
                     size="sm"
                   >

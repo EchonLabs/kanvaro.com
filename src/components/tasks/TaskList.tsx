@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { formatToTitleCase } from '@/lib/utils'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
@@ -25,6 +27,7 @@ import {
   Plus
 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import EditTaskModal from './EditTaskModal'
 import ViewTaskModal from './ViewTaskModal'
@@ -37,15 +40,17 @@ interface Task {
   status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled' | 'backlog'
   priority: 'low' | 'medium' | 'high' | 'critical'
   type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
-  assignedTo?: {
-    firstName: string
-    lastName: string
-    email: string
-  }
-  assignees?: Array<{
-    firstName: string
-    lastName: string
-    email: string
+  assignedTo?: Array<{
+    user?: {
+      _id: string
+      firstName: string
+      lastName: string
+      email: string
+    }
+    firstName?: string
+    lastName?: string
+    email?: string
+    _id?: string
   }>
   createdBy: {
     firstName: string
@@ -67,6 +72,8 @@ interface TaskListProps {
 }
 
 export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
+  const router = useRouter()
+  const { formatDate } = useDateTime()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -383,10 +390,10 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
             {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} found
           </p>
         </div>
-        <Button onClick={handleCreateTaskClick} className="w-full sm:w-auto">
+        {/* <Button onClick={handleCreateTaskClick} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           Add Task
-        </Button>
+        </Button> */}
       </div>
 
       {error && (
@@ -396,7 +403,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         </Alert>
       )}
 
-      <div className="flex flex-col gap-2 sm:gap-4">
+      <div className="flex flex-col gap-3 sm:gap-5 space-y-4 sm:space-y-5">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
@@ -406,7 +413,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
             className="pl-10 w-full"
           />
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 flex-wrap mb-4 sm:mb-6">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Status" />
@@ -453,64 +460,75 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         )}
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-8 mt-12">
         {filteredTasks.map((task) => (
-          <Card 
-            key={task._id} 
-            className="hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => handleViewTask(task)}
+          <Card
+            key={task._id}
+            className="hover:shadow-md transition-shadow cursor-pointer "
+            onClick={() => router.push(`/tasks/${task._id}`)}
           >
             <CardContent className="p-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex-1 min-w-0 w-full">
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <h4 className="font-medium text-foreground text-sm sm:text-base truncate flex-1 min-w-0">{task.title}</h4>
-                    <Badge className={getStatusColor(task.status) + ' flex-shrink-0'}>
-                      {getStatusIcon(task.status)}
-                      <span className="ml-1">{formatToTitleCase(task.status)}</span>
-                    </Badge>
-                    <Badge className={getPriorityColor(task.priority) + ' flex-shrink-0'}>
-                      {formatToTitleCase(task.priority)}
-                    </Badge>
-                    <Badge className={getTypeColor(task.type) + ' flex-shrink-0'}>
-                      {formatToTitleCase(task.type)}
-                    </Badge>
-                  </div>
+                    <div className="flex items-center justify-between mb-2">
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <h4 className="font-medium text-foreground text-sm sm:text-base truncate flex-1 min-w-0 mr-2">
+                              {task.title}
+                            </h4>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start" className="max-w-xs break-words">
+                            {task.title}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge className={getStatusColor(task.status) + ' flex-shrink-0'}>
+                          {getStatusIcon(task.status)}
+                          <span className="ml-1">{formatToTitleCase(task.status)}</span>
+                        </Badge>
+                        <Badge className={getPriorityColor(task.priority) + ' flex-shrink-0'}>
+                          {formatToTitleCase(task.priority)}
+                        </Badge>
+                        <Badge className={getTypeColor(task.type) + ' flex-shrink-0'}>
+                          {formatToTitleCase(task.type)}
+                        </Badge>
+                      </div>
+                    </div>
                   <p className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">
                     {task.description || 'No description'}
                   </p>
                   <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                    {(task.assignees && task.assignees.length > 0) || task.assignedTo ? (
+                    {task.assignedTo && task.assignedTo.length > 0 ? (
                       <div className="flex items-center space-x-1 flex-wrap gap-1">
                         <User className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                        {task.assignees && task.assignees.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
-                            {task.assignees.map((assignee, idx) => (
+                          {task.assignedTo.map((assignee, idx) => {
+                            // Try to get user data from populated user field first, then from denormalized fields
+                            const firstName = assignee?.user?.firstName || assignee?.firstName || '';
+                            const lastName = assignee?.user?.lastName || assignee?.lastName || '';
+                            const email = assignee?.user?.email || assignee?.email || '';
+                            const displayName = `${firstName} ${lastName}`.trim();
+
+                            return (
                               <Badge
-                                key={idx}
+                                key={assignee?.user?._id || assignee?._id || idx}
                                 variant="secondary"
                                 className="text-xs px-2 py-0.5"
-                                title={`${assignee.firstName} ${assignee.lastName} (${assignee.email})`}
+                                title={`${displayName} (${email})`}
                               >
-                                {assignee.firstName} {assignee.lastName}
+                                {displayName || 'Unknown User'}
                               </Badge>
-                            ))}
+                            );
+                          })}
                           </div>
-                        ) : task.assignedTo ? (
-                          <Badge
-                            variant="secondary"
-                            className="text-xs px-2 py-0.5"
-                            title={`${task.assignedTo.firstName} ${task.assignedTo.lastName} (${task.assignedTo.email})`}
-                          >
-                            {task.assignedTo.firstName} {task.assignedTo.lastName}
-                          </Badge>
-                        ) : null}
                       </div>
                     ) : null}
                     {task.dueDate && (
                       <div className="flex items-center space-x-1">
                         <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                        <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>
+                        <span>Due {formatDate(task.dueDate)}</span>
                       </div>
                     )}
                     {task.storyPoints && (
@@ -548,7 +566,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                       <SelectItem value="todo">To Do</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="review">Review</SelectItem>
-                      <SelectItem value="backlog">Backlog</SelectItem>
+                      <SelectItem value="backlog">backlog</SelectItem>
                       <SelectItem value="testing">Testing</SelectItem>
                       <SelectItem value="done">Done</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>

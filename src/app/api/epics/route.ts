@@ -22,22 +22,27 @@ export async function GET(request: NextRequest) {
     const userId = user.id
     const organizationId = user.organization
 
-    // Check if user has permission to view all epics
+    const canViewEpics = await PermissionService.hasAnyPermission(
+      userId.toString(),
+      [Permission.EPIC_VIEW, Permission.EPIC_READ, Permission.EPIC_VIEW_ALL]
+    );
     const hasEpicViewAll = await PermissionService.hasPermission(
-      userId,
+      userId.toString(),
       Permission.EPIC_VIEW_ALL
     );
 
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
+    const parsedPage = parseInt(searchParams.get('page') || '1')
+    const parsedLimit = parseInt(searchParams.get('limit') || '10')
+    const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 10
     const search = searchParams.get('search') || ''
     const status = searchParams.get('status') || ''
     const priority = searchParams.get('priority') || ''
     const projectFilter = searchParams.get('project') || ''
 
     // Build filters (Epic schema has no 'organization' field)
-    const filters: any = { archived: false }
+    const filters: any = { archived: false, is_deleted: { $ne: true } }
     
     if (search) {
       filters.$or = [
@@ -50,22 +55,25 @@ export async function GET(request: NextRequest) {
     if (priority) filters.priority = priority
     if (projectFilter) filters.project = projectFilter
 
-    const PAGE_SIZE = Math.min(limit, 100)
+    const PAGE_SIZE = Math.min(limit, 500)
 
     // Get epics - if user has EPIC_VIEW_ALL, show all epics; otherwise only their own
     const epicQuery: any = {
       ...filters,
     }
     
-    if (!hasEpicViewAll) {
+    if (!canViewEpics && !hasEpicViewAll) {
+      // Allow creator-only view fallback
       epicQuery.createdBy = userId
+    } else if (!hasEpicViewAll) {
+      epicQuery.$or = [{ createdBy: userId }]
     }
 
     const epics = await Epic.find(epicQuery)
       .populate('project', 'name')
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
-      .sort({ priority: -1, createdAt: -1 })
+      .sort({ createdAt: -1 })
       .skip((page - 1) * PAGE_SIZE)
       .limit(PAGE_SIZE)
       .lean()

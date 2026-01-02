@@ -236,7 +236,7 @@ export async function GET(
     
     if (!hasTaskViewAll && !hasProjectViewAll) {
       taskQuery.$or = [
-        { assignedTo: userId },
+        { 'assignedTo.user': userId },
         { createdBy: userId }
       ];
     }
@@ -244,7 +244,7 @@ export async function GET(
     const task = await Task.findOne(taskQuery)
       .populate([
         { path: 'project', select: '_id name' },
-        { path: 'assignedTo', select: 'firstName lastName email' },
+        { path: 'assignedTo.user', select: '_id firstName lastName email' },
         { path: 'createdBy', select: 'firstName lastName email' },
         { path: 'comments.author', select: 'firstName lastName email' },
         { path: 'comments.linkedIssues', select: 'displayId title', options: { strictPopulate: false } },
@@ -366,9 +366,38 @@ export async function PUT(
     }
 
     if (Object.prototype.hasOwnProperty.call(updateData, 'assignedTo')) {
-      if (typeof updateData.assignedTo === 'string') {
+      if (Array.isArray(updateData.assignedTo)) {
+        // Handle new format: array of objects with user and hourlyRate
+        updateData.assignedTo = updateData.assignedTo
+          .filter((item: any) => {
+            if (typeof item === 'object' && item !== null && item.user) {
+              return true
+            }
+            // Handle legacy format: array of strings
+            return typeof item === 'string' && item.trim().length > 0
+          })
+          .map((item: any) => {
+            if (typeof item === 'object' && item.user) {
+              // New format with user object and additional details
+              return {
+                user: typeof item.user === 'string' ? item.user.trim() : String(item.user),
+                firstName: typeof item.firstName === 'string' ? item.firstName.trim() : undefined,
+                lastName: typeof item.lastName === 'string' ? item.lastName.trim() : undefined,
+                email: typeof item.email === 'string' ? item.email.trim() : undefined,
+                hourlyRate: typeof item.hourlyRate === 'number' && item.hourlyRate >= 0 ? item.hourlyRate : undefined
+              }
+            } else {
+              // Legacy format: direct string ID
+              return {
+                user: typeof item === 'string' ? item.trim() : String(item),
+                hourlyRate: undefined
+              }
+            }
+          })
+      } else if (typeof updateData.assignedTo === 'string') {
+        // Handle legacy single string input
         const trimmed = updateData.assignedTo.trim()
-        updateData.assignedTo = trimmed.length > 0 ? trimmed : undefined
+        updateData.assignedTo = trimmed.length > 0 ? [{ user: trimmed, hourlyRate: undefined }] : []
       }
     }
 
@@ -417,7 +446,7 @@ export async function PUT(
     
     if (!hasTaskEditAll && !hasProjectViewAll) {
       taskQuery.$or = [
-        { assignedTo: userId },
+        { 'assignedTo.user': userId },
         { createdBy: userId }
       ];
     }
@@ -500,7 +529,7 @@ export async function PUT(
     
     if (!hasTaskEditAll && !hasProjectViewAll) {
       updateQuery.$or = [
-        { assignedTo: userId },
+        { 'assignedTo.user': userId },
         { createdBy: userId }
       ];
     }
@@ -512,7 +541,7 @@ export async function PUT(
     )
       .populate([
         { path: 'project', select: '_id name' },
-        { path: 'assignedTo', select: 'firstName lastName email' },
+        { path: 'assignedTo.user', select: '_id firstName lastName email' },
         { path: 'createdBy', select: 'firstName lastName email' },
         {
           path: 'story',
@@ -651,23 +680,47 @@ export async function PUT(
         const notificationPromises: Promise<unknown>[] = []
         
         // Notify if task was assigned to someone new
-        if (updateData.assignedTo && updateData.assignedTo !== currentTask.assignedTo?.toString()) {
-          notificationPromises.push(
-            Project.findById(taskProjectId).select('name').lean().then(projectResult => {
-              const projectResultTyped = Array.isArray(projectResult) ? projectResult[0] : projectResult
-              const project: LeanProject = projectResultTyped as LeanProject
-              return notificationService.notifyTaskUpdate(
-                taskIdStr,
-                'assigned',
-                updateData.assignedTo,
-                organizationId,
-                task.title,
-                project?.name
-              )
-            }).catch(error => {
-              console.error('Failed to send assignment notification:', error)
+        const currentAssignedToIds = Array.isArray(currentTask.assignedTo)
+          ? currentTask.assignedTo.map((item: any) => {
+              if (typeof item === 'object' && item.user) {
+                return typeof item.user === 'object' ? item.user._id?.toString() : item.user.toString()
+              }
+              return item.toString()
             })
-          )
+          : currentTask.assignedTo ? [currentTask.assignedTo.toString()] : []
+        const newAssignedToIds = Array.isArray(updateData.assignedTo)
+          ? updateData.assignedTo.map((item: any) => {
+              if (typeof item === 'object' && item.user) {
+                return typeof item.user === 'object' ? item.user._id?.toString() : item.user.toString()
+              }
+              return item.toString()
+            })
+          : []
+
+        const assignedUsersChanged = JSON.stringify(currentAssignedToIds.sort()) !== JSON.stringify(newAssignedToIds.sort())
+
+        if (assignedUsersChanged && newAssignedToIds.length > 0) {
+          // Find newly assigned users (users in newAssignedToIds but not in currentAssignedToIds)
+          const newlyAssignedUsers = newAssignedToIds.filter(id => !currentAssignedToIds.includes(id))
+
+          newlyAssignedUsers.forEach(userId => {
+            notificationPromises.push(
+              Project.findById(taskProjectId).select('name').lean().then(projectResult => {
+                const projectResultTyped = Array.isArray(projectResult) ? projectResult[0] : projectResult
+                const project: LeanProject = projectResultTyped as LeanProject
+                return notificationService.notifyTaskUpdate(
+                  taskIdStr,
+                  'assigned',
+                  userId,
+                  organizationId,
+                  task.title,
+                  project?.name
+                )
+              }).catch(error => {
+                console.error('Failed to send assignment notification:', error)
+              })
+            )
+          })
         }
 
         // Notify if task was completed
@@ -697,25 +750,31 @@ export async function PUT(
           )
         }
 
-        // Notify if task was updated (but not by the assignee)
-        if (updateData.assignedTo && updateData.assignedTo !== userId) {
-          notificationPromises.push(
-            Project.findById(taskProjectId).select('name').lean().then(projectResult => {
-              const projectResultTyped = Array.isArray(projectResult) ? projectResult[0] : projectResult
-              const project: LeanProject = projectResultTyped as LeanProject
-              return notificationService.notifyTaskUpdate(
-                taskIdStr,
-                'updated',
-                updateData.assignedTo,
-                organizationId,
-                task.title,
-                project?.name
-              )
-            }).catch(error => {
-              console.error('Failed to send update notification:', error)
-            })
-          )
-        }
+        // Notify assignees if task was updated (but not by them)
+        const currentAssignees = Array.isArray(currentTask.assignedTo)
+          ? currentTask.assignedTo.map((id: any) => id.toString())
+          : currentTask.assignedTo ? [currentTask.assignedTo.toString()] : []
+
+        currentAssignees.forEach((assigneeId: string) => {
+          if (assigneeId !== userId) {
+            notificationPromises.push(
+              Project.findById(taskProjectId).select('name').lean().then(projectResult => {
+                const projectResultTyped = Array.isArray(projectResult) ? projectResult[0] : projectResult
+                const project: LeanProject = projectResultTyped as LeanProject
+                return notificationService.notifyTaskUpdate(
+                  taskIdStr,
+                  'updated',
+                  assigneeId,
+                  organizationId,
+                  task.title,
+                  project?.name
+                )
+              }).catch(error => {
+                console.error('Failed to send update notification:', error)
+              })
+            )
+          }
+        })
 
         // Wait for all notifications to complete (but don't block response)
         await Promise.allSettled(notificationPromises)

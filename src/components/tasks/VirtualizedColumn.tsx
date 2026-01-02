@@ -15,11 +15,12 @@ interface PopulatedTask extends Omit<ITask, 'assignedTo' | 'project'> {
     _id: string
     name: string
   }
-  assignedTo?: {
+  assignedTo?: Array<{
     firstName: string
     lastName: string
     email: string
-  }
+    hourlyRate?: number
+  }>
 }
 
 interface Column {
@@ -39,6 +40,7 @@ interface VirtualizedColumnProps {
   onTaskClick?: (task: PopulatedTask) => void
   onEditTask?: (task: PopulatedTask) => void
   onDeleteTask?: (taskId: string) => void
+  canDragTask?: (task: PopulatedTask) => boolean
 }
 
 export default function VirtualizedColumn({
@@ -49,7 +51,8 @@ export default function VirtualizedColumn({
   getTypeColor,
   onTaskClick,
   onEditTask,
-  onDeleteTask
+  onDeleteTask,
+  canDragTask
 }: VirtualizedColumnProps) {
   const parentRef = useRef<HTMLDivElement | null>(null)
   
@@ -96,7 +99,7 @@ export default function VirtualizedColumn({
       </div>
       
         <SortableContext
-          items={tasks.map(task => task._id as string)}
+          items={tasks.map(task => task._id.toString())}
           strategy={verticalListSortingStrategy}
         >
         <div 
@@ -137,13 +140,14 @@ export default function VirtualizedColumn({
                       marginBottom: `${CARD_VERTICAL_GAP}px`,
                     }}
                   >
-                    <SortableTask 
+                    <SortableTask
                       task={task}
                       onClick={() => onTaskClick?.(task)}
                       getPriorityColor={getPriorityColor}
                       getTypeColor={getTypeColor}
-                      onEdit={onEditTask}
-                      onDelete={onDeleteTask}
+                      onEdit={task => onEditTask?.(task as unknown as PopulatedTask)}
+                      onDelete={task => onDeleteTask?.(task)}
+                      isDraggable={canDragTask ? canDragTask(task) : true}
                     />
                   </div>
                 )

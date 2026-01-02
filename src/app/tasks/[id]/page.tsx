@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { formatToTitleCase } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -38,6 +39,10 @@ import { AttachmentList } from '@/components/ui/AttachmentList'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useNotify } from '@/lib/notify'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { extractUserId } from '@/lib/auth/user-utils'
 
 interface Task {
   _id: string
@@ -51,11 +56,18 @@ interface Task {
     _id: string
     name: string
   }
-  assignedTo?: {
-    firstName: string
-    lastName: string
-    email: string
-  }
+  assignedTo?: [Array<{
+    user?: {
+      _id: string
+      firstName: string
+      lastName: string
+      email: string
+    }
+    firstName?: string
+    lastName?: string
+    email?: string
+    hourlyRate?: number
+  }>]
   createdBy: {
     firstName: string
     lastName: string
@@ -173,7 +185,8 @@ export default function TaskDetailPage() {
   const params = useParams()
   const taskId = params.id as string
   const { setItems } = useBreadcrumb()
-  
+  const { formatDate, formatDateTimeSafe } = useDateTime()
+
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -185,8 +198,9 @@ export default function TaskDetailPage() {
   const [issuesList, setIssuesList] = useState<Array<{ _id: string; displayId?: string; title?: string }>>([])
   const [suggestionMode, setSuggestionMode] = useState<'mention' | 'issue' | null>(null)
   const [suggestionQuery, setSuggestionQuery] = useState('')
-  const [suggestionPos, setSuggestionPos] = useState<{ top: number; left: number } | null>(null)
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
   const [currentUserId, setCurrentUserId] = useState('')
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editingContent, setEditingContent] = useState<string>('')
   const [replyTargetId, setReplyTargetId] = useState<string | null>(null)
@@ -195,9 +209,18 @@ export default function TaskDetailPage() {
   const [commentAttachments, setCommentAttachments] = useState<Array<{ name: string; url: string; size?: number; type?: string; uploadedAt?: string }>>([])
   const [replyAttachments, setReplyAttachments] = useState<Array<{ name: string; url: string; size?: number; type?: string; uploadedAt?: string }>>([])
   const [uploading, setUploading] = useState(false)
+  const [commentsCurrentPage, setCommentsCurrentPage] = useState(1)
+  const [commentsPageSize, setCommentsPageSize] = useState(5)
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
   const commentFileInputRef = useRef<HTMLInputElement | null>(null)
   const replyFileInputRef = useRef<HTMLInputElement | null>(null)
+  const composerContainerRef = useRef<HTMLDivElement | null>(null)
+  const suggestionMenuRef = useRef<HTMLDivElement | null>(null)
+  const measurementCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [suggestionPosition, setSuggestionPosition] = useState<{ top: number; left: number; flip: boolean }>({ top: 0, left: 0, flip: false })
+  const [editorScrollTop, setEditorScrollTop] = useState(0)
+  const { success: notifySuccess, error: notifyError } = useNotify()
+  const { hasPermission } = usePermissions()
 
   const checkAuth = useCallback(async () => {
     try {
@@ -205,7 +228,7 @@ export default function TaskDetailPage() {
       
       if (response.ok) {
         const me = await response.json().catch(() => null)
-        const uid = me?.id || me?._id || ''
+        const uid = extractUserId(me)
         if (uid) setCurrentUserId(uid)
         setAuthError('')
         await fetchTask()
@@ -216,7 +239,7 @@ export default function TaskDetailPage() {
         
         if (refreshResponse.ok) {
           const me = await fetch('/api/auth/me').then(r => r.json()).catch(() => null)
-          const uid = me?.id || me?._id || ''
+          const uid = extractUserId(me)
           if (uid) setCurrentUserId(uid)
           setAuthError('')
           await fetchTask()
@@ -250,6 +273,12 @@ export default function TaskDetailPage() {
     checkAuth()
   }, [checkAuth])
 
+  // Load mentions and issues when component mounts
+  useEffect(() => {
+    fetchOrganizationUsers()
+    fetchOrganizationTasks()
+  }, [])
+
   const fetchTask = async () => {
     try {
       setLoading(true)
@@ -258,12 +287,11 @@ export default function TaskDetailPage() {
 
       if (data.success) {
         setTask(data.data)
-        // preload mentions and issues lists (project members and project tasks)
-        const projectId = data.data?.project?._id
-        if (projectId) {
-          fetchProjectMembers(projectId)
-          fetchProjectIssues(projectId)
-        }
+
+
+        // preload mentions and issues lists (organization users and organization tasks)
+        fetchOrganizationUsers()
+        fetchOrganizationTasks()
         // Ensure breadcrumb is set
         setItems([
           { label: 'Tasks', href: '/tasks' },
@@ -279,41 +307,67 @@ export default function TaskDetailPage() {
     }
   }
 
-  const fetchProjectMembers = async (projectId: string) => {
+  const fetchOrganizationUsers = async () => {
     try {
-      const res = await fetch(`/api/projects/${projectId}`)
+      setIsLoadingSuggestions(true)
+      const res = await fetch('/api/users')
       const data = await res.json()
-      if (data?.success && data.data?.teamMembers) {
-        const members = data.data.teamMembers.map((m: any) => ({
-          _id: m._id,
-          name: `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.email || 'User'
-        }))
-        setMentionsList(members)
+
+      if (data && Array.isArray(data)) {
+        const users = data
+          .filter((u: any) => u && u._id) // Only include valid users
+          .map((u: any) => ({
+            _id: u._id,
+            name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email || 'User'
+          })) as Array<{ _id: string; name: string }>
+
+        setMentionsList(users)
+      } else {
+        setMentionsList([])
       }
     } catch (e) {
-      console.error('Failed to fetch project members for mentions', e)
+      console.error('Failed to fetch organization users for mentions', e)
+      setMentionsList([])
+    } finally {
+      setIsLoadingSuggestions(false)
     }
   }
 
-  const fetchProjectIssues = async (projectId: string) => {
+  const fetchOrganizationTasks = async () => {
     try {
-      const params = new URLSearchParams({ project: projectId, limit: '50' })
+      setIsLoadingSuggestions(true)
+      // Get current user's organization from the task data or use a different approach
+      // For now, let's use a broader query that gets recent tasks
+      const params = new URLSearchParams({
+        limit: '100',
+        sort: 'updatedAt',
+        order: 'desc'
+      })
       const res = await fetch(`/api/tasks?${params.toString()}`)
       const data = await res.json()
+
       if (data?.success && Array.isArray(data.data)) {
-        const issues = data.data.map((t: any) => ({
-          _id: t._id,
-          displayId: t.displayId,
-          title: t.title
-        }))
-        setIssuesList(issues)
+        const tasks = data.data
+          .filter((t: any) => t && t._id && t.displayId) // Only include valid tasks
+          .map((t: any) => ({
+            _id: t._id,
+            displayId: t.displayId,
+            title: t.title
+          }))
+        setIssuesList(tasks)
+      } else {
+        setIssuesList([])
       }
     } catch (e) {
-      console.error('Failed to fetch project issues for linking', e)
+      console.error('Failed to fetch organization tasks for linking', e)
+      setIssuesList([])
+    } finally {
+      setIsLoadingSuggestions(false)
     }
   }
 
   const handleDeleteTask = async () => {
+    if (!deleteAllowed) return
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'DELETE'
@@ -323,29 +377,78 @@ export default function TaskDetailPage() {
       if (data.success) {
         setShowDeleteConfirmModal(false)
         router.push('/tasks')
+        notifySuccess({ title: 'Task deleted successfully' })
       } else {
         setError(data.error || 'Failed to delete task')
+        notifyError({ title: data.error || 'Failed to delete task' })
       }
     } catch (error) {
       setError('Failed to delete task')
+      notifyError({ title: 'Failed to delete task' })
     }
   }
 
 
   const filteredSuggestions = useMemo<SuggestionItem[]>(() => {
-    const q = suggestionQuery.trim().toLowerCase()
+    const q = suggestionQuery.toLowerCase().trim()
+
     if (!suggestionMode) return []
+
     if (suggestionMode === 'mention') {
-      return mentionsList
-        .filter(m => m.name.toLowerCase().includes(q))
-        .slice(0, 6)
+      const filtered = mentionsList
+        .filter(m => {
+          if (!m.name) return false
+          // Show all users if no query, otherwise filter by name
+          return q === '' || m.name.toLowerCase().includes(q)
+        })
+        .slice(0, 8) // Show more suggestions
         .map(m => ({ _id: m._id, name: m.name }))
+
+      // If query is empty and we have no results, show a few default users
+      if (q === '' && filtered.length === 0 && mentionsList.length > 0) {
+        return mentionsList.slice(0, 8).map(m => ({ _id: m._id, name: m.name }))
+      }
+
+      return filtered
     }
-    return issuesList
-      .filter(i => (i.displayId || '').toLowerCase().includes(q) || (i.title || '').toLowerCase().includes(q))
-      .slice(0, 6)
+
+    const filtered = issuesList
+      .filter(i => {
+        const displayId = (i.displayId || '').toLowerCase()
+        const title = (i.title || '').toLowerCase()
+        // Show all tasks if no query, otherwise filter by ID or title
+        return q === '' || displayId.includes(q) || title.includes(q)
+      })
+      .slice(0, 8) // Show more suggestions
       .map(i => ({ _id: i._id, displayId: i.displayId, title: i.title }))
+
+    // If query is empty and we have no results, show a few default tasks
+    if (q === '' && filtered.length === 0 && issuesList.length > 0) {
+      return issuesList.slice(0, 8).map(i => ({ _id: i._id, displayId: i.displayId, title: i.title }))
+    }
+
+    return filtered
   }, [suggestionMode, suggestionQuery, mentionsList, issuesList])
+
+  // Reset selected index when filtered suggestions change
+  useEffect(() => {
+    setSelectedSuggestionIndex(0)
+  }, [filteredSuggestions])
+
+  // Helper function to highlight matched text
+  const highlightMatch = (text: string | undefined, query: string) => {
+    if (!text || !query.trim()) return text || ''
+
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+    const parts = text.split(regex)
+
+    return parts.map((part, index) => {
+      if (regex.test(part)) {
+        return <mark key={index} className="bg-yellow-200 dark:bg-yellow-800 px-0.5 rounded">{part}</mark>
+      }
+      return part
+    })
+  }
 
   const replaceActiveToken = (replacement: string) => {
     setCommentContent(prev => {
@@ -371,8 +474,92 @@ export default function TaskDetailPage() {
     })
     setSuggestionMode(null)
     setSuggestionQuery('')
-    setSuggestionPos(null)
   }
+
+  const getCaretOffsets = useCallback((textarea: HTMLTextAreaElement) => {
+    const selectionEnd = textarea.selectionEnd ?? textarea.value.length
+    const computed = window.getComputedStyle(textarea)
+    const beforeText = textarea.value.slice(0, selectionEnd)
+    const lines = beforeText.split('\n')
+    const currentLine = lines[lines.length - 1] ?? ''
+    const lineIndex = Math.max(0, lines.length - 1)
+    const fontSize = parseFloat(computed.fontSize) || 16
+    const lineHeightValue = parseFloat(computed.lineHeight)
+    const lineHeight = Number.isFinite(lineHeightValue) ? lineHeightValue : fontSize * 1.4
+    const paddingLeft = parseFloat(computed.paddingLeft) || 0
+    const paddingTop = parseFloat(computed.paddingTop) || 0
+    const borderLeft = parseFloat(computed.borderLeftWidth) || 0
+    const borderTop = parseFloat(computed.borderTopWidth) || 0
+
+    const canvas = measurementCanvasRef.current || document.createElement('canvas')
+    if (!measurementCanvasRef.current) {
+      measurementCanvasRef.current = canvas
+    }
+    const ctx = measurementCanvasRef.current.getContext('2d')
+    let lineWidth = 0
+    if (ctx) {
+      const fontParts = [computed.fontStyle, computed.fontVariant, computed.fontWeight, computed.fontSize, computed.fontFamily]
+        .filter(Boolean)
+        .join(' ')
+        .trim()
+      ctx.font = fontParts.length ? fontParts : `${fontSize}px sans-serif`
+      lineWidth = ctx.measureText(currentLine).width
+    } else {
+      lineWidth = currentLine.length * fontSize * 0.6
+    }
+
+    const top = lineIndex * lineHeight - textarea.scrollTop + paddingTop + borderTop
+    const left = lineWidth - textarea.scrollLeft + paddingLeft + borderLeft
+
+    return {
+      top: Math.max(paddingTop + borderTop, top),
+      left: Math.max(paddingLeft + borderLeft + 2, left),
+      lineHeight
+    }
+  }, [])
+
+  const updateSuggestionPosition = useCallback(() => {
+    if (!suggestionMode) return
+    const textarea = editorRef.current
+    const container = composerContainerRef.current
+    if (!textarea || !container) return
+
+    const caret = getCaretOffsets(textarea)
+    const textareaRect = textarea.getBoundingClientRect()
+    const containerRect = container.getBoundingClientRect()
+    const rawTop = textareaRect.top - containerRect.top + caret.top
+    const rawLeft = textareaRect.left - containerRect.left + caret.left
+
+    const containerWidth = container.clientWidth || containerRect.width || 0
+    const containerHeight = container.clientHeight || containerRect.height || 0
+    const menuWidth = suggestionMenuRef.current?.offsetWidth || 240
+    const menuHeight = suggestionMenuRef.current?.offsetHeight || 196
+    const halfMenu = menuWidth / 2
+
+    const minLeft = halfMenu + 8
+    const maxLeft = Math.max(minLeft, containerWidth - halfMenu - 8)
+    const boundedLeft = Math.min(Math.max(rawLeft, minLeft), maxLeft)
+
+    const minTop = 12
+    const maxTop = Math.max(minTop, containerHeight - minTop)
+    const boundedTop = Math.min(Math.max(rawTop, minTop), maxTop)
+
+    const flip = boundedTop + menuHeight + 12 > containerHeight
+
+    setSuggestionPosition({ top: boundedTop, left: boundedLeft, flip })
+  }, [composerContainerRef, editorRef, getCaretOffsets, suggestionMenuRef, suggestionMode])
+
+  const scheduleSuggestionPositionUpdate = useCallback(() => {
+    if (!suggestionMode) return
+    requestAnimationFrame(() => {
+      updateSuggestionPosition()
+    })
+  }, [suggestionMode, updateSuggestionPosition])
+
+  useLayoutEffect(() => {
+    if (!suggestionMode) return
+    updateSuggestionPosition()
+  }, [suggestionMode, suggestionQuery, filteredSuggestions, editorScrollTop, updateSuggestionPosition])
   const buildMentionAndIssueIds = (text: string) => {
     const mentionIds: string[] = []
     mentionsList.forEach(m => {
@@ -634,7 +821,7 @@ export default function TaskDetailPage() {
               : comment.author?.email || 'User'}
           </div>
           <div className="text-xs text-muted-foreground">
-            {comment.createdAt ? new Date(comment.createdAt).toLocaleString() : ''}
+            {comment.createdAt ? formatDateTimeSafe(comment.createdAt) : ''}
             {comment.updatedAt && (
               <span className="ml-2 text-[11px]">(edited)</span>
             )}
@@ -803,57 +990,31 @@ export default function TaskDetailPage() {
     handleCancelReply
   ])
 
+  // Pagination logic for comments
+  const paginatedComments = useMemo(() => {
+    const startIndex = (commentsCurrentPage - 1) * commentsPageSize
+    const endIndex = startIndex + commentsPageSize
+    return commentTree.slice(startIndex, endIndex)
+  }, [commentTree, commentsCurrentPage, commentsPageSize])
+
+  const commentsTotalPages = Math.ceil(commentTree.length / commentsPageSize)
+
   const renderComments = useMemo(() => {
     if (!commentTree.length) {
       return <p className="text-sm text-muted-foreground">No comments yet.</p>
     }
     return (
       <div className="space-y-3">
-        {commentTree.map((c) => renderCommentNode(c))}
+        {paginatedComments.map((c) => renderCommentNode(c))}
       </div>
     )
-  }, [commentTree, renderCommentNode])
+  }, [paginatedComments, renderCommentNode])
 
   const deleteTargetComment = useMemo(() => {
     if (!deleteConfirmId || !task?.comments) return null
     return task.comments.find(c => (c._id || '').toString() === deleteConfirmId) || null
   }, [deleteConfirmId, task?.comments])
 
-  const updateSuggestionPosition = (value: string, cursorPos: number) => {
-    const textarea = editorRef.current
-    if (!textarea) return
-    const mirror = document.createElement('div')
-    const style = window.getComputedStyle(textarea)
-    mirror.style.position = 'absolute'
-    mirror.style.visibility = 'hidden'
-    mirror.style.whiteSpace = 'pre-wrap'
-    mirror.style.wordWrap = 'break-word'
-    mirror.style.fontSize = style.fontSize
-    mirror.style.fontFamily = style.fontFamily
-    mirror.style.lineHeight = style.lineHeight
-    mirror.style.padding = style.padding
-    mirror.style.border = style.border
-    mirror.style.boxSizing = style.boxSizing
-    mirror.style.width = `${textarea.clientWidth}px`
-    mirror.style.left = `${textarea.getBoundingClientRect().left}px`
-    mirror.style.top = `${textarea.getBoundingClientRect().top}px`
-
-    const before = value.slice(0, cursorPos)
-    const after = value.slice(cursorPos)
-    const marker = document.createElement('span')
-    marker.textContent = '\u200b'
-    mirror.textContent = before
-    mirror.appendChild(marker)
-    mirror.append(after)
-    document.body.appendChild(mirror)
-    const markerRect = marker.getBoundingClientRect()
-    document.body.removeChild(mirror)
-
-    setSuggestionPos({
-      top: markerRect.bottom + 4,
-      left: markerRect.left
-    })
-  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -884,7 +1045,7 @@ export default function TaskDetailPage() {
   const formatDateTime = (value?: string) => {
     if (!value) return 'Not set'
     const date = new Date(value)
-    return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    return formatDateTimeSafe(date)
   }
 
   const getPriorityColor = (priority: string) => {
@@ -961,6 +1122,14 @@ export default function TaskDetailPage() {
     )
   }
 
+  const isCreator = (t: Task) => {
+    const creatorId = (t as any)?.createdBy?._id || (t as any)?.createdBy?.id
+    return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
+  }
+
+  const editAllowed = hasPermission(Permission.TASK_EDIT_ALL) || isCreator(task)
+  const deleteAllowed = hasPermission(Permission.TASK_DELETE_ALL) || isCreator(task)
+
   const attachmentListItems = (task.attachments || []).map(attachment => ({
     name: attachment.name,
     url: attachment.url,
@@ -977,42 +1146,60 @@ export default function TaskDetailPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 overflow-x-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto min-w-0">
-            <Button variant="ghost" onClick={() => router.back()} className="w-full sm:w-auto flex-shrink-0">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <div className="flex-1 min-w-0 w-full sm:w-auto">
-              <h1 
-                className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center space-x-2 min-w-0"
-                title={`${task.title} ${task.displayId}`}
+      <div className="space-y-8 sm:space-y-10 lg:space-y-12 overflow-x-hidden">
+        <div className="border-b border-border/40 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+              <Button
+                variant="ghost"
+                onClick={() => router.back()}
+                className="self-start text-sm hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-3"
               >
-                <span className="flex-shrink-0">{getTypeIcon(task.type)}</span>
-                <span className="truncate min-w-0">{task.title} {task.displayId}</span>
-              </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">Task Details</p>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                <h1
+                  className="text-2xl font-semibold leading-snug text-foreground flex items-start gap-2 min-w-0 flex-wrap max-w-[70ch] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden break-words overflow-wrap-anywhere"
+                  title={`${task.title} ${task.displayId}`}
+                >
+                  <span className="flex-shrink-0">{getTypeIcon(task.type)}</span>
+                  <span className="break-words overflow-wrap-anywhere">{task.title} {task.displayId}</span>
+                </h1>
+                <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap ml-auto justify-end">
+                  <Button
+                    variant="outline"
+                    disabled={!editAllowed}
+                    onClick={() => {
+                      if (!editAllowed) return
+                      router.push(`/tasks/${taskId}/edit`)
+                    }}
+                    className="min-h-[36px] w-full sm:w-auto"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    disabled={!deleteAllowed}
+                    onClick={() => {
+                      if (!deleteAllowed) return
+                      setShowDeleteConfirmModal(true)
+                    }}
+                    className="min-h-[36px] w-full sm:w-auto"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-shrink-0">
-            <Button variant="outline" onClick={() => router.push(`/tasks/${taskId}/edit`)} className="w-full sm:w-auto">
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={() => setShowDeleteConfirmModal(true)}
-              className="w-full sm:w-auto"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </Button>
+            <p className="text-sm text-muted-foreground">Task Details</p>
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="md:col-span-2 space-y-6">
+        <div className="grid gap-8 md:grid-cols-3">
+          <div className="md:col-span-2 space-y-8">
             <Card>
               <CardHeader>
                 <CardTitle>Description</CardTitle>
@@ -1040,31 +1227,130 @@ export default function TaskDetailPage() {
                 </Button>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="relative">
+                <div ref={composerContainerRef} className="relative">
                   <Textarea
                     ref={editorRef}
                     value={commentContent}
+                    className={suggestionMode ? 'ring-2 ring-blue-500/20 border-blue-500/30' : ''}
                     onChange={(e) => {
                       const val = e.target.value
                       setCommentContent(val)
                       const textarea = e.target
                       const cursor = textarea.selectionStart
                       const before = val.slice(0, cursor)
-                      const match = before.match(/([@#])([^\s@#]{0,30})$/)
+                      const match = before.match(/([@#])([^\s@#]{0,30})?$/)
+
                       if (match) {
                         const mode = match[1] === '@' ? 'mention' : 'issue'
+                        const query = match[2] || ''
                         setSuggestionMode(mode)
-                        setSuggestionQuery(match[2] || '')
-                        updateSuggestionPosition(val, cursor)
+                        setSuggestionQuery(query)
+                        setSelectedSuggestionIndex(0) // Reset selection when query changes
                       } else {
                         setSuggestionMode(null)
                         setSuggestionQuery('')
-                        setSuggestionPos(null)
+                        setSelectedSuggestionIndex(0)
                       }
                     }}
-                    placeholder="Add a comment. Use @ to mention team members, # to link project tasks."
+                    onKeyDown={(e) => {
+                      if (!suggestionMode || filteredSuggestions.length === 0) return
+
+                      switch (e.key) {
+                        case 'Escape':
+                          e.preventDefault()
+                          setSuggestionMode(null)
+                          setSuggestionQuery('')
+                          setSelectedSuggestionIndex(0)
+                          break
+
+                        case 'ArrowDown':
+                          e.preventDefault()
+                          setSelectedSuggestionIndex(prev =>
+                            prev < filteredSuggestions.length - 1 ? prev + 1 : prev
+                          )
+                          break
+
+                        case 'ArrowUp':
+                          e.preventDefault()
+                          setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : prev)
+                          break
+
+                        case 'Enter':
+                          e.preventDefault()
+                          const selectedSuggestion = filteredSuggestions[selectedSuggestionIndex]
+                          if (selectedSuggestion) {
+                            if (suggestionMode === 'mention') {
+                              replaceActiveToken(`@${selectedSuggestion.name}`)
+                            } else {
+                              replaceActiveToken(`#${selectedSuggestion.displayId || selectedSuggestion._id}`)
+                            }
+                            setSuggestionMode(null)
+                            setSuggestionQuery('')
+                            setSelectedSuggestionIndex(0)
+                          }
+                          break
+
+                        case 'Tab':
+                          // Allow tab to work normally if no suggestion is selected
+                          if (selectedSuggestionIndex === 0) {
+                            setSuggestionMode(null)
+                            setSuggestionQuery('')
+                            setSelectedSuggestionIndex(0)
+                          } else {
+                            e.preventDefault()
+                            const selectedSuggestion = filteredSuggestions[selectedSuggestionIndex]
+                            if (selectedSuggestion) {
+                              if (suggestionMode === 'mention') {
+                                replaceActiveToken(`@${selectedSuggestion.name}`)
+                              } else {
+                                replaceActiveToken(`#${selectedSuggestion.displayId || selectedSuggestion._id}`)
+                              }
+                              setSuggestionMode(null)
+                              setSuggestionQuery('')
+                              setSelectedSuggestionIndex(0)
+                            }
+                          }
+                          break
+                      }
+                    }}
+                    onKeyUp={scheduleSuggestionPositionUpdate}
+                    onClick={scheduleSuggestionPositionUpdate}
+                    onScroll={(e) => {
+                      setEditorScrollTop(e.currentTarget.scrollTop)
+                      scheduleSuggestionPositionUpdate()
+                    }}
+                    onBlur={() => {
+                      // Close suggestions when textarea loses focus
+                      setTimeout(() => {
+                        setSuggestionMode(null)
+                        setSuggestionQuery('')
+                        setSelectedSuggestionIndex(0)
+                      }, 150) // Small delay to allow clicking on suggestions
+                    }}
+                    placeholder=""
                     rows={4}
                   />
+                  <div className="mt-2 text-sm text-muted-foreground space-y-1">
+                    <p>Enter your comment and click the <strong>Post Comment</strong> button to submit your comment.</p>
+                    <div className="flex flex-col gap-1">
+                      <p>
+                        Use <code className="bg-muted px-1 py-0.5 rounded text-xs">@</code> to mention team members,
+                        <code className="bg-muted px-1 py-0.5 rounded text-xs ml-1">#</code> to link project tasks.
+                      </p>
+                      {suggestionMode && (
+                        <div className="space-y-1">
+                          <p className="text-xs text-blue-600 dark:text-blue-400">
+                            💡 Use ↑↓ arrows to navigate, Enter to select, Esc to close
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Searching for: <code className="bg-muted px-1 rounded text-xs">
+                              {suggestionMode === 'mention' ? '@' : '#'}{suggestionQuery || '...'}
+                            </code>
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
               <div className="flex items-center gap-2 mt-2">
                 <TooltipProvider>
                   <Tooltip>
@@ -1100,37 +1386,86 @@ export default function TaskDetailPage() {
                   </div>
                 )}
               </div>
-                  {suggestionMode && filteredSuggestions.length > 0 && suggestionPos && (
+                  {suggestionMode && (
                     <div
-                      className="z-20 rounded-md border bg-card shadow-lg"
+                      ref={suggestionMenuRef}
+                      className="absolute z-50 rounded-md border bg-background shadow-lg border-border overflow-hidden"
                       style={{
-                        position: 'fixed',
-                        top: suggestionPos.top,
-                        left: suggestionPos.left,
-                        minWidth: '220px',
-                        maxWidth: '360px'
+                        top: suggestionPosition.top,
+                        left: suggestionPosition.left,
+                        minWidth: 240,
+                        transform: suggestionPosition.flip ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+                        marginTop: suggestionPosition.flip ? '-8px' : '8px'
                       }}
                     >
-                      <div className="max-h-56 overflow-y-auto divide-y">
-                        {filteredSuggestions.map((s) => (
-                          <button
-                            key={s._id}
-                            type="button"
-                            className="w-full text-left px-3 py-2 hover:bg-muted text-sm"
-                            onClick={() => {
-                              if (suggestionMode === 'mention') {
-                                replaceActiveToken(`@${s.name}`)
-                              } else {
-                                replaceActiveToken(`#${s.displayId || s._id}`)
-                              }
-                            }}
-                          >
+                      <div className="max-h-48 overflow-y-auto py-1">
+                        {isLoadingSuggestions ? (
+                          <div className="px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
+                            <div className="animate-spin rounded-full h-3 w-3 border-b border-muted-foreground"></div>
+                            Loading...
+                          </div>
+                        ) : filteredSuggestions.length > 0 ? (
+                          filteredSuggestions.map((s, index) => (
+                            <button
+                              key={s._id}
+                              type="button"
+                              className={`w-full text-left px-3 py-2 text-sm hover:bg-muted focus:bg-muted focus:outline-none transition-colors ${
+                                index === selectedSuggestionIndex ? 'bg-muted' : ''
+                              }`}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                if (suggestionMode === 'mention') {
+                                  replaceActiveToken(`@${s.name}`)
+                                } else {
+                                  replaceActiveToken(`#${s.displayId || s._id}`)
+                                }
+                                setSuggestionMode(null)
+                                setSuggestionQuery('')
+                                setSelectedSuggestionIndex(0)
+                              }}
+                              onMouseDown={(e) => e.preventDefault()} // Prevent textarea blur
+                              onMouseEnter={() => setSelectedSuggestionIndex(index)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-muted-foreground text-xs font-medium">
+                                  {suggestionMode === 'mention' ? '@' : '#'}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  {suggestionMode === 'mention' ? (
+                                    <span className="truncate">
+                                      {highlightMatch(s.name || '', suggestionQuery)}
+                                    </span>
+                                  ) : (
+                                    <div className="truncate">
+                                      <span className="font-medium">
+                                        {highlightMatch(s.displayId || s._id, suggestionQuery)}
+                                      </span>
+                                      {s.title && (
+                                        <span className="text-muted-foreground ml-1">
+                                          — {highlightMatch(s.title || '', suggestionQuery)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-2 text-sm text-muted-foreground">
                             {suggestionMode === 'mention'
-                              ? `@${s.name}`
-                              : `#${s.displayId || s._id} ${s.title ? '— ' + s.title : ''}`}
-                          </button>
-                        ))}
+                              ? 'No users found'
+                              : 'No tasks found'
+                            }
+                          </div>
+                        )}
                       </div>
+                      {filteredSuggestions.length > 0 && (
+                        <div className="px-3 py-1 border-t bg-muted/50 text-xs text-muted-foreground">
+                          Use ↑↓ to navigate, Enter to select, Esc to close
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1138,6 +1473,52 @@ export default function TaskDetailPage() {
                 <div className="border-t pt-4">
                   <h3 className="text-sm font-semibold mb-2 text-foreground">All Comments</h3>
                   {renderComments}
+
+                  {/* Comments Pagination Controls */}
+                  {commentTree.length > commentsPageSize && (
+                    <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Items per page:</span>
+                        <select
+                          value={commentsPageSize}
+                          onChange={(e) => {
+                            setCommentsPageSize(parseInt(e.target.value))
+                            setCommentsCurrentPage(1)
+                          }}
+                          className="px-2 py-1 border rounded text-sm bg-background"
+                        >
+                          <option value="5">5</option>
+                          <option value="10">10</option>
+                          <option value="20">20</option>
+                          <option value="50">50</option>
+                        </select>
+                        <span>
+                          Showing {((commentsCurrentPage - 1) * commentsPageSize) + 1} to {Math.min(commentsCurrentPage * commentsPageSize, commentTree.length)} of {commentTree.length}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => setCommentsCurrentPage(commentsCurrentPage - 1)}
+                          disabled={commentsCurrentPage === 1}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm text-muted-foreground px-2">
+                          Page {commentsCurrentPage} of {commentsTotalPages || 1}
+                        </span>
+                        <Button
+                          onClick={() => setCommentsCurrentPage(commentsCurrentPage + 1)}
+                          disabled={commentsCurrentPage >= commentsTotalPages}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1273,7 +1654,7 @@ export default function TaskDetailPage() {
             )}
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-8">
             <Card>
               <CardHeader>
                 <CardTitle>Details</CardTitle>
@@ -1352,12 +1733,36 @@ export default function TaskDetailPage() {
                   </div>
                 )}
                 
-                {task.assignedTo && (
-                  <div className="flex items-center justify-between">
+                {task.assignedTo && task.assignedTo.length > 0 && (
+                  <div className="flex flex-col gap-2">
                     <span className="text-muted-foreground">Assigned To</span>
-                    <span className="font-medium">
-                      {task.assignedTo.firstName} {task.assignedTo.lastName}
-                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {task.assignedTo.map((assignee: any, idx) => {
+                        // Handle both string (user ID) and object formats for backward compatibility
+                        let userId: string;
+                        let displayName: string;
+
+                        if (typeof assignee === 'string') {
+                          // New format: assignee is a string (user ID)
+                          userId = assignee;
+                          const userInfo = mentionsList.find(u => u._id === userId);
+                          displayName = userInfo?.name || 'Unknown User';
+                        } else {
+                          // Legacy format: assignee is an object
+                          userId = assignee?.user?._id || assignee?.user || assignee?._id;
+                          const firstName = assignee?.user?.firstName || assignee?.firstName;
+                          const lastName = assignee?.user?.lastName || assignee?.lastName;
+                          displayName = firstName && lastName ? `${firstName} ${lastName}`.trim() : 'Unknown User';
+                        }
+
+                        return (
+                          <Badge key={userId || `assignee-${idx}`} variant="secondary" className="text-xs">
+                            <User className="h-3 w-3 mr-1" />
+                            {displayName}
+                          </Badge>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
                 
@@ -1365,7 +1770,7 @@ export default function TaskDetailPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Due Date</span>
                     <span className="font-medium">
-                      {new Date(task.dueDate).toLocaleDateString()}
+                      {formatDate(task.dueDate)}
                     </span>
                   </div>
                 )}
@@ -1423,7 +1828,7 @@ export default function TaskDetailPage() {
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {new Date(task.createdAt).toLocaleDateString()}
+                  {formatDate(task.createdAt)}
                 </p>
               </CardContent>
             </Card>

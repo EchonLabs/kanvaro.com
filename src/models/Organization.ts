@@ -13,9 +13,12 @@ export interface IOrganization extends Document {
   size: 'startup' | 'small' | 'medium' | 'enterprise'
   settings: {
     allowSelfRegistration: boolean
-    requireEmailVerification: boolean
     defaultUserRole: string
     projectTemplates: mongoose.Types.ObjectId[]
+    notifications: {
+      retentionDays: number
+      autoCleanup: boolean
+    }
     timeTracking: {
       allowTimeTracking: boolean
       allowManualTimeSubmission: boolean
@@ -115,9 +118,12 @@ const OrganizationSchema = new Schema<IOrganization>({
   },
   settings: {
     allowSelfRegistration: { type: Boolean, default: false },
-    requireEmailVerification: { type: Boolean, default: true },
     defaultUserRole: { type: String, default: 'team_member' },
     projectTemplates: [{ type: Schema.Types.ObjectId, ref: 'ProjectTemplate' }],
+    notifications: {
+      retentionDays: { type: Number, default: 30, min: 1, max: 365 },
+      autoCleanup: { type: Boolean, default: true }
+    },
     timeTracking: {
       allowTimeTracking: { type: Boolean, default: true },
       allowManualTimeSubmission: { type: Boolean, default: true },

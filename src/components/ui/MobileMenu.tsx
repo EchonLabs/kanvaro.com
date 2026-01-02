@@ -93,7 +93,7 @@ const navigationItems = [
       },
       {
         id: 'tasks-backlog',
-        label: 'Backlog',
+        label: 'backlog',
         icon: List,
         path: '/backlog',
         permission: Permission.BACKLOG_READ
@@ -103,7 +103,7 @@ const navigationItems = [
         label: 'Sprints',
         icon: Zap,
         path: '/sprints',
-        permission: Permission.SPRINT_READ
+        permission: Permission.SPRINT_VIEW
       },
       {
         id: 'tasks-epics',
@@ -300,6 +300,14 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
 
   const handleLogout = async () => {
     try {
+      // Clear permission cache before logout
+      try {
+        sessionStorage.removeItem('kanvaro_permissions')
+        sessionStorage.removeItem('kanvaro_permissions_timestamp')
+      } catch (cacheError) {
+        console.error('Error clearing permission cache:', cacheError)
+      }
+
       const response = await fetch('/api/auth/logout', { method: 'POST' })
       if (response.ok) {
         router.push('/login')
@@ -382,7 +390,7 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
             onClick={handleLogout}
           >
             <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
+            Logout
           </Button>
         </div>
       </div>

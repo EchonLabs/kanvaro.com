@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useNotify } from '@/lib/notify'
 import {
   ChevronLeft,
   ChevronRight,
@@ -16,7 +16,6 @@ import {
   Target,
   Loader2,
   Plus,
-  AlertTriangle,
   Users,
   Video,
   Repeat
@@ -88,9 +87,11 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
   const [tasks, setTasks] = useState<Task[]>([])
   const [sprintEvents, setSprintEvents] = useState<SprintEvent[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [view, setView] = useState<'month' | 'week' | 'day'>('month')
+
+  // Use the notification hook
+  const { error: notifyError } = useNotify()
 
   useEffect(() => {
     fetchData()
@@ -99,23 +100,22 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
   const fetchData = async () => {
     try {
       setLoading(true)
-      setError('')
-      
+
       // Fetch both tasks and sprint events in parallel
       const [tasksResponse, eventsResponse] = await Promise.all([
         fetch(projectId === 'all' ? '/api/tasks' : `/api/tasks?project=${projectId}`),
         fetch(projectId === 'all' ? '/api/sprint-events' : `/api/sprint-events?projectId=${projectId}`)
       ])
-      
+
       const tasksData = await tasksResponse.json()
       const eventsData = await eventsResponse.json()
 
       if (tasksData.success) {
         setTasks(tasksData.data)
       } else {
-        setError(tasksData.error || 'Failed to fetch tasks')
+        notifyError({ title: 'Failed to Load Tasks', message: tasksData.error || 'Failed to fetch tasks' })
       }
-      
+
       // Sprint events API returns array directly
       if (Array.isArray(eventsData)) {
         setSprintEvents(eventsData)
@@ -123,7 +123,7 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
         setSprintEvents(eventsData.data)
       }
     } catch (err) {
-      setError('Failed to fetch data')
+      notifyError({ title: 'Failed to Load Data', message: 'Failed to fetch data' })
     } finally {
       setLoading(false)
     }
@@ -364,12 +364,6 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
           </div>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
 
         {view === 'month' && (
           <Card>
@@ -714,10 +708,16 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                             <Badge className={`text-xs ${getStatusColor(task.status)}`}>
                               {formatToTitleCase(task.status)}
                             </Badge>
-                            {task.assignedTo && (
+                            {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && (
                               <div className="flex items-center space-x-1 text-xs text-muted-foreground">
                                 <User className="h-3 w-3" />
-                                <span>{task.assignedTo.firstName} {task.assignedTo.lastName}</span>
+                                <span>
+                                  {(() => {
+                                    const firstAssignee = task.assignedTo[0];
+                                    const userData = firstAssignee.user || firstAssignee;
+                                    return `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Unknown User';
+                                  })()}
+                                </span>
                               </div>
                             )}
                           </div>

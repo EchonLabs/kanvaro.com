@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { 
   X, 
   Calendar, 
@@ -33,6 +34,8 @@ interface ViewTaskModalProps {
 export default function ViewTaskModal({ isOpen, onClose, task, onEdit, onDelete }: ViewTaskModalProps) {
   if (!isOpen || !task) return null
 
+  const { formatDate, formatTime } = useDateTime()
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'critical': return 'destructive'
@@ -61,15 +64,14 @@ export default function ViewTaskModal({ isOpen, onClose, task, onEdit, onDelete 
     }
   }
 
-  const formatDate = (dateString: string) => {
+  const formatDateModal = (dateString: string) => {
     if (!dateString) return 'Not set'
-    return new Date(dateString).toLocaleDateString()
+    return formatDate(dateString)
   }
 
-  const formatDateTime = (dateString?: string) => {
+  const formatDateTimeModal = (dateString?: string) => {
     if (!dateString) return 'Not set'
-    const date = new Date(dateString)
-    return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    return `${formatDate(dateString)} ${formatTime(dateString)}`
   }
 
   const getSubtaskBadgeClass = (status: string) => {
@@ -160,8 +162,12 @@ export default function ViewTaskModal({ isOpen, onClose, task, onEdit, onDelete 
               <div className="mt-1 flex items-center space-x-2">
                 <User className="h-4 w-4 text-muted-foreground" />
                 <span>
-                  {task.assignedTo ? 
-                    `${task.assignedTo.firstName} ${task.assignedTo.lastName}` : 
+                  {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 ?
+                    (() => {
+                      const firstAssignee = task.assignedTo[0];
+                      const userData = firstAssignee.user || firstAssignee;
+                      return `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Unknown User';
+                    })() :
                     'Unassigned'
                   }
                 </span>
@@ -192,7 +198,7 @@ export default function ViewTaskModal({ isOpen, onClose, task, onEdit, onDelete 
                 <label className="text-sm font-medium text-muted-foreground">Due Date</label>
                 <div className="mt-1 flex items-center space-x-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>{formatDate(task.dueDate)}</span>
+                  <span>{formatDateModal(task.dueDate)}</span>
                 </div>
               </div>
             )}
@@ -263,8 +269,8 @@ export default function ViewTaskModal({ isOpen, onClose, task, onEdit, onDelete 
                         )}
                       </div>
                       <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                        <span>Created {formatDateTime(subtask.createdAt)}</span>
-                        <span>Updated {formatDateTime(subtask.updatedAt)}</span>
+                        <span>Created {formatDateTimeModal(subtask.createdAt)}</span>
+                        <span>Updated {formatDateTimeModal(subtask.updatedAt)}</span>
                       </div>
                     </div>
                   </div>
@@ -276,8 +282,8 @@ export default function ViewTaskModal({ isOpen, onClose, task, onEdit, onDelete 
           {/* Created/Updated Info */}
           <div className="pt-4 border-t">
             <div className="grid gap-2 text-sm text-muted-foreground">
-              <div>Created: {formatDate(task.createdAt)}</div>
-              <div>Updated: {formatDate(task.updatedAt)}</div>
+              <div>Created: {formatDateModal(task.createdAt)}</div>
+              <div>Updated: {formatDateModal(task.updatedAt)}</div>
             </div>
           </div>
         </CardContent>

@@ -162,7 +162,7 @@ export async function GET(request: NextRequest) {
     const organizationId = user.organization;
 
     const { searchParams } = new URL(request.url);
-    
+
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const after = searchParams.get('after');
@@ -178,6 +178,7 @@ export async function GET(request: NextRequest) {
     const dueDateTo = searchParams.get('dueDateTo') || '';
     const createdAtFrom = searchParams.get('createdAtFrom') || '';
     const createdAtTo = searchParams.get('createdAtTo') || '';
+    const minimal = searchParams.get('minimal') === 'true';
 
     const useCursorPagination = !!after;
     const PAGE_SIZE = Math.min(limit, 100);
@@ -196,12 +197,12 @@ export async function GET(request: NextRequest) {
     // If user has TASK_VIEW_ALL or PROJECT_VIEW_ALL, they can view all tasks
     // Otherwise, restrict to tasks assigned to or created by the user
     if (!canViewAllTasks && !hasTaskViewAll) {
-      const userFilters: any[] = [{ assignedTo: userId }, { createdBy: userId }];
-      
+      const userFilters: any[] = [{ 'assignedTo.user': { $in: [userId] } }, { createdBy: userId }];
+
       // If assignedTo filter is provided and it's the current user, use it
       // Otherwise, ignore the filter and use default user restriction
       if (assignedTo && assignedTo === userId) {
-        filters.assignedTo = userId;
+        filters['assignedTo.user'] = { $in: [userId] };
       } else if (createdBy && createdBy === userId) {
         filters.createdBy = userId;
       } else {
@@ -209,7 +210,7 @@ export async function GET(request: NextRequest) {
       }
     } else {
       // User can view all tasks, so apply filters as requested
-      if (assignedTo) filters.assignedTo = assignedTo;
+      if (assignedTo) filters['assignedTo.user'] = { $in: [assignedTo] };
       if (createdBy) filters.createdBy = createdBy;
     }
 
@@ -279,15 +280,29 @@ export async function GET(request: NextRequest) {
 
     const taskQueryFilters: any = { ...filters };
 
+    // Use minimal population for story detail view to improve performance
+    const populatePaths = minimal ? [] : [
+      { path: 'project', select: '_id name' },
+      { path: 'assignedTo.user', select: '_id firstName lastName email' },
+      { path: 'createdBy', select: 'firstName lastName email' },
+      { path: 'movedFromSprint', select: '_id name' }
+    ];
+
+    // Add performance logging for task queries
+    const queryStartTime = Date.now();
+
+    console.log('Task query filters:', JSON.stringify(taskQueryFilters, null, 2));
+    console.log('Task query minimal:', minimal, 'limit:', PAGE_SIZE);
+
     const items = await Task.find(taskQueryFilters)
-      .populate('project', '_id name')
-      .populate('assignedTo', 'firstName lastName email')
-      .populate('createdBy', 'firstName lastName email')
-      .populate('movedFromSprint', '_id name')
+      .populate(populatePaths)
       .sort(sort)
       .skip((page - 1) * PAGE_SIZE)
       .limit(PAGE_SIZE)
       .lean();
+
+    const queryTime = Date.now() - queryStartTime;
+    console.log(`Task query completed in ${queryTime}ms, found ${items.length} items`);
 
     // Exclude tasks whose project no longer exists (or is outside scope)
     const filteredItems = items.filter((t: any) => !!t.project)
@@ -418,7 +433,22 @@ export async function POST(request: NextRequest) {
     const normalizedStory = typeof story === 'string' && story.trim() !== '' ? story.trim() : undefined
     const normalizedEpic = typeof epic === 'string' && epic.trim() !== '' ? epic.trim() : undefined
     const normalizedParentTask = typeof parentTask === 'string' && parentTask.trim() !== '' ? parentTask.trim() : undefined
-    const normalizedAssignedTo = typeof assignedTo === 'string' && assignedTo.trim() !== '' ? assignedTo.trim() : undefined
+    // Handle assignedTo as an array of objects with user, user details, and hourlyRate
+    let normalizedAssignedTo: Array<{ user: string; firstName?: string; lastName?: string; email?: string; hourlyRate?: number }> = []
+    if (Array.isArray(assignedTo)) {
+      normalizedAssignedTo = assignedTo
+        .filter(item => typeof item === 'object' && item !== null && item.user)
+        .map(item => ({
+          user: typeof item.user === 'string' ? item.user.trim() : String(item.user),
+          firstName: typeof item.firstName === 'string' ? item.firstName.trim() : undefined,
+          lastName: typeof item.lastName === 'string' ? item.lastName.trim() : undefined,
+          email: typeof item.email === 'string' ? item.email.trim() : undefined,
+          hourlyRate: typeof item.hourlyRate === 'number' && item.hourlyRate >= 0 ? item.hourlyRate : undefined
+        }))
+    } else if (typeof assignedTo === 'string' && assignedTo.trim() !== '') {
+      // Legacy support for single string
+      normalizedAssignedTo = [{ user: assignedTo.trim() }]
+    }
 
     const task = new Task({
       title,
@@ -433,7 +463,13 @@ export async function POST(request: NextRequest) {
       story: normalizedStory,
       epic: normalizedEpic,
       parentTask: normalizedParentTask,
-      assignedTo: normalizedAssignedTo,
+      assignedTo: normalizedAssignedTo.map(item => ({
+        user: item.user,
+        firstName: item.firstName,
+        lastName: item.lastName,
+        email: item.email,
+        hourlyRate: item.hourlyRate
+      })),
       createdBy: userId,
       storyPoints: typeof storyPoints === 'number'
         ? storyPoints
@@ -458,7 +494,6 @@ export async function POST(request: NextRequest) {
     // Only populate essential fields that are likely to be used immediately
     const populatePaths: any[] = [
       { path: 'project', select: '_id name' },
-      { path: 'assignedTo', select: 'firstName lastName email' },
       { path: 'createdBy', select: 'firstName lastName email' }
     ]
 
@@ -504,19 +539,21 @@ export async function POST(request: NextRequest) {
       console.error('Failed to invalidate cache:', err)
     })
 
-    // Send notification if task is assigned to someone (non-blocking - fire and forget)
-    if (normalizedAssignedTo && normalizedAssignedTo !== userId) {
-      // Use projectDoc we already fetched earlier instead of querying again
+    // Send notifications to all assignees except the creator (non-blocking - fire and forget)
+    if (normalizedAssignedTo && normalizedAssignedTo.length > 0) {
+      const assigneesToNotify = normalizedAssignedTo.filter(id => id.user !== userId)
+      assigneesToNotify.forEach(assigneeId => {
       notificationService.notifyTaskUpdate(
         task._id.toString(),
         'assigned',
-        normalizedAssignedTo,
+          assigneeId.user.toString(),
         user.organization,
         title,
         projectDoc?.name
       ).catch(notificationError => {
         console.error('Failed to send task assignment notification:', notificationError)
         // Don't fail the task creation if notification fails
+        })
       })
     }
 

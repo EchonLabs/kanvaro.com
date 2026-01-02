@@ -8,12 +8,11 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useNotify } from '@/lib/notify'
 import { 
   ArrowLeft,
   Save,
   Loader2,
-  AlertTriangle,
   Target,
   Plus,
   X,
@@ -32,6 +31,8 @@ interface User {
   firstName: string
   lastName: string
   email: string
+  projectHourlyRate?: number
+  isActive?: boolean
 }
 
 interface Story {
@@ -119,7 +120,7 @@ function mapUserResponse(data: any): CurrentUser | null {
 }
 
 const SUBTASK_STATUS_OPTIONS: Array<{ value: SubtaskStatus; label: string }> = [
-  { value: 'backlog', label: 'Backlog' },
+  { value: 'backlog', label: 'backlog' },
   { value: 'todo', label: 'To Do' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'review', label: 'Review' },
@@ -131,8 +132,11 @@ const SUBTASK_STATUS_OPTIONS: Array<{ value: SubtaskStatus; label: string }> = [
 export default function CreateTaskPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
+
+  // Use the notification hook
+  const { error: notifyError } = useNotify()
+
   const [projects, setProjects] = useState<Project[]>([])
   const [projectMembers, setProjectMembers] = useState<User[]>([])
   const [loadingProjectMembers, setLoadingProjectMembers] = useState(false)
@@ -143,7 +147,7 @@ export default function CreateTaskPage() {
   const [epicQuery, setEpicQuery] = useState('')
   const today = new Date().toISOString().split('T')[0]
   const [projectQuery, setProjectQuery] = useState("");
-  const [assignedToIds, setAssignedToIds] = useState<string[]>([]);
+  const [assignedTo, setAssignedTo] = useState<string[]>([])
   const [assigneeQuery, setAssigneeQuery] = useState('');
   const [newLabel, setNewLabel] = useState('')
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
@@ -166,7 +170,8 @@ export default function CreateTaskPage() {
     type: 'task',
     dueDate: '',
     estimatedHours: '',
-    labels: [] as string[]
+    labels: [] as string[],
+    isBillable: false
   })
 
   const fetchProjects = useCallback(async () => {
@@ -263,7 +268,7 @@ export default function CreateTaskPage() {
 
     setLoadingEpics(true)
     try {
-      const response = await fetch(`/api/epics?project=${projectId}`)
+      const response = await fetch(`/api/epics?project=${encodeURIComponent(projectId)}&limit=100`)
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
@@ -292,7 +297,24 @@ export default function CreateTaskPage() {
 
       if (response.ok && data.success && data.data) {
         const members = Array.isArray(data.data.teamMembers) ? data.data.teamMembers : []
-        setProjectMembers(members)
+
+        // Transform populated team members data
+        const populatedMembers = members
+          .map((member: any) => ({
+            _id: member.memberId._id,
+            firstName: member.memberId.firstName,
+            lastName: member.memberId.lastName,
+            email: member.memberId.email,
+            projectHourlyRate: member.hourlyRate,
+            isActive: member.memberId.isActive !== false
+          }))
+          .filter((member: any) => member.isActive)
+
+        setProjectMembers(populatedMembers)
+
+        // Set billable default from project
+        const billableDefault = typeof data.data.isBillableByDefault === 'boolean' ? data.data.isBillableByDefault : true
+        setFormData(prev => ({ ...prev, isBillable: billableDefault }))
       } else {
         setProjectMembers([])
       }
@@ -307,12 +329,11 @@ export default function CreateTaskPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError('')
 
     try {
       // Prevent past due dates
       if (formData.dueDate && formData.dueDate < today) {
-        setError('Due date cannot be in the past')
+        notifyError({ title: 'Invalid Date', message: 'Due date cannot be in the past' })
         setLoading(false)
         return
       }
@@ -320,19 +341,19 @@ export default function CreateTaskPage() {
       // Validate required fields before submitting
       const missingSubtaskTitle = subtasks.some(st => !(st.title && st.title.trim().length > 0))
       if (!formData.title.trim() || !formData.project || !formData.dueDate) {
-        setError('Please fill in all required fields')
+        notifyError({ title: 'Validation Error', message: 'Please fill in all required fields' })
         setLoading(false)
         return
       }
 
-      if (assignedToIds.length === 0) {
-        setError('Please assign this task to at least one user')
+      if (assignedTo.length === 0) {
+        notifyError({ title: 'Assignment Required', message: 'Please assign this task to at least one user' })
         setLoading(false)
         return
       }
 
       if (missingSubtaskTitle) {
-        setError('Please fill in all required subtask titles')
+        notifyError({ title: 'Validation Error', message: 'Please fill in all required subtask titles' })
         setLoading(false)
         return
       }
@@ -343,6 +364,16 @@ export default function CreateTaskPage() {
         status: 'backlog', // Sub-tasks always created with backlog status
         isCompleted: false
       }))
+
+      const assignedToPayload = assignedTo.map(userId => {
+        const member = projectMembers.find(m => m._id.toString() === userId.toString())
+        return {
+          user: userId,
+          firstName: member?.firstName,
+          lastName: member?.lastName,
+          email: member?.email
+        }
+      })
 
       const response = await fetch('/api/tasks', {
         method: 'POST',
@@ -357,13 +388,14 @@ export default function CreateTaskPage() {
           story: formData.story === 'none' ? undefined : formData.story || undefined,
           epic: formData.epic === 'none' ? undefined : formData.epic || undefined,
           parentTask: formData.parentTask || undefined,
-          assignedTo: assignedToIds.length === 1 ? assignedToIds[0] : assignedToIds.length > 0 ? assignedToIds[0] : undefined,
+          assignedTo: assignedToPayload,
           priority: formData.priority,
           type: formData.type,
           status: 'backlog',
           dueDate: formData.dueDate,
           estimatedHours: formData.estimatedHours ? parseInt(formData.estimatedHours) : undefined,
           labels: Array.isArray(formData.labels) ? formData.labels : [],
+          isBillable: formData.isBillable,
           subtasks: preparedSubtasks,
           attachments: attachments.map(attachment => ({
             name: attachment.name,
@@ -380,7 +412,7 @@ export default function CreateTaskPage() {
       const data = await response.json().catch(() => ({ error: 'Failed to parse response' }))
 
       if (!response.ok) {
-        setError(data.error || 'Failed to create task')
+        notifyError({ title: 'Failed to Create Task', message: data.error || 'Failed to create task' })
         setLoading(false)
         return
       }
@@ -389,12 +421,12 @@ export default function CreateTaskPage() {
         router.push('/tasks')
         setAttachments([])
       } else {
-        setError(data.error || 'Failed to create task')
+        notifyError({ title: 'Failed to Create Task', message: data.error || 'Failed to create task' })
         setLoading(false)
       }
     } catch (err) {
       console.error('Task creation error:', err)
-      setError('Failed to create task. Please try again.')
+      notifyError({ title: 'Failed to Create Task', message: 'Failed to create task. Please try again.' })
       setLoading(false)
     }
   }
@@ -406,15 +438,22 @@ export default function CreateTaskPage() {
     }))
 
     if (field === 'project') {
-      setAssignedToIds([])
+      setAssignedTo([])
       setAssigneeQuery('')
       setProjectMembers([])
-      setFormData(prev => ({ ...prev, story: '', epic: '' }))
+      setFormData(prev => ({
+        ...prev,
+        story: '',
+        epic: '',
+        isBillable: false // Reset to unchecked when project changes
+      }))
       setStories([])
       setEpics([])
-      fetchStories(value)
-      fetchEpics(value)
-      fetchProjectMembers(value)
+      if (value) {
+        fetchStories(value)
+        fetchEpics(value)
+        fetchProjectMembers(value)
+      }
     }
   }, [fetchStories, fetchEpics, fetchProjectMembers])
 
@@ -536,9 +575,10 @@ export default function CreateTaskPage() {
 
   // Memoize filtered project members to avoid recalculating on every render
   const filteredProjectMembers = useMemo(() => {
-    if (!assigneeQuery.trim()) return projectMembers
+    const activeMembers = projectMembers.filter(member => member.isActive !== false)
+    if (!assigneeQuery.trim()) return activeMembers
     const q = assigneeQuery.toLowerCase().trim()
-    return projectMembers.filter(u =>
+    return activeMembers.filter(u =>
       `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
       u.email.toLowerCase().includes(q)
     )
@@ -550,10 +590,10 @@ export default function CreateTaskPage() {
       !!formData.title.trim() &&
       !!formData.project &&
       !!formData.dueDate &&
-      assignedToIds.length > 0 &&
+      assignedTo.length > 0 &&
       !subtasks.some(st => !(st.title && st.title.trim().length > 0))
     )
-  }, [formData.title, formData.project, formData.dueDate, assignedToIds.length, subtasks])
+  }, [formData.title, formData.project, formData.dueDate, assignedTo.length, subtasks])
 
   const attachmentListItems = useMemo(
     () =>
@@ -598,12 +638,6 @@ export default function CreateTaskPage() {
           </div>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
 
         <Card>
           <CardHeader>
@@ -634,17 +668,17 @@ export default function CreateTaskPage() {
                             placeholder="Type to search projects"
                             className="mb-2"
                           />
-                          <div className="max-h-56 overflow-y-auto">
-                            {filteredProjects.length > 0 ? (
-                              filteredProjects.map((project) => (
-                                <SelectItem key={project._id} value={project._id}>
+                          {filteredProjects.length > 0 ? (
+                            filteredProjects.map((project) => (
+                              <SelectItem key={project._id} value={project._id} title={project.name}>
+                                <div className="truncate max-w-xs" title={project.name}>
                                   {project.name}
-                                </SelectItem>
-                              ))
-                            ) : (
-                              <div className="px-2 py-1 text-sm text-muted-foreground">No matching projects</div>
-                            )}
-                          </div>
+                                </div>
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="px-2 py-1 text-sm text-muted-foreground">No matching projects</div>
+                          )}
                         </div>
                       </SelectContent>
                     </Select>
@@ -677,11 +711,12 @@ export default function CreateTaskPage() {
                           value=""
                           onValueChange={(value) => {
                             if (value === '__unassigned') {
-                              setAssignedToIds([])
+                              setAssignedTo([])
                               return
                             }
-                            if (!assignedToIds.includes(value)) {
-                              setAssignedToIds(prev => [...prev, value])
+                            if (!assignedTo.includes(value)) {
+                              setAssignedTo(prev => [...prev, value])
+                              setAssigneeQuery('')
                             }
                           }}
                           onOpenChange={(open) => { if (open) setAssigneeQuery(""); }}
@@ -721,14 +756,12 @@ export default function CreateTaskPage() {
                                   </div>
                                 ) : projectMembers.length === 0 ? (
                                   <>
-                                    <SelectItem value="__unassigned">
-                                      Unassigned
-                                    </SelectItem>
+                                   
                                     <div className="px-2 py-1 text-sm text-muted-foreground">No team members found for this project</div>
                                   </>
                                 ) : filteredProjectMembers.length > 0 ? (
                                   filteredProjectMembers.map(user => {
-                                    const isSelected = assignedToIds.includes(user._id);
+                                    const isSelected = assignedTo.includes(user._id);
                                     return (
                                       <SelectItem 
                                         key={user._id} 
@@ -752,27 +785,27 @@ export default function CreateTaskPage() {
                             </div>
                           </SelectContent>
                         </Select>
-                        {assignedToIds.length > 0 && (
+                        {assignedTo.length > 0 && (
                           <div className="flex flex-wrap gap-2">
-                            {assignedToIds.map(id => {
-                              const u = projectMembers.find(x => x._id === id);
-                              if (!u) return null;
+                            {assignedTo.map(userId => {
+                              const user = projectMembers.find(u => u._id.toString() === userId.toString())
+                              if (!user) return null
                               return (
-                                <span 
-                                  key={id} 
+                                <span
+                                  key={userId}
                                   className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
                                 >
-                                  <span>{u.firstName} {u.lastName}</span>
+                                  <span>{user.firstName} {user.lastName}</span>
                                   <button
                                     type="button"
                                     aria-label="Remove assignee"
                                     className="text-muted-foreground hover:text-foreground focus:outline-none"
-                                    onClick={() => setAssignedToIds(prev => prev.filter(x => x !== id))}
+                                    onClick={() => setAssignedTo(prev => prev.filter(id => id !== userId))}
                                   >
                                     <X className="h-3 w-3" />
                                   </button>
                                 </span>
-                              );
+                              )
                             })}
                           </div>
                         )}
@@ -827,7 +860,7 @@ export default function CreateTaskPage() {
                       }}
                       onOpenChange={(open) => { if (open) setStoryQuery('') }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a story" />
                       </SelectTrigger>
                       <SelectContent className="z-[10050] p-0">
@@ -853,8 +886,10 @@ export default function CreateTaskPage() {
                               }
                               
                               return filtered.map((story) => (
-                                <SelectItem key={story._id} value={story._id}>
-                                  {story.title}
+                                <SelectItem key={story._id} value={story._id} title={story.title}>
+                                  <div className="truncate max-w-xs" title={story.title}>
+                                    {story.title}
+                                  </div>
                                 </SelectItem>
                               ))
                             })()}
@@ -872,7 +907,7 @@ export default function CreateTaskPage() {
                       disabled={loadingEpics}
                       onOpenChange={(open) => { if (open) setEpicQuery('') }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder={loadingEpics ? 'Loading epics...' : 'Select an epic'} />
                       </SelectTrigger>
                       <SelectContent className="z-[10050] p-0">
@@ -923,8 +958,10 @@ export default function CreateTaskPage() {
                               }
                               
                               return filtered.map((epic) => (
-                                <SelectItem key={epic._id} value={epic._id}>
-                                  {epic.title}
+                                <SelectItem key={epic._id} value={epic._id} title={epic.title}>
+                                  <div className="truncate max-w-xs" title={epic.title}>
+                                    {epic.title}
+                                  </div>
                                 </SelectItem>
                               ))
                             })()}
@@ -951,6 +988,18 @@ export default function CreateTaskPage() {
                       value={formData.estimatedHours}
                       onChange={(e) => handleChange('estimatedHours', e.target.value)}
                       placeholder="Enter estimated hours"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-sm font-medium text-foreground">Billable</label>
+                      <p className="text-xs text-muted-foreground">Defaults from project; you can override per task.</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={formData.isBillable}
+                      onChange={(e) => setFormData(prev => ({ ...prev, isBillable: e.target.checked }))}
                     />
                   </div>
 

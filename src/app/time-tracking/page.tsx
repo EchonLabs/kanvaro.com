@@ -103,7 +103,7 @@ export default function TimeTrackingPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -120,7 +120,7 @@ export default function TimeTrackingPage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/time-tracking/timer')}>
             <CardContent className="p-6">
               <div className="flex items-center space-x-4">
@@ -168,7 +168,7 @@ export default function TimeTrackingPage() {
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Active Timer Section */}
           <div className="lg:col-span-2">
             <Card>
@@ -200,7 +200,7 @@ export default function TimeTrackingPage() {
           </div>
 
           {/* Quick Stats */}
-          <div className="space-y-6">
+          <div className="flex flex-col gap-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -224,7 +224,7 @@ export default function TimeTrackingPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card >
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Calendar className="h-5 w-5" />
@@ -278,7 +278,7 @@ export default function TimeTrackingPage() {
         </Card>
 
         {/* Quick Tips */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">

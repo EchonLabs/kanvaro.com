@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/Badge'
 import { Progress } from '@/components/ui/Progress'
 import { Button } from '@/components/ui/Button'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { 
   BarChart, 
   Bar, 
@@ -68,6 +70,8 @@ interface ProjectTimelineReportProps {
 }
 
 export function ProjectTimelineReport({ projects, filters }: ProjectTimelineReportProps) {
+  const { formatDate } = useDateTime()
+
   // Prepare timeline data
   const timelineData = projects.map(project => {
     const startDate = new Date(project.startDate)
@@ -98,9 +102,9 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
   const completedProjects = timelineData.filter(p => p.status === 'completed')
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Timeline Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Projects</CardTitle>
@@ -161,7 +165,7 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Project Timeline Gantt-like View */}
         <Card>
           <CardHeader>
@@ -279,9 +283,9 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
           <CardDescription className="text-xs sm:text-sm">Detailed timeline view for each project</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {timelineData.map((project) => (
-              <div key={project.name} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
+              <div key={project.name} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-5">
                 <div className="flex-1 min-w-0 w-full sm:w-auto">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 flex-wrap gap-2">
                     <h3 className="font-semibold text-sm sm:text-base truncate">{project.name}</h3>
@@ -297,7 +301,7 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
                   </div>
                   
                   {/* Timeline Progress */}
-                  <div className="mt-4 space-y-3">
+                  <div className="mt-4 space-y-4">
                     <div>
                       <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
                         <span className="flex items-center space-x-1">
@@ -325,7 +329,7 @@ export function ProjectTimelineReport({ projects, filters }: ProjectTimelineRepo
                   </div>
                 </div>
                 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full sm:w-auto sm:ml-6">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-5 w-full sm:w-auto sm:ml-6">
                   <div className="flex sm:flex-col items-center sm:items-center text-center gap-2 sm:gap-0">
                     <div className="text-xs sm:text-sm font-medium truncate">
                       {project.startDate}

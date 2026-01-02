@@ -432,7 +432,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
   const projectCurrency = project?.budget?.currency || 'USD'
 
   return (
-    <div ref={pageRef} className="space-y-6">
+    <div ref={pageRef} className="space-y-8">
       {error && (
         <Alert variant="destructive" className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-2">
@@ -574,10 +574,17 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                         size={48}
                         className="h-12 w-12 flex-shrink-0"
                       />
-                      <div className="min-w-0">
-                        <p className="font-medium text-foreground truncate">
-                          {firstName} {lastName}
-                        </p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-foreground truncate">
+                            {firstName} {lastName}
+                          </p>
+                          {organizationRole && (
+                            <Badge className={`${getOrganizationRoleColor(organizationRole)} border-none text-xs`}>
+                              {formatOrganizationRole(organizationRole)}
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground truncate">{email}</p>
                       </div>
                     </div>
@@ -640,12 +647,6 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                         </div>
                       )}
 
-                      {/* Organization role badge (read-only) */}
-                      {organizationRole && (
-                        <Badge className={`${getOrganizationRoleColor(organizationRole)} border-none`}>
-                          {formatOrganizationRole(organizationRole)}
-                        </Badge>
-                      )}
 
                       <PermissionGate permission={Permission.PROJECT_MANAGE_TEAM} projectId={projectId}>
                         <DropdownMenu>
@@ -715,8 +716,30 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                   value={selectedMemberId || ''}
                   onValueChange={(value) => setSelectedMemberId(value)}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a team member" />
+                  <SelectTrigger className="h-12">
+                    <SelectValue placeholder="Choose a team member">
+                      {selectedMemberId && (() => {
+                        const member = availableMembers.find(m => m._id === selectedMemberId)
+                        return member ? (
+                          <div className="flex flex-col text-left">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium truncate">
+                                {member.firstName} {member.lastName}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={`text-xs ${getOrganizationRoleColor(member.role)} border-none`}
+                              >
+                                {formatOrganizationRole(member.role)}
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground truncate">
+                              {member.email}
+                            </span>
+                          </div>
+                        ) : null
+                      })()}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="z-[10050] p-0">
                     <div className="p-2">
@@ -724,7 +747,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                         value={memberSearchQuery}
                         onChange={(e) => setMemberSearchQuery(e.target.value)}
                         placeholder="Type to search team members"
-                        className="mb-2"
+                        className="mb-2 h-10"
                         onKeyDown={(e) => e.stopPropagation()}
                       />
                       <div className="max-h-56 overflow-y-auto">
@@ -736,9 +759,17 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                           filteredAvailableMembers.map((member) => (
                             <SelectItem key={member._id} value={member._id}>
                               <div className="flex flex-col">
-                                <span className="text-sm font-medium">
-                                  {member.firstName} {member.lastName}
-                                </span>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium">
+                                    {member.firstName} {member.lastName}
+                                  </span>
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-xs ml-2 ${getOrganizationRoleColor(member.role)} border-none`}
+                                  >
+                                    {formatOrganizationRole(member.role)}
+                                  </Badge>
+                                </div>
                                 <span className="text-xs text-muted-foreground">{member.email}</span>
                               </div>
                             </SelectItem>

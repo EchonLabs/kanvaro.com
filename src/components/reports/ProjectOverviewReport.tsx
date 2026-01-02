@@ -132,9 +132,9 @@ export function ProjectOverviewReport({ projects, summary, trends, filters }: Pr
   }))
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Project Status</CardTitle>
@@ -205,7 +205,7 @@ export function ProjectOverviewReport({ projects, summary, trends, filters }: Pr
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Project Status Distribution */}
         <Card>
           <CardHeader>

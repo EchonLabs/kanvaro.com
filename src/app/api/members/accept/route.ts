@@ -8,6 +8,7 @@ import { emailService } from '@/lib/email/EmailService'
 import { formatToTitleCase } from '@/lib/utils'
 import bcrypt from 'bcryptjs'
 import { generateAvatarImage } from '@/lib/avatar-generator'
+import crypto from 'crypto'
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,7 +49,8 @@ export async function POST(request: NextRequest) {
     // Create user
     const userFirstName = firstName || invitation.firstName || ''
     const userLastName = lastName || invitation.lastName || ''
-    
+
+
     const userData: any = {
       firstName: userFirstName,
       lastName: userLastName,
@@ -66,7 +68,8 @@ export async function POST(request: NextRequest) {
     }
 
     const user = new User(userData)
-    await user.save()
+    const savedUser = await user.save()
+
 
     // Generate and save avatar image
     try {
@@ -87,32 +90,33 @@ export async function POST(request: NextRequest) {
     invitation.acceptedAt = new Date()
     await invitation.save()
 
-    // Send welcome email to the new user (non-blocking)
+    // Send appropriate email based on verification requirement (non-blocking)
     try {
       const organizationName = invitation.organization?.name || 'Kanvaro'
       const roleDisplayName = invitation.roleDisplayName || formatToTitleCase(invitation.role) || 'Team Member'
-      
+
       // Get base URL from request headers (same as invite route)
       let baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
       const forwardedHost = request.headers.get('x-forwarded-host')
       const host = request.headers.get('host')
       const forwardedProto = request.headers.get('x-forwarded-proto')
-      
+
       if (forwardedHost || host) {
         const protocol = forwardedProto || (request.url.startsWith('https') ? 'https' : 'http')
         let hostValue = forwardedHost || host || ''
-        
+
         // Clean up host (remove any protocol prefix, remove trailing slash, remove port if default)
         hostValue = hostValue.replace(/^https?:\/\//, '').replace(/\/$/, '')
         // Remove default ports
         hostValue = hostValue.replace(/^(.+):80$/, '$1')
         hostValue = hostValue.replace(/^(.+):443$/, '$1')
-        
+
         baseUrl = `${protocol}://${hostValue}`
       }
-      
+
+      // Send welcome email
       const loginUrl = `${baseUrl}/login`
-      
+
       const welcomeEmailHtml = emailService.generateWelcomeEmail(
         user.firstName,
         user.lastName,
@@ -131,7 +135,7 @@ export async function POST(request: NextRequest) {
         // Don't fail the account creation if email fails
       })
     } catch (emailError) {
-      console.error('Error preparing welcome email (non-blocking):', emailError)
+      console.error('Error preparing email (non-blocking):', emailError)
       // Don't fail the account creation if email preparation fails
     }
 

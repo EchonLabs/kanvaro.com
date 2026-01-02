@@ -26,12 +26,20 @@ export async function PUT(
     }
 
     // Check if user has permission to manage project
-    const hasPermission = project.teamMembers.includes(authResult.user.id) || 
-                         project.createdBy.toString() === authResult.user.id ||
-                         project.projectRoles.some((role: any) => 
-                           role.user.toString() === authResult.user.id && 
-                           ['project_manager', 'project_qa_lead'].includes(role.role)
-                         )
+    const hasPermission =
+      (Array.isArray(project.teamMembers)
+        ? project.teamMembers.some((m: any) => ((m.memberId || m).toString() === authResult.user.id))
+        : project.teamMembers && project.teamMembers.toString() === authResult.user.id
+      ) ||
+      (project.createdBy && project.createdBy.toString() === authResult.user.id) ||
+      (Array.isArray(project.projectRoles) &&
+      project.projectRoles.some(
+          (role: any) =>
+            role.user &&
+            role.user.toString() === authResult.user.id &&
+            ['project_manager', 'project_qa_lead'].includes(role.role)
+        )
+      );
 
     if (!hasPermission) {
       return NextResponse.json({ success: false, error: 'Permission denied' }, { status: 403 })
@@ -100,12 +108,14 @@ export async function DELETE(
     }
 
     // Check if user has permission to manage project
-    const hasPermission = project.teamMembers.includes(authResult.user.id) || 
-                         project.createdBy.toString() === authResult.user.id ||
-                         project.projectRoles.some((role: any) => 
-                           role.user.toString() === authResult.user.id && 
-                           ['project_manager', 'project_qa_lead'].includes(role.role)
-                         )
+    const hasPermission = Array.isArray(project.teamMembers)
+      ? project.teamMembers.some((m: any) => (m.memberId || m).toString() === authResult.user.id)
+      : project.teamMembers?.toString() === authResult.user.id ||
+        project.createdBy.toString() === authResult.user.id ||
+        project.projectRoles.some((role: any) =>
+          role.user.toString() === authResult.user.id &&
+          ['project_manager', 'project_qa_lead'].includes(role.role)
+        )
 
     if (!hasPermission) {
       return NextResponse.json({ success: false, error: 'Permission denied' }, { status: 403 })

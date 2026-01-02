@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Progress } from '@/components/ui/Progress'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { 
   BarChart, 
   Download, 
@@ -27,6 +28,7 @@ export default function TestReportsPage() {
   const [executions, setExecutions] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const { formatDate } = useDateTime()
 
   useEffect(() => {
     // Set breadcrumb
@@ -213,7 +215,7 @@ export default function TestReportsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Test Reports</h1>
@@ -228,7 +230,7 @@ export default function TestReportsPage() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Test Cases</CardTitle>
@@ -286,7 +288,7 @@ export default function TestReportsPage() {
               Test execution statistics by project
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="text-muted-foreground">Loading project statistics...</div>
@@ -300,7 +302,7 @@ export default function TestReportsPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
+            <div className="space-y-5">
                 {projectStats.map((project, index) => (
                   <div key={index} className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -372,7 +374,7 @@ export default function TestReportsPage() {
                         {execution.status.charAt(0).toUpperCase() + execution.status.slice(1)}
                       </Badge>
                       <span className="text-sm text-muted-foreground">
-                        {new Date(execution.executedAt).toLocaleDateString()}
+                        {formatDate(execution.executedAt)}
                       </span>
                     </div>
                   </div>

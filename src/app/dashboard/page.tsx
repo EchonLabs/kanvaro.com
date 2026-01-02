@@ -52,16 +52,38 @@ export default function DashboardPage() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [authError, setAuthError] = useState('')
   const [dataError, setDataError] = useState('')
+  const [permissionsRefreshed, setPermissionsRefreshed] = useState(false)
+  const [initialPermissionCheckDone, setInitialPermissionCheckDone] = useState(false)
+  const [dashboardLoaded, setDashboardLoaded] = useState(false)
+  const [isAuthChecking, setIsAuthChecking] = useState(false)
   const router = useRouter()
-  const { loading: permissionsLoading, error: permissionsError, permissions } = usePermissionContext()
+  const { loading: permissionsLoading, error: permissionsError, permissions, refreshPermissions } = usePermissionContext()
 
-  const loadDashboardData = useCallback(async () => {
+  const loadDashboardData = useCallback(async (force = false) => {
+    // Prevent multiple simultaneous dashboard loads
+    if (!force && dashboardLoaded && !isRefreshing) {
+      return
+    }
+
     try {
       const response = await fetch('/api/dashboard')
       if (response.ok) {
         const data = await response.json()
         setDashboardData(data.data)
+        setDashboardLoaded(true)
         setDataError('')
+
+        // Quick refresh of permissions after dashboard loads to ensure they're current
+        if (!permissionsRefreshed) {
+          setTimeout(async () => {
+            try {
+              await refreshPermissions()
+              setPermissionsRefreshed(true)
+            } catch (error) {
+              console.error('Dashboard: Failed to refresh permissions:', error)
+            }
+          }, 500) // Small delay to ensure dashboard is fully rendered
+        }
       } else {
         setDataError('Failed to load dashboard data')
       }
@@ -69,20 +91,27 @@ export default function DashboardPage() {
       console.error('Failed to load dashboard data:', error)
       setDataError('Failed to load dashboard data')
     }
-  }, [])
+  }, [dashboardLoaded, isRefreshing, permissionsRefreshed, refreshPermissions])
 
-  const checkAuth = useCallback(async () => {
+  const checkAuth = useCallback(async (forceLoadDashboard = false) => {
+    // Prevent multiple simultaneous auth checks
+    if (isAuthChecking && !forceLoadDashboard) {
+      return
+    }
+
     try {
-      console.log('Dashboard: Checking authentication...')
+      setIsAuthChecking(true)
       const response = await fetch('/api/auth/me')
-      console.log('Dashboard: Auth response status:', response.status)
 
       if (response.ok) {
         const userData = await response.json()
         setUser(userData)
         setAuthError('')
-        // Load dashboard data after successful auth
-        await loadDashboardData()
+
+        // Only load dashboard data if not already loaded or if forced
+        if (!dashboardLoaded || forceLoadDashboard) {
+          await loadDashboardData(forceLoadDashboard)
+        } 
       } else if (response.status === 401) {
         // Try to refresh token
         const refreshResponse = await fetch('/api/auth/refresh', {
@@ -93,8 +122,11 @@ export default function DashboardPage() {
           const refreshData = await refreshResponse.json()
           setUser(refreshData.user)
           setAuthError('')
-          // Load dashboard data after successful refresh
-          await loadDashboardData()
+
+          // Only load dashboard data if not already loaded or if forced
+          if (!dashboardLoaded || forceLoadDashboard) {
+            await loadDashboardData(forceLoadDashboard)
+          } 
         } else {
           // Both access and refresh tokens are invalid
           setAuthError('Session expired')
@@ -114,8 +146,9 @@ export default function DashboardPage() {
       }, 2000)
     } finally {
       setIsLoading(false)
+      setIsAuthChecking(false)
     }
-  }, [router, loadDashboardData])
+  }, [router, loadDashboardData, isAuthChecking, dashboardLoaded, permissionsLoading, permissions])
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true)
@@ -126,27 +159,52 @@ export default function DashboardPage() {
     }
   }, [loadDashboardData])
 
+  // Initial auth check on mount
   useEffect(() => {
+    if (!dashboardLoaded) {
     checkAuth()
-  }, [checkAuth])
+    }
+  }, []) // Empty dependency array to run only once on mount
 
-  // Set up periodic auth check to handle token expiration
+  // Ensure permissions are current when component mounts
+  useEffect(() => {
+    if (!permissionsLoading && permissions && !initialPermissionCheckDone) {
+      // Quick check to refresh permissions if needed
+      const timer = setTimeout(async () => {
+        try {
+          await refreshPermissions()
+          setPermissionsRefreshed(true)
+          setInitialPermissionCheckDone(true)
+        } catch (error) {
+          console.error('Dashboard: Failed initial permission refresh:', error)
+          setInitialPermissionCheckDone(true) // Prevent infinite retries
+        }
+      }, 100)
+
+      return () => clearTimeout(timer)
+    }
+  }, [permissionsLoading, permissions, initialPermissionCheckDone, refreshPermissions])
+
+  // Set up periodic auth check to handle token expiration (less frequent)
   useEffect(() => {
     const interval = setInterval(() => {
-      checkAuth()
-    }, 5 * 60 * 1000) // Check every 5 minutes
+      checkAuth(true) // Force dashboard reload on periodic checks
+    }, 10 * 60 * 1000) // Check every 10 minutes instead of 5
 
     return () => clearInterval(interval)
-  }, [checkAuth])
+  }, []) // Empty dependency array
 
-  // Wait for permissions to load before showing dashboard
-  // Only show loading if permissions are actually being fetched (not just initialized)
-  if (permissionsLoading && !permissions) {
+  // Handle loading states consistently to prevent hydration mismatch
+  // Show loading until permissions are loaded, auth check is complete, initial permission check done, and dashboard data is ready
+  // Ensure permissions are fully available and refreshed before showing dashboard
+  const isInitialLoading = permissionsLoading || isLoading || !permissions || !initialPermissionCheckDone || (!permissionsRefreshed && dashboardData);
+
+  if (isInitialLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Loading permissions...</p>
+          <p className="text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
     )
@@ -158,17 +216,6 @@ export default function DashboardPage() {
         <div className="text-center">
           <p className="text-sm text-destructive">Failed to load permissions</p>
           <p className="text-xs text-muted-foreground mt-1">{permissionsError}</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
     )

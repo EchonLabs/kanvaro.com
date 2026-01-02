@@ -9,6 +9,7 @@ import { Organization } from '@/models/Organization'
 import { applyRoundingRules } from '@/lib/utils'
 import { notificationService } from '@/lib/notification-service'
 import { isNotificationEnabled } from '@/lib/notification-utils'
+import { zonedTimeToUtc } from 'date-fns-tz'
 
 type EffectiveTimeTrackingSettings = {
   maxSessionHours?: number
@@ -93,6 +94,7 @@ interface StopTimerOptions {
   reason?: StopTimerReason
   stopSettings?: EffectiveTimeTrackingSettings
   now?: Date
+  userTimezone?: string
 }
 
 const buildNotificationPayload = (
@@ -134,6 +136,11 @@ async function stopTimerAndBuildResponse(
   }
 
   const now = options.now || new Date()
+  const stopUserTimezone = options.userTimezone || 'UTC'
+
+  // Convert end time to user's timezone
+  const endTimeInUserTimezone = zonedTimeToUtc(now, stopUserTimezone)
+
   const descriptionSource = options.description ?? activeTimer.description ?? ''
   const finalDescription =
     typeof descriptionSource === 'string'
@@ -145,7 +152,7 @@ async function stopTimerAndBuildResponse(
     return { status: 400, body: { error: 'Description is required for time entries' } }
   }
 
-  const totalDuration = calculateCurrentDurationMinutes(activeTimer, now)
+  const totalDuration = calculateCurrentDurationMinutes(activeTimer, endTimeInUserTimezone)
   let finalDuration = totalDuration
   if (stopSettings.roundingRules?.enabled) {
     finalDuration = applyRoundingRules(totalDuration, {
@@ -184,6 +191,7 @@ async function stopTimerAndBuildResponse(
   const category = options.category ?? activeTimer.category
   const tags = options.tags ?? activeTimer.tags
   const projectValue = (activeTimer.project as any)?._id ?? activeTimer.project
+  console.log('-8794651234455',projectValue);
   const taskValue = (activeTimer.task as any)?._id ?? activeTimer.task
 
   const timeEntry = new TimeEntry({
@@ -193,7 +201,7 @@ async function stopTimerAndBuildResponse(
     task: taskValue,
     description: finalDescription,
     startTime: activeTimer.startTime,
-    endTime: now,
+    endTime: endTimeInUserTimezone,
     duration: finalDuration,
     isBillable: activeTimer.isBillable,
     hourlyRate: activeTimer.hourlyRate,
@@ -214,7 +222,7 @@ async function stopTimerAndBuildResponse(
 
   // Only send notifications if time was actually logged
   // Notifications should only be sent when timer stops with logged time
-  const project = projectValue ? await Project.findById(projectValue).select('name') : null
+  const project = projectValue ? await Project.findById(projectValue).select('name settings') : null
   const projectName = project?.name || 'Unknown Project'
   const hoursFormatted = `${Math.floor(hoursLogged)}h ${Math.round((hoursLogged % 1) * 60)}m`
   const projectUrl = '/time-tracking/logs'
@@ -284,8 +292,10 @@ async function stopTimerAndBuildResponse(
     }
   }
 
-  // Approval Required notification - only if approval is required AND time was logged
-  if (requiresApproval && hasTimeLogged && !isZeroDurationDisplay) {
+  // Approval Required  notification - only if approval is required AND time was logged
+ 
+const projectRequiresApproval = project?.settings?.requireApproval === true;
+  if (projectRequiresApproval && hasTimeLogged && !isZeroDurationDisplay) {
     const approvalNeededEnabled = await isNotificationEnabled(
       organizationId,
       'onApprovalNeeded',
@@ -362,7 +372,8 @@ async function stopTimerAndBuildResponse(
 }
 
 async function enforceMaxSessionLimit(
-  activeTimer: IActiveTimer
+  activeTimer: IActiveTimer,
+  userTimezone: string = 'UTC'
 ): Promise<{ status: number; body: any } | null> {
   const organizationId = getIdString(activeTimer.organization)
   if (!organizationId) return null
@@ -374,15 +385,17 @@ async function enforceMaxSessionLimit(
   }
 
   const now = new Date()
-  const currentDuration = calculateCurrentDurationMinutes(activeTimer, now)
+  const nowInUserTimezone = zonedTimeToUtc(now, userTimezone)
+  const currentDuration = calculateCurrentDurationMinutes(activeTimer, nowInUserTimezone)
   if (currentDuration < stopSettings.maxSessionHours * MINUTES_PER_HOUR) {
     return null
   }
 
   return stopTimerAndBuildResponse(activeTimer, {
     stopSettings,
-    now,
-    reason: 'auto_max_session'
+    now: nowInUserTimezone,
+    reason: 'auto_max_session',
+    userTimezone
   })
 }
 
@@ -409,7 +422,11 @@ console.log('organizationId',organizationId);
       return NextResponse.json({ activeTimer: null })
     }
 
-    const autoStopResult = await enforceMaxSessionLimit(activeTimer)
+    // Get user's timezone for timezone-aware operations
+    const userForTimezone = await User.findById(userId).select('timezone preferences')
+    const getUserTimezone = userForTimezone?.timezone || 'UTC'
+
+    const autoStopResult = await enforceMaxSessionLimit(activeTimer, getUserTimezone)
     if (autoStopResult) {
       return NextResponse.json(
         {
@@ -420,14 +437,17 @@ console.log('organizationId',organizationId);
       )
     }
 
-    const currentDuration = calculateCurrentDurationMinutes(activeTimer)
+    // Calculate current duration using user's timezone
+    const nowInUserTimezone = zonedTimeToUtc(new Date(), getUserTimezone)
+    const currentDuration = calculateCurrentDurationMinutes(activeTimer, nowInUserTimezone)
 
     return NextResponse.json({
       activeTimer: {
         ...activeTimer.toObject(),
         currentDuration,
         isPaused: !!activeTimer.pausedAt
-      }
+      },
+      userTimezone: getUserTimezone
     })
   } catch (error) {
     console.error('Error fetching active timer:', error)
@@ -561,9 +581,14 @@ console.log('existingTimer',existingTimer);
     // If description is not required and empty, use empty string or default
     const finalDescription = description || ''
 
-    // Get user's hourly rate if not provided
-    const user = await User.findById(userId)
-    const finalHourlyRate = hourlyRate || user?.billingRate || settings.defaultHourlyRate
+    // Get user's hourly rate and timezone
+    const userForRate = await User.findById(userId)
+    const finalHourlyRate = hourlyRate || userForRate?.billingRate || settings.defaultHourlyRate
+    const postUserTimezone = userForRate?.timezone || 'UTC'
+
+    // Create timer start time in user's timezone
+    const now = new Date()
+    const startTimeInUserTimezone = zonedTimeToUtc(now, postUserTimezone)
 
     // Create active timer
     const activeTimer = new ActiveTimer({
@@ -572,7 +597,7 @@ console.log('existingTimer',existingTimer);
       project: projectId,
       task: taskId,
       description: finalDescription,
-      startTime: new Date(),
+      startTime: startTimeInUserTimezone,
       category,
       tags: tags || [],
       isBillable: isBillable ?? true,
@@ -605,6 +630,10 @@ console.log('activeTimer',activeTimer);
       })
     }
 
+    // Get user's timezone for timezone-aware operations
+    const userForStartTimezone = await User.findById(userId).select('timezone')
+    const startResponseUserTimezone = userForStartTimezone?.timezone || 'UTC'
+
     return NextResponse.json({
       message: 'Timer started successfully',
       activeTimer: {
@@ -612,6 +641,7 @@ console.log('activeTimer',activeTimer);
         currentDuration: 0,
         isPaused: false
       },
+      userTimezone: startResponseUserTimezone,
       notificationSent: shouldNotifyStart
     })
   } catch (error) {
@@ -640,26 +670,31 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'No active timer found' }, { status: 404 })
     }
 
-    const autoStopResult = await enforceMaxSessionLimit(activeTimer)
+    // Get user's timezone
+    const userForTimezone = await User.findById(userId).select('timezone')
+    const userTimezonePUT = userForTimezone?.timezone || 'UTC'
+
+    const autoStopResult = await enforceMaxSessionLimit(activeTimer, userTimezonePUT)
     if (autoStopResult) {
       return NextResponse.json(autoStopResult.body, { status: autoStopResult.status })
     }
 
     const now = new Date()
+    const nowInUserTimezone = zonedTimeToUtc(now, userTimezonePUT)
 
     switch (action) {
       case 'pause':
         if (activeTimer.pausedAt) {
           return NextResponse.json({ error: 'Timer is already paused' }, { status: 400 })
         }
-        activeTimer.pausedAt = now
+        activeTimer.pausedAt = nowInUserTimezone
         break
 
       case 'resume':
         if (!activeTimer.pausedAt) {
           return NextResponse.json({ error: 'Timer is not paused' }, { status: 400 })
         }
-        const pausedDuration = (now.getTime() - activeTimer.pausedAt.getTime()) / (1000 * 60)
+        const pausedDuration = (nowInUserTimezone.getTime() - activeTimer.pausedAt.getTime()) / (1000 * 60)
         activeTimer.totalPausedDuration += pausedDuration
         activeTimer.pausedAt = undefined
         break
@@ -669,7 +704,8 @@ export async function PUT(request: NextRequest) {
           description,
           category,
           tags,
-          reason: 'manual'
+          reason: 'manual',
+          userTimezone: userTimezonePUT
         })
         return NextResponse.json(stopResult.body, { status: stopResult.status })
       }
@@ -686,9 +722,13 @@ export async function PUT(request: NextRequest) {
 
     await activeTimer.save()
 
-    // Calculate current duration
-    const baseDuration = (now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60)
+    // Calculate current duration using user's timezone
+    const baseDuration = (nowInUserTimezone.getTime() - activeTimer.startTime.getTime()) / (1000 * 60)
     const currentDuration = Math.max(0, baseDuration - activeTimer.totalPausedDuration)
+
+    // Get user's timezone for timezone-aware operations
+    const userForUpdateTimezone = await User.findById(userId).select('timezone')
+    const updateUserTimezone = userForUpdateTimezone?.timezone || 'UTC'
 
     return NextResponse.json({
       message: 'Timer updated successfully',
@@ -696,7 +736,8 @@ export async function PUT(request: NextRequest) {
         ...activeTimer.toObject(),
         currentDuration,
         isPaused: !!activeTimer.pausedAt
-      }
+      },
+      userTimezone: userTimezonePUT
     })
   } catch (error) {
     console.error('Error updating timer:', error)

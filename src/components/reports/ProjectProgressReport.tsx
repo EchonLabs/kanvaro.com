@@ -4,27 +4,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/Badge'
 import { Progress } from '@/components/ui/Progress'
 import { Button } from '@/components/ui/Button'
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   LineChart,
   Line,
   Area,
   AreaChart
 } from 'recharts'
-import { 
-  FolderOpen, 
-  CheckCircle, 
-  Clock, 
+import {
+  FolderOpen,
+  CheckCircle,
+  Clock,
   Target,
   TrendingUp,
   Calendar
 } from 'lucide-react'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 
 interface Project {
   _id: string
@@ -68,6 +69,8 @@ interface ProjectProgressReportProps {
 }
 
 export function ProjectProgressReport({ projects, filters }: ProjectProgressReportProps) {
+  const { formatDate } = useDateTime()
+
   // Prepare data for charts
   const progressData = projects.map(project => ({
     name: project.name.length > 15 ? project.name.substring(0, 15) + '...' : project.name,
@@ -104,9 +107,9 @@ export function ProjectProgressReport({ projects, filters }: ProjectProgressRepo
   }))
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Progress Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Projects</CardTitle>
@@ -169,7 +172,7 @@ export function ProjectProgressReport({ projects, filters }: ProjectProgressRepo
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Project Completion Rates */}
         <Card>
           <CardHeader>
@@ -272,7 +275,7 @@ export function ProjectProgressReport({ projects, filters }: ProjectProgressRepo
           <CardDescription className="text-xs sm:text-sm">Detailed progress tracking for each project</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {projects.map((project) => (
               <div key={project._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4">
                 <div className="flex-1 min-w-0 w-full sm:w-auto">
@@ -284,7 +287,7 @@ export function ProjectProgressReport({ projects, filters }: ProjectProgressRepo
                     {project.endDate && (
                       <Badge variant="outline" className="flex items-center space-x-1 flex-shrink-0">
                         <Calendar className="h-3 w-3" />
-                        <span className="text-xs sm:text-sm">Due: {new Date(project.endDate).toLocaleDateString()}</span>
+                        <span className="text-xs sm:text-sm">Due: {formatDate(project.endDate)}</span>
                       </Badge>
                     )}
                   </div>

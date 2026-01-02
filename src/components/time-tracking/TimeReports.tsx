@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { BarChart3, PieChart, TrendingUp, Download, Calendar, Users, DollarSign, Clock } from 'lucide-react'
+import { BarChart3, PieChart, TrendingUp, Download, Calendar, Users, DollarSign, Clock, X, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/Badge'
@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules } from '@/lib/utils'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 
 interface TimeReportsProps {
   userId?: string
@@ -88,6 +89,7 @@ interface ReportData {
     endTime: string
     duration: number
     hourlyRate: number
+    rateSource: string
     cost: number
     notes: string
     isBillable: boolean
@@ -99,6 +101,23 @@ interface ReportData {
 export function TimeReports({ userId, organizationId, projectId }: TimeReportsProps) {
   const { organization } = useOrganization()
   const { formatCurrency } = useOrgCurrency()
+  const { formatDate, formatTime, formatDuration: formatDurationUtil } = useDateTime()
+
+  // Function to determine hourly rate source explanation
+  const getHourlyRateSource = (entry: any) => {
+    switch (entry.rateSource) {
+      case 'project-member':
+        return 'Project member rate'
+      case 'project':
+        return 'Project default rate'
+      case 'user':
+        return 'User default rate'
+      case 'organization':
+        return 'Organization default rate'
+      default:
+        return 'Rate applied'
+    }
+  }
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -120,6 +139,47 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     taskId: 'all'
   })
 
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 50, // Default to 50 entries per page
+    total: 0,
+    totalPages: 0
+  })
+
+  const [detailedEntriesPagination, setDetailedEntriesPagination] = useState({
+    page: 1,
+    limit: 10, // Default to 10 entries per page for detailed view
+    total: 0,
+    totalPages: 0
+  })
+
+  // Check if any filters are active (not default values)
+  const hasActiveFilters = useMemo(() => {
+    return filters.startDate !== '' ||
+           filters.endDate !== '' ||
+           filters.projectId !== (projectId || 'all') ||
+           filters.assignedTo !== (userId || 'all') ||
+           filters.assignedBy !== 'all' ||
+           filters.taskId !== 'all'
+  }, [filters, projectId, userId])
+
+  // Reset all filters to default values
+  const resetFilters = () => {
+    setFilters({
+      startDate: '',
+      endDate: '',
+      reportType: 'detailed',
+      projectId: projectId || 'all',
+      assignedTo: userId || 'all',
+      assignedBy: 'all',
+      taskId: 'all'
+    })
+    setProjectFilterQuery('')
+    setAssignedToFilterQuery('')
+    setAssignedByFilterQuery('')
+    setTaskFilterQuery('')
+  }
+
   const loadReport = useCallback(async () => {
     setIsLoading(true)
     setError('')
@@ -127,7 +187,9 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     try {
       const params = new URLSearchParams({
         organizationId,
-        reportType: filters.reportType
+        reportType: filters.reportType,
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString()
       })
 
       if (filters.projectId && filters.projectId !== 'all') params.append('projectId', filters.projectId)
@@ -154,6 +216,11 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
         if (data.organizationCurrency) {
           setOrgCurrency(data.organizationCurrency)
         }
+
+        // Set pagination from API response
+        if (data.pagination) {
+          setPagination(data.pagination)
+        }
       } else {
         setError(data?.error || 'Failed to load report')
       }
@@ -167,6 +234,35 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   useEffect(() => {
     loadReport()
   }, [loadReport])
+
+  // Reset pagination to page 1 when filters change
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, page: 1 }))
+    setDetailedEntriesPagination(prev => ({ ...prev, page: 1 }))
+  }, [filters.startDate, filters.endDate, filters.projectId, filters.assignedTo, filters.assignedBy, filters.taskId])
+
+  // Update detailed entries pagination when reportData changes
+  useEffect(() => {
+    if (reportData?.detailedEntries) {
+      const total = reportData.detailedEntries.length
+      const totalPages = Math.ceil(total / detailedEntriesPagination.limit)
+      setDetailedEntriesPagination(prev => ({
+        ...prev,
+        total,
+        totalPages,
+        page: Math.min(prev.page, totalPages || 1)
+      }))
+    }
+  }, [reportData?.detailedEntries])
+
+  // Get paginated detailed entries
+  const getPaginatedDetailedEntries = useMemo(() => {
+    if (!reportData?.detailedEntries) return []
+
+    const startIndex = (detailedEntriesPagination.page - 1) * detailedEntriesPagination.limit
+    const endIndex = startIndex + detailedEntriesPagination.limit
+    return reportData.detailedEntries.slice(startIndex, endIndex)
+  }, [reportData?.detailedEntries, detailedEntriesPagination.page, detailedEntriesPagination.limit])
 
   // Load organization currency and debug
   useEffect(() => {
@@ -274,7 +370,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   const formatDuration = (minutes: number) => {
     // Apply rounding rules if enabled
     let displayMinutes = minutes
-    const roundingRules = organization?.settings?.timeTracking?.roundingRules
+    const roundingRules = (organization?.settings as any)?.roundingRules
     if (roundingRules?.enabled) {
       displayMinutes = applyRoundingRules(minutes, {
         enabled: roundingRules.enabled,
@@ -344,7 +440,62 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
 
   const handleExport = async () => {
     try {
-      // Always export detailed entries format
+      if (reportData?.detailedEntries && reportData.detailedEntries.length > 0) {
+        const headers = [
+          'Employee Name',
+          'Employee Email',
+          'Project',
+          'Task',
+          'Date',
+          'Start Time',
+          'End Time',
+          'Duration',
+          'Hourly Rate',
+          'Rate Source',
+          'Cost',
+          'Billable',
+          'Notes'
+        ]
+
+        const sanitize = (value: string | number | null | undefined) => {
+          if (value === null || value === undefined) return ''
+          return String(value).replace(/"/g, '""')
+        }
+
+        const rows = reportData.detailedEntries.map(entry => [
+          sanitize(entry.userName),
+          sanitize(entry.userEmail),
+          sanitize(entry.projectName),
+          sanitize(entry.taskTitle || ''),
+          sanitize(formatDate(entry.date)),
+          sanitize(entry.startTime ? formatTime(entry.startTime) : '-'),
+          sanitize(entry.endTime ? formatTime(entry.endTime) : '-'),
+          sanitize(formatDurationUtil(entry.duration)),
+          sanitize(`${formatCurrency(entry.hourlyRate, orgCurrency)}/hr`),
+          sanitize(getHourlyRateSource(entry)),
+          sanitize(formatCurrency(entry.cost, orgCurrency)),
+          sanitize(entry.isBillable ? 'Yes' : 'No'),
+          sanitize(entry.notes || '')
+        ])
+
+        const csvContent = [headers, ...rows]
+          .map(row => row.map(value => `"${value}"`).join(','))
+          .join('\r\n')
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+        a.download = `All_time_log_${timestamp}.csv`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        return
+      }
+
+      // Fallback to server export if no detailed entries are loaded yet
       const params = new URLSearchParams({
         organizationId,
         reportType: 'detailed',
@@ -391,7 +542,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Filters */}
       <Card>
         <CardHeader>
@@ -400,14 +551,14 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
             Time Tracking Reports
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div>
               <Label htmlFor="startDate">Start Date</Label>
               <Input
@@ -558,7 +709,29 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
               </Select>
             </div>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setFilters({
+                  startDate: '',
+                  endDate: '',
+                  reportType: 'detailed',
+                  projectId: 'all',
+                  taskId: 'all',
+                  assignedTo: 'all',
+                  assignedBy: 'all'
+                })
+                setProjectFilterQuery('')
+                setTaskFilterQuery('')
+                setAssignedToFilterQuery('')
+                setAssignedByFilterQuery('')
+              }}
+              title="Clear all filters"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
             <Button onClick={handleExport}>
               <Download className="h-4 w-4 mr-2" />
               Export CSV
@@ -569,7 +742,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
 
       {/* Summary Widgets */}
       {reportData && filters.reportType === 'detailed' && reportData.detailedEntries && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -589,8 +762,9 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 <div className="ml-4">
                   <p className="text-sm font-medium text-muted-foreground">Total Cost</p>
                   <p className="text-2xl font-bold">{(() => {
-                    const formatted = formatCurrency(summaryStats.totalCost, orgCurrency);
-                    return formatted;
+                    // Use API summary total cost if available, otherwise fall back to calculated
+                    const totalCost = reportData.summary?.totalCost ?? summaryStats.totalCost;
+                    return formatCurrency(totalCost, orgCurrency);
                   })()}</p>
                 </div>
               </div>
@@ -628,74 +802,115 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
         <Card>
           <CardHeader>
             <CardTitle>Approved Time Entries</CardTitle>
+            <CardDescription>
+              Shows approved entries and entries from projects that don't require approval
+            </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Results Count */}
+            <div className="flex items-center justify-between mb-4 pb-3 border-b">
+              <div className="text-sm text-muted-foreground">
+                {reportData.detailedEntries && reportData.detailedEntries.length > 0 ? (
+                  <span>
+                    Showing <span className="font-medium text-foreground">{getPaginatedDetailedEntries.length}</span> of{' '}
+                    <span className="font-medium text-foreground">{reportData.summary?.totalEntries || reportData.detailedEntries.length}</span> time entries
+                    {detailedEntriesPagination.page > 1 && (
+                      <span className="ml-2 text-xs">
+                        (Page {detailedEntriesPagination.page} of {Math.ceil(reportData.detailedEntries.length / detailedEntriesPagination.limit)})
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span>No time entries found</span>
+                )}
+              </div>
+              {hasActiveFilters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={resetFilters}
+                  className="text-xs"
+                >
+                  <X className="h-3 w-3 mr-1" />
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+
             {reportData.detailedEntries.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No approved time entries found for the selected filters.
+                No time entries found for the selected filters.
+                <div className="text-sm mt-2">
+                  This includes both approved entries and entries from projects that don't require approval.
+                </div>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <div className="min-w-full">
                   {/* Desktop Table View */}
                   <div className="hidden md:block">
-                    <div className="grid grid-cols-12 gap-4 p-4 border-b font-semibold text-sm text-muted-foreground">
+                    <div className="grid grid-cols-11 gap-4 p-4 border-b font-semibold text-sm text-muted-foreground">
                       <div className="col-span-2">Employee</div>
-                      <div className="col-span-2">Project (Task)</div>
+                      <div className="col-span-3">Project (Task)</div>
                       <div className="col-span-1">Date</div>
                       <div className="col-span-1">Start</div>
                       <div className="col-span-1">End</div>
                       <div className="col-span-1">Duration</div>
+                      <div className="col-span-1">Rate</div>
                       <div className="col-span-1">Cost</div>
                       <div className="col-span-1">Billable</div>
-                      <div className="col-span-2">Notes</div>
                     </div>
-                    {reportData.detailedEntries.map((entry) => (
-                      <div key={entry._id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-muted/50">
+                    {getPaginatedDetailedEntries.map((entry) => (
+                      <div key={entry._id} className="grid grid-cols-11 gap-4 p-4 border-b hover:bg-muted/50">
                         <div className="col-span-2">
                           <div className="font-medium text-sm">{entry.userName}</div>
                           <div className="text-xs text-muted-foreground">{entry.userEmail}</div>
                         </div>
-                        <div className="col-span-2">
+                        <div className="col-span-3">
                           <div className="font-medium text-sm">{entry.projectName}</div>
                           {entry.taskTitle && (
                             <div className="text-xs text-muted-foreground">{entry.taskTitle}</div>
                           )}
                         </div>
                         <div className="col-span-1 text-sm">
-                          {new Date(entry.date).toLocaleDateString()}
+                          {formatDate(entry.date)}
                         </div>
                         <div className="col-span-1 text-sm">
-                          {entry.startTime ? new Date(entry.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                          {entry.startTime ? formatTime(entry.startTime) : '-'}
                         </div>
                         <div className="col-span-1 text-sm">
-                          {entry.endTime ? new Date(entry.endTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                          {entry.endTime ? formatTime(entry.endTime) : '-'}
                         </div>
                         <div className="col-span-1 text-sm font-medium">
-                          {formatDuration(entry.duration)}
+                          {formatDurationUtil(entry.duration)}
+                        </div>
+                        <div className="col-span-1 text-sm">
+                          <div className="flex flex-col">
+                            <span className="font-medium">{formatCurrency(entry.hourlyRate, orgCurrency)}/hr</span>
+                            <span className="text-xs text-muted-foreground">
+                              {getHourlyRateSource(entry)}
+                            </span>
+                          </div>
                         </div>
                         <div className="col-span-1 text-sm font-medium">
                           {formatCurrency(entry.cost, orgCurrency)}
                         </div>
                         <div className="col-span-1">
                           {entry.isBillable ? (
-                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
+                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-400">
                               Yes
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="text-xs">No</Badge>
                           )}
                         </div>
-                        <div className="col-span-2 text-sm text-muted-foreground truncate" title={entry.notes}>
-                          {entry.notes || '-'}
-                        </div>
                       </div>
                     ))}
                   </div>
 
                   {/* Mobile Card View */}
-                  <div className="md:hidden space-y-4">
-                    {reportData.detailedEntries.map((entry) => (
+                  <div className="md:hidden space-y-5">
+                    {getPaginatedDetailedEntries.map((entry) => (
                       <div key={entry._id} className="border rounded-lg p-4 space-y-3">
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
@@ -703,7 +918,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                             <div className="text-xs text-muted-foreground">{entry.userEmail}</div>
                           </div>
                           {entry.isBillable && (
-                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
+                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-400">
                               Billable
                             </Badge>
                           )}
@@ -717,27 +932,28 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div>
                             <span className="text-muted-foreground">Date: </span>
-                            <span>{new Date(entry.date).toLocaleDateString()}</span>
+                            <span>{formatDate(entry.date)}</span>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Duration: </span>
-                            <span className="font-medium">{formatDuration(entry.duration)}</span>
+                            <span className="font-medium">{formatDurationUtil(entry.duration)}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Rate: </span>
+                            <span className="font-medium">{formatCurrency(entry.hourlyRate, orgCurrency)}/hr</span>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Start: </span>
-                            <span>{entry.startTime ? new Date(entry.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-'}</span>
+                            <span>{entry.startTime ? formatTime(entry.startTime) : '-'}</span>
                           </div>
-                          <div>
+                          <div className="col-span-2">
                             <span className="text-muted-foreground">Cost: </span>
                             <span className="font-medium">{formatCurrency(entry.cost, orgCurrency)}</span>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Cost = {formatDurationUtil(entry.duration)} × {formatCurrency(entry.hourlyRate, orgCurrency)}/hr
+                            </div>
                           </div>
                         </div>
-                        {entry.notes && (
-                          <div className="text-sm text-muted-foreground">
-                            <span className="font-medium">Notes: </span>
-                            {entry.notes}
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -745,6 +961,61 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
               </div>
             )}
           </CardContent>
+
+          {/* Pagination Controls */}
+          {detailedEntriesPagination.total > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 pb-6">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Items per page:</span>
+                  <Select
+                    value={detailedEntriesPagination.limit.toString()}
+                    onValueChange={(value) => {
+                      const newLimit = parseInt(value)
+                      setDetailedEntriesPagination(prev => ({
+                        ...prev,
+                        limit: newLimit,
+                        page: 1 // Reset to first page when changing limit
+                      }))
+                    }}
+                  >
+                    <SelectTrigger className="w-16 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Showing {((detailedEntriesPagination.page - 1) * detailedEntriesPagination.limit) + 1} to {Math.min(detailedEntriesPagination.page * detailedEntriesPagination.limit, detailedEntriesPagination.total)} of {detailedEntriesPagination.total}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDetailedEntriesPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                  disabled={detailedEntriesPagination.page === 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {detailedEntriesPagination.page} of {detailedEntriesPagination.totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDetailedEntriesPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                  disabled={detailedEntriesPagination.page === detailedEntriesPagination.totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 

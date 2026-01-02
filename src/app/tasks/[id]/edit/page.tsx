@@ -9,13 +9,13 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useNotify } from '@/lib/notify'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { AttachmentList } from '@/components/ui/AttachmentList'
-import { Loader2, ArrowLeft, CheckCircle, Plus, Trash2, Target, User, Clock, Calendar, Paperclip, AlertTriangle, X } from 'lucide-react'
+import { Loader2, ArrowLeft, CheckCircle, Plus, Trash2, Target, User, Clock, Calendar, Paperclip, X } from 'lucide-react'
 
 const STATUS_OPTIONS = [
-  { value: 'backlog', label: 'Backlog' },
+  { value: 'backlog', label: 'backlog' },
   { value: 'todo', label: 'To Do' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'review', label: 'Review' },
@@ -45,6 +45,7 @@ interface User {
   firstName: string
   lastName: string
   email: string
+  projectHourlyRate?: number
 }
 
 interface Project {
@@ -83,6 +84,7 @@ interface TaskFormState {
   estimatedHours?: number
   story?: string
   epic?: string
+  isBillable?: boolean
   // storyPoints?: number
 }
 
@@ -99,6 +101,7 @@ const mapTaskFormState = (data: any): TaskFormState => ({
   estimatedHours: typeof data?.estimatedHours === 'number' ? data.estimatedHours : undefined,
   story: data?.story?._id ?? data?.story ?? undefined,
   epic: data?.epic?._id ?? data?.epic ?? undefined,
+  isBillable: typeof data?.isBillable === 'boolean' ? data.isBillable : undefined,
  // storyPoints: typeof data?.storyPoints === 'number' ? data.storyPoints : undefined
 })
 
@@ -207,29 +210,69 @@ const mapCurrentUser = (input: any): CurrentUser | null => {
   }
 }
 
-const extractAssigneeIds = (data: any): string[] => {
-  const ids: string[] = []
-  if (Array.isArray(data?.assignees)) {
-    data.assignees.forEach((assignee: any) => {
-      const id =
-        typeof assignee === 'string'
-          ? assignee
-          : typeof assignee?._id === 'string'
-            ? assignee._id
-            : undefined
-      if (id) ids.push(String(id))
+const extractAssigneeObjects = (data: any): Array<{
+  _id: string
+  firstName: string
+  lastName: string
+  email: string
+  hourlyRate?: string
+}> => {
+  const assignees: Array<{
+    _id: string
+    firstName: string
+    lastName: string
+    email: string
+    hourlyRate?: string
+  }> = []
+
+  if (Array.isArray(data?.assignedTo)) {
+    data.assignedTo.forEach((assignee: any) => {
+
+      let userId: string | undefined
+      let firstName: string = ''
+      let lastName: string = ''
+      let email: string = ''
+      let hourlyRate: string | undefined
+
+      // New format: { user: populated User object, firstName, lastName, email, hourlyRate }
+      if (typeof assignee === 'object' && assignee?.user) {
+        if (typeof assignee.user === 'object' && assignee.user._id) {
+          // Populated user object
+          userId = String(assignee.user._id)
+          firstName = assignee.user.firstName || assignee.firstName || ''
+          lastName = assignee.user.lastName || assignee.lastName || ''
+          email = assignee.user.email || assignee.email || ''
+        } else {
+          // User ObjectId string
+          userId = String(assignee.user)
+          firstName = assignee.firstName || ''
+          lastName = assignee.lastName || ''
+          email = assignee.email || ''
+        }
+        hourlyRate = assignee.hourlyRate !== undefined ? String(assignee.hourlyRate) : undefined
+      }
+      // Legacy format: direct ObjectId
+      else if (typeof assignee === 'string') {
+        userId = assignee
+      }
+      // Legacy format: { _id: ObjectId }
+      else if (typeof assignee === 'object' && assignee?._id) {
+        userId = String(assignee._id)
+        hourlyRate = assignee.hourlyRate !== undefined ? String(assignee.hourlyRate) : undefined
+      }
+
+      if (userId) {
+        assignees.push({
+          _id: userId,
+          firstName,
+          lastName,
+          email,
+          hourlyRate
+        })
+      }
     })
   }
-  if (ids.length === 0 && data?.assignedTo) {
-    const single =
-      typeof data.assignedTo === 'string'
-        ? data.assignedTo
-        : typeof data.assignedTo?._id === 'string'
-          ? data.assignedTo._id
-          : undefined
-    if (single) ids.push(String(single))
-  }
-  return ids
+  return assignees
 }
 
 export default function EditTaskPage() {
@@ -240,6 +283,7 @@ export default function EditTaskPage() {
 
   const [task, setTask] = useState<TaskFormState | null>(null)
   const [originalTask, setOriginalTask] = useState<TaskFormState | null>(null)
+  const [taskHasSprint, setTaskHasSprint] = useState(false)
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
   const [originalSubtasks, setOriginalSubtasks] = useState<Subtask[]>([])
   const [users, setUsers] = useState<User[]>([])
@@ -254,28 +298,52 @@ export default function EditTaskPage() {
   const [epicQuery, setEpicQuery] = useState('')
   const [projectFilterQuery, setProjectFilterQuery] = useState('')
   const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
-  const [assignedToIds, setAssignedToIds] = useState<string[]>([])
-  const [originalAssignedToIds, setOriginalAssignedToIds] = useState<string[]>([])
+  const [assignedTo, setAssignedTo] = useState<Array<{
+    _id: string
+    firstName: string
+    lastName: string
+    email: string
+    hourlyRate?: string
+  }>>([])
+  const [originalAssignedTo, setOriginalAssignedTo] = useState<Array<{
+    _id: string
+    firstName: string
+    lastName: string
+    email: string
+    hourlyRate?: string
+  }>>([])
+  const [assigneeHourlyRates, setAssigneeHourlyRates] = useState<Record<string, string>>({})
   const [labelsInput, setLabelsInput] = useState('')
   const [attachments, setAttachments] = useState<AttachmentDraft[]>([])
   const [originalAttachments, setOriginalAttachments] = useState<AttachmentDraft[]>([])
-  const [attachmentError, setAttachmentError] = useState('')
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
 
+  // Use the notification hook
+  const { success: notifySuccess, error: notifyError } = useNotify()
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
 
-  const updateAssignees = useCallback((updater: (prev: string[]) => string[]) => {
-    setAssignedToIds(prev => {
+  const updateAssignees = useCallback((updater: (prev: Array<{
+    _id: string
+    firstName: string
+    lastName: string
+    email: string
+    hourlyRate?: string
+  }>) => Array<{
+    _id: string
+    firstName: string
+    lastName: string
+    email: string
+    hourlyRate?: string
+  }>) => {
+    setAssignedTo(prev => {
       const next = updater(prev)
-      setTask(prevTask => prevTask ? ({ ...prevTask, assignedTo: next[0] }) : prevTask)
       return next
     })
-  }, [setTask])
+  }, [])
 
   const fetchTask = useCallback(async () => {
     // Set breadcrumb
@@ -293,27 +361,31 @@ export default function EditTaskPage() {
         const mappedTask = mapTaskFormState(data.data)
         const mappedSubtasks = mapSubtasksFromResponse(data.data?.subtasks)
         const mappedAttachments = mapAttachmentsFromResponse(data.data?.attachments)
-        const initialAssignees = extractAssigneeIds(data.data)
+        const initialAssignees = extractAssigneeObjects(data.data)
         const normalizedTask = {
           ...mappedTask,
-          assignedTo: initialAssignees[0] ?? mappedTask.assignedTo
+          assignedTo: initialAssignees[0]?._id ?? mappedTask.assignedTo
         }
 
         setTask(normalizedTask)
         setOriginalTask(normalizedTask)
+        setTaskHasSprint(!!data.data?.sprint)
         setSubtasks(mappedSubtasks)
         setOriginalSubtasks(mappedSubtasks)
         setAttachments(mappedAttachments)
         setOriginalAttachments(mappedAttachments)
         setLabelsInput(Array.isArray(data.data?.labels) ? data.data.labels.join(', ') : '')
-        const initialAssigneeState = initialAssignees.length > 0
-          ? initialAssignees
-          : normalizedTask.assignedTo
-            ? [normalizedTask.assignedTo]
-            : []
-        updateAssignees(() => initialAssigneeState)
-        setOriginalAssignedToIds(initialAssigneeState)
-        setError('')
+        updateAssignees(() => initialAssignees)
+        setOriginalAssignedTo(initialAssignees)
+
+        // Initialize hourly rates
+        const initialRates: Record<string, string> = {}
+        initialAssignees.forEach(assignee => {
+          if (assignee.hourlyRate !== undefined) {
+            initialRates[assignee._id] = assignee.hourlyRate
+          }
+        })
+        setAssigneeHourlyRates(initialRates)
         // Reset filter queries
         setProjectFilterQuery('')
         setAssignedToFilterQuery('')
@@ -333,10 +405,10 @@ export default function EditTaskPage() {
           setEpics([])
         }
       } else {
-        setError(data.error || 'Failed to load task')
+        notifyError({ title: 'Failed to Load Task', message: data.error || 'Failed to load task' })
       }
     } catch (e) {
-      setError('Failed to load task')
+      notifyError({ title: 'Failed to Load Task', message: 'Failed to load task' })
     } finally {
       setLoading(false)
     }
@@ -404,50 +476,53 @@ export default function EditTaskPage() {
       updateAssignees(() => [])
       return
     }
-    
+
     setLoadingUsers(true)
     try {
       const response = await fetch(`/api/projects/${projectId}`)
       const data = await response.json()
-      
+
       if (!response.ok || !data.success || !data.data) {
         setUsers([])
         updateAssignees(() => [])
         return
       }
-      
-      const rawMembers = Array.isArray(data.data.teamMembers) 
-        ? data.data.teamMembers 
+
+      const rawMembers = Array.isArray(data.data.teamMembers)
+        ? data.data.teamMembers
         : []
-      
+
+      // Transform populated team members data
       const teamMembers: User[] = rawMembers
-        .map((member: any) => {
-          const userObj = member.user || member
-          const userId = userObj?._id || member?._id
-          const firstName = userObj?.firstName || member?.firstName
-          const lastName = userObj?.lastName || member?.lastName
-          const email = userObj?.email || member?.email
-          
-          if (!userId || !firstName || !lastName) {
-            return null
-          }
-          
-          return {
-            _id: String(userId),
-            firstName: String(firstName),
-            lastName: String(lastName),
-            email: email ? String(email) : ''
-          }
-        })
-        .filter((member: User | null): member is User => member !== null)
-      
+        .map((member: any) => ({
+          _id: String(member.memberId._id),
+          firstName: member.memberId.firstName,
+          lastName: member.memberId.lastName,
+          email: member.memberId.email || '',
+          projectHourlyRate: member.hourlyRate
+        }))
+        .filter((member: User): boolean => Boolean(member._id && member.firstName && member.lastName))
+
       setUsers(teamMembers)
-      
+
+      // Set billable default from project
+      const billableDefault = typeof data.data.isBillableByDefault === 'boolean' ? data.data.isBillableByDefault : true
+      setTask((prev) => prev ? ({ ...prev, isBillable: billableDefault }) : prev)
+
       updateAssignees((prev) => {
-        const valid = prev.filter(id => teamMembers.some((member) => String(member._id) === String(id)))
+        const valid = prev.filter(assignee => teamMembers.some((member) => String(member._id) === String(assignee._id)))
         const preserveId = preserveAssigneeId ? String(preserveAssigneeId) : undefined
-        if (preserveId && teamMembers.some((member) => String(member._id) === preserveId) && !valid.includes(preserveId)) {
-          valid.push(preserveId)
+        if (preserveId && teamMembers.some((member) => String(member._id) === preserveId)) {
+          const preservedMember = teamMembers.find(m => String(m._id) === preserveId)
+          if (preservedMember && !valid.some(v => v._id === preserveId)) {
+            valid.push({
+              _id: preservedMember._id,
+              firstName: preservedMember.firstName,
+              lastName: preservedMember.lastName,
+              email: preservedMember.email,
+              hourlyRate: assigneeHourlyRates[preserveId] || ''
+            })
+          }
         }
         return valid
       })
@@ -492,7 +567,7 @@ export default function EditTaskPage() {
 
     setLoadingEpics(true)
     try {
-      const response = await fetch(`/api/epics?project=${projectId}`)
+      const response = await fetch(`/api/epics?project=${encodeURIComponent(projectId)}&limit=100`)
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
@@ -612,11 +687,10 @@ export default function EditTaskPage() {
     event.target.value = ''
 
     try {
-      setAttachmentError('')
       setIsUploadingAttachment(true)
       await uploadAttachmentFile(file)
     } catch (err) {
-      setAttachmentError(err instanceof Error ? err.message : 'Failed to upload attachment')
+      notifyError({ title: 'Upload Failed', message: err instanceof Error ? err.message : 'Failed to upload attachment' })
     } finally {
       setIsUploadingAttachment(false)
     }
@@ -624,11 +698,11 @@ export default function EditTaskPage() {
 
   const handleAttachmentButtonClick = useCallback(() => {
     if (!currentUser) {
-      setAttachmentError('User information is still loading. Please try again shortly.')
+      notifyError({ title: 'User Loading', message: 'User information is still loading. Please try again shortly.' })
       return
     }
     attachmentInputRef.current?.click()
-  }, [currentUser])
+  }, [currentUser, notifyError])
 
   const handleAttachmentDelete = useCallback((index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index))
@@ -638,18 +712,17 @@ export default function EditTaskPage() {
     if (!task) return
 
     if (!task.project) {
-      setError('Project is required')
+      notifyError({ title: 'Validation Error', message: 'Project is required' })
       return
     }
-    
-    if (assignedToIds.length === 0) {
-      setError('Please assign this task to at least one team member')
+
+    if (assignedTo.length === 0) {
+      notifyError({ title: 'Validation Error', message: 'Please assign this task to at least one team member' })
       return
     }
 
     try {
       setSaving(true)
-      setError('')
       const preparedSubtasks = sanitizeSubtasksForPayload(subtasks)
       const preparedAttachments = attachments
         .filter((attachment) => attachment.name && attachment.url)
@@ -678,11 +751,17 @@ export default function EditTaskPage() {
           priority: task.priority,
           type: task.type,
           project: task.project || undefined,
-          assignedTo: assignedToIds[0],
-          assignees: assignedToIds.length > 1 ? assignedToIds : undefined,
+          assignedTo: assignedTo.map(assignee => ({
+            user: assignee._id,
+            firstName: assignee.firstName,
+            lastName: assignee.lastName,
+            email: assignee.email,
+            hourlyRate: assignee.hourlyRate ? parseFloat(assignee.hourlyRate) : undefined
+          })),
           dueDate: task.dueDate || undefined,
           labels: labels,
           estimatedHours: task.estimatedHours || undefined,
+          isBillable: task.isBillable,
         //  storyPoints: task.storyPoints || undefined,
           story: task.story || undefined,
           epic: task.epic || undefined,
@@ -699,7 +778,7 @@ export default function EditTaskPage() {
         const mappedTask = mapTaskFormState(data.data)
         const mappedSubtasks = mapSubtasksFromResponse(data.data?.subtasks)
         const mappedAttachments = mapAttachmentsFromResponse(data.data?.attachments)
-        const updatedAssignees = extractAssigneeIds(data.data)
+        const updatedAssignees = extractAssigneeObjects(data.data)
 
         setTask(mappedTask)
         setOriginalTask(mappedTask)
@@ -709,17 +788,16 @@ export default function EditTaskPage() {
         setOriginalAttachments(mappedAttachments)
         setLabelsInput(Array.isArray(data.data?.labels) ? data.data.labels.join(', ') : '')
         updateAssignees(() => updatedAssignees)
-        setOriginalAssignedToIds(updatedAssignees)
-        setSuccess('Task updated successfully')
-        setError('')
+        setOriginalAssignedTo(updatedAssignees)
+        notifySuccess({ title: 'Task Updated', message: 'Task updated successfully' })
         setTimeout(() => {
           router.push('/tasks?success=Task%20updated%20successfully')
         }, 1200)
       } else {
-        setError(data.error || 'Failed to save task')
+        notifyError({ title: 'Failed to Save Task', message: data.error || 'Failed to save task' })
       }
     } catch (e) {
-      setError('Failed to save task')
+      notifyError({ title: 'Failed to Save Task', message: 'Failed to save task' })
     } finally {
       setSaving(false)
     }
@@ -754,7 +832,7 @@ export default function EditTaskPage() {
     const originalLabelsStr = Array.isArray(originalTask.labels) ? originalTask.labels.join(', ') : (originalTask.labels || '')
     const labelsChanged = labelsInput.trim() !== originalLabelsStr.trim()
     
-    const assigneesChanged = JSON.stringify(assignedToIds) !== JSON.stringify(originalAssignedToIds)
+    const assigneesChanged = JSON.stringify(assignedTo) !== JSON.stringify(originalAssignedTo)
     
     return taskChanged || subtasksChanged || labelsChanged || attachmentsChanged || assigneesChanged
   }, [
@@ -765,22 +843,16 @@ export default function EditTaskPage() {
     comparableCurrentAttachments,
     comparableOriginalAttachments,
     labelsInput,
-    assignedToIds,
-    originalAssignedToIds
+    assignedTo,
+    originalAssignedTo
   ])
 
   const isValid = useMemo(() => {
     if (!task) return false
     // Check all required fields
-    return !!(task.title?.trim() && task.project && assignedToIds.length > 0)
-  }, [task, assignedToIds])
+    return !!(task.title?.trim() && task.project && assignedTo.length > 0)
+  }, [task, assignedTo])
 
-  // Scroll to top to reveal status messages
-  useEffect(() => {
-    if (error || success) {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    }
-  }, [error, success])
 
   if (loading) {
     return (
@@ -795,16 +867,13 @@ export default function EditTaskPage() {
     )
   }
 
-  if (error || !task) {
+  if (!task) {
     return (
       <MainLayout>
         <div className="max-w-3xl mx-auto">
           <Button variant="ghost" onClick={() => router.back()} className="mb-4">
             <ArrowLeft className="h-4 w-4 mr-2" /> Back
           </Button>
-          <Alert variant="destructive">
-            <AlertDescription>{error || 'Task not found'}</AlertDescription>
-          </Alert>
         </div>
       </MainLayout>
     )
@@ -821,80 +890,9 @@ export default function EditTaskPage() {
           <CardHeader>
             <CardTitle>Edit Task</CardTitle>
           </CardHeader>
-          {(success || error) && (
-            <div className="px-6 -mt-4 mb-2 space-y-3">
-              {success && (
-                <Alert variant="success">
-                  <AlertDescription>{success}</AlertDescription>
-                </Alert>
-              )}
-              {!success && error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-            </div>
-          )}
           <CardContent className="space-y-6">
             <div className="grid gap-4">
-              <div>
-                <label className="text-sm font-medium">Title</label>
-                <Input
-                  value={task.title}
-                  onChange={(e) => setTask((prev) => prev ? ({ ...prev, title: e.target.value }) : prev)}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Description</label>
-                <Textarea
-                  value={task.description}
-                  onChange={(e) => setTask((prev) => prev ? ({ ...prev, description: e.target.value }) : prev)}
-                  className="mt-1"
-                  rows={4}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Status</label>
-                  <Select value={task.status} onValueChange={(v) => setTask((prev) => prev ? ({ ...prev, status: v as TaskStatus }) : prev)}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Priority</label>
-                  <Select value={task.priority} onValueChange={(v) => setTask((prev) => prev ? ({ ...prev, priority: v as TaskPriority }) : prev)}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="critical">Critical</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Type</label>
-                  <Select value={task.type} onValueChange={(v) => setTask((prev) => prev ? ({ ...prev, type: v as TaskType }) : prev)}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="task">Task</SelectItem>
-                      <SelectItem value="bug">Bug</SelectItem>
-                      <SelectItem value="feature">Feature</SelectItem>
-                      <SelectItem value="improvement">Improvement</SelectItem>
-                      <SelectItem value="subtask">Subtask</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+            <div>
                   <label className="text-sm font-medium flex items-center gap-2">
                     <Target className="h-4 w-4" />
                     Project *
@@ -972,6 +970,64 @@ export default function EditTaskPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              <div>
+                <label className="text-sm font-medium">Title</label>
+                <Input
+                  value={task.title}
+                  onChange={(e) => setTask((prev) => prev ? ({ ...prev, title: e.target.value }) : prev)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Description</label>
+                <Textarea
+                  value={task.description}
+                  onChange={(e) => setTask((prev) => prev ? ({ ...prev, description: e.target.value }) : prev)}
+                  className="mt-1"
+                  rows={4}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Status</label>
+                  <Select value={task.status} onValueChange={(v) => setTask((prev) => prev ? ({ ...prev, status: v as TaskStatus }) : prev)} disabled={!taskHasSprint}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Priority</label>
+                  <Select value={task.priority} onValueChange={(v) => setTask((prev) => prev ? ({ ...prev, priority: v as TaskPriority }) : prev)}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Type</label>
+                  <Select value={task.type} onValueChange={(v) => setTask((prev) => prev ? ({ ...prev, type: v as TaskType }) : prev)}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="task">Task</SelectItem>
+                      <SelectItem value="bug">Bug</SelectItem>
+                      <SelectItem value="feature">Feature</SelectItem>
+                      <SelectItem value="improvement">Improvement</SelectItem>
+                      <SelectItem value="subtask">Subtask</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
 
                 <div>
                   <label className="text-sm font-medium flex items-center gap-2">
@@ -982,8 +1038,18 @@ export default function EditTaskPage() {
                     <Select
                       value=""
                       onValueChange={(value) => {
-                        if (!assignedToIds.includes(value)) {
-                          updateAssignees(prev => [...prev, value])
+                        if (!assignedTo.some(assignee => assignee._id === value)) {
+                          const selectedUser = users.find(u => u._id === value)
+                          if (selectedUser) {
+                            console.log('Selected user:', selectedUser)
+                            updateAssignees(prev => [...prev, {
+                              _id: selectedUser._id,
+                              firstName: selectedUser.firstName,
+                              lastName: selectedUser.lastName,
+                              email: selectedUser.email,
+                              hourlyRate: assigneeHourlyRates[selectedUser._id] || ''
+                            }])
+                          }
                         }
                       }}
                       disabled={loadingUsers || !task.project}
@@ -1024,7 +1090,7 @@ export default function EditTaskPage() {
                                 </div>
                               ) : (
                                 filteredAssignedToOptions.map((member: User) => {
-                                  const isSelected = assignedToIds.includes(member._id)
+                                  const isSelected = assignedTo.some(assignee => assignee._id === member._id)
                                   return (
                                     <SelectItem
                                       key={member._id}
@@ -1049,28 +1115,26 @@ export default function EditTaskPage() {
                         </div>
                       </SelectContent>
                     </Select>
-                    {assignedToIds.length > 0 && (
+                    {assignedTo.length > 0 && (
                       <div className="flex flex-wrap gap-2">
-                        {assignedToIds.map((id: string) => {
-                          const member = users.find(u => u._id === id)
-                          if (!member) return null
+                        {assignedTo.map((assignee) => {
                           return (
-                            <span
-                              key={id}
-                              className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
+                          <span
+                            key={assignee._id}
+                            className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
+                          >
+                            <span>{assignee.firstName} {assignee.lastName}</span>
+                            <button
+                              type="button"
+                              aria-label="Remove assignee"
+                              className="text-muted-foreground hover:text-foreground focus:outline-none"
+                              onClick={() => {
+                                updateAssignees(prev => prev.filter((a) => a._id !== assignee._id))
+                              }}
                             >
-                              <span>{member.firstName} {member.lastName}</span>
-                              <button
-                                type="button"
-                                aria-label="Remove assignee"
-                                className="text-muted-foreground hover:text-foreground focus:outline-none"
-                                onClick={() => {
-                                  updateAssignees(prev => prev.filter((x: string) => x !== id))
-                                }}
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </span>
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
                           )
                         })}
                       </div>
@@ -1259,6 +1323,18 @@ export default function EditTaskPage() {
                   />
                 </div>
 
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Billable</label>
+                    <p className="text-xs text-muted-foreground">Override project default for this task.</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={task.isBillable || false}
+                    onChange={(e) => setTask((prev) => prev ? ({ ...prev, isBillable: e.target.checked }) : prev)}
+                  />
+                </div>
+
                 <div>
                   <label className="text-sm font-medium">Labels</label>
                   <Input
@@ -1300,14 +1376,6 @@ export default function EditTaskPage() {
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span>Uploading attachment...</span>
                   </div>
-                )}
-                {attachmentError && (
-                  <Alert variant="destructive">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>{attachmentError}</AlertDescription>
-                    </div>
-                  </Alert>
                 )}
                 <AttachmentList
                   attachments={attachmentListItems}

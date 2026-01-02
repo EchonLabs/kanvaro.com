@@ -10,6 +10,7 @@ import { TestPlanForm } from '@/components/test-management/TestPlanForm'
 import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmDialog'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Plus, Calendar, Users, CheckSquare, Edit, Trash2 } from 'lucide-react'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 
 interface TestPlan {
   _id?: string
@@ -37,6 +38,7 @@ export default function TestPlansPage() {
   const [testPlans, setTestPlans] = useState<TestPlan[]>([])
   const [plansLoading, setPlansLoading] = useState(false)
   const [refreshCounter, setRefreshCounter] = useState(0)
+  const { formatDate } = useDateTime()
 
   useEffect(() => {
     // Set breadcrumb
@@ -196,7 +198,7 @@ export default function TestPlansPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold">Test Plans</h1>
@@ -210,7 +212,7 @@ export default function TestPlansPage() {
           </Button>
         </div>
 
-        <div className="grid gap-6">
+        <div className="grid gap-8">
           {testPlans.map((plan) => (
             <Card key={plan._id}>
               <CardHeader>
@@ -245,7 +247,7 @@ export default function TestPlansPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-4">
                   <div className="flex items-center space-x-2">
                     <CheckSquare className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm text-muted-foreground">Test Cases:</span>
@@ -254,12 +256,12 @@ export default function TestPlansPage() {
                   <div className="flex items-center space-x-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm text-muted-foreground">Start Date:</span>
-                    <span className="font-medium">{plan.startDate?.toLocaleDateString() || 'N/A'}</span>
+                    <span className="font-medium">{plan.startDate ? formatDate(plan.startDate) : 'N/A'}</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="h-4 w-4 rounded-full bg-blue-500" />
                     <span className="text-sm text-muted-foreground">End Date:</span>
-                    <span className="font-medium">{plan.endDate?.toLocaleDateString() || 'N/A'}</span>
+                    <span className="font-medium">{plan.endDate ? formatDate(plan.endDate) : 'N/A'}</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="h-4 w-4 rounded-full bg-green-500" />

@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Loader2, CheckCircle } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { PageContent } from '@/components/ui/PageContent'
 import TasksClient from '@/components/tasks/TasksClient'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useNotify } from '@/lib/notify'
 
 export default function TasksPage() {
   const router = useRouter()
@@ -15,6 +15,7 @@ export default function TasksPage() {
   const [authError, setAuthError] = useState('')
   const [checkingAuth, setCheckingAuth] = useState(true)
   const successMessage = searchParams.get('success')
+  const { success: notifySuccess, error: notifyError } = useNotify()
 
   const checkAuth = useCallback(async () => {
     try {
@@ -46,14 +47,22 @@ export default function TasksPage() {
 
   useEffect(() => {
     if (!successMessage) return
-    const timeout = setTimeout(() => {
-      const params = new URLSearchParams(searchParams.toString())
-      params.delete('success')
-      const queryString = params.toString()
-      router.replace(queryString ? `/tasks?${queryString}` : '/tasks', { scroll: false })
-    }, 3000)
-    return () => clearTimeout(timeout)
+    notifySuccess({ title: successMessage })
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('success')
+    const queryString = params.toString()
+    router.replace(queryString ? `/tasks?${queryString}` : '/tasks', { scroll: false })
+    // notifySuccess is stable enough; omit from deps to avoid re-run loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successMessage, searchParams, router])
+
+  useEffect(() => {
+    if (authError) {
+      notifyError({ title: authError })
+    }
+    // notifyError is stable enough; omit from deps to avoid re-run loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authError])
 
   if (checkingAuth) {
     return (
@@ -90,14 +99,6 @@ export default function TasksPage() {
   return (
     <MainLayout>
       <PageContent>
-        {successMessage && (
-          <div className="mb-4">
-            <Alert variant="success">
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>{successMessage}</AlertDescription>
-            </Alert>
-          </div>
-        )}
         <TasksClient
           initialTasks={[]}
           initialPagination={{ pageSize: 10, hasMore: false }}

@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({
+      userId: userId,
       globalPermissions: userPermissions.globalPermissions,
       projectPermissions,
       projectRoles,

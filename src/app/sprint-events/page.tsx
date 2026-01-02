@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useDebounce } from '@/hooks/useDebounce'
 import { useAuth } from '@/hooks/useAuth'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { MainLayout } from '@/components/layout/MainLayout'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Calendar, 
   Clock, 
@@ -26,13 +27,13 @@ import {
   Eye,
   MoreVertical,
   X,
-  AlertCircle
+  RotateCcw
 } from 'lucide-react'
 import { AddSprintEventModal } from '@/components/sprint-events/AddSprintEventModal'
 import { EditSprintEventModal } from '@/components/sprint-events/EditSprintEventModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { format } from 'date-fns'
+import { useNotify } from '@/lib/notify'
 
 interface SprintEvent {
   _id: string
@@ -96,6 +97,7 @@ export default function SprintEventsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, isLoading: authLoading, isAuthenticated } = useAuth()
+  const { formatDate, formatTime } = useDateTime()
   const projectId = params.id as string
   const [events, setEvents] = useState<SprintEvent[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -104,8 +106,26 @@ export default function SprintEventsPage() {
   const [filterType, setFilterType] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterProject, setFilterProject] = useState('all')
+  const [filterSprint, setFilterSprint] = useState('all')
   const [projectQuery, setProjectQuery] = useState('')
-  
+
+  // Check if any filters are active
+  const hasActiveFilters = searchTerm !== '' ||
+                          filterType !== 'all' ||
+                          filterStatus !== 'all' ||
+                          filterProject !== 'all' ||
+                          filterSprint !== 'all'
+
+  // Reset all filters
+  const resetFilters = () => {
+    setSearchTerm('')
+    setFilterType('all')
+    setFilterStatus('all')
+    setFilterProject('all')
+    setFilterSprint('all')
+    setProjectQuery('')
+  }
+
   // Debounced search (300ms delay)
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
   
@@ -121,10 +141,9 @@ export default function SprintEventsPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingEvent, setEditingEvent] = useState<SprintEvent | null>(null)
-  const [success, setSuccess] = useState('')
-  const [error, setError] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const { success: notifySuccess, error: notifyError } = useNotify()
 
   // Define fetch functions BEFORE useEffect that uses them
   const fetchProjects = useCallback(async (signal?: AbortSignal) => {
@@ -225,20 +244,14 @@ export default function SprintEventsPage() {
     const errorParam = searchParams?.get('error')
     
     if (successParam === 'created') {
-      setSuccess('Sprint Event created successfully')
+      notifySuccess({ title: 'Sprint Event Created', message: 'Sprint Event created successfully' })
       router.replace('/sprint-events', { scroll: false })
-      const timer = setTimeout(() => setSuccess(''), 3000)
-      return () => clearTimeout(timer)
     } else if (successParam === 'updated') {
-      setSuccess('Sprint Event updated successfully')
+      notifySuccess({ title: 'Sprint Event Updated', message: 'Sprint Event updated successfully' })
       router.replace('/sprint-events', { scroll: false })
-      const timer = setTimeout(() => setSuccess(''), 3000)
-      return () => clearTimeout(timer)
     } else if (errorParam) {
-      setError(decodeURIComponent(errorParam))
+      notifyError({ title: 'Error', message: decodeURIComponent(errorParam) })
       router.replace('/sprint-events', { scroll: false })
-      const timer = setTimeout(() => setError(''), 5000)
-      return () => clearTimeout(timer)
     }
   }, [searchParams, router])
 
@@ -334,8 +347,7 @@ export default function SprintEventsPage() {
   }
 
   const formatDateTime = (date: string, startTime?: string, endTime?: string) => {
-    const dateObj = new Date(date)
-    const dateStr = format(dateObj, 'MMM dd, yyyy')
+    const dateStr = formatDate(date)
     if (startTime && endTime) {
       return `${dateStr} • ${startTime} - ${endTime}`
     }
@@ -352,11 +364,13 @@ export default function SprintEventsPage() {
 
       const matchesType = filterType === 'all' || event.eventType === filterType
       const matchesStatus = filterStatus === 'all' || event.status === filterStatus
-      const matchesProject = filterProject === 'all' || event.project._id === filterProject
+      const matchesProject = filterProject === 'all' || event.project?._id === filterProject
+      const matchesSprint = filterSprint === 'all' || event.sprint?._id === filterSprint  
 
-      return matchesSearch && matchesType && matchesStatus && matchesProject
+
+      return matchesSearch && matchesType && matchesStatus && matchesProject && matchesSprint
     })
-  }, [events, debouncedSearchTerm, filterType, filterStatus, filterProject])
+  }, [events, debouncedSearchTerm, filterType, filterStatus, filterProject, filterSprint])
 
   // Pagination derived data
   const totalCount = filteredEvents.length
@@ -411,67 +425,29 @@ export default function SprintEventsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Sprint Events</h1>
-            <p className="text-muted-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl sm:text-3xl font-bold truncate">Sprint Events</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
               {projectId ? 'Manage agile events and ceremonies' : 'View all sprint events across your projects'}
             </p>
           </div>
-          <Button onClick={() => setShowAddModal(true)}>
+          <Button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
-            Create Event
+            <span className="hidden xs:inline">Create Event</span>
+            <span className="xs:hidden">Create Event</span>
           </Button>
         </div>
 
         {/* Success/Error Messages */}
-        {(success || error) && (
-          <Alert 
-            variant={success ? "success" : "destructive"}
-            className="flex items-center justify-between pr-2"
-          >
-            <AlertDescription className="flex-1 flex items-center gap-2">
-              {success ? (
-                <>
-                  <CheckCircle className="h-4 w-4" />
-                  {success}
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="h-4 w-4" />
-                  {error}
-                </>
-              )}
-            </AlertDescription>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`h-6 w-6 p-0 ${
-                success 
-                  ? "hover:bg-green-100 dark:hover:bg-green-900/40" 
-                  : "hover:bg-red-100 dark:hover:bg-red-900/40"
-              }`}
-              onClick={() => {
-                setSuccess('')
-                setError('')
-              }}
-            >
-              <X className={`h-4 w-4 ${
-                success 
-                  ? "text-green-700 dark:text-green-300" 
-                  : "text-red-700 dark:text-red-300"
-              }`} />
-            </Button>
-          </Alert>
-        )}
 
         {/* Filters */}
         <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
+          <CardContent className="p-3 sm:p-4">
+            <div className="space-y-4">
+              {/* Search Input */}
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -481,15 +457,16 @@ export default function SprintEventsPage() {
                     className="pl-10"
                   />
                 </div>
-              </div>
-              <div className="flex gap-2 flex-wrap">
+
+              {/* Filter Controls */}
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 {!projectId && (
                   <Select 
                     value={filterProject} 
                     onValueChange={setFilterProject}
                     onOpenChange={(open) => { if (open) setProjectQuery('') }}
                   >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px]">
                       <SelectValue placeholder="All Projects" />
                     </SelectTrigger>
                     <SelectContent className="z-[10050] p-0">
@@ -527,7 +504,7 @@ export default function SprintEventsPage() {
                   </Select>
                 )}
                 <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger className="w-[150px]">
+                  <SelectTrigger className="w-full sm:w-[150px]">
                     <SelectValue placeholder="Event Type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -541,7 +518,7 @@ export default function SprintEventsPage() {
                   </SelectContent>
                 </Select>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="w-[150px]">
+                  <SelectTrigger className="w-full sm:w-[150px]">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -552,6 +529,28 @@ export default function SprintEventsPage() {
                     <SelectItem value="cancelled">Cancelled</SelectItem>
                   </SelectContent>
                 </Select>
+                {hasActiveFilters && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={resetFilters}
+                          className="text-xs w-full sm:w-auto"
+                          aria-label="Reset all filters"
+                        >
+                          <RotateCcw className="h-4 w-4 mr-1" />
+                          <span className="hidden sm:inline">Reset Filters</span>
+                          <span className="sm:hidden">Reset</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Reset filters</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
               </div>
             </div>
           </CardContent>
@@ -560,12 +559,14 @@ export default function SprintEventsPage() {
         {/* Events Display */}
         {filteredEvents.length === 0 ? (
           <Card>
-            <CardContent className="text-center py-12">
-              <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground mb-4">No sprint events found</p>
-              <Button onClick={() => setShowAddModal(true)}>
+            <CardContent className="text-center py-8 sm:py-12 px-4 sm:px-6">
+              <Calendar className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+              <p className="text-sm sm:text-base text-muted-foreground mb-3 sm:mb-4">
+                {hasActiveFilters ? 'No events match your filters' : 'No sprint events found'}
+              </p>
+              <Button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
-                Create First Event
+                {hasActiveFilters ? 'Create New Event' : 'Create First Event'}
               </Button>
             </CardContent>
           </Card>
@@ -578,23 +579,25 @@ export default function SprintEventsPage() {
                   <TabsTrigger value="list">List View</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="grid" className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <TabsContent value="grid" className="space-y-4 sm:space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {paginatedEvents.map((event) => (
                       <Card 
                         key={event._id} 
                         className="hover:shadow-md transition-shadow cursor-pointer"
                         onClick={() => router.push(`/sprint-events/${event._id}`)}
                       >
-                        <CardContent className="p-6">
-                          <div className="space-y-4">
-                            <div className="flex items-start justify-between">
-                              <div className="flex items-center space-x-2">
+                        <CardContent className="p-4 sm:p-6">
+                          <div className="space-y-3 sm:space-y-4">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center space-x-2 min-w-0 flex-1">
                                 {getEventTypeIcon(event.eventType)}
                                 <div className="flex-1 min-w-0">
-                                  <h3 className="text-lg font-semibold truncate">{event.title}</h3>
-                                  <p className="text-sm text-muted-foreground truncate">
-                                    {event.sprint.name} • {event.project.name}
+                                  <h3 className="text-base sm:text-lg font-semibold truncate">{event.title}</h3>
+                                  <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                                    {(() => {
+                                      return (event.sprint?.name || 'Unavailable Sprint') + ' • ' + (event.project?.name || 'Unavailable Project')
+                                    })()}
                                   </p>
                                 </div>
                               </div>
@@ -603,7 +606,7 @@ export default function SprintEventsPage() {
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            className="h-8 w-8 p-0"
+                                    className="h-8 w-8 p-0 flex-shrink-0"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <MoreVertical className="h-4 w-4" />
@@ -619,7 +622,9 @@ export default function SprintEventsPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => {
                             e.stopPropagation()
-                            setEditingEvent(event)
+                                    // Find the current event data by ID to ensure we have fresh data
+                                    const currentEvent = events.find(ev => ev._id === event._id)
+                                    setEditingEvent(currentEvent || event)
                           }}>
                             <Edit className="h-4 w-4 mr-2" />
                             Edit Event
@@ -645,14 +650,14 @@ export default function SprintEventsPage() {
                             </div>
 
                             <div className="space-y-2">
-                              <div className="flex items-center space-x-2 text-sm">
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-muted-foreground">
+                              <div className="flex items-start space-x-2 text-xs sm:text-sm">
+                                <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                <span className="text-muted-foreground break-words">
                                   {formatDateTime(event.scheduledDate, event.startTime, event.endTime)}
                                 </span>
                               </div>
-                              <div className="flex items-center space-x-2 text-sm">
-                                <Users className="h-4 w-4 text-muted-foreground" />
+                              <div className="flex items-center space-x-2 text-xs sm:text-sm">
+                                <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                                 <span className="text-muted-foreground">
                                   {event.attendees.length} {event.attendees.length === 1 ? 'attendee' : 'attendees'}
                                 </span>
@@ -665,33 +670,49 @@ export default function SprintEventsPage() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="list" className="space-y-4">
-                  <div className="space-y-4">
+                <TabsContent value="list" className="space-y-4 sm:space-y-6">
+                  <div className="space-y-4 sm:space-y-6">
                     {paginatedEvents.map((event) => (
               <Card 
                 key={event._id} 
                 className="hover:shadow-md transition-shadow cursor-pointer"
                 onClick={() => router.push(`/sprint-events/${event._id}`)}
               >
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4 flex-1 min-w-0">
-                      <div className="flex items-center space-x-2">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                    <div className="flex items-start space-x-3 flex-1 min-w-0">
+                      <div className="flex-shrink-0 mt-1">
                         {getEventTypeIcon(event.eventType)}
+                      </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="text-lg font-semibold truncate">{event.title}</h3>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                          <h3 className="text-base sm:text-lg font-semibold truncate">{event.title}</h3>
+                          <div className="flex items-center gap-2 flex-wrap">
                             {getEventTypeBadge(event.eventType)}
                             {getStatusBadge(event.status)}
                           </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-                            <span>{event.sprint.name}</span>
-                            <span>•</span>
-                            <span>{event.project.name}</span>
-                            <span>•</span>
-                            <span>{formatDateTime(event.scheduledDate, event.startTime, event.endTime)}</span>
-                            <span>•</span>
-                            <span>{event.attendees.length} {event.attendees.length === 1 ? 'attendee' : 'attendees'}</span>
+                        </div>
+                        <div className="flex flex-col gap-1 text-xs sm:text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="truncate">
+                              {event.sprint?.name || 'Unavailable Sprint'}
+                            </span>
+                            <span className="hidden sm:inline">•</span>
+                            <span className="truncate">
+                              {event.project?.name || 'Unavailable Project'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Calendar className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">
+                              {formatDateTime(event.scheduledDate, event.startTime, event.endTime)}
+                            </span>
+                            <span className="hidden sm:inline">•</span>
+                            <Users className="h-3 w-3 flex-shrink-0 sm:hidden" />
+                            <span className="sm:hidden">•</span>
+                            <span>
+                              {event.attendees.length} {event.attendees.length === 1 ? 'attendee' : 'attendees'}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -717,7 +738,9 @@ export default function SprintEventsPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={(e) => {
                           e.stopPropagation()
-                          setEditingEvent(event)
+                          // Find the current event data by ID to ensure we have fresh data
+                          const currentEvent = events.find(ev => ev._id === event._id)
+                          setEditingEvent(currentEvent || event)
                         }}>
                           <Edit className="h-4 w-4 mr-2" />
                           Edit Event
@@ -745,8 +768,11 @@ export default function SprintEventsPage() {
 
               {/* Pagination Controls */}
               {totalCount > 0 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="flex flex-col gap-4 mt-6 pt-4 border-t">
+                  {/* Page size selector and info */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
                     <span>Items per page:</span>
                     <Select
                       value={pageSize.toString()}
@@ -756,7 +782,7 @@ export default function SprintEventsPage() {
                         setCurrentPage(1)
                       }}
                     >
-                      <SelectTrigger className="w-20 h-8">
+                          <SelectTrigger className="w-16 sm:w-20 h-8">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -766,20 +792,24 @@ export default function SprintEventsPage() {
                         <SelectItem value="100">100</SelectItem>
                       </SelectContent>
                     </Select>
-                    <span>
+                      </div>
+                      <span className="text-center sm:text-left">
                       Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
+
+                    {/* Navigation buttons */}
+                    <div className="flex items-center justify-center sm:justify-end gap-2">
                     <Button
                       onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                       disabled={currentPage === 1 || loading}
                       variant="outline"
                       size="sm"
+                        className="min-w-[80px]"
                     >
                       Previous
                     </Button>
-                    <span className="text-sm text-muted-foreground px-2">
+                      <span className="text-xs sm:text-sm text-muted-foreground px-2 min-w-fit">
                       Page {currentPage} of {totalPages}
                     </span>
                     <Button
@@ -787,9 +817,11 @@ export default function SprintEventsPage() {
                       disabled={currentPage >= totalPages || loading}
                       variant="outline"
                       size="sm"
+                        className="min-w-[80px]"
                     >
                       Next
                     </Button>
+                    </div>
                   </div>
                 </div>
               )}

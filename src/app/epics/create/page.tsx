@@ -8,25 +8,27 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { 
+import {
   ArrowLeft,
   Save,
   Loader2,
-  AlertTriangle,
-  Layers
+  Layers,
+  Plus,
+  X
 } from 'lucide-react'
+import { useNotify } from '@/lib/notify'
 
 interface Project {
   _id: string
   name: string
+  startDate?: Date
+  endDate?: Date
 }
 
 export default function CreateEpicPage() {
   const router = useRouter()
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [authError, setAuthError] = useState('')
   const [projects, setProjects] = useState<Project[]>([])
   const [projectQuery, setProjectQuery] = useState("");
@@ -39,8 +41,9 @@ export default function CreateEpicPage() {
     priority: 'medium',
     dueDate: '',
     estimatedHours: '',
-    labels: ''
+    labels: [] as string[]
   })
+  const [newLabel, setNewLabel] = useState('')
 
   const checkAuth = useCallback(async () => {
     try {
@@ -79,9 +82,25 @@ export default function CreateEpicPage() {
     checkAuth()
   }, [checkAuth])
 
+  // Clear due date if it's outside the valid range when project changes
+  useEffect(() => {
+    if (formData.project && formData.dueDate) {
+      const dateRange = getValidDateRange()
+      if (dateRange) {
+        const selectedDate = new Date(formData.dueDate)
+        const isBeforeMin = dateRange.minDate && selectedDate < dateRange.minDate
+        const isAfterMax = dateRange.maxDate && selectedDate > dateRange.maxDate
+
+        if (isBeforeMin || isAfterMax) {
+          setFormData(prev => ({ ...prev, dueDate: '' }))
+        }
+      }
+    }
+  }, [formData.project])
+
   const fetchProjects = async () => {
     try {
-      const response = await fetch('/api/projects')
+      const response = await fetch('/api/projects?fields=name,startDate,endDate')
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
@@ -95,11 +114,49 @@ export default function CreateEpicPage() {
     }
   }
 
+  const addLabel = () => {
+    if (newLabel.trim() && !formData.labels.includes(newLabel.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        labels: [...prev.labels, newLabel.trim()]
+      }))
+      setNewLabel('')
+    }
+  }
+
+  const removeLabel = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      labels: prev.labels.filter((_, i) => i !== index)
+    }))
+  }
+
+  // Calculate valid date range for due date based on selected project
+  const getValidDateRange = () => {
+    const selectedProject = projects.find(p => p._id === formData.project)
+    if (!selectedProject) return null
+
+    let minDate = null
+    let maxDate = null
+
+    // If project has start date, due date should be on or after project start
+    if (selectedProject.startDate) {
+      minDate = new Date(selectedProject.startDate)
+      minDate.setHours(0, 0, 0, 0)
+    }
+
+    // If project has end date, due date should be on or before project end
+    if (selectedProject.endDate) {
+      maxDate = new Date(selectedProject.endDate)
+      maxDate.setHours(23, 59, 59, 999)
+    }
+
+    return { minDate, maxDate }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError('')
-    setSuccess('')
 
     try {
       const response = await fetch('/api/epics', {
@@ -111,22 +168,20 @@ export default function CreateEpicPage() {
           ...formData,
           title: formData.name?.trim() || undefined,
           estimatedHours: formData.estimatedHours ? parseInt(formData.estimatedHours) : undefined,
-          labels: formData.labels ? formData.labels.split(',').map(label => label.trim()) : []
+          labels: formData.labels
         })
       })
 
       const data = await response.json()
 
       if (data.success) {
-        setSuccess('Epic created successfully')
-        setTimeout(() => {
-          router.push('/epics?created=1')
-        }, 1000)
+        notifySuccess({ title: 'Epic created successfully' })
+        router.push('/epics?created=1')
       } else {
-        setError(data.error || 'Failed to create epic')
+        notifyError({ title: data.error || 'Failed to create epic' })
       }
     } catch (err) {
-      setError('Failed to create epic')
+      notifyError({ title: 'Failed to create epic' })
     } finally {
       setLoading(false)
     }
@@ -178,19 +233,6 @@ export default function CreateEpicPage() {
           </div>
         </div>
 
-        {success && (
-          <Alert variant="success">
-            <AlertDescription>{success}</AlertDescription>
-          </Alert>
-        )}
-
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
         <Card className="overflow-x-hidden">
           <CardHeader>
             <CardTitle>Epic Details</CardTitle>
@@ -231,7 +273,9 @@ export default function CreateEpicPage() {
                           <div className="max-h-56 overflow-y-auto">
                             {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).map((project) => (
                               <SelectItem key={project._id} value={project._id}>
-                                {project.name}
+                                <span className="truncate block max-w-[200px]" title={project.name}>
+                                  {project.name}
+                                </span>
                               </SelectItem>
                             ))}
                             {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).length === 0 && (
@@ -264,8 +308,23 @@ export default function CreateEpicPage() {
                       type="date"
                       value={formData.dueDate}
                       onChange={(e) => handleChange('dueDate', e.target.value)}
+                      min={(() => {
+                        const minDate = getValidDateRange()?.minDate;
+                        if (minDate) {
+                          const nextDay = new Date(minDate);
+                          nextDay.setDate(nextDay.getDate() + 1);
+                          return nextDay.toISOString().split('T')[0];
+                        }
+                        return undefined;
+                      })()}
+                      max={getValidDateRange()?.maxDate?.toISOString().split('T')[0]}
                       required
                     />
+                    {formData.project && getValidDateRange() && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Due date must be within the selected project's date range
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -282,11 +341,39 @@ export default function CreateEpicPage() {
 
                   <div>
                     <label className="text-sm font-medium text-foreground">Labels</label>
-                    <Input
-                      value={formData.labels}
-                      onChange={(e) => handleChange('labels', e.target.value)}
-                      placeholder="Enter labels separated by commas"
-                    />
+                    <div className="space-y-2">
+                      <div className="flex space-x-2">
+                        <Input
+                          value={newLabel}
+                          onChange={(e) => setNewLabel(e.target.value)}
+                          placeholder="Enter label"
+                          onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLabel())}
+                        />
+                        <Button type="button" onClick={addLabel} size="sm" disabled={newLabel.trim() === ''}>
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {formData.labels.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {formData.labels.map((label, index) => (
+                            <div
+                              key={index}
+                              className="inline-flex items-center gap-1.5 bg-muted px-3 py-1.5 rounded-md text-sm"
+                            >
+                              <span>{label}</span>
+                              <button
+                                type="button"
+                                aria-label="Remove label"
+                                className="text-muted-foreground hover:text-foreground focus:outline-none transition-colors"
+                                onClick={() => removeLabel(index)}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

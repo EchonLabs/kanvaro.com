@@ -8,9 +8,9 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Plus, 
   Search, 
@@ -19,7 +19,6 @@ import {
   Calendar, 
   Clock,
   CheckCircle,
-  AlertTriangle,
   Pause,
   XCircle,
   Play,
@@ -38,16 +37,19 @@ import {
   X,
   Layers
 } from 'lucide-react'
-import { Permission, PermissionGate } from '@/lib/permissions'
+import { Permission } from '@/lib/permissions'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { extractUserId } from '@/lib/auth/user-utils'
+import { useNotify } from '@/lib/notify'
 
 interface Story {
   _id: string
   title: string
   description: string
-  status: 'backlog' | 'in_progress' | 'completed' | 'cancelled' | string
+  status: 'backlog' | 'todo' | 'inprogress' | 'done' | 'cancelled' | string
   priority: 'low' | 'medium' | 'high' | 'critical'
   project?: {
     _id: string
@@ -100,10 +102,6 @@ export default function StoriesPage() {
   const searchParams = useSearchParams()
   const [stories, setStories] = useState<Story[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
-  const [showSuccessAlert, setShowSuccessAlert] = useState(false)
-  const [success, setSuccess] = useState('')
 
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -114,6 +112,7 @@ export default function StoriesPage() {
   const [sprintFilter, setSprintFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list')
   const [selectedStory, setSelectedStory] = useState<Story | null>(null)
+  const { formatDate } = useDateTime()
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [deleting, setDeleting] = useState(false);
   const [draggedStoryId, setDraggedStoryId] = useState<string | null>(null)
@@ -124,11 +123,30 @@ export default function StoriesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
+  const [currentUserId, setCurrentUserId] = useState<string>('')
+
+  const { hasPermission } = usePermissions()
+  const { success: notifySuccess, error: notifyError } = useNotify()
+
+  const fetchAndSetCurrentUser = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/me')
+      if (response.ok) {
+        const data = await response.json().catch(() => ({}))
+        const userId = extractUserId(data)
+        if (userId) setCurrentUserId(userId)
+      }
+      return response
+    } catch (error) {
+      console.error('Auth check failed:', error)
+      throw error
+    }
+  }, [])
 
   const checkAuth = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/me')
-      
+      const response = await fetchAndSetCurrentUser()
+
       if (response.ok) {
         setAuthError('')
         await fetchStories()
@@ -138,8 +156,16 @@ export default function StoriesPage() {
         })
         
         if (refreshResponse.ok) {
-          setAuthError('')
-          await fetchStories()
+          const meResponse = await fetchAndSetCurrentUser()
+          if (meResponse.ok) {
+            setAuthError('')
+            await fetchStories()
+          } else {
+            setAuthError('Session expired')
+            setTimeout(() => {
+              router.push('/login')
+            }, 2000)
+          }
         } else {
           setAuthError('Session expired')
           setTimeout(() => {
@@ -156,7 +182,7 @@ export default function StoriesPage() {
         router.push('/login')
       }, 2000)
     }
-  }, [router])
+  }, [router, fetchAndSetCurrentUser])
 
   useEffect(() => {
     checkAuth()
@@ -165,10 +191,10 @@ export default function StoriesPage() {
   useEffect(() => {
     const successParam = searchParams?.get('success')
     if (successParam === 'story-created') {
-      setSuccess('User story created successfully.')
-      const timeout = setTimeout(() => setSuccess(''), 3000)
-      return () => clearTimeout(timeout)
+      notifySuccess({ title: 'User story created successfully' })
     }
+    // notifySuccess is stable enough; omit from deps to avoid re-run loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
   // Fetch when pagination changes (after initial load)
@@ -182,17 +208,11 @@ export default function StoriesPage() {
   useEffect(() => {
     const updated = searchParams.get('updated')
     if (updated === 'true') {
-      setSuccessMessage('Story updated successfully')
-      setShowSuccessAlert(true)
-      // Clear the query parameter from URL
+      notifySuccess({ title: 'Story updated successfully' })
       router.replace('/stories', { scroll: false })
-      // Auto-hide after 5 seconds
-      const timer = setTimeout(() => {
-        setShowSuccessAlert(false)
-        setSuccessMessage('')
-      }, 5000)
-      return () => clearTimeout(timer)
     }
+    // notifySuccess is stable enough; omit from deps to avoid re-run loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, router])
 
   const fetchStories = async () => {
@@ -209,10 +229,10 @@ export default function StoriesPage() {
         setStories(data.data)
         setTotalCount(data.pagination?.total || data.data.length)
       } else {
-        setError(data.error || 'Failed to fetch stories')
+        notifyError({ title: 'Failed to Load Stories', message: data.error || 'Failed to fetch stories' })
       }
     } catch (err) {
-      setError('Failed to fetch stories')
+      notifyError({ title: 'Failed to Load Stories', message: 'Failed to fetch stories' })
     } finally {
       setLoading(false)
     }
@@ -279,18 +299,12 @@ export default function StoriesPage() {
         setStories(stories.filter(p => p._id !== selectedStory._id))
         setShowDeleteConfirmModal(false)
         setSelectedStory(null)
-        setSuccessMessage('Story deleted successfully')
-        setShowSuccessAlert(true)
-        // Auto-hide after 5 seconds
-        setTimeout(() => {
-          setShowSuccessAlert(false)
-          setSuccessMessage('')
-        }, 5000)
+        notifySuccess({ title: 'Story deleted successfully' })
       } else {
-        setError(data.error || 'Failed to delete story')
+        notifyError({ title: 'Failed to Delete Story', message: data.error || 'Failed to delete story' })
       }
     } catch (err) {
-      setError('Failed to delete story')
+      notifyError({ title: 'Failed to Delete Story', message: 'Failed to delete story' })
     } finally {
       setDeleting(false)
     }
@@ -298,8 +312,9 @@ export default function StoriesPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'backlog': return 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900'
-      case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
-      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
+      case 'todo': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900'
+      case 'inprogress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+      case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-100 dark:hover:bg-green-900'
       case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
@@ -308,8 +323,9 @@ export default function StoriesPage() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'backlog': return <List className="h-4 w-4" />
-      case 'in_progress': return <Play className="h-4 w-4" />
-      case 'completed': return <CheckCircle className="h-4 w-4" />
+      case 'todo': return <Target className="h-4 w-4" />
+      case 'inprogress': return <Play className="h-4 w-4" />
+      case 'done': return <CheckCircle className="h-4 w-4" />
       case 'cancelled': return <XCircle className="h-4 w-4" />
       default: return <Target className="h-4 w-4" />
     }
@@ -324,6 +340,17 @@ export default function StoriesPage() {
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
+
+  const isCreator = (story: Story) => {
+    const creatorId = (story as any)?.createdBy?._id || (story as any)?.createdBy?.id
+    return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
+  }
+
+  const canEditStory = (story: Story) =>
+    hasPermission(Permission.STORY_UPDATE, story.project?._id) || isCreator(story)
+
+  const canDeleteStory = (story: Story) =>
+    hasPermission(Permission.STORY_DELETE, story.project?._id) || isCreator(story)
 
   const filteredStories = stories.filter(story => {
     const matchesSearch = !searchQuery || 
@@ -350,7 +377,7 @@ export default function StoriesPage() {
     )
   })
 
-  const kanbanStatuses: Array<Story['status']> = ['backlog', 'in_progress', 'completed', 'cancelled']
+  const kanbanStatuses: Array<Story['status']> = ['backlog', 'todo', 'inprogress', 'done', 'cancelled']
 
   const handleKanbanStatusChange = async (story: Story, nextStatus: Story['status']) => {
     if (nextStatus === story.status) return
@@ -374,12 +401,11 @@ export default function StoriesPage() {
           item._id === story._id ? { ...item, status: nextStatus } : item
         )
       )
-      setSuccess('Story status updated successfully.')
-      setTimeout(() => setSuccess(''), 3000)
+      notifySuccess({ title: 'Story status updated successfully' })
     } catch (err) {
       console.error('Failed to update story status:', err)
-      setError(err instanceof Error ? err.message : 'Failed to update story status')
-      setTimeout(() => setError(''), 4000)
+      const message = err instanceof Error ? err.message : 'Failed to update story status'
+      notifyError({ title: 'Failed to Update Story', message })
     }
   }
 
@@ -423,12 +449,6 @@ export default function StoriesPage() {
           </Button>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
 
         <Card>
           <CardHeader>
@@ -441,12 +461,6 @@ export default function StoriesPage() {
                   </CardDescription>
                 </div>
               </div>
-              {success && (
-                <Alert variant="success">
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>{success}</AlertDescription>
-                </Alert>
-              )}
               <div className="flex flex-col gap-2 sm:gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -464,9 +478,10 @@ export default function StoriesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="backlog">Backlog</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="backlog">backlog</SelectItem>
+                      <SelectItem value="todo">Todo</SelectItem>
+                      <SelectItem value="inprogress">In Progress</SelectItem>
+                      <SelectItem value="done">Done</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
@@ -535,30 +550,6 @@ export default function StoriesPage() {
                 <TabsTrigger value="kanban">Kanban View</TabsTrigger>
               </TabsList>
               
-              {showSuccessAlert && successMessage && (
-                <Alert className="mt-4 border-green-500 bg-green-50 dark:bg-green-900/20">
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
-                      <AlertDescription className="text-green-800 dark:text-green-200 flex-1">
-                        {successMessage}
-                      </AlertDescription>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40 ml-auto flex-shrink-0"
-                      onClick={() => {
-                        setShowSuccessAlert(false)
-                        setSuccessMessage('')
-                      }}
-                    >
-                      <X className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    </Button>
-                  </div>
-                </Alert>
-              )}
-
               <TabsContent value="list" className="space-y-4">
                 <div className="space-y-4">
                   {filteredStories.map((story) => (
@@ -647,7 +638,7 @@ export default function StoriesPage() {
                                 {story.dueDate && (
                                   <div className="flex items-center space-x-1">
                                     <Calendar className="h-4 w-4" />
-                                    <span>Due {new Date(story.dueDate).toLocaleDateString()}</span>
+                                    <span>Due {formatDate(story.dueDate)}</span>
                                   </div>
                                 )}
                                 {story.storyPoints && (
@@ -681,25 +672,40 @@ export default function StoriesPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="min-w-[172px] py-2 rounded-md shadow-lg border border-border bg-background z-[10000]">
-                               
-                                  <DropdownMenuItem onClick={e => { e.stopPropagation(); router.push(`/stories/${story._id}`); }} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    <span>View Story</span>
-                                  </DropdownMenuItem>
-                              
-                                <PermissionGate permission={Permission.STORY_UPDATE} projectId={story.project?._id}>
-                                  <DropdownMenuItem onClick={e => { e.stopPropagation(); router.push(`/stories/${story._id}/edit`); }} className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer">
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    <span>Edit Story</span>
-                                  </DropdownMenuItem>
-                                </PermissionGate>
-                                <PermissionGate permission={Permission.STORY_DELETE} projectId={story.project?._id}>
-                                  <DropdownMenuSeparator className="my-1" />
-                                  <DropdownMenuItem onClick={e => { e.stopPropagation(); handleDeleteClick(story); }} className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer">
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    <span>Delete Story</span>
-                                  </DropdownMenuItem>
-                                </PermissionGate>
+                                <DropdownMenuItem
+                                  onClick={e => { e.stopPropagation(); router.push(`/stories/${story._id}`); }}
+                                  className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  <span>View Story</span>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem
+                                  disabled={!canEditStory(story)}
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    if (!canEditStory(story)) return
+                                    router.push(`/stories/${story._id}/edit`)
+                                  }}
+                                  className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                >
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  <span>Edit Story</span>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuSeparator className="my-1" />
+                                <DropdownMenuItem
+                                  disabled={!canDeleteStory(story)}
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    if (!canDeleteStory(story)) return
+                                    handleDeleteClick(story)
+                                  }}
+                                  className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  <span>Delete Story</span>
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                             </div>
@@ -716,7 +722,9 @@ export default function StoriesPage() {
                   {kanbanStatuses.map((statusKey) => {
                     const columnStories = filteredStories.filter((story) => story.status === statusKey)
                     const label =
-                      statusKey === 'completed'
+                      statusKey === 'inprogress'
+                        ? 'In Progress'
+                        : statusKey === 'done'
                         ? 'Done'
                         : formatToTitleCase(statusKey)
 
@@ -811,6 +819,7 @@ export default function StoriesPage() {
                                           value as Story['status']
                                         )
                                       }
+                                      disabled={!story.sprint}
                                     >
                                       <SelectTrigger className="h-7 w-[120px] text-[11px]">
                                         <SelectValue placeholder="Status" />

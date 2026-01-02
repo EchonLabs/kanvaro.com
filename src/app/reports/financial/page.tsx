@@ -21,6 +21,7 @@ import { FinancialOverviewReport } from '@/components/reports/FinancialOverviewR
 import { BudgetAnalysisReport } from '@/components/reports/BudgetAnalysisReport'
 import { ExpenseReport } from '@/components/reports/ExpenseReport'
 import { RevenueReport } from '@/components/reports/RevenueReport'
+import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 
 interface FinancialReportData {
   overview: {
@@ -73,6 +74,7 @@ interface FilterState {
 
 export default function FinancialReportsPage() {
   const { setItems } = useBreadcrumb()
+  const { formatCurrency } = useOrgCurrency()
   const [reportData, setReportData] = useState<FinancialReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
@@ -231,9 +233,9 @@ export default function FinancialReportsPage() {
   return (
     <MainLayout>
       <PageWrapper>
-        <div className="space-y-6">
+        <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
         <div className="flex-1 min-w-0">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Financial Reports</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">
@@ -263,8 +265,8 @@ export default function FinancialReportsPage() {
             <CardTitle className="text-base sm:text-lg">Filters</CardTitle>
             <CardDescription className="text-xs sm:text-sm">Filter and sort financial reports</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="search" className="text-xs sm:text-sm">Search</Label>
                 <div className="relative">
@@ -356,7 +358,7 @@ export default function FinancialReportsPage() {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-5">
               <Button variant="outline" onClick={clearFilters} className="w-full sm:w-auto">
                 Clear Filters
               </Button>
@@ -389,7 +391,7 @@ export default function FinancialReportsPage() {
       )}
 
       {/* Key Financial Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Total Budget</CardTitle>
@@ -397,7 +399,7 @@ export default function FinancialReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold">
-              ${reportData.overview.totalBudget.toLocaleString()}
+              {formatCurrency(reportData.overview.totalBudget)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Across all projects
@@ -412,7 +414,7 @@ export default function FinancialReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold">
-              ${reportData.overview.totalSpent.toLocaleString()}
+              {formatCurrency(reportData.overview.totalSpent)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {reportData.overview.budgetUtilization.toFixed(1)}% of budget
@@ -428,7 +430,7 @@ export default function FinancialReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold text-green-600">
-              ${reportData.overview.totalRevenue.toLocaleString()}
+              {formatCurrency(reportData.overview.totalRevenue)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Generated revenue
@@ -440,12 +442,12 @@ export default function FinancialReportsPage() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium truncate flex-1 min-w-0">Net Profit</CardTitle>
             <Badge variant={reportData.overview.netProfit >= 0 ? 'default' : 'destructive'} className="flex-shrink-0 ml-2 text-xs">
-              {reportData.overview.netProfit >= 0 ? '+' : ''}${reportData.overview.netProfit.toLocaleString()}
+              {reportData.overview.netProfit >= 0 ? '+' : ''}{formatCurrency(reportData.overview.netProfit)}
             </Badge>
           </CardHeader>
           <CardContent>
             <div className={`text-xl sm:text-2xl font-bold ${reportData.overview.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              ${reportData.overview.netProfit.toLocaleString()}
+              {formatCurrency(reportData.overview.netProfit)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {reportData.overview.profitMargin.toFixed(1)}% profit margin
@@ -455,8 +457,8 @@ export default function FinancialReportsPage() {
       </div>
 
       {/* Report Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 overflow-x-auto">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 overflow-x-auto mb-4">
           <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
           <TabsTrigger value="budget" className="text-xs sm:text-sm">Budget Analysis</TabsTrigger>
           <TabsTrigger value="expenses" className="text-xs sm:text-sm">Expenses</TabsTrigger>

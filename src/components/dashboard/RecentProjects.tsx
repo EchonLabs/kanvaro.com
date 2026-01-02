@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Progress } from '@/components/ui/Progress'
 import { Calendar, Users, ArrowRight, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -32,6 +33,7 @@ const getStatusColor = (status: string) => {
 
 export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
   const router = useRouter()
+  const { formatDate } = useDateTime()
 
   if (isLoading) {
     return (
@@ -156,7 +158,7 @@ export function RecentProjects({ projects, isLoading }: RecentProjectsProps) {
                   {project.endDate && (
                     <div className="flex items-center whitespace-nowrap">
                       <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
-                      <span className="truncate">{new Date(project.endDate).toLocaleDateString()}</span>
+                      <span className="truncate">{formatDate(project.endDate)}</span>
                     </div>
                   )}
                   <div className="flex items-center whitespace-nowrap">

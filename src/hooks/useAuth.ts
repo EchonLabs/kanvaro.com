@@ -103,6 +103,16 @@ export function useAuth() {
 
   const logout = useCallback(async () => {
     try {
+      // Clear permission cache before logout
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.removeItem('kanvaro_permissions')
+          sessionStorage.removeItem('kanvaro_permissions_timestamp')
+        } catch (cacheError) {
+          console.error('Error clearing permission cache:', cacheError)
+        }
+      }
+
       await fetch('/api/auth/logout', { method: 'POST' })
     } catch (error) {
       console.error('Logout failed:', error)

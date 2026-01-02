@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Mail, TestTube, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { Mail, TestTube, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useNotify } from '@/lib/notify'
 
 interface EmailConfigProps {
   onNext: (data: any) => void
@@ -37,14 +38,11 @@ export const EmailConfig = ({ onNext, onBack, initialData }: EmailConfigProps) =
     fromName: initialData?.azure?.fromName || '',
   })
   const [isTesting, setIsTesting] = useState(false)
-  const [testResult, setTestResult] = useState<'success' | 'error' | null>(null)
-  const [testMessage, setTestMessage] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const { success: notifySuccess, error: notifyError } = useNotify()
 
   const handleTestEmail = async () => {
     setIsTesting(true)
-    setTestResult(null)
-    setTestMessage('')
 
     try {
       const response = await fetch('/api/setup/email/test', {
@@ -60,15 +58,21 @@ export const EmailConfig = ({ onNext, onBack, initialData }: EmailConfigProps) =
       const result = await response.json()
 
       if (response.ok) {
-        setTestResult('success')
-        setTestMessage('Email configuration test successful!')
+        notifySuccess({
+          title: 'Email Test Successful',
+          message: 'Email configuration test successful!'
+        })
       } else {
-        setTestResult('error')
-        setTestMessage(result.error || 'Email test failed')
+        notifyError({
+          title: 'Email Test Failed',
+          message: result.error || 'Email test failed'
+        })
       }
     } catch (error) {
-      setTestResult('error')
-      setTestMessage('Email test failed')
+      notifyError({
+        title: 'Email Test Failed',
+        message: 'Email test failed'
+      })
     } finally {
       setIsTesting(false)
     }
@@ -405,18 +409,6 @@ export const EmailConfig = ({ onNext, onBack, initialData }: EmailConfigProps) =
               Test Email
             </Button>
 
-                {testResult && (
-                  <Alert variant={testResult === 'success' ? 'default' : 'destructive'}>
-                    {testResult === 'success' ? (
-                      <CheckCircle className="h-4 w-4" />
-                    ) : (
-                      <XCircle className="h-4 w-4" />
-                    )}
-                    <AlertDescription>
-                      {testMessage}
-                    </AlertDescription>
-                  </Alert>
-                )}
           </div>
         )}
 

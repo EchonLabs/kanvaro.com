@@ -8,7 +8,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/Badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   X, 
   Plus, 
@@ -16,13 +15,13 @@ import {
   User, 
   Target, 
   Clock,
-  AlertTriangle,
   Loader2,
   Trash2,
   Paperclip,
   Check
 } from 'lucide-react'
 import { AttachmentList } from '@/components/ui/AttachmentList'
+import { useNotify } from '@/lib/notify'
 
 interface CreateTaskModalProps {
   isOpen: boolean
@@ -39,6 +38,8 @@ interface User {
   firstName: string
   lastName: string
   email: string
+  projectHourlyRate?: number
+  isActive?: boolean
 }
 
 interface CurrentUser {
@@ -98,7 +99,7 @@ interface Subtask {
 }
 
 const SUBTASK_STATUS_OPTIONS: Array<{ value: SubtaskStatus; label: string }> = [
-  { value: 'backlog', label: 'Backlog' },
+  { value: 'backlog', label: 'backlog' },
   { value: 'todo', label: 'To Do' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'review', label: 'Review' },
@@ -133,9 +134,9 @@ export default function CreateTaskModal({
   stayOnCurrentPage = false
 }: CreateTaskModalProps) {
   const router = useRouter()
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [projectMembers, setProjectMembers] = useState<User[]>([])
   const [loadingProjectMembers, setLoadingProjectMembers] = useState(false)
   const [projects, setProjects] = useState<Array<{ _id: string; name: string }>>([])
@@ -143,7 +144,8 @@ export default function CreateTaskModal({
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
   const [projectQuery, setProjectQuery] = useState('')
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
-  const [assignedToIds, setAssignedToIds] = useState<string[]>([])
+  const [assignedTo, setAssignedTo] = useState<string[]>([])
+  const [assigneeHourlyRates, setAssigneeHourlyRates] = useState<Record<string, string>>({})
   const [assigneeQuery, setAssigneeQuery] = useState('')
   const [newLabel, setNewLabel] = useState('')
   const [stories, setStories] = useState<Story[]>([])
@@ -163,7 +165,7 @@ export default function CreateTaskModal({
     labels: [],
     story: '',
     epic: '',
-    isBillable: true
+    isBillable: false
   })
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [attachments, setAttachments] = useState<AttachmentDraft[]>([])
@@ -188,7 +190,21 @@ export default function CreateTaskModal({
       if (response.ok && data.success && data.data) {
         const projectData = data.data
         const members = Array.isArray(projectData.teamMembers) ? projectData.teamMembers : []
-        setProjectMembers(members)
+
+        // Transform populated team members data
+        const populatedMembers = members
+          .map((member: any) => ({
+            _id: member.memberId._id,
+            firstName: member.memberId.firstName,
+            lastName: member.memberId.lastName,
+            email: member.memberId.email,
+            projectHourlyRate: member.hourlyRate,
+            isActive: member.memberId.isActive !== false
+          }))
+          .filter((member: any) => member.isActive)
+
+        setProjectMembers(populatedMembers)
+
         const billableDefault = typeof projectData.isBillableByDefault === 'boolean' ? projectData.isBillableByDefault : true
         setFormData(prev => ({ ...prev, isBillable: billableDefault }))
       } else {
@@ -251,7 +267,7 @@ export default function CreateTaskModal({
 
     setLoadingEpics(true)
     try {
-      const response = await fetch(`/api/epics?project=${projectIdParam}`)
+      const response = await fetch(`/api/epics?project=${encodeURIComponent(projectIdParam)}&limit=100`)
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
@@ -320,7 +336,6 @@ export default function CreateTaskModal({
   useEffect(() => {
     if (!isOpen) {
       setError('')
-      setSuccess('')
       setFormData({
         title: '',
         description: '',
@@ -332,10 +347,11 @@ export default function CreateTaskModal({
         labels: [],
         story: '',
         epic: '',
-        isBillable: false // Add missing required property
+        isBillable: false
       })
       setSubtasks([])
-      setAssignedToIds([])
+      setAssignedTo([])
+      setAssigneeHourlyRates({})
       setAssigneeQuery('')
       setNewLabel('')
       setProjectMembers([])
@@ -470,11 +486,10 @@ export default function CreateTaskModal({
     e.preventDefault()
     setLoading(true)
     setError('')
-    setSuccess('')
     // Validate required fields including subtasks titles
     const missingSubtaskTitle = subtasks.some(st => !(st.title && st.title.trim().length > 0))
     const missingDueDate = !(formData.dueDate && formData.dueDate.trim().length > 0)
-    const missingAssignees = assignedToIds.length === 0
+    const missingAssignees = assignedTo.length === 0
     if (
       !formData.title ||
       !hasProjectSelected ||
@@ -502,6 +517,16 @@ export default function CreateTaskModal({
         isCompleted: false
       }))
 
+      const assignedToPayload = assignedTo.map(userId => {
+        const member = projectMembers.find(m => m._id.toString() === userId.toString())
+        return {
+          user: userId,
+          firstName: member?.firstName,
+          lastName: member?.lastName,
+          email: member?.email
+        }
+      })
+
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: {
@@ -511,8 +536,7 @@ export default function CreateTaskModal({
           ...formData,
           status: 'backlog',
           project: effectiveProjectId,
-          assignedTo: assignedToIds.length === 1 ? assignedToIds[0] : undefined,
-          assignees: assignedToIds.length > 1 ? assignedToIds : undefined,
+          assignedTo: assignedToPayload,
           estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined,
           dueDate: formData.dueDate || undefined,
           labels: Array.isArray(formData.labels) ? formData.labels : [],
@@ -533,65 +557,52 @@ export default function CreateTaskModal({
       // Read response body only once - you can't read it twice!
       const data = await response.json().catch(() => ({ error: 'Failed to parse response' }))
       
-      if (!response.ok) {
-        setError(data.error || 'Failed to create task')
+      if (!response.ok || !data.success) {
+        const message = data.error || 'Failed to create task'
+        setError(message)
+        notifyError({ title: message })
         setLoading(false)
         return
       }
 
-      if (data.success) {
-        setSuccess('Task created successfully')
-        setError('')
-        onTaskCreated()
-        // Show success message briefly before closing
-        setTimeout(() => {
-          // Reset form
-          setFormData({
-            title: '',
-            description: '',
-            priority: 'medium',
-            type: 'task',
-            assignedTo: '',
-            dueDate: '',
-            estimatedHours: '',
-            labels: [],
-            story: '',
-            epic: '',
-            isBillable: false, // Fix: Provide required field missing from TaskFormData
-          })
-          setSubtasks([])
-          setAssignedToIds([])
-          setAssigneeQuery('')
-          setNewLabel('')
-          if (!projectId) setSelectedProjectId('')
-          setAttachments([])
-          setAttachmentError('')
-          setSuccess('')
-          onClose()
-          // Only redirect to tasks page if not staying on current page (e.g., kanban board)
-          if (!stayOnCurrentPage) {
-            setTimeout(() => {
-              router.push('/tasks')
-            }, 100)
-          }
-        }, 1500)
-      } else {
-        setError(data.error || 'Failed to create task')
-        setLoading(false)
+      notifySuccess({ title: 'Task created successfully' })
+      setError('')
+      onTaskCreated()
+
+      // Reset form immediately after success
+      setFormData({
+        title: '',
+        description: '',
+        priority: 'medium',
+        type: 'task',
+        assignedTo: '',
+        dueDate: '',
+        estimatedHours: '',
+        labels: [],
+        story: '',
+        epic: '',
+        isBillable: false
+      })
+      setSubtasks([])
+      setAssignedTo([])
+      setAssigneeHourlyRates({})
+      setAssigneeQuery('')
+      setNewLabel('')
+      if (!projectId) setSelectedProjectId('')
+      setAttachments([])
+      setAttachmentError('')
+      onClose()
+
+      if (!stayOnCurrentPage) {
+        setTimeout(() => router.push('/tasks'), 100)
       }
     } catch (error) {
       console.error('Task creation error:', error)
       setError('Failed to create task. Please try again.')
+      notifyError({ title: 'Failed to create task. Please try again.' })
       setLoading(false)
     }
   }
-
-  useEffect(() => {
-    if (success) {
-      const t = setTimeout(() => setSuccess(''), 3000)
-      return () => clearTimeout(t)
-    }
-  }, [success])
 
   useEffect(() => {
     if (error) {
@@ -635,29 +646,6 @@ export default function CreateTaskModal({
         </CardHeader>
         <CardContent className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <form onSubmit={handleSubmit} className="space-y-6" autoComplete="on" id="create-task-form">
-            {success && (
-              <Alert variant="success" className="flex items-center justify-between pr-2">
-                <AlertDescription className="flex-1">{success}</AlertDescription>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40"
-                  onClick={() => {
-                    setSuccess('')
-                    onClose()
-                  }}
-                >
-                  <X className="h-4 w-4 text-green-700 dark:text-green-300" />
-                </Button>
-              </Alert>
-            )}
-            {error && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
             {!projectId && (
               <div>
                 <label className="text-sm font-medium text-foreground">Project *</label>
@@ -665,15 +653,23 @@ export default function CreateTaskModal({
                   value={selectedProjectId}
                   onValueChange={(v) => {
                     setSelectedProjectId(v)
-                    setAssignedToIds([])
+                    setAssignedTo([])
+      setAssigneeHourlyRates({})
                     setAssigneeQuery('')
                     setProjectMembers([])
-                    setFormData(prev => ({ ...prev, story: '', epic: '' }))
+                    setFormData(prev => ({
+                      ...prev,
+                      story: '',
+                      epic: '',
+                      isBillable: false // Reset to unchecked when project changes
+                    }))
                     setStories([])
                     setEpics([])
-                    fetchProjectMembers(v)
-                    fetchStories(v)
-                    fetchEpics(v)
+                    if (v) {
+                      fetchProjectMembers(v)
+                      fetchStories(v)
+                      fetchEpics(v)
+                    }
                   }}
                   onOpenChange={(open) => { if (open) setProjectQuery('') }}
                 >
@@ -944,8 +940,8 @@ export default function CreateTaskModal({
                     <Select
                       value=""
                       onValueChange={(value) => {
-                        if (!assignedToIds.includes(value)) {
-                          setAssignedToIds(prev => [...prev, value])
+                        if (!assignedTo.includes(value)) {
+                          setAssignedTo(prev => [...prev, value])
                           setAssigneeQuery('')
                         }
                       }}
@@ -988,8 +984,9 @@ export default function CreateTaskModal({
                               <div className="px-2 py-1 text-sm text-muted-foreground">No team members found for this project</div>
                             ) : (
                               (() => {
+                                const activeMembers = projectMembers.filter(member => member.isActive !== false)
                                 const q = assigneeQuery.toLowerCase().trim()
-                                const filtered = projectMembers.filter(u =>
+                                const filtered = activeMembers.filter(u =>
                                   !q ||
                                   `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
                                   u.email.toLowerCase().includes(q)
@@ -1002,7 +999,7 @@ export default function CreateTaskModal({
                                 }
 
                                 return filtered.map(user => {
-                                  const isSelected = assignedToIds.includes(user._id)
+                                  const isSelected = assignedTo.includes(user._id)
                                   return (
                                     <SelectItem
                                       key={user._id}
@@ -1025,28 +1022,76 @@ export default function CreateTaskModal({
                         </div>
                       </SelectContent>
                     </Select>
-                    {assignedToIds.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {assignedToIds.map(id => {
-                          const u = projectMembers.find(x => x._id === id);
-                          if (!u) return null;
-                          return (
-                            <span 
-                              key={id} 
-                              className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
-                            >
-                              <span>{u.firstName} {u.lastName}</span>
-                              <button
-                                type="button"
-                                aria-label="Remove assignee"
-                                className="text-muted-foreground hover:text-foreground focus:outline-none"
-                                onClick={() => setAssignedToIds(prev => prev.filter(x => x !== id))}
+                    {assignedTo.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                          {assignedTo.map(userId => {
+                            const user = projectMembers.find(u => u._id === userId)
+                            if (!user) return null
+                            return (
+                              <span
+                                key={userId}
+                                className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
                               >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </span>
-                          );
-                        })}
+                                <span>{user.firstName} {user.lastName}</span>
+                                <button
+                                  type="button"
+                                  aria-label="Remove assignee"
+                                  className="text-muted-foreground hover:text-foreground focus:outline-none"
+                                  onClick={() => setAssignedTo(prev => prev.filter(id => id !== userId))}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            )
+                          })}
+                        </div>
+                        {/* Hourly rate inputs for each assignee */}
+                        {/* <div className="space-y-2">
+                          <label className="text-xs font-medium text-muted-foreground">Hourly Rates (optional)</label>
+                          <div className="grid gap-2">
+                            {assignedTo.map(assignee => {
+                              const memberData = projectMembers.find(u => u._id === assignee._id);
+                              const defaultRate = memberData?.projectHourlyRate;
+                              return (
+                                <div key={assignee._id} className="flex items-center gap-2">
+                                  <span className="text-sm min-w-0 flex-1 truncate">{assignee.firstName} {assignee.lastName}</span>
+                                  <div className="flex items-center gap-1">
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={assignee.hourlyRate || ''}
+                                      onChange={(e) => {
+                                        const newRate = e.target.value
+                                        setAssignedTo(prev => prev.map(a =>
+                                          a._id === assignee._id ? { ...a, hourlyRate: newRate } : a
+                                        ))
+                                      }}
+                                      placeholder={defaultRate ? `${defaultRate}` : 'Set rate'}
+                                      className="w-20 h-7 text-xs"
+                                    />
+                                    <span className="text-xs text-muted-foreground">/hr</span>
+                                    {defaultRate && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setAssignedTo(prev => prev.map(a =>
+                                            a._id === assignee._id ? { ...a, hourlyRate: defaultRate.toString() } : a
+                                          ))
+                                        }}
+                                        className="text-xs text-primary hover:text-primary/80"
+                                        title="Use project default rate"
+                                      >
+                                        Use default
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div> */}
                       </div>
                     )}
                   </div>
@@ -1197,7 +1242,7 @@ export default function CreateTaskModal({
               !(formData.title && formData.title.trim().length > 0) ||
               !(projectId || (selectedProjectId && selectedProjectId.trim().length > 0)) ||
               !(formData.dueDate && formData.dueDate.trim().length > 0) ||
-              assignedToIds.length === 0 ||
+              assignedTo.length === 0 ||
               subtasks.some(st => !(st.title && st.title.trim().length > 0))
             }>
               {loading ? (
@@ -1215,18 +1260,6 @@ export default function CreateTaskModal({
           </div>
         </div>
       </Card>
-      {(success || error) && (
-        <div className="fixed bottom-6 right-6 z-[10000]">
-          <div
-            className={`flex items-center space-x-2 rounded-md px-4 py-3 shadow-lg ${success ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}
-            role="status"
-            aria-live="polite"
-          >
-            {success ? <Check className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-            <span className="text-sm font-medium">{success || error}</span>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

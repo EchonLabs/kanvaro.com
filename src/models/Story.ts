@@ -8,7 +8,7 @@ export interface IStory extends Document {
   epic?: mongoose.Types.ObjectId
   createdBy: mongoose.Types.ObjectId
   assignedTo?: mongoose.Types.ObjectId
-  status: 'backlog' | 'in_progress' | 'completed' | 'done' | 'cancelled'
+  status: 'backlog' | 'todo' | 'inprogress' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   storyPoints?: number
   estimatedHours?: number
@@ -35,8 +35,7 @@ const StorySchema = new Schema<IStory>({
   title: {
     type: String,
     required: true,
-    trim: true,
-    maxlength: 200
+    trim: true
   },
   description: {
     type: String,
@@ -67,7 +66,7 @@ const StorySchema = new Schema<IStory>({
   },
   status: {
     type: String,
-    enum: ['backlog', 'in_progress', 'completed', 'done', 'cancelled'],
+    enum: ['backlog', 'todo', 'inprogress', 'done', 'cancelled'],
     default: 'backlog'
   },
   priority: {
@@ -126,4 +125,12 @@ StorySchema.index({ sprint: 1, status: 1 })
 StorySchema.index({ archived: 1 })
 StorySchema.index({ project: 1, archived: 1 })
 
-export const Story = mongoose.models.Story || mongoose.model<IStory>('Story', StorySchema)
+// Check if model already exists to avoid re-registration
+let Story: mongoose.Model<IStory>
+try {
+  Story = mongoose.model<IStory>('Story')
+} catch {
+  Story = mongoose.model<IStory>('Story', StorySchema)
+}
+
+export { Story }

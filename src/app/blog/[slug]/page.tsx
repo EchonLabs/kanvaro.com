@@ -116,7 +116,7 @@ Effective sprint planning is the foundation of successful agile delivery. Here's
 
 ## Before the Planning Session
 
-### Groom Your Backlog
+### Groom Your backlog
 
 Ensure your product backlog is refined and ready:
 

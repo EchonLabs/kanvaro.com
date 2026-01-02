@@ -31,6 +31,12 @@ export async function GET(request: NextRequest) {
 
     // Check if user can view all projects (admin permission)
     const canViewAllProjects = await PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL)
+
+    console.log('Projects API - User permissions:', {
+      userId,
+      canViewAllProjects,
+      hasProjectRead: await PermissionService.hasPermission(userId, Permission.PROJECT_READ)
+    })
     
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
@@ -66,20 +72,45 @@ export async function GET(request: NextRequest) {
     if (!canViewAllProjects) {
       projectQuery.$or = [
         { createdBy: userId },
-        { teamMembers: userId },
+        { "teamMembers.memberId": userId }, // Check teamMembers array for memberId
         { client: userId }
       ]
+      console.log('Projects API - Restricted query for team member:', {
+        userId,
+        baseFilters: filters,
+        finalQuery: projectQuery
+      })
+    } else {
+      console.log('Projects API - Unrestricted query for admin:', {
+        userId,
+        query: projectQuery
+      })
     }
 
     const projects = await Project.find(projectQuery)
+      .select('name startDate endDate createdBy teamMembers client status priority settings')
       .populate('createdBy', 'firstName lastName email')
-      .populate('teamMembers', 'firstName lastName email')
       .populate('client', 'firstName lastName email')
+      .populate('teamMembers.memberId', 'firstName lastName email _id')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
 
     const total = await Project.countDocuments(projectQuery)
+
+    console.log('Projects API - Query results:', {
+      query: projectQuery,
+      totalProjectsFound: total,
+      projectsReturned: projects.length,
+      projects: projects.map(p => ({
+        _id: p._id,
+        name: p.name,
+        createdBy: p.createdBy?._id,
+        teamMembers: p.teamMembers?.map((tm: any) => tm.memberId),
+        isUserCreator: p.createdBy?._id?.toString() === userId,
+        isUserTeamMember: p.teamMembers?.some((tm: any) => tm.memberId?.toString() === userId)
+      }))
+    })
 
     // Calculate progress for each project
     const projectsWithProgress = await Promise.all(
@@ -269,6 +300,7 @@ export async function POST(request: NextRequest) {
           total: budget.total || 0,
           spent: 0,
           currency: orgCurrency, // Use organization currency instead of project currency
+          defaultHourlyRate: budget.defaultHourlyRate || 0,
           categories: {
             materials: budget.categories?.materials || 0,
             overhead: budget.categories?.overhead || 0

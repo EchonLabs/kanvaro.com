@@ -13,10 +13,11 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { FileUploader } from '@/components/ui/FileUploader'
 import { AttachmentList } from '@/components/ui/AttachmentList'
-import { CalendarIcon, X, Link as LinkIcon, AlertCircle, Loader2, CheckCircle, Repeat } from 'lucide-react'
+import { CalendarIcon, X, Link as LinkIcon, AlertCircle, Loader2, Repeat } from 'lucide-react'
 import { format } from 'date-fns'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useNotify } from '@/lib/notify'
 
 interface Sprint {
   _id: string
@@ -32,6 +33,7 @@ interface User {
   firstName: string
   lastName: string
   email: string
+  isActive?: boolean
 }
 
 interface Project {
@@ -54,17 +56,18 @@ interface AddSprintEventModalProps {
   onSuccess: () => void
 }
 
+const MIN_DURATION_MINUTES = 15
+
 export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprintEventModalProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState('')
-  const [error, setError] = useState('')
   const [projects, setProjects] = useState<Project[]>([])
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [selectedDate, setSelectedDate] = useState<Date>()
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [linkUrl, setLinkUrl] = useState('')
+  const { success: notifySuccess, error: notifyError } = useNotify()
 
   // Search queries for dropdowns
   const [projectQuery, setProjectQuery] = useState('')
@@ -209,7 +212,6 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
   }, [])
 
   const fetchUsers = useCallback(async (signal?: AbortSignal) => {
-    // Check cache first
     const cached = cacheRef.current.users
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
       setUsers(cached.data)
@@ -222,56 +224,35 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
       if (response.ok) {
         const data = await response.json()
-        // Handle different response structures
-        let members = []
-        if (data.success && data.data && data.data.members) {
-          members = data.data.members
-        } else if (data.data && Array.isArray(data.data)) {
-          members = data.data
-        } else if (data.members && Array.isArray(data.members)) {
-          members = data.members
-        } else if (Array.isArray(data)) {
-          members = data
-        }
-        const usersData = Array.isArray(members) ? members : []
-        setUsers(usersData)
-        // Update cache
-        cacheRef.current.users = { data: usersData, timestamp: Date.now() }
-      } else {
-        // Fallback to /api/users if /api/members fails
-        const fallbackResponse = await fetch('/api/users', { signal })
-        if (signal?.aborted) return
+        const members =
+          data?.data?.members ??
+          data?.data ??
+          data?.members ??
+          (Array.isArray(data) ? data : [])
 
-        if (fallbackResponse.ok) {
-          const usersData = await fallbackResponse.json()
-          const usersArray = Array.isArray(usersData) ? usersData : []
-          setUsers(usersArray)
-          cacheRef.current.users = { data: usersArray, timestamp: Date.now() }
-        } else {
-          setUsers([])
-        }
+        const normalizedMembers = Array.isArray(members)
+          ? members
+              .filter((member: any) => member && member._id)
+              .map((member: any) => ({
+                _id: member._id,
+                firstName: member.firstName || '',
+                lastName: member.lastName || '',
+                email: member.email || '',
+                isActive: member.isActive !== false
+              }))
+          : []
+
+        const activeMembers = normalizedMembers.filter(member => member.isActive !== false)
+
+        setUsers(activeMembers)
+        cacheRef.current.users = { data: activeMembers, timestamp: Date.now() }
+      } else {
+        setUsers([])
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return
-
-      // Try fallback API
-      try {
-        const fallbackResponse = await fetch('/api/users', { signal })
-        if (signal?.aborted) return
-
-        if (fallbackResponse.ok) {
-          const usersData = await fallbackResponse.json()
-          const usersArray = Array.isArray(usersData) ? usersData : []
-          setUsers(usersArray)
-          cacheRef.current.users = { data: usersArray, timestamp: Date.now() }
-        } else {
-          setUsers([])
-        }
-      } catch (fallbackError) {
-        if (fallbackError instanceof Error && fallbackError.name === 'AbortError') return
-        console.error('Error fetching users:', fallbackError)
-        setUsers([])
-      }
+      console.error('Error fetching organization members:', error)
+      setUsers([])
     }
   }, [])
 
@@ -289,7 +270,6 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     const fetchAllData = async () => {
       const promises: Promise<void>[] = []
 
-      // Always fetch users (cached)
       promises.push(fetchUsers(signal))
 
       if (projectId) {
@@ -566,14 +546,11 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
       const start = startHours * 60 + startMinutes
       const end = endHours * 60 + endMinutes
       const duration = end - start
-      if (duration > 0) {
-        setFormData(prev => ({ ...prev, duration }))
-      } else {
-        setFormData(prev => ({ ...prev, duration: 0 }))
-      }
+      const clampedDuration = duration > 0 ? Math.max(duration, MIN_DURATION_MINUTES) : MIN_DURATION_MINUTES
+      setFormData(prev => ({ ...prev, duration: clampedDuration }))
     } else {
-      // Reset duration if times are not both provided or there are errors
-      setFormData(prev => ({ ...prev, duration: 0 }))
+      // When times are missing or invalid, keep the duration at backend minimum to avoid validation errors
+      setFormData(prev => ({ ...prev, duration: MIN_DURATION_MINUTES }))
     }
   }
 
@@ -595,7 +572,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
   // Get the calculated duration display value
   const getDurationDisplay = () => {
-    if (formData.startTime && formData.endTime && !startTimeError && !endTimeError && formData.duration > 0) {
+    if (formData.startTime && formData.endTime && !startTimeError && !endTimeError && formData.duration >= MIN_DURATION_MINUTES) {
       return formatDuration(formData.duration)
     }
     return 'Enter start and end time to calculate'
@@ -619,12 +596,12 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     // If both times are provided, they must be valid (no timeError) and duration must be > 0
     const hasValidTime =
       (!formData.startTime && !formData.endTime) || // Both empty is OK (optional)
-      (formData.startTime && formData.endTime && !startTimeError && !endTimeError && formData.duration > 0) // Both filled and valid
+      (formData.startTime && formData.endTime && !startTimeError && !endTimeError && formData.duration >= MIN_DURATION_MINUTES) // Both filled and valid
 
     // Check date validation - date must be valid if selected
     const hasValidDate = !dateError || (selectedDate && (!selectedSprint || validateDate(selectedDate)))
 
-    return hasRequiredFields && hasValidTime && hasValidDate
+    return hasRequiredFields && hasValidTime && hasValidDate && formData.duration >= MIN_DURATION_MINUTES
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -681,38 +658,37 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
       })
 
       if (response.ok) {
-        setSuccess('Sprint Event created successfully')
-        setError('')
+        notifySuccess({
+          title: 'Sprint Event Created',
+          message: 'Sprint Event created successfully'
+        })
         setLoading(false)
         onSuccess()
-        // Show success message briefly before closing and redirecting
+        // Close modal and redirect after showing success notification
         setTimeout(() => {
-          setSuccess('')
           onClose()
           router.push('/sprint-events?success=created')
-        }, 2500)
+        }, 1000)
       } else {
         const errorData = await response.json()
         const errorMessage = errorData.error || 'Failed to create event'
         console.error('Error creating sprint event:', errorData)
-        setError(errorMessage)
-        setSuccess('')
+        notifyError({
+          title: 'Failed to Create Sprint Event',
+          message: errorMessage
+        })
         setLoading(false)
       }
     } catch (err) {
       console.error('Error creating sprint event:', err)
-      setError('Failed to create event. Please try again.')
-      setSuccess('')
+      notifyError({
+        title: 'Failed to Create Sprint Event',
+        message: 'Failed to create event. Please try again.'
+      })
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    if (error) {
-      const t = setTimeout(() => setError(''), 5000)
-      return () => clearTimeout(t)
-    }
-  }, [error])
 
   const handleInputChange = useCallback((field: string, value: string | number | any) => {
     if (field.includes('.')) {
@@ -780,15 +756,19 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     return statusOptions.filter(so => so.label.toLowerCase().includes(query))
   }, [statusQuery])
 
-  const filteredUsers = useMemo(() => {
+  const activeUsers = useMemo(() => {
     if (!Array.isArray(users)) return []
-    if (!debouncedAttendeeQuery.trim()) return users
+    return users.filter(user => user.isActive !== false)
+  }, [users])
+
+  const filteredUsers = useMemo(() => {
+    if (!debouncedAttendeeQuery.trim()) return activeUsers
     const query = debouncedAttendeeQuery.toLowerCase()
-    return users.filter((u: User) => {
+    return activeUsers.filter((u: User) => {
       const fullName = `${u.firstName} ${u.lastName}`.toLowerCase()
       return fullName.includes(query) || u.email.toLowerCase().includes(query)
     })
-  }, [users, debouncedAttendeeQuery])
+  }, [activeUsers, debouncedAttendeeQuery])
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -802,31 +782,6 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
         <DialogBody className="flex-1 overflow-y-auto px-4 sm:px-6">
           <form onSubmit={handleSubmit} className="space-y-6" id="create-sprint-event-form">
-            {success && (
-              <Alert variant="success" className="flex items-center justify-between pr-2">
-                <AlertDescription className="flex-1 flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4" />
-                  {success}
-                </AlertDescription>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900/40"
-                  onClick={() => {
-                    setSuccess('')
-                    onClose()
-                  }}
-                >
-                  <X className="h-4 w-4 text-green-700 dark:text-green-300" />
-                </Button>
-              </Alert>
-            )}
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
             {/* (1) Basic Details */}
             <div className="space-y-4">
               <h3 className="text-sm font-semibold">Basic Details</h3>
@@ -947,7 +902,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
             {/* (3) Schedule */}
             <div className="space-y-4 mt-8">
-              <h3 className="text-sm font-semibold">Schedule</h3>
+              <h3 className="text-sm font-semibold mt-4">Schedule</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="scheduledDate">Date *</Label>
@@ -1215,40 +1170,74 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
             </div>
 
             {/* (4) Attendees */}
-            <div className="space-y-4 mt-8">
-              <h3 className="text-sm font-semibold">Attendees</h3>
-              <div className="max-h-32 overflow-y-auto border rounded-md p-2">
-                <Input
-                  value={attendeeQuery}
-                  onChange={(e) => setAttendeeQuery(e.target.value)}
-                  placeholder="Search attendees..."
-                  className="mb-2"
-                />
-                <div className="space-y-2">
-                  {filteredUsers.map((user) => (
-                    <label key={user._id} className="flex items-center space-x-2 cursor-pointer">
-                      <Checkbox
-                        checked={formData.attendees.includes(user._id)}
-                        onCheckedChange={() => handleAttendeeToggle(user._id)}
-                      />
-                      <span className="text-sm">
-                        {user.firstName} {user.lastName} ({user.email})
+            {(() => {
+          
+
+            
+
+              return (
+                <div className="space-y-4 mt-8">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold mt-4">Attendees</h3>
+                    {formData.attendees.length > 0 && (
+                      <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                        {formData.attendees.length} selected
                       </span>
-                    </label>
-                  ))}
-                  {filteredUsers.length === 0 && users.length > 0 && (
-                    <div className="px-2 py-1 text-sm text-muted-foreground">No matching attendees</div>
-                  )}
-                  {users.length === 0 && (
-                    <div className="px-2 py-1 text-sm text-muted-foreground">No attendees available</div>
-                  )}
+                    )}
+                  </div>
+
+                  {/* Search input - outside scrollable area */}
+                  <Input
+                    value={attendeeQuery}
+                    onChange={(e) => {
+                      setAttendeeQuery(e.target.value)
+                    }}
+                    placeholder="Search attendees..."
+                    className="w-full"
+                  />
+
+                  {/* Scrollable attendees list */}
+                  <div className="max-h-48 overflow-y-auto border rounded-md">
+                    <div className="p-3">
+                      {filteredUsers && filteredUsers.length > 0 ? (
+                        <div className="space-y-3">
+                          {filteredUsers.map((user) => (
+                            <label key={user._id} className="flex items-center space-x-3 cursor-pointer hover:bg-muted/50 p-2 rounded-md transition-colors">
+                              <Checkbox
+                                checked={formData.attendees.includes(user._id)}
+                                onCheckedChange={() => {
+                                  handleAttendeeToggle(user._id)
+                                }}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium truncate">
+                                  {user.firstName} {user.lastName}
+                                </div>
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {user.email}
+                                </div>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      ) : users && users.length > 0 ? (
+                        <div className="text-center py-8 text-sm text-muted-foreground">
+                          No attendees match your search "{attendeeQuery}"
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-sm text-muted-foreground">
+                          No attendees available
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              )
+            })()}
 
             {/* (5) Description / Notes */}
             <div className="space-y-4 mt-8">
-              <h3 className="text-sm font-semibold">Description / Notes</h3>
+              <h3 className="text-sm font-semibold mt-4">Description / Notes</h3>
               <Textarea
                 id="description"
                 value={formData.description}
@@ -1261,7 +1250,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
             {/* (6) Attachments */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Attachments (Optional)</h3>
+              <h3 className="text-sm font-semibold mt-4">Attachments (Optional)</h3>
               <FileUploader onUpload={handleFileUpload} />
 
               {attachments.length > 0 && (
@@ -1288,7 +1277,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
 
             {/* (7) Notification Settings */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Notification & Reminder Settings</h3>
+              <h3 className="text-sm font-semibold mt-4">Notification & Reminder Settings</h3>
               <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
                 <label className="flex items-center space-x-2">
                   <Checkbox
@@ -1356,8 +1345,8 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
             </div>
 
             {/* Location and Meeting Link */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-4 mt-8">
+              <div className="space-y-2 mt-4">
                 <Label htmlFor="location">Location</Label>
                 <Input
                   id="location"
@@ -1366,7 +1355,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
                   placeholder="Meeting room, office, etc."
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 mt-4">
                 <Label htmlFor="meetingLink">Meeting Link</Label>
                 <Input
                   id="meetingLink"

@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/Badge'
 import { Loader2, ArrowLeft, Users, X, AlertTriangle } from 'lucide-react'
+import { useNotify } from '@/lib/notify'
+import { validateSprintDates } from '@/lib/sprintDateValidation'
 
 interface SprintForm {
   name: string
@@ -28,6 +30,7 @@ interface TeamMember {
   firstName: string
   lastName: string
   email: string
+  isActive?: boolean
 }
 
 interface Project {
@@ -39,6 +42,7 @@ export default function EditSprintPage() {
   const router = useRouter()
   const params = useParams()
   const sprintId = params.id as string
+  const { success: notifySuccess, error: notifyError } = useNotify()
 
   const [form, setForm] = useState<SprintForm>({
     name: '',
@@ -68,7 +72,8 @@ export default function EditSprintPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [projectQuery, setProjectQuery] = useState('')
   const [selectedProject, setSelectedProject] = useState<any>(null)
-  const [dateError, setDateError] = useState('')
+  const [startDateError, setStartDateError] = useState('')
+  const [endDateError, setEndDateError] = useState('')
   const messageContainerRef = useRef<HTMLDivElement>(null)
 
   const storeMemberDetails = useCallback((members?: TeamMember[]) => {
@@ -81,7 +86,8 @@ export default function EditSprintPage() {
             _id: member._id,
             firstName: member.firstName,
             lastName: member.lastName,
-            email: member.email
+            email: member.email,
+            isActive: member.isActive !== false
           }
         }
       })
@@ -113,19 +119,98 @@ export default function EditSprintPage() {
     try {
       setMembersLoading(true)
       setMembersError('')
-      const res = await fetch(`/api/projects/${projectId}`)
-      const data = await res.json()
+      const [projectResponse, membersResponse] = await Promise.all([
+        fetch(`/api/projects/${projectId}`),
+        fetch('/api/members')
+      ])
 
-      if (res.ok && data.success && data.data) {
-        setSelectedProject(data.data)
-        if (data.data?.teamMembers) {
-          setAvailableMembers(data.data.teamMembers)
-          storeMemberDetails(data.data.teamMembers)
+      const projectData = await projectResponse.json()
+      const membersData = await membersResponse.json().catch(() => ({ success: false }))
+
+      if (projectResponse.ok && projectData.success && projectData.data) {
+        setSelectedProject(projectData.data)
+
+        const directoryMembers =
+          membersResponse.ok && membersData.success && Array.isArray(membersData.data?.members)
+            ? membersData.data.members
+            : []
+        const directoryMap = new Map<string, any>()
+        directoryMembers.forEach((member: any) => {
+          if (member?._id) directoryMap.set(member._id, member)
+        })
+
+        const collectMemberId = (entry: any): string | null => {
+          if (!entry) return null
+          if (typeof entry === 'string') return entry
+          if (entry.memberId) return collectMemberId(entry.memberId)
+          if (entry._id) return entry._id
+          return null
         }
+
+        const normalizeMember = (raw: any): TeamMember | null => {
+          if (!raw) return null
+          if (typeof raw === 'string') {
+            const fromDirectory = directoryMap.get(raw)
+            if (fromDirectory) return normalizeMember(fromDirectory)
+            return {
+              _id: raw,
+              firstName: 'Unknown',
+              lastName: '',
+              email: '',
+              isActive: true
+            }
+          }
+          if (raw.memberId) return normalizeMember(raw.memberId)
+          if (!raw._id) return null
+          return {
+            _id: raw._id,
+            firstName: raw.firstName || '',
+            lastName: raw.lastName || '',
+            email: raw.email || '',
+            isActive: raw.isActive !== false
+          }
+        }
+
+        const normalizedMembersMap = new Map<string, TeamMember>()
+        const addMember = (entry: any) => {
+          const normalized = normalizeMember(entry)
+          if (normalized) normalizedMembersMap.set(normalized._id, normalized)
+        }
+
+        const projectTeamMembers = Array.isArray(projectData.data.teamMembers)
+          ? projectData.data.teamMembers
+          : []
+        const projectMembersList = Array.isArray(projectData.data.members)
+          ? projectData.data.members
+          : []
+
+        projectTeamMembers.forEach((member: any) => addMember(member))
+        projectMembersList.forEach((member: any) => addMember(member))
+
+        if (normalizedMembersMap.size === 0 && directoryMap.size > 0) {
+          const projectMemberIds = new Set<string>()
+          projectTeamMembers.forEach((member: any) => {
+            const id = collectMemberId(member)
+            if (id) projectMemberIds.add(id)
+          })
+          projectMembersList.forEach((member: any) => {
+            const id = collectMemberId(member)
+            if (id) projectMemberIds.add(id)
+          })
+
+          projectMemberIds.forEach((memberId) => {
+            const directoryEntry = directoryMap.get(memberId)
+            if (directoryEntry) addMember(directoryEntry)
+          })
+        }
+
+        const normalizedMembers = Array.from(normalizedMembersMap.values())
+        setAvailableMembers(normalizedMembers)
+        storeMemberDetails(normalizedMembers)
       } else {
         setAvailableMembers([])
         setSelectedProject(null)
-        setMembersError(data.error || 'Failed to load project team members')
+        setMembersError(projectData.error || 'Failed to load project team members')
       }
     } catch (err) {
       console.error('Failed to fetch project members:', err)
@@ -137,77 +222,23 @@ export default function EditSprintPage() {
     }
   }, [storeMemberDetails])
 
-  // Validate sprint dates
-  const validateDates = (startDate: string, endDate: string, project?: any) => {
-    setDateError('')
-    
-    if (!startDate || !endDate) {
-      return true // Allow empty dates during input
-    }
-
-    if (!project || !project.startDate || !project.endDate) {
-      setDateError('Project dates are not available. Please select a valid project.')
-      return false
-    }
-
-    const today = new Date()
-    today.setHours(0, 0, 0, 0) // Reset time to start of day
-
-    const sprintStart = new Date(startDate)
-    sprintStart.setHours(0, 0, 0, 0)
-    
-    const sprintEnd = new Date(endDate)
-    sprintEnd.setHours(0, 0, 0, 0)
-
-    const projectStart = new Date(project.startDate)
-    projectStart.setHours(0, 0, 0, 0)
-    
-    const projectEnd = new Date(project.endDate)
-    projectEnd.setHours(23, 59, 59, 999) // End of day
-
-    // Check if start date is in the past
-    if (sprintStart < today) {
-      setDateError(`Start date: Must be today (${today.toLocaleDateString()}) or a future date.`)
-      return false
-    }
-
-    // Check if start date is before project start
-    if (sprintStart < projectStart) {
-      setDateError(`Start date: Must be on or after project start date (${projectStart.toLocaleDateString()}).`)
-      return false
-    }
-
-    // Check if start date is after project end
-    if (sprintStart > projectEnd) {
-      setDateError(`Start date: Must be on or before project end date (${projectEnd.toLocaleDateString()}).`)
-      return false
-    }
-
-    // Check if end date is in the past
-    if (sprintEnd < today) {
-      setDateError(`End date: Must be today (${today.toLocaleDateString()}) or a future date.`)
-      return false
-    }
-
-    // Check if end date is before project start
-    if (sprintEnd < projectStart) {
-      setDateError(`End date: Must be on or after project start date (${projectStart.toLocaleDateString()}).`)
-      return false
-    }
-
-    // Check if end date is after project end
-    if (sprintEnd > projectEnd) {
-      setDateError(`End date: Must be on or before project end date (${projectEnd.toLocaleDateString()}).`)
-      return false
-    }
-
-    // Check if end date is after start date
-    if (sprintEnd < sprintStart) {
-      setDateError('End date: Must be after the start date.')
-      return false
-    }
-
-    return true
+  // Shared sprint date validation
+  const runDateValidation = (
+    startDate: string,
+    endDate: string,
+    project: any,
+    requireBoth = false
+  ) => {
+    const result = validateSprintDates({
+      startDate,
+      endDate,
+      projectStart: project?.startDate,
+      projectEnd: project?.endDate,
+      requireBoth
+    })
+    setStartDateError(result.startError)
+    setEndDateError(result.endError)
+    return result.isValid
   }
 
   const fetchSprint = useCallback(async () => {
@@ -295,16 +326,18 @@ export default function EditSprintPage() {
       fetchProjectMembers(projectId)
       // Clear team members when project changes
       setTeamMembers([])
-      setDateError('')
+      setStartDateError('')
+      setEndDateError('')
     }
   }, [projectId, initialProjectId, fetchProjectMembers])
 
   // Validate dates when project or dates change
   useEffect(() => {
-    if (selectedProject && form.startDate && form.endDate) {
-      validateDates(form.startDate, form.endDate, selectedProject)
+    if (selectedProject && (form.startDate || form.endDate)) {
+      runDateValidation(form.startDate, form.endDate, selectedProject, false)
     } else if (!form.startDate || !form.endDate) {
-      setDateError('')
+      setStartDateError('')
+      setEndDateError('')
     }
   }, [selectedProject, form.startDate, form.endDate])
 
@@ -334,17 +367,21 @@ export default function EditSprintPage() {
     // Validate dates before saving
     if (!selectedProject) {
       setError('Project information is not available. Please refresh the page.')
+      notifyError({ title: 'Project information is not available. Please refresh the page.' })
       return
     }
 
-    if (!validateDates(form.startDate, form.endDate, selectedProject)) {
+    const datesAreValid = runDateValidation(form.startDate, form.endDate, selectedProject, true)
+    if (!datesAreValid) {
+      notifyError({ title: 'Please fix the date errors before saving.' })
       return
     }
 
     try {
       setSaving(true)
       setError('')
-      setDateError('')
+      setStartDateError('')
+      setEndDateError('')
       const res = await fetch(`/api/sprints/${sprintId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -404,19 +441,27 @@ export default function EditSprintPage() {
         }
         setSuccessMessage('Sprint updated successfully')
         setError('')
+        notifySuccess({ title: 'Sprint updated successfully' })
       } else {
         setError(data.error || 'Failed to save sprint')
+        notifyError({ title: data.error || 'Failed to save sprint' })
       }
     } catch (e) {
       setError('Failed to save sprint')
+      notifyError({ title: 'Failed to save sprint' })
     } finally {
       setSaving(false)
     }
   }
 
+  const activeAvailableMembers = useMemo(
+    () => availableMembers.filter((member) => member.isActive !== false),
+    [availableMembers]
+  )
+
   const filteredTeamOptions = useMemo(() => {
     // First, exclude already selected members
-    const unselectedMembers = availableMembers.filter(
+    const unselectedMembers = activeAvailableMembers.filter(
       (member) => !teamMembers.includes(member._id)
     )
     
@@ -431,9 +476,9 @@ export default function EditSprintPage() {
         (member.email ? member.email.toLowerCase().includes(query) : false)
       )
     })
-  }, [availableMembers, teamMembers, teamMemberQuery])
+  }, [activeAvailableMembers, teamMembers, teamMemberQuery])
 
-  const isSelectDisabled = membersLoading || availableMembers.length === 0
+  const isSelectDisabled = membersLoading || activeAvailableMembers.length === 0
 
   const handleRemoveMember = (memberId: string) => {
     setTeamMembers((prev) => prev.filter((id) => id !== memberId))
@@ -504,18 +549,6 @@ export default function EditSprintPage() {
         <Button variant="ghost" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
-        <div ref={messageContainerRef}>
-          {successMessage && (
-            <Alert variant="success">
-              <AlertDescription>{successMessage}</AlertDescription>
-            </Alert>
-          )}
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-        </div>
         <Card>
           <CardHeader>
             <CardTitle>Edit Sprint</CardTitle>
@@ -528,7 +561,8 @@ export default function EditSprintPage() {
                 onValueChange={(value) => {
                   setProjectId(value)
                   setTeamMembers([]) // Clear team members when project changes
-                  setDateError('') // Clear date error when project changes
+                  setStartDateError('') // Clear date errors when project changes
+                  setEndDateError('')
                   // Project details will be fetched in useEffect
                 }}
                 onOpenChange={(open) => {
@@ -603,7 +637,7 @@ export default function EditSprintPage() {
                 </Select>
               </div>
 
-              {selectedProject && (
+              {selectedProject?.startDate && selectedProject?.endDate && (
                 <div className="p-3 bg-muted/50 rounded-md border border-muted">
                   <p className="text-xs text-muted-foreground">
                     <span className="font-medium">Project Duration:</span>{' '}
@@ -625,37 +659,37 @@ export default function EditSprintPage() {
                     onChange={(e) => {
                       const newStartDate = e.target.value
                       setForm({ ...form, startDate: newStartDate })
-                      if (selectedProject && newStartDate && form.endDate) {
-                        validateDates(newStartDate, form.endDate, selectedProject)
+                      if (selectedProject && (newStartDate || form.endDate)) {
+                        runDateValidation(newStartDate, form.endDate, selectedProject, false)
                       } else {
-                        setDateError('')
+                        setStartDateError('')
+                        setEndDateError('')
                       }
                     }}
                     min={
-                      selectedProject?.startDate 
-                        ? new Date(Math.max(
-                            new Date(selectedProject.startDate).getTime(),
-                            new Date().setHours(0, 0, 0, 0)
-                          )).toISOString().split('T')[0]
+                      selectedProject?.startDate
+                        ? new Date(
+                            Math.max(
+                              new Date(selectedProject.startDate).getTime(),
+                              new Date().setHours(0, 0, 0, 0)
+                            )
+                          )
+                          .toISOString()
+                          .split('T')[0]
                         : new Date().toISOString().split('T')[0]
                     }
                     max={
-                      selectedProject?.endDate && form.endDate
-                        ? new Date(Math.min(
-                            new Date(selectedProject.endDate).getTime(),
-                            new Date(form.endDate).getTime()
-                          )).toISOString().split('T')[0]
-                        : selectedProject?.endDate
-                          ? new Date(selectedProject.endDate).toISOString().split('T')[0]
-                          : undefined
+                      selectedProject?.endDate
+                        ? new Date(selectedProject.endDate).toISOString().split('T')[0]
+                        : undefined
                     }
-                    className={`mt-1 ${dateError && form.startDate && dateError.includes('start') ? 'border-destructive' : ''}`}
+                    className={`mt-1 ${startDateError ? 'border-destructive' : ''}`}
                     disabled={!projectId}
                   />
-                  {dateError && form.startDate && dateError.includes('start') && (
+                  {startDateError && (
                     <p className="text-xs text-destructive mt-1 flex items-center gap-1">
                       <AlertTriangle className="h-3 w-3 flex-shrink-0" />
-                      {dateError}
+                      {startDateError}
                     </p>
                   )}
                 </div>
@@ -667,37 +701,32 @@ export default function EditSprintPage() {
                     onChange={(e) => {
                       const newEndDate = e.target.value
                       setForm({ ...form, endDate: newEndDate })
-                      if (selectedProject && form.startDate && newEndDate) {
-                        validateDates(form.startDate, newEndDate, selectedProject)
+                      if (selectedProject && (form.startDate || newEndDate)) {
+                        runDateValidation(form.startDate, newEndDate, selectedProject, false)
                       } else {
-                        setDateError('')
+                        setStartDateError('')
+                        setEndDateError('')
                       }
                     }}
                     min={
-                      selectedProject?.startDate && form.startDate
-                        ? new Date(Math.max(
-                            new Date(selectedProject.startDate).getTime(),
-                            new Date(form.startDate).getTime(),
-                            new Date().setHours(0, 0, 0, 0)
-                          )).toISOString().split('T')[0]
-                        : form.startDate
-                          ? new Date(Math.max(
-                              new Date(form.startDate).getTime(),
+                      selectedProject?.startDate || form.startDate
+                        ? new Date(
+                            Math.max(
+                              form.startDate ? new Date(form.startDate).getTime() : 0,
+                              selectedProject?.startDate ? new Date(selectedProject.startDate).getTime() : 0,
                               new Date().setHours(0, 0, 0, 0)
-                            )).toISOString().split('T')[0]
-                          : selectedProject?.startDate
-                            ? new Date(Math.max(
-                                new Date(selectedProject.startDate).getTime(),
-                                new Date().setHours(0, 0, 0, 0)
-                              )).toISOString().split('T')[0]
-                            : new Date().toISOString().split('T')[0]
+                            )
+                          )
+                          .toISOString()
+                          .split('T')[0]
+                        : new Date().toISOString().split('T')[0]
                     }
                     max={
                       selectedProject?.endDate
                         ? new Date(selectedProject.endDate).toISOString().split('T')[0]
                         : undefined
                     }
-                    className={`mt-1 ${dateError && form.endDate && (dateError.includes('end') || dateError.includes('after')) ? 'border-destructive' : ''}`}
+                    className={`mt-1 ${endDateError ? 'border-destructive' : ''}`}
                     disabled={!projectId || !form.startDate}
                   />
                   {!form.startDate && projectId && (
@@ -706,10 +735,10 @@ export default function EditSprintPage() {
                       Please select start date first
                     </p>
                   )}
-                  {dateError && form.endDate && (dateError.includes('end') || dateError.includes('after')) && (
+                  {endDateError && (
                     <p className="text-xs text-destructive mt-1 flex items-center gap-1">
                       <AlertTriangle className="h-3 w-3 flex-shrink-0" />
-                      {dateError}
+                      {endDateError}
                     </p>
                   )}
                 </div>
@@ -780,8 +809,8 @@ export default function EditSprintPage() {
                       placeholder={
                         membersLoading
                           ? 'Loading team members...'
-                          : availableMembers.length === 0
-                            ? 'No team members for this project'
+                          : activeAvailableMembers.length === 0
+                            ? 'No active team members for this project'
                             : 'Search team members'
                       }
                     />
@@ -800,9 +829,9 @@ export default function EditSprintPage() {
                               <Loader2 className="h-4 w-4 animate-spin" />
                               <span>Loading members...</span>
                             </div>
-                          ) : availableMembers.length === 0 ? (
+                          ) : activeAvailableMembers.length === 0 ? (
                             <div className="px-2 py-1 text-xs text-muted-foreground">
-                              No team members available
+                              No active team members available
                             </div>
                           ) : filteredTeamOptions.length === 0 ? (
                             <div className="px-2 py-1 text-xs text-muted-foreground">
@@ -831,9 +860,9 @@ export default function EditSprintPage() {
                       </div>
                     </SelectContent>
                   </Select>
-                  {!membersLoading && availableMembers.length === 0 && (
+                  {!membersLoading && activeAvailableMembers.length === 0 && (
                     <p className="text-xs text-muted-foreground italic">
-                      No team members available for this sprint&apos;s project.
+                      No active team members available for this sprint&apos;s project.
                     </p>
                   )}
                 </div>
@@ -889,7 +918,10 @@ export default function EditSprintPage() {
 
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => router.push(`/sprints/${sprintId}`)}>Cancel</Button>
-              <Button onClick={handleSave} disabled={saving || !hasChanges}>
+              <Button
+                onClick={handleSave}
+                disabled={saving || !hasChanges || Boolean(startDateError) || Boolean(endDateError)}
+              >
                 {saving ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>) : 'Save Changes'}
               </Button>
             </div>
