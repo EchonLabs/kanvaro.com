@@ -199,7 +199,7 @@ export const Organization = mongoose.model<IOrganization>('Organization', Organi
 export interface IProject extends Document {
   name: string;
   description: string;
-  status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled';
+  status: 'draft' | 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled';
   organization: mongoose.Types.ObjectId;
   createdBy: mongoose.Types.ObjectId;
   teamMembers: mongoose.Types.ObjectId[];
@@ -234,7 +234,7 @@ const ProjectSchema = new Schema<IProject>({
   description: String,
   status: { 
     type: String, 
-    enum: ['planning', 'active', 'on_hold', 'completed', 'cancelled'],
+    enum: ['draft', 'planning', 'active', 'on_hold', 'completed', 'cancelled'],
     default: 'planning'
   },
   organization: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },

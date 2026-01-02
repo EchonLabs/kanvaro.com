@@ -51,7 +51,7 @@ interface ProjectFormData {
   // Basic Information
   name: string
   description: string
-  status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled'
+  status: 'draft' | 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   projectNumber?: number
   isBillableByDefault: boolean
@@ -218,6 +218,25 @@ const [overheadInput, setOverheadInput] = useState('')
     { id: 7, title: 'Review', description: 'Review and create project' }
   ]
 
+  const getStatusBadgeStyles = (status: string) => {
+    switch (status) {
+      case 'draft':
+        return 'bg-amber-100 text-amber-800'
+      case 'planning':
+        return 'bg-blue-100 text-blue-800'
+      case 'active':
+        return 'bg-green-100 text-green-800'
+      case 'on_hold':
+        return 'bg-yellow-100 text-yellow-800'
+      case 'completed':
+        return 'bg-gray-100 text-gray-800'
+      case 'cancelled':
+        return 'bg-red-100 text-red-800'
+      default:
+        return 'bg-muted text-foreground'
+    }
+  }
+
   // Validate current step before proceeding
   const validateCurrentStep = () => {
     const errors: Record<string, string> = {}
@@ -377,6 +396,10 @@ const [overheadInput, setOverheadInput] = useState('')
         ...formData,
         teamMembers: teamMembersWithRates,
         isDraft
+      }
+
+      if (isDraft) {
+        payload.status = 'draft'
       }
 
       if (normalizedClients.length > 0) {
@@ -1057,6 +1080,7 @@ const [overheadInput, setOverheadInput] = useState('')
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="draft">Draft</SelectItem>
                         <SelectItem value="planning">Planning</SelectItem>
                         <SelectItem value="active">Active</SelectItem>
                         {isEditMode && (
@@ -2380,8 +2404,8 @@ const [overheadInput, setOverheadInput] = useState('')
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-muted-foreground">Status</span>
-                            <Badge className={formData.status === 'planning' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}>
-                              {formData.status}
+                            <Badge className={getStatusBadgeStyles(formData.status)}>
+                              {formatToTitleCase(formData.status.replace(/_/g, ' '))}
                             </Badge>
                           </div>
                           <div className="flex items-center justify-between">
