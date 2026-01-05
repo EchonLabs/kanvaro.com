@@ -52,6 +52,7 @@ interface TimeEntry {
   category?: string
   tags: string[]
   notes?: string
+  isReject?: boolean
   isApproved: boolean
   approvedBy?: { firstName: string; lastName: string }
   project?: { _id: string; name: string; settings?: any } | null
@@ -1023,7 +1024,13 @@ export function TimeLogs({
       if (filters.endDate) params.append('endDate', filters.endDate)
       if (filters.status && filters.status !== 'all') params.append('status', filters.status)
       if (filters.isBillable && filters.isBillable !== 'all') params.append('isBillable', filters.isBillable)
-      if (filters.isApproved && filters.isApproved !== 'all') params.append('isApproved', filters.isApproved)
+      if (filters.isApproved && filters.isApproved !== 'all') {
+        if (filters.isApproved === 'rejected') {
+          params.append('isRejected', 'true')
+        } else {
+          params.append('isApproved', filters.isApproved)
+        }
+      }
 
       const response = await fetch(`/api/time-tracking/entries?${params}`)
       const data = await response.json()
@@ -1785,7 +1792,13 @@ export function TimeLogs({
             if (filters.endDate) params.append('endDate', filters.endDate)
             if (filters.status && filters.status !== 'all') params.append('status', filters.status)
             if (filters.isBillable && filters.isBillable !== 'all') params.append('isBillable', filters.isBillable)
-            if (filters.isApproved && filters.isApproved !== 'all') params.append('isApproved', filters.isApproved)
+            if (filters.isApproved && filters.isApproved !== 'all') {
+        if (filters.isApproved === 'rejected') {
+          params.append('isRejected', 'true')
+        } else {
+          params.append('isApproved', filters.isApproved)
+        }
+      }
 
             const response = await fetch(`/api/time-tracking/entries?${params}`)
             const data = await response.json()
@@ -2206,6 +2219,7 @@ export function TimeLogs({
                     <SelectItem value="all">All</SelectItem>
                     <SelectItem value="true">Approved</SelectItem>
                     <SelectItem value="false">Pending</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -2408,14 +2422,26 @@ export function TimeLogs({
                             // If project doesn't require approval, always show as Approved
                             const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
 
-                            const isApproved = projectRequiresApproval ? entry.isApproved : true;                            
+                            const isApproved = projectRequiresApproval ? entry.isApproved : true;
+                            const isRejected = entry.isReject;
+
+                            let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
+                            let badgeText = 'Pending';
+
+                            if (isRejected) {
+                              badgeVariant = 'destructive';
+                              badgeText = 'Rejected';
+                            } else if (isApproved) {
+                              badgeVariant = 'default';
+                              badgeText = 'Approved';
+                            }
 
                             return (
-                          <Badge 
-                                variant={isApproved ? 'default' : 'secondary'}
+                          <Badge
+                                variant={badgeVariant}
                             className="text-xs"
                           >
-                                {isApproved ? 'Approved' : 'Pending'}
+                                {badgeText}
                           </Badge>
                             );
                           })()}
@@ -2548,13 +2574,25 @@ export function TimeLogs({
                           const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
 
                           const isApproved = projectRequiresApproval ? entry.isApproved : true;
+                          const isRejected = entry.isReject;
+
+                          let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
+                          let badgeText = 'Pending';
+
+                          if (isRejected) {
+                            badgeVariant = 'destructive';
+                            badgeText = 'Rejected';
+                          } else if (isApproved) {
+                            badgeVariant = 'default';
+                            badgeText = 'Approved';
+                          }
 
                           return (
-                        <Badge 
-                              variant={isApproved ? 'default' : 'secondary'}
+                        <Badge
+                              variant={badgeVariant}
                           className="text-xs"
                         >
-                              {isApproved ? 'Approved' : 'Pending'}
+                              {badgeText}
                         </Badge>
                           );
                         })()}

@@ -895,7 +895,7 @@ export default function TaskDetailPage() {
             </div>
           )}
           <div className="flex gap-2 text-xs ml-auto">
-            {!isEditing && (
+            {!isAuthor && !isEditing && (
               <Button
                 variant="ghost"
                 size="sm"
