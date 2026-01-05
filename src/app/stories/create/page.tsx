@@ -345,6 +345,14 @@ export default function CreateStoryPage() {
     )
   }
 
+  const handleBackNavigation = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back()
+      return
+    }
+    router.push('/stories')
+  }
+
   if (authError) {
     return (
       <MainLayout>
@@ -362,7 +370,7 @@ export default function CreateStoryPage() {
     <MainLayout>
       <div className="space-y-8 sm:space-y-10 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <Button variant="ghost" onClick={() => router.push('/stories')} className="w-full sm:w-auto">
+          <Button variant="ghost" onClick={handleBackNavigation} className="w-full sm:w-auto">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
