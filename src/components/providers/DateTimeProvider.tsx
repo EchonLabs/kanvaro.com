@@ -52,10 +52,20 @@ export function DateTimeProvider({ children }: { children: React.ReactNode }) {
         if (response.ok) {
           const userData = await response.json()
           if (userData.preferences || userData.timezone) {
+            // Auto-detect browser timezone if user doesn't have one set
+            let detectedTimezone = DEFAULT_DATE_TIME_PREFERENCES.timezone
+            if (!userData.timezone && typeof window !== 'undefined') {
+              try {
+                detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+              } catch (error) {
+                console.warn('Failed to detect browser timezone:', error)
+              }
+            }
+
             const userPreferences = {
               dateFormat: userData.preferences?.dateFormat || DEFAULT_DATE_TIME_PREFERENCES.dateFormat,
               timeFormat: userData.preferences?.timeFormat || DEFAULT_DATE_TIME_PREFERENCES.timeFormat,
-              timezone: userData.timezone || DEFAULT_DATE_TIME_PREFERENCES.timezone
+              timezone: userData.timezone || detectedTimezone
             }
             setPreferencesState(userPreferences)
             // Store in sessionStorage for faster subsequent loads
@@ -126,23 +136,38 @@ export function useDateTime() {
 
   // Provide fallback with default preferences if context is not available
   if (context === undefined) {
+    // Try to detect browser timezone for fallback
+    let fallbackTimezone = DEFAULT_DATE_TIME_PREFERENCES.timezone
+    if (typeof window !== 'undefined') {
+      try {
+        fallbackTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      } catch (error) {
+        // Keep default timezone
+      }
+    }
+
+    const fallbackPreferences = {
+      ...DEFAULT_DATE_TIME_PREFERENCES,
+      timezone: fallbackTimezone
+    }
+
     return {
-      formatDate: (date: Date | string) => formatDate(date, DEFAULT_DATE_TIME_PREFERENCES),
-      formatTime: (date: Date | string) => formatTime(date, DEFAULT_DATE_TIME_PREFERENCES),
-      formatDateTimeSafe: (date: Date | string) => formatDateTimeSafe(date, DEFAULT_DATE_TIME_PREFERENCES),
-      getDatePlaceholder: () => getDatePlaceholder(DEFAULT_DATE_TIME_PREFERENCES),
-      getTimePlaceholder: () => getTimePlaceholder(DEFAULT_DATE_TIME_PREFERENCES),
-      preferences: DEFAULT_DATE_TIME_PREFERENCES,
+      formatDate: (date: Date | string) => formatDate(date, fallbackPreferences),
+      formatTime: (date: Date | string) => formatTime(date, fallbackPreferences),
+      formatDateTimeSafe: (date: Date | string) => formatDateTimeSafe(date, fallbackPreferences),
+      getDatePlaceholder: () => getDatePlaceholder(fallbackPreferences),
+      getTimePlaceholder: () => getTimePlaceholder(fallbackPreferences),
+      preferences: fallbackPreferences,
       setPreferences: () => {
         console.warn('DateTimeProvider not available, cannot set preferences')
       },
       // Timezone utilities fallback
-      utcToUserTimezone: (utcDate: Date | string) => utcToUserTimezone(utcDate, DEFAULT_DATE_TIME_PREFERENCES.timezone),
-      userTimezoneToUtc: (userDate: Date | string) => userTimezoneToUtc(userDate, DEFAULT_DATE_TIME_PREFERENCES.timezone),
-      getCurrentTimeInUserTimezone: () => getCurrentTimeInUserTimezone(DEFAULT_DATE_TIME_PREFERENCES.timezone),
-      formatUtcInUserTimezone: (utcDate: Date | string, formatStr?: string) => formatUtcInUserTimezone(utcDate, DEFAULT_DATE_TIME_PREFERENCES.timezone, formatStr),
+      utcToUserTimezone: (utcDate: Date | string) => utcToUserTimezone(utcDate, fallbackPreferences.timezone),
+      userTimezoneToUtc: (userDate: Date | string) => userTimezoneToUtc(userDate, fallbackPreferences.timezone),
+      getCurrentTimeInUserTimezone: () => getCurrentTimeInUserTimezone(fallbackPreferences.timezone),
+      formatUtcInUserTimezone: (utcDate: Date | string, formatStr?: string) => formatUtcInUserTimezone(utcDate, fallbackPreferences.timezone, formatStr),
       formatDuration,
-      calculateDurationInUserTimezone: (startUtc: Date | string, endUtc: Date | string) => calculateDurationInUserTimezone(startUtc, endUtc, DEFAULT_DATE_TIME_PREFERENCES.timezone),
+      calculateDurationInUserTimezone: (startUtc: Date | string, endUtc: Date | string) => calculateDurationInUserTimezone(startUtc, endUtc, fallbackPreferences.timezone),
       getCurrentUtcTime,
       isValidTimezone
     }

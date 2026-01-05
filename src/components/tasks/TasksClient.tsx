@@ -157,7 +157,9 @@ export default function TasksClient({
     const [pagination, setPagination] = useState(initialPagination)
     const [currentPage, setCurrentPage] = useState(1)
     const [pageSize, setPageSize] = useState(10)
-    const [totalCount, setTotalCount] = useState(0)
+    const [totalCount, setTotalCount] = useState(() =>
+        typeof initialPagination?.total === 'number' ? initialPagination.total : initialTasks?.length || 0
+    )
     const [loading, setLoading] = useState(false)
     const [searchQuery, setSearchQuery] = useState(initialFilters.search || '')
     const [statusFilter, setStatusFilter] = useState(initialFilters.status || 'all')
@@ -903,7 +905,7 @@ export default function TasksClient({
                             <div>
                                 <CardTitle>All Tasks</CardTitle>
                                 <CardDescription>
-                                    {tasks.length} task{tasks.length !== 1 ? 's' : ''} found
+                                    {totalCount} task{totalCount !== 1 ? 's' : ''} found
                                 </CardDescription>
                             </div>
                         </div>
@@ -1158,7 +1160,7 @@ export default function TasksClient({
                                         </Button>
                                     </div>
                                 </div>
-                              <div className="flex justify-end ml-auto">
+                                                            <div className="flex justify-end w-full md:col-span-2 xl:col-span-3">
                                 <TooltipProvider>
                                   <Tooltip>
                                     <TooltipTrigger asChild>

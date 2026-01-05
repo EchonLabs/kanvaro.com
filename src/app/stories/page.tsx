@@ -443,7 +443,7 @@ export default function StoriesPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">User Stories</h1>
             <p className="text-sm sm:text-base text-muted-foreground">Manage your user stories and requirements</p>
           </div>
-          <Button onClick={() => router.push('/stories/create')} className="w-full sm:w-auto">
+          <Button onClick={() => router.push('/stories/create-story')} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             New Story
           </Button>

@@ -287,7 +287,25 @@ export default function PreferencesPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="timezone">Timezone</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="timezone">Timezone</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        try {
+                          const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+                          setFormData({ ...formData, timezone: userTimezone })
+                        } catch (error) {
+                          console.error('Failed to detect timezone:', error)
+                        }
+                      }}
+                      className="text-xs"
+                    >
+                      Detect Timezone
+                    </Button>
+                  </div>
                   <Select value={formData.timezone} onValueChange={(value) => setFormData({ ...formData, timezone: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select timezone" />
@@ -301,6 +319,7 @@ export default function PreferencesPage() {
                       <SelectItem value="Europe/London">London</SelectItem>
                       <SelectItem value="Europe/Paris">Paris</SelectItem>
                       <SelectItem value="Asia/Tokyo">Tokyo</SelectItem>
+                      <SelectItem value="Asia/Colombo">Sri Lanka Time</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

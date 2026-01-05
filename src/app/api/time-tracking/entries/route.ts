@@ -137,7 +137,22 @@ export async function GET(request: NextRequest) {
     if (taskId) query.task = taskId
     if (status) query.status = status
     if (isBillable !== null) query.isBillable = isBillable === 'true'
-    if (isApproved !== null) query.isApproved = isApproved === 'true'
+
+    // Handle approval status filtering
+    if (isApproved !== null) {
+      if (isApproved === 'true') {
+        // Approved entries
+        query.isApproved = true
+      } else if (isApproved === 'false') {
+        // Pending entries (not approved and not rejected)
+        query.isApproved = false
+        query.isReject = false
+      } else if (isApproved === 'rejected') {
+        // Rejected entries
+        query.isReject = true
+      }
+    }
+
     if (isRejected !== null) query.isReject = isRejected === 'true'
 
     if (startDate || endDate) {
@@ -420,6 +435,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Create time entry
+    // Check project settings for approval requirement
+    let projectRequiresApproval = false
+    if (projectId) {
+      const projectForApproval = await Project.findById(projectId).select('settings.requireApproval')
+      projectRequiresApproval = projectForApproval?.settings?.requireApproval === true
+    }
+
     const timeEntry = new TimeEntry({
       user: userId,
       organization: organizationId,
@@ -435,7 +457,7 @@ export async function POST(request: NextRequest) {
       category,
       tags: tags || [],
       notes,
-      isApproved: !settings.requireApproval
+      isApproved: !projectRequiresApproval
     })
 
     await timeEntry.save()
