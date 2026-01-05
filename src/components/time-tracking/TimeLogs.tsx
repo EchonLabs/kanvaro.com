@@ -52,6 +52,7 @@ interface TimeEntry {
   category?: string
   tags: string[]
   notes?: string
+  isReject?: boolean
   isApproved: boolean
   approvedBy?: { firstName: string; lastName: string }
   project?: { _id: string; name: string; settings?: any } | null
