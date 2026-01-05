@@ -18,6 +18,7 @@ export interface ITimeEntry extends Document {
   approvedBy?: mongoose.Types.ObjectId
   approvedAt?: Date
   isApproved: boolean
+  isReject: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -93,6 +94,10 @@ const TimeEntrySchema = new Schema<ITimeEntry>({
   },
   approvedAt: Date,
   isApproved: {
+    type: Boolean,
+    default: false
+  },
+  isReject: {
     type: Boolean,
     default: false
   }

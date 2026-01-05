@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const isBillable = searchParams.get('isBillable')
     const isApproved = searchParams.get('isApproved')
+    const isRejected = searchParams.get('isRejected')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
 
@@ -137,6 +138,7 @@ export async function GET(request: NextRequest) {
     if (status) query.status = status
     if (isBillable !== null) query.isBillable = isBillable === 'true'
     if (isApproved !== null) query.isApproved = isApproved === 'true'
+    if (isRejected !== null) query.isReject = isRejected === 'true'
 
     if (startDate || endDate) {
       query.startTime = {}
