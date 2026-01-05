@@ -351,7 +351,7 @@ export default function EpicsPage() {
           <Button
             onClick={() => {
               if (!canCreateEpic) return
-              router.push('/epics/create')
+              router.push('/epics/create-epic')
             }}
             disabled={!canCreateEpic}
             title={!canCreateEpic ? 'You need epic:create permission to create an epic.' : undefined}

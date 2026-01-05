@@ -1025,11 +1025,7 @@ export function TimeLogs({
       if (filters.status && filters.status !== 'all') params.append('status', filters.status)
       if (filters.isBillable && filters.isBillable !== 'all') params.append('isBillable', filters.isBillable)
       if (filters.isApproved && filters.isApproved !== 'all') {
-        if (filters.isApproved === 'rejected') {
-          params.append('isRejected', 'true')
-        } else {
-          params.append('isApproved', filters.isApproved)
-        }
+        params.append('isApproved', filters.isApproved)
       }
 
       const response = await fetch(`/api/time-tracking/entries?${params}`)
@@ -1793,12 +1789,8 @@ export function TimeLogs({
             if (filters.status && filters.status !== 'all') params.append('status', filters.status)
             if (filters.isBillable && filters.isBillable !== 'all') params.append('isBillable', filters.isBillable)
             if (filters.isApproved && filters.isApproved !== 'all') {
-        if (filters.isApproved === 'rejected') {
-          params.append('isRejected', 'true')
-        } else {
-          params.append('isApproved', filters.isApproved)
-        }
-      }
+              params.append('isApproved', filters.isApproved)
+            }
 
             const response = await fetch(`/api/time-tracking/entries?${params}`)
             const data = await response.json()
@@ -2227,7 +2219,7 @@ export function TimeLogs({
           </div>
 
           {/* Clear Filters Button */}
-            <div className="flex justify-start sm:justify-end pt-2">
+            <div className="flex justify-center sm:justify-end items-center pt-2 w-full">
               <Button
                 variant="outline"
                 size="sm"
@@ -2249,7 +2241,7 @@ export function TimeLogs({
                   setStatusSearch('')
                   setPagination(prev => ({ ...prev, page: 1 }))
                 }}
-                className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
+                className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm flex-shrink-0"
                 title="Clear all filters"
               >
                 <RotateCcw className="h-4 w-4" />
