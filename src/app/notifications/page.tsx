@@ -81,6 +81,15 @@ export default function NotificationsPage() {
     }
   }
 
+  const formatTypeLabel = (value?: string) => {
+    if (!value) return ''
+    return value
+      .split(/[_\s]+/)
+      .filter(Boolean)
+      .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase())
+      .join(' ')
+  }
+
   return (
     <MainLayout>
       <div className="space-y-4">
@@ -163,7 +172,7 @@ export default function NotificationsPage() {
                           <div className="flex items-center gap-2">
                             <h3 className={`text-sm font-medium ${getNotificationColor(n.data?.priority)}`}>{n.title}</h3>
                             {isUnread && <Badge variant="secondary" className="text-[10px]">Unread</Badge>}
-                            {n.type && <Badge variant="outline" className="text-[10px]">{n.type}</Badge>}
+                            {n.type && <Badge variant="outline" className="text-[10px]">{formatTypeLabel(n.type)}</Badge>}
                           </div>
                           <p className="text-xs text-muted-foreground">{n.message}</p>
                         </div>
