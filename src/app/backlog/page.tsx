@@ -1354,11 +1354,11 @@ export default function BacklogPage() {
             <p className="text-sm sm:text-base text-muted-foreground">Manage your product backlog and sprint planning</p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-            <Button variant="outline" onClick={() => router.push('/epics/create')} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={() => router.push('/epics/create-epic')} className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               New Epic
             </Button>
-            <Button variant="outline" onClick={() => router.push('/stories/create')} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={() => router.push('/stories/create-story')} className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               New Story
             </Button>
