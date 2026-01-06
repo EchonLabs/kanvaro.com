@@ -1531,8 +1531,8 @@ const [overheadInput, setOverheadInput] = useState('')
                 </div>
 
                 {/* Client Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                <div className="space-y-4 mt-4">
+                  <div className="flex items-center justify-between mt-6">
                     <Label className="text-base font-medium">Client</Label>
                     <Button
                       type="button"

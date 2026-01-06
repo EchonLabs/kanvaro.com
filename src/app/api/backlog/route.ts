@@ -7,6 +7,49 @@ import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
 import '@/models/Sprint'
 
+const PRIORITY_WEIGHT: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1
+}
+
+const STATUS_FILTER_MAP: Record<string, { tasks?: string[]; stories?: string[]; epics?: string[] }> = {
+  backlog: {
+    tasks: ['backlog', 'todo'],
+    stories: ['backlog', 'todo'],
+    epics: ['backlog', 'todo']
+  },
+  todo: {
+    tasks: ['todo'],
+    stories: ['todo'],
+    epics: ['todo']
+  },
+  inprogress: {
+    tasks: ['in_progress'],
+    stories: ['inprogress'],
+    epics: ['inprogress']
+  },
+  review: {
+    tasks: ['review']
+  },
+  testing: {
+    tasks: ['testing']
+  },
+  done: {
+    tasks: ['done'],
+    stories: ['done', 'completed'],
+    epics: ['done', 'completed']
+  },
+  cancelled: {
+    tasks: ['cancelled'],
+    stories: ['cancelled'],
+    epics: ['cancelled']
+  }
+}
+
+const normalizeStatusKey = (value: string) => value.replace(/[\s_-]/g, '').toLowerCase()
+
 // Legacy implementation kept for reference (commented out).
 // export async function GET(request: NextRequest) {
 //   try {
@@ -261,10 +304,19 @@ export async function GET(request: NextRequest) {
     const organizationId = user.organization
 
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
-    const search = searchParams.get('search') || ''
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = Math.max(1, parseInt(searchParams.get('limit') || '10'))
+    const search = searchParams.get('search')?.trim() || ''
     const type = searchParams.get('type') || '' // optional: 'task' | 'story' | 'epic'
+    const priority = searchParams.get('priority') || ''
+    const status = searchParams.get('status') || ''
+    const project = searchParams.get('project') || ''
+    const assignedTo = searchParams.get('assignedTo') || ''
+    const createdBy = searchParams.get('createdBy') || ''
+    const createdAtFrom = searchParams.get('createdAtFrom') || ''
+    const createdAtTo = searchParams.get('createdAtTo') || ''
+    const sortBy = searchParams.get('sortBy') || 'created'
+    const sortOrder = searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc'
 
     const searchFilter = search
       ? {
@@ -289,23 +341,97 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const taskFilter: any = {
+    const taskFilter: Record<string, unknown> = {
       ...searchFilter,
       organization: organizationId,
-      project: { $in: projectIds },
+      project: project ? project : { $in: projectIds },
       archived: false
     }
 
-    const storyFilter: any = {
+    const storyFilter: Record<string, unknown> = {
       ...searchFilter,
-      project: { $in: projectIds },
+      project: project ? project : { $in: projectIds },
       archived: false
     }
 
-    const epicFilter: any = {
+    const epicFilter: Record<string, unknown> = {
       ...searchFilter,
-      project: { $in: projectIds },
+      project: project ? project : { $in: projectIds },
       archived: false
+    }
+
+    if (priority) {
+      taskFilter.priority = priority
+      storyFilter.priority = priority
+      epicFilter.priority = priority
+    }
+
+    if (assignedTo) {
+      taskFilter['assignedTo.user'] = assignedTo
+      storyFilter.assignedTo = assignedTo
+      epicFilter.assignedTo = assignedTo
+    }
+
+    if (createdBy) {
+      taskFilter.createdBy = createdBy
+      storyFilter.createdBy = createdBy
+      epicFilter.createdBy = createdBy
+    }
+
+    if (createdAtFrom || createdAtTo) {
+      const dateFilter: Record<string, Date> = {}
+      if (createdAtFrom) {
+        const fromDate = new Date(createdAtFrom)
+        if (!isNaN(fromDate.getTime())) {
+          dateFilter.$gte = fromDate
+        }
+      }
+      if (createdAtTo) {
+        const toDate = new Date(createdAtTo)
+        if (!isNaN(toDate.getTime())) {
+          dateFilter.$lte = toDate
+        }
+      }
+
+      if (Object.keys(dateFilter).length > 0) {
+        taskFilter.createdAt = dateFilter
+        storyFilter.createdAt = dateFilter
+        epicFilter.createdAt = dateFilter
+      }
+    }
+
+    if (status) {
+      const normalizedStatus = normalizeStatusKey(status)
+      const statusConfig = STATUS_FILTER_MAP[normalizedStatus]
+
+      if (statusConfig?.tasks?.length) {
+        taskFilter.status = statusConfig.tasks.length === 1
+          ? statusConfig.tasks[0]
+          : { $in: statusConfig.tasks }
+      } else {
+        taskFilter.status = status
+      }
+
+      if (statusConfig?.stories?.length) {
+        storyFilter.status = statusConfig.stories.length === 1
+          ? statusConfig.stories[0]
+          : { $in: statusConfig.stories }
+      } else if (status && !statusConfig) {
+        storyFilter.status = status
+      }
+
+      if (statusConfig?.epics?.length) {
+        epicFilter.status = statusConfig.epics.length === 1
+          ? statusConfig.epics[0]
+          : { $in: statusConfig.epics }
+      } else if (status && !statusConfig) {
+        epicFilter.status = status
+      }
+    } else {
+      // Match UI behavior: hide completed work unless explicitly requested
+      taskFilter.status = { $ne: 'done' }
+      storyFilter.status = { $nin: ['done', 'completed'] }
+      epicFilter.status = { $nin: ['done', 'completed'] }
     }
 
     const [tasks, stories, epics] = await Promise.all([
@@ -340,7 +466,7 @@ export async function GET(request: NextRequest) {
         // assignedTo is already an array of populated user objects
         return {
           ...taskObj,
-        type: 'task'
+          type: 'task'
         }
       }),
       ...stories.map(story => {
@@ -350,7 +476,7 @@ export async function GET(request: NextRequest) {
         return {
           ...storyObj,
           assignedTo: normalizedAssignedTo,
-        type: 'story'
+          type: 'story'
         }
       }),
       ...epics.map(epic => {
@@ -360,13 +486,43 @@ export async function GET(request: NextRequest) {
         return {
           ...epicObj,
           assignedTo: normalizedAssignedTo,
-        type: 'epic'
+          type: 'epic'
         }
       })
     ]
 
-    // Sort by createdAt descending (newest first)
-    allItems.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    const compareItems = (a: any, b: any) => {
+      switch (sortBy) {
+        case 'title':
+          return (a.title || '').localeCompare(b.title || '')
+        case 'created': {
+          const aCreated = new Date(a.createdAt).getTime()
+          const bCreated = new Date(b.createdAt).getTime()
+          return aCreated - bCreated
+        }
+        case 'dueDate': {
+          const aDue = a.dueDate ? new Date(a.dueDate).getTime() : Number.POSITIVE_INFINITY
+          const bDue = b.dueDate ? new Date(b.dueDate).getTime() : Number.POSITIVE_INFINITY
+          return aDue - bDue
+        }
+        case 'priority':
+        default: {
+          const aPriority = PRIORITY_WEIGHT[(a.priority || '').toLowerCase()] || 0
+          const bPriority = PRIORITY_WEIGHT[(b.priority || '').toLowerCase()] || 0
+          if (aPriority === bPriority) {
+            const aCreated = new Date(a.createdAt).getTime()
+            const bCreated = new Date(b.createdAt).getTime()
+            return aCreated - bCreated
+          }
+          return aPriority - bPriority
+        }
+      }
+    }
+
+    allItems.sort((a, b) => {
+      const comparison = compareItems(a, b)
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
 
     // Apply pagination
     const total = allItems.length

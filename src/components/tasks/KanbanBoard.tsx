@@ -444,7 +444,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
 
   return (
     <div className="space-y-6 overflow-x-hidden">
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 mb-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex-1 min-w-0">
             <h3 className="text-base sm:text-lg font-semibold text-foreground truncate">

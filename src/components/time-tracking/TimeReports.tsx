@@ -676,7 +676,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className='mb-4'>
               <Label htmlFor="assignedBy">Assigned By</Label>
               <Select value={filters.assignedBy} onValueChange={(value) => { setFilters(prev => ({ ...prev, assignedBy: value })); setAssignedByFilterQuery(''); }}>
                 <SelectTrigger>
@@ -709,7 +709,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
               </Select>
             </div>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 pt-2 mb-4">
             <Button
               variant="outline"
               size="sm"

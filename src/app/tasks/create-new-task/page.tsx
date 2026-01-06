@@ -624,7 +624,7 @@ export default function CreateTaskPage() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-4 mb-4">
           <Button variant="ghost" onClick={() => router.back()}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back

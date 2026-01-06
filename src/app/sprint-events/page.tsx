@@ -671,7 +671,7 @@ export default function SprintEventsPage() {
                 </TabsContent>
 
                 <TabsContent value="list" className="space-y-4 sm:space-y-6">
-                  <div className="space-y-4 sm:space-y-6">
+                  <div className="flex flex-col gap-4 sm:gap-6">
                     {paginatedEvents.map((event) => (
               <Card 
                 key={event._id} 

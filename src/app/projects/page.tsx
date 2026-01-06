@@ -325,7 +325,7 @@ export default function ProjectsPage() {
     <MainLayout>
       <PageContent>
         <div className="space-y-6 sm:space-y-8 lg:space-y-10">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4">
         <div className="min-w-0 flex-1">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">Projects</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage and track your projects</p>
