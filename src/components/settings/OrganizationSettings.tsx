@@ -68,6 +68,7 @@ export function OrganizationSettings() {
     }
   })
   const [roundingIncrementInput, setRoundingIncrementInput] = useState('15')
+  const [notificationRetentionInput, setNotificationRetentionInput] = useState('30')
   
   const [logo, setLogo] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
@@ -170,6 +171,8 @@ export function OrganizationSettings() {
 
   useEffect(() => {
     if (organization) {
+      const retentionDaysFromOrg = organization.settings?.notifications?.retentionDays ?? 30
+
       setFormData({
         name: organization.name || '',
         domain: organization.domain || '',
@@ -208,10 +211,12 @@ export function OrganizationSettings() {
           }
         },
         notifications: {
-          retentionDays: organization.settings?.notifications?.retentionDays ?? 30,
+          retentionDays: retentionDaysFromOrg,
           autoCleanup: organization.settings?.notifications?.autoCleanup ?? true
         }
       })
+
+      setNotificationRetentionInput(retentionDaysFromOrg.toString())
 
       // Load time tracking settings from TimeTrackingSettings collection
       const loadTimeTrackingSettings = async () => {
@@ -426,6 +431,17 @@ export function OrganizationSettings() {
   const handleSaveNotificationSettings = async () => {
     setSavingNotifications(true)
 
+    const parseRetentionDays = () => {
+      const parsed = parseInt(notificationRetentionInput, 10)
+      if (!Number.isNaN(parsed)) {
+        return Math.min(365, Math.max(1, parsed))
+      }
+      const fallback = formData.notifications?.retentionDays ?? 30
+      return Math.min(365, Math.max(1, fallback))
+    }
+
+    const normalizedRetentionDays = parseRetentionDays()
+
     try {
       const response = await fetch('/api/organization', {
         method: 'PUT',
@@ -435,7 +451,7 @@ export function OrganizationSettings() {
         body: JSON.stringify({
           settings: {
             notifications: {
-              retentionDays: formData.notifications?.retentionDays || 30,
+              retentionDays: normalizedRetentionDays,
               autoCleanup: formData.notifications?.autoCleanup ?? true
             }
           }
@@ -446,6 +462,16 @@ export function OrganizationSettings() {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.error || 'Failed to update notification settings')
       }
+
+      setFormData(prev => ({
+        ...prev,
+        notifications: {
+          ...prev.notifications,
+          retentionDays: normalizedRetentionDays
+        }
+      }))
+
+      setNotificationRetentionInput(normalizedRetentionDays.toString())
 
       refetch()
       notifySuccess({
@@ -1455,14 +1481,22 @@ export function OrganizationSettings() {
                     type="number"
                     min="1"
                     max="365"
-                    value={formData.notifications?.retentionDays ?? 30}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      notifications: {
-                        ...formData.notifications,
-                        retentionDays: parseInt(e.target.value) || 30
+                    value={notificationRetentionInput}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (!/^\d*$/.test(value)) return
+                      setNotificationRetentionInput(value)
+                      if (value) {
+                        const numericValue = Math.min(365, Math.max(1, parseInt(value, 10)))
+                        setFormData(prev => ({
+                          ...prev,
+                          notifications: {
+                            ...prev.notifications,
+                            retentionDays: numericValue
+                          }
+                        }))
                       }
-                    })}
+                    }}
                     className="w-20 text-center"
                     disabled={!formData.notifications?.autoCleanup}
                   />
@@ -1472,7 +1506,7 @@ export function OrganizationSettings() {
             </div>
           </div>
 
-          <div className="flex justify-end mt-6 sm:mt-8">
+          <div className="flex justify-end mt-6 sm:mt-8 pt-4 border-t border-border/60">
             <Button
               onClick={handleSaveNotificationSettings}
               disabled={savingNotifications}

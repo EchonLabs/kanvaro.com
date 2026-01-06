@@ -582,32 +582,46 @@ export default function BacklogPage() {
       existingSprint?: { _id: string; name: string }
     }
   ) => {
-    // Filter out tasks and stories that are already in a sprint
-    const tasksNotInSprint = taskIds.filter(taskId => {
-      const task = backlogItems.find(item => item.type === 'task' && item._id === taskId)
-      return task && !task.sprint
-    })
-    const storiesNotInSprint = storyIds.filter(storyId => {
-      const story = backlogItems.find(item => item.type === 'story' && item._id === storyId)
-      return story && !story.sprint
-    })
-    
-    const uniqueTaskIds = Array.from(new Set(tasksNotInSprint.filter(Boolean)))
-    const uniqueStoryIds = Array.from(new Set(storiesNotInSprint.filter(Boolean)))
-    
-    if (uniqueTaskIds.length === 0 && uniqueStoryIds.length === 0) {
-      // Show error if all selected items are already in sprints
+    const mode = options?.mode ?? 'assign'
+    const isManageMode = mode === 'manage'
+
+    const sourceTaskIds = isManageMode
+      ? taskIds
+      : taskIds.filter((taskId) => {
+          const task = backlogItems.find((item) => item.type === 'task' && item._id === taskId)
+          return task && !task.sprint
+        })
+
+    const sourceStoryIds = isManageMode
+      ? storyIds
+      : storyIds.filter((storyId) => {
+          const story = backlogItems.find((item) => item.type === 'story' && item._id === storyId)
+          return story && !story.sprint
+        })
+
+    const uniqueTaskIds = Array.from(new Set(sourceTaskIds.filter(Boolean)))
+    const uniqueStoryIds = Array.from(new Set(sourceStoryIds.filter(Boolean)))
+
+    if (!isManageMode && uniqueTaskIds.length === 0 && uniqueStoryIds.length === 0) {
       if (taskIds.length > 0 || storyIds.length > 0) {
         setSprintsError('Selected items are already in a sprint and cannot be added to another sprint.')
       }
       return
     }
 
+    if (isManageMode && uniqueTaskIds.length === 0 && uniqueStoryIds.length === 0) {
+      setSprintsError('Unable to manage sprint because the selected items are not currently in a sprint.')
+      return
+    }
+
     setTaskIdsForSprint(uniqueTaskIds)
     setStoryIdsForSprint(uniqueStoryIds)
     clearSprintSelection()
-    setSprintModalMode(options?.mode ?? 'assign')
+    setSprintModalMode(mode)
     setCurrentSprintInfo(options?.existingSprint ?? null)
+    if (isManageMode && options?.existingSprint?._id) {
+      setSelectedSprintId(options.existingSprint._id)
+    }
     
     // Fetch tasks for selected stories
     if (uniqueStoryIds.length > 0) {
@@ -1869,8 +1883,16 @@ export default function BacklogPage() {
 
                                 {item.type === 'task' && (
                                   <DropdownMenuItem
-                                    onClick={() => openStatusChangeModal(item)}
-                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                    onClick={() => {
+                                      if (!item.sprint) return
+                                      openStatusChangeModal(item)
+                                    }}
+                                    disabled={!item.sprint}
+                                    className={cn(
+                                      'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
+                                      !item.sprint && 'opacity-50 cursor-not-allowed'
+                                    )}
+                                    title={!item.sprint ? 'Assign the task to a sprint to change its status' : undefined}
                                   >
                                     <CheckCircle className="h-4 w-4 mr-2" />
                                     <span>Change Status</span>

@@ -274,7 +274,7 @@ export default function EditEpicPage() {
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="backlog">backlog</SelectItem>
+                    <SelectItem value="backlog">Backlog</SelectItem>
                     <SelectItem value="todo">Todo</SelectItem>
                     <SelectItem value="inprogress">In Progress</SelectItem>
                     <SelectItem value="done">Done</SelectItem>
