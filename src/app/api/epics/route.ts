@@ -32,6 +32,28 @@ export async function GET(request: NextRequest) {
     );
 
     const { searchParams } = new URL(request.url)
+    const ids = searchParams.get('ids') // Comma-separated epic IDs
+
+    if (ids) {
+      // Fetch specific epics by IDs
+      const epicIds = ids.split(',').filter(id => id.trim())
+      const epics = await Epic.find({
+        _id: { $in: epicIds },
+        archived: false,
+        is_deleted: { $ne: true }
+      })
+      .select('_id title')
+      .lean()
+
+      // Return as an object keyed by epic ID for easy lookup
+      const epicMap: Record<string, any> = {}
+      epics.forEach((epic: any) => {
+        epicMap[epic._id.toString()] = epic
+      })
+
+      return NextResponse.json(epicMap)
+    }
+
     const parsedPage = parseInt(searchParams.get('page') || '1')
     const parsedLimit = parseInt(searchParams.get('limit') || '10')
     const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1

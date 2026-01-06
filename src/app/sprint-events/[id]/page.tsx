@@ -116,7 +116,6 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
       if (response.ok) {
         const data = await response.json()
         setEvent(data)
-console.log('data', data)
           // Fetch full project
       const projectRes = await fetch(`/api/projects/${data?.project?._id}`)
       const projectData = projectRes.ok ? await projectRes.json() : null
@@ -308,7 +307,7 @@ console.log('data', data)
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-4">
             <Button variant="ghost" size="sm" onClick={() => router.push('/sprint-events')}>
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -366,7 +365,7 @@ console.log('data', data)
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 flex flex-col gap-6">
             {/* Event Summary */}
             <Card>
               <CardHeader>
@@ -609,7 +608,7 @@ console.log('data', data)
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="flex flex-col gap-6">
             {/* Participants */}
             <Card>
               <CardHeader>

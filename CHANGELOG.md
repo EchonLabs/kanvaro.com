@@ -1,3 +1,10 @@
+## [1.21.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.21.0...v1.21.1) (2026-01-06)
+
+
+### Bug Fixes
+
+* add chnages ([6d98b14](https://github.com/EchonLabs/kanvaro.com/commit/6d98b144d69c596ad5d17c7bd299f00aae8f92e0))
+
 # [1.21.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.20.4...v1.21.0) (2026-01-06)
 
 
