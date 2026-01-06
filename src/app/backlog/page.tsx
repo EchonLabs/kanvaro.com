@@ -1883,8 +1883,16 @@ export default function BacklogPage() {
 
                                 {item.type === 'task' && (
                                   <DropdownMenuItem
-                                    onClick={() => openStatusChangeModal(item)}
-                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                    onClick={() => {
+                                      if (!item.sprint) return
+                                      openStatusChangeModal(item)
+                                    }}
+                                    disabled={!item.sprint}
+                                    className={cn(
+                                      'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
+                                      !item.sprint && 'opacity-50 cursor-not-allowed'
+                                    )}
+                                    title={!item.sprint ? 'Assign the task to a sprint to change its status' : undefined}
                                   >
                                     <CheckCircle className="h-4 w-4 mr-2" />
                                     <span>Change Status</span>
