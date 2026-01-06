@@ -319,7 +319,7 @@ export default function SprintsPage() {
 
   const formatTaskStatusLabel = (status: string) => {
     const statusMap: Record<string, string> = {
-      backlog: 'backlog',
+      backlog: 'Backlog',
       todo: 'To Do',
       in_progress: 'In Progress',
       review: 'In Review',

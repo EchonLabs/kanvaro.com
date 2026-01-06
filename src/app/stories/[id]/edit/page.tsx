@@ -623,7 +623,7 @@ export default function EditStoryPage() {
                 >
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="backlog">backlog</SelectItem>
+                    <SelectItem value="backlog">Backlog</SelectItem>
                     <SelectItem value="todo">Todo</SelectItem>
                     <SelectItem value="inprogress">In Progress</SelectItem>
                     <SelectItem value="done">Done</SelectItem>

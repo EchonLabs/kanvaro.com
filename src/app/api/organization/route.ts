@@ -328,6 +328,8 @@ export async function PUT(request: NextRequest) {
     // Otherwise, extract from nested settings structure
     const sourceTimeTracking = updateData.timeTracking ?? updateData.settings?.timeTracking
     
+    const sourceNotifications = updateData.notifications ?? updateData.settings?.notifications
+
     const normalized = {
       name: updateData.name,
       domain: updateData.domain,
@@ -342,6 +344,12 @@ export async function PUT(request: NextRequest) {
       size: updateData.size,
       allowSelfRegistration: updateData.allowSelfRegistration ?? updateData.settings?.allowSelfRegistration,
       defaultUserRole: updateData.defaultUserRole ?? updateData.settings?.defaultUserRole,
+      notifications: sourceNotifications
+        ? {
+            retentionDays: sourceNotifications.retentionDays ?? undefined,
+            autoCleanup: sourceNotifications.autoCleanup ?? undefined
+          }
+        : undefined,
       timeTracking: sourceTimeTracking ? {
         allowTimeTracking: sourceTimeTracking.allowTimeTracking ?? undefined,
         allowManualTimeSubmission: sourceTimeTracking.allowManualTimeSubmission ?? undefined,
@@ -397,6 +405,19 @@ export async function PUT(request: NextRequest) {
     setIfDefined('size', normalized.size)
     setIfDefined('settings.allowSelfRegistration', normalized.allowSelfRegistration)
     setIfDefined('settings.defaultUserRole', normalized.defaultUserRole)
+
+    const notifications = normalized.notifications
+    if (notifications) {
+      const clampRetentionDays = (value: any) => {
+        const numeric = Number(value)
+        if (Number.isNaN(numeric)) return undefined
+        return Math.min(365, Math.max(1, numeric))
+      }
+
+      const retentionDays = clampRetentionDays(notifications.retentionDays)
+      setIfDefined('settings.notifications.retentionDays', retentionDays)
+      setIfDefined('settings.notifications.autoCleanup', notifications.autoCleanup)
+    }
     
     // Only set timeTracking fields if timeTracking object exists
     const timeTracking = normalized.timeTracking
