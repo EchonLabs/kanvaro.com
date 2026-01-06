@@ -1696,7 +1696,7 @@ export default function ProjectDetailPage() {
 
           <TabsContent value="settings" className="space-y-6">
             <div className="space-y-6">
-              <div>
+              <div className='mb-4'>
                 <h3 className="text-lg font-semibold text-foreground">Project Settings</h3>
                 <p className="text-sm text-muted-foreground">
                   Manage project configuration and preferences

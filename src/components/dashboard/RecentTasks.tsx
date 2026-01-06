@@ -113,7 +113,7 @@ export function RecentTasks({ tasks, isLoading, onTaskUpdate }: RecentTasksProps
             <Button
               variant="outline"
               className="mt-4"
-              onClick={() => router.push('/tasks/create')}
+              onClick={() => router.push('/tasks/create-new-task')}
             >
               Create Your First Task
             </Button>

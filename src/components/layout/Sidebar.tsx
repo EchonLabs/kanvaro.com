@@ -166,6 +166,13 @@ const navigationItems = [
         icon: Shield,
         path: '/team/roles',
         permission: Permission.USER_MANAGE_ROLES
+      },
+      {
+        id: 'team-activity',
+        label: 'Team Activity',
+        icon: Activity,
+        path: '/team/activity',
+        permission: Permission.TEAM_VIEW_ACTIVITY
       }
     ]
   },

@@ -68,6 +68,8 @@ export default function ActivityPage() {
     user: 'all',
     dateRange: 'all'
   })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const { formatDate } = useDateTime()
   const [user, setUser] = useState<any>(null)
   const [authError, setAuthError] = useState('')
@@ -179,6 +181,17 @@ export default function ActivityPage() {
     checkAuth()
   }, [checkAuth])
 
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [
+    searchTerm,
+    filters.type,
+    filters.action,
+    filters.project,
+    filters.user,
+    filters.dateRange
+  ])
+
   // Load projects for the Project filter dropdown
   useEffect(() => {
     const loadProjects = async () => {
@@ -207,43 +220,65 @@ export default function ActivityPage() {
   }, [projects, projectFilterQuery])
 
   // Filter activities based on search and filters
-  const filteredActivities = activities.filter(activity => {
-    const matchesSearch = searchTerm === '' ||
-      activity.target.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.project.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      `${activity.user.firstName} ${activity.user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredActivities = useMemo(() => {
+    return activities.filter(activity => {
+      const matchesSearch = searchTerm === '' ||
+        activity.target.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        activity.project.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        `${activity.user.firstName} ${activity.user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesType = filters.type === 'all' || activity.type === filters.type
-    const matchesAction = filters.action === 'all' || activity.action === filters.action
-    const matchesProject = filters.project === 'all' || activity.project === filters.project
-    const matchesUser = filters.user === 'all' || activity.user._id === filters.user
+      const matchesType = filters.type === 'all' || activity.type === filters.type
+      const matchesAction = filters.action === 'all' || activity.action === filters.action
+      const matchesProject = filters.project === 'all' || activity.project === filters.project
+      const matchesUser = filters.user === 'all' || activity.user._id === filters.user
 
-    // Date range filtering
-    const matchesDateRange = (() => {
-      if (filters.dateRange === 'all') return true
+      // Date range filtering
+      const matchesDateRange = (() => {
+        if (filters.dateRange === 'all') return true
 
-      const activityDate = new Date(activity.timestamp)
-      const now = new Date()
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        const activityDate = new Date(activity.timestamp)
+        const now = new Date()
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
-      switch (filters.dateRange) {
-        case 'today':
-          return activityDate >= today
-        case 'week':
-          const weekAgo = new Date(today)
-          weekAgo.setDate(today.getDate() - 7)
-          return activityDate >= weekAgo
-        case 'month':
-          const monthAgo = new Date(today)
-          monthAgo.setMonth(today.getMonth() - 1)
-          return activityDate >= monthAgo
-        default:
-          return true
-      }
-    })()
+        switch (filters.dateRange) {
+          case 'today':
+            return activityDate >= today
+          case 'week':
+            const weekAgo = new Date(today)
+            weekAgo.setDate(today.getDate() - 7)
+            return activityDate >= weekAgo
+          case 'month':
+            const monthAgo = new Date(today)
+            monthAgo.setMonth(today.getMonth() - 1)
+            return activityDate >= monthAgo
+          default:
+            return true
+        }
+      })()
 
-    return matchesSearch && matchesType && matchesAction && matchesProject && matchesUser && matchesDateRange
-  })
+      return matchesSearch && matchesType && matchesAction && matchesProject && matchesUser && matchesDateRange
+    })
+  }, [activities, searchTerm, filters])
+
+  useEffect(() => {
+    const totalPagesForData = filteredActivities.length === 0
+      ? 1
+      : Math.max(1, Math.ceil(filteredActivities.length / pageSize))
+
+    if (currentPage > totalPagesForData) {
+      setCurrentPage(totalPagesForData)
+    }
+  }, [filteredActivities.length, pageSize, currentPage])
+
+  const totalActivitiesCount = filteredActivities.length
+  const totalPages = Math.max(1, Math.ceil((totalActivitiesCount || 0) / pageSize) || 1)
+  const pageStartIndex = totalActivitiesCount === 0 ? 0 : ((currentPage - 1) * pageSize) + 1
+  const pageEndIndex = totalActivitiesCount === 0 ? 0 : Math.min(currentPage * pageSize, totalActivitiesCount)
+
+  const paginatedActivities = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize
+    return filteredActivities.slice(startIndex, startIndex + pageSize)
+  }, [filteredActivities, currentPage, pageSize])
 
   if (isLoading) {
     return (
@@ -280,9 +315,9 @@ export default function ActivityPage() {
   return (
     <MainLayout>
       <PageContent>
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-4">
               <Button
                 variant="ghost"
@@ -453,12 +488,12 @@ export default function ActivityPage() {
               <div className="flex items-center justify-between">
                 <CardTitle>Recent Activities</CardTitle>
                 <Badge variant="secondary">
-                  {filteredActivities.length} activities
+                  {totalActivitiesCount} activities
                 </Badge>
               </div>
             </CardHeader>
             <CardContent>
-              {filteredActivities.length === 0 ? (
+              {totalActivitiesCount === 0 ? (
                 <div className="text-center py-12">
                   <div className="p-4 bg-muted/50 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
                     <Activity className="h-8 w-8 text-muted-foreground" />
@@ -489,64 +524,113 @@ export default function ActivityPage() {
                   )}
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {filteredActivities.map((activity) => {
-                    const ActionIcon = getActionIcon(activity.action)
-                    
-                    return (
-                      <div 
-                        key={activity.id} 
-                        className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                <>
+                  <div className="space-y-8">
+                    {paginatedActivities.map((activity) => {
+                      const ActionIcon = getActionIcon(activity.action)
+                      
+                      return (
+                        <div 
+                          key={activity.id} 
+                          className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          <div className="relative">
+                            <GravatarAvatar 
+                              user={{
+                                avatar: activity.user.avatar,
+                                firstName: activity.user.firstName,
+                                lastName: activity.user.lastName,
+                                email: activity.user.email
+                              }}
+                              size={40}
+                              className="h-10 w-10"
+                            />
+                            <div className="absolute -bottom-1 -right-1 p-1 bg-background border border-border rounded-full">
+                              <ActionIcon className="h-3 w-3 text-muted-foreground" />
+                            </div>
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <span className="font-semibold text-foreground">
+                                {activity.user.firstName} {activity.user.lastName}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                {getActionText(activity.action)}
+                              </span>
+                            </div>
+                            
+                            <p className="text-sm text-muted-foreground mb-2">
+                              {activity.target}
+                            </p>
+                            
+                            <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                              <Badge variant="outline" className="text-xs">
+                                {activity.type}
+                              </Badge>
+                              <span>{activity.project}</span>
+                              <span>•</span>
+                              <span>{formatTimestamp(activity.timestamp)}</span>
+                              {activity.duration && (
+                                <>
+                                  <span>•</span>
+                                  <span>{activity.duration} minutes</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>Items per page:</span>
+                      <Select
+                        value={pageSize.toString()}
+                        onValueChange={(value) => {
+                          setPageSize(parseInt(value, 10))
+                          setCurrentPage(1)
+                        }}
                       >
-                        <div className="relative">
-                          <GravatarAvatar 
-                            user={{
-                              avatar: activity.user.avatar,
-                              firstName: activity.user.firstName,
-                              lastName: activity.user.lastName,
-                              email: activity.user.email
-                            }}
-                            size={40}
-                            className="h-10 w-10"
-                          />
-                          <div className="absolute -bottom-1 -right-1 p-1 bg-background border border-border rounded-full">
-                            <ActionIcon className="h-3 w-3 text-muted-foreground" />
-                          </div>
-                        </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <span className="font-semibold text-foreground">
-                              {activity.user.firstName} {activity.user.lastName}
-                            </span>
-                            <span className="text-sm text-muted-foreground">
-                              {getActionText(activity.action)}
-                            </span>
-                          </div>
-                          
-                          <p className="text-sm text-muted-foreground mb-2">
-                            {activity.target}
-                          </p>
-                          
-                          <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                            <Badge variant="outline" className="text-xs">
-                              {activity.type}
-                            </Badge>
-                            <span>{activity.project}</span>
-                            <span>•</span>
-                            <span>{formatTimestamp(activity.timestamp)}</span>
-                            {activity.duration && (
-                              <>
-                                <span>•</span>
-                                <span>{activity.duration} minutes</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                        <SelectTrigger className="w-24 h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span>
+                        Showing {pageStartIndex} to {pageEndIndex} of {totalActivitiesCount}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-sm text-muted-foreground px-2">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <Button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage >= totalPages}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

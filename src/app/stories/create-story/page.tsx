@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -67,6 +67,12 @@ export default function CreateStoryPage() {
   })
 
   const [newCriteria, setNewCriteria] = useState('')
+
+  const filteredProjects = useMemo(() => {
+    const query = projectQuery.trim().toLowerCase()
+    if (!query) return projects
+    return projects.filter(project => project.name.toLowerCase().includes(query))
+  }, [projects, projectQuery])
 
   const checkAuth = useCallback(async () => {
     try {
@@ -398,7 +404,7 @@ export default function CreateStoryPage() {
                     <Select
                       value={formData.project}
                       onValueChange={(value) => handleChange('project', value)}
-                      onOpenChange={open => { if (open) setProjectQuery(""); }}
+                      onOpenChange={open => { if(open) setProjectQuery(""); }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select a project" />
@@ -408,20 +414,22 @@ export default function CreateStoryPage() {
                           <Input
                             value={projectQuery}
                             onChange={e => setProjectQuery(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
                             placeholder="Type to search projects"
                             className="mb-2"
-                            onKeyDown={e => e.stopPropagation()}
                           />
-                          <div className="max-h-56 overflow-y-auto">
-                            {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).map((project) => (
-                              <SelectItem key={project._id} value={project._id}>
-                                {project.name}
+                          {filteredProjects.length > 0 ? (
+                            filteredProjects.map((project) => (
+                              <SelectItem key={project._id} value={project._id} title={project.name}>
+                                <div className="truncate max-w-xs" title={project.name}>
+                                  {project.name}
+                                </div>
                               </SelectItem>
-                            ))}
-                            {projects.filter(p => !projectQuery.trim() || p.name.toLowerCase().includes(projectQuery.toLowerCase())).length === 0 && (
-                              <div className="px-2 py-1 text-sm text-muted-foreground">No matching projects</div>
-                            )}
-                          </div>
+                            ))
+                          ) : (
+                            <div className="px-2 py-1 text-sm text-muted-foreground">No matching projects</div>
+                          )}
                         </div>
                       </SelectContent>
                     </Select>
