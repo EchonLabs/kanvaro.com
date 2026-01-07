@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Epic } from '@/models/Epic'
 import { Story } from '@/models/Story'
+import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -26,26 +27,12 @@ export async function GET(
     const organizationId = user.organization
     const epicId = params.id
 
-    const canViewEpic = await PermissionService.hasAnyPermission(
-      userId.toString(),
-      [Permission.EPIC_VIEW, Permission.EPIC_READ, Permission.EPIC_VIEW_ALL]
-    );
     const hasEpicViewAll = await PermissionService.hasPermission(
       userId.toString(),
       Permission.EPIC_VIEW_ALL
     );
 
-    // Build query - if user has EPIC_VIEW_ALL, they can view any epic
-    const epicQuery: any = { _id: epicId };
-    
-    if (!hasEpicViewAll) {
-      epicQuery.$or = [
-        { createdBy: userId },
-        { assignedTo: userId }
-      ];
-    }
-
-    const epic = await Epic.findOne(epicQuery)
+    const epic = await Epic.findOne({ _id: epicId })
       .populate('project', 'name startDate endDate')
       .populate('assignedTo', 'firstName lastName email')
       .populate('createdBy', 'firstName lastName email')
@@ -55,6 +42,30 @@ export async function GET(
         { error: 'Epic not found' },
         { status: 404 }
       )
+    }
+
+    if (!hasEpicViewAll) {
+      const projectId = (epic.project as any)?._id?.toString() || epic.project?.toString?.()
+
+      if (!projectId) {
+        return NextResponse.json(
+          { error: 'You do not have permission to view this epic' },
+          { status: 403 }
+        )
+      }
+
+      const hasProjectAccess = await Project.exists({
+        _id: projectId,
+        organization: organizationId,
+        'teamMembers.memberId': userId
+      })
+
+      if (!hasProjectAccess) {
+        return NextResponse.json(
+          { error: 'You do not have permission to view this epic' },
+          { status: 403 }
+        )
+      }
     }
 
     const stories = await Story.find({
