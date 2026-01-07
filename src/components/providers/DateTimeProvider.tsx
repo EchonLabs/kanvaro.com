@@ -18,6 +18,7 @@ import {
   getCurrentUtcTime,
   isValidTimezone
 } from '@/lib/dateTimeUtils'
+import { detectClientTimezone } from '@/lib/timezone'
 
 interface DateTimeContextType {
   formatDate: (date: Date | string) => string
@@ -51,27 +52,15 @@ export function DateTimeProvider({ children }: { children: React.ReactNode }) {
         const response = await fetch('/api/auth/me')
         if (response.ok) {
           const userData = await response.json()
-          if (userData.preferences || userData.timezone) {
-            // Auto-detect browser timezone if user doesn't have one set
-            let detectedTimezone = DEFAULT_DATE_TIME_PREFERENCES.timezone
-            if (!userData.timezone && typeof window !== 'undefined') {
-              try {
-                detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-              } catch (error) {
-                console.warn('Failed to detect browser timezone:', error)
-              }
-            }
-
-            const userPreferences = {
-              dateFormat: userData.preferences?.dateFormat || DEFAULT_DATE_TIME_PREFERENCES.dateFormat,
-              timeFormat: userData.preferences?.timeFormat || DEFAULT_DATE_TIME_PREFERENCES.timeFormat,
-              timezone: userData.timezone || detectedTimezone
-            }
-            setPreferencesState(userPreferences)
-            // Store in sessionStorage for faster subsequent loads
-            if (typeof window !== 'undefined') {
-              sessionStorage.setItem('user_date_preferences', JSON.stringify(userPreferences))
-            }
+          const detectedTimezone = detectClientTimezone()
+          const userPreferences = {
+            dateFormat: userData.preferences?.dateFormat || DEFAULT_DATE_TIME_PREFERENCES.dateFormat,
+            timeFormat: userData.preferences?.timeFormat || DEFAULT_DATE_TIME_PREFERENCES.timeFormat,
+            timezone: detectedTimezone
+          }
+          setPreferencesState(userPreferences)
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('user_date_preferences', JSON.stringify(userPreferences))
           }
         }
       } catch (error) {
@@ -103,6 +92,9 @@ export function DateTimeProvider({ children }: { children: React.ReactNode }) {
 
   const setPreferences = (prefs: DateTimePreferences) => {
     setPreferencesState(prefs)
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('user_date_preferences', JSON.stringify(prefs))
+    }
   }
 
   const value: DateTimeContextType = {

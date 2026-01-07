@@ -449,7 +449,6 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
               <SelectItem value="feature">Feature</SelectItem>
               <SelectItem value="improvement">Improvement</SelectItem>
               <SelectItem value="task">Task</SelectItem>
-              <SelectItem value="subtask">Subtask</SelectItem>
             </SelectContent>
           </Select>
         </div>
