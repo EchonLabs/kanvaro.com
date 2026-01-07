@@ -45,6 +45,11 @@ export interface IUser extends Document {
       teamActivity: boolean
     }
   }
+  security?: {
+    loginAlerts: boolean
+    sessionTimeout: number
+    requirePasswordChange: boolean
+  }
   createdAt: Date
   updatedAt: Date
 }
@@ -101,6 +106,11 @@ const UserSchema = new Schema<IUser>({
       projectUpdates: { type: Boolean, default: true },
       teamActivity: { type: Boolean, default: false }
     }
+  },
+  security: {
+    loginAlerts: { type: Boolean, default: true },
+    sessionTimeout: { type: Number, default: 30 },
+    requirePasswordChange: { type: Boolean, default: false }
   }
 }, {
   timestamps: true

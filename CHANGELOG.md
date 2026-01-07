@@ -1,3 +1,10 @@
+## [1.21.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.21.1...v1.21.2) (2026-01-07)
+
+
+### Bug Fixes
+
+* fix time log issues ([3746c20](https://github.com/EchonLabs/kanvaro.com/commit/3746c2005347ae5cff7bd7031750a85ab9749de8))
+
 ## [1.21.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.21.0...v1.21.1) (2026-01-06)
 
 

@@ -1014,7 +1014,6 @@ export default function TasksClient({
                                         <SelectItem value="feature">Feature</SelectItem>
                                         <SelectItem value="improvement">Improvement</SelectItem>
                                         <SelectItem value="task">Task</SelectItem>
-                                        <SelectItem value="subtask">Subtask</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -1317,11 +1316,11 @@ export default function TasksClient({
                                                                                     </Badge>
                                                                                 </div>
                                                                             </div>
-                                                                            <TooltipProvider>
+                                                                            {/* <TooltipProvider>
                                                                               <Tooltip>
                                                                                 <TooltipTrigger asChild>
                                                                                   <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
-                                                                                    {task.description || 'No description'}
+                                                                                    {task.description}
                                                                                   </p>
                                                                                 </TooltipTrigger>
                                                                                 {(task.description && task.description.length > 0) && (
@@ -1330,7 +1329,7 @@ export default function TasksClient({
                                                                                   </TooltipContent>
                                                                                 )}
                                                                               </Tooltip>
-                                                                            </TooltipProvider>
+                                                                            </TooltipProvider> */}
                                                                             <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                                                                                 <div className="flex items-center space-x-1 min-w-0">
                                                                                     <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />

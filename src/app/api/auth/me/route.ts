@@ -58,6 +58,12 @@ export async function GET() {
             language: user.language,
             currency: user.currency,
             preferences: user.preferences,
+            twoFactorEnabled: user.twoFactorEnabled ?? false,
+            security: {
+              loginAlerts: user.security?.loginAlerts ?? true,
+              sessionTimeout: user.security?.sessionTimeout ?? 30,
+              requirePasswordChange: user.security?.requirePasswordChange ?? false
+            },
             lastLogin: user.lastLogin
           }
         } else {
@@ -110,6 +116,12 @@ export async function GET() {
                 language: user.language,
                 currency: user.currency,
                 preferences: user.preferences,
+                twoFactorEnabled: user.twoFactorEnabled ?? false,
+                security: {
+                  loginAlerts: user.security?.loginAlerts ?? true,
+                  sessionTimeout: user.security?.sessionTimeout ?? 30,
+                  requirePasswordChange: user.security?.requirePasswordChange ?? false
+                },
                 lastLogin: user.lastLogin
               }
             } else {
@@ -174,6 +186,12 @@ export async function GET() {
             language: user.language,
             currency: user.currency,
             preferences: user.preferences,
+            twoFactorEnabled: user.twoFactorEnabled ?? false,
+            security: {
+              loginAlerts: user.security?.loginAlerts ?? true,
+              sessionTimeout: user.security?.sessionTimeout ?? 30,
+              requirePasswordChange: user.security?.requirePasswordChange ?? false
+            },
             lastLogin: user.lastLogin
           }
         } else {

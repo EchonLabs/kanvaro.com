@@ -72,6 +72,8 @@ import { TestSuiteForm } from '@/components/test-management/TestSuiteForm'
 import { TestCaseForm } from '@/components/test-management/TestCaseForm'
 import { ProjectTeamTab } from '@/components/projects/ProjectTeamTab'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
+import { Permission } from '@/lib/permissions'
+import { usePermissions } from '@/lib/permissions/permission-context'
 
 interface Project {
   _id: string
@@ -188,6 +190,8 @@ export default function ProjectDetailPage() {
   const orgCurrency = organization?.currency || 'USD'
   const { formatCurrency } = useOrgCurrency()
   const { formatDate } = useDateTime()
+  const { hasPermission } = usePermissions()
+  const canUpdateProject = hasPermission(Permission.PROJECT_UPDATE)
 
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
@@ -618,15 +622,17 @@ export default function ProjectDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto sm:mt-4 lg:mt-6">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push(`/projects/create?edit=${projectId}`)}
-              className="w-full sm:w-auto"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Project
-            </Button>
+            {canUpdateProject && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push(`/projects/create?edit=${projectId}`)}
+                className="w-full sm:w-auto"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Project
+              </Button>
+            )}
             <Button size="sm" onClick={() => setShowCreateTaskModal(true)} className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               Add Task
@@ -895,15 +901,17 @@ export default function ProjectDetailPage() {
                     <CardTitle>Quick Actions</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full justify-start"
-                      onClick={() => router.push(`/projects/create?edit=${projectId}`)}
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit Project
-                    </Button>
+                    {canUpdateProject && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-start"
+                        onClick={() => router.push(`/projects/create?edit=${projectId}`)}
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit Project
+                      </Button>
+                    )}
                     {/* <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setShowCreateTaskModal(true)}>
                       <Plus className="mr-2 h-4 w-4" />
                       Add Task
