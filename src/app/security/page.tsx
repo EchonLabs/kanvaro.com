@@ -8,17 +8,59 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Shield, Save, Loader2, AlertCircle, CheckCircle, Key, Smartphone, ShieldCheck } from 'lucide-react'
+import { Shield, Save, Loader2, Key, Smartphone, ShieldCheck } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PasswordStrength } from '@/components/ui/PasswordStrength'
+import { useToast } from '@/components/ui/Toast'
+
+type SecuritySettingsState = {
+  twoFactorEnabled: boolean
+  loginAlerts: boolean
+  sessionTimeout: number
+  requirePasswordChange: boolean
+}
+
+const DEFAULT_SECURITY_SETTINGS: SecuritySettingsState = {
+  twoFactorEnabled: false,
+  loginAlerts: true,
+  sessionTimeout: 30,
+  requirePasswordChange: false
+}
+
+const normalizeSecurityPayload = (
+  payload?: Partial<Record<keyof SecuritySettingsState, any>>
+): SecuritySettingsState => {
+  const parsedTimeout = Number(payload?.sessionTimeout)
+  const normalizedTimeout = Number.isNaN(parsedTimeout)
+    ? DEFAULT_SECURITY_SETTINGS.sessionTimeout
+    : Math.min(Math.max(Math.round(parsedTimeout), 5), 1440)
+
+  return {
+    twoFactorEnabled:
+      typeof payload?.twoFactorEnabled === 'boolean'
+        ? payload.twoFactorEnabled
+        : DEFAULT_SECURITY_SETTINGS.twoFactorEnabled,
+    loginAlerts:
+      typeof payload?.loginAlerts === 'boolean'
+        ? payload.loginAlerts
+        : DEFAULT_SECURITY_SETTINGS.loginAlerts,
+    sessionTimeout: normalizedTimeout,
+    requirePasswordChange:
+      typeof payload?.requirePasswordChange === 'boolean'
+        ? payload.requirePasswordChange
+        : DEFAULT_SECURITY_SETTINGS.requirePasswordChange
+  }
+}
 
 export default function SecurityPage() {
   const [isLoading, setIsLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [isSavingPassword, setIsSavingPassword] = useState(false)
+  const [isSavingSecurity, setIsSavingSecurity] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [authError, setAuthError] = useState('')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const router = useRouter()
+  const { showToast } = useToast()
 
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -26,12 +68,45 @@ export default function SecurityPage() {
     confirmPassword: ''
   })
 
-  const [securitySettings, setSecuritySettings] = useState({
-    twoFactorEnabled: false,
-    loginAlerts: true,
-    sessionTimeout: 30,
-    requirePasswordChange: false
+  const [securitySettings, setSecuritySettings] = useState<SecuritySettingsState>({
+    ...DEFAULT_SECURITY_SETTINGS
   })
+  const [initialSecuritySettings, setInitialSecuritySettings] = useState<SecuritySettingsState>({
+    ...DEFAULT_SECURITY_SETTINGS
+  })
+  const [isSavingTwoFactor, setIsSavingTwoFactor] = useState(false)
+
+  const loadSecuritySettings = useCallback(async () => {
+    try {
+      const response = await fetch('/api/settings/security')
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          setSecuritySettings({ ...DEFAULT_SECURITY_SETTINGS })
+          return
+        }
+
+        const errorMessage = data?.error || 'Failed to load security settings'
+        throw new Error(errorMessage)
+      }
+
+      const payload = data?.data ?? data ?? {}
+      const normalizedSettings = normalizeSecurityPayload(payload)
+      setSecuritySettings(normalizedSettings)
+      setInitialSecuritySettings(normalizedSettings)
+    } catch (error) {
+      console.error('Load security settings failed:', error)
+      showToast({
+        type: 'error',
+        title: 'Unable to load security settings',
+        message: 'Please try again.',
+        duration: 4000
+      })
+      setSecuritySettings({ ...DEFAULT_SECURITY_SETTINGS })
+      setInitialSecuritySettings({ ...DEFAULT_SECURITY_SETTINGS })
+    }
+  }, [showToast])
 
   const checkAuth = useCallback(async () => {
     try {
@@ -43,12 +118,7 @@ export default function SecurityPage() {
         const userData = await response.json()
         console.log('Security: User data received:', userData)
         setUser(userData)
-        setSecuritySettings({
-          twoFactorEnabled: userData.twoFactorEnabled || false,
-          loginAlerts: userData.security?.loginAlerts ?? true,
-          sessionTimeout: userData.security?.sessionTimeout || 30,
-          requirePasswordChange: userData.security?.requirePasswordChange || false
-        })
+        await loadSecuritySettings()
         setAuthError('')
       } else if (response.status === 401) {
         console.log('Security: 401 response, trying refresh token')
@@ -59,12 +129,7 @@ export default function SecurityPage() {
         if (refreshResponse.ok) {
           const refreshData = await refreshResponse.json()
           setUser(refreshData.user)
-          setSecuritySettings({
-            twoFactorEnabled: refreshData.user.twoFactorEnabled || false,
-            loginAlerts: refreshData.user.security?.loginAlerts ?? true,
-            sessionTimeout: refreshData.user.security?.sessionTimeout || 30,
-            requirePasswordChange: refreshData.user.security?.requirePasswordChange || false
-          })
+          await loadSecuritySettings()
           setAuthError('')
         } else {
           setAuthError('Session expired')
@@ -84,13 +149,20 @@ export default function SecurityPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [router])
+  }, [loadSecuritySettings, router])
 
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
 
+  const passwordDirty =
+    passwordForm.newPassword.trim() !== '' || passwordForm.confirmPassword.trim() !== ''
+
   const handlePasswordChange = async () => {
+    if (!passwordDirty || isSavingPassword) {
+      return
+    }
+
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setMessage({ type: 'error', text: 'New passwords do not match' })
       return
@@ -112,7 +184,7 @@ export default function SecurityPage() {
       return
     }
 
-    setSaving(true)
+    setIsSavingPassword(true)
     setMessage(null)
 
     try {
@@ -133,16 +205,39 @@ export default function SecurityPage() {
       }
 
       setMessage({ type: 'success', text: 'Password changed successfully' })
+      showToast({
+        type: 'success',
+        title: 'Password Updated',
+        message: 'Your password has been changed.',
+        duration: 4000
+      })
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || 'Failed to change password' })
+      const errorText = error.message || 'Failed to change password'
+      setMessage({ type: 'error', text: errorText })
+      showToast({
+        type: 'error',
+        title: 'Password Change Failed',
+        message: errorText,
+        duration: 4000
+      })
     } finally {
-      setSaving(false)
+      setIsSavingPassword(false)
     }
   }
 
+  const twoFactorDirty = securitySettings.twoFactorEnabled !== initialSecuritySettings.twoFactorEnabled
+  const securitySettingsDirty =
+    securitySettings.loginAlerts !== initialSecuritySettings.loginAlerts ||
+    securitySettings.requirePasswordChange !== initialSecuritySettings.requirePasswordChange ||
+    securitySettings.sessionTimeout !== initialSecuritySettings.sessionTimeout
+
   const handleSecuritySettingsSave = async () => {
-    setSaving(true)
+    if (!securitySettingsDirty || isSavingSecurity) {
+      return
+    }
+
+    setIsSavingSecurity(true)
     setMessage(null)
 
     try {
@@ -154,15 +249,92 @@ export default function SecurityPage() {
         body: JSON.stringify(securitySettings),
       })
 
+      const data = await response.json().catch(() => null)
+
       if (!response.ok) {
-        throw new Error('Failed to update security settings')
+        const errorMessage = data?.error || 'Failed to update security settings'
+        throw new Error(errorMessage)
       }
 
+      const updatedSettings = normalizeSecurityPayload(data?.data ?? securitySettings)
+      setSecuritySettings(updatedSettings)
+      setInitialSecuritySettings(updatedSettings)
+
       setMessage({ type: 'success', text: 'Security settings updated successfully' })
+      showToast({
+        type: 'success',
+        title: 'Security Updated',
+        message: 'Your security preferences have been saved.',
+        duration: 4000
+      })
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update security settings' })
+      const errorText = error instanceof Error ? error.message : 'Failed to update security settings'
+      setMessage({ type: 'error', text: errorText })
+      showToast({
+        type: 'error',
+        title: 'Save Failed',
+        message: errorText,
+        duration: 4000
+      })
     } finally {
-      setSaving(false)
+      setIsSavingSecurity(false)
+    }
+  }
+
+  const handleTwoFactorSave = async () => {
+    if (!twoFactorDirty || isSavingTwoFactor) {
+      return
+    }
+
+    setIsSavingTwoFactor(true)
+    setMessage(null)
+
+    try {
+      const response = await fetch('/api/settings/security', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ twoFactorEnabled: securitySettings.twoFactorEnabled })
+      })
+
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        const errorMessage = data?.error || 'Failed to update two-factor settings'
+        throw new Error(errorMessage)
+      }
+
+      const updatedSettings = normalizeSecurityPayload(data?.data ?? securitySettings)
+      setSecuritySettings((prev) => ({
+        ...prev,
+        twoFactorEnabled: updatedSettings.twoFactorEnabled
+      }))
+      setInitialSecuritySettings((prev) => ({
+        ...prev,
+        twoFactorEnabled: updatedSettings.twoFactorEnabled
+      }))
+
+      setMessage({ type: 'success', text: 'Two-factor authentication updated successfully' })
+      showToast({
+        type: 'success',
+        title: '2FA Updated',
+        message: updatedSettings.twoFactorEnabled
+          ? 'Two-factor authentication is now enabled.'
+          : 'Two-factor authentication has been disabled.',
+        duration: 4000
+      })
+    } catch (error) {
+      const errorText = error instanceof Error ? error.message : 'Failed to update two-factor settings'
+      setMessage({ type: 'error', text: errorText })
+      showToast({
+        type: 'error',
+        title: '2FA Update Failed',
+        message: errorText,
+        duration: 4000
+      })
+    } finally {
+      setIsSavingTwoFactor(false)
     }
   }
 
@@ -217,7 +389,7 @@ export default function SecurityPage() {
         </div>
 
         {/* Security Content */}
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* Change Password */}
           <Card>
             <CardHeader>
@@ -267,13 +439,17 @@ export default function SecurityPage() {
               </div>
 
               <div className="flex justify-end">
-                <Button onClick={handlePasswordChange} disabled={saving} className="flex items-center gap-2">
-                  {saving ? (
+                <Button
+                  onClick={handlePasswordChange}
+                  disabled={!passwordDirty || isSavingPassword}
+                  className="flex items-center gap-2"
+                >
+                  {isSavingPassword ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                   ) : (
                     <Key className="h-4 w-4" />
                   )}
-                  {saving ? 'Changing...' : 'Change Password'}
+                  {isSavingPassword ? 'Changing...' : 'Change Password'}
                 </Button>
               </div>
             </CardContent>
@@ -315,6 +491,22 @@ export default function SecurityPage() {
                   </AlertDescription>
                 </Alert>
               )}
+
+              <div className="flex justify-end pt-2 mt-4">
+                <Button
+                  onClick={handleTwoFactorSave}
+                  disabled={!twoFactorDirty || isSavingTwoFactor}
+                  className="flex items-center gap-2"
+                  size="sm"
+                >
+                  {isSavingTwoFactor ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  {isSavingTwoFactor ? 'Saving...' : 'Save 2FA Settings'}
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -384,24 +576,23 @@ export default function SecurityPage() {
               </div>
 
               <div className="flex justify-end">
-                <Button onClick={handleSecuritySettingsSave} disabled={saving} className="flex items-center gap-2">
-                  {saving ? (
+                <Button
+                  onClick={handleSecuritySettingsSave}
+                  disabled={!securitySettingsDirty || isSavingSecurity}
+                  className="flex items-center gap-2"
+                >
+                  {isSavingSecurity ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                   ) : (
                     <Save className="h-4 w-4" />
                   )}
-                  {saving ? 'Saving...' : 'Save Security Settings'}
+                  {isSavingSecurity ? 'Saving...' : 'Save Security Settings'}
                 </Button>
               </div>
             </CardContent>
           </Card>
 
-          {message && (
-            <Alert variant={message.type === 'error' ? 'destructive' : 'default'}>
-              {message.type === 'error' ? <AlertCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-              <AlertDescription>{message.text}</AlertDescription>
-            </Alert>
-          )}
+          
         </div>
       </div>
     </MainLayout>

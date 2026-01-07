@@ -431,9 +431,9 @@ export default function ProjectsPage() {
                               )}
                             </div>
                           </div>
-                          <CardDescription className="line-clamp-2 text-xs sm:text-sm" title={project.description}>
+                          {/* <CardDescription className="line-clamp-2 text-xs sm:text-sm" title={project.description}>
                             {project.description || 'No description'}
-                          </CardDescription>
+                          </CardDescription> */}
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

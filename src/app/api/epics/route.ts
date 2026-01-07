@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Epic } from '@/models/Epic'
 import { Story } from '@/models/Story'
+import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -22,10 +23,6 @@ export async function GET(request: NextRequest) {
     const userId = user.id
     const organizationId = user.organization
 
-    const canViewEpics = await PermissionService.hasAnyPermission(
-      userId.toString(),
-      [Permission.EPIC_VIEW, Permission.EPIC_READ, Permission.EPIC_VIEW_ALL]
-    );
     const hasEpicViewAll = await PermissionService.hasPermission(
       userId.toString(),
       Permission.EPIC_VIEW_ALL
@@ -33,15 +30,54 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const ids = searchParams.get('ids') // Comma-separated epic IDs
+    const parsedPage = parseInt(searchParams.get('page') || '1')
+    const parsedLimit = parseInt(searchParams.get('limit') || '10')
+    const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 10
+    const PAGE_SIZE = Math.min(limit, 500)
+
+    let accessibleProjectIds: string[] = []
+
+    if (!hasEpicViewAll) {
+      const memberProjects = await Project.distinct('_id', {
+        organization: organizationId,
+        'teamMembers.memberId': userId
+      })
+
+      accessibleProjectIds = memberProjects.map(projectId => projectId.toString())
+
+      if (!accessibleProjectIds.length) {
+        if (ids) {
+          return NextResponse.json({})
+        }
+
+        return NextResponse.json({
+          success: true,
+          data: [],
+          pagination: {
+            page,
+            limit: PAGE_SIZE,
+            total: 0,
+            totalPages: 0
+          }
+        })
+      }
+    }
 
     if (ids) {
       // Fetch specific epics by IDs
       const epicIds = ids.split(',').filter(id => id.trim())
-      const epics = await Epic.find({
+      const epicFilter: any = {
         _id: { $in: epicIds },
         archived: false,
         is_deleted: { $ne: true }
-      })
+      }
+
+      if (!hasEpicViewAll) {
+        epicFilter.project = { $in: accessibleProjectIds }
+      }
+
+      const epics = await Epic.find(epicFilter)
       .select('_id title')
       .lean()
 
@@ -54,10 +90,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(epicMap)
     }
 
-    const parsedPage = parseInt(searchParams.get('page') || '1')
-    const parsedLimit = parseInt(searchParams.get('limit') || '10')
-    const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
-    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 10
     const search = searchParams.get('search') || ''
     const status = searchParams.get('status') || ''
     const priority = searchParams.get('priority') || ''
@@ -77,18 +109,29 @@ export async function GET(request: NextRequest) {
     if (priority) filters.priority = priority
     if (projectFilter) filters.project = projectFilter
 
-    const PAGE_SIZE = Math.min(limit, 500)
-
     // Get epics - if user has EPIC_VIEW_ALL, show all epics; otherwise only their own
     const epicQuery: any = {
       ...filters,
     }
-    
-    if (!canViewEpics && !hasEpicViewAll) {
-      // Allow creator-only view fallback
-      epicQuery.createdBy = userId
-    } else if (!hasEpicViewAll) {
-      epicQuery.$or = [{ createdBy: userId }]
+
+    if (!hasEpicViewAll) {
+      if (projectFilter) {
+        const canAccessProject = accessibleProjectIds.some(id => id === projectFilter)
+        if (!canAccessProject) {
+          return NextResponse.json({
+            success: true,
+            data: [],
+            pagination: {
+              page,
+              limit: PAGE_SIZE,
+              total: 0,
+              totalPages: 0
+            }
+          })
+        }
+      } else {
+        epicQuery.project = { $in: accessibleProjectIds }
+      }
     }
 
     const epics = await Epic.find(epicQuery)
