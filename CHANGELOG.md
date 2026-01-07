@@ -1,3 +1,11 @@
+## [1.21.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.21.3...v1.21.4) (2026-01-07)
+
+
+### Bug Fixes
+
+* add new widget ([febb326](https://github.com/EchonLabs/kanvaro.com/commit/febb326f99a9f632cbe34c8889f545b46499e719))
+* fix timer widget ([2ddef43](https://github.com/EchonLabs/kanvaro.com/commit/2ddef43b3a3f3a5faf29dd4b9bf37c730fc160cf))
+
 ## [1.21.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.21.2...v1.21.3) (2026-01-07)
 
 
