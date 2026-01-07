@@ -1,3 +1,10 @@
+# [1.22.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.21.4...v1.22.0) (2026-01-07)
+
+
+### Features
+
+* fix time report widget ([1d16199](https://github.com/EchonLabs/kanvaro.com/commit/1d16199149cd05bbb61ec8bce524628c5bbf462f))
+
 ## [1.21.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.21.3...v1.21.4) (2026-01-07)
 
 
