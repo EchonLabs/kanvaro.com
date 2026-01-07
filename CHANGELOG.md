@@ -1,3 +1,10 @@
+## [1.21.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.21.2...v1.21.3) (2026-01-07)
+
+
+### Bug Fixes
+
+* add changes in epic sprint and stories related ([8876c75](https://github.com/EchonLabs/kanvaro.com/commit/8876c7542ebfcaaa8fb8f60fb6a4a5b8db327982))
+
 ## [1.21.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.21.1...v1.21.2) (2026-01-07)
 
 
