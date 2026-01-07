@@ -851,7 +851,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                   <div className="hidden md:block">
                     <div className="grid grid-cols-11 gap-4 p-4 border-b font-semibold text-sm text-muted-foreground">
                       <div className="col-span-2">Employee</div>
-                      <div className="col-span-3">Project (Task)</div>
+                      <div className="col-span-2">Project (Task)</div>
                       <div className="col-span-1">Date</div>
                       <div className="col-span-1">Start</div>
                       <div className="col-span-1">End</div>
@@ -866,7 +866,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                           <div className="font-medium text-sm">{entry.userName}</div>
                           <div className="text-xs text-muted-foreground">{entry.userEmail}</div>
                         </div>
-                        <div className="col-span-3">
+                        <div className="col-span-2">
                           <div className="font-medium text-sm">{entry.projectName}</div>
                           {entry.taskTitle && (
                             <div className="text-xs text-muted-foreground">{entry.taskTitle}</div>

@@ -26,6 +26,10 @@ export async function GET(request: NextRequest) {
     const userId = user.id
     const organizationId = user.organization
 
+    const userPermissions = await PermissionService.getUserPermissions(userId)
+    console.log('Stories API - user role:', userPermissions.userRole)
+    console.log('Stories API - global permissions:', userPermissions.globalPermissions)
+
     // Check if user has permission to view all stories
     const hasStoryViewAll = await PermissionService.hasPermission(
       userId,
@@ -43,16 +47,49 @@ export async function GET(request: NextRequest) {
 
     // Build filters
     const filters: any = {}
-    
-    // If user doesn't have STORY_VIEW_ALL, restrict to stories they created or are assigned to
+    let accessibleProjectIds: mongoose.Types.ObjectId[] = []
+
     if (!hasStoryViewAll) {
-      filters.$or = [
-        { createdBy: userId },
-        { assignedTo: userId }
-      ]
+      accessibleProjectIds = await Project.distinct('_id', {
+        organization: organizationId,
+        'teamMembers.memberId': userId
+      }) as mongoose.Types.ObjectId[]
+
+      // No accessible projects means no visible stories
+      if (!accessibleProjectIds.length) {
+        const PAGE_SIZE = Math.min(limit, 100)
+        return NextResponse.json({
+          success: true,
+          data: [],
+          pagination: {
+            page,
+            limit: PAGE_SIZE,
+            total: 0,
+            totalPages: 0
+          }
+        })
+      }
+
+      filters.project = { $in: accessibleProjectIds }
     }
     
     if (projectId) {
+      if (!hasStoryViewAll) {
+        const canAccessProject = accessibleProjectIds.some((id) => id.toString() === projectId)
+        if (!canAccessProject) {
+          const PAGE_SIZE = Math.min(limit, 100)
+          return NextResponse.json({
+            success: true,
+            data: [],
+            pagination: {
+              page,
+              limit: PAGE_SIZE,
+              total: 0,
+              totalPages: 0
+            }
+          })
+        }
+      }
       filters.project = projectId
     }
     
@@ -157,14 +194,13 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
     // Verify project exists and user has access
     const projectDoc = await Project.findOne({
       _id: project,
       organization: organizationId,
       $or: [
         { createdBy: userId },
-        { teamMembers: userId }
+        { 'teamMembers.memberId': userId }
       ]
     })
 

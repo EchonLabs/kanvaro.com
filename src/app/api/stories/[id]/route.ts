@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Story } from '@/models/Story'
 import { Epic } from '@/models/Epic'
+import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -34,20 +35,8 @@ export async function GET(
       Permission.STORY_VIEW_ALL
     );
 
-    // Build query - if user has STORY_VIEW_ALL, they can view any story
-    const storyQuery: any = {
-      _id: storyId,
-    };
-    
-    if (!hasStoryViewAll) {
-      storyQuery.$or = [
-        { createdBy: userId },
-        { assignedTo: userId }
-      ];
-    }
-
     // Optimize population to only fetch what's needed for the UI
-    const story = await Story.findOne(storyQuery)
+    const story = await Story.findOne({ _id: storyId })
       .populate('project', '_id name') // Include _id for permission checks
       .populate({
         path: 'epic',
@@ -73,6 +62,30 @@ export async function GET(
         { error: 'Story not found' },
         { status: 404 }
       )
+    }
+
+    if (!hasStoryViewAll) {
+      const projectId = (story.project as any)?._id?.toString() || story.project?.toString()
+
+      if (!projectId) {
+        return NextResponse.json(
+          { error: 'You do not have permission to view this story' },
+          { status: 403 }
+        )
+      }
+
+      const hasProjectAccess = await Project.exists({
+        _id: projectId,
+        organization: organizationId,
+        'teamMembers.memberId': userId
+      })
+
+      if (!hasProjectAccess) {
+        return NextResponse.json(
+          { error: 'You do not have permission to view this story' },
+          { status: 403 }
+        )
+      }
     }
 
     return NextResponse.json({

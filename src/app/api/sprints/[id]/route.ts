@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Sprint } from '@/models/Sprint'
 import { Task } from '@/models/Task'
+import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -45,14 +46,7 @@ export async function GET(
       Permission.SPRINT_VIEW_ALL
     );
 
-    // Build query - if user has SPRINT_VIEW_ALL, they can view any sprint
-    const sprintQuery: any = { _id: sprintId };
-    
-    if (!hasSprintViewAll) {
-      sprintQuery.createdBy = userId;
-    }
-
-    const sprint = await Sprint.findOne(sprintQuery)
+    const sprint = await Sprint.findOne({ _id: sprintId })
       .populate('project', 'name')
       .populate('createdBy', 'firstName lastName email')
       .populate('teamMembers', 'firstName lastName email')
@@ -62,6 +56,32 @@ export async function GET(
         { error: 'Sprint not found' },
         { status: 404 }
       )
+    }
+
+    if (!hasSprintViewAll) {
+      const projectId = typeof sprint.project === 'object' && sprint.project !== null
+        ? (sprint.project as any)._id?.toString()
+        : sprint.project?.toString?.()
+
+      if (!projectId) {
+        return NextResponse.json(
+          { error: 'You do not have permission to view this sprint' },
+          { status: 403 }
+        )
+      }
+
+      const hasProjectAccess = await Project.exists({
+        _id: projectId,
+        organization: organizationId,
+        'teamMembers.memberId': userId
+      })
+
+      if (!hasProjectAccess) {
+        return NextResponse.json(
+          { error: 'You do not have permission to view this sprint' },
+          { status: 403 }
+        )
+      }
     }
 
     // Fetch all tasks that were ever in this sprint (from sprint's tasks array)
