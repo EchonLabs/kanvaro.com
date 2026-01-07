@@ -46,8 +46,42 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
+    const PAGE_SIZE = Math.min(limit, 100)
     const search = searchParams.get('search') || ''
     const status = searchParams.get('status') || ''
+    const projectFilter = searchParams.get('project') || ''
+    const countOnly = searchParams.get('countOnly') === 'true'
+
+    let accessibleProjectIds: string[] = []
+
+    if (!hasSprintViewAll) {
+      const memberProjects = await Project.distinct('_id', {
+        organization: organizationId,
+        'teamMembers.memberId': userId
+      })
+
+      accessibleProjectIds = memberProjects.map(projectId => projectId.toString())
+
+      if (!accessibleProjectIds.length) {
+        if (countOnly) {
+          return NextResponse.json({
+            success: true,
+            count: 0
+          })
+        }
+
+        return NextResponse.json({
+          success: true,
+          data: [],
+          pagination: {
+            page,
+            limit: PAGE_SIZE,
+            total: 0,
+            totalPages: 0,
+          },
+        })
+      }
+    }
 
     // Build filters (Sprint schema has no 'organization' field)
     const filters: any = {
@@ -65,21 +99,40 @@ export async function GET(request: NextRequest) {
       filters.status = status
     }
 
-    // Query sprints - if user has SPRINT_VIEW_ALL, show all sprints; otherwise only their own
+    // Query sprints - if user has SPRINT_VIEW_ALL, show all sprints; otherwise only projects they belong to
     const sprintQueryFilters: any = {
       ...filters,
     }
-    
-    if (!hasSprintViewAll) {
-      sprintQueryFilters.createdBy = userId
-    }
-    const projectFilter = searchParams.get('project')
+
     if (projectFilter) {
+      if (!hasSprintViewAll) {
+        const canAccessProject = accessibleProjectIds.some(id => id === projectFilter)
+        if (!canAccessProject) {
+          if (countOnly) {
+            return NextResponse.json({
+              success: true,
+              count: 0
+            })
+          }
+
+          return NextResponse.json({
+            success: true,
+            data: [],
+            pagination: {
+              page,
+              limit: PAGE_SIZE,
+              total: 0,
+              totalPages: 0,
+            },
+          })
+        }
+      }
       sprintQueryFilters.project = projectFilter
+    } else if (!hasSprintViewAll) {
+      sprintQueryFilters.project = { $in: accessibleProjectIds }
     }
 
     // Check if only count is requested
-    const countOnly = searchParams.get('countOnly') === 'true'
     if (countOnly) {
       const total = await Sprint.countDocuments(sprintQueryFilters)
       return NextResponse.json({
@@ -87,8 +140,6 @@ export async function GET(request: NextRequest) {
         count: total
       })
     }
-
-    const PAGE_SIZE = Math.min(limit, 100)
 
     // Fetch sprints
     const sprints = await Sprint.find(sprintQueryFilters)
