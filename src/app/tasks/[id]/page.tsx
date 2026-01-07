@@ -185,6 +185,8 @@ type CommentNode = {
   children: CommentNode[]
 }
 
+type ComposerType = 'comment' | 'reply'
+
 export default function TaskDetailPage() {
   const router = useRouter()
   const params = useParams()
@@ -204,6 +206,7 @@ export default function TaskDetailPage() {
   const [suggestionMode, setSuggestionMode] = useState<'mention' | 'issue' | null>(null)
   const [suggestionQuery, setSuggestionQuery] = useState('')
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
+  const [suggestionComposer, setSuggestionComposer] = useState<ComposerType | null>(null)
   const [currentUserId, setCurrentUserId] = useState('')
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
@@ -216,14 +219,17 @@ export default function TaskDetailPage() {
   const [uploading, setUploading] = useState(false)
   const [commentsCurrentPage, setCommentsCurrentPage] = useState(1)
   const [commentsPageSize, setCommentsPageSize] = useState(5)
-  const editorRef = useRef<HTMLTextAreaElement | null>(null)
+  const commentEditorRef = useRef<HTMLTextAreaElement | null>(null)
+  const replyEditorRef = useRef<HTMLTextAreaElement | null>(null)
   const commentFileInputRef = useRef<HTMLInputElement | null>(null)
   const replyFileInputRef = useRef<HTMLInputElement | null>(null)
-  const composerContainerRef = useRef<HTMLDivElement | null>(null)
+  const commentComposerRef = useRef<HTMLDivElement | null>(null)
+  const replyComposerRef = useRef<HTMLDivElement | null>(null)
+  const activeSuggestionComposerRef = useRef<ComposerType | null>(null)
   const suggestionMenuRef = useRef<HTMLDivElement | null>(null)
   const measurementCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const [suggestionPosition, setSuggestionPosition] = useState<{ top: number; left: number; flip: boolean }>({ top: 0, left: 0, flip: false })
-  const [editorScrollTop, setEditorScrollTop] = useState(0)
+  const [composerScrollTop, setComposerScrollTop] = useState<{ comment: number; reply: number }>({ comment: 0, reply: 0 })
   const { success: notifySuccess, error: notifyError } = useNotify()
   const { hasPermission } = usePermissions()
 
@@ -461,6 +467,13 @@ export default function TaskDetailPage() {
     setSelectedSuggestionIndex(0)
   }, [filteredSuggestions])
 
+  const closeSuggestions = useCallback(() => {
+    setSuggestionMode(null)
+    setSuggestionQuery('')
+    setSelectedSuggestionIndex(0)
+    setSuggestionComposer(null)
+  }, [])
+
   // Helper function to highlight matched text
   const highlightMatch = (text: string | undefined, query: string) => {
     if (!text || !query.trim()) return text || ''
@@ -476,10 +489,13 @@ export default function TaskDetailPage() {
     })
   }
 
-  const replaceActiveToken = (replacement: string) => {
-    setCommentContent(prev => {
-      const textarea = editorRef.current
-      const cursorPos = textarea?.selectionStart ?? prev.length
+  const replaceActiveToken = useCallback((replacement: string, composer: ComposerType) => {
+    const textarea = composer === 'reply' ? replyEditorRef.current : commentEditorRef.current
+    const setContent = composer === 'reply' ? setReplyContent : setCommentContent
+
+    setContent(prev => {
+      if (!textarea) return prev
+      const cursorPos = textarea.selectionStart ?? prev.length
       const textBefore = prev.slice(0, cursorPos)
       const textAfter = prev.slice(cursorPos)
       // match last @word or #word before cursor
@@ -498,9 +514,8 @@ export default function TaskDetailPage() {
       }, 0)
       return nextContent
     })
-    setSuggestionMode(null)
-    setSuggestionQuery('')
-  }
+    closeSuggestions()
+  }, [closeSuggestions])
 
   const getCaretOffsets = useCallback((textarea: HTMLTextAreaElement) => {
     const selectionEnd = textarea.selectionEnd ?? textarea.value.length
@@ -544,10 +559,12 @@ export default function TaskDetailPage() {
     }
   }, [])
 
-  const updateSuggestionPosition = useCallback(() => {
+  const updateSuggestionPosition = useCallback((composer?: ComposerType | null) => {
     if (!suggestionMode) return
-    const textarea = editorRef.current
-    const container = composerContainerRef.current
+    const targetComposer = composer ?? suggestionComposer
+    if (!targetComposer) return
+    const textarea = targetComposer === 'reply' ? replyEditorRef.current : commentEditorRef.current
+    const container = targetComposer === 'reply' ? replyComposerRef.current : commentComposerRef.current
     if (!textarea || !container) return
 
     const caret = getCaretOffsets(textarea)
@@ -571,21 +588,187 @@ export default function TaskDetailPage() {
     const boundedTop = Math.min(Math.max(rawTop, minTop), maxTop)
 
     const flip = boundedTop + menuHeight + 12 > containerHeight
-
     setSuggestionPosition({ top: boundedTop, left: boundedLeft, flip })
-  }, [composerContainerRef, editorRef, getCaretOffsets, suggestionMenuRef, suggestionMode])
+  }, [commentComposerRef, commentEditorRef, getCaretOffsets, replyComposerRef, replyEditorRef, suggestionMenuRef, suggestionMode, suggestionComposer])
 
-  const scheduleSuggestionPositionUpdate = useCallback(() => {
-    if (!suggestionMode) return
+  const scheduleSuggestionPositionUpdate = useCallback((composer?: ComposerType | null) => {
+    const targetComposer = composer ?? suggestionComposer
+    if (!suggestionMode || !targetComposer) return
     requestAnimationFrame(() => {
-      updateSuggestionPosition()
+      updateSuggestionPosition(targetComposer)
     })
-  }, [suggestionMode, updateSuggestionPosition])
+  }, [suggestionMode, suggestionComposer, updateSuggestionPosition])
 
   useLayoutEffect(() => {
+    if (!suggestionMode || !suggestionComposer) return
+    updateSuggestionPosition(suggestionComposer)
+  }, [suggestionMode, suggestionComposer, suggestionQuery, filteredSuggestions, composerScrollTop.comment, composerScrollTop.reply, updateSuggestionPosition])
+
+  useEffect(() => {
+    activeSuggestionComposerRef.current = suggestionComposer
+  }, [suggestionComposer])
+
+  const insertSelectedSuggestion = (composer: ComposerType) => {
     if (!suggestionMode) return
-    updateSuggestionPosition()
-  }, [suggestionMode, suggestionQuery, filteredSuggestions, editorScrollTop, updateSuggestionPosition])
+    const selectedSuggestion = filteredSuggestions[selectedSuggestionIndex]
+    if (!selectedSuggestion) return
+
+    if (suggestionMode === 'mention') {
+      replaceActiveToken(`@${selectedSuggestion.name}`, composer)
+    } else {
+      replaceActiveToken(`#${selectedSuggestion.displayId || selectedSuggestion._id}`, composer)
+    }
+  }
+
+  const handleComposerKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>, composer: ComposerType) => {
+    if (!suggestionMode || suggestionComposer !== composer || filteredSuggestions.length === 0) return
+
+    switch (event.key) {
+      case 'Escape': {
+        event.preventDefault()
+        closeSuggestions()
+        break
+      }
+      case 'ArrowDown': {
+        event.preventDefault()
+        setSelectedSuggestionIndex(prev => (prev < filteredSuggestions.length - 1 ? prev + 1 : prev))
+        break
+      }
+      case 'ArrowUp': {
+        event.preventDefault()
+        setSelectedSuggestionIndex(prev => (prev > 0 ? prev - 1 : prev))
+        break
+      }
+      case 'Enter': {
+        event.preventDefault()
+        insertSelectedSuggestion(composer)
+        break
+      }
+      case 'Tab': {
+        if (selectedSuggestionIndex === 0) {
+          closeSuggestions()
+        } else {
+          event.preventDefault()
+          insertSelectedSuggestion(composer)
+        }
+        break
+      }
+    }
+  }
+
+  const handleComposerInput = (value: string, composer: ComposerType, textarea: HTMLTextAreaElement | null) => {
+    if (composer === 'comment') {
+      setCommentContent(value)
+    } else {
+      setReplyContent(value)
+    }
+
+    if (!textarea) return
+
+    const cursor = textarea.selectionStart ?? value.length
+    const before = value.slice(0, cursor)
+    const match = before.match(/([@#])([^\s@#]{0,30})?$/)
+
+    if (match) {
+      const mode = match[1] === '@' ? 'mention' : 'issue'
+      const query = match[2] || ''
+      setSuggestionMode(mode)
+      setSuggestionQuery(query)
+      setSelectedSuggestionIndex(0)
+      setSuggestionComposer(composer)
+    } else if (suggestionComposer === composer) {
+      closeSuggestions()
+    }
+  }
+
+  const handleComposerBlur = (composer: ComposerType) => {
+    setTimeout(() => {
+      if (activeSuggestionComposerRef.current === composer) {
+        closeSuggestions()
+      }
+    }, 150)
+  }
+
+  const renderSuggestionMenu = useCallback((composer: ComposerType) => {
+    if (!suggestionMode || suggestionComposer !== composer) return null
+
+    return (
+      <div
+        ref={suggestionMenuRef}
+        className="absolute z-50 rounded-md border bg-background shadow-lg border-border overflow-hidden"
+        style={{
+          top: suggestionPosition.top,
+          left: suggestionPosition.left,
+          minWidth: 240,
+          transform: suggestionPosition.flip ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+          marginTop: suggestionPosition.flip ? '-8px' : '8px'
+        }}
+      >
+        <div className="max-h-48 overflow-y-auto py-1">
+          {isLoadingSuggestions ? (
+            <div className="px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
+              <div className="animate-spin rounded-full h-3 w-3 border-b border-muted-foreground"></div>
+              Loading...
+            </div>
+          ) : filteredSuggestions.length > 0 ? (
+            filteredSuggestions.map((s, index) => (
+              <button
+                key={s._id}
+                type="button"
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-muted focus:bg-muted focus:outline-none transition-colors ${
+                  index === selectedSuggestionIndex ? 'bg-muted' : ''
+                }`}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (suggestionMode === 'mention') {
+                    replaceActiveToken(`@${s.name}`, composer)
+                  } else {
+                    replaceActiveToken(`#${s.displayId || s._id}`, composer)
+                  }
+                }}
+                onMouseDown={(e) => e.preventDefault()}
+                onMouseEnter={() => setSelectedSuggestionIndex(index)}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground text-xs font-medium">
+                    {suggestionMode === 'mention' ? '@' : '#'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    {suggestionMode === 'mention' ? (
+                      <span className="truncate">
+                        {highlightMatch(s.name || '', suggestionQuery)}
+                      </span>
+                    ) : (
+                      <div className="truncate">
+                        <span className="font-medium">
+                          {highlightMatch(s.displayId || s._id, suggestionQuery)}
+                        </span>
+                        {s.title && (
+                          <span className="text-muted-foreground ml-1">
+                            — {highlightMatch(s.title || '', suggestionQuery)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </button>
+            ))
+          ) : (
+            <div className="px-3 py-2 text-sm text-muted-foreground">
+              {suggestionMode === 'mention' ? 'No users found' : 'No tasks found'}
+            </div>
+          )}
+        </div>
+        {filteredSuggestions.length > 0 && (
+          <div className="px-3 py-1 border-t bg-muted/50 text-xs text-muted-foreground">
+            Use ↑↓ to navigate, Enter to select, Esc to close
+          </div>
+        )}
+      </div>
+    )
+  }, [filteredSuggestions, highlightMatch, isLoadingSuggestions, replaceActiveToken, selectedSuggestionIndex, suggestionComposer, suggestionMode, suggestionPosition, suggestionQuery])
   const buildMentionAndIssueIds = (text: string) => {
     const mentionIds: string[] = []
     mentionsList.forEach(m => {
@@ -715,6 +898,9 @@ export default function TaskDetailPage() {
   }
 
   const handleCancelReply = () => {
+    if (suggestionComposer === 'reply') {
+      closeSuggestions()
+    }
     setReplyTargetId(null)
     setReplyContent('')
   }
@@ -847,7 +1033,7 @@ export default function TaskDetailPage() {
               : comment.author?.email || 'User'}
           </div>
           <div className="text-xs text-muted-foreground">
-            {comment.createdAt ? formatDateTimeSafe(comment.createdAt) : ''}
+            {comment.updatedAt ? formatDateTimeSafe(comment.updatedAt) : (comment.createdAt ? formatDateTimeSafe(comment.createdAt) : '')}
             {comment.updatedAt && (
               <span className="ml-2 text-[11px]">(edited)</span>
             )}
@@ -929,46 +1115,70 @@ export default function TaskDetailPage() {
         </div>
         {isReplying && (
           <div className="mt-2 space-y-2">
-            <Textarea
-              value={replyContent}
-              onChange={(e) => setReplyContent(e.target.value)}
-              rows={3}
-              placeholder="Write a reply..."
-            />
-            <div className="flex items-center gap-2">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div
-                      role="button"
-                      aria-label="Attachments"
-                      className="h-8 w-8 inline-flex items-center justify-center rounded-md border hover:bg-muted cursor-pointer"
-                      onClick={() => replyFileInputRef.current?.click()}
-                    >
-                      <Paperclip className="h-4 w-4" />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Attachments</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <input
-                ref={replyFileInputRef}
-                type="file"
-                className="hidden"
-                onChange={(e) => handleFileInputChange(e, true)}
+            <div ref={replyComposerRef} className="relative space-y-2">
+              <Textarea
+                ref={replyEditorRef}
+                value={replyContent}
+                onChange={(e) => handleComposerInput(e.target.value, 'reply', e.target)}
+                onKeyDown={(e) => handleComposerKeyDown(e, 'reply')}
+                onKeyUp={() => scheduleSuggestionPositionUpdate('reply')}
+                onClick={() => scheduleSuggestionPositionUpdate('reply')}
+                onScroll={(e) => {
+                  setComposerScrollTop(prev => ({ ...prev, reply: e.currentTarget.scrollTop }))
+                  scheduleSuggestionPositionUpdate('reply')
+                }}
+                onBlur={() => handleComposerBlur('reply')}
+                rows={3}
+                placeholder="Write a reply..."
+                className={suggestionMode && suggestionComposer === 'reply' ? 'ring-2 ring-blue-500/20 border-blue-500/30' : ''}
               />
-              {replyAttachments.length > 0 && (
-                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                  {replyAttachments.map((att, idx) => (
-                    <span key={`${att.url}-${idx}`} className="inline-flex items-center gap-1 rounded border px-2 py-1">
-                      <a className="text-primary hover:underline" href={att.url} target="_blank" rel="noreferrer">
-                        {att.name}
-                      </a>
-                      {att.size ? <span>({(att.size / 1024).toFixed(1)} KB)</span> : null}
-                    </span>
-                  ))}
-                </div>
-              )}
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>
+                  Use <code className="bg-muted px-1 py-0.5 rounded text-[11px]">@</code> to mention teammates and
+                  <code className="bg-muted px-1 py-0.5 rounded text-[11px] ml-1">#</code> to link tasks.
+                </p>
+                {suggestionMode && suggestionComposer === 'reply' && (
+                  <p className="text-[11px] text-blue-600 dark:text-blue-400">
+                    💡 Use ↑↓ arrows to navigate, Enter to select, Esc to close
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        role="button"
+                        aria-label="Attachments"
+                        className="h-8 w-8 inline-flex items-center justify-center rounded-md border hover:bg-muted cursor-pointer"
+                        onClick={() => replyFileInputRef.current?.click()}
+                      >
+                        <Paperclip className="h-4 w-4" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Attachments</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <input
+                  ref={replyFileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => handleFileInputChange(e, true)}
+                />
+                {replyAttachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    {replyAttachments.map((att, idx) => (
+                      <span key={`${att.url}-${idx}`} className="inline-flex items-center gap-1 rounded border px-2 py-1">
+                        <a className="text-primary hover:underline" href={att.url} target="_blank" rel="noreferrer">
+                          {att.name}
+                        </a>
+                        {att.size ? <span>({(att.size / 1024).toFixed(1)} KB)</span> : null}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {renderSuggestionMenu('reply')}
             </div>
             <div className="flex gap-2">
               <Button size="sm" onClick={handleSubmitReply} disabled={!replyContent.trim() || commentSubmitting}>
@@ -1004,16 +1214,25 @@ export default function TaskDetailPage() {
     currentUserId,
     editingCommentId,
     editingContent,
+    handleCancelEdit,
+    handleCancelReply,
+    handleComposerBlur,
+    handleComposerInput,
+    handleComposerKeyDown,
+    handleDeleteComment,
+    handleSaveEdit,
+    handleStartEditComment,
+    handleStartReply,
+    handleSubmitReply,
+    renderSuggestionMenu,
+    replyAttachments,
     replyContent,
     replyTargetId,
     router,
-    handleStartReply,
-    handleStartEditComment,
-    handleDeleteComment,
-    handleSaveEdit,
-    handleCancelEdit,
-    handleSubmitReply,
-    handleCancelReply
+    scheduleSuggestionPositionUpdate,
+    suggestionComposer,
+    suggestionMode,
+    suggestionQuery
   ])
 
   // Pagination logic for comments
@@ -1350,106 +1569,20 @@ export default function TaskDetailPage() {
                 </Button>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div ref={composerContainerRef} className="relative">
+                <div ref={commentComposerRef} className="relative">
                   <Textarea
-                    ref={editorRef}
+                    ref={commentEditorRef}
                     value={commentContent}
-                    className={suggestionMode ? 'ring-2 ring-blue-500/20 border-blue-500/30' : ''}
-                    onChange={(e) => {
-                      const val = e.target.value
-                      setCommentContent(val)
-                      const textarea = e.target
-                      const cursor = textarea.selectionStart
-                      const before = val.slice(0, cursor)
-                      const match = before.match(/([@#])([^\s@#]{0,30})?$/)
-
-                      if (match) {
-                        const mode = match[1] === '@' ? 'mention' : 'issue'
-                        const query = match[2] || ''
-                        setSuggestionMode(mode)
-                        setSuggestionQuery(query)
-                        setSelectedSuggestionIndex(0) // Reset selection when query changes
-                      } else {
-                        setSuggestionMode(null)
-                        setSuggestionQuery('')
-                        setSelectedSuggestionIndex(0)
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (!suggestionMode || filteredSuggestions.length === 0) return
-
-                      switch (e.key) {
-                        case 'Escape':
-                          e.preventDefault()
-                          setSuggestionMode(null)
-                          setSuggestionQuery('')
-                          setSelectedSuggestionIndex(0)
-                          break
-
-                        case 'ArrowDown':
-                          e.preventDefault()
-                          setSelectedSuggestionIndex(prev =>
-                            prev < filteredSuggestions.length - 1 ? prev + 1 : prev
-                          )
-                          break
-
-                        case 'ArrowUp':
-                          e.preventDefault()
-                          setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : prev)
-                          break
-
-                        case 'Enter':
-                          e.preventDefault()
-                          const selectedSuggestion = filteredSuggestions[selectedSuggestionIndex]
-                          if (selectedSuggestion) {
-                            if (suggestionMode === 'mention') {
-                              replaceActiveToken(`@${selectedSuggestion.name}`)
-                            } else {
-                              replaceActiveToken(`#${selectedSuggestion.displayId || selectedSuggestion._id}`)
-                            }
-                            setSuggestionMode(null)
-                            setSuggestionQuery('')
-                            setSelectedSuggestionIndex(0)
-                          }
-                          break
-
-                        case 'Tab':
-                          // Allow tab to work normally if no suggestion is selected
-                          if (selectedSuggestionIndex === 0) {
-                            setSuggestionMode(null)
-                            setSuggestionQuery('')
-                            setSelectedSuggestionIndex(0)
-                          } else {
-                            e.preventDefault()
-                            const selectedSuggestion = filteredSuggestions[selectedSuggestionIndex]
-                            if (selectedSuggestion) {
-                              if (suggestionMode === 'mention') {
-                                replaceActiveToken(`@${selectedSuggestion.name}`)
-                              } else {
-                                replaceActiveToken(`#${selectedSuggestion.displayId || selectedSuggestion._id}`)
-                              }
-                              setSuggestionMode(null)
-                              setSuggestionQuery('')
-                              setSelectedSuggestionIndex(0)
-                            }
-                          }
-                          break
-                      }
-                    }}
-                    onKeyUp={scheduleSuggestionPositionUpdate}
-                    onClick={scheduleSuggestionPositionUpdate}
+                    className={suggestionMode && suggestionComposer === 'comment' ? 'ring-2 ring-blue-500/20 border-blue-500/30' : ''}
+                    onChange={(e) => handleComposerInput(e.target.value, 'comment', e.target)}
+                    onKeyDown={(e) => handleComposerKeyDown(e, 'comment')}
+                    onKeyUp={() => scheduleSuggestionPositionUpdate('comment')}
+                    onClick={() => scheduleSuggestionPositionUpdate('comment')}
                     onScroll={(e) => {
-                      setEditorScrollTop(e.currentTarget.scrollTop)
-                      scheduleSuggestionPositionUpdate()
+                      setComposerScrollTop(prev => ({ ...prev, comment: e.currentTarget.scrollTop }))
+                      scheduleSuggestionPositionUpdate('comment')
                     }}
-                    onBlur={() => {
-                      // Close suggestions when textarea loses focus
-                      setTimeout(() => {
-                        setSuggestionMode(null)
-                        setSuggestionQuery('')
-                        setSelectedSuggestionIndex(0)
-                      }, 150) // Small delay to allow clicking on suggestions
-                    }}
+                    onBlur={() => handleComposerBlur('comment')}
                     placeholder=""
                     rows={4}
                   />
@@ -1460,7 +1593,7 @@ export default function TaskDetailPage() {
                         Use <code className="bg-muted px-1 py-0.5 rounded text-xs">@</code> to mention team members,
                         <code className="bg-muted px-1 py-0.5 rounded text-xs ml-1">#</code> to link project tasks.
                       </p>
-                      {suggestionMode && (
+                      {suggestionMode && suggestionComposer === 'comment' && (
                         <div className="space-y-1">
                           <p className="text-xs text-blue-600 dark:text-blue-400">
                             💡 Use ↑↓ arrows to navigate, Enter to select, Esc to close
@@ -1509,88 +1642,7 @@ export default function TaskDetailPage() {
                   </div>
                 )}
               </div>
-                  {suggestionMode && (
-                    <div
-                      ref={suggestionMenuRef}
-                      className="absolute z-50 rounded-md border bg-background shadow-lg border-border overflow-hidden"
-                      style={{
-                        top: suggestionPosition.top,
-                        left: suggestionPosition.left,
-                        minWidth: 240,
-                        transform: suggestionPosition.flip ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
-                        marginTop: suggestionPosition.flip ? '-8px' : '8px'
-                      }}
-                    >
-                      <div className="max-h-48 overflow-y-auto py-1">
-                        {isLoadingSuggestions ? (
-                          <div className="px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
-                            <div className="animate-spin rounded-full h-3 w-3 border-b border-muted-foreground"></div>
-                            Loading...
-                          </div>
-                        ) : filteredSuggestions.length > 0 ? (
-                          filteredSuggestions.map((s, index) => (
-                            <button
-                              key={s._id}
-                              type="button"
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-muted focus:bg-muted focus:outline-none transition-colors ${
-                                index === selectedSuggestionIndex ? 'bg-muted' : ''
-                              }`}
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                if (suggestionMode === 'mention') {
-                                  replaceActiveToken(`@${s.name}`)
-                                } else {
-                                  replaceActiveToken(`#${s.displayId || s._id}`)
-                                }
-                                setSuggestionMode(null)
-                                setSuggestionQuery('')
-                                setSelectedSuggestionIndex(0)
-                              }}
-                              onMouseDown={(e) => e.preventDefault()} // Prevent textarea blur
-                              onMouseEnter={() => setSelectedSuggestionIndex(index)}
-                            >
-                              <div className="flex items-center gap-2">
-                                <span className="text-muted-foreground text-xs font-medium">
-                                  {suggestionMode === 'mention' ? '@' : '#'}
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  {suggestionMode === 'mention' ? (
-                                    <span className="truncate">
-                                      {highlightMatch(s.name || '', suggestionQuery)}
-                                    </span>
-                                  ) : (
-                                    <div className="truncate">
-                                      <span className="font-medium">
-                                        {highlightMatch(s.displayId || s._id, suggestionQuery)}
-                                      </span>
-                                      {s.title && (
-                                        <span className="text-muted-foreground ml-1">
-                                          — {highlightMatch(s.title || '', suggestionQuery)}
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </button>
-                          ))
-                        ) : (
-                          <div className="px-3 py-2 text-sm text-muted-foreground">
-                            {suggestionMode === 'mention'
-                              ? 'No users found'
-                              : 'No tasks found'
-                            }
-                          </div>
-                        )}
-                      </div>
-                      {filteredSuggestions.length > 0 && (
-                        <div className="px-3 py-1 border-t bg-muted/50 text-xs text-muted-foreground">
-                          Use ↑↓ to navigate, Enter to select, Esc to close
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {renderSuggestionMenu('comment')}
                 </div>
 
                 <div className="border-t pt-4">

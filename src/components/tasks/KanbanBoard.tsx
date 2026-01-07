@@ -111,7 +111,7 @@ export interface KanbanBoardProps {
 }
 
 const defaultColumns = [
-  { key: 'backlog', title: 'backlog', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
+  { key: 'backlog', title: 'Backlog', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
   { key: 'todo', title: 'To Do', color: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200' },
   { key: 'in_progress', title: 'In Progress', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
   { key: 'review', title: 'Review', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
@@ -444,7 +444,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
 
   return (
     <div className="space-y-6 overflow-x-hidden">
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 mb-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex-1 min-w-0">
             <h3 className="text-base sm:text-lg font-semibold text-foreground truncate">

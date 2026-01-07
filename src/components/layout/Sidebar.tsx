@@ -48,6 +48,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/Popover'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import packageJson from '../../../package.json'
 
@@ -165,6 +166,13 @@ const navigationItems = [
         icon: Shield,
         path: '/team/roles',
         permission: Permission.USER_MANAGE_ROLES
+      },
+      {
+        id: 'team-activity',
+        label: 'Team Activity',
+        icon: Activity,
+        path: '/team/activity',
+        permission: Permission.TEAM_VIEW_ACTIVITY
       }
     ]
   },
@@ -416,19 +424,28 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             )}
           </div>
         )}
-        
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onToggle}
-          className="h-8 w-8 rounded-full"
-        >
-          {collapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <ChevronLeft className="h-4 w-4" />
-          )}
-        </Button>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onToggle}
+                className="h-8 w-8 rounded-full"
+              >
+                {collapsed ? (
+                  <ChevronRight className="h-4 w-4" />
+                ) : (
+                  <ChevronLeft className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{collapsed ? 'Expand side menu' : 'Collapse side menu'}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       <div className="border-t" />

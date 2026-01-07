@@ -52,7 +52,7 @@ export function BottomNav() {
 
   const quickActions = [
     {
-      href: '/tasks/create',
+      href: '/tasks/create-new-task',
       icon: Plus,
       label: 'New Task'
     },

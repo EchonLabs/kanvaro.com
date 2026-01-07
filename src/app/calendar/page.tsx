@@ -411,7 +411,7 @@ export default function CalendarPage() {
           <div className="flex items-center space-x-2 w-full sm:w-auto">
             <Button
               variant="outline"
-              onClick={() => router.push('/tasks/create')}
+              onClick={() => router.push('/tasks/create-new-task')}
               className="w-full sm:w-auto text-sm sm:text-base"
             >
               <Plus className="h-4 w-4 mr-2" />

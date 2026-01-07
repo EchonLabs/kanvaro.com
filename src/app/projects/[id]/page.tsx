@@ -41,6 +41,7 @@ import {
   Target,
   Zap,
   Download,
+  ChevronDown,
   Edit,
   MoreVertical,
   UserPlus,
@@ -171,6 +172,12 @@ interface Project {
   updatedAt: string
 }
 
+type ExpenseAttachment = {
+  url?: string | null
+  name?: string | null
+  size?: number | null
+}
+
 export default function ProjectDetailPage() {
   const router = useRouter()
   const params = useParams()
@@ -198,6 +205,22 @@ export default function ProjectDetailPage() {
   const [editingSuite, setEditingSuite] = useState<any | null>(null)
   const [editingExpense, setEditingExpense] = useState<any | null>(null)
   const [showDeleteExpenseConfirmModal, setShowDeleteExpenseConfirmModal] = useState(false)
+  const [expandedExpenseAttachments, setExpandedExpenseAttachments] = useState<Record<string, boolean>>({})
+    const toggleExpenseAttachments = (expenseId: string) => {
+      setExpandedExpenseAttachments(prev => ({
+        ...prev,
+        [expenseId]: !prev[expenseId]
+      }))
+    }
+
+    const formatFileSize = (size?: number) => {
+      if (!size) return ''
+      if (size >= 1024 * 1024) {
+        return `${(size / (1024 * 1024)).toFixed(1)} MB`
+      }
+      return `${(size / 1024).toFixed(1)} KB`
+    }
+
   const [expenseToDelete, setExpenseToDelete] = useState<any | null>(null)
   const [parentSuiteIdForCreate, setParentSuiteIdForCreate] = useState<string | undefined>(undefined)
   const [suitesRefreshCounter, setSuitesRefreshCounter] = useState(0)
@@ -1310,93 +1333,157 @@ export default function ProjectDetailPage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {expenses.map((expense: any) => (
-                        <Card key={expense._id} className="hover:shadow-md transition-shadow">
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-sm mb-1">{expense.name}</h4>
-                                {expense.description && (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <p className="text-xs text-muted-foreground line-clamp-2 mb-2 cursor-help">{expense.description}</p>
-                                      </TooltipTrigger>
-                                      <TooltipContent className="max-w-xs">
-                                        <p className="text-sm">{expense.description}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
+                      {expenses.map((expense: any) => {
+                        const attachments: ExpenseAttachment[] = Array.isArray(expense.attachments)
+                          ? expense.attachments as ExpenseAttachment[]
+                          : []
+                        const isExpanded = expandedExpenseAttachments[expense._id]
+                        return (
+                          <Card key={expense._id} className="hover:shadow-md transition-shadow">
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="flex-1">
+                                  <h4 className="font-semibold text-sm mb-1">{expense.name}</h4>
+                                  {expense.description && (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <p className="text-xs text-muted-foreground line-clamp-2 mb-2 cursor-help">{expense.description}</p>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-xs">
+                                          <p className="text-sm">{expense.description}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                </div>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={(e) => {
+                                      e.stopPropagation()
+                                      setEditingExpense(expense)
+                                    }}>
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Edit Expense
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleExpenseDeleted(expense._id, expense.name)
+                                      }}
+                                      className="text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+
+                              <div className="flex items-center justify-start mb-2">
+                                <Badge variant={expense.paidStatus === 'paid' ? 'default' : 'secondary'}>
+                                  {expense.paidStatus === 'paid' ? 'Paid' : 'Unpaid'}
+                                </Badge>
+                              </div>
+
+                              <div className="space-y-1 text-xs">
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Amount:</span>
+                                  <span className="font-semibold">
+                                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(expense.fullAmount)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Category:</span>
+                                  <span className="capitalize">{expense.category}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Date:</span>
+                                  <span>{formatDate(expense.expenseDate)}</span>
+                                </div>
+                                {expense.isBillable && (
+                                  <Badge variant="outline" className="mt-1">Billable</Badge>
+                                )}
+                                {expense.paidStatus === 'paid' && expense.paidBy && (
+                                  <div className="flex justify-between mt-1">
+                                    <span className="text-muted-foreground">Paid by:</span>
+                                    <span>{expense.paidBy.firstName} {expense.paidBy.lastName}</span>
+                                  </div>
                                 )}
                               </div>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation()
-                                    setEditingExpense(expense)
-                                  }}>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit Expense
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleExpenseDeleted(expense._id, expense.name)
-                                    }}
-                                    className="text-destructive"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
 
-                            <div className="flex items-center justify-start mb-2">
-                              <Badge variant={expense.paidStatus === 'paid' ? 'default' : 'secondary'}>
-                                {expense.paidStatus === 'paid' ? 'Paid' : 'Unpaid'}
-                              </Badge>
-                            </div>
-
-                            <div className="space-y-1 text-xs">
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Amount:</span>
-                                <span className="font-semibold">
-                                  {new Intl.NumberFormat('en-US', { style: 'currency', currency: orgCurrency }).format(expense.fullAmount)}
-                                </span>
+                              <div className="mt-4 border-t pt-3">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpenseAttachments(expense._id)}
+                                  className="flex w-full items-center justify-between text-xs font-semibold text-primary hover:text-primary/80"
+                                  aria-expanded={isExpanded ? 'true' : 'false'}
+                                >
+                                  <span>
+                                    View attachments {attachments.length > 0 ? `(${attachments.length})` : ''}
+                                  </span>
+                                  <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                </button>
+                                {isExpanded && (
+                                  <div className="mt-3 space-y-2">
+                                    {attachments.length === 0 ? (
+                                      <p className="text-xs text-muted-foreground">No attachments added for this expense.</p>
+                                    ) : (
+                                      attachments.map((att, idx) => (
+                                        <div
+                                          key={`${expense._id}-${att.url || idx}`}
+                                          className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-2 text-xs sm:flex-row sm:items-center sm:justify-between"
+                                        >
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                            <div className="min-w-0">
+                                              <p className="font-medium text-foreground truncate" title={att.name || 'Attachment'}>
+                                                {att.name || 'Attachment'}
+                                              </p>
+                                              {att.size && (
+                                                <p className="text-[11px] text-muted-foreground">{formatFileSize(att.size)}</p>
+                                              )}
+                                            </div>
+                                          </div>
+                                          {att.url ? (
+                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" asChild>
+                                                <a href={att.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1">
+                                                  <ExternalLink className="h-3.5 w-3.5" />
+                                                  View
+                                                </a>
+                                              </Button>
+                                              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" asChild>
+                                                <a href={att.url} download={att.name || 'attachment'} className="inline-flex items-center gap-1">
+                                                  <Download className="h-3.5 w-3.5" />
+                                                  Download
+                                                </a>
+                                              </Button>
+                                            </div>
+                                          ) : (
+                                            <p className="text-[11px] text-destructive">Attachment URL unavailable.</p>
+                                          )}
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Category:</span>
-                                <span className="capitalize">{expense.category}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Date:</span>
-                                <span>{formatDate(expense.expenseDate)}</span>
-                              </div>
-                              {expense.isBillable && (
-                                <Badge variant="outline" className="mt-1">Billable</Badge>
-                              )}
-                              {expense.paidStatus === 'paid' && expense.paidBy && (
-                                <div className="flex justify-between mt-1">
-                                  <span className="text-muted-foreground">Paid by:</span>
-                                  <span>{expense.paidBy.firstName} {expense.paidBy.lastName}</span>
-                                </div>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                            </CardContent>
+                          </Card>
+                        )
+                      })}
                     </div>
                   )}
                 </CardContent>
@@ -1609,7 +1696,7 @@ export default function ProjectDetailPage() {
 
           <TabsContent value="settings" className="space-y-6">
             <div className="space-y-6">
-              <div>
+              <div className='mb-4'>
                 <h3 className="text-lg font-semibold text-foreground">Project Settings</h3>
                 <p className="text-sm text-muted-foreground">
                   Manage project configuration and preferences

@@ -108,6 +108,7 @@ const moduleData: Record<string, {
       { name: 'Team Members', description: 'View and manage all team members and their roles' },
       { name: 'Roles & Permissions', description: 'Create custom roles with fine-grained permission control' },
       { name: 'Invitations', description: 'Invite new team members via email with role assignment' },
+      { name: 'Team Activity', description: 'Monitor real-time updates from across the team in one feed' },
       { name: 'Activity Logs', description: 'Track all team activity and changes in real-time' },
       { name: 'Audit Trail', description: 'Comprehensive audit logs for compliance and security' }
     ],

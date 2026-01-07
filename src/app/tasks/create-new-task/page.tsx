@@ -120,7 +120,7 @@ function mapUserResponse(data: any): CurrentUser | null {
 }
 
 const SUBTASK_STATUS_OPTIONS: Array<{ value: SubtaskStatus; label: string }> = [
-  { value: 'backlog', label: 'backlog' },
+  { value: 'backlog', label: 'Backlog' },
   { value: 'todo', label: 'To Do' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'review', label: 'Review' },
@@ -624,7 +624,7 @@ export default function CreateTaskPage() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-4 mb-4">
           <Button variant="ghost" onClick={() => router.back()}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back

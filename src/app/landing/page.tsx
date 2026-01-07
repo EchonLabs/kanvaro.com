@@ -105,7 +105,7 @@ const flows = [
     caption: '2. Execute & Track',
     gradient: '#0bbcd6, #19f2a5',
     imageKey: 'tasks' as const,
-    steps: ['backlog', 'Sprint Planning', 'In Progress', 'Review', 'Done']
+    steps: ['Backlog', 'Sprint Planning', 'In Progress', 'Review', 'Done']
   },
   {
     title: 'Time & Reporting Flow',

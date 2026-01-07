@@ -19,7 +19,7 @@ export interface TaskStatusOption {
 }
 
 export const DEFAULT_TASK_STATUS_LABELS: Record<string, string> = {
-  backlog: 'backlog',
+  backlog: 'Backlog',
   todo: 'To Do',
   in_progress: 'In Progress',
   review: 'In Review',

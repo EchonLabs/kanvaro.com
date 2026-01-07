@@ -191,8 +191,14 @@ async function stopTimerAndBuildResponse(
   const category = options.category ?? activeTimer.category
   const tags = options.tags ?? activeTimer.tags
   const projectValue = (activeTimer.project as any)?._id ?? activeTimer.project
-  console.log('-8794651234455',projectValue);
   const taskValue = (activeTimer.task as any)?._id ?? activeTimer.task
+
+  // Check project settings for approval requirement
+  let requiresProjectApproval = false
+  if (projectId) {
+    const project = await Project.findById(projectId).select('settings.requireApproval')
+    requiresProjectApproval = project?.settings?.requireApproval === true
+  }
 
   const timeEntry = new TimeEntry({
     user: activeTimer.user,
@@ -208,7 +214,7 @@ async function stopTimerAndBuildResponse(
     status: 'completed',
     category,
     tags,
-    isApproved: !requiresApproval
+    isApproved: !requiresProjectApproval
   })
 
   await timeEntry.save()
@@ -406,8 +412,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
     const organizationId = searchParams.get('organizationId')
-console.log('userId',userId);
-console.log('organizationId',organizationId);
     if (!userId || !organizationId) {
       return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 })
     }
@@ -457,23 +461,16 @@ console.log('organizationId',organizationId);
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Timer API POST called');
     
     await connectDB()
     
     const body = await request.json()
-    console.log('Received body:', body)
     
     const { userId, organizationId, projectId, taskId, description, category, tags, isBillable, hourlyRate } = body
     
-    console.log('Extracted fields:', { userId, organizationId, projectId, taskId, description })
 
     if (!userId || !organizationId || !projectId) {
-      console.log('Missing required fields:', { 
-        userId: !!userId, 
-        organizationId: !!organizationId, 
-        projectId: !!projectId
-      })
+   
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -482,7 +479,6 @@ export async function POST(request: NextRequest) {
       user: userId,
       organization: organizationId
     })
-console.log('existingTimer',existingTimer);
 
     if (existingTimer) {
       return NextResponse.json({ error: 'User already has an active timer' }, { status: 400 })
@@ -507,22 +503,11 @@ console.log('existingTimer',existingTimer);
       })
     }
     
-    console.log('Time tracking settings found:', {
-      hasSettings: !!settings,
-      settingsId: settings?._id?.toString(),
-      isProjectSpecific: settings?.project?.toString() === projectId,
-      projectId: settings?.project?.toString(),
-      requestedProjectId: projectId,
-      requireDescription: settings?.requireDescription,
-      requireDescriptionType: typeof settings?.requireDescription,
-      allowTimeTracking: settings?.allowTimeTracking,
-      allSettingsKeys: settings ? Object.keys(settings.toObject()) : []
-    })
+ 
 
     // If no TimeTrackingSettings exist, create default ones based on organization settings
     if (!settings) {
       const organization = await Organization.findById(organizationId)
-      console.log('organization',organization);
       
       if (!organization || !organization.settings.timeTracking.allowTimeTracking) {
         return NextResponse.json({ error: 'Time tracking not enabled' }, { status: 403 })
@@ -562,19 +547,10 @@ console.log('existingTimer',existingTimer);
     const requireDescription = settings.requireDescription === true
     const hasDescription = description && typeof description === 'string' && description.trim().length > 0
     
-    console.log('Description validation:', {
-      requireDescription,
-      hasDescription,
-      descriptionValue: description,
-      descriptionType: typeof description,
-      descriptionLength: description?.length,
-      settingsRequireDescription: settings.requireDescription,
-      settingsRequireDescriptionType: typeof settings.requireDescription
-    })
+  
     
     // Only validate description if it's explicitly required
     if (requireDescription === true && !hasDescription) {
-      console.log('Validation failed: Description is required but missing')
       return NextResponse.json({ error: 'Description is required for time entries' }, { status: 400 })
     }
     
@@ -604,7 +580,6 @@ console.log('existingTimer',existingTimer);
       hourlyRate: finalHourlyRate,
       maxSessionHours: settings.maxSessionHours
     })
-console.log('activeTimer',activeTimer);
 
     await activeTimer.save()
 

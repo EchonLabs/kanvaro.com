@@ -1,3 +1,29 @@
+## [1.21.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.21.0...v1.21.1) (2026-01-06)
+
+
+### Bug Fixes
+
+* add chnages ([6d98b14](https://github.com/EchonLabs/kanvaro.com/commit/6d98b144d69c596ad5d17c7bd299f00aae8f92e0))
+
+# [1.21.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.20.4...v1.21.0) (2026-01-06)
+
+
+### Bug Fixes
+
+* add manage sprint changes ([365c7d0](https://github.com/EchonLabs/kanvaro.com/commit/365c7d0f668ece82f7429b97ec4c47d0c8a5a8b5))
+
+
+### Features
+
+* add notifications settings ([c0a26ed](https://github.com/EchonLabs/kanvaro.com/commit/c0a26edcd2b7474256db92e3d89c9fe11215d421))
+
+## [1.20.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.20.3...v1.20.4) (2026-01-05)
+
+
+### Bug Fixes
+
+* add new changes ([99f22d8](https://github.com/EchonLabs/kanvaro.com/commit/99f22d86ccf2b196eb59a299c2fef02dfff17a42))
+
 ## [1.20.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.20.2...v1.20.3) (2026-01-05)
 
 

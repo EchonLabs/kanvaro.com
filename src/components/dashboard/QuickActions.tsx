@@ -30,7 +30,7 @@ const quickActions: QuickAction[] = [
     description: 'Create a new task',
     icon: CheckSquare,
     color: 'bg-green-500 hover:bg-green-600',
-    href: '/tasks/create',
+    href: '/tasks/create-new-task',
     permissions: [Permission.TASK_CREATE]
   },
   {

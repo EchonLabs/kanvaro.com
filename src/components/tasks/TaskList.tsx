@@ -566,7 +566,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                       <SelectItem value="todo">To Do</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="review">Review</SelectItem>
-                      <SelectItem value="backlog">backlog</SelectItem>
+                      <SelectItem value="backlog">Backlog</SelectItem>
                       <SelectItem value="testing">Testing</SelectItem>
                       <SelectItem value="done">Done</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>

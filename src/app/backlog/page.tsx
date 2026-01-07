@@ -59,6 +59,11 @@ interface ProjectSummary {
   name: string
 }
 
+interface EpicSummary {
+  _id: string
+  title: string
+}
+
 interface BacklogItem {
   _id: string
   title: string
@@ -132,7 +137,7 @@ export default function BacklogPage() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [sortBy, setSortBy] = useState('priority')
+  const [sortBy, setSortBy] = useState('created')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [selectMode, setSelectMode] = useState(false)
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
@@ -159,6 +164,7 @@ export default function BacklogPage() {
   const [projectOptions, setProjectOptions] = useState<ProjectSummary[]>([])
   const [assignedToOptions, setAssignedToOptions] = useState<UserSummary[]>([])
   const [assignedByOptions, setAssignedByOptions] = useState<UserSummary[]>([])
+  const [epicMap, setEpicMap] = useState<Map<string, { _id: string; title: string }>>(new Map())
   const [projectFilterValue, setProjectFilterValue] = useState('all')
   const [assignedToFilter, setAssignedToFilter] = useState('all')
   const [assignedByFilter, setAssignedByFilter] = useState('all')
@@ -170,18 +176,6 @@ export default function BacklogPage() {
   const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
   const [assignedByFilterQuery, setAssignedByFilterQuery] = useState('')
   const [selectedProjectDetails, setSelectedProjectDetails] = useState<any>(null)
-  const startDateBoundary = useMemo(() => {
-    if (!dateRangeFilter?.from) return null
-    const boundary = new Date(dateRangeFilter.from)
-    boundary.setHours(0, 0, 0, 0)
-    return boundary
-  }, [dateRangeFilter])
-  const endDateBoundary = useMemo(() => {
-    if (!dateRangeFilter?.to) return null
-    const boundary = new Date(dateRangeFilter.to)
-    boundary.setHours(23, 59, 59, 999)
-    return boundary
-  }, [dateRangeFilter])
 
   // Dynamic status options based on selected project and type filter
   const availableStatusOptions = useMemo(() => {
@@ -304,7 +298,7 @@ export default function BacklogPage() {
         setCurrentPage(1)
       }
     }
-  }, [searchQuery, typeFilter, priorityFilter, statusFilter, projectFilterValue, assignedToFilter, assignedByFilter, dateRangeFilter])
+  }, [searchQuery, typeFilter, priorityFilter, statusFilter, projectFilterValue, assignedToFilter, assignedByFilter, dateRangeFilter, sortBy, sortOrder])
 
   // Fetch when pagination changes
   useEffect(() => {
@@ -337,6 +331,8 @@ export default function BacklogPage() {
       if (assignedByFilter !== 'all') params.set('createdBy', assignedByFilter)
       if (dateRangeFilter?.from) params.set('createdAtFrom', dateRangeFilter.from.toISOString())
       if (dateRangeFilter?.to) params.set('createdAtTo', dateRangeFilter.to.toISOString())
+      params.set('sortBy', sortBy)
+      params.set('sortOrder', sortOrder)
       
       const response = await fetch(`/api/backlog?${params.toString()}`)
       const data = await response.json()
@@ -353,6 +349,10 @@ export default function BacklogPage() {
         const projectMap = new Map<string, ProjectSummary>()
         const assignedToMap = new Map<string, UserSummary>()
         const createdByMap = new Map<string, UserSummary>()
+        const epicMap = new Map<string, EpicSummary>()
+
+        // Collect unique epic IDs to fetch
+        const epicIdsToFetch = new Set<string>()
 
         normalized.forEach((item) => {
           if (item.project?._id) {
@@ -381,7 +381,34 @@ export default function BacklogPage() {
               email: item.createdBy.email
             })
           }
+          // Collect epic IDs
+          if (item.epic && typeof item.epic === 'string') {
+            epicIdsToFetch.add(item.epic)
+          }
         })
+
+        // Fetch epic data if there are epics to fetch
+        if (epicIdsToFetch.size > 0) {
+          try {
+            const epicIds = Array.from(epicIdsToFetch)
+            const response = await fetch(`/api/epics?ids=${epicIds.join(',')}`)
+            if (response.ok) {
+              const epicData = await response.json()
+              if (Array.isArray(epicData)) {
+                epicData.forEach((epic: any) => {
+                  if (epic._id && epic.title) {
+                    epicMap.set(epic._id, {
+                      _id: epic._id,
+                      title: epic.title
+                    })
+                  }
+                })
+              }
+            }
+          } catch (error) {
+            console.warn('Failed to fetch epic data:', error)
+          }
+        }
 
         setProjectOptions(Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name)))
         setAssignedToOptions(Array.from(assignedToMap.values()).sort((a, b) =>
@@ -390,6 +417,7 @@ export default function BacklogPage() {
         setAssignedByOptions(Array.from(createdByMap.values()).sort((a, b) =>
           `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
         ))
+        setEpicMap(epicMap)
       } else {
         notifyError({ title: 'Error', message: data.error || 'Failed to fetch backlog items' })
       }
@@ -582,32 +610,46 @@ export default function BacklogPage() {
       existingSprint?: { _id: string; name: string }
     }
   ) => {
-    // Filter out tasks and stories that are already in a sprint
-    const tasksNotInSprint = taskIds.filter(taskId => {
-      const task = backlogItems.find(item => item.type === 'task' && item._id === taskId)
-      return task && !task.sprint
-    })
-    const storiesNotInSprint = storyIds.filter(storyId => {
-      const story = backlogItems.find(item => item.type === 'story' && item._id === storyId)
-      return story && !story.sprint
-    })
-    
-    const uniqueTaskIds = Array.from(new Set(tasksNotInSprint.filter(Boolean)))
-    const uniqueStoryIds = Array.from(new Set(storiesNotInSprint.filter(Boolean)))
-    
-    if (uniqueTaskIds.length === 0 && uniqueStoryIds.length === 0) {
-      // Show error if all selected items are already in sprints
+    const mode = options?.mode ?? 'assign'
+    const isManageMode = mode === 'manage'
+
+    const sourceTaskIds = isManageMode
+      ? taskIds
+      : taskIds.filter((taskId) => {
+          const task = backlogItems.find((item) => item.type === 'task' && item._id === taskId)
+          return task && !task.sprint
+        })
+
+    const sourceStoryIds = isManageMode
+      ? storyIds
+      : storyIds.filter((storyId) => {
+          const story = backlogItems.find((item) => item.type === 'story' && item._id === storyId)
+          return story && !story.sprint
+        })
+
+    const uniqueTaskIds = Array.from(new Set(sourceTaskIds.filter(Boolean)))
+    const uniqueStoryIds = Array.from(new Set(sourceStoryIds.filter(Boolean)))
+
+    if (!isManageMode && uniqueTaskIds.length === 0 && uniqueStoryIds.length === 0) {
       if (taskIds.length > 0 || storyIds.length > 0) {
         setSprintsError('Selected items are already in a sprint and cannot be added to another sprint.')
       }
       return
     }
 
+    if (isManageMode && uniqueTaskIds.length === 0 && uniqueStoryIds.length === 0) {
+      setSprintsError('Unable to manage sprint because the selected items are not currently in a sprint.')
+      return
+    }
+
     setTaskIdsForSprint(uniqueTaskIds)
     setStoryIdsForSprint(uniqueStoryIds)
     clearSprintSelection()
-    setSprintModalMode(options?.mode ?? 'assign')
+    setSprintModalMode(mode)
     setCurrentSprintInfo(options?.existingSprint ?? null)
+    if (isManageMode && options?.existingSprint?._id) {
+      setSelectedSprintId(options.existingSprint._id)
+    }
     
     // Fetch tasks for selected stories
     if (uniqueStoryIds.length > 0) {
@@ -1215,7 +1257,6 @@ export default function BacklogPage() {
       case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
       case 'medium': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
       case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900'
-      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900'
     }
   }
@@ -1235,89 +1276,23 @@ export default function BacklogPage() {
     }
   }
 
-  const filteredAndSortedItems = backlogItems
-    .filter(item => {
-      const matchesSearch = !searchQuery || 
-        item.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.project?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
-      
-      const matchesType = typeFilter === 'all' || item.type === typeFilter
-      const matchesPriority = priorityFilter === 'all' || item.priority === priorityFilter
+  // When assigning work to a sprint, temporarily narrow items to the sprint's project
+  const displayedItems = useMemo(() => {
+    if (!selectedSprintId) {
+      return backlogItems
+    }
 
-      // Treat "done" / "completed" as final states that should not appear in the
-      // default backlog view.
-      const isFinalTask = item.type === 'task' && item.status === 'done'
-      const isFinalStory = item.type === 'story' && (item.status === 'completed' || item.status === 'done')
-      const isFinalEpic = item.type === 'epic' && (item.status === 'completed' || item.status === 'done')
+    const selectedSprint = sprints.find((s) => s._id === selectedSprintId)
+    if (!selectedSprint?.project?._id) {
+      return backlogItems
+    }
 
-      const isFinal = isFinalTask || isFinalStory || isFinalEpic
+    return backlogItems.filter((item) => item.project?._id === selectedSprint.project?._id)
+  }, [backlogItems, selectedSprintId, sprints])
 
-      const matchesStatus =
-        statusFilter === 'all'
-          ? !isFinal
-          : item.status === statusFilter
-      const matchesProject =
-        projectFilterValue === 'all' ||
-        (item.project?._id ? item.project._id === projectFilterValue : false)
-      const matchesAssignedTo =
-        assignedToFilter === 'all' ||
-        (item.assignedTo && item.assignedTo.length > 0
-          ? item.assignedTo.some(user => user._id === assignedToFilter)
-          : false)
-      const matchesAssignedBy =
-        assignedByFilter === 'all' ||
-        (item.createdBy?._id ? item.createdBy._id === assignedByFilter : false)
-
-      // Filter by sprint project when a sprint is selected
-      const selectedSprint = selectedSprintId ? sprints.find(s => s._id === selectedSprintId) : null
-      const matchesSprintProject =
-        !selectedSprint ||
-        (item.project ? item.project.toString() === selectedSprint.project?.toString() : false)
-
-      const createdAtDate = new Date(item.createdAt)
-      const matchesStartDate = !startDateBoundary || createdAtDate >= startDateBoundary
-      const matchesEndDate = !endDateBoundary || createdAtDate <= endDateBoundary
-
-      return (
-        matchesSearch &&
-        matchesType &&
-        matchesPriority &&
-        matchesStatus &&
-        matchesProject &&
-        matchesAssignedTo &&
-        matchesAssignedBy &&
-        matchesSprintProject &&
-        matchesStartDate &&
-        matchesEndDate
-      )
-    })
-    .sort((a, b) => {
-      let comparison = 0
-      
-      switch (sortBy) {
-        case 'priority':
-          const priorityOrder = { critical: 4, high: 3, medium: 2, low: 1 }
-          comparison = (priorityOrder[b.priority as keyof typeof priorityOrder] || 0) - 
-                      (priorityOrder[a.priority as keyof typeof priorityOrder] || 0)
-          break
-        case 'title':
-          comparison = a.title.localeCompare(b.title)
-          break
-        case 'created':
-          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-          break
-        case 'dueDate':
-          const aDate = a.dueDate ? new Date(a.dueDate).getTime() : Infinity
-          const bDate = b.dueDate ? new Date(b.dueDate).getTime() : Infinity
-          comparison = aDate - bDate
-          break
-        default:
-          comparison = 0
-      }
-      
-      return sortOrder === 'asc' ? comparison : -comparison
-    })
+  const totalPages = Math.max(1, Math.ceil((totalCount || 0) / pageSize) || 1)
+  const pageStartIndex = totalCount === 0 ? 0 : ((currentPage - 1) * pageSize) + 1
+  const pageEndIndex = totalCount === 0 ? 0 : Math.min(currentPage * pageSize, totalCount)
 
   if (loading) {
     return (
@@ -1354,15 +1329,15 @@ export default function BacklogPage() {
             <p className="text-sm sm:text-base text-muted-foreground">Manage your product backlog and sprint planning</p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-            <Button variant="outline" onClick={() => router.push('/epics/create')} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={() => router.push('/epics/create-epic')} className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               New Epic
             </Button>
-            <Button variant="outline" onClick={() => router.push('/stories/create')} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={() => router.push('/stories/create-story')} className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               New Story
             </Button>
-            <Button onClick={() => router.push('/tasks/create')} className="w-full sm:w-auto">
+            <Button onClick={() => router.push('/tasks/create-new-task')} className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               New Task
             </Button>
@@ -1377,7 +1352,7 @@ export default function BacklogPage() {
                 <div>
                   <CardTitle>Backlog Items</CardTitle>
                   <CardDescription>
-                    {filteredAndSortedItems.length} item{filteredAndSortedItems.length !== 1 ? 's' : ''} found
+                    {totalCount} item{totalCount !== 1 ? 's' : ''} found
                   </CardDescription>
                 </div>
               </div>
@@ -1452,7 +1427,6 @@ export default function BacklogPage() {
                       <SelectItem value="low">Low</SelectItem>
                       <SelectItem value="medium">Medium</SelectItem>
                       <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="critical">Critical</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={sortBy} onValueChange={setSortBy}>
@@ -1572,7 +1546,7 @@ export default function BacklogPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {filteredAndSortedItems.map((item) => {
+              {displayedItems.map((item) => {
                 
                 const isTask = item.type === 'task'
                 const isStory = item.type === 'story'
@@ -1654,7 +1628,8 @@ export default function BacklogPage() {
                                 >
                                   {(() => {
                                     if (typeof item.epic === 'string') {
-                                      return formatToTitleCase('Epic')
+                                      const epicData = epicMap.get(item.epic)
+                                      return epicData ? formatToTitleCase(epicData.title) : formatToTitleCase('Epic')
                                     }
                                     const epicObj = item.epic as { _id: string; name?: string; title?: string }
                                     return formatToTitleCase(epicObj.title || epicObj.name || 'Epic')
@@ -1869,8 +1844,16 @@ export default function BacklogPage() {
 
                                 {item.type === 'task' && (
                                   <DropdownMenuItem
-                                    onClick={() => openStatusChangeModal(item)}
-                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                    onClick={() => {
+                                      if (!item.sprint) return
+                                      openStatusChangeModal(item)
+                                    }}
+                                    disabled={!item.sprint}
+                                    className={cn(
+                                      'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
+                                      !item.sprint && 'opacity-50 cursor-not-allowed'
+                                    )}
+                                    title={!item.sprint ? 'Assign the task to a sprint to change its status' : undefined}
                                   >
                                     <CheckCircle className="h-4 w-4 mr-2" />
                                     <span>Change Status</span>
@@ -2243,7 +2226,7 @@ export default function BacklogPage() {
         </ResponsiveDialog>
 
         {/* Pagination Controls */}
-        {filteredAndSortedItems.length > 0 && (
+        {totalCount > 0 && (
           <Card className="mt-6">
             <CardContent className="p-4">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -2264,7 +2247,7 @@ export default function BacklogPage() {
                     </SelectContent>
                   </Select>
                   <span>
-                    Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredAndSortedItems.length)} of {filteredAndSortedItems.length}
+                    Showing {pageStartIndex} to {pageEndIndex} of {totalCount}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -2277,11 +2260,11 @@ export default function BacklogPage() {
                     Previous
                   </Button>
                   <span className="text-sm text-muted-foreground px-2">
-                    Page {currentPage} of {Math.ceil(filteredAndSortedItems.length / pageSize) || 1}
+                    Page {currentPage} of {totalPages}
                   </span>
                   <Button
                     onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage >= Math.ceil(filteredAndSortedItems.length / pageSize) || loading}
+                    disabled={currentPage >= totalPages || loading}
                     variant="outline"
                     size="sm"
                   >

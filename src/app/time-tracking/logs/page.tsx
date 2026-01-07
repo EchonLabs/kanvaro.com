@@ -78,7 +78,7 @@ export default function TimeLogsPage() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div>
+        <div className="mb-4">
           <h1 className="text-3xl font-bold text-foreground flex items-center space-x-2">
             <Clock className="h-8 w-8 text-blue-600" />
             <span>Time Logs</span>

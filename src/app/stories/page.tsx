@@ -45,6 +45,14 @@ import { usePermissions } from '@/lib/permissions/permission-context'
 import { extractUserId } from '@/lib/auth/user-utils'
 import { useNotify } from '@/lib/notify'
 
+interface UserSummary {
+  _id?: string
+  firstName?: string
+  lastName?: string
+  email?: string
+  avatar?: string
+}
+
 interface Story {
   _id: string
   title: string
@@ -63,16 +71,8 @@ interface Story {
     _id: string
     name: string
   }
-  assignedTo?: {
-    firstName: string
-    lastName: string
-    email: string
-  }
-  createdBy: {
-    firstName: string
-    lastName: string
-    email: string
-  }
+  assignedTo?: UserSummary | null
+  createdBy?: UserSummary | string | null
   storyPoints?: number
   dueDate?: string
   estimatedHours?: number
@@ -124,6 +124,7 @@ export default function StoriesPage() {
   const [pageSize, setPageSize] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
   const [currentUserId, setCurrentUserId] = useState<string>('')
+  const [creatorDetailsMap, setCreatorDetailsMap] = useState<Record<string, UserSummary>>({})
 
   const { hasPermission } = usePermissions()
   const { success: notifySuccess, error: notifyError } = useNotify()
@@ -238,6 +239,114 @@ export default function StoriesPage() {
     }
   }
 
+  useEffect(() => {
+    if (!stories.length) {
+      setCreatorDetailsMap((prev) => (Object.keys(prev).length ? {} : prev))
+      return
+    }
+
+    setCreatorDetailsMap((prev) => {
+      const next = { ...prev }
+      let changed = false
+
+      stories.forEach((story) => {
+        const creator = story.createdBy
+        if (!creator || typeof creator === 'string') return
+
+        const id = creator._id || (creator as any).id
+        if (!id) return
+
+        const sanitized: UserSummary = {
+          _id: id,
+          firstName: creator.firstName,
+          lastName: creator.lastName,
+          email: creator.email,
+          avatar: creator.avatar
+        }
+
+        if (!next[id]) {
+          next[id] = sanitized
+          changed = true
+          return
+        }
+
+        const existing = next[id]
+        if (
+          (sanitized.firstName && sanitized.firstName !== existing.firstName) ||
+          (sanitized.lastName && sanitized.lastName !== existing.lastName) ||
+          (sanitized.email && sanitized.email !== existing.email) ||
+          (sanitized.avatar && sanitized.avatar !== existing.avatar)
+        ) {
+          next[id] = { ...existing, ...sanitized }
+          changed = true
+        }
+      })
+
+      return changed ? next : prev
+    })
+  }, [stories])
+
+  useEffect(() => {
+    if (!stories.length) return
+
+    const idsToFetch = new Set<string>()
+
+    stories.forEach((story) => {
+      const creator = story.createdBy
+      if (!creator) return
+
+      if (typeof creator === 'string') {
+        if (!creatorDetailsMap[creator]) {
+          idsToFetch.add(creator)
+        }
+        return
+      }
+
+      const id = creator._id || (creator as any).id
+      const hasProfile = Boolean(
+        creator.firstName ||
+        creator.lastName ||
+        creator.email
+      )
+
+      if (id && !hasProfile && !creatorDetailsMap[id]) {
+        idsToFetch.add(id)
+      }
+    })
+
+    if (!idsToFetch.size) return
+
+    const controller = new AbortController()
+
+    const fetchCreators = async () => {
+      try {
+        const response = await fetch(`/api/users?ids=${Array.from(idsToFetch).join(',')}`, {
+          signal: controller.signal,
+          cache: 'no-store'
+        })
+
+        if (!response.ok) {
+          console.warn('Failed to fetch creator info:', response.status)
+          return
+        }
+
+        const data = await response.json()
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+          setCreatorDetailsMap((prev) => ({ ...prev, ...data }))
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return
+        }
+        console.error('Failed to fetch creator details:', error)
+      }
+    }
+
+    fetchCreators()
+
+    return () => controller.abort()
+  }, [stories, creatorDetailsMap])
+
   // Build filter option lists from loaded stories
   useEffect(() => {
     if (!stories.length) {
@@ -320,6 +429,48 @@ export default function StoriesPage() {
     }
   }
 
+  const resolveStoryCreator = (story: Story): UserSummary | null => {
+    const creator = story.createdBy
+    if (!creator) return null
+
+    if (typeof creator === 'string') {
+      return creatorDetailsMap[creator] || null
+    }
+
+    if (creator.firstName || creator.lastName || creator.email) {
+      return creator
+    }
+
+    const id = creator._id || (creator as any).id
+    if (id && creatorDetailsMap[id]) {
+      return creatorDetailsMap[id]
+    }
+
+    return null
+  }
+
+  const getUserDisplayName = (user?: UserSummary | null) => {
+    if (!user) return 'Unknown Creator'
+    const firstName = user.firstName?.trim() || ''
+    const lastName = user.lastName?.trim() || ''
+    const fullName = `${firstName} ${lastName}`.trim()
+    if (fullName) return fullName
+    return user.email || 'Unknown Creator'
+  }
+
+  const getUserInitials = (user?: UserSummary | null) => {
+    if (!user) return '?'
+    const firstInitial = user.firstName?.[0]
+    const lastInitial = user.lastName?.[0]
+    if (firstInitial || lastInitial) {
+      return `${firstInitial ?? ''}${lastInitial ?? ''}`.toUpperCase()
+    }
+    if (user.email) {
+      return user.email.charAt(0).toUpperCase()
+    }
+    return '?'
+  }
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'backlog': return <List className="h-4 w-4" />
@@ -342,8 +493,17 @@ export default function StoriesPage() {
   }
 
   const isCreator = (story: Story) => {
-    const creatorId = (story as any)?.createdBy?._id || (story as any)?.createdBy?.id
-    return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
+    const creatorData = story.createdBy as any
+    const creatorId =
+      typeof creatorData === 'string'
+        ? creatorData
+        : creatorData?._id || creatorData?.id
+
+    return (
+      Boolean(creatorId) &&
+      Boolean(currentUserId) &&
+      creatorId.toString() === currentUserId.toString()
+    )
   }
 
   const canEditStory = (story: Story) =>
@@ -381,6 +541,13 @@ export default function StoriesPage() {
 
   const handleKanbanStatusChange = async (story: Story, nextStatus: Story['status']) => {
     if (nextStatus === story.status) return
+    if (!story.sprint?._id) {
+      notifyError({
+        title: 'Assign to a sprint first',
+        message: 'Add this story to a sprint before moving it on the Kanban board.'
+      })
+      return
+    }
 
     try {
       const response = await fetch(`/api/stories/${story._id}`, {
@@ -437,13 +604,13 @@ export default function StoriesPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6 overflow-x-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="space-y-6 overflow-x-hidden ">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">User Stories</h1>
             <p className="text-sm sm:text-base text-muted-foreground">Manage your user stories and requirements</p>
           </div>
-          <Button onClick={() => router.push('/stories/create')} className="w-full sm:w-auto">
+          <Button onClick={() => router.push('/stories/create-story')} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             New Story
           </Button>
@@ -478,7 +645,7 @@ export default function StoriesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="backlog">backlog</SelectItem>
+                      <SelectItem value="backlog">Backlog</SelectItem>
                       <SelectItem value="todo">Todo</SelectItem>
                       <SelectItem value="inprogress">In Progress</SelectItem>
                       <SelectItem value="done">Done</SelectItem>
@@ -740,6 +907,10 @@ export default function StoriesPage() {
                           if (!draggedStoryId) return
                           const story = stories.find((s) => s._id === draggedStoryId)
                           if (!story) return
+                          if (!story.sprint?._id) {
+                            setDraggedStoryId(null)
+                            return
+                          }
                           handleKanbanStatusChange(story, statusKey)
                           setDraggedStoryId(null)
                         }}
@@ -761,14 +932,28 @@ export default function StoriesPage() {
                               No stories
                             </p>
                           ) : (
-                            columnStories.map((story) => (
-                              <Card
-                                key={story._id}
-                                className="hover:shadow-sm transition-shadow cursor-pointer"
-                                draggable
-                                onDragStart={() => setDraggedStoryId(story._id)}
-                                onClick={() => router.push(`/stories/${story._id}`)}
-                              >
+                            columnStories.map((story) => {
+                              const isDraggable = Boolean(story.sprint?._id)
+                              const creatorDetails = resolveStoryCreator(story)
+                              const creatorName = getUserDisplayName(creatorDetails)
+                              const creatorInitials = getUserInitials(creatorDetails)
+                              const creatorTitle = creatorDetails?.email
+                                ? `${creatorName} (${creatorDetails.email})`
+                                : creatorName
+                              const assigneeName = story.assignedTo
+                                ? `${story.assignedTo.firstName ?? ''} ${story.assignedTo.lastName ?? ''}`.trim() || story.assignedTo.email || ''
+                                : ''
+                              return (
+                                <Card
+                                  key={story._id}
+                                  className={`hover:shadow-sm transition-shadow ${isDraggable ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'}`}
+                                  draggable={isDraggable}
+                                  onDragStart={() => {
+                                    if (!isDraggable) return
+                                    setDraggedStoryId(story._id)
+                                  }}
+                                  onClick={() => router.push(`/stories/${story._id}`)}
+                                >
                                 <CardContent className="p-3 space-y-2">
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="flex-1 min-w-0">
@@ -805,44 +990,36 @@ export default function StoriesPage() {
                                       </Badge>
                                     )}
                                   </div>
-                                  <div className="flex items-center justify-between mt-2">
-                                    {story.assignedTo && (
+                                  <div className="flex flex-col gap-1 mt-2">
+                                    {assigneeName && (
                                       <span className="text-[11px] text-muted-foreground truncate">
-                                        {story.assignedTo.firstName} {story.assignedTo.lastName}
+                                        {assigneeName}
                                       </span>
                                     )}
-                                    <Select
-                                      value={story.status}
-                                      onValueChange={(value) =>
-                                        handleKanbanStatusChange(
-                                          story,
-                                          value as Story['status']
-                                        )
-                                      }
-                                      disabled={!story.sprint}
+                                    <div
+                                      className="flex items-center gap-1 min-w-0"
+                                      title={creatorTitle}
                                     >
-                                      <SelectTrigger className="h-7 w-[120px] text-[11px]">
-                                        <SelectValue placeholder="Status" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {kanbanStatuses.map((status) => (
-                                          <SelectItem key={status} value={status} className="text-xs">
-                                            <div className="flex items-center gap-2">
-                                              {getStatusIcon(status)}
-                                              <span>
-                                                {status === 'completed'
-                                                  ? 'Done'
-                                                  : formatToTitleCase(status)}
-                                              </span>
-                                            </div>
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
+                                      {creatorDetails?.avatar ? (
+                                        <img
+                                          src={creatorDetails.avatar}
+                                          alt={creatorName}
+                                          className="w-5 h-5 rounded-full object-cover flex-shrink-0"
+                                        />
+                                      ) : (
+                                        <div className="w-5 h-5 rounded-full bg-primary/80 text-primary-foreground text-[10px] font-medium flex items-center justify-center flex-shrink-0">
+                                          {creatorInitials}
+                                        </div>
+                                      )}
+                                      <span className="text-[11px] text-muted-foreground truncate">
+                                        {creatorName}
+                                      </span>
+                                    </div>
                                   </div>
                                 </CardContent>
-                              </Card>
-                            ))
+                                </Card>
+                              )
+                            })
                           )}
                         </div>
                       </div>
