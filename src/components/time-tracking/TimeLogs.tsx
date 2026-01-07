@@ -2303,6 +2303,33 @@ export function TimeLogs({
             </div>
           ) : (
             <div className="space-y-2 w-full overflow-x-hidden">
+              {/* Total Time Widget */}
+              <div className="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Clock className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground">Total Time Logged</h3>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-primary">
+                      {(() => {
+                        const totalMinutes = displayedEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0)
+                        const hours = Math.floor(totalMinutes / 60)
+                        const minutes = Math.floor(totalMinutes % 60)
+                        return `${hours}h ${minutes}m`
+                      })()}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {displayedEntries.length} {displayedEntries.length === 1 ? 'entry' : 'entries'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Table Header - Hidden on mobile */}
               <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium overflow-x-auto ${
                 showSelectionAndApproval && canApproveTimeLogs 
