@@ -824,7 +824,6 @@ export default function CreateTaskPage() {
                         <SelectItem value="bug">Bug</SelectItem>
                         <SelectItem value="feature">Feature</SelectItem>
                         <SelectItem value="improvement">Improvement</SelectItem>
-                        <SelectItem value="subtask">Subtask</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

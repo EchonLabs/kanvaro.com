@@ -1871,7 +1871,7 @@ export default function TaskDetailPage() {
                     <span className="font-medium">—</span>
                   )}
                 </div>
-                
+{/*                 
                 {task.sprint?.name && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Sprint</span>
@@ -1882,9 +1882,9 @@ export default function TaskDetailPage() {
                       {task.sprint.name.length > 20 ? `${task.sprint.name.slice(0, 20)}…` : task.sprint.name}
                     </span>
                   </div>
-                )}
+                )} */}
                 
-                {task.story?.title && (
+                {/* {task.story?.title && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Story</span>
                     <span
@@ -1895,8 +1895,8 @@ export default function TaskDetailPage() {
                     </span>
                   </div>
                 )}
-                
-                {task.story?.epic?.title && (
+                 */}
+                {/* {task.story?.epic?.title && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Epic</span>
                     <span
@@ -1906,7 +1906,7 @@ export default function TaskDetailPage() {
                       {task.story.epic.title.length > 20 ? `${task.story.epic.title.slice(0, 20)}…` : task.story.epic.title}
                     </span>
                   </div>
-                )}
+                )} */}
                 
                 {task.assignedTo && task.assignedTo.length > 0 && (
                   <div className="flex flex-col gap-2">

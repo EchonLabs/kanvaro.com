@@ -12,11 +12,13 @@ import { Switch } from '@/components/ui/switch'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useCurrencies } from '@/hooks/useCurrencies'
 import { useProfile } from '@/hooks/useProfile'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { useToast } from '@/components/ui/Toast'
+import { detectClientTimezone } from '@/lib/timezone'
 import {
   User,
   Settings,
@@ -63,6 +65,17 @@ interface UserProfile {
       teamActivity: boolean
     }
   }
+  twoFactorEnabled?: boolean
+  lastLogin?: string
+}
+
+interface SessionInsight {
+  id: string
+  label: string
+  device: string
+  location?: string
+  lastActive: string
+  isCurrent: boolean
 }
 
 export default function ProfilePage() {
@@ -85,7 +98,6 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
-    timezone: 'UTC',
     language: 'en',
     currency: 'USD',
     theme: 'system' as 'light' | 'dark' | 'system',
@@ -104,6 +116,15 @@ export default function ProfilePage() {
 
   const [originalFormData, setOriginalFormData] = useState<typeof formData | null>(null)
   const [activeTab, setActiveTab] = useState('personal')
+  const [browserTimezone, setBrowserTimezone] = useState(() => detectClientTimezone())
+  const resolvedTimezone = browserTimezone || 'UTC'
+  const [isTwoFactorModalOpen, setIsTwoFactorModalOpen] = useState(false)
+  const [isSessionsModalOpen, setIsSessionsModalOpen] = useState(false)
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
+  const [twoFactorInitial, setTwoFactorInitial] = useState(false)
+  const [isSavingTwoFactor, setIsSavingTwoFactor] = useState(false)
+  const [currentDeviceInfo, setCurrentDeviceInfo] = useState('Current device')
+  const [sessionInsights, setSessionInsights] = useState<SessionInsight[]>([])
 
   const checkAuth = useCallback(async () => {
     try {
@@ -112,13 +133,15 @@ export default function ProfilePage() {
       if (response.ok) {
         const userData = await response.json()
         setProfile(userData)
+        const twoFactorState = !!userData.twoFactorEnabled
+        setTwoFactorEnabled(twoFactorState)
+        setTwoFactorInitial(twoFactorState)
         const loadedDateFormat = userData.preferences?.notifications?.dateFormat || userData.preferences?.dateFormat || 'MM/DD/YYYY'
         const loadedTimeFormat = userData.preferences?.notifications?.timeFormat || userData.preferences?.timeFormat || '12h'
 
         setFormData({
           firstName: userData.firstName || '',
           lastName: userData.lastName || '',
-          timezone: userData.timezone || 'UTC',
           language: userData.language || 'en',
           currency: userData.currency || 'USD',
           theme: userData.preferences?.theme || 'system',
@@ -136,10 +159,11 @@ export default function ProfilePage() {
         })
 
         // Update DateTimeProvider with loaded preferences
+        const timezonePreference = browserTimezone || 'UTC'
         setPreferences({
           dateFormat: loadedDateFormat as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD',
           timeFormat: loadedTimeFormat as '12h' | '24h',
-          timezone: userData.timezone || 'UTC'
+          timezone: timezonePreference
         })
 
         setAuthError('')
@@ -147,7 +171,6 @@ export default function ProfilePage() {
         setOriginalFormData(JSON.parse(JSON.stringify({
           firstName: userData.firstName || '',
           lastName: userData.lastName || '',
-          timezone: userData.timezone || 'UTC',
           language: userData.language || 'en',
           currency: userData.currency || 'USD',
           theme: userData.preferences?.theme || 'system',
@@ -171,13 +194,15 @@ export default function ProfilePage() {
         if (refreshResponse.ok) {
           const refreshData = await refreshResponse.json()
           setProfile(refreshData)
+          const refreshTwoFactorState = !!refreshData.twoFactorEnabled
+          setTwoFactorEnabled(refreshTwoFactorState)
+          setTwoFactorInitial(refreshTwoFactorState)
           const refreshDateFormat = refreshData.preferences?.notifications?.dateFormat || refreshData.preferences?.dateFormat || 'MM/DD/YYYY'
           const refreshTimeFormat = refreshData.preferences?.notifications?.timeFormat || refreshData.preferences?.timeFormat || '12h'
 
           setFormData({
             firstName: refreshData.firstName || '',
             lastName: refreshData.lastName || '',
-            timezone: refreshData.timezone || 'UTC',
             language: refreshData.language || 'en',
             currency: refreshData.currency || 'USD',
             theme: refreshData.preferences?.theme || 'system',
@@ -195,10 +220,11 @@ export default function ProfilePage() {
           })
 
           // Update DateTimeProvider with loaded preferences
+          const timezonePreference = browserTimezone || 'UTC'
           setPreferences({
             dateFormat: refreshDateFormat as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD',
             timeFormat: refreshTimeFormat as '12h' | '24h',
-            timezone: refreshData.timezone || 'UTC'
+            timezone: timezonePreference
           })
 
           setAuthError('')
@@ -206,7 +232,6 @@ export default function ProfilePage() {
           setOriginalFormData(JSON.parse(JSON.stringify({
             firstName: refreshData.firstName || '',
             lastName: refreshData.lastName || '',
-            timezone: refreshData.timezone || 'UTC',
             language: refreshData.language || 'en',
             currency: refreshData.currency || 'USD',
             theme: refreshData.preferences?.theme || 'system',
@@ -240,11 +265,37 @@ export default function ProfilePage() {
     } finally {
       setLoading(false)
     }
-  }, [router])
+  }, [router, browserTimezone])
 
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
+
+  useEffect(() => {
+    setBrowserTimezone(detectClientTimezone())
+  }, [])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const platform = window.navigator.platform || 'Current device'
+      const browser = window.navigator.userAgent || 'Browser session'
+      setCurrentDeviceInfo(`${platform} • ${browser}`)
+    }
+  }, [])
+
+  useEffect(() => {
+    const lastActiveTimestamp = profile?.lastLogin || new Date().toISOString()
+    setSessionInsights([
+      {
+        id: 'current-session',
+        label: 'Current Session',
+        device: currentDeviceInfo,
+        location: resolvedTimezone,
+        lastActive: lastActiveTimestamp,
+        isCurrent: true
+      }
+    ])
+  }, [currentDeviceInfo, profile?.lastLogin, resolvedTimezone])
 
   const handleSave = async () => {
     // Generate tab-specific success message
@@ -276,7 +327,7 @@ export default function ProfilePage() {
       setPreferences({
         dateFormat: formData.dateFormat as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD',
         timeFormat: formData.timeFormat as '12h' | '24h',
-        timezone: formData.timezone || 'UTC'
+        timezone: resolvedTimezone
       })
       // Show success toast notification
       showToast({
@@ -287,6 +338,44 @@ export default function ProfilePage() {
       })
       // Clear any previous error
       setAuthError('')
+    }
+  }
+
+  const twoFactorDirty = twoFactorEnabled !== twoFactorInitial
+
+  const handleTwoFactorSave = async () => {
+    if (!twoFactorDirty || isSavingTwoFactor) return
+    setIsSavingTwoFactor(true)
+    try {
+      const response = await fetch('/api/settings/security', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ twoFactorEnabled })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        throw new Error(errorData?.error || 'Failed to update 2FA settings')
+      }
+
+      setTwoFactorInitial(twoFactorEnabled)
+      showToast({
+        type: 'success',
+        title: 'Security Updated',
+        message: `Two-factor authentication ${twoFactorEnabled ? 'enabled' : 'disabled'} successfully.`,
+        duration: 4000
+      })
+    } catch (error: any) {
+      showToast({
+        type: 'error',
+        title: 'Update Failed',
+        message: error.message || 'Could not update two-factor settings.',
+        duration: 4000
+      })
+    } finally {
+      setIsSavingTwoFactor(false)
     }
   }
 
@@ -360,6 +449,15 @@ export default function ProfilePage() {
     )
   }
 
+  const handleNavigateToSecurity = (section: 'twoFactor' | 'sessions') => {
+    if (section === 'twoFactor') {
+      setIsTwoFactorModalOpen(false)
+    } else {
+      setIsSessionsModalOpen(false)
+    }
+    router.push(`/security?section=${section}`)
+  }
+
 
   // Check if there are any changes in the current tab's form data
   const hasChanges = () => {
@@ -370,7 +468,6 @@ export default function ProfilePage() {
         return (
           formData.firstName !== originalFormData.firstName ||
           formData.lastName !== originalFormData.lastName ||
-          formData.timezone !== originalFormData.timezone ||
           formData.language !== originalFormData.language
         )
       case 'preferences':
@@ -532,39 +629,15 @@ export default function ProfilePage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-2">
-                      <Label htmlFor="timezone">Timezone</Label>
-                      <Select value={formData.timezone} onValueChange={(value) => setFormData(prev => ({ ...prev, timezone: value }))}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="UTC">UTC</SelectItem>
-                          <SelectItem value="America/New_York">Eastern Time (UTC-5)</SelectItem>
-                          <SelectItem value="America/Chicago">Central Time (UTC-6)</SelectItem>
-                          <SelectItem value="America/Denver">Mountain Time (UTC-7)</SelectItem>
-                          <SelectItem value="America/Los_Angeles">Pacific Time (UTC-8)</SelectItem>
-                          <SelectItem value="Europe/London">London (UTC+0)</SelectItem>
-                          <SelectItem value="Europe/Paris">Paris (UTC+1)</SelectItem>
-                          <SelectItem value="Asia/Colombo">Sri Lanka (UTC+5:30)</SelectItem>
-                          <SelectItem value="Asia/Kolkata">India (UTC+5:30)</SelectItem>
-                          <SelectItem value="Asia/Dhaka">Bangladesh (UTC+6)</SelectItem>
-                          <SelectItem value="Asia/Tokyo">Tokyo (UTC+9)</SelectItem>
-                          <SelectItem value="Australia/Sydney">Sydney (UTC+10)</SelectItem>
-                          <SelectItem value="Pacific/Auckland">Auckland (UTC+12)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-                          setFormData(prev => ({ ...prev, timezone: browserTimezone }))
-                        }}
-                        className="mt-2 text-xs"
-                      >
-                        Auto-detect from browser
-                      </Button>
+                      <Label>Timezone (auto-detected)</Label>
+                      <Input
+                        value={resolvedTimezone}
+                        disabled
+                        className="bg-muted/50 text-muted-foreground cursor-not-allowed"
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Timezone follows your device settings.
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="language">Language</Label>
@@ -916,20 +989,45 @@ export default function ProfilePage() {
                             Add an extra layer of security to your account
                           </p>
                         </div>
-                        <Button variant="outline" size="sm">
-                          Enable 2FA
-                        </Button>
+                        <Switch
+                          checked={twoFactorEnabled}
+                          onCheckedChange={setTwoFactorEnabled}
+                          aria-label="Toggle two-factor authentication"
+                        />
                       </div>
 
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label>Active Sessions</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Manage your active login sessions
-                          </p>
-                        </div>
-                        <Button variant="outline" size="sm">
+                      <div className="space-y-0.5">
+                        <Label>Active Sessions</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Manage your active login sessions
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 pt-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsTwoFactorModalOpen(true)}
+                          title="Review and configure two-factor authentication"
+                          disabled={!twoFactorDirty}
+                        >
+                          Manage 2FA
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsSessionsModalOpen(true)}
+                          title="View the devices that are signed in"
+                          disabled={!twoFactorDirty}
+                        >
                           View Sessions
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleTwoFactorSave}
+                          disabled={!twoFactorDirty || isSavingTwoFactor}
+                        >
+                          {isSavingTwoFactor ? 'Saving...' : 'Save 2FA Settings'}
                         </Button>
                       </div>
                     </div>
@@ -957,6 +1055,99 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={isTwoFactorModalOpen} onOpenChange={setIsTwoFactorModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Two-Factor Authentication</DialogTitle>
+            <DialogDescription>
+              Protect your account by requiring a one-time code when you sign in.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            <div className="rounded-lg border p-4 bg-muted/40">
+              <p className="text-sm font-medium text-foreground">
+                Current status:{' '}
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${twoFactorEnabled ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'}`}>
+                  {twoFactorEnabled ? 'Enabled' : 'Disabled'}
+                </span>
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                We remember this preference from your last security check. Manage authenticators and backup codes from the Security Center.
+              </p>
+            </div>
+            <div className="space-y-2 text-sm">
+              <p className="font-medium text-foreground">Getting started</p>
+              <ol className="list-decimal pl-5 space-y-1 text-muted-foreground">
+                <li>Open the Security Center from the button below.</li>
+                <li>Toggle two-factor authentication on and scan the QR code with your authenticator app.</li>
+                <li>Enter the generated code to confirm and download your backup codes.</li>
+              </ol>
+            </div>
+            <Alert>
+              <AlertDescription>
+                Tip: We recommend Google Authenticator, 1Password, or Microsoft Authenticator for generating secure codes.
+              </AlertDescription>
+            </Alert>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsTwoFactorModalOpen(false)}>
+              Close
+            </Button>
+            <Button onClick={() => handleNavigateToSecurity('twoFactor')}>
+              Open Security Center
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isSessionsModalOpen} onOpenChange={setIsSessionsModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Active Sessions</DialogTitle>
+            <DialogDescription>
+              Review devices that are currently signed in to your account.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            {sessionInsights.length === 0 ? (
+              <div className="text-sm text-muted-foreground">
+                No sessions detected for your account.
+              </div>
+            ) : (
+              sessionInsights.map((session) => (
+                <div key={session.id} className="border rounded-lg p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{session.label}</p>
+                      <p className="text-xs text-muted-foreground break-words">{session.device}</p>
+                    </div>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${session.isCurrent ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200' : 'bg-secondary text-secondary-foreground'}`}>
+                      {session.isCurrent ? 'Current device' : 'Signed in'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Last active: {formatDateDisplay(session.lastActive)} at {formatTimeDisplay(session.lastActive)} ({session.location || 'Timezone unknown'})
+                  </p>
+                </div>
+              ))
+            )}
+            <Alert>
+              <AlertDescription>
+                Need to sign out another device? Jump into the Security Center to revoke access instantly.
+              </AlertDescription>
+            </Alert>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSessionsModalOpen(false)}>
+              Close
+            </Button>
+            <Button onClick={() => handleNavigateToSecurity('sessions')}>
+              Open Security Center
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   )
 }

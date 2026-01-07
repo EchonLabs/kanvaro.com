@@ -22,6 +22,7 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { toast } from 'sonner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { detectClientTimezone } from '@/lib/timezone'
 
 interface TimeLogsProps {
   userId: string
@@ -33,6 +34,7 @@ interface TimeLogsProps {
   liveActiveTimer?: ActiveTimerPayload | null
   showSelectionAndApproval?: boolean // Default true - controls checkbox selection and approval flow
   showManualLogButtons?: boolean // Default false - controls Bulk Upload and Add Time Log buttons
+  timezone?: string
 }
 
 interface TimeEntry {
@@ -544,6 +546,19 @@ export function TimeLogs({
   const combineDateTime = (date: string, time: string): string => {
     if (!date || !time) return ''
     return `${date}T${time}`
+  }
+
+  const formatDateForInput = (date: Date): string => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const formatTimeForInput = (date: Date): string => {
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    return `${hours}:${minutes}`
   }
 
   // Helper function to clear all field validation errors
@@ -1294,32 +1309,29 @@ export function TimeLogs({
       setTasks([])
     }
     
-    // Format dates and times for the form - use UTC times since database stores UTC
+    // Format dates and times for the form using the user's local timezone
     const start = new Date(entry.startTime)
     const end = entry.endTime ? new Date(entry.endTime) : new Date()
 
-    // Get UTC time components for proper display
-    const formatUTCTime = (date: Date): string => {
-      const hours = date.getUTCHours().toString().padStart(2, '0')
-      const minutes = date.getUTCMinutes().toString().padStart(2, '0')
-      return `${hours}:${minutes}`
-    }
-
+    const startDateLocal = formatDateForInput(start)
+    const startTimeLocal = formatTimeForInput(start)
+    const endDateLocal = formatDateForInput(end)
+    const endTimeLocal = formatTimeForInput(end)
 
     setManualLogData({
-      startDate: start.toISOString().split('T')[0], // Already UTC
-      startTime: formatUTCTime(start), // Use UTC time
-      endDate: end.toISOString().split('T')[0], // Already UTC
-      endTime: formatUTCTime(end), // Use UTC time
+      startDate: startDateLocal,
+      startTime: startTimeLocal,
+      endDate: endDateLocal,
+      endTime: endTimeLocal,
       description: entry.description || ''
     })
     setEditInitial({
       projectId: entry.project?._id || '',
       taskId: entry.task?._id || '',
-      startDate: start.toISOString().split('T')[0], // Already UTC
-      startTime: formatUTCTime(start), // Use UTC time
-      endDate: end.toISOString().split('T')[0], // Already UTC
-      endTime: formatUTCTime(end), // Use UTC time
+      startDate: startDateLocal,
+      startTime: startTimeLocal,
+      endDate: endDateLocal,
+      endTime: endTimeLocal,
       description: entry.description || ''
     })
     
