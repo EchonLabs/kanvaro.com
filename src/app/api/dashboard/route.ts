@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Types } from 'mongoose'
 import connectDB from '@/lib/db-config'
 import { Project } from '@/models/Project'
 import { Task } from '@/models/Task'
@@ -23,6 +24,9 @@ export async function GET(request: NextRequest) {
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
+    const privilegedTimeRoles = new Set(['admin', 'human_resource', 'project_manager'])
+    const canViewOrganizationWideTime = privilegedTimeRoles.has(user.role)
+
 
     // Check if user has "view all" permissions
     const [hasProjectViewAll, hasTaskViewAll] = await Promise.all([
@@ -51,7 +55,8 @@ export async function GET(request: NextRequest) {
       is_deleted: { $ne: true },
       $or: [
         { createdBy: userId },
-        { teamMembers: userId }
+        { teamMembers: userId },
+        { 'teamMembers.memberId': userId }
       ]
     }
 
@@ -91,7 +96,6 @@ export async function GET(request: NextRequest) {
       teamMembers,
       activeProjects,
       completedTasks,
-      timeStats,
       recentProjects,
       recentTasks,
       teamActivity
@@ -132,9 +136,6 @@ export async function GET(request: NextRequest) {
         completedAt: { $gte: startOfMonth }
       }),
 
-      // Get time tracking stats (organization-wide)
-      getTimeStats(organizationId, startOfDay, startOfWeek, startOfMonth, now),
-
       // Get recent projects (user-specific, last 4)
       Project.find(userProjectsQuery)
         .populate('createdBy', 'firstName lastName email')
@@ -154,6 +155,15 @@ export async function GET(request: NextRequest) {
       // Get team activity (last 10 activities)
       getTeamActivity(organizationId, userId, hasProjectViewAll, hasTaskViewAll)
     ])
+
+    const timeStats = await getTimeStats(
+      organizationId,
+      startOfDay,
+      startOfWeek,
+      startOfMonth,
+      now,
+      canViewOrganizationWideTime ? {} : { userId }
+    )
 
     // Calculate project progress
     const projectsWithProgress = await Promise.all(
@@ -183,8 +193,15 @@ export async function GET(request: NextRequest) {
       timeEntriesCount: timeEntries.length
     }
 
+    console.log('Dashboard total hours tracked:', stats.hoursTracked)
+
     // Calculate changes from last month
-    const lastMonthStats = await getLastMonthStats(organizationId, startOfLastMonth, endOfLastMonth)
+    const lastMonthStats = await getLastMonthStats(
+      organizationId,
+      startOfLastMonth,
+      endOfLastMonth,
+      canViewOrganizationWideTime ? {} : { userId }
+    )
     const changes = {
       activeProjects: activeProjects - lastMonthStats.activeProjects,
       completedTasks: completedTasks - lastMonthStats.completedTasks,
@@ -213,14 +230,83 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function getTimeStats(organizationId: string, startOfDay: Date, startOfWeek: Date, startOfMonth: Date, endDate: Date) {
+function getProjectScopeIds(projects: any[], userId: string): Types.ObjectId[] {
+  const normalizedUserId = userId?.toString()
+  if (!normalizedUserId) {
+    return []
+  }
+
+  const scopedProjects = new Map<string, Types.ObjectId>()
+
+  projects.forEach((project: any) => {
+    const projectId = project?._id as Types.ObjectId | undefined
+    const projectIdString = projectId?.toString?.()
+    if (!projectId || !projectIdString) {
+      return
+    }
+
+    const createdBy = project?.createdBy?._id ?? project?.createdBy
+    const isCreator = createdBy?.toString?.() === normalizedUserId
+
+    const isTeamMember = Array.isArray(project?.teamMembers) && project.teamMembers.some((member: any) => {
+      const memberId = member?.memberId?._id ?? member?.memberId ?? member
+      return memberId?.toString?.() === normalizedUserId
+    })
+
+    const hasProjectRole = Array.isArray(project?.projectRoles) && project.projectRoles.some((role: any) => {
+      const roleUser = role?.user?._id ?? role?.user
+      return roleUser?.toString?.() === normalizedUserId
+    })
+
+    if (isCreator || isTeamMember || hasProjectRole) {
+      scopedProjects.set(projectIdString, projectId)
+    }
+  })
+
+  return Array.from(scopedProjects.values())
+}
+
+function createEmptyTimeStats() {
+  return {
+    today: { duration: 0, cost: 0 },
+    week: { duration: 0, cost: 0 },
+    month: { duration: 0, cost: 0 },
+    totalDuration: 0,
+    totalCost: 0
+  }
+}
+
+
+async function getTimeStats(
+  organizationId: string,
+  startOfDay: Date,
+  startOfWeek: Date,
+  startOfMonth: Date,
+  endDate: Date,
+  options: { projectIds?: Types.ObjectId[]; userId?: string } = {}
+) {
+  if (options.projectIds && options.projectIds.length === 0) {
+    return createEmptyTimeStats()
+  }
+
+  // Build match filter - either by project IDs or by user ID
+  let matchFilter: any = {
+    organization: organizationId,
+    status: 'completed'
+  }
+
+  if (options.projectIds) {
+    matchFilter.project = { $in: options.projectIds }
+  } else if (options.userId) {
+    matchFilter.user = options.userId
+  }
+
   const [todayStats, weekStats, monthStats] = await Promise.all([
     TimeEntry.aggregate([
       {
         $match: {
-          organization: organizationId,
-          startTime: { $gte: startOfDay, $lte: endDate },
-          status: 'completed'
+          ...matchFilter,
+          startTime: { $gte: startOfDay, $lte: endDate }
         }
       },
       {
@@ -242,9 +328,8 @@ async function getTimeStats(organizationId: string, startOfDay: Date, startOfWee
     TimeEntry.aggregate([
       {
         $match: {
-          organization: organizationId,
-          startTime: { $gte: startOfWeek, $lte: endDate },
-          status: 'completed'
+          ...matchFilter,
+          startTime: { $gte: startOfWeek, $lte: endDate }
         }
       },
       {
@@ -266,9 +351,8 @@ async function getTimeStats(organizationId: string, startOfDay: Date, startOfWee
     TimeEntry.aggregate([
       {
         $match: {
-          organization: organizationId,
-          startTime: { $gte: startOfMonth, $lte: endDate },
-          status: 'completed'
+          ...matchFilter,
+          startTime: { $gte: startOfMonth, $lte: endDate }
         }
       },
       {
@@ -307,7 +391,41 @@ async function getTimeStats(organizationId: string, startOfDay: Date, startOfWee
   }
 }
 
-async function getLastMonthStats(organizationId: string, startOfLastMonth: Date, endOfLastMonth: Date) {
+async function getLastMonthStats(
+  organizationId: string,
+  startOfLastMonth: Date,
+  endOfLastMonth: Date,
+  options: { projectIds?: Types.ObjectId[]; userId?: string } = {}
+) {
+  // Build match filter - either by project IDs or by user ID
+  let matchFilter: any = {
+    organization: organizationId,
+    startTime: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+    status: 'completed'
+  }
+
+  if (options.projectIds) {
+    matchFilter.project = { $in: options.projectIds }
+  } else if (options.userId) {
+    matchFilter.user = options.userId
+  }
+
+  const skipHoursAggregation = (options.projectIds && options.projectIds.length === 0) ||
+                              (!options.projectIds && !options.userId)
+  const hoursAggregationPromise = skipHoursAggregation
+    ? Promise.resolve([{ totalDuration: 0 }])
+    : TimeEntry.aggregate([
+        {
+          $match: matchFilter
+        },
+        {
+          $group: {
+            _id: null,
+            totalDuration: { $sum: '$duration' }
+          }
+        }
+      ])
+
   const [activeProjects, completedTasks, teamMembers, hoursTracked] = await Promise.all([
     Project.countDocuments({
       organization: organizationId,
@@ -324,28 +442,16 @@ async function getLastMonthStats(organizationId: string, startOfLastMonth: Date,
       organization: organizationId,
       isActive: true
     }),
-    TimeEntry.aggregate([
-      {
-        $match: {
-          organization: organizationId,
-          startTime: { $gte: startOfLastMonth, $lte: endOfLastMonth },
-          status: 'completed'
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalDuration: { $sum: '$duration' }
-        }
-      }
-    ])
+    hoursAggregationPromise
   ])
+
+  const scopedHours = skipHoursAggregation ? 0 : hoursTracked[0]?.totalDuration || 0
 
   return {
     activeProjects,
     completedTasks,
     teamMembers,
-    hoursTracked: hoursTracked[0]?.totalDuration || 0
+    hoursTracked: scopedHours
   }
 }
 
