@@ -24,15 +24,9 @@ export async function GET(request: NextRequest) {
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
-    const privilegedTimeRoles = new Set(['admin', 'human_resource', 'project_manager'])
-    const canViewOrganizationWideTime = privilegedTimeRoles.has(user.role)
-
-
-    // Check if user has "view all" permissions
-    const [hasProjectViewAll, hasTaskViewAll] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
-      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL)
-    ])
+    const privilegedRoles = new Set(['admin', 'human_resource', 'project_manager'])
+    const canViewAll = privilegedRoles.has(user.role)
+    const canViewOrganizationWideTime = privilegedRoles.has(user.role)
 
     // Get date ranges
     const now = new Date()
@@ -48,16 +42,13 @@ export async function GET(request: NextRequest) {
       is_deleted: { $ne: true }
     }
 
-    // Get projects where user is creator or team member (for user-specific views)
-    // If user has PROJECT_VIEW_ALL, use projectsQuery instead
-    const userProjectsQuery = hasProjectViewAll ? projectsQuery : {
+    // Get projects based on role
+    // Admin, Project Manager, HR can see all projects
+    // Other roles only see projects where they are team members
+    const userProjectsQuery = canViewAll ? projectsQuery : {
       organization: organizationId,
       is_deleted: { $ne: true },
-      $or: [
-        { createdBy: userId },
-        { teamMembers: userId },
-        { 'teamMembers.memberId': userId }
-      ]
+      'teamMembers.memberId': userId
     }
 
     // Get all tasks in organization (for organization-wide stats)
@@ -66,15 +57,13 @@ export async function GET(request: NextRequest) {
       is_deleted: { $ne: true }
     }
 
-    // Get tasks assigned to or created by the user (for user-specific views)
-    // If user has TASK_VIEW_ALL, use tasksQuery instead
-    const userTasksQuery = hasTaskViewAll ? tasksQuery : {
+    // Get tasks based on role
+    // Admin, Project Manager, HR can see all tasks
+    // Other roles only see tasks where they are assigned
+    const userTasksQuery = canViewAll ? tasksQuery : {
       organization: organizationId,
       is_deleted: { $ne: true },
-      $or: [
-        { assignedTo: userId },
-        { createdBy: userId }
-      ]
+      'assignedTo.user': userId
     }
 
     // Get all time entries in organization (for organization-wide stats)
@@ -106,8 +95,8 @@ export async function GET(request: NextRequest) {
         .populate('teamMembers', 'firstName lastName email')
         .populate('client', 'firstName lastName email'),
 
-      // Get all tasks for stats (organization-wide)
-      Task.find(tasksQuery)
+      // Get all tasks for stats (role-based)
+      Task.find(canViewAll ? tasksQuery : userTasksQuery)
         .populate('assignedTo', 'firstName lastName email')
         .populate('createdBy', 'firstName lastName email')
         .populate('project', 'name'),
@@ -123,17 +112,20 @@ export async function GET(request: NextRequest) {
         isActive: true
       }),
 
-      // Get active projects count (organization-wide)
+      // Get active projects count (role-based)
       Project.countDocuments({
-        ...projectsQuery,
+        ...(canViewAll ? projectsQuery : userProjectsQuery),
         status: 'active'
       }),
 
-      // Get completed tasks this month (organization-wide)
+      // Get completed tasks this month (role-based)
       Task.countDocuments({
-        ...tasksQuery,
-        status: { $in: ['done', 'completed'] },
-        completedAt: { $gte: startOfMonth }
+        ...(canViewAll ? tasksQuery : userTasksQuery),
+        status: 'done',
+        $or: [
+          { completedAt: { $gte: startOfMonth } },
+          { completedAt: { $exists: false }, updatedAt: { $gte: startOfMonth } }
+        ]
       }),
 
       // Get recent projects (user-specific, last 4)
@@ -153,7 +145,7 @@ export async function GET(request: NextRequest) {
         .limit(5),
 
       // Get team activity (last 10 activities)
-      getTeamActivity(organizationId, userId, hasProjectViewAll, hasTaskViewAll)
+      getTeamActivity(organizationId, userId, canViewAll, canViewAll)
     ])
 
     const timeStats = await getTimeStats(
@@ -435,8 +427,11 @@ async function getLastMonthStats(
     Task.countDocuments({
       organization: organizationId,
       is_deleted: { $ne: true },
-      status: { $in: ['done', 'completed'] },
-      completedAt: { $gte: startOfLastMonth, $lte: endOfLastMonth }
+      status: 'done',
+      $or: [
+        { completedAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } },
+        { completedAt: { $exists: false }, updatedAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } }
+      ]
     }),
     User.countDocuments({ 
       organization: organizationId,
@@ -458,29 +453,25 @@ async function getLastMonthStats(
 async function getTeamActivity(
   organizationId: string, 
   userId: string, 
-  hasProjectViewAll: boolean = false,
+  canViewAll: boolean = false,
   hasTaskViewAll: boolean = false
 ) {
-  // Build queries based on permissions
+  // Build queries based on role
+  // Admin, Project Manager, HR can see all activities
+  // Other roles only see their assigned tasks and team member projects
   const taskQuery: any = {
     organization: organizationId
   }
-  if (!hasTaskViewAll) {
-    taskQuery.$or = [
-      { assignedTo: userId },
-      { createdBy: userId }
-    ]
+  if (!canViewAll) {
+    taskQuery['assignedTo.user'] = userId
   }
 
   const projectQuery: any = {
     organization: organizationId,
     is_deleted: { $ne: true }
   }
-  if (!hasProjectViewAll) {
-    projectQuery.$or = [
-      { createdBy: userId },
-      { teamMembers: userId }
-    ]
+  if (!canViewAll) {
+    projectQuery['teamMembers.memberId'] = userId
   }
 
   // Get recent activities from tasks, projects, and time entries
