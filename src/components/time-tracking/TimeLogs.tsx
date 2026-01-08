@@ -748,8 +748,8 @@ export function TimeLogs({
           projectId: selectedProjectForLog,
           taskId: selectedTaskForLog,
           description: manualLogData.description || undefined,
-          startTime: startDateTime,
-          endTime: endDateTime,
+          startTime: start.toISOString(),
+          endTime: end.toISOString(),
           isBillable: getBillableFromTask(selectedTaskForLog) && timeTrackingSettings?.allowBillableTime
         })
       })
@@ -840,8 +840,8 @@ export function TimeLogs({
           projectId: selectedProjectForLog,
           taskId: selectedTaskForLog,
           description: manualLogData.description || undefined,
-          startTime: startDateTime,
-          endTime: endDateTime,
+          startTime: start.toISOString(),
+          endTime: end.toISOString(),
           isBillable: getBillableFromTask(selectedTaskForLog) && timeTrackingSettings?.allowBillableTime
         })
       })
