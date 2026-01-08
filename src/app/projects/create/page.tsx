@@ -147,6 +147,7 @@ const [overheadInput, setOverheadInput] = useState('')
   const [newFigmaLink, setNewFigmaLink] = useState('')
   const [newDocLink, setNewDocLink] = useState('')
   const [isDragging, setIsDragging] = useState(false)
+  const [globalTimeTrackingSettings, setGlobalTimeTrackingSettings] = useState<any>(null)
 
   // Edit mode state
   const searchParams = useSearchParams()
@@ -328,7 +329,6 @@ const [overheadInput, setOverheadInput] = useState('')
   const handleSubmit = async (isDraft = false) => {
     // Prevent duplicate submissions
     if (isSubmitting) {
-      console.log('Request already in progress, ignoring duplicate submission')
       return
     }
 
@@ -396,6 +396,11 @@ const [overheadInput, setOverheadInput] = useState('')
         ...formData,
         teamMembers: teamMembersWithRates,
         isDraft
+      }
+
+      // Ensure requireApproval respects global setting
+      if (globalTimeTrackingSettings?.requireApproval === false) {
+        payload.settings.requireApproval = false
       }
 
       if (isDraft) {
@@ -833,6 +838,32 @@ const [overheadInput, setOverheadInput] = useState('')
 
     return matchesSearch && !isAlreadySelected
   })
+
+  // Fetch global time tracking settings
+  useEffect(() => {
+    const fetchGlobalTimeTrackingSettings = async () => {
+      try {
+        const response = await fetch('/api/time-tracking/settings')
+        if (response.ok) {
+          const data = await response.json()
+          
+          // Handle both response structures: {settings: ...} or {success: true, settings: ...}
+          const settings = data.settings || (data.success && data.data)
+          
+          if (settings) {
+            setGlobalTimeTrackingSettings(settings)
+          } else {
+            console.warn('[CREATE/EDIT PROJECT] No settings found in response:', data)
+          }
+        } else {
+          console.error('[CREATE/EDIT PROJECT] API request failed with status:', response.status)
+        }
+      } catch (error) {
+        console.error('[CREATE/EDIT PROJECT] Failed to fetch global time tracking settings:', error)
+      }
+    }
+    fetchGlobalTimeTrackingSettings()
+  }, [])
 
   // Load members when component mounts
   useEffect(() => {
@@ -2348,7 +2379,7 @@ const [overheadInput, setOverheadInput] = useState('')
                       <Label>Require Approval</Label>
                       <p className="text-sm text-muted-foreground">
                         Require approval for time entries and expenses
-                        {organization?.settings?.timeTracking?.requireApproval === false && (
+                        {globalTimeTrackingSettings?.requireApproval === false && (
                           <span className="block text-xs text-amber-600 dark:text-amber-400 mt-1">
                             ⚠️ Disabled globally in Application Settings
                           </span>
@@ -2357,12 +2388,17 @@ const [overheadInput, setOverheadInput] = useState('')
                     </div>
                     <input
                       type="checkbox"
-                      checked={formData.settings.requireApproval}
-                      disabled={organization?.settings?.timeTracking?.requireApproval === false}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        settings: { ...prev.settings, requireApproval: e.target.checked }
-                      }))}
+                      checked={(() => {
+                        const isChecked = globalTimeTrackingSettings?.requireApproval === false ? false : formData.settings.requireApproval
+                        return isChecked
+                      })()}
+                      disabled={globalTimeTrackingSettings?.requireApproval === false}
+                      onChange={(e) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          settings: { ...prev.settings, requireApproval: e.target.checked }
+                        }))
+                      }}
                     />
                   </div>
                 </div>

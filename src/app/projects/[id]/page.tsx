@@ -327,7 +327,6 @@ export default function ProjectDetailPage() {
   }
 
   const handleExpenseDeleted = async (expenseId: string, expenseName: string) => {
-    console.log('Delete triggered for expense:', expenseName)
     setExpenseToDelete({ id: expenseId, name: expenseName })
     setShowDeleteExpenseConfirmModal(true)
   }
@@ -483,16 +482,22 @@ export default function ProjectDetailPage() {
       const response = await fetch('/api/time-tracking/settings')
       const data = await response.json()
 
-      if (data.success && data.data) {
-        setGlobalTimeTrackingSettings({
-          allowTimeTracking: data.data.allowTimeTracking ?? true,
-          allowManualTimeSubmission: data.data.allowManualTimeSubmission ?? true,
-          requireApproval: data.data.requireApproval ?? false,
-          allowBillableTime: data.data.allowBillableTime ?? true,
-        })
+      // Handle both response structures: {settings: ...} or {success: true, data: ...}
+      const settingsData = data.settings || (data.success && data.data)
+
+      if (settingsData) {
+        const settings = {
+          allowTimeTracking: settingsData.allowTimeTracking ?? true,
+          allowManualTimeSubmission: settingsData.allowManualTimeSubmission ?? true,
+          requireApproval: settingsData.requireApproval ?? false,
+          allowBillableTime: settingsData.allowBillableTime ?? true,
+        }
+        setGlobalTimeTrackingSettings(settings)
+      } else {
+        console.warn('[VIEW PROJECT] No settings found in response:', data)
       }
     } catch (error) {
-      console.error('Error fetching global time tracking settings:', error)
+      console.error('[VIEW PROJECT] Error fetching global time tracking settings:', error)
     }
   }
 
@@ -1821,7 +1826,7 @@ export default function ProjectDetailPage() {
                         <Label htmlFor="require-approval">Require Approval</Label>
                         <p className="text-sm text-muted-foreground">
                           Require approval for time entries and expenses
-                          {globalTimeTrackingSettings && !globalTimeTrackingSettings.requireApproval && (
+                          {globalTimeTrackingSettings?.requireApproval === false && (
                             <span className="block text-xs text-amber-600 dark:text-amber-400 mt-1">
                               ⚠️ Disabled globally in Application Settings
                             </span>
@@ -1830,14 +1835,17 @@ export default function ProjectDetailPage() {
                       </div>
                       <Switch
                         id="require-approval"
-                        checked={settingsForm.requireApproval && (globalTimeTrackingSettings?.requireApproval ?? true)}
-                        disabled={!globalTimeTrackingSettings?.requireApproval}
-                        onCheckedChange={(checked) =>
+                        checked={(() => {
+                          const isChecked = globalTimeTrackingSettings?.requireApproval === false ? false : settingsForm.requireApproval
+                          return isChecked
+                        })()}
+                        disabled={globalTimeTrackingSettings?.requireApproval === false}
+                        onCheckedChange={(checked) => {      
                           setSettingsForm((prev) => ({
                             ...prev,
                             requireApproval: checked,
                           }))
-                        }
+                        }}
                       />
                     </div>
 
