@@ -1,3 +1,10 @@
+## [1.22.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.2...v1.22.3) (2026-01-08)
+
+
+### Bug Fixes
+
+* fix pagination in role and permissions ([5d30fe0](https://github.com/EchonLabs/kanvaro.com/commit/5d30fe0480b6232fd6808983c226e30f5515b3db))
+
 ## [1.22.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.1...v1.22.2) (2026-01-08)
 
 
