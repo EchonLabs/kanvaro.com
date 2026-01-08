@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { CreateRoleModal } from '@/components/roles/CreateRoleModal'
@@ -46,6 +47,14 @@ export default function RolesPage() {
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const hasInitializedRef = useRef(false)
+
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0
+  })
 
   const checkAuth = useCallback(async () => {
     try {
@@ -171,6 +180,24 @@ export default function RolesPage() {
     }
   }
 
+  // Update pagination when roles change
+  useEffect(() => {
+    const total = roles.length
+    const totalPages = Math.ceil(total / pagination.limit)
+    setPagination(prev => ({
+      ...prev,
+      total,
+      totalPages,
+      page: Math.min(prev.page, totalPages || 1)
+    }))
+  }, [roles.length, pagination.limit])
+
+  // Get paginated roles
+  const paginatedRoles = roles.slice(
+    (pagination.page - 1) * pagination.limit,
+    pagination.page * pagination.limit
+  )
+
   if (loading) {
     return (
       <MainLayout>
@@ -213,7 +240,7 @@ export default function RolesPage() {
 
 
         <div className="grid gap-6">
-          {roles.map((role) => (
+          {paginatedRoles.map((role) => (
             <Card key={role._id}>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -287,6 +314,66 @@ export default function RolesPage() {
             </Card>
           ))}
         </div>
+
+        {/* Pagination Controls */}
+        {pagination.total > 0 && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Items per page:</span>
+                    <Select
+                      value={pagination.limit.toString()}
+                      onValueChange={(value) => {
+                        const newLimit = parseInt(value)
+                        setPagination(prev => ({
+                          ...prev,
+                          limit: newLimit,
+                          page: 1
+                        }))
+                      }}
+                    >
+                      <SelectTrigger className="w-16 h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                    disabled={pagination.page === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {pagination.page} of {pagination.totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                    disabled={pagination.page === pagination.totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {roles.length === 0 && !loading && (
           <Card>
