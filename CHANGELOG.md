@@ -1,3 +1,10 @@
+## [1.22.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.4...v1.22.5) (2026-01-08)
+
+
+### Bug Fixes
+
+* fix wdgets ([6041ffc](https://github.com/EchonLabs/kanvaro.com/commit/6041ffce0dd595e75ecac46106485239f8476158))
+
 ## [1.22.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.3...v1.22.4) (2026-01-08)
 
 
