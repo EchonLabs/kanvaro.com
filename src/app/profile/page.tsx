@@ -89,6 +89,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -383,11 +385,15 @@ export default function ProfilePage() {
     const result = await changePassword(passwordData)
     if (result.success) {
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      // Reset password visibility states
+      setShowPassword(false)
+      setShowNewPassword(false)
+      setShowConfirmPassword(false)
       showToast({
         type: 'success',
         title: 'Password Changed',
-        message: 'Your password has been updated successfully',
-        duration: 4000
+        message: 'Your password has been updated successfully. Please use your new password for future logins.',
+        duration: 5000
       })
       setAuthError('')
     }
@@ -488,7 +494,7 @@ export default function ProfilePage() {
 
   return (
     <MainLayout>
-      <div className="space-y-8">
+      <div className="space-y-10">
         {/* Profile Header */}
         <div className="border-b border-border pb-6">
           <div className="flex items-center space-x-4">
@@ -551,9 +557,9 @@ export default function ProfilePage() {
                     Update your personal details and contact information
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-8">
                   {/* Avatar Section */}
-                  <div className="flex items-center space-x-6">
+                  <div className="flex flex-col md:flex-row items-center md:items-start gap-6 p-6 rounded-lg border bg-muted/30">
                     <GravatarAvatar 
                       user={{
                         avatar: profile?.avatar,
@@ -562,9 +568,13 @@ export default function ProfilePage() {
                         email: profile?.email
                       }}
                       size={120}
-                      className="h-32 w-32"
+                      className="h-32 w-32 ring-4 ring-background shadow-lg"
                     />
-                    <div className="space-y-2">
+                    <div className="flex-1 space-y-3 text-center md:text-left">
+                      <div>
+                        <h3 className="text-lg font-semibold">{profile?.firstName} {profile?.lastName}</h3>
+                        <p className="text-sm text-muted-foreground">{profile?.email}</p>
+                      </div>
                       <input
                         type="file"
                         id="avatar-upload"
@@ -572,24 +582,26 @@ export default function ProfilePage() {
                         onChange={handleAvatarUpload}
                         className="hidden"
                       />
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => document.getElementById('avatar-upload')?.click()}
-                        disabled={profileLoading}
-                      >
-                        {profileLoading ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Uploading...
-                          </>
-                        ) : (
-                          'Change Avatar'
-                        )}
-                      </Button>
-                      <p className="text-sm text-muted-foreground">
-                        JPG, PNG, GIF or WebP. Max size 2MB.
-                      </p>
+                      <div className="space-y-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => document.getElementById('avatar-upload')?.click()}
+                          disabled={profileLoading}
+                        >
+                          {profileLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            'Change Avatar'
+                          )}
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          JPG, PNG, GIF or WebP. Max size 2MB.
+                        </p>
+                      </div>
                     </div>
                   </div>
 
@@ -693,53 +705,53 @@ export default function ProfilePage() {
                     Customize how the application looks and behaves
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label htmlFor="theme">Theme</Label>
+                      <Label htmlFor="theme" className="text-sm font-medium">Theme</Label>
                       <Select value={formData.theme} onValueChange={(value: 'light' | 'dark' | 'system') => setFormData(prev => ({ ...prev, theme: value }))}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="light">Light</SelectItem>
-                          <SelectItem value="dark">Dark</SelectItem>
-                          <SelectItem value="system">System</SelectItem>
+                          <SelectItem value="light">☀️ Light</SelectItem>
+                          <SelectItem value="dark">🌙 Dark</SelectItem>
+                          <SelectItem value="system">💻 System</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="dateFormat">Date Format</Label>
+                      <Label htmlFor="dateFormat" className="text-sm font-medium">Date Format</Label>
                       <Select value={formData.dateFormat} onValueChange={(value) => setFormData(prev => ({ ...prev, dateFormat: value }))}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
-                          <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
-                          <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
+                          <SelectItem value="MM/DD/YYYY">MM/DD/YYYY (US)</SelectItem>
+                          <SelectItem value="DD/MM/YYYY">DD/MM/YYYY (EU)</SelectItem>
+                          <SelectItem value="YYYY-MM-DD">YYYY-MM-DD (ISO)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="timeFormat">Time Format</Label>
+                      <Label htmlFor="timeFormat" className="text-sm font-medium">Time Format</Label>
                       <Select value={formData.timeFormat} onValueChange={(value: '12h' | '24h') => setFormData(prev => ({ ...prev, timeFormat: value }))}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="12h">12-hour (AM/PM)</SelectItem>
-                          <SelectItem value="24h">24-hour</SelectItem>
+                          <SelectItem value="12h">🕐 12-hour (AM/PM)</SelectItem>
+                          <SelectItem value="24h">🕐 24-hour</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="sidebarCollapsed">Collapsed Sidebar</Label>
+                  <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                    <div className="space-y-1">
+                      <Label htmlFor="sidebarCollapsed" className="text-sm font-medium">Collapsed Sidebar</Label>
                       <p className="text-sm text-muted-foreground">
                         Start with the sidebar collapsed by default
                       </p>
@@ -773,121 +785,130 @@ export default function ProfilePage() {
                     Choose how you want to be notified about updates and activities
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="flex items-center gap-2">
-                          <Mail className="h-4 w-4" />
-                          Email Notifications
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive notifications via email
-                        </p>
+                <CardContent className="space-y-8">
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-sm font-semibold mb-4 text-foreground">Notification Channels</h3>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                          <div className="space-y-1">
+                            <Label className="flex items-center gap-2 text-sm font-medium">
+                              <Mail className="h-4 w-4" />
+                              Email Notifications
+                            </Label>
+                            <p className="text-sm text-muted-foreground">
+                              Receive notifications via email
+                            </p>
+                          </div>
+                          <Switch
+                            checked={formData.notifications.email}
+                            onCheckedChange={(checked) => setFormData(prev => ({ 
+                              ...prev, 
+                              notifications: { ...prev.notifications, email: checked }
+                            }))}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                          <div className="space-y-1">
+                            <Label className="flex items-center gap-2 text-sm font-medium">
+                              <Monitor className="h-4 w-4" />
+                              In-App Notifications
+                            </Label>
+                            <p className="text-sm text-muted-foreground">
+                              Show notifications within the application
+                            </p>
+                          </div>
+                          <Switch
+                            checked={formData.notifications.inApp}
+                            onCheckedChange={(checked) => setFormData(prev => ({ 
+                              ...prev, 
+                              notifications: { ...prev.notifications, inApp: checked }
+                            }))}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                          <div className="space-y-1">
+                            <Label className="flex items-center gap-2 text-sm font-medium">
+                              <Smartphone className="h-4 w-4" />
+                              Push Notifications
+                            </Label>
+                            <p className="text-sm text-muted-foreground">
+                              Receive push notifications in your browser
+                            </p>
+                          </div>
+                          <Switch
+                            checked={formData.notifications.push}
+                            onCheckedChange={(checked) => setFormData(prev => ({ 
+                              ...prev, 
+                              notifications: { ...prev.notifications, push: checked }
+                            }))}
+                          />
+                        </div>
                       </div>
-                      <Switch
-                        checked={formData.notifications.email}
-                        onCheckedChange={(checked) => setFormData(prev => ({ 
-                          ...prev, 
-                          notifications: { ...prev.notifications, email: checked }
-                        }))}
-                      />
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="flex items-center gap-2">
-                          <Monitor className="h-4 w-4" />
-                          In-App Notifications
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Show notifications within the application
-                        </p>
-                      </div>
-                      <Switch
-                        checked={formData.notifications.inApp}
-                        onCheckedChange={(checked) => setFormData(prev => ({ 
-                          ...prev, 
-                          notifications: { ...prev.notifications, inApp: checked }
-                        }))}
-                      />
-                    </div>
+                    <div className="border-t pt-6">
+                      <h3 className="text-sm font-semibold mb-4 text-foreground">Activity Preferences</h3>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                          <div className="space-y-1">
+                            <Label className="flex items-center gap-2 text-sm font-medium">
+                              <Clock className="h-4 w-4" />
+                              Task Reminders
+                            </Label>
+                            <p className="text-sm text-muted-foreground">
+                              Get reminded about upcoming task deadlines
+                            </p>
+                          </div>
+                          <Switch
+                            checked={formData.notifications.taskReminders}
+                            onCheckedChange={(checked) => setFormData(prev => ({ 
+                              ...prev, 
+                              notifications: { ...prev.notifications, taskReminders: checked }
+                            }))}
+                          />
+                        </div>
 
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="flex items-center gap-2">
-                          <Smartphone className="h-4 w-4" />
-                          Push Notifications
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive push notifications in your browser
-                        </p>
-                      </div>
-                      <Switch
-                        checked={formData.notifications.push}
-                        onCheckedChange={(checked) => setFormData(prev => ({ 
-                          ...prev, 
-                          notifications: { ...prev.notifications, push: checked }
-                        }))}
-                      />
-                    </div>
+                        <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                          <div className="space-y-1">
+                            <Label className="flex items-center gap-2 text-sm font-medium">
+                              <Globe className="h-4 w-4" />
+                              Project Updates
+                            </Label>
+                            <p className="text-sm text-muted-foreground">
+                              Get notified about project status changes
+                            </p>
+                          </div>
+                          <Switch
+                            checked={formData.notifications.projectUpdates}
+                            onCheckedChange={(checked) => setFormData(prev => ({ 
+                              ...prev, 
+                              notifications: { ...prev.notifications, projectUpdates: checked }
+                            }))}
+                          />
+                        </div>
 
-
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          Task Reminders
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Get reminded about upcoming task deadlines
-                        </p>
+                        <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                          <div className="space-y-1">
+                            <Label className="flex items-center gap-2 text-sm font-medium">
+                              <User className="h-4 w-4" />
+                              Team Activity
+                            </Label>
+                            <p className="text-sm text-muted-foreground">
+                              Get notified about team member activities
+                            </p>
+                          </div>
+                          <Switch
+                            checked={formData.notifications.teamActivity}
+                            onCheckedChange={(checked) => setFormData(prev => ({ 
+                              ...prev, 
+                              notifications: { ...prev.notifications, teamActivity: checked }
+                            }))}
+                          />
+                        </div>
                       </div>
-                      <Switch
-                        checked={formData.notifications.taskReminders}
-                        onCheckedChange={(checked) => setFormData(prev => ({ 
-                          ...prev, 
-                          notifications: { ...prev.notifications, taskReminders: checked }
-                        }))}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="flex items-center gap-2">
-                          <Globe className="h-4 w-4" />
-                          Project Updates
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Get notified about project status changes
-                        </p>
-                      </div>
-                      <Switch
-                        checked={formData.notifications.projectUpdates}
-                        onCheckedChange={(checked) => setFormData(prev => ({ 
-                          ...prev, 
-                          notifications: { ...prev.notifications, projectUpdates: checked }
-                        }))}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="flex items-center gap-2">
-                          <User className="h-4 w-4" />
-                          Team Activity
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Get notified about team member activities
-                        </p>
-                      </div>
-                      <Switch
-                        checked={formData.notifications.teamActivity}
-                        onCheckedChange={(checked) => setFormData(prev => ({ 
-                          ...prev, 
-                          notifications: { ...prev.notifications, teamActivity: checked }
-                        }))}
-                      />
                     </div>
                   </div>
                 </CardContent>
@@ -908,18 +929,18 @@ export default function ProfilePage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Password Change Section */}
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Key className="h-4 w-4" />
+                      <Label className="flex items-center gap-2 text-base font-semibold">
+                        <Key className="h-5 w-5" />
                         Change Password
                       </Label>
                       <p className="text-sm text-muted-foreground">
-                        Update your password to keep your account secure
+                        Update your password to keep your account secure. Use a strong password with at least 8 characters.
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="currentPassword">Current Password</Label>
                         <div className="relative">
@@ -929,6 +950,7 @@ export default function ProfilePage() {
                             value={passwordData.currentPassword}
                             onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
                             placeholder="Enter current password"
+                            className="pr-10"
                           />
                           <Button
                             type="button"
@@ -942,71 +964,109 @@ export default function ProfilePage() {
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="newPassword">New Password</Label>
-                        <Input
-                          id="newPassword"
-                          type={showPassword ? "text" : "password"}
-                          value={passwordData.newPassword}
-                          onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                          placeholder="Enter new password"
-                        />
-                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="newPassword">New Password</Label>
+                          <div className="relative">
+                            <Input
+                              id="newPassword"
+                              type={showNewPassword ? "text" : "password"}
+                              value={passwordData.newPassword}
+                              onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                              placeholder="Enter new password"
+                              className="pr-10"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowNewPassword(!showNewPassword)}
+                            >
+                              {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                        <Input
-                          id="confirmPassword"
-                          type={showPassword ? "text" : "password"}
-                          value={passwordData.confirmPassword}
-                          onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                          placeholder="Confirm new password"
-                        />
+                        <div className="space-y-2">
+                          <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                          <div className="relative">
+                            <Input
+                              id="confirmPassword"
+                              type={showConfirmPassword ? "text" : "password"}
+                              value={passwordData.confirmPassword}
+                              onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                              placeholder="Confirm new password"
+                              className="pr-10"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            >
+                              {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    <Button onClick={handlePasswordChange} disabled={profileLoading} variant="outline">
-                      {profileLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Changing...
-                        </>
-                      ) : (
-                        <>
-                          <Key className="mr-2 h-4 w-4" />
-                          Change Password
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex justify-end pt-2">
+                      <Button onClick={handlePasswordChange} disabled={profileLoading} variant="default">
+                        {profileLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Changing Password...
+                          </>
+                        ) : (
+                          <>
+                            <Key className="mr-2 h-4 w-4" />
+                            Change Password
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
 
-                  <div className="border-t pt-6">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label>Two-Factor Authentication</Label>
+                  <div className="border-t pt-8">
+                    <div className="space-y-6">
+                      <div>
+                        <Label className="flex items-center gap-2 text-base font-semibold mb-3">
+                          <Shield className="h-5 w-5" />
+                          Two-Factor Authentication
+                        </Label>
+                        <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30 my-4">
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Enable 2FA Protection</p>
+                            <p className="text-sm text-muted-foreground">
+                              Add an extra layer of security to your account with two-factor authentication
+                            </p>
+                          </div>
+                          <Switch
+                            checked={twoFactorEnabled}
+                            onCheckedChange={setTwoFactorEnabled}
+                            aria-label="Toggle two-factor authentication"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="flex items-center gap-2 text-base font-semibold mb-3">
+                          <Monitor className="h-5 w-5" />
+                          Active Sessions
+                        </Label>
+                        <div className="p-4 rounded-lg border bg-muted/30 my-4">
                           <p className="text-sm text-muted-foreground">
-                            Add an extra layer of security to your account
+                            Monitor and manage devices that are currently signed in to your account. Review your active sessions to ensure account security.
                           </p>
                         </div>
-                        <Switch
-                          checked={twoFactorEnabled}
-                          onCheckedChange={setTwoFactorEnabled}
-                          aria-label="Toggle two-factor authentication"
-                        />
                       </div>
 
-                      <div className="space-y-0.5">
-                        <Label>Active Sessions</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Manage your active login sessions
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2 pt-4">
+                      <div className="flex flex-wrap justify-end gap-3 pt-2">
                         <Button
                           variant="outline"
-                          size="sm"
                           onClick={() => setIsTwoFactorModalOpen(true)}
                           title="Review and configure two-factor authentication"
                           disabled={!twoFactorDirty}
@@ -1015,7 +1075,6 @@ export default function ProfilePage() {
                         </Button>
                         <Button
                           variant="outline"
-                          size="sm"
                           onClick={() => setIsSessionsModalOpen(true)}
                           title="View the devices that are signed in"
                           disabled={!twoFactorDirty}
@@ -1023,11 +1082,17 @@ export default function ProfilePage() {
                           View Sessions
                         </Button>
                         <Button
-                          size="sm"
                           onClick={handleTwoFactorSave}
                           disabled={!twoFactorDirty || isSavingTwoFactor}
                         >
-                          {isSavingTwoFactor ? 'Saving...' : 'Save 2FA Settings'}
+                          {isSavingTwoFactor ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            'Save 2FA Settings'
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -1037,22 +1102,6 @@ export default function ProfilePage() {
             </TabsContent>
           </Tabs>
 
-          {/* Save Button */}
-          <div className="flex justify-end pt-6 mt-8 border-t border-muted">
-            <Button onClick={handleSave} disabled={profileLoading || !hasChanges()} size="lg">
-              {profileLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-          </div>
         </div>
       </div>
 

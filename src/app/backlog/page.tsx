@@ -164,10 +164,17 @@ export default function BacklogPage() {
   const [projectOptions, setProjectOptions] = useState<ProjectSummary[]>([])
   const [assignedToOptions, setAssignedToOptions] = useState<UserSummary[]>([])
   const [assignedByOptions, setAssignedByOptions] = useState<UserSummary[]>([])
+  const [createdByOptions, setCreatedByOptions] = useState<UserSummary[]>([])
   const [epicMap, setEpicMap] = useState<Map<string, { _id: string; title: string }>>(new Map())
   const [projectFilterValue, setProjectFilterValue] = useState('all')
   const [assignedToFilter, setAssignedToFilter] = useState('all')
   const [assignedByFilter, setAssignedByFilter] = useState('all')
+  const [createdByFilter, setCreatedByFilter] = useState('all')
+  const [createdByFilterQuery, setCreatedByFilterQuery] = useState('')
+  const [createdDateRange, setCreatedDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined
+  })
   const [dateRangeFilter, setDateRangeFilter] = useState<DateRange | undefined>()
   const [projectFilterQuery, setProjectFilterQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -202,7 +209,10 @@ export default function BacklogPage() {
                           projectFilterValue !== 'all' ||
                           assignedToFilter !== 'all' ||
                           assignedByFilter !== 'all' ||
-                          dateRangeFilter !== undefined
+                          createdByFilter !== 'all' ||
+                          dateRangeFilter !== undefined ||
+                          createdDateRange.from !== undefined ||
+                          createdDateRange.to !== undefined
 
   // Reset all filters
   const resetFilters = () => {
@@ -213,10 +223,13 @@ export default function BacklogPage() {
     setProjectFilterValue('all')
     setAssignedToFilter('all')
     setAssignedByFilter('all')
+    setCreatedByFilter('all')
     setDateRangeFilter(undefined)
+    setCreatedDateRange({ from: undefined, to: undefined })
     setProjectFilterQuery('')
     setAssignedToFilterQuery('')
     setAssignedByFilterQuery('')
+    setCreatedByFilterQuery('')
   }
 
   // Reset status filter if current value is not valid for the new context
@@ -298,7 +311,7 @@ export default function BacklogPage() {
         setCurrentPage(1)
       }
     }
-  }, [searchQuery, typeFilter, priorityFilter, statusFilter, projectFilterValue, assignedToFilter, assignedByFilter, dateRangeFilter, sortBy, sortOrder])
+  }, [searchQuery, typeFilter, priorityFilter, statusFilter, projectFilterValue, assignedToFilter, assignedByFilter, createdByFilter, dateRangeFilter, createdDateRange, sortBy, sortOrder])
 
   // Fetch when pagination changes
   useEffect(() => {
@@ -328,9 +341,12 @@ export default function BacklogPage() {
       if (statusFilter !== 'all') params.set('status', statusFilter)
       if (projectFilterValue !== 'all') params.set('project', projectFilterValue)
       if (assignedToFilter !== 'all') params.set('assignedTo', assignedToFilter)
-      if (assignedByFilter !== 'all') params.set('createdBy', assignedByFilter)
-      if (dateRangeFilter?.from) params.set('createdAtFrom', dateRangeFilter.from.toISOString())
-      if (dateRangeFilter?.to) params.set('createdAtTo', dateRangeFilter.to.toISOString())
+      if (assignedByFilter !== 'all') params.set('assignedBy', assignedByFilter)
+      if (createdByFilter !== 'all') params.set('createdBy', createdByFilter)
+      if (dateRangeFilter?.from) params.set('dueDateFrom', dateRangeFilter.from.toISOString())
+      if (dateRangeFilter?.to) params.set('dueDateTo', dateRangeFilter.to.toISOString())
+      if (createdDateRange.from) params.set('createdAtFrom', createdDateRange.from.toISOString())
+      if (createdDateRange.to) params.set('createdAtTo', createdDateRange.to.toISOString())
       params.set('sortBy', sortBy)
       params.set('sortOrder', sortOrder)
       
@@ -417,6 +433,9 @@ export default function BacklogPage() {
         setAssignedByOptions(Array.from(createdByMap.values()).sort((a, b) =>
           `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
         ))
+        setCreatedByOptions(Array.from(createdByMap.values()).sort((a, b) =>
+          `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
+        ))
         setEpicMap(epicMap)
       } else {
         notifyError({ title: 'Error', message: data.error || 'Failed to fetch backlog items' })
@@ -488,6 +507,13 @@ export default function BacklogPage() {
 
   const clearDateFilters = () => {
     setDateRangeFilter(undefined)
+  }
+
+  const handleCreatedDateChange = (type: 'from' | 'to', date: Date | undefined) => {
+    setCreatedDateRange((prev) => ({
+      ...prev,
+      [type]: date
+    }))
   }
 
   const resetSprintModalState = () => {
@@ -831,6 +857,15 @@ export default function BacklogPage() {
       member.email.toLowerCase().includes(query)
     )
   }, [assignedByOptions, assignedByFilterQuery])
+
+  const filteredCreatedByOptions = useMemo(() => {
+    const query = createdByFilterQuery.trim().toLowerCase()
+    if (!query) return createdByOptions
+    return createdByOptions.filter((member) =>
+      `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
+      member.email.toLowerCase().includes(query)
+    )
+  }, [createdByOptions, createdByFilterQuery])
 
   const sprintModalTitle =
     sprintModalMode === 'manage'
@@ -1375,7 +1410,12 @@ export default function BacklogPage() {
                       <div className="p-2">
                         <Input
                           value={projectFilterQuery}
-                          onChange={(e) => setProjectFilterQuery(e.target.value)}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            setProjectFilterQuery(e.target.value)
+                          }}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
                           placeholder="Search projects"
                           className="mb-2"
                         />
@@ -1429,6 +1469,70 @@ export default function BacklogPage() {
                       <SelectItem value="high">High</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
+                    <SelectTrigger className="w-full sm:w-40">
+                      <SelectValue placeholder="Assignee" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div className="p-2">
+                        <Input
+                          value={assignedToFilterQuery}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            setAssignedToFilterQuery(e.target.value)
+                          }}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder="Search assignees"
+                          className="mb-2"
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          <SelectItem value="all">All Assignees</SelectItem>
+                          {filteredAssignedToOptions.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching members</div>
+                          ) : (
+                            filteredAssignedToOptions.map((member) => (
+                              <SelectItem key={member._id} value={member._id}>
+                                {member.firstName} {member.lastName}
+                              </SelectItem>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                  <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
+                    <SelectTrigger className="w-full sm:w-40">
+                      <SelectValue placeholder="Creator" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div className="p-2">
+                        <Input
+                          value={createdByFilterQuery}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            setCreatedByFilterQuery(e.target.value)
+                          }}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder="Search creators"
+                          className="mb-2"
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          <SelectItem value="all">All Creators</SelectItem>
+                          {filteredCreatedByOptions.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching members</div>
+                          ) : (
+                            filteredCreatedByOptions.map((member) => (
+                              <SelectItem key={member._id} value={member._id}>
+                                {member.firstName} {member.lastName}
+                              </SelectItem>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
                   <Select value={sortBy} onValueChange={setSortBy}>
                     <SelectTrigger className="w-full sm:w-32">
                       <SelectValue placeholder="Sort by" />
@@ -1478,6 +1582,53 @@ export default function BacklogPage() {
                       </Tooltip>
                     </TooltipProvider>
                   )}
+                </div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+                  <Label className="text-xs sm:text-sm font-medium text-muted-foreground w-full sm:w-auto">Created Date Range:</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full sm:w-[200px] justify-start text-left font-normal",
+                          !createdDateRange.from && "text-muted-foreground"
+                        )}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {createdDateRange.from ? format(createdDateRange.from, "PPP") : "From"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <DateRangeCalendar
+                        mode="single"
+                        selected={createdDateRange.from}
+                        onSelect={(date) => handleCreatedDateChange('from', date)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full sm:w-[200px] justify-start text-left font-normal",
+                          !createdDateRange.to && "text-muted-foreground"
+                        )}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {createdDateRange.to ? format(createdDateRange.to, "PPP") : "To"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <DateRangeCalendar
+                        mode="single"
+                        selected={createdDateRange.to}
+                        onSelect={(date) => handleCreatedDateChange('to', date)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
@@ -1727,6 +1878,27 @@ export default function BacklogPage() {
                                   <span className="truncate">
                                     {truncateText(item.labels.join(', '), 30)}
                                   </span>
+                                </div>
+                              )}
+                              {item.createdBy && (
+                                <div className="flex items-center space-x-1">
+                                  <span className="text-muted-foreground">Created by:</span>
+                                  <span className="font-medium">
+                                    {(() => {
+                                      const firstName = item.createdBy?.firstName;
+                                      const lastName = item.createdBy?.lastName;
+                                      if (firstName && lastName) {
+                                        return `${firstName} ${lastName}`;
+                                      }
+                                      return 'Unknown User';
+                                    })()}
+                                  </span>
+                                </div>
+                              )}
+                              {item.createdAt && (
+                                <div className="flex items-center space-x-1">
+                                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  <span>Created {formatDate(item.createdAt)}</span>
                                 </div>
                               )}
                             </div>

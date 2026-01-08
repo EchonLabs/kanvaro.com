@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
     }
 
     const { user } = authResult
-    const organizationId = user.organization
+    const organizationId = user.organization.toString()
+    console.log('userfsdfsdf',user.organization.toString())
 
     // Get query params for optional projectId
     const { searchParams } = new URL(request.url)
@@ -134,8 +135,8 @@ export async function PUT(request: NextRequest) {
     }
 
     const { user } = authResult
-    const organizationId = user.organization
-
+    const organizationId = user.organization.toString()
+console.log('userfsdfsdf',user.organization)
     // Check permissions
     const canUpdate = await PermissionService.hasPermission(user.id, Permission.ORGANIZATION_UPDATE)
     if (!canUpdate) {
@@ -193,34 +194,44 @@ export async function PUT(request: NextRequest) {
     )
 
     // Sync back to Organization document for backwards compatibility
-    const organization = await Organization.findById(organizationId)
-    if (organization) {
-      if (!organization.settings) {
-        organization.settings = {}
-      }
-      if (!organization.settings.timeTracking) {
-        organization.settings.timeTracking = {}
-      }
+    try {
+      const organization = await Organization.findById(organizationId)
+      if (organization) {
+        // Use markModified to ensure nested objects are saved properly
+        if (!organization.settings) {
+          organization.settings = {}
+        }
+        if (!organization.settings.timeTracking) {
+          organization.settings.timeTracking = {}
+        }
 
-      // Update organization settings with the new values
-      if (settings.allowTimeTracking !== undefined) organization.settings.timeTracking.allowTimeTracking = settings.allowTimeTracking
-      if (settings.allowManualTimeSubmission !== undefined) organization.settings.timeTracking.allowManualTimeSubmission = settings.allowManualTimeSubmission
-      if (settings.requireApproval !== undefined) organization.settings.timeTracking.requireApproval = settings.requireApproval
-      if (settings.allowBillableTime !== undefined) organization.settings.timeTracking.allowBillableTime = settings.allowBillableTime
-      if (settings.defaultHourlyRate !== undefined) organization.settings.timeTracking.defaultHourlyRate = settings.defaultHourlyRate
-      if (settings.maxDailyHours !== undefined) organization.settings.timeTracking.maxDailyHours = settings.maxDailyHours
-      if (settings.maxWeeklyHours !== undefined) organization.settings.timeTracking.maxWeeklyHours = settings.maxWeeklyHours
-      if (settings.maxSessionHours !== undefined) organization.settings.timeTracking.maxSessionHours = settings.maxSessionHours
-      if (settings.allowOvertime !== undefined) organization.settings.timeTracking.allowOvertime = settings.allowOvertime
-      if (settings.requireDescription !== undefined) organization.settings.timeTracking.requireDescription = settings.requireDescription
-      if (settings.requireCategory !== undefined) organization.settings.timeTracking.requireCategory = settings.requireCategory
-      if (settings.allowFutureTime !== undefined) organization.settings.timeTracking.allowFutureTime = settings.allowFutureTime
-      if (settings.allowPastTime !== undefined) organization.settings.timeTracking.allowPastTime = settings.allowPastTime
-      if (settings.pastTimeLimitDays !== undefined) organization.settings.timeTracking.pastTimeLimitDays = settings.pastTimeLimitDays
-      if (settings.roundingRules !== undefined) organization.settings.timeTracking.roundingRules = settings.roundingRules
-      if (settings.notifications !== undefined) organization.settings.timeTracking.notifications = settings.notifications
+        // Update organization settings with the new values
+        if (settings.allowTimeTracking !== undefined) organization.settings.timeTracking.allowTimeTracking = settings.allowTimeTracking
+        if (settings.allowManualTimeSubmission !== undefined) organization.settings.timeTracking.allowManualTimeSubmission = settings.allowManualTimeSubmission
+        if (settings.requireApproval !== undefined) organization.settings.timeTracking.requireApproval = settings.requireApproval
+        if (settings.allowBillableTime !== undefined) organization.settings.timeTracking.allowBillableTime = settings.allowBillableTime
+        if (settings.defaultHourlyRate !== undefined) organization.settings.timeTracking.defaultHourlyRate = settings.defaultHourlyRate
+        if (settings.maxDailyHours !== undefined) organization.settings.timeTracking.maxDailyHours = settings.maxDailyHours
+        if (settings.maxWeeklyHours !== undefined) organization.settings.timeTracking.maxWeeklyHours = settings.maxWeeklyHours
+        if (settings.maxSessionHours !== undefined) organization.settings.timeTracking.maxSessionHours = settings.maxSessionHours
+        if (settings.allowOvertime !== undefined) organization.settings.timeTracking.allowOvertime = settings.allowOvertime
+        if (settings.requireDescription !== undefined) organization.settings.timeTracking.requireDescription = settings.requireDescription
+        if (settings.requireCategory !== undefined) organization.settings.timeTracking.requireCategory = settings.requireCategory
+        if (settings.allowFutureTime !== undefined) organization.settings.timeTracking.allowFutureTime = settings.allowFutureTime
+        if (settings.allowPastTime !== undefined) organization.settings.timeTracking.allowPastTime = settings.allowPastTime
+        if (settings.pastTimeLimitDays !== undefined) organization.settings.timeTracking.pastTimeLimitDays = settings.pastTimeLimitDays
+        if (settings.roundingRules !== undefined) organization.settings.timeTracking.roundingRules = settings.roundingRules
+        if (settings.notifications !== undefined) organization.settings.timeTracking.notifications = settings.notifications
 
-      await organization.save()
+        // Mark the nested field as modified to ensure Mongoose saves it
+        organization.markModified('settings.timeTracking')
+        organization.markModified('settings')
+        
+        await organization.save()
+      }
+    } catch (orgError) {
+      console.error('Error syncing to organization:', orgError)
+      // Don't fail the request if org sync fails - the main TimeTrackingSettings was saved
     }
 
     console.log('TimeTrackingSettings updated successfully:', {
@@ -254,8 +265,16 @@ export async function PUT(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error updating time tracking settings:', error)
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined
+    })
     return NextResponse.json(
-      { error: 'Failed to update time tracking settings' },
+      { 
+        error: 'Failed to update time tracking settings',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     )
   }

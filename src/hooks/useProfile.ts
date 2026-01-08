@@ -107,12 +107,22 @@ export function useProfile() {
       return { success: false, error: 'New passwords do not match' }
     }
 
+    if (!data.currentPassword) {
+      setError('Current password is required')
+      return { success: false, error: 'Current password is required' }
+    }
+
+    if (data.newPassword.length < 8) {
+      setError('New password must be at least 8 characters long')
+      return { success: false, error: 'New password must be at least 8 characters long' }
+    }
+
     try {
       setLoading(true)
       setError('')
       setSuccess('')
 
-      const response = await fetch('/api/auth/reset-password', {
+      const response = await fetch('/api/auth/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

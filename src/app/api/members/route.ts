@@ -182,6 +182,7 @@ export async function PUT(request: NextRequest) {
         firstName: member.firstName,
         lastName: member.lastName,
         email: member.email,
+        memberId: member.memberId,
         role: member.role,
         isActive: member.isActive
       }

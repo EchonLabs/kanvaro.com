@@ -117,8 +117,8 @@ export function Timer({
       const runningMinutes = Math.max(0, baseMinutesRef.current + elapsed)
       setDisplayTime(formatTime(runningMinutes))
 
-      // Auto-stop when reaching max session (only when overtime is allowed)
-      if (allowOvertime && runningMinutes >= activeTimer.maxSessionHours * 60) {
+      // Auto-stop when reaching max session hours (when overtime is NOT allowed)
+      if (!allowOvertime && activeTimer.maxSessionHours && runningMinutes >= activeTimer.maxSessionHours * 60) {
         console.log('Timer: Auto-stopping - reached max session hours')
         const maxHours = activeTimer.maxSessionHours
         onAutoStop?.(`Timer stopped automatically. Maximum session limit of ${maxHours} ${maxHours === 1 ? 'hour' : 'hours'} reached.`)
