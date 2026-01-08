@@ -1,6 +1,6 @@
 {
   "name": "kanvaro",
-  "version": "1.22.1",
+  "version": "1.22.2",
   "description": "Kanvaro - Self-hosted project management solution",
   "private": true,
   "scripts": {
