@@ -173,10 +173,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       notificationSettings
     } = body
 
-    // Ensure facilitator is included in attendees when updating
-    const attendeesWithFacilitator = Array.isArray(attendees) ? Array.from(new Set([...attendees, authResult.user.id])) : [authResult.user.id]
-
-
     const sprintEvent = await SprintEvent.findById(params.id)
     if (!sprintEvent) {
       return NextResponse.json({ error: 'Sprint event not found' }, { status: 404 })
@@ -187,6 +183,20 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (!hasAccess) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
+
+    // Ensure facilitator is included in attendees when updating
+    // Filter out any invalid IDs and ensure we have valid ObjectIds
+    let attendeesWithFacilitator = [authResult.user.id]
+    if (Array.isArray(attendees) && attendees.length > 0) {
+      const validAttendees = attendees.filter(id => id && typeof id === 'string' && id.length > 0)
+      attendeesWithFacilitator = Array.from(new Set([...validAttendees, authResult.user.id]))
+    }
+
+    console.log('Update - Processing attendees:', {
+      received: attendees,
+      facilitator: authResult.user.id,
+      final: attendeesWithFacilitator
+    })
 
     // Update sprint event
     if (title !== undefined) sprintEvent.title = title
@@ -267,8 +277,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         }))
       } else if (key === 'attendees' && body[key] !== undefined) {
         // Ensure facilitator is included in attendees when updating attendees
-        const attendeesWithFacilitator = Array.isArray(body[key]) ? Array.from(new Set([...body[key], authResult.user.id])) : [authResult.user.id]
+        // Filter out any invalid IDs and ensure we have valid ObjectIds
+        const attendees = body[key]
+        let attendeesWithFacilitator = [authResult.user.id]
+        if (Array.isArray(attendees) && attendees.length > 0) {
+          const validAttendees = attendees.filter((id: any) => id && typeof id === 'string' && id.length > 0)
+          attendeesWithFacilitator = Array.from(new Set([...validAttendees, authResult.user.id]))
+        }
         sprintEvent[key] = attendeesWithFacilitator
+        console.log('PATCH - Processing attendees:', {
+          received: attendees,
+          facilitator: authResult.user.id,
+          final: attendeesWithFacilitator
+        })
       } else if (body[key] !== undefined) {
         sprintEvent[key] = body[key]
       }

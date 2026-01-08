@@ -33,6 +33,7 @@ import { AddSprintEventModal } from '@/components/sprint-events/AddSprintEventMo
 import { EditSprintEventModal } from '@/components/sprint-events/EditSprintEventModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { useNotify } from '@/lib/notify'
 
 interface SprintEvent {
@@ -143,6 +144,9 @@ export default function SprintEventsPage() {
   const [editingEvent, setEditingEvent] = useState<SprintEvent | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [eventToDelete, setEventToDelete] = useState<SprintEvent | null>(null)
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false)
   const { success: notifySuccess, error: notifyError } = useNotify()
 
   // Define fetch functions BEFORE useEffect that uses them
@@ -160,10 +164,13 @@ export default function SprintEventsPage() {
       
       if (response.ok) {
         const data = await response.json()
-        const projectsData = data.projects || []
+        // API returns { success: true, data: [...projects], pagination: {...} }
+        const projectsData = data.data || []
         setProjects(projectsData)
         // Update cache
         cacheRef.current.projects = { data: projectsData, timestamp: Date.now() }
+      } else {
+        console.error('Failed to fetch projects:', response.status)
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return
@@ -171,15 +178,15 @@ export default function SprintEventsPage() {
     }
   }, [])
 
-  const fetchSprintEvents = useCallback(async (signal?: AbortSignal) => {
+  const fetchSprintEvents = useCallback(async (signal?: AbortSignal, forceRefresh = false) => {
     try {
       setLoading(true)
       const url = projectId ? `/api/sprint-events?projectId=${projectId}` : '/api/sprint-events'
       
-      // Check cache first
+      // Check cache first (unless force refresh is requested)
       const cacheKey = projectId || 'all'
       const cached = cacheRef.current.events
-      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_DURATION) {
         setEvents(cached.data)
         setLoading(false)
         return
@@ -256,29 +263,55 @@ export default function SprintEventsPage() {
   }, [searchParams, router])
 
   const handleEventAdded = () => {
-    fetchSprintEvents()
+    // Invalidate cache and force refresh
+    cacheRef.current.events = undefined
+    fetchSprintEvents(undefined, true)
     setShowAddModal(false)
   }
 
   const handleEventUpdated = () => {
-    fetchSprintEvents()
+    // Invalidate cache and force refresh
+    cacheRef.current.events = undefined
+    fetchSprintEvents(undefined, true)
     setEditingEvent(null)
   }
 
-  const handleEventDeleted = async (eventId: string) => {
-    if (!confirm('Are you sure you want to delete this event?')) {
-      return
-    }
+  const handleDeleteClick = (event: SprintEvent) => {
+    setEventToDelete(event)
+    setShowDeleteConfirm(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!eventToDelete) return
+
     try {
-      const response = await fetch(`/api/sprint-events/${eventId}`, {
+      setIsDeletingEvent(true)
+      const response = await fetch(`/api/sprint-events/${eventToDelete._id}`, {
         method: 'DELETE'
       })
       if (response.ok) {
-        fetchSprintEvents()
+        // Invalidate cache and force refresh
+        cacheRef.current.events = undefined
+        await fetchSprintEvents(undefined, true)
+        notifySuccess({ title: 'Sprint event deleted successfully' })
+      } else {
+        const errorData = await response.json()
+        notifyError({ title: errorData.error || 'Failed to delete sprint event' })
       }
     } catch (error) {
       console.error('Error deleting sprint event:', error)
+      notifyError({ title: 'Failed to delete sprint event' })
+    } finally {
+      setIsDeletingEvent(false)
+      setShowDeleteConfirm(false)
+      setEventToDelete(null)
     }
+  }
+
+  const handleDeleteCancel = () => {
+    if (isDeletingEvent) return
+    setShowDeleteConfirm(false)
+    setEventToDelete(null)
   }
 
   const getEventTypeIcon = (eventType: string) => {
@@ -633,7 +666,7 @@ export default function SprintEventsPage() {
                           <DropdownMenuItem 
                             onClick={(e) => {
                               e.stopPropagation()
-                              handleEventDeleted(event._id)
+                              handleDeleteClick(event)
                             }}
                             className="text-destructive"
                           >
@@ -749,7 +782,7 @@ export default function SprintEventsPage() {
                         <DropdownMenuItem 
                           onClick={(e) => {
                             e.stopPropagation()
-                            handleEventDeleted(event._id)
+                            handleDeleteClick(event)
                           }}
                           className="text-destructive"
                         >
@@ -845,6 +878,22 @@ export default function SprintEventsPage() {
             onSuccess={handleEventUpdated}
           />
         )}
+
+        <ConfirmationModal
+          isOpen={showDeleteConfirm}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Sprint Event"
+          description={
+            eventToDelete
+              ? `Are you sure you want to delete "${eventToDelete.title}"? This action cannot be undone.`
+              : 'Are you sure you want to delete this sprint event?'
+          }
+          confirmText="Delete"
+          cancelText="Cancel"
+          variant="default"
+          isLoading={isDeletingEvent}
+        />
       </div>
     </MainLayout>
   )

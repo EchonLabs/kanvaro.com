@@ -388,8 +388,10 @@ export default function MembersPage() {
       member.email.toLowerCase().includes(searchQuery.toLowerCase())
     
     // Check both system roles and custom roles
+    // Special case: "administrator" filter should match "admin" role
     const matchesRole = roleFilter === 'all' || 
       member.role === roleFilter ||
+      (roleFilter === 'administrator' && member.role === 'admin') ||
       (member.customRole && member.customRole.name.toLowerCase().replace(/\s+/g, '_') === roleFilter)
     
     const matchesStatus = statusFilter === 'all' || 
@@ -748,31 +750,30 @@ export default function MembersPage() {
                               Joined {formatDate(member.createdAt)}
                             </p>
                           </div>
-                          <div className="flex items-center gap-2 w-full pt-2 border-t">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => canEditMemberRecord(member) && setEditingMember(member)}
-                              disabled={!canEditMemberRecord(member)}
-                              title={
-                                canEditMemberRecord(member)
-                                  ? undefined
-                                  : 'You do not have permission to edit this member'
-                              }
-                              className="flex-1 text-xs sm:text-sm min-h-[36px]"
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleRemoveMemberClick(member)}
-                              disabled={!canDeleteMembers || member.role === 'admin' || member.role === 'human_resource' || !member.isActive}
-                              className="flex-1 text-xs sm:text-sm min-h-[36px]"
-                            >
-                              Remove
-                            </Button>
-                          </div>
+                          {(canEditMemberRecord(member) || (canDeleteMembers && member.role !== 'admin' && member.role !== 'human_resource' && member.isActive)) && (
+                            <div className="flex items-center gap-2 w-full pt-2 border-t">
+                              {canEditMemberRecord(member) && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setEditingMember(member)}
+                                  className="flex-1 text-xs sm:text-sm min-h-[36px]"
+                                >
+                                  Edit
+                                </Button>
+                              )}
+                              {canDeleteMembers && member.role !== 'admin' && member.role !== 'human_resource' && member.isActive && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleRemoveMemberClick(member)}
+                                  className="flex-1 text-xs sm:text-sm min-h-[36px]"
+                                >
+                                  Remove
+                                </Button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -813,31 +814,30 @@ export default function MembersPage() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 w-full sm:w-auto flex-shrink-0 sm:ml-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => canEditMemberRecord(member) && setEditingMember(member)}
-                          disabled={!canEditMemberRecord(member)}
-                          title={
-                            canEditMemberRecord(member)
-                              ? undefined
-                              : 'You do not have permission to edit this member'
-                          }
-                          className="flex-1 sm:flex-initial text-xs sm:text-sm min-h-[44px] touch-target"
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRemoveMemberClick(member)}
-                          disabled={!canDeleteMembers || member.role === 'admin' || member.role === 'human_resource' || !member.isActive}
-                          className="flex-1 sm:flex-initial text-xs sm:text-sm min-h-[44px] touch-target"
-                        >
-                          Remove
-                        </Button>
-                      </div>
+                      {(canEditMemberRecord(member) || (canDeleteMembers && member.role !== 'admin' && member.role !== 'human_resource' && member.isActive)) && (
+                        <div className="flex items-center gap-2 w-full sm:w-auto flex-shrink-0 sm:ml-4">
+                          {canEditMemberRecord(member) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setEditingMember(member)}
+                              className="flex-1 sm:flex-initial text-xs sm:text-sm min-h-[44px] touch-target"
+                            >
+                              Edit
+                            </Button>
+                          )}
+                          {canDeleteMembers && member.role !== 'admin' && member.role !== 'human_resource' && member.isActive && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRemoveMemberClick(member)}
+                              className="flex-1 sm:flex-initial text-xs sm:text-sm min-h-[44px] touch-target"
+                            >
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -963,15 +963,17 @@ export default function MembersPage() {
                               <Clock className="h-3.5 w-3.5 text-yellow-500" />
                               <span>Pending</span>
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleCancelInvitationClick(invitation)}
-                              className="text-destructive hover:text-destructive flex-1 text-xs sm:text-sm min-h-[36px]"
-                            >
-                              <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
-                              Cancel
-                            </Button>
+                            {canInviteMembers && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleCancelInvitationClick(invitation)}
+                                className="text-destructive hover:text-destructive flex-1 text-xs sm:text-sm min-h-[36px]"
+                              >
+                                <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
+                                Cancel
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </CardContent>
@@ -1006,15 +1008,17 @@ export default function MembersPage() {
                           <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-yellow-500 flex-shrink-0" />
                           <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">Pending</span>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleCancelInvitationClick(invitation)}
-                          className="text-destructive hover:text-destructive flex-1 sm:flex-initial text-xs sm:text-sm min-h-[44px] touch-target"
-                        >
-                          <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
-                          Cancel
-                        </Button>
+                        {canInviteMembers && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCancelInvitationClick(invitation)}
+                            className="text-destructive hover:text-destructive flex-1 sm:flex-initial text-xs sm:text-sm min-h-[44px] touch-target"
+                          >
+                            <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
+                            Cancel
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
