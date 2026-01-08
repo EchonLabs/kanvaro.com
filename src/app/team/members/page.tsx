@@ -104,6 +104,21 @@ export default function MembersPage() {
   const { hasPermission, loading: permissionsLoading } = usePermissions()
   const { success: notifySuccess, error: notifyError } = useNotify()
 
+  // Pagination states
+  const [membersPagination, setMembersPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0
+  })
+
+  const [invitationsPagination, setInvitationsPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0
+  })
+
   const canViewMembers = hasPermission(Permission.TEAM_READ) || hasPermission(Permission.USER_READ)
   const canInviteMembers = hasPermission(Permission.TEAM_INVITE) || hasPermission(Permission.USER_INVITE)
   const canEditMembers = hasPermission(Permission.TEAM_EDIT) && hasPermission(Permission.USER_UPDATE)
@@ -380,6 +395,47 @@ export default function MembersPage() {
     return matchesSearch && matchesRole && matchesStatus
   })
 
+  // Update members pagination when filtered members change
+  useEffect(() => {
+    const total = filteredMembers.length
+    const totalPages = Math.ceil(total / membersPagination.limit)
+    setMembersPagination(prev => ({
+      ...prev,
+      total,
+      totalPages,
+      page: Math.min(prev.page, totalPages || 1)
+    }))
+  }, [filteredMembers.length, membersPagination.limit])
+
+  // Update invitations pagination when invitations change
+  useEffect(() => {
+    const total = pendingInvitations.length
+    const totalPages = Math.ceil(total / invitationsPagination.limit)
+    setInvitationsPagination(prev => ({
+      ...prev,
+      total,
+      totalPages,
+      page: Math.min(prev.page, totalPages || 1)
+    }))
+  }, [pendingInvitations.length, invitationsPagination.limit])
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setMembersPagination(prev => ({ ...prev, page: 1 }))
+  }, [searchQuery, roleFilter, statusFilter])
+
+  // Get paginated members
+  const paginatedMembers = filteredMembers.slice(
+    (membersPagination.page - 1) * membersPagination.limit,
+    membersPagination.page * membersPagination.limit
+  )
+
+  // Get paginated invitations
+  const paginatedInvitations = pendingInvitations.slice(
+    (invitationsPagination.page - 1) * invitationsPagination.limit,
+    invitationsPagination.page * invitationsPagination.limit
+  )
+
   const handleInlineRoleChange = async (member: Member, newRole: string) => {
     if (newRole === member.role) return
 
@@ -641,14 +697,14 @@ export default function MembersPage() {
                 )}
               </div>
 
-              {filteredMembers.length === 0 ? (
+              {paginatedMembers.length === 0 ? (
                 <div className="text-center py-8 sm:py-12 text-muted-foreground">
                   <Users className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50 flex-shrink-0" />
                   <p className="text-sm sm:text-base break-words">No members found</p>
                 </div>
               ) : viewMode === 'grid' ? (
                 <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                  {filteredMembers.map((member) => (
+                  {paginatedMembers.map((member) => (
                     <Card key={member._id} className="overflow-hidden hover:shadow-md transition-shadow">
                       <CardContent className="p-4 sm:p-5">
                         <div className="flex flex-col items-center text-center space-y-3">
@@ -720,7 +776,7 @@ export default function MembersPage() {
                 </div>
               ) : (
                 <div className="space-y-3 sm:space-y-4">
-                  {filteredMembers.map((member) => (
+                  {paginatedMembers.map((member) => (
                     <div key={member._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 border border-muted rounded-lg gap-3 sm:gap-4 overflow-x-hidden hover:bg-muted/50 transition-colors">
                       <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 flex-1 min-w-0 w-full">
                         <GravatarAvatar 
@@ -782,6 +838,62 @@ export default function MembersPage() {
                   ))}
                 </div>
               )}
+
+              {/* Members Pagination Controls */}
+              {membersPagination.total > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Items per page:</span>
+                      <Select
+                        value={membersPagination.limit.toString()}
+                        onValueChange={(value) => {
+                          const newLimit = parseInt(value)
+                          setMembersPagination(prev => ({
+                            ...prev,
+                            limit: newLimit,
+                            page: 1
+                          }))
+                        }}
+                      >
+                        <SelectTrigger className="w-16 h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Showing {((membersPagination.page - 1) * membersPagination.limit) + 1} to {Math.min(membersPagination.page * membersPagination.limit, membersPagination.total)} of {membersPagination.total}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMembersPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                      disabled={membersPagination.page === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      Page {membersPagination.page} of {membersPagination.totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMembersPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                      disabled={membersPagination.page === membersPagination.totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -811,14 +923,14 @@ export default function MembersPage() {
               </div>
             </CardHeader>
             <CardContent className="p-4 sm:p-6 pt-0">
-              {pendingInvitations.length === 0 ? (
+              {paginatedInvitations.length === 0 ? (
                 <div className="text-center py-8 sm:py-12 text-muted-foreground">
                   <Mail className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50 flex-shrink-0" />
                   <p className="text-sm sm:text-base break-words">No pending invitations</p>
                 </div>
               ) : invitationViewMode === 'grid' ? (
                 <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                  {pendingInvitations.map((invitation) => (
+                  {paginatedInvitations.map((invitation) => (
                     <Card key={invitation._id} className="overflow-hidden hover:shadow-md transition-shadow">
                       <CardContent className="p-4 sm:p-5">
                         <div className="flex flex-col items-center text-center space-y-3">
@@ -864,7 +976,7 @@ export default function MembersPage() {
                 </div>
               ) : (
                 <div className="space-y-3 sm:space-y-4">
-                  {pendingInvitations.map((invitation) => (
+                  {paginatedInvitations.map((invitation) => (
                     <div key={invitation._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 border border-muted rounded-lg gap-3 sm:gap-4 overflow-x-hidden hover:bg-muted/50 transition-colors">
                       <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 flex-1 min-w-0 w-full">
                         <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
@@ -902,6 +1014,62 @@ export default function MembersPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Invitations Pagination Controls */}
+              {invitationsPagination.total > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Items per page:</span>
+                      <Select
+                        value={invitationsPagination.limit.toString()}
+                        onValueChange={(value) => {
+                          const newLimit = parseInt(value)
+                          setInvitationsPagination(prev => ({
+                            ...prev,
+                            limit: newLimit,
+                            page: 1
+                          }))
+                        }}
+                      >
+                        <SelectTrigger className="w-16 h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Showing {((invitationsPagination.page - 1) * invitationsPagination.limit) + 1} to {Math.min(invitationsPagination.page * invitationsPagination.limit, invitationsPagination.total)} of {invitationsPagination.total}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setInvitationsPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                      disabled={invitationsPagination.page === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      Page {invitationsPagination.page} of {invitationsPagination.totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setInvitationsPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                      disabled={invitationsPagination.page === invitationsPagination.totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
