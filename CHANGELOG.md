@@ -1,3 +1,25 @@
+## [1.22.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.2...v1.22.3) (2026-01-08)
+
+
+### Bug Fixes
+
+* fix pagination in role and permissions ([5d30fe0](https://github.com/EchonLabs/kanvaro.com/commit/5d30fe0480b6232fd6808983c226e30f5515b3db))
+
+## [1.22.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.1...v1.22.2) (2026-01-08)
+
+
+### Bug Fixes
+
+* add timelog issue ([f38d87b](https://github.com/EchonLabs/kanvaro.com/commit/f38d87b22a7f6277c0590df36aaec38423a6e7c9))
+* add timer chnges ([690bd6f](https://github.com/EchonLabs/kanvaro.com/commit/690bd6f00f7180408eca007541639e1b82bafd34))
+
+## [1.22.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.0...v1.22.1) (2026-01-08)
+
+
+### Bug Fixes
+
+* fix timer issue ([1e6e750](https://github.com/EchonLabs/kanvaro.com/commit/1e6e75006a33b6eca1df126699b91955d849a6fe))
+
 # [1.22.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.21.4...v1.22.0) (2026-01-07)
 
 
