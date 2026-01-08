@@ -1,3 +1,10 @@
+## [1.22.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.5...v1.22.6) (2026-01-08)
+
+
+### Bug Fixes
+
+* add sprint event chnges ([6779e9a](https://github.com/EchonLabs/kanvaro.com/commit/6779e9a6ea1e095f133836d8a7515d8e6abd9d18))
+
 ## [1.22.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.4...v1.22.5) (2026-01-08)
 
 

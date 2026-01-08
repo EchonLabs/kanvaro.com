@@ -245,6 +245,12 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
 
     try {
       setLoading(true)
+      
+      // Extract only user IDs from attendees array for backend
+      const attendeeIds = formData.attendees.map((attendee: any) => 
+        typeof attendee === 'string' ? attendee : attendee._id
+      ).filter(Boolean) as string[]
+      
       const response = await fetch(`/api/sprint-events/${event._id}`, {
         method: 'PUT',
         headers: {
@@ -256,7 +262,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
           scheduledDate: selectedDate.toISOString(),
           actualDate: actualDate?.toISOString(),
           duration: formData.duration,
-          attendees: formData.attendees,
+          attendees: attendeeIds,
           status: formData.status,
           outcomes: formData.outcomes,
           location: formData.location || undefined,
