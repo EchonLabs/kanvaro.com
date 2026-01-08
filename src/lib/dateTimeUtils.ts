@@ -2,8 +2,6 @@
  * Date and time formatting utilities based on user preferences
  */
 
-import { format, formatInTimeZone, zonedTimeToUtc, utcToZonedTime } from 'date-fns-tz'
-
 export interface DateTimePreferences {
   dateFormat: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD'
   timeFormat: '12h' | '24h'
@@ -19,11 +17,18 @@ export const DEFAULT_DATE_TIME_PREFERENCES: DateTimePreferences = {
   timezone: 'UTC'
 }
 
+const normalizeDate = (input: Date | string): Date => {
+  if (input instanceof Date) {
+    return new Date(input.getTime())
+  }
+  return new Date(input)
+}
+
 /**
  * Format date based on user's preference
  */
 export const formatDate = (date: Date | string, preferences: DateTimePreferences): string => {
-  const dateObj = typeof date === 'string' ? new Date(date) : date
+  const dateObj = normalizeDate(date)
   if (!dateObj || isNaN(dateObj.getTime())) return ''
 
   try {
@@ -72,7 +77,7 @@ export const formatDate = (date: Date | string, preferences: DateTimePreferences
  * Format time based on user's preference
  */
 export const formatTime = (date: Date | string, preferences: DateTimePreferences): string => {
-  const dateObj = typeof date === 'string' ? new Date(date) : date
+  const dateObj = normalizeDate(date)
   if (!dateObj || isNaN(dateObj.getTime())) return ''
 
   try {
@@ -132,42 +137,55 @@ export const getDatePlaceholder = (preferences: DateTimePreferences): string => 
 }
 
 // ============================================================================
-// TIMEZONE CONVERSION UTILITIES
+// TIMEZONE CONVERSION UTILITIES (NO-OP TO PRESERVE LEGACY CALL SITES)
 // ============================================================================
 
 /**
- * Convert a UTC date to user's timezone
+ * Previously converted UTC to user timezone. Now simply normalizes to a Date instance
+ * without performing any timezone math so we preserve the browser-local timestamps.
  */
-export const utcToUserTimezone = (utcDate: Date | string, timezone: string): Date => {
-  const date = typeof utcDate === 'string' ? new Date(utcDate) : utcDate
-  return utcToZonedTime(date, timezone)
+export const utcToUserTimezone = (utcDate: Date | string): Date => {
+  return normalizeDate(utcDate)
 }
 
 /**
- * Convert a date from user's timezone to UTC
+ * Previously converted from user timezone back to UTC. Now behaves as a passthrough
+ * since all timestamps are already stored in the user's local time.
  */
-export const userTimezoneToUtc = (userDate: Date | string, timezone: string): Date => {
-  const date = typeof userDate === 'string' ? new Date(userDate) : userDate
-  return zonedTimeToUtc(date, timezone)
+export const userTimezoneToUtc = (userDate: Date | string): Date => {
+  return normalizeDate(userDate)
 }
 
 /**
- * Get current date/time in user's timezone
+ * Returns the current browser-local time. Timezone argument retained for API compatibility.
  */
-export const getCurrentTimeInUserTimezone = (timezone: string): Date => {
-  return utcToZonedTime(new Date(), timezone)
+export const getCurrentTimeInUserTimezone = (_timezone: string): Date => {
+  return new Date()
 }
 
 /**
- * Format a UTC date in user's timezone for display
+ * Formats a date string using Intl while honoring the requested timezone label
+ * but without transforming the underlying timestamp.
  */
 export const formatUtcInUserTimezone = (
   utcDate: Date | string,
   timezone: string,
-  formatStr: string = 'yyyy-MM-dd HH:mm:ss'
+  _formatStr: string = 'yyyy-MM-dd HH:mm:ss'
 ): string => {
-  const date = typeof utcDate === 'string' ? new Date(utcDate) : utcDate
-  return formatInTimeZone(date, timezone, formatStr)
+  const date = normalizeDate(utcDate)
+
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  })
+
+  return formatter.format(date)
 }
 
 /**
@@ -188,11 +206,11 @@ export const formatDuration = (minutes: number): string => {
 export const calculateDurationInUserTimezone = (
   startUtc: Date | string,
   endUtc: Date | string,
-  timezone: string
+  _timezone: string
 ): number => {
-  const startUser = utcToUserTimezone(startUtc, timezone)
-  const endUser = utcToUserTimezone(endUtc, timezone)
-  return (endUser.getTime() - startUser.getTime()) / (1000 * 60) // minutes
+  const start = normalizeDate(startUtc)
+  const end = normalizeDate(endUtc)
+  return (end.getTime() - start.getTime()) / (1000 * 60) // minutes
 }
 
 /**
