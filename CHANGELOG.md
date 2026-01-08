@@ -1,3 +1,10 @@
+## [1.22.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.0...v1.22.1) (2026-01-08)
+
+
+### Bug Fixes
+
+* fix timer issue ([1e6e750](https://github.com/EchonLabs/kanvaro.com/commit/1e6e75006a33b6eca1df126699b91955d849a6fe))
+
 # [1.22.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.21.4...v1.22.0) (2026-01-07)
 
 
