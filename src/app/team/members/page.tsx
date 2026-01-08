@@ -387,7 +387,11 @@ export default function MembersPage() {
       member.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       member.email.toLowerCase().includes(searchQuery.toLowerCase())
     
-    const matchesRole = roleFilter === 'all' || member.role === roleFilter
+    // Check both system roles and custom roles
+    const matchesRole = roleFilter === 'all' || 
+      member.role === roleFilter ||
+      (member.customRole && member.customRole.name.toLowerCase().replace(/\s+/g, '_') === roleFilter)
+    
     const matchesStatus = statusFilter === 'all' || 
       (statusFilter === 'active' && member.isActive) ||
       (statusFilter === 'inactive' && !member.isActive)
