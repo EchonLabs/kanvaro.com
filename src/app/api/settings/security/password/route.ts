@@ -3,11 +3,22 @@ import connectDB from '@/lib/db-config'
 import { hasDatabaseConfig } from '@/lib/db-config'
 import { User } from '@/models/User'
 import bcrypt from 'bcryptjs'
+import { authenticateUser } from '@/lib/auth-utils'
 
 export async function PUT(request: NextRequest) {
   try {
+    // Authenticate user
+    const authResult = await authenticateUser()
+    if ('error' in authResult) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { user } = authResult
     const { currentPassword, newPassword } = await request.json()
-    
+
     // Check if database is configured
     const isConfigured = await hasDatabaseConfig()
     if (!isConfigured) {
@@ -16,13 +27,13 @@ export async function PUT(request: NextRequest) {
         { status: 200 }
       )
     }
-    
+
     await connectDB()
-    
-    // Find the user (in a real app, this would be based on the authenticated user)
-    const user = await User.findOne({ email: 'admin@kanvaro.com' })
-    
-    if (!user) {
+
+    // Find the authenticated user
+    const dbUser = await User.findById(user.id)
+
+    if (!dbUser) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
@@ -30,20 +41,20 @@ export async function PUT(request: NextRequest) {
     }
     
     // Verify current password
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password)
-    
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, dbUser.password)
+
     if (!isCurrentPasswordValid) {
       return NextResponse.json(
         { error: 'Current password is incorrect' },
         { status: 400 }
       )
     }
-    
+
     // Hash the new password
     const hashedNewPassword = await bcrypt.hash(newPassword, 12)
-    
+
     // Update the user's password
-    await User.findByIdAndUpdate(user._id, {
+    await User.findByIdAndUpdate(dbUser._id, {
       password: hashedNewPassword
     })
     

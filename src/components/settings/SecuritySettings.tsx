@@ -167,7 +167,7 @@ export function SecuritySettings() {
               ) : (
                 <Key className="h-4 w-4" />
               )}
-              {saving ? 'Updating...' : 'Update Password'}
+              {saving ? 'Changing...' : 'Change Password'}
             </Button>
           </div>
         </CardContent>

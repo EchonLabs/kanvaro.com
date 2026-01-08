@@ -17,6 +17,7 @@ interface Member {
   lastName: string
   email: string
   role: string
+  memberId?: string
   customRole?: {
     _id: string
     name: string
@@ -57,6 +58,7 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
     firstName: member.firstName,
     lastName: member.lastName,
     role: member.role,
+    memberId: member.memberId || '',
     customRoleId: member.customRole?._id || '',
     isActive: member.isActive,
     hourlyRate: member.hourlyRate || '',
@@ -129,6 +131,7 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
         firstName: formData.firstName,
         lastName: formData.lastName,
         role: formData.role,
+        memberId: formData.memberId || undefined,
         isActive: formData.isActive,
         hourlyRate: formData.hourlyRate ? Number(formData.hourlyRate) : undefined,
       })
@@ -198,6 +201,21 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
                 className="bg-muted text-muted-foreground w-full cursor-not-allowed"
               />
               <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="memberId">Member ID (Optional)</Label>
+              <Input
+                id="memberId"
+                type="text"
+                value={formData.memberId}
+                onChange={(e) => setFormData(prev => ({ ...prev, memberId: e.target.value }))}
+                placeholder="Enter member ID"
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Custom identifier for this team member
+              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
