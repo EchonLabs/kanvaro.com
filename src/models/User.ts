@@ -6,6 +6,7 @@ export interface IUser extends Document {
   email: string
   password: string
   role: 'admin' | 'human_resource' | 'project_manager' | 'team_member' | 'client' | 'viewer' | 'account_manager' | 'qa_engineer' | 'tester'
+  memberId?: string
   customRole?: mongoose.Types.ObjectId
   // Organization-level partners
   projectManager?: mongoose.Types.ObjectId
@@ -59,11 +60,12 @@ const UserSchema = new Schema<IUser>({
   lastName: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true },
   password: { type: String, required: true },
-  role: { 
-    type: String, 
+  role: {
+    type: String,
     enum: ['admin', 'human_resource', 'project_manager', 'team_member', 'client', 'viewer', 'account_manager', 'qa_engineer', 'tester'],
     default: 'team_member'
   },
+  memberId: { type: String, trim: true },
   customRole: { type: Schema.Types.ObjectId, ref: 'CustomRole' },
   // Organization-level partners
   projectManager: { type: Schema.Types.ObjectId, ref: 'User' },

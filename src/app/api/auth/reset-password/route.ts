@@ -6,11 +6,38 @@ import { emailService } from '@/lib/email/EmailService'
 
 export async function POST(request: Request) {
   try {
-    const { resetToken, newPassword } = await request.json()
+    let body
+    try {
+      body = await request.json()
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError)
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      )
+    }
+
+    const { resetToken, newPassword } = body
+
+    console.log('Reset password request received:', {
+      hasResetToken: !!resetToken,
+      hasNewPassword: !!newPassword,
+      resetTokenLength: resetToken?.length,
+      newPasswordLength: newPassword?.length,
+      bodyKeys: Object.keys(body),
+      resetTokenPreview: resetToken ? `${resetToken.substring(0, 10)}...` : 'null'
+    })
 
     if (!resetToken || !newPassword) {
+      console.log('Missing required fields:', { resetToken: !!resetToken, newPassword: !!newPassword })
       return NextResponse.json(
-        { error: 'Reset token and new password are required' },
+        {
+          error: 'Reset token and new password are required',
+          details: {
+            resetToken: resetToken ? 'provided' : 'missing',
+            newPassword: newPassword ? 'provided' : 'missing'
+          }
+        },
         { status: 400 }
       )
     }

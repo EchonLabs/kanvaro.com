@@ -5,7 +5,7 @@ export interface IOrganization extends Document {
   domain?: string
   logo?: string
   darkLogo?: string
-  logoMode?: 'light' | 'dark' | 'both'
+  logoMode?: 'single' | 'dual' | 'both' |'light' | 'dark'
   timezone: string
   currency: string
   language: string
@@ -106,7 +106,7 @@ const OrganizationSchema = new Schema<IOrganization>({
   domain: String,
   logo: String,
   darkLogo: String,
-  logoMode: { type: String, enum: ['light', 'dark', 'both'], default: 'both' },
+  logoMode: { type: String, enum: ['single', 'dual', 'both', 'light', 'dark'], default: 'single' },
   timezone: { type: String, default: 'UTC' },
   currency: { type: String, default: 'USD' },
   language: { type: String, default: 'en' },
