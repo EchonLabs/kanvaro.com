@@ -346,7 +346,7 @@ export function TimeLogs({
 
       setFilterTasksLoading(true)
       try {
-        const response = await fetch(`/api/tasks?project=${filters.projectId}&limit=500`)
+        const response = await fetch(`/api/tasks?project=${filters.projectId}&all=true`)
         const data = await response.json()
         if (data.success && Array.isArray(data.data)) {
           setFilterTasks(data.data)
@@ -1271,7 +1271,7 @@ export function TimeLogs({
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout (matching timer page)
 
-      const url = `/api/tasks?project=${projectId}&assignedTo=${resolvedUserId}&limit=50&minimal=true`
+      const url = `/api/tasks?project=${projectId}&assignedTo=${resolvedUserId}&all=true&minimal=true`
 
       const res = await fetch(url, {
         cache: 'no-store',
@@ -1668,7 +1668,7 @@ export function TimeLogs({
         // Fetch tasks for eligible projects that are assigned to the user
         for (const project of eligibleProjects) {
           try {
-            const tasksResponse = await fetch(`/api/tasks?project=${project._id}&assignedTo=${resolvedUserId}&limit=500`)
+            const tasksResponse = await fetch(`/api/tasks?project=${project._id}&assignedTo=${resolvedUserId}&all=true`)
             const tasksData = await tasksResponse.json()
             if (tasksData.success && Array.isArray(tasksData.data)) {
               tasksData.data.forEach((task: any) => {

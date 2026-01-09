@@ -173,7 +173,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
   const fetchUsers = async () => {
     try {
       setLoadingUsers(true)
-      const response = await fetch('/api/members?limit=1000')
+      const response = await fetch('/api/members?all=true')
       if (response.ok) {
         const data = await response.json()
         // Handle different response structures
