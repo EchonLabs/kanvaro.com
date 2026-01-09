@@ -1,3 +1,10 @@
+## [1.22.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.6...v1.22.7) (2026-01-09)
+
+
+### Bug Fixes
+
+* add pagination issue ([95abadd](https://github.com/EchonLabs/kanvaro.com/commit/95abadd31c45dcf9d56c5816c72d49bff4a9b86a))
+
 ## [1.22.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.5...v1.22.6) (2026-01-08)
 
 

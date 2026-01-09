@@ -188,7 +188,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     }
 
     try {
-      const response = await fetch(`/api/sprints?project=${projId}&limit=100`, { signal })
+      const response = await fetch(`/api/sprints?project=${projId}&all=true`, { signal })
       if (signal?.aborted) return
 
       if (response.ok) {
@@ -219,7 +219,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     }
 
     try {
-      const response = await fetch('/api/members?limit=1000', { signal })
+      const response = await fetch('/api/members?all=true', { signal })
       if (signal?.aborted) return
 
       if (response.ok) {

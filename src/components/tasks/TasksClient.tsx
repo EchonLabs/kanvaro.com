@@ -347,7 +347,7 @@ export default function TasksClient({
     useEffect(() => {
         const loadProjects = async () => {
             try {
-                const response = await fetch('/api/projects?limit=1000&page=1')
+                const response = await fetch('/api/projects?all=true')
                 if (response.ok) {
                     const data = await response.json()
                     if (data.success && Array.isArray(data.data)) {
@@ -373,7 +373,7 @@ export default function TasksClient({
 
         const loadUsers = async () => {
             try {
-                const response = await fetch('/api/members?limit=1000&page=1')
+                const response = await fetch('/api/members?all=true')
                 if (response.ok) {
                     const data = await response.json()
                     if (data.success && data.data?.members && Array.isArray(data.data.members)) {
