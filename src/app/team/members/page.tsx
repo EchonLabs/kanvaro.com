@@ -206,12 +206,32 @@ export default function MembersPage() {
   const fetchMembers = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/members')
+      
+      // Build query parameters for server-side filtering
+      const params = new URLSearchParams({
+        page: membersPagination.page.toString(),
+        limit: membersPagination.limit.toString(),
+      })
+      
+      if (searchQuery) params.append('search', searchQuery)
+      if (roleFilter !== 'all') params.append('role', roleFilter)
+      if (statusFilter !== 'all') params.append('status', statusFilter)
+      
+      const response = await fetch(`/api/members?${params.toString()}`)
       const data = await response.json()
 
       if (data.success) {
         setMembers(data.data.members)
         setPendingInvitations(data.data.pendingInvitations)
+        
+        // Update pagination with server response
+        if (data.data.pagination) {
+          setMembersPagination(prev => ({
+            ...prev,
+            total: data.data.pagination.total,
+            totalPages: data.data.pagination.totalPages
+          }))
+        }
       } else {
         notifyError({ title: data.error || 'Failed to fetch members' })
       }
@@ -381,37 +401,15 @@ export default function MembersPage() {
     }
   }
 
-  const filteredMembers = members.filter(member => {
-    const matchesSearch = !searchQuery || 
-      member.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.email.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    // Check both system roles and custom roles
-    // Special case: "administrator" filter should match "admin" role
-    const matchesRole = roleFilter === 'all' || 
-      member.role === roleFilter ||
-      (roleFilter === 'administrator' && member.role === 'admin') ||
-      (member.customRole && member.customRole.name.toLowerCase().replace(/\s+/g, '_') === roleFilter)
-    
-    const matchesStatus = statusFilter === 'all' || 
-      (statusFilter === 'active' && member.isActive) ||
-      (statusFilter === 'inactive' && !member.isActive)
+  // Server handles filtering, no client-side filtering needed
+  const filteredMembers = members
 
-    return matchesSearch && matchesRole && matchesStatus
-  })
-
-  // Update members pagination when filtered members change
+  // Fetch members whenever filters or pagination changes
   useEffect(() => {
-    const total = filteredMembers.length
-    const totalPages = Math.ceil(total / membersPagination.limit)
-    setMembersPagination(prev => ({
-      ...prev,
-      total,
-      totalPages,
-      page: Math.min(prev.page, totalPages || 1)
-    }))
-  }, [filteredMembers.length, membersPagination.limit])
+    if (!loading && !authError) {
+      fetchMembers()
+    }
+  }, [searchQuery, roleFilter, statusFilter, membersPagination.page, membersPagination.limit])
 
   // Update invitations pagination when invitations change
   useEffect(() => {
@@ -425,18 +423,15 @@ export default function MembersPage() {
     }))
   }, [pendingInvitations.length, invitationsPagination.limit])
 
-  // Reset pagination when filters change
+  // Reset page to 1 when filters change (but not limit)
   useEffect(() => {
     setMembersPagination(prev => ({ ...prev, page: 1 }))
   }, [searchQuery, roleFilter, statusFilter])
 
-  // Get paginated members
-  const paginatedMembers = filteredMembers.slice(
-    (membersPagination.page - 1) * membersPagination.limit,
-    membersPagination.page * membersPagination.limit
-  )
+  // Server returns paginated data, use it directly
+  const paginatedMembers = members
 
-  // Get paginated invitations
+  // Client-side pagination for invitations
   const paginatedInvitations = pendingInvitations.slice(
     (invitationsPagination.page - 1) * invitationsPagination.limit,
     invitationsPagination.page * invitationsPagination.limit
