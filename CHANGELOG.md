@@ -1,3 +1,25 @@
+# [1.23.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.8...v1.23.0) (2026-01-10)
+
+
+### Features
+
+* :sparkles: add production CI/CD pipeline configuration ([9e4a364](https://github.com/EchonLabs/kanvaro.com/commit/9e4a3640212a76c3165bf492a529b2973f0d2305))
+* fix conflicts ([0baa0c7](https://github.com/EchonLabs/kanvaro.com/commit/0baa0c769bf8baa3cb40695d894fa56a8a3f6d13))
+
+## [1.22.8](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.7...v1.22.8) (2026-01-10)
+
+
+### Bug Fixes
+
+* fix csv ([3bfe47a](https://github.com/EchonLabs/kanvaro.com/commit/3bfe47a97db62cd53d930994abd4a1ad0be48f1e))
+
+## [1.22.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.6...v1.22.7) (2026-01-09)
+
+
+### Bug Fixes
+
+* add pagination issue ([95abadd](https://github.com/EchonLabs/kanvaro.com/commit/95abadd31c45dcf9d56c5816c72d49bff4a9b86a))
+
 ## [1.22.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.5...v1.22.6) (2026-01-08)
 
 

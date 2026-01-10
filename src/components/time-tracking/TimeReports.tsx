@@ -77,6 +77,7 @@ interface ReportData {
   detailedEntries?: Array<{
     _id: string
     userId: string
+    memberId?: string
     userName: string
     userEmail: string
     projectId: string
@@ -276,7 +277,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     const loadFilterData = async () => {
       try {
         // Load projects
-        const projectsRes = await fetch(`/api/projects?limit=1000&page=1`)
+        const projectsRes = await fetch(`/api/projects?all=true`)
         if (projectsRes.ok) {
           const projectsData = await projectsRes.json()
           if (projectsData.success) {
@@ -442,19 +443,15 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     try {
       if (reportData?.detailedEntries && reportData.detailedEntries.length > 0) {
         const headers = [
-          'Employee Name',
-          'Employee Email',
-          'Project',
+          'No.',
+          'Member ID',
           'Task',
-          'Date',
+          'Employee',
           'Start Time',
           'End Time',
-          'Duration',
-          'Hourly Rate',
-          'Rate Source',
+          'Total Hours',
           'Cost',
-          'Billable',
-          'Notes'
+          'Status'
         ]
 
         const sanitize = (value: string | number | null | undefined) => {
@@ -462,21 +459,27 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
           return String(value).replace(/"/g, '""')
         }
 
-        const rows = reportData.detailedEntries.map(entry => [
-          sanitize(entry.userName),
-          sanitize(entry.userEmail),
-          sanitize(entry.projectName),
-          sanitize(entry.taskTitle || ''),
-          sanitize(formatDate(entry.date)),
-          sanitize(entry.startTime ? formatTime(entry.startTime) : '-'),
-          sanitize(entry.endTime ? formatTime(entry.endTime) : '-'),
-          sanitize(formatDurationUtil(entry.duration)),
-          sanitize(`${formatCurrency(entry.hourlyRate, orgCurrency)}/hr`),
-          sanitize(getHourlyRateSource(entry)),
-          sanitize(formatCurrency(entry.cost, orgCurrency)),
-          sanitize(entry.isBillable ? 'Yes' : 'No'),
-          sanitize(entry.notes || '')
-        ])
+        const rows = reportData.detailedEntries.map((entry, index) => {
+          // Determine status based on approvedBy field
+          let status = 'Pending'
+          if (entry.approvedBy) {
+            status = 'Approved'
+          }
+          // Note: If you have a rejected status in your data, add logic here
+          // For example: if (entry.status === 'rejected') status = 'Rejected'
+
+          return [
+            sanitize(index + 1), // Numbering
+            sanitize(entry.memberId || ''), // Member ID
+            sanitize(entry.taskTitle || '-'), // Task
+            sanitize(entry.userName), // Employee
+            sanitize(entry.startTime ? formatTime(entry.startTime) : '-'), // Start Time
+            sanitize(entry.endTime ? formatTime(entry.endTime) : '-'), // End Time
+            sanitize(formatDurationUtil(entry.duration)), // Total Hours
+            sanitize(formatCurrency(entry.cost, orgCurrency)), // Cost
+            sanitize(status) // Status
+          ]
+        })
 
         const csvContent = [headers, ...rows]
           .map(row => row.map(value => `"${value}"`).join(','))
