@@ -288,10 +288,67 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    // Authenticate requester from cookies
+    const cookieStore = cookies()
+    const accessToken = cookieStore.get('accessToken')?.value
+    const refreshToken = cookieStore.get('refreshToken')?.value
+
+    if (!accessToken && !refreshToken) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    let requester: any = null
+    let requesterId: string = ''
+    try {
+      if (accessToken) {
+        const decoded: any = jwt.verify(accessToken, JWT_SECRET)
+        requester = await User.findById(decoded.userId)
+      }
+    } catch {}
+    if (!requester && refreshToken) {
+      try {
+        const decoded: any = jwt.verify(refreshToken, JWT_REFRESH_SECRET)
+        requester = await User.findById(decoded.userId)
+      } catch {}
+    }
+    if (!requester || !requester.isActive) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    requesterId = requester._id.toString()
+
+    // Verify the requester can create time entries for the specified user
+    // Allow if: 1) Creating for themselves, OR 2) Has bulk_upload_all permission
+    const isCreatingSelf = userId === requesterId
+    const hasBulkUploadAll = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_BULK_UPLOAD_ALL)
+    
+    if (!isCreatingSelf && !hasBulkUploadAll) {
+      return NextResponse.json({ error: 'You do not have permission to create time entries for other users' }, { status: 403 })
+    }
+
     // Get project and check if time tracking is allowed
     const project = await Project.findById(projectId)
     if (!project || !project.settings.allowTimeTracking) {
       return NextResponse.json({ error: 'Time tracking not allowed for this project' }, { status: 403 })
+    }
+
+    // If taskId is provided, verify task assignment for users without bulk_upload_all permission
+    if (taskId && !hasBulkUploadAll) {
+      const Task = require('@/models/Task').default
+      const task = await Task.findById(taskId)
+      
+      if (!task) {
+        return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+      }
+
+      // Check if user is assigned to the task
+      const isAssignedToTask = task.assignedTo?.some((assigned: any) => {
+        const assignedUserId = typeof assigned === 'string' ? assigned : assigned?.user?.toString() || assigned?._id?.toString()
+        return assignedUserId === userId
+      })
+
+      if (!isAssignedToTask) {
+        return NextResponse.json({ error: 'Task is not assigned to you' }, { status: 403 })
+      }
     }
 
     // Get time tracking settings - check project-specific first, then organization-wide

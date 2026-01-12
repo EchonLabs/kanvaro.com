@@ -411,7 +411,7 @@ export async function GET(request: NextRequest) {
     const activeTimer = await ActiveTimer.findOne({
       user: userId,
       organization: organizationId
-    }).populate('project', 'name').populate('task', 'title')
+    }).populate('project', 'name').populate('task', 'title').populate('user', 'firstName lastName')
 
     if (!activeTimer) {
       return NextResponse.json({ activeTimer: null })
@@ -462,7 +462,7 @@ export async function POST(request: NextRequest) {
     const existingTimer = await ActiveTimer.findOne({
       user: userId,
       organization: organizationId
-    })
+    }).populate('user', 'firstName lastName')
 
     if (existingTimer) {
       return NextResponse.json({ error: 'User already has an active timer' }, { status: 400 })
@@ -563,6 +563,9 @@ export async function POST(request: NextRequest) {
     })
 
     await activeTimer.save()
+    
+    // Populate user data after saving
+    await activeTimer.populate('user', 'firstName lastName')
 
     // Send timer start notification if enabled
     const shouldNotifyStart = await isNotificationEnabled(organizationId, 'onTimerStart', projectId)
@@ -615,7 +618,7 @@ export async function PUT(request: NextRequest) {
     const activeTimer = await ActiveTimer.findOne({
       user: userId,
       organization: organizationId
-    })
+    }).populate('user', 'firstName lastName')
 
     if (!activeTimer) {
       return NextResponse.json({ error: 'No active timer found' }, { status: 404 })

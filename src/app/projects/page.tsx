@@ -198,18 +198,7 @@ export default function ProjectsPage() {
       const data = await response.json()
 
       if (data.success) {
-        console.log('Projects page - received projects:', {
-          total: data.pagination?.total || data.data.length,
-          currentUserId: user?.id,
-          projects: data.data.map((p: any) => ({
-            _id: p._id,
-            name: p.name,
-            createdBy: p.createdBy?._id,
-            teamMembers: p.teamMembers?.map((tm: any) => tm.memberId?._id),
-            isCurrentUserCreator: p.createdBy?._id === user?.id,
-            isCurrentUserTeamMember: p.teamMembers?.some((tm: any) => tm.memberId?._id === user?.id)
-          }))
-        })
+        
         setProjects(data.data)
         setTotalCount(data.pagination?.total || data.data.length)
       } else {

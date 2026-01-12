@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { FolderOpen, CheckSquare, Users, Clock, TrendingUp, TrendingDown, Loader2 } from 'lucide-react'
 import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules } from '@/lib/utils'
+import { usePermissions } from '@/lib/permissions/permission-hooks'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 interface StatsCardsProps {
   stats?: {
@@ -26,6 +28,7 @@ interface StatsCardsProps {
 
 export function StatsCards({ stats, changes, isLoading }: StatsCardsProps) {
   const { organization } = useOrganization()
+  const { hasPermission } = usePermissions()
   
   const formatDuration = (minutes: number) => {
     if (minutes === 0) return '0h'
@@ -184,9 +187,22 @@ export function StatsCards({ stats, changes, isLoading }: StatsCardsProps) {
     }
   ]
 
+  // Filter out team members widget if user doesn't have permission
+  const filteredStatsData = statsData.filter(stat => {
+    if (stat.title === 'Team Members') {
+      return hasPermission(Permission.TEAM_MEMBER_WIDGET_VIEW)
+    }
+    return true
+  })
+
+  // Determine grid columns based on number of cards
+  const gridCols = filteredStatsData.length === 3 
+    ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' 
+    : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-      {statsData.map((stat, index) => {
+    <div className={`grid ${gridCols} gap-4 sm:gap-6`}>
+      {filteredStatsData.map((stat, index) => {
         const Icon = stat.icon
         const hasChange = stat.change !== null
         const ChangeIcon = stat.changeType === 'positive' ? TrendingUp : 
