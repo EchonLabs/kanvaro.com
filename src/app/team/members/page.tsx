@@ -135,7 +135,7 @@ export default function MembersPage() {
     setStatusFilter('all')
   }
 
-  const [organizationRoles, setOrganizationRoles] = useState<Array<{ id: string; name: string; isSystem?: boolean }>>([])
+  const [organizationRoles, setOrganizationRoles] = useState<Array<{ id: string; name: string; key: string; isSystem?: boolean }>>([])
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [memberToRemove, setMemberToRemove] = useState<Member | null>(null)
   const [removingMember, setRemovingMember] = useState(false)
@@ -154,6 +154,7 @@ export default function MembersPage() {
           const allRoles = data.data.map((role: any) => ({
             id: role._id,
             name: role.name,
+            key: role._id, // Use _id as the key (e.g., 'admin', 'project_manager')
             isSystem: role.isSystem
           }))
           setOrganizationRoles(allRoles)
@@ -642,7 +643,7 @@ export default function MembersPage() {
                       <SelectContent className="z-[10050]">
                         <SelectItem value="all">All Roles</SelectItem>
                         {organizationRoles.map((role) => (
-                          <SelectItem key={role.id} value={role.name.toLowerCase().replace(/\s+/g, '_')}>
+                          <SelectItem key={role.id} value={role.key}>
                             {formatToTitleCase(role.name)}
                           </SelectItem>
                         ))}
@@ -675,7 +676,7 @@ export default function MembersPage() {
                       </span>
                       <span className="ml-2 text-xs">
                         {searchQuery && `• "${searchQuery}"`}
-                        {roleFilter !== 'all' && `• ${formatToTitleCase(roleFilter.replace(/_/g, ' '))}`}
+                        {roleFilter !== 'all' && roleFilter && `• ${organizationRoles.find(r => r.key === roleFilter)?.name || formatToTitleCase(roleFilter.replace(/_/g, ' '))}`}
                         {statusFilter !== 'all' && `• ${statusFilter === 'active' ? 'Active' : 'Inactive'}`}
                       </span>
                     </span>
