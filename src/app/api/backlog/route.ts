@@ -366,10 +366,26 @@ export async function GET(request: NextRequest) {
       epicFilter.priority = priority
     }
 
-    if (assignedTo) {
+    if (assignedTo && assignedTo !== 'all') {
+      // For tasks: check assignedTo.user field
       taskFilter['assignedTo.user'] = assignedTo
-      storyFilter.assignedTo = assignedTo
-      epicFilter.assignedTo = assignedTo
+      
+      // For stories and epics: filter by projects where user is a team member
+      const projectsWithUser = await Project.find({
+        organization: organizationId,
+        'teamMembers.memberId': assignedTo
+      }).select('_id')
+      
+      const userProjectIds = projectsWithUser.map(p => p._id)
+      
+      if (userProjectIds.length > 0) {
+        storyFilter.project = project ? project : { $in: userProjectIds }
+        epicFilter.project = project ? project : { $in: userProjectIds }
+      } else {
+        // If user is not in any project team, exclude all stories and epics
+        storyFilter.project = null
+        epicFilter.project = null
+      }
     }
 
     if (createdBy) {

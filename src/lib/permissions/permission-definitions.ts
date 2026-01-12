@@ -94,6 +94,7 @@ export enum Permission {
   TEAM_REMOVE = 'team:remove',
   TEAM_MANAGE_PERMISSIONS = 'team:manage_permissions',
   TEAM_VIEW_ACTIVITY = 'team:view_activity',
+  TEAM_MEMBER_WIDGET_VIEW = 'team_member_widget:view',
   
   // Time tracking permissions
   TIME_TRACKING_CREATE = 'time_tracking:create',
@@ -107,6 +108,7 @@ export enum Permission {
   TIME_TRACKING_VIEW_ASSIGNED = 'time_tracking:view_assigned',
   TIME_TRACKING_EMPLOYEE_FILTER_READ = 'time_tracking:employee_filter:read',
   TIME_TRACKING_VIEW_ALL_TIMER = 'time_tracking:view_all_timer',
+  TIME_TRACKING_BULK_UPLOAD_ALL = 'time_tracking:bulk_upload_all',
   
   // Financial permissions
   FINANCIAL_READ = 'financial:read',
@@ -279,6 +281,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEAM_REMOVE,
     Permission.TEAM_MANAGE_PERMISSIONS,
     Permission.TEAM_VIEW_ACTIVITY,
+    Permission.TEAM_MEMBER_WIDGET_VIEW,
     
     // Time tracking
     Permission.TIME_TRACKING_CREATE,
@@ -440,6 +443,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEAM_REMOVE,
     Permission.TEAM_MANAGE_PERMISSIONS,
     Permission.TEAM_VIEW_ACTIVITY,
+    Permission.TEAM_MEMBER_WIDGET_VIEW,
     
     // Time tracking
     Permission.TIME_TRACKING_CREATE,
@@ -452,6 +456,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
     Permission.TIME_TRACKING_VIEW_ALL_TIMER,
+    Permission.TIME_TRACKING_BULK_UPLOAD_ALL,
+    Permission.TIME_TRACKING_BULK_UPLOAD_ALL,
     
     // Financial
     Permission.FINANCIAL_READ,
@@ -594,6 +600,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEAM_REMOVE,
     Permission.TEAM_MANAGE_PERMISSIONS,
     Permission.TEAM_VIEW_ACTIVITY,
+    Permission.TEAM_MEMBER_WIDGET_VIEW,
     
     // Time tracking
     Permission.TIME_TRACKING_CREATE,
@@ -605,6 +612,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
     Permission.TIME_TRACKING_VIEW_ALL_TIMER,
+    Permission.TIME_TRACKING_BULK_UPLOAD_ALL,
     
     // Financial
     Permission.FINANCIAL_READ,

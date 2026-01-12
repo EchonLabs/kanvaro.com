@@ -1104,14 +1104,7 @@ export default function ProfilePage() {
 
           {/* Save Changes Button - Only show for non-security tabs */}
           {activeTab !== 'security' && (
-            <div className="flex items-center justify-between p-4 border-t bg-background sticky bottom-0 z-10">
-              <div className="text-sm text-muted-foreground">
-                {hasChanges() && (
-                  <span className="text-amber-600 dark:text-amber-400">
-                    You have unsaved changes
-                  </span>
-                )}
-              </div>
+            <div className="flex items-center justify-end p-4 border-t bg-background">
               <Button 
                 onClick={handleSave} 
                 disabled={profileLoading || !hasChanges()}
