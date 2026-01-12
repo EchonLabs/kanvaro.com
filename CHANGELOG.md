@@ -1,3 +1,10 @@
+## [1.23.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.3...v1.23.4) (2026-01-12)
+
+
+### Bug Fixes
+
+* add chganges ([d99473a](https://github.com/EchonLabs/kanvaro.com/commit/d99473aa5bb13a3ceb77d9b3f654f29bdad79b70))
+
 ## [1.23.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.2...v1.23.3) (2026-01-12)
 
 
