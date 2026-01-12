@@ -688,7 +688,7 @@ const [overheadInput, setOverheadInput] = useState('')
   // Fetch available team members
   const fetchAvailableMembers = async () => {
     try {
-      const response = await fetch('/api/members')
+      const response = await fetch('/api/members?status=active')
       const data = await response.json()
 
       if (data.success) {
