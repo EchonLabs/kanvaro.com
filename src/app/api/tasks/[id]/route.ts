@@ -454,13 +454,17 @@ export async function PUT(
     const currentTask = await Task.findOne(taskQuery)
     if (!currentTask) {
       console.warn('[Task PUT] Task not found or unauthorized', { taskId, userId })
-    } else {
-      console.log('[Task PUT] Current task loaded', {
-        taskId,
-        currentStatus: currentTask.status,
-        currentSprint: currentTask.sprint
-      })
+      return NextResponse.json(
+        { error: 'Task not found or unauthorized' },
+        { status: 404 }
+      )
     }
+    
+    console.log('[Task PUT] Current task loaded', {
+      taskId,
+      currentStatus: currentTask.status,
+      currentSprint: currentTask.sprint
+    })
 
     // If status is changing, set position to end of target column
     if (updateData.status && updateData.status !== currentTask.status) {
@@ -469,14 +473,6 @@ export async function PUT(
         { position: 1 }
       ).sort({ position: -1 })
       updateData.position = maxPosition ? maxPosition.position + 1 : 0
-    }
-
-    if (!currentTask) {
-      console.warn('[Task PUT] Task not found or unauthorized on update', { taskId, userId })
-      return NextResponse.json(
-        { error: 'Task not found or unauthorized' },
-        { status: 404 }
-      )
     }
 
     // When adding task to sprint, only change status to 'todo' if currently 'backlog'

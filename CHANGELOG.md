@@ -1,3 +1,18 @@
+## [1.23.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.1...v1.23.2) (2026-01-12)
+
+
+### Bug Fixes
+
+* add kanbarn board changes ([e75b9c3](https://github.com/EchonLabs/kanvaro.com/commit/e75b9c3abb3d1d7ea8b700b9e9ad82a05a4cf592))
+
+## [1.23.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.0...v1.23.1) (2026-01-12)
+
+
+### Bug Fixes
+
+* add backlog and time log chnges ([b7c9a9f](https://github.com/EchonLabs/kanvaro.com/commit/b7c9a9f5a66d3dc9790bc9f5e9e06ade48f7a9fc))
+* add fixes ([e7d92e7](https://github.com/EchonLabs/kanvaro.com/commit/e7d92e76f7cba988010c6ebbfbdc1939802af19a))
+
 # [1.23.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.8...v1.23.0) (2026-01-10)
 
 
