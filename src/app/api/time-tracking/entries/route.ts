@@ -333,7 +333,6 @@ export async function POST(request: NextRequest) {
 
     // If taskId is provided, verify task assignment for users without bulk_upload_all permission
     if (taskId && !hasBulkUploadAll) {
-      const Task = require('@/models/Task').default
       const task = await Task.findById(taskId)
       
       if (!task) {
@@ -363,23 +362,18 @@ export async function POST(request: NextRequest) {
         project: null
       })
     }
-    
-    console.log('Manual time entry - Time tracking settings found:', {
-      hasSettings: !!settings,
-      settingsId: settings?._id?.toString(),
-      isProjectSpecific: settings?.project?.toString() === projectId,
-      projectId: settings?.project?.toString(),
-      requestedProjectId: projectId,
-      requireDescription: settings?.requireDescription,
-      requireDescriptionType: typeof settings?.requireDescription,
-      allowManualTimeSubmission: settings?.allowManualTimeSubmission
-    })
+   
 
     // If no TimeTrackingSettings exist, create default ones based on organization settings
     if (!settings) {
+      if (!Organization) {
+        console.error('Organization model is undefined')
+        return NextResponse.json({ error: 'Internal server error: Organization model not loaded' }, { status: 500 })
+      }
+      
       const organization = await Organization.findById(organizationId)
       
-      if (!organization || !organization.settings.timeTracking.allowTimeTracking) {
+      if (!organization || !organization.settings?.timeTracking?.allowTimeTracking) {
         return NextResponse.json({ error: 'Time tracking not enabled' }, { status: 403 })
       }
 
@@ -387,25 +381,32 @@ export async function POST(request: NextRequest) {
       const projectRequireApproval = project?.settings?.requireApproval ?? undefined
 
       // Create default TimeTrackingSettings based on organization settings
+      const orgTimeTracking = organization.settings?.timeTracking || {}
       settings = new TimeTrackingSettings({
         organization: organizationId,
         project: null,
-        allowTimeTracking: organization.settings.timeTracking.allowTimeTracking,
-        allowManualTimeSubmission: organization.settings.timeTracking.allowManualTimeSubmission,
-        requireApproval: projectRequireApproval !== undefined ? projectRequireApproval : organization.settings.timeTracking.requireApproval,
-        allowBillableTime: organization.settings.timeTracking.allowBillableTime,
-        defaultHourlyRate: organization.settings.timeTracking.defaultHourlyRate,
-        maxDailyHours: organization.settings.timeTracking.maxDailyHours,
-        maxWeeklyHours: organization.settings.timeTracking.maxWeeklyHours,
-        maxSessionHours: organization.settings.timeTracking.maxSessionHours,
-        allowOvertime: organization.settings.timeTracking.allowOvertime,
-        requireDescription: organization.settings.timeTracking.requireDescription,
-        requireCategory: organization.settings.timeTracking.requireCategory,
-        allowFutureTime: organization.settings.timeTracking.allowFutureTime,
-        allowPastTime: organization.settings.timeTracking.allowPastTime,
-        pastTimeLimitDays: organization.settings.timeTracking.pastTimeLimitDays,
-        roundingRules: organization.settings.timeTracking.roundingRules,
-        notifications: organization.settings.timeTracking.notifications
+        allowTimeTracking: orgTimeTracking.allowTimeTracking ?? true,
+        allowManualTimeSubmission: orgTimeTracking.allowManualTimeSubmission ?? true,
+        requireApproval: projectRequireApproval !== undefined ? projectRequireApproval : (orgTimeTracking.requireApproval ?? false),
+        allowBillableTime: orgTimeTracking.allowBillableTime ?? true,
+        defaultHourlyRate: orgTimeTracking.defaultHourlyRate,
+        maxDailyHours: orgTimeTracking.maxDailyHours ?? 24,
+        maxWeeklyHours: orgTimeTracking.maxWeeklyHours ?? 168,
+        maxSessionHours: orgTimeTracking.maxSessionHours ?? 12,
+        allowOvertime: orgTimeTracking.allowOvertime ?? false,
+        requireDescription: orgTimeTracking.requireDescription ?? false,
+        requireCategory: orgTimeTracking.requireCategory ?? false,
+        allowFutureTime: orgTimeTracking.allowFutureTime ?? false,
+        allowPastTime: orgTimeTracking.allowPastTime ?? true,
+        pastTimeLimitDays: orgTimeTracking.pastTimeLimitDays ?? 30,
+        roundingRules: orgTimeTracking.roundingRules || { enabled: false, increment: 15, roundUp: false },
+        notifications: orgTimeTracking.notifications || {
+          onTimerStart: false,
+          onTimerStop: false,
+          onOvertime: false,
+          onApprovalNeeded: false,
+          onTimeSubmitted: false
+        }
       })
 
       await settings.save()
