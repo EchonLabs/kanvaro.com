@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Clock, Play, Pause, Square, TrendingUp, DollarSign } from 'lucide-react'
+import { Clock, Play, Pause, Square, TrendingUp } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -263,7 +263,6 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
             </div>
             {activeTimer.hourlyRate != null && activeTimer.hourlyRate > 0 && (
               <div className="text-sm font-medium text-green-600 dark:text-green-400">
-                <DollarSign className="h-4 w-4 inline mr-1" />
                 <span className="break-words">{formatCurrency((activeTimer.hourlyRate * activeTimer.currentDuration) / 60)}</span>
               </div>
             )}
