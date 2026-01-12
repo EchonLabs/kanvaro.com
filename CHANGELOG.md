@@ -1,3 +1,10 @@
+## [1.23.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.4...v1.23.5) (2026-01-12)
+
+
+### Bug Fixes
+
+* fix attendees ([3fa029b](https://github.com/EchonLabs/kanvaro.com/commit/3fa029b562f60b3ac56fe96a041bf9a8d71fe27c))
+
 ## [1.23.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.3...v1.23.4) (2026-01-12)
 
 
