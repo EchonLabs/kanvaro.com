@@ -730,6 +730,9 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TASK_UPDATE,
     Permission.TASK_CHANGE_STATUS,
     Permission.TASK_MANAGE_COMMENTS,
+
+    // User Stories (assigned stories only)
+    Permission.STORY_READ,
     
     // Team (read only)
     Permission.TEAM_READ,
@@ -1232,6 +1235,7 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.SPRINT_EVENT_VIEW_ALL,
     Permission.TEAM_INVITE, // Organization-wide permission to invite team members
     Permission.TEAM_EDIT,
+    Permission.TEAM_REMOVE,
     Permission.TEAM_DELETE,
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_VIEW_ASSIGNED,
