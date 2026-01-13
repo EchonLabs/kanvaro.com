@@ -939,7 +939,7 @@ export default function StoriesPage() {
                             </p>
                           ) : (
                             columnStories.map((story) => {
-                              const isCreator = story.createdBy?._id === currentUserId || story.createdBy === currentUserId
+                              const isCreator = story.createdBy?.toString() === currentUserId || story.createdBy === currentUserId
                               const canDragStory = canManageAllStories || isCreator
                               const isDraggable = Boolean(story.sprint?._id) && canDragStory
                               const creatorDetails = resolveStoryCreator(story)
