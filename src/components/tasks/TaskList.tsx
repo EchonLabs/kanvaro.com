@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { formatToTitleCase } from '@/lib/utils'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useNotify } from '@/lib/notify'
 import { 
   Search, 
   Filter, 
@@ -74,10 +74,9 @@ interface TaskListProps {
 export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   const router = useRouter()
   const { formatDate } = useDateTime()
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
@@ -149,21 +148,14 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
       if (data.success) {
         setTasks(data.data)
       } else {
-        setError(data.error || 'Failed to fetch tasks')
+        notifyError({ title: 'Error', message: data.error || 'Failed to fetch tasks' })
       }
     } catch (err) {
-      setError('Failed to fetch tasks')
+      notifyError({ title: 'Error', message: 'Failed to fetch tasks' })
     } finally {
       setLoading(false)
     }
   }
-
-  useEffect(() => {
-    if (success) {
-      const t = setTimeout(() => setSuccess(''), 3000)
-      return () => clearTimeout(t)
-    }
-  }, [success])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -275,8 +267,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
             task._id === taskId ? { ...task, ...data.data, status: newStatus as any } : task
           )
         )
-        setSuccess('Task updated successfully.')
-        setError('')
+        notifySuccess({ title: 'Success', message: 'Task updated successfully' })
       } else if (data.success) {
         // If success but no data, just update status
         setTasks(prevTasks => 
@@ -284,8 +275,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
             task._id === taskId ? { ...task, status: newStatus as any } : task
           )
         )
-        setSuccess('Task updated successfully.')
-        setError('')
+        notifySuccess({ title: 'Success', message: 'Task updated successfully' })
       } else {
         // Revert on error
         if (previousStatus) {
@@ -295,7 +285,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
             )
           )
         }
-        setError(data.error || 'Failed to update task status')
+        notifyError({ title: 'Error', message: data.error || 'Failed to update task status' })
       }
     } catch (error) {
       console.error('Failed to update task status:', error)
@@ -310,7 +300,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
       const errorMessage = error instanceof Error 
         ? error.message 
         : 'Failed to update task status. The API endpoint may not be available in this environment.'
-      setError(errorMessage)
+      notifyError({ title: 'Error', message: errorMessage })
     }
   }
 
@@ -344,7 +334,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         setTasks(tasks.filter(task => task._id !== selectedTask._id))
         setShowDeleteModal(false)
         setSelectedTask(null)
-        setSuccess('Task deleted successfully.')
+        notifySuccess({ title: 'Success', message: 'Task deleted successfully' })
       }
     } catch (error) {
       console.error('Failed to delete task:', error)
@@ -357,13 +347,13 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
     fetchTasks()
     setShowEditModal(false)
     setSelectedTask(null)
-    setSuccess('Task updated successfully.')
+    notifySuccess({ title: 'Success', message: 'Task updated successfully' })
   }
 
   const handleTaskCreated = () => {
     fetchTasks() // Refresh the task list
     setShowCreateModal(false)
-    setSuccess('Task created successfully.')
+    notifySuccess({ title: 'Success', message: 'Task created successfully' })
   }
 
   const handleCreateTaskClick = () => {
@@ -396,14 +386,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         </Button> */}
       </div>
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      <div className="flex flex-col gap-3 sm:gap-5 space-y-4 sm:space-y-5">
+      <div className="flex flex-col gap-3 sm:gap-5 space-y-4 sm:space-y-5 mb-12">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
@@ -413,7 +396,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
             className="pl-10 w-full"
           />
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 flex-wrap mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 flex-wrap">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Status" />
@@ -452,11 +435,6 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
             </SelectContent>
           </Select>
         </div>
-        {success && (
-          <Alert variant="success">
-            <AlertDescription>{success}</AlertDescription>
-          </Alert>
-        )}
       </div>
 
       <div className="space-y-8 mt-12">

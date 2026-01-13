@@ -168,6 +168,17 @@ export function useOrganization() {
     } else {
       setLoading(false)
     }
+
+    // Listen for cache invalidation events from organization settings
+    const handleCacheInvalidation = () => {
+      fetchOrganization(true)
+    }
+
+    window.addEventListener('organization-settings-updated', handleCacheInvalidation)
+
+    return () => {
+      window.removeEventListener('organization-settings-updated', handleCacheInvalidation)
+    }
   }, [organization])
 
   return {

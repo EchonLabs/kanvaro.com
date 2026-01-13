@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -12,14 +12,12 @@ import { useOrganization } from '@/hooks/useOrganization'
 import { Building2, Upload, Save, AlertCircle, CheckCircle, X, Users, UserCheck, Building, Crown } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useCurrencies } from '@/hooks/useCurrencies'
-import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { useNotify } from '@/lib/notify'
 
 export function OrganizationSettings() {
   const { success: notifySuccess, error: notifyError } = useNotify()
   const { organization, loading, refetch } = useOrganization()
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay, getCurrencyByCode } = useCurrencies(true)
-  const { currencySymbol } = useOrgCurrency()
   const [saving, setSaving] = useState(false)
   const [savingRegistration, setSavingRegistration] = useState(false)
   const [savingTimeTracking, setSavingTimeTracking] = useState(false)
@@ -77,6 +75,28 @@ export function OrganizationSettings() {
   const [logoMode, setLogoMode] = useState<'single' | 'dual'>('single')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [currencySearchQuery, setCurrencySearchQuery] = useState('')
+
+  // Compute currency symbol from local form state to avoid stale cache issues
+  const currentCurrencySymbol = useMemo(() => {
+    const currency = getCurrencyByCode(formData.currency)
+    return currency?.symbol || '$'
+  }, [formData.currency, getCurrencyByCode])
+
+  // Helper function to invalidate caches and notify other components
+  const invalidateOrganizationCache = useCallback(async () => {
+    // Dispatch custom event to notify other components about settings change
+    window.dispatchEvent(new CustomEvent('organization-settings-updated', {
+      detail: { timestamp: Date.now() }
+    }))
+    
+    // Force cache invalidation by updating window state
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(
+        { ...window.history.state, cacheKey: Date.now() },
+        ''
+      )
+    }
+  }, [])
 
   const timezones = [
     'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
@@ -323,7 +343,12 @@ export function OrganizationSettings() {
       }
 
       // Clear cache and refetch organization data to show updated values (including logos)
-      refetch()
+      await refetch()
+      
+      // Wait a bit for refetch to complete, then invalidate caches
+      setTimeout(() => {
+        invalidateOrganizationCache()
+      }, 100)
 
       notifySuccess({
         title: 'Organization Updated',
@@ -358,7 +383,12 @@ export function OrganizationSettings() {
         throw new Error(errorData.error || 'Failed to update registration settings')
       }
 
-      // No need to refetch since registration settings don't affect other parts of the form
+      // Refetch and invalidate cache to ensure other components see the changes
+      await refetch()
+      setTimeout(() => {
+        invalidateOrganizationCache()
+      }, 100)
+
       notifySuccess({
         title: 'Registration Settings Updated',
         message: 'User registration settings have been updated successfully'
@@ -413,7 +443,13 @@ export function OrganizationSettings() {
         }))
       }
 
-      refetch()
+      await refetch()
+      
+      // Invalidate caches to ensure global settings propagate to all components
+      setTimeout(() => {
+        invalidateOrganizationCache()
+      }, 100)
+
       notifySuccess({
         title: 'Time Tracking Settings Updated',
         message: 'Time tracking configuration has been updated successfully'
@@ -473,7 +509,11 @@ export function OrganizationSettings() {
 
       setNotificationRetentionInput(normalizedRetentionDays.toString())
 
-      refetch()
+      await refetch()
+      setTimeout(() => {
+        invalidateOrganizationCache()
+      }, 100)
+
       notifySuccess({
         title: 'Notification Settings Updated',
         message: 'Notification retention settings have been updated successfully'
@@ -1071,7 +1111,7 @@ export function OrganizationSettings() {
 
               {formData.timeTracking.allowBillableTime && (
                 <div>
-                  <Label htmlFor="defaultHourlyRate" className="text-xs sm:text-sm">Default Hourly Rate ({currencySymbol})</Label>
+                  <Label htmlFor="defaultHourlyRate" className="text-xs sm:text-sm">Default Hourly Rate ({currentCurrencySymbol})</Label>
                   <Input
                     id="defaultHourlyRate"
                     type="number"

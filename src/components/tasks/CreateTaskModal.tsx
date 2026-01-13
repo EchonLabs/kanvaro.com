@@ -737,7 +737,7 @@ export default function CreateTaskModal({
 
               <div className="md:col-span-2 space-y-2">
                 <label className="text-sm font-medium text-foreground">Attachments</label>
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap mt-3">
                   <input
                     ref={attachmentInputRef}
                     type="file"
@@ -1136,7 +1136,7 @@ export default function CreateTaskModal({
               <div>
                 <label className="text-sm font-medium text-foreground">Labels</label>
                 <div className="space-y-2">
-                  <div className="flex space-x-2">
+                  <div className="flex space-x-2 mt-3">
                     <Input
                       value={newLabel}
                       onChange={(e) => setNewLabel(e.target.value)}
@@ -1174,8 +1174,8 @@ export default function CreateTaskModal({
             </div>
 
             {/* Subtasks Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
+            <div className="space-y-4 mt-16">
+              <div className="flex items-center justify-between mt-4">
                 <h3 className="text-lg font-medium">Subtasks</h3>
                 <Button type="button" variant="outline" size="sm" onClick={addSubtask}>
                   <Plus className="h-4 w-4 mr-2" />
@@ -1231,8 +1231,8 @@ export default function CreateTaskModal({
 
           </form>
         </CardContent>
-        <div className="flex-shrink-0 px-4 sm:px-6 pb-4 sm:pb-6 pt-3 sm:pt-4 border-t">
-          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-0 sm:space-x-2">
+        <div className="flex-shrink-0 px-4 sm:px-6 pb-4 sm:pb-6 pt-6 border-t">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-0 sm:space-x-2 mt-2">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
