@@ -95,6 +95,7 @@ ActiveTimerSchema.index({ organization: 1 })
 ActiveTimerSchema.index({ project: 1 })
 ActiveTimerSchema.index({ task: 1 })
 ActiveTimerSchema.index({ lastActivity: 1 })
+ActiveTimerSchema.index({ startTime: 1 }) // For efficient timer expiry queries in cron jobs
 
 // Virtual for current duration
 ActiveTimerSchema.virtual('currentDuration').get(function() {
