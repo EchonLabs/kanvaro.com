@@ -1,3 +1,11 @@
+## [1.23.8](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.7...v1.23.8) (2026-01-13)
+
+
+### Bug Fixes
+
+* add fixes ([a5a57fc](https://github.com/EchonLabs/kanvaro.com/commit/a5a57fcf6832806d86e185f29ef74fe9f0954cde))
+* add permission issues ([12064ac](https://github.com/EchonLabs/kanvaro.com/commit/12064acc88bff3a981fe648cc6ff1489cd1f5f14))
+
 ## [1.23.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.6...v1.23.7) (2026-01-13)
 
 
