@@ -730,6 +730,9 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TASK_UPDATE,
     Permission.TASK_CHANGE_STATUS,
     Permission.TASK_MANAGE_COMMENTS,
+
+    // User Stories (assigned stories only)
+    Permission.STORY_READ,
     
     // Team (read only)
     Permission.TEAM_READ,
