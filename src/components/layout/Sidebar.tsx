@@ -322,7 +322,7 @@ const navigationItems = [
     label: 'Settings',
     icon: Settings,
     path: '/settings',
-    permission: Permission.SETTINGS_READ
+    permission: Permission.SETTINGS_VIEW
   }
 ]
 

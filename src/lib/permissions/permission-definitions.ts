@@ -128,7 +128,7 @@ export enum Permission {
   TIME_LOG_REPORT_ACCESS = 'time_tracking:report_access',
   
   // Settings permissions
-  SETTINGS_READ = 'settings:read',
+    SETTINGS_VIEW = 'settings:view',
   SETTINGS_UPDATE = 'settings:update',
   SETTINGS_MANAGE_EMAIL = 'settings:manage_email',
   SETTINGS_MANAGE_DATABASE = 'settings:manage_database',
@@ -228,6 +228,7 @@ export enum ProjectRole {
   PROJECT_VIEWER = 'project_viewer',
   PROJECT_CLIENT = 'project_client',
   PROJECT_QA_LEAD = 'project_qa_lead',
+      Permission.SETTINGS_VIEW,
   PROJECT_TESTER = 'project_tester',
 }
 
@@ -306,7 +307,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.FINANCIAL_MANAGE_PAYMENTS,
     
     // Reporting
-    Permission.REPORTING_VIEW,
     Permission.REPORTING_CREATE,
     Permission.REPORTING_EXPORT,
     Permission.REPORTING_SHARE,
@@ -390,6 +390,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.DOCUMENTATION_SEARCH,
     Permission.DOCUMENTATION_CREATE,
     Permission.DOCUMENTATION_UPDATE,
+      Permission.SETTINGS_VIEW,
     Permission.DOCUMENTATION_DELETE,
     Permission.DOCUMENTATION_UPDATE,
     Permission.DOCUMENTATION_DELETE,
@@ -468,7 +469,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.FINANCIAL_APPROVE_EXPENSE,
     Permission.FINANCIAL_CREATE_INVOICE,
     Permission.FINANCIAL_SEND_INVOICE,
-    Permission.FINANCIAL_MANAGE_PAYMENTS,
     
     // Reporting
     Permission.REPORTING_VIEW,
