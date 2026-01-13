@@ -47,6 +47,7 @@ import { DateRange } from 'react-day-picker'
 import { useNotify } from '@/lib/notify'
 import { usePermissions } from '@/lib/permissions/permission-hooks'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionGate } from '@/lib/permissions/permission-components'
 
 interface UserSummary {
   _id: string
@@ -132,6 +133,7 @@ export default function BacklogPage() {
   const { formatDate } = useDateTime()
   const { hasPermission } = usePermissions()
   const canManageSprints = hasPermission(Permission.SPRINT_MANAGE)
+  const canCreateTask = hasPermission(Permission.TASK_CREATE)
   const [deleteError, setDeleteError] = useState('')
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -1412,18 +1414,24 @@ export default function BacklogPage() {
               {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
               Refresh
             </Button>
-            <Button variant="outline" onClick={() => router.push('/epics/create-epic')} className="w-full sm:w-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              New Epic
-            </Button>
-            <Button variant="outline" onClick={() => router.push('/stories/create-story')} className="w-full sm:w-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              New Story
-            </Button>
-            <Button onClick={() => router.push('/tasks/create-new-task')} className="w-full sm:w-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              New Task
-            </Button>
+            <PermissionGate permission={Permission.EPIC_CREATE}>
+              <Button variant="outline" onClick={() => router.push('/epics/create-epic')} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                New Epic
+              </Button>
+            </PermissionGate>
+            <PermissionGate permission={Permission.STORY_CREATE}>
+              <Button variant="outline" onClick={() => router.push('/stories/create-story')} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                New Story
+              </Button>
+            </PermissionGate>
+            {canCreateTask && (
+              <Button onClick={() => router.push('/tasks/create-new-task')} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                New Task
+              </Button>
+            )}
           </div>
         </div>
 

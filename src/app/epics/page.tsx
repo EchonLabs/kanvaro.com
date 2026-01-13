@@ -16,6 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionGate } from '@/lib/permissions/permission-components'
 import { useNotify } from '@/lib/notify'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { extractUserId } from '@/lib/auth/user-utils'
@@ -348,18 +349,20 @@ export default function EpicsPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Epics</h1>
             <p className="text-sm sm:text-base text-muted-foreground">Manage your product epics and large features</p>
           </div>
-          <Button
-            onClick={() => {
-              if (!canCreateEpic) return
-              router.push('/epics/create-epic')
-            }}
-            disabled={!canCreateEpic}
-            title={!canCreateEpic ? 'You need epic:create permission to create an epic.' : undefined}
-            className="w-full sm:w-auto"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Epic
-          </Button>
+          <PermissionGate permission={Permission.EPIC_CREATE}>
+            <Button
+              onClick={() => {
+                if (!canCreateEpic) return
+                router.push('/epics/create-epic')
+              }}
+              disabled={!canCreateEpic}
+              title={!canCreateEpic ? 'You need epic:create permission to create an epic.' : undefined}
+              className="w-full sm:w-auto"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Epic
+            </Button>
+          </PermissionGate>
         </div>
 
 
@@ -465,29 +468,31 @@ export default function EpicsPage() {
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Epic
                                 </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  disabled={!editAllowed}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    if (!editAllowed) return
-                                    router.push(`/epics/${epic._id}/edit`)
-                                  }}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit Epic
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  disabled={!deleteAllowed}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    if (!deleteAllowed) return
-                                    handleDeleteClick(epic)
-                                  }}
-                                  className="text-destructive focus:text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete Epic
-                                </DropdownMenuItem>
+                                {editAllowed && (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      router.push(`/epics/${epic._id}/edit`)
+                                    }}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit Epic
+                                  </DropdownMenuItem>
+                                )}
+                                {deleteAllowed && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem 
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleDeleteClick(epic)
+                                      }}
+                                      className="text-destructive focus:text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete Epic
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
@@ -673,29 +678,31 @@ export default function EpicsPage() {
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Epic
                                 </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  disabled={!editAllowed}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    if (!editAllowed) return
-                                    router.push(`/epics/${epic._id}/edit`)
-                                  }}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit Epic
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  disabled={!deleteAllowed}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    if (!deleteAllowed) return
-                                    handleDeleteClick(epic)
-                                  }}
-                                  className="text-destructive focus:text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete Epic
-                                </DropdownMenuItem>
+                                {editAllowed && (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      router.push(`/epics/${epic._id}/edit`)
+                                    }}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit Epic
+                                  </DropdownMenuItem>
+                                )}
+                                {deleteAllowed && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem 
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleDeleteClick(epic)
+                                      }}
+                                      className="text-destructive focus:text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete Epic
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>

@@ -29,9 +29,19 @@ interface ViewTaskModalProps {
   task: any
   onEdit: () => void
   onDelete: () => void
+  canEdit?: boolean
+  canDelete?: boolean
 }
 
-export default function ViewTaskModal({ isOpen, onClose, task, onEdit, onDelete }: ViewTaskModalProps) {
+export default function ViewTaskModal({ 
+  isOpen, 
+  onClose, 
+  task, 
+  onEdit, 
+  onDelete,
+  canEdit = true,
+  canDelete = true
+}: ViewTaskModalProps) {
   if (!isOpen || !task) return null
 
   const { formatDate, formatTime } = useDateTime()
@@ -113,11 +123,23 @@ export default function ViewTaskModal({ isOpen, onClose, task, onEdit, onDelete 
               <CardDescription>Task Details</CardDescription>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" onClick={onEdit}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onEdit}
+                disabled={!canEdit}
+                title={!canEdit ? 'You need TASK_EDIT_ALL permission or be the creator to edit this task' : undefined}
+              >
                 <Edit className="h-4 w-4 mr-2" />
                 Edit
               </Button>
-              <Button variant="destructive" size="sm" onClick={onDelete}>
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                onClick={onDelete}
+                disabled={!canDelete}
+                title={!canDelete ? 'You need TASK_DELETE_ALL permission or be the creator to delete this task' : undefined}
+              >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete
               </Button>

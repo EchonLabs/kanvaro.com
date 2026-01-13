@@ -74,6 +74,7 @@ import { ProjectTeamTab } from '@/components/projects/ProjectTeamTab'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { Permission } from '@/lib/permissions'
 import { usePermissions } from '@/lib/permissions/permission-context'
+import { PermissionGate } from '@/lib/permissions/permission-components'
 
 interface Project {
   _id: string
@@ -192,6 +193,7 @@ export default function ProjectDetailPage() {
   const { formatDate } = useDateTime()
   const { hasPermission } = usePermissions()
   const canUpdateProject = hasPermission(Permission.PROJECT_UPDATE)
+  const canCreateTask = hasPermission(Permission.TASK_CREATE)
 
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
@@ -649,10 +651,12 @@ export default function ProjectDetailPage() {
                 Edit Project
               </Button>
             )}
-            <Button size="sm" onClick={() => setShowCreateTaskModal(true)} className="w-full sm:w-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Task
-            </Button>
+            {canCreateTask && (
+              <Button size="sm" onClick={() => setShowCreateTaskModal(true)} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Task
+              </Button>
+            )}
           </div>
         </div>
 
@@ -932,15 +936,20 @@ export default function ProjectDetailPage() {
                       <Plus className="mr-2 h-4 w-4" />
                       Add Task
                     </Button> */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full justify-start"
-                      onClick={() => router.push(`/projects/${projectId}?tab=team`)}
+                    <PermissionGate 
+                      permission={Permission.PROJECT_MANAGE_TEAM}
+                      projectId={projectId}
                     >
-                      <Users className="mr-2 h-4 w-4" />
-                      Manage Team
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-start"
+                        onClick={() => router.push(`/projects/${projectId}?tab=team`)}
+                      >
+                        <Users className="mr-2 h-4 w-4" />
+                        Manage Team
+                      </Button>
+                    </PermissionGate>
                     <Button
                       variant="outline"
                       size="sm"
@@ -1336,10 +1345,15 @@ export default function ProjectDetailPage() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Expenses</CardTitle>
-                    <Button onClick={() => setShowAddExpenseDialog(true)} size="sm">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Expense
-                    </Button>
+                    <PermissionGate 
+                      permission={Permission.PROJECT_MANAGE_BUDGET}
+                      projectId={projectId}
+                    >
+                      <Button onClick={() => setShowAddExpenseDialog(true)} size="sm">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Expense
+                      </Button>
+                    </PermissionGate>
                   </div>
                 </CardHeader>
 
@@ -1381,38 +1395,43 @@ export default function ProjectDetailPage() {
                                     </TooltipProvider>
                                   )}
                                 </div>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 w-8 p-0"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={(e) => {
-                                      e.stopPropagation()
-                                      setEditingExpense(expense)
-                                    }}>
-                                      <Edit className="h-4 w-4 mr-2" />
-                                      Edit Expense
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      onClick={(e) => {
+                                <PermissionGate 
+                                  permission={Permission.PROJECT_MANAGE_BUDGET}
+                                  projectId={projectId}
+                                >
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={(e) => {
                                         e.stopPropagation()
-                                        handleExpenseDeleted(expense._id, expense.name)
-                                      }}
-                                      className="text-destructive"
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                                        setEditingExpense(expense)
+                                      }}>
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        Edit Expense
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleExpenseDeleted(expense._id, expense.name)
+                                        }}
+                                        className="text-destructive"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </PermissionGate>
                               </div>
 
                               <div className="flex items-center justify-start mb-2">

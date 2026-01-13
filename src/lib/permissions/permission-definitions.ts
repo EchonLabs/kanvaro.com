@@ -162,6 +162,7 @@ export enum Permission {
   STORY_UPDATE = 'story:update',
   STORY_DELETE = 'story:delete',
   STORY_VIEW_ALL = 'story:view_all',
+  STORY_MANAGE_ALL = 'story:manage_all',
   
   // Calendar permissions
   CALENDAR_READ = 'calendar:read',
@@ -509,6 +510,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.STORY_UPDATE,
     Permission.STORY_DELETE,
     
+    Permission.STORY_MANAGE_ALL,
+    
     // Calendar
     Permission.CALENDAR_READ,
     Permission.CALENDAR_CREATE,
@@ -665,6 +668,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.STORY_UPDATE,
     Permission.STORY_DELETE,
     Permission.STORY_VIEW_ALL,
+    Permission.STORY_MANAGE_ALL,
     
     // Calendar
     Permission.CALENDAR_READ,
@@ -721,8 +725,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Projects (assigned projects only)
     Permission.PROJECT_READ,
     
-    // Tasks (assigned tasks)
-    Permission.TASK_CREATE,
+    // Tasks (assigned tasks only)
     Permission.TASK_READ,
     Permission.TASK_UPDATE,
     Permission.TASK_CHANGE_STATUS,
@@ -747,7 +750,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.SETTINGS_READ,
     
     // Epics (read only)
-    Permission.EPIC_CREATE,
     Permission.EPIC_VIEW,
     Permission.EPIC_READ,
     

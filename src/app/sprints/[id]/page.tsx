@@ -249,7 +249,7 @@ export default function SprintDetailPage() {
 
   const canCreateSprint = hasPermission(Permission.SPRINT_CREATE)
   const canViewSprint = hasPermission(Permission.SPRINT_VIEW) || hasPermission(Permission.SPRINT_READ)
-  const canEditSprint = hasPermission(Permission.SPRINT_EDIT) && canCreateSprint
+  const canEditSprint = hasPermission(Permission.SPRINT_EDIT) && hasPermission(Permission.SPRINT_CREATE)
   const canDeleteSprint = hasPermission(Permission.SPRINT_DELETE)
   const canStartSprint = hasPermission(Permission.SPRINT_START)
   const canCompleteSprint = hasPermission(Permission.SPRINT_COMPLETE)
@@ -984,28 +984,30 @@ export default function SprintDetailPage() {
                       {completingSprint ? 'Completing...' : 'Complete Sprint'}
                     </Button>
                   )}
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      if (!canEditSprint) return
-                      router.push(`/sprints/${sprintId}/edit`)
-                    }}
-                    className="min-h-[36px] w-full sm:w-auto"
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={() => {
-                      if (!canDeleteSprint) return
-                      setShowDeleteConfirm(true)
-                    }}
-                    className="min-h-[36px] w-full sm:w-auto"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </Button>
+                  {canEditSprint && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        router.push(`/sprints/${sprintId}/edit`)
+                      }}
+                      className="min-h-[36px] w-full sm:w-auto"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                  )}
+                  {canDeleteSprint && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        setShowDeleteConfirm(true)
+                      }}
+                      className="min-h-[36px] w-full sm:w-auto"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
