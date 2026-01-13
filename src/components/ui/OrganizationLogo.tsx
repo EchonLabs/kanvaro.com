@@ -82,9 +82,7 @@ export const OrganizationLogo = ({
       <img
         src={logoSrc}
         alt="Organization logo"
-        className={`object-contain ${sizeClasses[size]} ${className} ${
-          currentTheme === 'dark' ? 'brightness-0 invert' : ''
-        }`}
+        className={`object-contain ${sizeClasses[size]} ${className}`}
       />
     )
   }

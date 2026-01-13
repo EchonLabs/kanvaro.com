@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { authenticateUser } from '@/lib/auth-utils';
 import { DocsLoader } from '@/lib/docs/loader';
 import { DocsLayout } from '@/components/docs/DocsLayout';
+import { DocCard } from '@/components/docs/DocCard';
 import { Category, Audience } from '@/lib/docs/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -245,35 +246,38 @@ export default async function InternalDocsIndex({ searchParams }: PageProps) {
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {categoryDocs.map((doc) => (
-                  <Card key={doc.slug} className="hover:shadow-md transition-shadow">
-                    <Link href={`/docs/internal/${doc.slug}`} target="_blank" rel="noopener noreferrer">
-                      <CardHeader className="p-4 sm:p-6">
-                        <CardTitle className="text-base sm:text-lg break-words">{doc.title}</CardTitle>
-                        <CardDescription className="line-clamp-3 text-xs sm:text-sm">
-                          {doc.summary}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="p-4 sm:p-6 pt-0">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
-                          <div className="flex flex-wrap gap-2 flex-1 min-w-0">
-                            {doc.audiences.slice(0, 2).map(audience => (
-                              <Badge key={audience} variant="secondary" className="text-xs flex-shrink-0">
-                                {audienceLabels[audience]}
-                              </Badge>
-                            ))}
-                            {doc.audiences.length > 2 && (
-                              <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
-                                +{doc.audiences.length - 2} more
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-xs text-muted-foreground flex-shrink-0 whitespace-nowrap">
-                            {new Date(doc.updated).toISOString().split('T')[0]}
-                          </span>
+                  <DocCard
+                    key={doc.slug}
+                    href={`/docs/internal/${doc.slug}`}
+                    title={doc.title}
+                    summary={doc.summary}
+                  >
+                    <CardHeader className="p-4 sm:p-6">
+                      <CardTitle className="text-base sm:text-lg break-words">{doc.title}</CardTitle>
+                      <CardDescription className="line-clamp-3 text-xs sm:text-sm">
+                        {doc.summary}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-4 sm:p-6 pt-0">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+                        <div className="flex flex-wrap gap-2 flex-1 min-w-0">
+                          {doc.audiences.slice(0, 2).map(audience => (
+                            <Badge key={audience} variant="secondary" className="text-xs flex-shrink-0">
+                              {audienceLabels[audience]}
+                            </Badge>
+                          ))}
+                          {doc.audiences.length > 2 && (
+                            <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
+                              +{doc.audiences.length - 2} more
+                            </span>
+                          )}
                         </div>
-                      </CardContent>
-                    </Link>
-                  </Card>
+                        <span className="text-xs text-muted-foreground flex-shrink-0 whitespace-nowrap">
+                          {new Date(doc.updated).toISOString().split('T')[0]}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </DocCard>
                 ))}
               </div>
             </div>
@@ -312,29 +316,26 @@ export default async function InternalDocsIndex({ searchParams }: PageProps) {
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Card className="hover:shadow-md transition-shadow">
-                <Link href="/docs/internal/operations/deployment" target="_blank" rel="noopener noreferrer">
-                  <CardContent className="flex items-center p-3 sm:p-4">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-destructive/10 rounded-lg flex items-center justify-center">
-                        <svg className="w-4 h-4 sm:w-5 sm:h-5 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-                        </svg>
-                      </div>
+              <DocCard href="/docs/internal/operations/deployment" title="" summary="">
+                <CardContent className="flex items-center p-3 sm:p-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-destructive/10 rounded-lg flex items-center justify-center">
+                      <svg className="w-4 h-4 sm:w-5 sm:h-5 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                      </svg>
                     </div>
-                    <div className="ml-3 sm:ml-4 flex-1 min-w-0">
-                      <h3 className="text-xs sm:text-sm font-medium text-foreground truncate">Deployment Guide</h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground break-words">Production deployment procedures</p>
-                    </div>
-                  </CardContent>
-                </Link>
-              </Card>
+                  </div>
+                  <div className="ml-3 sm:ml-4 flex-1 min-w-0">
+                    <h3 className="text-xs sm:text-sm font-medium text-foreground truncate">Deployment Guide</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground break-words">Production deployment procedures</p>
+                  </div>
+                </CardContent>
+              </DocCard>
               
-              <Card className="hover:shadow-md transition-shadow">
-                <Link href="/docs/internal/operations/monitoring" target="_blank" rel="noopener noreferrer">
-                  <CardContent className="flex items-center p-3 sm:p-4">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+              <DocCard href="/docs/internal/operations/monitoring" title="" summary="">
+                <CardContent className="flex items-center p-3 sm:p-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-orange-100 rounded-lg flex items-center justify-center">
                         <svg className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
@@ -345,17 +346,16 @@ export default async function InternalDocsIndex({ searchParams }: PageProps) {
                       <p className="text-xs sm:text-sm text-muted-foreground break-words">Health checks and monitoring setup</p>
                     </div>
                   </CardContent>
-                </Link>
-              </Card>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </DocsLayout>
-  );
-}
-
-export const metadata = {
+                </DocCard>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </DocsLayout>
+    );
+  }
+  
+  export const metadata = {
   title: 'Internal Documentation - Kanvaro',
   description: 'Advanced guides, operations runbooks, and configuration matrices for administrators and technical teams.',
   openGraph: {

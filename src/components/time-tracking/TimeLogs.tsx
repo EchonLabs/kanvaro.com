@@ -2419,13 +2419,11 @@ export function TimeLogs({
               {/* Table Header - Hidden on mobile */}
               <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium overflow-x-auto ${
                 showSelectionAndApproval && canApproveTimeLogs 
-                  ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]' 
-                  : showSelectionAndApproval
-                    ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]'
-                    : 'grid-cols-[minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)]'
+                  ? 'grid-cols-[40px_minmax(150px,1.5fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]' 
+                  : 'grid-cols-[minmax(200px,2fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
               }`}>
-                {showSelectionAndApproval && (
-                  <div>
+                {showSelectionAndApproval && canApproveTimeLogs && (
+                  <div className="flex items-center justify-center">
                     <Checkbox
                       checked={allSelected}
                       onCheckedChange={(checked) => handleSelectAll(!!checked)}
@@ -2440,7 +2438,7 @@ export function TimeLogs({
                 <div>Duration</div>
                 <div>Status</div>
                 <div>Billable</div>
-                {showSelectionAndApproval && <div>Approval</div>}
+                <div>Approval</div>
                 <div>Actions</div>
               </div>
 
@@ -2451,7 +2449,7 @@ export function TimeLogs({
                   <div className="md:hidden p-3 space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
-                        {showSelectionAndApproval && !entry.__isActive && (
+                        {showSelectionAndApproval && canApproveTimeLogs && !entry.__isActive && (
                           <Checkbox
                             checked={selectedEntries.includes(entry._id)}
                             onCheckedChange={(checked) => handleSelectEntry(entry._id, checked as boolean)}
@@ -2594,14 +2592,12 @@ export function TimeLogs({
                   </div>
 
                   {/* Desktop Table View */}
-                  <div className={`hidden md:grid gap-2 p-3 overflow-x-auto ${
+                  <div className={`hidden md:grid gap-2 p-3 items-center overflow-x-auto ${
                     showSelectionAndApproval && canApproveTimeLogs 
-                      ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]' 
-                      : showSelectionAndApproval
-                        ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]'
-                        : 'grid-cols-[minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)]'
+                      ? 'grid-cols-[40px_minmax(150px,1.5fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]' 
+                      : 'grid-cols-[minmax(200px,2fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
                   }`}>
-                    {showSelectionAndApproval && (
+                    {showSelectionAndApproval && canApproveTimeLogs && (
                       <div className="flex items-center justify-center">
                         <Checkbox
                           id={`select-${entry._id}`}
@@ -2684,42 +2680,40 @@ export function TimeLogs({
                         {entry.isBillable ? 'Yes' : 'No'}
                       </Badge>
                     </div>
-                    {showSelectionAndApproval && (
-                      <div>
-                        {(() => {
-                          // If project doesn't require approval, always show as Approved
-                          const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
+                    <div>
+                      {(() => {
+                        // If project doesn't require approval, always show as Approved
+                        const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
 
-                          const isApproved = projectRequiresApproval ? entry.isApproved : true;
-                          const isRejected = entry.isReject;
+                        const isApproved = projectRequiresApproval ? entry.isApproved : true;
+                        const isRejected = entry.isReject;
 
-                          let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
-                          let badgeText = 'Pending';
+                        let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
+                        let badgeText = 'Pending';
 
-                          if (isRejected) {
-                            badgeVariant = 'destructive';
-                            badgeText = 'Rejected';
-                          } else if (isApproved) {
-                            badgeVariant = 'default';
-                            badgeText = 'Approved';
-                          }
+                        if (isRejected) {
+                          badgeVariant = 'destructive';
+                          badgeText = 'Rejected';
+                        } else if (isApproved) {
+                          badgeVariant = 'default';
+                          badgeText = 'Approved';
+                        }
 
-                          return (
-                        <Badge
-                              variant={badgeVariant}
-                          className="text-xs"
-                        >
-                              {badgeText}
-                        </Badge>
-                          );
-                        })()}
-                        {entry.approvedBy && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            by {entry.approvedBy.firstName} {entry.approvedBy.lastName}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                        return (
+                      <Badge
+                            variant={badgeVariant}
+                        className="text-xs whitespace-nowrap"
+                      >
+                            {badgeText}
+                      </Badge>
+                        );
+                      })()}
+                      {entry.approvedBy && (
+                        <div className="text-xs text-muted-foreground mt-1 truncate" title={`by ${entry.approvedBy.firstName} ${entry.approvedBy.lastName}`}>
+                          by {entry.approvedBy.firstName} {entry.approvedBy.lastName}
+                        </div>
+                      )}
+                    </div>
                     <div className="flex items-center">
                       <DropdownMenu.Root>
                         <DropdownMenu.Trigger asChild>

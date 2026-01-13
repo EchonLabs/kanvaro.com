@@ -296,6 +296,17 @@ export default function ProjectDetailPage() {
       fetchTasks()
       fetchGlobalTimeTrackingSettings()
     }
+
+    // Listen for organization settings updates to refresh global time tracking settings
+    const handleOrganizationSettingsUpdated = () => {
+      fetchGlobalTimeTrackingSettings()
+    }
+
+    window.addEventListener('organization-settings-updated', handleOrganizationSettingsUpdated)
+
+    return () => {
+      window.removeEventListener('organization-settings-updated', handleOrganizationSettingsUpdated)
+    }
   }, [projectId])
 
   const fetchExpenses = async () => {
