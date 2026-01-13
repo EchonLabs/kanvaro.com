@@ -1,3 +1,11 @@
+## [1.23.9](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.8...v1.23.9) (2026-01-13)
+
+
+### Bug Fixes
+
+* add fixes ([792b797](https://github.com/EchonLabs/kanvaro.com/commit/792b7974d36049bc1a2fb02571c321c4ae911b92))
+* fix remove memeber button ([2bed6e8](https://github.com/EchonLabs/kanvaro.com/commit/2bed6e8f55fdf86bb9b6022c7d022f437da45f2c))
+
 ## [1.23.8](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.7...v1.23.8) (2026-01-13)
 
 
