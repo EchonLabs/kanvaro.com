@@ -155,13 +155,15 @@ export async function PUT(
       )
     }
 
-    const isCreator = existingEpic.createdBy?._id?.toString?.() === userId.toString()
+    const isCreator = existingEpic.createdBy?.toString?.() === userId.toString()
 
     const canEditEpic = isCreator || await PermissionService.hasPermission(
       userId.toString(),
-      Permission.EPIC_EDIT
+      Permission.EPIC_EDIT,
+      existingEpic.project._id?.toString()
     )
-    
+console.log('canEditEpic',canEditEpic);
+
     if (!canEditEpic) {
       return NextResponse.json(
         { error: 'You do not have permission to edit this epic' },

@@ -121,9 +121,8 @@ export default function MembersPage() {
 
   const canViewMembers = hasPermission(Permission.TEAM_READ) || hasPermission(Permission.USER_READ)
   const canInviteMembers = hasPermission(Permission.TEAM_INVITE) || hasPermission(Permission.USER_INVITE)
-  const canEditMembers = hasPermission(Permission.TEAM_EDIT) && hasPermission(Permission.USER_UPDATE)
-  const canEditAdminMembers = hasPermission(Permission.TEAM_EDIT) && hasPermission(Permission.USER_MANAGE_ROLES)
-  const canDeleteMembers = hasPermission(Permission.USER_DEACTIVATE)
+  const canEditMembers = hasPermission(Permission.TEAM_EDIT)
+  const canDeleteMembers = hasPermission(Permission.TEAM_REMOVE)
 
   // Check if any filters are active
   const hasActiveFilters = searchQuery !== '' || roleFilter !== 'all' || statusFilter !== 'all'
@@ -291,7 +290,7 @@ export default function MembersPage() {
     }
 
     const requiresAdminAccess = member.role === 'admin'
-    if (!canEditMembers || (requiresAdminAccess && !canEditAdminMembers)) {
+    if (!canEditMembers) {
       notifyError({ title: 'You do not have permission to edit this member.' })
       return
     }
@@ -360,8 +359,6 @@ export default function MembersPage() {
   }
 
   const handleRemoveMemberClick = (member: Member) => {
-    // Extra guard: do not allow removing admins or HR from here
-    if (member.role === 'admin' || member.role === 'human_resource') return
     if (!canDeleteMembers) {
       notifyError({ title: 'You do not have permission to delete team members.' })
       return
@@ -442,7 +439,7 @@ export default function MembersPage() {
     if (newRole === member.role) return
 
     // Prevent assigning admin role without proper permission
-    if (newRole === 'admin' && !canEditAdminMembers) {
+    if (newRole === 'admin' && !canEditMembers) {
       notifyError({ title: 'You do not have permission to assign admin role.' })
       return
     }
@@ -554,7 +551,7 @@ export default function MembersPage() {
 
   const canEditMemberRecord = (member: Member) => {
     if (member.role === 'admin' || member.role === 'human_resource') {
-      return canEditAdminMembers
+      return canEditMembers
     }
     return canEditMembers
   }
@@ -758,7 +755,7 @@ export default function MembersPage() {
                                   Edit
                                 </Button>
                               )}
-                              {canDeleteMembers && member.role !== 'admin' && member.role !== 'human_resource' && member.isActive && (
+                              {canDeleteMembers && member.isActive && (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -822,7 +819,7 @@ export default function MembersPage() {
                               Edit
                             </Button>
                           )}
-                          {canDeleteMembers && member.role !== 'admin' && member.role !== 'human_resource' && member.isActive && (
+                          {canDeleteMembers && member.isActive && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -1093,7 +1090,7 @@ export default function MembersPage() {
           member={editingMember}
           onClose={() => setEditingMember(null)}
           onUpdate={handleUpdateMember}
-          canEditAdminUsers={canEditAdminMembers}
+          canEditAdminUsers={canEditMembers}
         />
       )}
       <ConfirmationModal

@@ -349,30 +349,30 @@ export default function EpicDetailPage() {
                   <span className="break-words overflow-wrap-anywhere">{epic?.title}</span>
               </h1>
                 <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap ml-auto">
-            <Button
-              variant="outline"
-              disabled={!editAllowed}
-              onClick={() => {
-                if (!editAllowed) return
-                router.push(`/epics/${epicId}/edit`)
-              }}
-                    className="min-h-[36px] w-full sm:w-auto"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-            <Button
-              variant="destructive"
-                    disabled={!deleteAllowed}
-              onClick={() => {
-                      if (!deleteAllowed) return
-                      setShowDeleteConfirmModal(true)
-              }}
-                    className="min-h-[36px] w-full sm:w-auto"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-            </Button>
+                  {editAllowed && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        router.push(`/epics/${epicId}/edit`)
+                      }}
+                      className="min-h-[36px] w-full sm:w-auto"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                  )}
+                  {deleteAllowed && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        setShowDeleteConfirmModal(true)
+                      }}
+                      className="min-h-[36px] w-full sm:w-auto"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

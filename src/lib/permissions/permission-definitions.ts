@@ -162,6 +162,7 @@ export enum Permission {
   STORY_UPDATE = 'story:update',
   STORY_DELETE = 'story:delete',
   STORY_VIEW_ALL = 'story:view_all',
+  STORY_MANAGE_ALL = 'story:manage_all',
   
   // Calendar permissions
   CALENDAR_READ = 'calendar:read',
@@ -509,6 +510,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.STORY_UPDATE,
     Permission.STORY_DELETE,
     
+    Permission.STORY_MANAGE_ALL,
+    
     // Calendar
     Permission.CALENDAR_READ,
     Permission.CALENDAR_CREATE,
@@ -665,6 +668,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.STORY_UPDATE,
     Permission.STORY_DELETE,
     Permission.STORY_VIEW_ALL,
+    Permission.STORY_MANAGE_ALL,
     
     // Calendar
     Permission.CALENDAR_READ,
@@ -721,12 +725,14 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Projects (assigned projects only)
     Permission.PROJECT_READ,
     
-    // Tasks (assigned tasks)
-    Permission.TASK_CREATE,
+    // Tasks (assigned tasks only)
     Permission.TASK_READ,
     Permission.TASK_UPDATE,
     Permission.TASK_CHANGE_STATUS,
     Permission.TASK_MANAGE_COMMENTS,
+
+    // User Stories (assigned stories only)
+    Permission.STORY_READ,
     
     // Team (read only)
     Permission.TEAM_READ,
@@ -747,7 +753,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.SETTINGS_READ,
     
     // Epics (read only)
-    Permission.EPIC_CREATE,
     Permission.EPIC_VIEW,
     Permission.EPIC_READ,
     
@@ -1230,6 +1235,7 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.SPRINT_EVENT_VIEW_ALL,
     Permission.TEAM_INVITE, // Organization-wide permission to invite team members
     Permission.TEAM_EDIT,
+    Permission.TEAM_REMOVE,
     Permission.TEAM_DELETE,
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_VIEW_ASSIGNED,

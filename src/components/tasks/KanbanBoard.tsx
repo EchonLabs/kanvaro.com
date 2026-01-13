@@ -48,6 +48,9 @@ import VirtualizedColumn from './VirtualizedColumn'
 import SortableTask from './SortableTask'
 import { ITask } from '@/models/Task'
 import { useRouter } from 'next/navigation'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions'
+import { PermissionGate } from '@/lib/permissions/permission-components'
 
 interface PopulatedTask extends Omit<ITask, 'assignedTo' | 'project'> {
   project?: {
@@ -486,18 +489,23 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
             </SelectContent>
           </Select>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:ml-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowColumnSettings(true)}
-              disabled={selectedProjectId === 'all'}
-              title={selectedProjectId === 'all' ? 'Please select a specific project to manage columns' : 'Manage Kanban columns'}
-              className="w-full sm:w-auto"
+            <PermissionGate 
+              permission={Permission.TASK_EDIT_ALL}
+              projectId={selectedProjectId !== 'all' ? selectedProjectId : undefined}
             >
-              <Settings className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Manage Columns</span>
-              <span className="sm:hidden">Columns</span>
-            </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowColumnSettings(true)}
+                disabled={selectedProjectId === 'all'}
+                title={selectedProjectId === 'all' ? 'Please select a specific project to manage columns' : 'Manage Kanban columns'}
+                className="w-full sm:w-auto"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Manage Columns</span>
+                <span className="sm:hidden">Columns</span>
+              </Button>
+            </PermissionGate>
             {/* <Button
               onClick={() => handleCreateTask()}
               disabled={selectedProjectId === 'all'}

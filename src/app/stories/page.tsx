@@ -42,6 +42,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { usePermissions } from '@/lib/permissions/permission-context'
+import { PermissionGate } from '@/lib/permissions/permission-components'
 import { extractUserId } from '@/lib/auth/user-utils'
 import { useNotify } from '@/lib/notify'
 
@@ -128,6 +129,7 @@ export default function StoriesPage() {
 
   const { hasPermission } = usePermissions()
   const { success: notifySuccess, error: notifyError } = useNotify()
+  const canManageAllStories = hasPermission(Permission.STORY_MANAGE_ALL)
 
   const fetchAndSetCurrentUser = useCallback(async () => {
     try {
@@ -610,10 +612,12 @@ export default function StoriesPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">User Stories</h1>
             <p className="text-sm sm:text-base text-muted-foreground">Manage your user stories and requirements</p>
           </div>
-          <Button onClick={() => router.push('/stories/create-story')} className="w-full sm:w-auto">
-            <Plus className="h-4 w-4 mr-2" />
-            New Story
-          </Button>
+          <PermissionGate permission={Permission.STORY_CREATE}>
+            <Button onClick={() => router.push('/stories/create-story')} className="w-full sm:w-auto">
+              <Plus className="h-4 w-4 mr-2" />
+              New Story
+            </Button>
+          </PermissionGate>
         </div>
 
 
@@ -847,32 +851,34 @@ export default function StoriesPage() {
                                   <span>View Story</span>
                                 </DropdownMenuItem>
 
-                                <DropdownMenuItem
-                                  disabled={!canEditStory(story)}
-                                  onClick={e => {
-                                    e.stopPropagation()
-                                    if (!canEditStory(story)) return
-                                    router.push(`/stories/${story._id}/edit`)
-                                  }}
-                                  className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
-                                >
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  <span>Edit Story</span>
-                                </DropdownMenuItem>
+                                {canEditStory(story) && (
+                                  <DropdownMenuItem
+                                    onClick={e => {
+                                      e.stopPropagation()
+                                      router.push(`/stories/${story._id}/edit`)
+                                    }}
+                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    <span>Edit Story</span>
+                                  </DropdownMenuItem>
+                                )}
 
-                                <DropdownMenuSeparator className="my-1" />
-                                <DropdownMenuItem
-                                  disabled={!canDeleteStory(story)}
-                                  onClick={e => {
-                                    e.stopPropagation()
-                                    if (!canDeleteStory(story)) return
-                                    handleDeleteClick(story)
-                                  }}
-                                  className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  <span>Delete Story</span>
-                                </DropdownMenuItem>
+                                {canDeleteStory(story) && (
+                                  <>
+                                    <DropdownMenuSeparator className="my-1" />
+                                    <DropdownMenuItem
+                                      onClick={e => {
+                                        e.stopPropagation()
+                                        handleDeleteClick(story)
+                                      }}
+                                      className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      <span>Delete Story</span>
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                             </div>
@@ -933,7 +939,9 @@ export default function StoriesPage() {
                             </p>
                           ) : (
                             columnStories.map((story) => {
-                              const isDraggable = Boolean(story.sprint?._id)
+                              const isCreator = story.createdBy?.toString() === currentUserId || story.createdBy === currentUserId
+                              const canDragStory = canManageAllStories || isCreator
+                              const isDraggable = Boolean(story.sprint?._id) && canDragStory
                               const creatorDetails = resolveStoryCreator(story)
                               const creatorName = getUserDisplayName(creatorDetails)
                               const creatorInitials = getUserInitials(creatorDetails)
