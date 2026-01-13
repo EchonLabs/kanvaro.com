@@ -90,6 +90,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
   const { hasPermission } = usePermissions()
   const canManageOrgRoles = hasPermission(Permission.USER_MANAGE_ROLES)
   const canManageBudget = hasPermission(Permission.BUDGET_HANDLING)
+  const canManageTeam = hasPermission(Permission.PROJECT_MANAGE_TEAM, projectId)
 
   const scrollToAddMemberSection = () => {
     if (addMemberSectionRef.current) {
@@ -656,7 +657,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            {canManageBudget && (
+                            {canManageBudget && canManageTeam && (
                               <DropdownMenuItem onClick={() => {
                                 setEditingRate(memberId)
                                 setTempRate(hourlyRate ? hourlyRate.toString() : '')

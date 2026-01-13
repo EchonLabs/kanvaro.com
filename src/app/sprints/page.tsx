@@ -987,7 +987,7 @@ export default function SprintsPage() {
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
+                              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                                 <DropdownMenuItem
                                   disabled={!canViewSprint}
                                   onClick={(e) => {
@@ -1006,31 +1006,33 @@ export default function SprintsPage() {
                                 <Settings className="h-4 w-4 mr-2" />
                                 Settings
                               </DropdownMenuItem> */}
-                                <DropdownMenuItem
-                                  disabled={!canEditSprint}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    if (!canEditSprint) return
-                                    router.push(`/sprints/${sprint._id}/edit`)
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit Sprint
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  disabled={!canDeleteSprint}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    if (!canDeleteSprint) return
-                                    handleDeleteClick(sprint._id)
+                                {canEditSprint && (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      router.push(`/sprints/${sprint._id}/edit`)
+                                    }}
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit Sprint
+                                  </DropdownMenuItem>
+                                )}
+                                {canDeleteSprint && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleDeleteClick(sprint._id)
 
-                                  }}
-                                  className="text-destructive focus:text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete Sprint
-                                </DropdownMenuItem>
+                                      }}
+                                      className="text-destructive focus:text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete Sprint
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
@@ -1332,7 +1334,7 @@ export default function SprintsPage() {
                                     <MoreHorizontal className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
+                                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                                   <DropdownMenuItem
                                     disabled={!canViewSprint}
                                     onClick={(e) => {
@@ -1344,31 +1346,33 @@ export default function SprintsPage() {
                                     <Zap className="h-4 w-4 mr-2" />
                                     View Sprint
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    disabled={!canEditSprint}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      if (!canEditSprint) return
-                                      router.push(`/sprints/${sprint._id}/edit`)
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit Sprint
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    disabled={!canDeleteSprint}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      if (!canDeleteSprint) return
-                                      handleDeleteClick(sprint._id)
+                                  {canEditSprint && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        router.push(`/sprints/${sprint._id}/edit`)
+                                      }}
+                                    >
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Edit Sprint
+                                    </DropdownMenuItem>
+                                  )}
+                                  {canDeleteSprint && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleDeleteClick(sprint._id)
 
-                                    }}
-                                    className="text-destructive focus:text-destructive"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete Sprint
-                                  </DropdownMenuItem>
+                                        }}
+                                        className="text-destructive focus:text-destructive"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete Sprint
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>

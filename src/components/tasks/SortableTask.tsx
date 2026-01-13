@@ -42,6 +42,8 @@ interface SortableTaskProps {
   isDraggable?: boolean
   onEdit?: (task: PopulatedTask) => void
   onDelete?: (taskId: string) => void
+  canEdit?: boolean
+  canDelete?: boolean
 }
 
 export default function SortableTask({
@@ -52,7 +54,9 @@ export default function SortableTask({
   isDragOverlay = false,
   isDraggable = true,
   onEdit,
-  onDelete
+  onDelete,
+  canEdit = true,
+  canDelete = true
 }: SortableTaskProps) {
   const [userData, setUserData] = useState<Record<string, any>>({})
   const [loadingUsers, setLoadingUsers] = useState(false)
@@ -199,10 +203,15 @@ export default function SortableTask({
                     View Details
                   </DropdownMenuItem>
                   {onEdit && (
-                    <DropdownMenuItem onClick={(e) => {
-                      e.stopPropagation()
-                      onEdit(task)
-                    }}>
+                    <DropdownMenuItem 
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (!canEdit) return
+                        onEdit(task)
+                      }}
+                      disabled={!canEdit}
+                      title={!canEdit ? 'You need TASK_EDIT_ALL permission or be the creator to edit this task' : undefined}
+                    >
                       Edit Task
                     </DropdownMenuItem>
                   )}
@@ -212,8 +221,11 @@ export default function SortableTask({
                       <DropdownMenuItem 
                         onClick={(e) => {
                           e.stopPropagation()
+                          if (!canDelete) return
                           onDelete(task._id.toString())
                         }}
+                        disabled={!canDelete}
+                        title={!canDelete ? 'You need TASK_DELETE_ALL permission or be the creator to delete this task' : undefined}
                         className="text-destructive focus:text-destructive"
                       >
                         Delete Task
