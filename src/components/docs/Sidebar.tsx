@@ -126,8 +126,6 @@ export function Sidebar({
                       <Link
                         key={doc.slug}
                         href={`/docs/${visibility}/${doc.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
                         className={`
                           block px-3 py-2 text-sm rounded-md transition-colors
                           ${isActive(doc.slug)
@@ -135,7 +133,12 @@ export function Sidebar({
                             : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                           }
                         `}
-                        onClick={onClose}
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            sessionStorage.setItem('docsReferrer', pathname);
+                          }
+                          onClose();
+                        }}
                       >
                         <div className="font-medium">{doc.title}</div>
                         <div className="text-xs text-muted-foreground mt-1">{doc.summary}</div>

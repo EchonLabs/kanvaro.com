@@ -204,7 +204,7 @@ export function EditMemberModal({ member, onClose, onUpdate, canEditAdminUsers =
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="memberId">Member ID (Optional)</Label>
+              <Label htmlFor="memberId">Member ID</Label>
               <Input
                 id="memberId"
                 type="text"

@@ -1,3 +1,10 @@
+## [1.23.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.5...v1.23.6) (2026-01-13)
+
+
+### Bug Fixes
+
+* add documentation and auto tiemr off fixes ([96195bb](https://github.com/EchonLabs/kanvaro.com/commit/96195bb837a258eace98a89dabd75d7bf2dc3865))
+
 ## [1.23.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.4...v1.23.5) (2026-01-12)
 
 
