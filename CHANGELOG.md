@@ -1,3 +1,10 @@
+## [1.23.10](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.9...v1.23.10) (2026-01-13)
+
+
+### Bug Fixes
+
+* add settings fixes ([ee5fb87](https://github.com/EchonLabs/kanvaro.com/commit/ee5fb87cc62ca7d48d585ce73861d186f34207dd))
+
 ## [1.23.9](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.8...v1.23.9) (2026-01-13)
 
 
