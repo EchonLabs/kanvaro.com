@@ -59,7 +59,6 @@ export default function DashboardPage() {
   const [isAuthChecking, setIsAuthChecking] = useState(false)
   const router = useRouter()
   const { loading: permissionsLoading, error: permissionsError, permissions, refreshPermissions } = usePermissionContext()
-  const { organization, loading: organizationLoading } = useOrganization()
 
   const loadDashboardData = useCallback(async (force = false) => {
     // Prevent multiple simultaneous dashboard loads
@@ -199,7 +198,7 @@ export default function DashboardPage() {
   // Handle loading states consistently to prevent hydration mismatch
   // Show loading until permissions are loaded, auth check is complete, initial permission check done, organization data is loaded, and dashboard data is ready
   // Ensure permissions are fully available and refreshed before showing dashboard
-  const isInitialLoading = permissionsLoading || isLoading || organizationLoading || !permissions || !initialPermissionCheckDone || !organization || (!permissionsRefreshed && dashboardData);
+  const isInitialLoading = permissionsLoading || isLoading  || !permissions || !initialPermissionCheckDone  || (!permissionsRefreshed && dashboardData);
 
   if (isInitialLoading) {
     return (
@@ -302,7 +301,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex flex-col gap-6 sm:gap-8">
-              {user.id && user.organization && organization && (
+              {user.id && user.organization  && (
                 <TimeTrackingWidget
                   userId={user.id}
                   organizationId={user.organization}
