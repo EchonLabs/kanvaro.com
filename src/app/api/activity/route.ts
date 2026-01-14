@@ -54,8 +54,32 @@ export async function GET(request: NextRequest) {
       // Format activities
       const activities: any[] = []
 
-      // Add task activities
+
+      // Add task activities (created and updated/completed)
       taskActivities.forEach(task => {
+        // Created action
+        if (task.createdAt) {
+          const createdBy = task.createdBy
+          if (createdBy) {
+            activities.push({
+              id: `task-${task._id}-created`,
+              type: 'task',
+              action: 'created',
+              target: task.title,
+              project: task.project?.name || 'Unknown Project',
+              user: {
+                _id: createdBy._id,
+                firstName: createdBy.firstName,
+                lastName: createdBy.lastName,
+                email: createdBy.email,
+                avatar: createdBy.avatar
+              },
+              timestamp: task.createdAt,
+              status: task.status
+            })
+          }
+        }
+        // Updated/Completed action
         const user = task.assignedTo || task.createdBy
         if (user) {
           activities.push({
@@ -77,8 +101,31 @@ export async function GET(request: NextRequest) {
         }
       })
 
-      // Add project activities
+      // Add project activities (created and updated)
       projectActivities.forEach(project => {
+        // Created action
+        if (project.createdAt) {
+          const createdBy = project.createdBy
+          if (createdBy) {
+            activities.push({
+              id: `project-${project._id}-created`,
+              type: 'project',
+              action: 'created',
+              target: project.name,
+              project: project.name,
+              user: {
+                _id: createdBy._id,
+                firstName: createdBy.firstName,
+                lastName: createdBy.lastName,
+                email: createdBy.email,
+                avatar: createdBy.avatar
+              },
+              timestamp: project.createdAt,
+              status: project.status
+            })
+          }
+        }
+        // Updated action
         const user = project.createdBy
         if (user) {
           activities.push({
