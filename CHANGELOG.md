@@ -1,3 +1,10 @@
+## [1.23.11](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.10...v1.23.11) (2026-01-14)
+
+
+### Bug Fixes
+
+* add setinngs chnges ([eb2e7b0](https://github.com/EchonLabs/kanvaro.com/commit/eb2e7b04737d0664c8e0df56fec56aad3d1a63bc))
+
 ## [1.23.10](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.9...v1.23.10) (2026-01-13)
 
 
