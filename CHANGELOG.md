@@ -1,3 +1,11 @@
+## [1.23.13](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.12...v1.23.13) (2026-01-14)
+
+
+### Bug Fixes
+
+* add fixes in time tracking ([4bb64dc](https://github.com/EchonLabs/kanvaro.com/commit/4bb64dc2c420d2929253821d3bd13b0085aec209))
+* addfixes ([ac8ab42](https://github.com/EchonLabs/kanvaro.com/commit/ac8ab4241994a0fb9aaf9f8be3aec057a57bc83e))
+
 ## [1.23.12](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.11...v1.23.12) (2026-01-14)
 
 

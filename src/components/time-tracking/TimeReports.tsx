@@ -193,12 +193,13 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
         limit: pagination.limit.toString()
       })
 
-      if (filters.projectId && filters.projectId !== 'all') params.append('projectId', filters.projectId)
-      if (filters.assignedTo && filters.assignedTo !== 'all') params.append('userId', filters.assignedTo)
-      if (filters.assignedBy && filters.assignedBy !== 'all') params.append('assignedBy', filters.assignedBy)
-      if (filters.taskId && filters.taskId !== 'all') params.append('taskId', filters.taskId)
-      if (filters.startDate) params.append('startDate', filters.startDate)
-      if (filters.endDate) params.append('endDate', filters.endDate)
+      if (filters.projectId && filters.projectId !== 'all') params.append('projectId', filters.projectId);
+      if (filters.assignedTo && filters.assignedTo !== 'all') params.append('userId', filters.assignedTo);
+      // Use approvedBy for approver filter
+      if (filters.assignedBy && filters.assignedBy !== 'all') params.append('approvedBy', filters.assignedBy);
+      if (filters.taskId && filters.taskId !== 'all') params.append('taskId', filters.taskId);
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
 
       const response = await fetch(`/api/time-tracking/reports?${params}`)
       const data = await response.json()
@@ -258,12 +259,18 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
 
   // Get paginated detailed entries
   const getPaginatedDetailedEntries = useMemo(() => {
-    if (!reportData?.detailedEntries) return []
+    if (!reportData?.detailedEntries) return [];
 
-    const startIndex = (detailedEntriesPagination.page - 1) * detailedEntriesPagination.limit
-    const endIndex = startIndex + detailedEntriesPagination.limit
-    return reportData.detailedEntries.slice(startIndex, endIndex)
-  }, [reportData?.detailedEntries, detailedEntriesPagination.page, detailedEntriesPagination.limit])
+    // If filtering by a specific approver, only show entries with approvedBy set to that approver
+    let filteredEntries = reportData.detailedEntries;
+    if (filters.assignedBy && filters.assignedBy !== 'all') {
+      filteredEntries = filteredEntries.filter(entry => entry.approvedBy === filters.assignedBy);
+    }
+
+    const startIndex = (detailedEntriesPagination.page - 1) * detailedEntriesPagination.limit;
+    const endIndex = startIndex + detailedEntriesPagination.limit;
+    return filteredEntries.slice(startIndex, endIndex);
+  }, [reportData?.detailedEntries, detailedEntriesPagination.page, detailedEntriesPagination.limit, filters.assignedBy]);
 
   // Load organization currency and debug
   useEffect(() => {
@@ -505,12 +512,13 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
         format: 'csv'
       })
 
-      if (filters.projectId && filters.projectId !== 'all') params.append('projectId', filters.projectId)
-      if (filters.assignedTo && filters.assignedTo !== 'all') params.append('userId', filters.assignedTo)
-      if (filters.assignedBy && filters.assignedBy !== 'all') params.append('assignedBy', filters.assignedBy)
-      if (filters.taskId && filters.taskId !== 'all') params.append('taskId', filters.taskId)
-      if (filters.startDate) params.append('startDate', filters.startDate)
-      if (filters.endDate) params.append('endDate', filters.endDate)
+      if (filters.projectId && filters.projectId !== 'all') params.append('projectId', filters.projectId);
+      if (filters.assignedTo && filters.assignedTo !== 'all') params.append('userId', filters.assignedTo);
+      // Use approvedBy for approver filter
+      if (filters.assignedBy && filters.assignedBy !== 'all') params.append('approvedBy', filters.assignedBy);
+      if (filters.taskId && filters.taskId !== 'all') params.append('taskId', filters.taskId);
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
 
       const response = await fetch(`/api/time-tracking/reports?${params}`)
 
@@ -680,7 +688,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
               </Select>
             </div>
             <div className='mb-4'>
-              <Label htmlFor="assignedBy">Assigned By</Label>
+              <Label htmlFor="approvedBy">Approved By</Label>
               <Select value={filters.assignedBy} onValueChange={(value) => { setFilters(prev => ({ ...prev, assignedBy: value })); setAssignedByFilterQuery(''); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Approvers" />

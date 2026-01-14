@@ -91,6 +91,7 @@ export default function ProfilePage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [removingAvatar, setRemovingAvatar] = useState(false)
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -417,6 +418,47 @@ export default function ProfilePage() {
     }
   }
 
+  const handleRemoveAvatar = async () => {
+    if (!profile) return
+
+    try {
+      setRemovingAvatar(true)
+      const response = await fetch('/api/profile/avatar', {
+        method: 'DELETE'
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setProfile(prev => prev ? { ...prev, avatar: result.data?.avatar } : null)
+        showToast({
+          type: 'success',
+          title: 'Avatar Removed',
+          message: 'Your avatar has been removed.',
+          duration: 4000
+        })
+        setAuthError('')
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Error',
+          message: result.error || 'Failed to remove avatar.',
+          duration: 4000
+        })
+      }
+    } catch (error) {
+      console.error('Avatar removal error:', error)
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to remove avatar.',
+        duration: 4000
+      })
+    } finally {
+      setRemovingAvatar(false)
+    }
+  }
+
   if (loading) {
     return (
       <MainLayout>
@@ -583,21 +625,39 @@ export default function ProfilePage() {
                         className="hidden"
                       />
                       <div className="space-y-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => document.getElementById('avatar-upload')?.click()}
-                          disabled={profileLoading}
-                        >
-                          {profileLoading ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Uploading...
-                            </>
-                          ) : (
-                            'Change Avatar'
-                          )}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => document.getElementById('avatar-upload')?.click()}
+                            disabled={profileLoading}
+                          >
+                            {profileLoading ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              'Change Avatar'
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleRemoveAvatar}
+                            disabled={removingAvatar}
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            {removingAvatar ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Removing...
+                              </>
+                            ) : (
+                              'Remove Avatar'
+                            )}
+                          </Button>
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           JPG, PNG, GIF or WebP. Max size 2MB.
                         </p>
