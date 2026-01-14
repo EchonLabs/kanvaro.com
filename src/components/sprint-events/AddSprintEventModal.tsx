@@ -219,7 +219,7 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     }
 
     try {
-      const response = await fetch('/api/members?status=active', { signal })
+      const response = await fetch('/api/members?status=active&limit=10000&page=1', { signal })
       if (signal?.aborted) return
 
       if (response.ok) {

@@ -688,7 +688,8 @@ const [overheadInput, setOverheadInput] = useState('')
   // Fetch available team members
   const fetchAvailableMembers = async () => {
     try {
-      const response = await fetch('/api/members?status=active')
+      // Fetch all active members without pagination limit
+      const response = await fetch('/api/members?status=active&limit=1000&page=1')
       const data = await response.json()
 
       if (data.success) {

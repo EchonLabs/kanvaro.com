@@ -261,7 +261,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
             <div className="text-4xl font-mono font-bold text-primary break-words mb-2">
               {displayTime}
             </div>
-            {activeTimer.hourlyRate != null && activeTimer.hourlyRate > 0 && (
+            {activeTimer.hourlyRate != null && activeTimer.hourlyRate > 0 && organization && (
               <div className="text-sm font-medium text-green-600 dark:text-green-400">
                 <span className="break-words">{formatCurrency((activeTimer.hourlyRate * activeTimer.currentDuration) / 60)}</span>
               </div>
@@ -410,7 +410,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
           </div>
         )}
 
-        {timeStats && (timeStats.todayCost > 0 || timeStats.weekCost > 0 || timeStats.monthCost > 0) && (
+        {timeStats && organization && (timeStats.todayCost > 0 || timeStats.weekCost > 0 || timeStats.monthCost > 0) && (
           <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
             <div>
               <div className="text-sm sm:text-lg font-semibold text-green-600 break-words">

@@ -89,7 +89,7 @@ export default function GanttReportPage() {
       }
 
       // Load assignees
-      const assigneesResponse = await fetch('/api/members')
+      const assigneesResponse = await fetch('/api/members?limit=10000&page=1')
       if (assigneesResponse.ok) {
         const assigneesData = await assigneesResponse.json()
         const assigneesArray = Array.isArray(assigneesData)
