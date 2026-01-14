@@ -1,3 +1,10 @@
+## [1.23.12](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.11...v1.23.12) (2026-01-14)
+
+
+### Bug Fixes
+
+* apply team memeber fixes ([8a8c49a](https://github.com/EchonLabs/kanvaro.com/commit/8a8c49acafab8e7b097c8c642f5c5f4450230fd9))
+
 ## [1.23.11](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.10...v1.23.11) (2026-01-14)
 
 
