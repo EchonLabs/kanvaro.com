@@ -274,14 +274,14 @@ const navigationItems = [
     label: 'Documentation',
     icon: BookOpen,
     path: '/docs',
-    permission: Permission.SETTINGS_READ
+    permission: Permission.SETTINGS_VIEW
   },
   {
     id: 'settings',
     label: 'Settings',
     icon: Settings,
     path: '/settings',
-    permission: Permission.SETTINGS_READ
+    permission: Permission.SETTINGS_VIEW
   }
 ]
 
