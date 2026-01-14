@@ -378,7 +378,7 @@ export function TimeLogs({
       }
       setFilterEmployeesLoading(true)
       try {
-        const response = await fetch('/api/members')
+        const response = await fetch('/api/members?limit=10000&page=1')
         const data = await response.json()
         if (data.success && Array.isArray(data.data?.members)) {
           setFilterEmployees(data.data.members)
