@@ -529,6 +529,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEST_SUITE_UPDATE,
     Permission.TEST_SUITE_DELETE,
     Permission.TEST_CASE_CREATE,
+    Permission.EPIC_VIEW_ALL,
     Permission.TEST_CASE_READ,
     Permission.TEST_CASE_UPDATE,
     Permission.TEST_CASE_DELETE,
@@ -540,12 +541,14 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEST_EXECUTION_CREATE,
     Permission.TEST_EXECUTION_READ,
     Permission.TEST_EXECUTION_UPDATE,
+    Permission.SPRINT_VIEW_ALL,
     Permission.TEST_REPORT_VIEW,
     Permission.TEST_REPORT_EXPORT,
 
     // Documentation
     Permission.DOCUMENTATION_VIEW,
     Permission.DOCUMENTATION_SEARCH,
+    Permission.STORY_VIEW_ALL,
     Permission.DOCUMENTATION_CREATE,
     Permission.DOCUMENTATION_UPDATE,
     Permission.DOCUMENTATION_DELETE,

@@ -6,6 +6,7 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission, Role, ROLE_PERMISSIONS } from '@/lib/permissions/permission-definitions'
 import { Types } from 'mongoose'
+import { User } from '@/models/User'
 
 export async function GET(
   request: NextRequest,
@@ -87,7 +88,18 @@ export async function GET(
     }
 
     const projectData = project.toObject()
-    
+    // Cross-reference teamMembers with User collection for isActive === true
+    if (Array.isArray(projectData.teamMembers) && projectData.teamMembers.length > 0) {
+      const memberIds = projectData.teamMembers.map((tm: any) => tm.memberId?._id || tm.memberId).filter(Boolean)
+      const activeUsers = await User.find({ _id: { $in: memberIds }, isActive: true }).select('_id')
+      const activeUserIds = new Set(activeUsers.map((u: any) => u._id.toString()))
+      projectData.teamMembers = projectData.teamMembers.filter(
+        (tm: any) => {
+          const id = tm.memberId?._id?.toString() || tm.memberId?.toString()
+          return id && activeUserIds.has(id)
+        }
+      )
+    }
     // Ensure externalLinks always exists with proper structure
     if (!projectData.externalLinks) {
       projectData.externalLinks = {
@@ -101,7 +113,6 @@ export async function GET(
         documentation: Array.isArray(projectData.externalLinks.documentation) ? projectData.externalLinks.documentation : []
       }
     }
-    
     return NextResponse.json({
       success: true,
       data: {
