@@ -638,7 +638,7 @@ export default function CreateSprintPage() {
                 </div>
               </div>
 
-              <div>
+              <div className="mt-8">
                 <label className="text-sm font-medium text-foreground">Description</label>
                 <Textarea
                   value={formData.description}
@@ -649,10 +649,11 @@ export default function CreateSprintPage() {
                 />
               </div>
 
-              <div className="space-y-3">
+              {/* Add more space above Team Members */}
+              <div className="mt-12 space-y-3">
                 <label className="text-sm font-medium text-foreground">Team Members</label>
                 {!formData.project ? (
-                  <p className="text-xs sm:text-sm text-muted-foreground italic">
+                  <p className="text-xs sm:text-sm text-muted-foreground italic mt-6">
                     Please select a project to see available team members
                   </p>
                 ) : (

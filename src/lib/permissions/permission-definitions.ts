@@ -128,7 +128,7 @@ export enum Permission {
   TIME_LOG_REPORT_ACCESS = 'time_tracking:report_access',
   
   // Settings permissions
-  SETTINGS_READ = 'settings:read',
+    SETTINGS_VIEW = 'settings:view',
   SETTINGS_UPDATE = 'settings:update',
   SETTINGS_MANAGE_EMAIL = 'settings:manage_email',
   SETTINGS_MANAGE_DATABASE = 'settings:manage_database',
@@ -306,14 +306,12 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.FINANCIAL_MANAGE_PAYMENTS,
     
     // Reporting
-    Permission.REPORTING_VIEW,
     Permission.REPORTING_CREATE,
     Permission.REPORTING_EXPORT,
     Permission.REPORTING_SHARE,
     Permission.TIME_LOG_REPORT_ACCESS,
     
     // Settings
-    Permission.SETTINGS_READ,
     Permission.SETTINGS_UPDATE,
     Permission.SETTINGS_MANAGE_EMAIL,
     Permission.SETTINGS_MANAGE_DATABASE,
@@ -390,6 +388,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.DOCUMENTATION_SEARCH,
     Permission.DOCUMENTATION_CREATE,
     Permission.DOCUMENTATION_UPDATE,
+      Permission.SETTINGS_VIEW,
     Permission.DOCUMENTATION_DELETE,
     Permission.DOCUMENTATION_UPDATE,
     Permission.DOCUMENTATION_DELETE,
@@ -468,7 +467,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.FINANCIAL_APPROVE_EXPENSE,
     Permission.FINANCIAL_CREATE_INVOICE,
     Permission.FINANCIAL_SEND_INVOICE,
-    Permission.FINANCIAL_MANAGE_PAYMENTS,
     
     // Reporting
     Permission.REPORTING_VIEW,
@@ -478,7 +476,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_LOG_REPORT_ACCESS,
     
     // Settings
-    Permission.SETTINGS_READ,
     Permission.SETTINGS_UPDATE,
     Permission.SETTINGS_MANAGE_EMAIL,
     Permission.SETTINGS_MANAGE_DATABASE,
@@ -532,6 +529,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEST_SUITE_UPDATE,
     Permission.TEST_SUITE_DELETE,
     Permission.TEST_CASE_CREATE,
+    Permission.EPIC_VIEW_ALL,
     Permission.TEST_CASE_READ,
     Permission.TEST_CASE_UPDATE,
     Permission.TEST_CASE_DELETE,
@@ -543,12 +541,14 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEST_EXECUTION_CREATE,
     Permission.TEST_EXECUTION_READ,
     Permission.TEST_EXECUTION_UPDATE,
+    Permission.SPRINT_VIEW_ALL,
     Permission.TEST_REPORT_VIEW,
     Permission.TEST_REPORT_EXPORT,
 
     // Documentation
     Permission.DOCUMENTATION_VIEW,
     Permission.DOCUMENTATION_SEARCH,
+    Permission.STORY_VIEW_ALL,
     Permission.DOCUMENTATION_CREATE,
     Permission.DOCUMENTATION_UPDATE,
     Permission.DOCUMENTATION_DELETE,
@@ -634,7 +634,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_LOG_REPORT_ACCESS,
     
     // Settings
-    Permission.SETTINGS_READ,
     Permission.SETTINGS_UPDATE,
     Permission.SETTINGS_MANAGE_EMAIL,
     Permission.SETTINGS_MANAGE_DATABASE,
@@ -750,7 +749,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_VIEW,
     
     // Settings (own settings)
-    Permission.SETTINGS_READ,
     
     // Epics (read only)
     Permission.EPIC_VIEW,
@@ -803,7 +801,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_VIEW,
     
     // Settings (own settings)
-    Permission.SETTINGS_READ,
     
     // Epics (read only)
     Permission.EPIC_VIEW,
@@ -856,7 +853,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_VIEW,
     
     // Settings (own settings)
-    Permission.SETTINGS_READ,
     
     // Epics (read only)
     Permission.EPIC_VIEW,
@@ -915,7 +911,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_VIEW,
     
     // Settings (own settings)
-    Permission.SETTINGS_READ,
     
     // Epics (read only)
     Permission.EPIC_READ,
@@ -991,7 +986,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_VIEW,
     
     // Settings (own settings)
-    Permission.SETTINGS_READ,
     
     // Epics (read only)
     Permission.EPIC_READ,
@@ -1257,7 +1251,6 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.TIME_TRACKING_CREATE,
     Permission.TIME_TRACKING_UPDATE,
     Permission.TIME_TRACKING_DELETE,
-    Permission.SETTINGS_READ,
   ];
   
   if (globalPermissions.includes(permission)) {

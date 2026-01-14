@@ -1045,7 +1045,7 @@ const [overheadInput, setOverheadInput] = useState('')
             setCurrentStep(targetStep)
           }
         }}>
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-7 mt-2">
             <TabsTrigger value="1">Basic</TabsTrigger>
             <TabsTrigger value="2">Timeline</TabsTrigger>
             <TabsTrigger value="3">Budget</TabsTrigger>

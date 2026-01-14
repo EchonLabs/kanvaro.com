@@ -113,7 +113,7 @@ export default function SettingsPage() {
     )
   }
 
-  const canViewSettings = hasPermission(Permission.SETTINGS_READ)
+  const canViewSettings = hasPermission(Permission.SETTINGS_VIEW)
   const canManageDocumentation = hasPermission(Permission.DOCUMENTATION_MANAGE_PERMISSIONS)
 
   if (!permissionsLoading && !canViewSettings) {

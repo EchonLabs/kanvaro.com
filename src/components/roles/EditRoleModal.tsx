@@ -179,7 +179,7 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
   {
     category: PermissionCategory.SETTINGS,
     permissions: [
-      { permission: Permission.SETTINGS_READ, label: 'View Settings', description: 'View system settings' },
+      { permission: Permission.SETTINGS_VIEW, label: 'View Settings', description: 'View system settings' },
       { permission: Permission.SETTINGS_UPDATE, label: 'Edit Settings', description: 'Edit system settings' },
       { permission: Permission.SETTINGS_MANAGE_EMAIL, label: 'Manage Email', description: 'Manage email settings' },
       { permission: Permission.SETTINGS_MANAGE_DATABASE, label: 'Manage Database', description: 'Manage database settings' },

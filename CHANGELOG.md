@@ -1,3 +1,24 @@
+## [1.23.12](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.11...v1.23.12) (2026-01-14)
+
+
+### Bug Fixes
+
+* apply team memeber fixes ([8a8c49a](https://github.com/EchonLabs/kanvaro.com/commit/8a8c49acafab8e7b097c8c642f5c5f4450230fd9))
+
+## [1.23.11](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.10...v1.23.11) (2026-01-14)
+
+
+### Bug Fixes
+
+* add setinngs chnges ([eb2e7b0](https://github.com/EchonLabs/kanvaro.com/commit/eb2e7b04737d0664c8e0df56fec56aad3d1a63bc))
+
+## [1.23.10](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.9...v1.23.10) (2026-01-13)
+
+
+### Bug Fixes
+
+* add settings fixes ([ee5fb87](https://github.com/EchonLabs/kanvaro.com/commit/ee5fb87cc62ca7d48d585ce73861d186f34207dd))
+
 ## [1.23.9](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.8...v1.23.9) (2026-01-13)
 
 
