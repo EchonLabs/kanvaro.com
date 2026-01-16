@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -70,6 +70,7 @@ interface EpicSummary {
 interface BacklogItem {
   _id: string
   title: string
+  displayId: string
   description: string
   type: 'epic' | 'story' | 'task'
   priority: string
@@ -140,6 +141,8 @@ export default function BacklogPage() {
   const [selectedForDelete, setSelectedForDelete] = useState<{ id: string; type: BacklogItem['type']; title: string } | null>(null)
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [localSearch, setLocalSearch] = useState('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [typeFilter, setTypeFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -310,7 +313,7 @@ export default function BacklogPage() {
   // Fetch when pagination or filters change (after initial load)
   useEffect(() => {
     if (!loading && !authError) {
-      // Reset to page 1 when filters change
+      // Only fetch if searchQuery changes (not localSearch)
       if (currentPage === 1) {
         fetchBacklogItems()
       } else {
@@ -318,6 +321,11 @@ export default function BacklogPage() {
       }
     }
   }, [searchQuery, typeFilter, priorityFilter, statusFilter, projectFilterValue, assignedToFilter, assignedByFilter, createdByFilter, dateRangeFilter, createdDateRange, sortBy, sortOrder])
+
+  // Keep localSearch in sync with searchQuery
+  useEffect(() => {
+    setLocalSearch(searchQuery)
+  }, [searchQuery])
 
   // Fetch when pagination changes
   useEffect(() => {
@@ -1352,18 +1360,29 @@ export default function BacklogPage() {
   }
 
   // When assigning work to a sprint, temporarily narrow items to the sprint's project
+  // Local filter for search bar (includes displayId)
+  const locallyFilteredItems = useMemo(() => {
+    if (!localSearch.trim()) return backlogItems
+    const q = localSearch.trim().toLowerCase()
+    return backlogItems.filter(item => {
+      // Match title, description, or displayId (for tasks)
+      if (item.title?.toLowerCase().includes(q)) return true
+      if (item.description?.toLowerCase().includes(q)) return true
+      if (item.type === 'task' && (item as any).displayId && ((item as any).displayId + '').toLowerCase().includes(q)) return true
+      return false
+    })
+  }, [localSearch, backlogItems])
+
   const displayedItems = useMemo(() => {
-    if (!selectedSprintId) {
-      return backlogItems
+    let items = locallyFilteredItems
+    if (selectedSprintId) {
+      const selectedSprint = sprints.find((s) => s._id === selectedSprintId)
+      if (selectedSprint?.project?._id) {
+        items = items.filter((item) => item.project?._id === selectedSprint.project?._id)
+      }
     }
-
-    const selectedSprint = sprints.find((s) => s._id === selectedSprintId)
-    if (!selectedSprint?.project?._id) {
-      return backlogItems
-    }
-
-    return backlogItems.filter((item) => item.project?._id === selectedSprint.project?._id)
-  }, [backlogItems, selectedSprintId, sprints])
+    return items
+  }, [locallyFilteredItems, selectedSprintId, sprints])
 
   const totalPages = Math.max(1, Math.ceil((totalCount || 0) / pageSize) || 1)
   const pageStartIndex = totalCount === 0 ? 0 : ((currentPage - 1) * pageSize) + 1
@@ -1404,9 +1423,13 @@ export default function BacklogPage() {
             <p className="text-sm sm:text-base text-muted-foreground">Manage your product backlog and sprint planning</p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-            <Button 
-              variant="outline" 
-              onClick={() => fetchBacklogItems()} 
+            <Button
+              variant="outline"
+              onClick={() => {
+                setLocalSearch('');
+                setSearchQuery('');
+                fetchBacklogItems();
+              }}
               disabled={loading}
               className="w-full sm:w-auto"
               title="Refresh backlog items"
@@ -1451,9 +1474,16 @@ export default function BacklogPage() {
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   <Input
+                    ref={searchInputRef}
                     placeholder="Search backlog..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    value={localSearch}
+                    onChange={e => setLocalSearch(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        setSearchQuery(localSearch)
+                      }
+                    }}
+                    onBlur={() => setSearchQuery(localSearch)}
                     className="pl-10 w-full"
                   />
                 </div>
@@ -1824,6 +1854,12 @@ export default function BacklogPage() {
                               <Badge className={cn(getStatusColor(item.status), "flex-shrink-0 font-semibold")}>
                                 {formatToTitleCase(item.status.replace('_', ' '))}
                               </Badge>
+                              {/* Display displayId for tasks only */}
+                              {item.type === 'task' && item.displayId && (
+                                <Badge className="bg-gray-200 text-gray-800 dark:bg-gray-800 dark:text-gray-200 ml-1 font-mono text-xs" title={`Task ID: ${item.displayId}`}> 
+                                  #{item.displayId}
+                                </Badge>
+                              )}
                             </div>
                             <div className="flex flex-wrap items-center gap-2 mb-2">
                               <Badge className={getTypeColor(item.type)}>
