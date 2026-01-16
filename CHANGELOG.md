@@ -1,3 +1,15 @@
+# [1.24.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.14...v1.24.0) (2026-01-16)
+
+
+### Bug Fixes
+
+* add chnges ([e33a599](https://github.com/EchonLabs/kanvaro.com/commit/e33a59991ff48aaed3d2ea933ac31fd9c1159c68))
+
+
+### Features
+
+* time log fixes ([406d0a8](https://github.com/EchonLabs/kanvaro.com/commit/406d0a85b63a19e7d9384c2404fa11bd2cb7b98b))
+
 ## [1.23.14](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.13...v1.23.14) (2026-01-14)
 
 
