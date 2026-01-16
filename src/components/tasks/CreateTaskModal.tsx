@@ -499,12 +499,16 @@ export default function CreateTaskModal({
     ) {
       setLoading(false)
       if (missingSubtaskTitle) {
+        notifyError({ title: 'Validation Error', message: 'Please fill in all required subtask titles' })
         setError('Please fill in all required subtask titles')
       } else if (missingDueDate) {
+        notifyError({ title: 'Validation Error', message: 'Due date is required' })
         setError('Due date is required')
       } else if (missingAssignees) {
+        notifyError({ title: 'Validation Error', message: 'Please assign this task to at least one team member' })
         setError('Please assign this task to at least one team member')
       } else {
+        notifyError({ title: 'Validation Error', message: 'Please fill in all required fields' })
         setError('Please fill in all required fields')
       }
       return
@@ -558,14 +562,14 @@ export default function CreateTaskModal({
       const data = await response.json().catch(() => ({ error: 'Failed to parse response' }))
       
       if (!response.ok || !data.success) {
-        const message = data.error || 'Failed to create task'
+        const message = data.error || 'Failed to create task. Please try again.'
         setError(message)
-        notifyError({ title: message })
+        notifyError({ title: 'Failed to Create Task', message: message })
         setLoading(false)
         return
       }
 
-      notifySuccess({ title: 'Task created successfully' })
+      notifySuccess({ title: 'Task Created Successfully', message: 'Your task has been created and assigned.' })
       setError('')
       onTaskCreated()
 
@@ -599,7 +603,7 @@ export default function CreateTaskModal({
     } catch (error) {
       console.error('Task creation error:', error)
       setError('Failed to create task. Please try again.')
-      notifyError({ title: 'Failed to create task. Please try again.' })
+      notifyError({ title: 'Failed to Create Task', message: 'Failed to create task. Please try again.' })
       setLoading(false)
     }
   }
