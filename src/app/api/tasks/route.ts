@@ -145,22 +145,31 @@ function sanitizeAttachments(input: any, defaultUserId: string) {
 }
 
 export async function GET(request: NextRequest) {
-  try {
-    
-    await connectDB();
+  const startTime = Date.now();
+  console.log('[Tasks GET] Starting request processing');
 
+  try {
+    console.log('[Tasks GET] Connecting to database');
+    await connectDB();
+    console.log('[Tasks GET] Database connected successfully');
+
+    console.log('[Tasks GET] Authenticating user');
     const authResult = await authenticateUser();
     if ('error' in authResult) {
+      console.error('[Tasks GET] Authentication failed:', authResult.error);
       return NextResponse.json(
         { error: authResult.error },
         { status: authResult.status }
       );
     }
+    console.log('[Tasks GET] User authenticated successfully');
 
     const { user } = authResult;
     const userId = user.id;
     const organizationId = user.organization;
+    console.log('[Tasks GET] User ID:', userId, 'Organization ID:', organizationId);
 
+    console.log('[Tasks GET] Parsing search parameters');
     const { searchParams } = new URL(request.url);
 
     const page = parseInt(searchParams.get('page') || '1');
@@ -180,14 +189,22 @@ export async function GET(request: NextRequest) {
     const createdAtTo = searchParams.get('createdAtTo') || '';
     const minimal = searchParams.get('minimal') === 'true';
 
+    console.log('[Tasks GET] Parameters parsed:', {
+      page, limit, after, search, status, priority, type, project, story,
+      assignedTo, createdBy, dueDateFrom, dueDateTo, createdAtFrom, createdAtTo, minimal
+    });
+
     const useCursorPagination = !!after;
-    const PAGE_SIZE = Math.min(limit, 100);
+    const PAGE_SIZE = Math.min(limit, 1000);
     const sort = { createdAt: -1 as const };
 
+    console.log('[Tasks GET] Checking user permissions');
     const [canViewAllTasks, hasTaskViewAll] = await Promise.all([
       PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
       PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL)
     ]);
+    console.log('[Tasks GET] User permissions - canViewAllTasks:', canViewAllTasks, 'hasTaskViewAll:', hasTaskViewAll);
+
     const filters: any = {
       organization: organizationId,
       archived: false,
@@ -214,68 +231,131 @@ export async function GET(request: NextRequest) {
       if (createdBy) filters.createdBy = createdBy;
     }
 
+    console.log('[Tasks GET] Building search filters');
     if (search) {
-      const trimmedSearch = search.trim()
-      const escapedSearch = escapeRegex(trimmedSearch)
-      const fuzzyRegex = new RegExp(escapedSearch, 'i')
-      const displayIdRegex = new RegExp(`^${escapedSearch}$`, 'i')
-      const orFilters: any[] = [
-        { title: fuzzyRegex },
-        { description: fuzzyRegex },
-        { displayId: trimmedSearch.includes('.') ? displayIdRegex : fuzzyRegex }
-      ]
+      try {
+        const trimmedSearch = search.trim()
+        const escapedSearch = escapeRegex(trimmedSearch)
+        const fuzzyRegex = new RegExp(escapedSearch, 'i')
+        const displayIdRegex = new RegExp(`^${escapedSearch}$`, 'i')
+        const orFilters: any[] = [
+          { title: fuzzyRegex },
+          { description: fuzzyRegex },
+          { displayId: trimmedSearch.includes('.') ? displayIdRegex : fuzzyRegex }
+        ]
 
-      const numericValue = Number(trimmedSearch)
-      if (!Number.isNaN(numericValue)) {
-        orFilters.push({ taskNumber: numericValue })
+        const numericValue = Number(trimmedSearch)
+        if (!Number.isNaN(numericValue)) {
+          orFilters.push({ taskNumber: numericValue })
+        }
+
+        filters.$and = filters.$and || []
+        filters.$and.push({ $or: orFilters })
+      } catch (searchError) {
+        console.error('[Tasks GET] Error building search filters:', searchError);
+        return NextResponse.json(
+          { error: 'Invalid search parameter' },
+          { status: 400 }
+        );
       }
-
-      filters.$and = filters.$and || []
-      filters.$and.push({ $or: orFilters })
     }
 
+    // Apply simple filters
     if (status) filters.status = status;
     if (priority) filters.priority = priority;
     if (type) filters.type = type;
     if (project) filters.project = project;
     if (story) filters.story = story;
 
+    console.log('[Tasks GET] Building date filters');
     // Date range filters
     if (dueDateFrom || dueDateTo) {
-      filters.dueDate = {};
-      if (dueDateFrom) {
-        const fromDate = new Date(dueDateFrom);
-        fromDate.setHours(0, 0, 0, 0);
-        filters.dueDate.$gte = fromDate;
-      }
-      if (dueDateTo) {
-        const toDate = new Date(dueDateTo);
-        toDate.setHours(23, 59, 59, 999);
-        filters.dueDate.$lte = toDate;
+      try {
+        filters.dueDate = {};
+        if (dueDateFrom) {
+          const fromDate = new Date(dueDateFrom);
+          if (isNaN(fromDate.getTime())) {
+            throw new Error('Invalid dueDateFrom format');
+          }
+          fromDate.setHours(0, 0, 0, 0);
+          filters.dueDate.$gte = fromDate;
+        }
+        if (dueDateTo) {
+          const toDate = new Date(dueDateTo);
+          if (isNaN(toDate.getTime())) {
+            throw new Error('Invalid dueDateTo format');
+          }
+          toDate.setHours(23, 59, 59, 999);
+          filters.dueDate.$lte = toDate;
+        }
+      } catch (dateError) {
+        console.error('[Tasks GET] Error parsing due date filters:', dateError);
+        return NextResponse.json(
+          { error: 'Invalid due date format. Use ISO date strings.' },
+          { status: 400 }
+        );
       }
     }
 
     // Created date range filters (combine with cursor pagination if needed)
     const createdAtFilters: any = {};
-    if (createdAtFrom) {
-      const fromDate = new Date(createdAtFrom);
-      fromDate.setHours(0, 0, 0, 0);
-      createdAtFilters.$gte = fromDate;
+    if (createdAtFrom || createdAtTo) {
+      try {
+        if (createdAtFrom) {
+          const fromDate = new Date(createdAtFrom);
+          if (isNaN(fromDate.getTime())) {
+            throw new Error('Invalid createdAtFrom format');
+          }
+          fromDate.setHours(0, 0, 0, 0);
+          createdAtFilters.$gte = fromDate;
+        }
+        if (createdAtTo) {
+          const toDate = new Date(createdAtTo);
+          if (isNaN(toDate.getTime())) {
+            throw new Error('Invalid createdAtTo format');
+          }
+          toDate.setHours(23, 59, 59, 999);
+          createdAtFilters.$lte = toDate;
+        }
+      } catch (dateError) {
+        console.error('[Tasks GET] Error parsing created date filters:', dateError);
+        return NextResponse.json(
+          { error: 'Invalid created date format. Use ISO date strings.' },
+          { status: 400 }
+        );
+      }
     }
-    if (createdAtTo) {
-      const toDate = new Date(createdAtTo);
-      toDate.setHours(23, 59, 59, 999);
-      createdAtFilters.$lte = toDate;
-    }
-    
+
     if (useCursorPagination && after) {
-      createdAtFilters.$lt = new Date(after);
+      try {
+        createdAtFilters.$lt = new Date(after);
+        if (isNaN(createdAtFilters.$lt.getTime())) {
+          throw new Error('Invalid after cursor format');
+        }
+      } catch (cursorError) {
+        console.error('[Tasks GET] Error parsing cursor:', cursorError);
+        return NextResponse.json(
+          { error: 'Invalid cursor format. Use ISO date string.' },
+          { status: 400 }
+        );
+      }
     }
-    
+
     if (Object.keys(createdAtFilters).length > 0) {
       filters.createdAt = createdAtFilters;
     } else if (useCursorPagination && after) {
-      filters.createdAt = { $lt: new Date(after) };
+      try {
+        filters.createdAt = { $lt: new Date(after) };
+        if (isNaN(filters.createdAt.$lt.getTime())) {
+          throw new Error('Invalid after cursor format');
+        }
+      } catch (cursorError) {
+        console.error('[Tasks GET] Error parsing cursor for createdAt:', cursorError);
+        return NextResponse.json(
+          { error: 'Invalid cursor format. Use ISO date string.' },
+          { status: 400 }
+        );
+      }
     }
 
     const taskQueryFilters: any = { ...filters };
@@ -288,26 +368,42 @@ export async function GET(request: NextRequest) {
       { path: 'movedFromSprint', select: '_id name' }
     ];
 
+    console.log('[Tasks GET] Executing database query');
+    console.log('[Tasks GET] Query filters:', JSON.stringify(taskQueryFilters, null, 2));
+    console.log('[Tasks GET] Minimal mode:', minimal, 'Page size:', PAGE_SIZE);
+
     // Add performance logging for task queries
     const queryStartTime = Date.now();
 
-    console.log('Task query filters:', JSON.stringify(taskQueryFilters, null, 2));
-    console.log('Task query minimal:', minimal, 'limit:', PAGE_SIZE);
-
-    const items = await Task.find(taskQueryFilters)
-      .populate(populatePaths)
-      .sort(sort)
-      .skip((page - 1) * PAGE_SIZE)
-      .limit(PAGE_SIZE)
-      .lean();
+    let items: any[], total: number;
+    try {
+      [items, total] = await Promise.all([
+        Task.find(taskQueryFilters)
+          .populate(populatePaths)
+          .sort(sort)
+          .skip((page - 1) * PAGE_SIZE)
+          .limit(PAGE_SIZE)
+          .lean(),
+        Task.countDocuments(taskQueryFilters)
+      ]);
+    } catch (queryError) {
+      console.error('[Tasks GET] Database query error:', queryError);
+      return NextResponse.json(
+        { error: 'Database query failed' },
+        { status: 500 }
+      );
+    }
 
     const queryTime = Date.now() - queryStartTime;
-    console.log(`Task query completed in ${queryTime}ms, found ${items.length} items`);
+    console.log(`[Tasks GET] Query completed in ${queryTime}ms, found ${items.length} items, total: ${total}`);
 
+    console.log('[Tasks GET] Filtering results');
     // Exclude tasks whose project no longer exists (or is outside scope)
     const filteredItems = items.filter((t: any) => !!t.project)
+    console.log(`[Tasks GET] Filtered ${items.length - filteredItems.length} items without projects`);
 
-    const total = await Task.countDocuments(taskQueryFilters);
+    const totalTime = Date.now() - startTime;
+    console.log(`[Tasks GET] Request completed successfully in ${totalTime}ms`);
 
     return NextResponse.json({
       success: true,
@@ -320,7 +416,25 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Get tasks error:', error);
+    const totalTime = Date.now() - startTime;
+    console.error(`[Tasks GET] Unexpected error after ${totalTime}ms:`, error);
+
+    // Provide more specific error messages based on error type
+    if (error instanceof Error) {
+      if (error.message.includes('connect')) {
+        return NextResponse.json(
+          { error: 'Database connection failed' },
+          { status: 503 }
+        );
+      }
+      if (error.message.includes('auth')) {
+        return NextResponse.json(
+          { error: 'Authentication service unavailable' },
+          { status: 503 }
+        );
+      }
+    }
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
