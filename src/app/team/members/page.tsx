@@ -121,9 +121,8 @@ export default function MembersPage() {
 
   const canViewMembers = hasPermission(Permission.TEAM_READ) || hasPermission(Permission.USER_READ)
   const canInviteMembers = hasPermission(Permission.TEAM_INVITE) || hasPermission(Permission.USER_INVITE)
-  const canEditMembers = hasPermission(Permission.TEAM_EDIT) && hasPermission(Permission.USER_UPDATE)
-  const canEditAdminMembers = hasPermission(Permission.TEAM_EDIT) && hasPermission(Permission.USER_MANAGE_ROLES)
-  const canDeleteMembers = hasPermission(Permission.USER_DEACTIVATE)
+  const canEditMembers = hasPermission(Permission.TEAM_EDIT)
+  const canDeleteMembers = hasPermission(Permission.TEAM_REMOVE)
 
   // Check if any filters are active
   const hasActiveFilters = searchQuery !== '' || roleFilter !== 'all' || statusFilter !== 'all'
@@ -135,7 +134,7 @@ export default function MembersPage() {
     setStatusFilter('all')
   }
 
-  const [organizationRoles, setOrganizationRoles] = useState<Array<{ id: string; name: string; isSystem?: boolean }>>([])
+  const [organizationRoles, setOrganizationRoles] = useState<Array<{ id: string; name: string; key: string; isSystem?: boolean }>>([])
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [memberToRemove, setMemberToRemove] = useState<Member | null>(null)
   const [removingMember, setRemovingMember] = useState(false)
@@ -154,6 +153,7 @@ export default function MembersPage() {
           const allRoles = data.data.map((role: any) => ({
             id: role._id,
             name: role.name,
+            key: role._id, // Use _id as the key (e.g., 'admin', 'project_manager')
             isSystem: role.isSystem
           }))
           setOrganizationRoles(allRoles)
@@ -290,7 +290,7 @@ export default function MembersPage() {
     }
 
     const requiresAdminAccess = member.role === 'admin'
-    if (!canEditMembers || (requiresAdminAccess && !canEditAdminMembers)) {
+    if (!canEditMembers) {
       notifyError({ title: 'You do not have permission to edit this member.' })
       return
     }
@@ -359,8 +359,6 @@ export default function MembersPage() {
   }
 
   const handleRemoveMemberClick = (member: Member) => {
-    // Extra guard: do not allow removing admins or HR from here
-    if (member.role === 'admin' || member.role === 'human_resource') return
     if (!canDeleteMembers) {
       notifyError({ title: 'You do not have permission to delete team members.' })
       return
@@ -441,7 +439,7 @@ export default function MembersPage() {
     if (newRole === member.role) return
 
     // Prevent assigning admin role without proper permission
-    if (newRole === 'admin' && !canEditAdminMembers) {
+    if (newRole === 'admin' && !canEditMembers) {
       notifyError({ title: 'You do not have permission to assign admin role.' })
       return
     }
@@ -553,7 +551,7 @@ export default function MembersPage() {
 
   const canEditMemberRecord = (member: Member) => {
     if (member.role === 'admin' || member.role === 'human_resource') {
-      return canEditAdminMembers
+      return canEditMembers
     }
     return canEditMembers
   }
@@ -642,7 +640,7 @@ export default function MembersPage() {
                       <SelectContent className="z-[10050]">
                         <SelectItem value="all">All Roles</SelectItem>
                         {organizationRoles.map((role) => (
-                          <SelectItem key={role.id} value={role.name.toLowerCase().replace(/\s+/g, '_')}>
+                          <SelectItem key={role.id} value={role.key}>
                             {formatToTitleCase(role.name)}
                           </SelectItem>
                         ))}
@@ -675,7 +673,7 @@ export default function MembersPage() {
                       </span>
                       <span className="ml-2 text-xs">
                         {searchQuery && `• "${searchQuery}"`}
-                        {roleFilter !== 'all' && `• ${formatToTitleCase(roleFilter.replace(/_/g, ' '))}`}
+                        {roleFilter !== 'all' && roleFilter && `• ${organizationRoles.find(r => r.key === roleFilter)?.name || formatToTitleCase(roleFilter.replace(/_/g, ' '))}`}
                         {statusFilter !== 'all' && `• ${statusFilter === 'active' ? 'Active' : 'Inactive'}`}
                       </span>
                     </span>
@@ -757,7 +755,7 @@ export default function MembersPage() {
                                   Edit
                                 </Button>
                               )}
-                              {canDeleteMembers && member.role !== 'admin' && member.role !== 'human_resource' && member.isActive && (
+                              {canDeleteMembers && member.isActive && (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -821,7 +819,7 @@ export default function MembersPage() {
                               Edit
                             </Button>
                           )}
-                          {canDeleteMembers && member.role !== 'admin' && member.role !== 'human_resource' && member.isActive && (
+                          {canDeleteMembers && member.isActive && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -1092,7 +1090,7 @@ export default function MembersPage() {
           member={editingMember}
           onClose={() => setEditingMember(null)}
           onUpdate={handleUpdateMember}
-          canEditAdminUsers={canEditAdminMembers}
+          canEditAdminUsers={canEditMembers}
         />
       )}
       <ConfirmationModal

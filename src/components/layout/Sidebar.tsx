@@ -121,7 +121,7 @@ const navigationItems = [
         label: 'User Stories',
         icon: BookOpen,
         path: '/stories',
-        permission: Permission.TASK_READ
+        permission: Permission.STORY_READ
       },
       {
         id: 'tasks-sprints',
@@ -322,7 +322,7 @@ const navigationItems = [
     label: 'Settings',
     icon: Settings,
     path: '/settings',
-    permission: Permission.SETTINGS_READ
+    permission: Permission.SETTINGS_VIEW
   }
 ]
 

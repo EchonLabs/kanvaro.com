@@ -182,7 +182,7 @@ export default function ColumnSettingsModal({
         notifyError({ title: 'Error', message: 'Column settings can only be managed for a specific project. Please select a project from the dropdown above.' })
       }
     }
-  }, [isOpen, currentColumns, projectId])
+  }, [isOpen, projectId])
 
   // Color palette for new columns - distinct colors that work well in light and dark modes
   // Removed slate (too similar to gray) and reordered for better visual distinction

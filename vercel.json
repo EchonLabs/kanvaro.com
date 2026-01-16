@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/timer-cleanup",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/notification-cleanup",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/event-reminders",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

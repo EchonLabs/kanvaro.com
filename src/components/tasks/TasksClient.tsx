@@ -152,6 +152,7 @@ export default function TasksClient({
     const { hasPermission } = usePermissions()
     const { formatDate } = useDateTime()
     const canViewAllTasks = hasPermission(Permission.PROJECT_VIEW_ALL)
+    const canCreateTask = hasPermission(Permission.TASK_CREATE)
 
     const [tasks, setTasks] = useState<Task[]>(initialTasks)
     const [pagination, setPagination] = useState(initialPagination)
@@ -891,10 +892,12 @@ export default function TasksClient({
                     <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground truncate">My Tasks</h1>
                     <p className="text-sm sm:text-base text-muted-foreground">Manage and track your assigned tasks</p>
                 </div>
-                <Button onClick={() => setShowCreateTaskModal(true)} className="w-full sm:w-auto flex-shrink-0">
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Task
-                </Button>
+                {canCreateTask && (
+                    <Button onClick={() => setShowCreateTaskModal(true)} className="w-full sm:w-auto flex-shrink-0">
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Task
+                    </Button>
+                )}
             </div>
 
 

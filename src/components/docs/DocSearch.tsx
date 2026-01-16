@@ -136,6 +136,9 @@ export function DocSearch({ query, onQueryChange, visibility }: DocSearchProps) 
                   href={`/docs/${visibility}/${doc.slug}`}
                   className="block px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
                   onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      sessionStorage.setItem('docsReferrer', window.location.pathname);
+                    }
                     setIsOpen(false);
                     onQueryChange('');
                   }}

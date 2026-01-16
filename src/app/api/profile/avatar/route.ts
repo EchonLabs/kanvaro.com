@@ -97,3 +97,82 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    await connectDB()
+
+    const authResult = await authenticateUser()
+    if ('error' in authResult) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const userId = authResult.user.id
+
+    // Get user details to generate initials
+    const user = await User.findById(userId).select('firstName lastName')
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    // Generate initials
+    const firstInitial = user.firstName?.[0]?.toUpperCase() || ''
+    const lastInitial = user.lastName?.[0]?.toUpperCase() || ''
+    const initials = firstInitial + lastInitial
+
+    // Generate random background color
+    const colors = [
+      '#3B82F6', // blue
+      '#EF4444', // red
+      '#10B981', // green
+      '#F59E0B', // yellow
+      '#8B5CF6', // purple
+      '#06B6D4', // cyan
+      '#F97316', // orange
+      '#84CC16', // lime
+      '#EC4899', // pink
+      '#6366F1'  // indigo
+    ]
+    const randomColor = colors[Math.floor(Math.random() * colors.length)]
+
+    // Generate SVG with initials
+    const svg = `<svg width='120' height='120' xmlns='http://www.w3.org/2000/svg'>
+      <rect width='100%' height='100%' fill='${randomColor}'/>
+      <text x='50%' y='55%' text-anchor='middle' alignment-baseline='middle' font-size='48' font-family='Arial, sans-serif' fill='white' font-weight='600'>${initials}</text>
+    </svg>`
+
+    // Convert SVG to base64 data URL
+    const svgBuffer = Buffer.from(svg)
+    const base64Data = svgBuffer.toString('base64')
+    const dataUrl = `data:image/svg+xml;base64,${base64Data}`
+
+    // Update user with the initials avatar
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { avatar: dataUrl },
+      { new: true }
+    )
+
+    return NextResponse.json({
+      success: true,
+      message: 'Avatar reset to initials',
+      data: {
+        avatar: dataUrl
+      }
+    })
+
+  } catch (error) {
+    console.error('Avatar removal error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}

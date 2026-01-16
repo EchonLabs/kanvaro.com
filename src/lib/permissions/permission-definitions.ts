@@ -94,6 +94,7 @@ export enum Permission {
   TEAM_REMOVE = 'team:remove',
   TEAM_MANAGE_PERMISSIONS = 'team:manage_permissions',
   TEAM_VIEW_ACTIVITY = 'team:view_activity',
+  TEAM_MEMBER_WIDGET_VIEW = 'team_member_widget:view',
   
   // Time tracking permissions
   TIME_TRACKING_CREATE = 'time_tracking:create',
@@ -107,6 +108,7 @@ export enum Permission {
   TIME_TRACKING_VIEW_ASSIGNED = 'time_tracking:view_assigned',
   TIME_TRACKING_EMPLOYEE_FILTER_READ = 'time_tracking:employee_filter:read',
   TIME_TRACKING_VIEW_ALL_TIMER = 'time_tracking:view_all_timer',
+  TIME_TRACKING_BULK_UPLOAD_ALL = 'time_tracking:bulk_upload_all',
   
   // Financial permissions
   FINANCIAL_READ = 'financial:read',
@@ -126,7 +128,7 @@ export enum Permission {
   TIME_LOG_REPORT_ACCESS = 'time_tracking:report_access',
   
   // Settings permissions
-  SETTINGS_READ = 'settings:read',
+    SETTINGS_VIEW = 'settings:view',
   SETTINGS_UPDATE = 'settings:update',
   SETTINGS_MANAGE_EMAIL = 'settings:manage_email',
   SETTINGS_MANAGE_DATABASE = 'settings:manage_database',
@@ -160,6 +162,7 @@ export enum Permission {
   STORY_UPDATE = 'story:update',
   STORY_DELETE = 'story:delete',
   STORY_VIEW_ALL = 'story:view_all',
+  STORY_MANAGE_ALL = 'story:manage_all',
   
   // Calendar permissions
   CALENDAR_READ = 'calendar:read',
@@ -279,6 +282,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEAM_REMOVE,
     Permission.TEAM_MANAGE_PERMISSIONS,
     Permission.TEAM_VIEW_ACTIVITY,
+    Permission.TEAM_MEMBER_WIDGET_VIEW,
     
     // Time tracking
     Permission.TIME_TRACKING_CREATE,
@@ -302,14 +306,12 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.FINANCIAL_MANAGE_PAYMENTS,
     
     // Reporting
-    Permission.REPORTING_VIEW,
     Permission.REPORTING_CREATE,
     Permission.REPORTING_EXPORT,
     Permission.REPORTING_SHARE,
     Permission.TIME_LOG_REPORT_ACCESS,
     
     // Settings
-    Permission.SETTINGS_READ,
     Permission.SETTINGS_UPDATE,
     Permission.SETTINGS_MANAGE_EMAIL,
     Permission.SETTINGS_MANAGE_DATABASE,
@@ -386,6 +388,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.DOCUMENTATION_SEARCH,
     Permission.DOCUMENTATION_CREATE,
     Permission.DOCUMENTATION_UPDATE,
+      Permission.SETTINGS_VIEW,
     Permission.DOCUMENTATION_DELETE,
     Permission.DOCUMENTATION_UPDATE,
     Permission.DOCUMENTATION_DELETE,
@@ -440,6 +443,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEAM_REMOVE,
     Permission.TEAM_MANAGE_PERMISSIONS,
     Permission.TEAM_VIEW_ACTIVITY,
+    Permission.TEAM_MEMBER_WIDGET_VIEW,
     
     // Time tracking
     Permission.TIME_TRACKING_CREATE,
@@ -452,6 +456,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
     Permission.TIME_TRACKING_VIEW_ALL_TIMER,
+    Permission.TIME_TRACKING_BULK_UPLOAD_ALL,
+    Permission.TIME_TRACKING_BULK_UPLOAD_ALL,
     
     // Financial
     Permission.FINANCIAL_READ,
@@ -461,7 +467,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.FINANCIAL_APPROVE_EXPENSE,
     Permission.FINANCIAL_CREATE_INVOICE,
     Permission.FINANCIAL_SEND_INVOICE,
-    Permission.FINANCIAL_MANAGE_PAYMENTS,
     
     // Reporting
     Permission.REPORTING_VIEW,
@@ -471,7 +476,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_LOG_REPORT_ACCESS,
     
     // Settings
-    Permission.SETTINGS_READ,
     Permission.SETTINGS_UPDATE,
     Permission.SETTINGS_MANAGE_EMAIL,
     Permission.SETTINGS_MANAGE_DATABASE,
@@ -503,6 +507,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.STORY_UPDATE,
     Permission.STORY_DELETE,
     
+    Permission.STORY_MANAGE_ALL,
+    
     // Calendar
     Permission.CALENDAR_READ,
     Permission.CALENDAR_CREATE,
@@ -523,6 +529,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEST_SUITE_UPDATE,
     Permission.TEST_SUITE_DELETE,
     Permission.TEST_CASE_CREATE,
+    Permission.EPIC_VIEW_ALL,
     Permission.TEST_CASE_READ,
     Permission.TEST_CASE_UPDATE,
     Permission.TEST_CASE_DELETE,
@@ -534,12 +541,14 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEST_EXECUTION_CREATE,
     Permission.TEST_EXECUTION_READ,
     Permission.TEST_EXECUTION_UPDATE,
+    Permission.SPRINT_VIEW_ALL,
     Permission.TEST_REPORT_VIEW,
     Permission.TEST_REPORT_EXPORT,
 
     // Documentation
     Permission.DOCUMENTATION_VIEW,
     Permission.DOCUMENTATION_SEARCH,
+    Permission.STORY_VIEW_ALL,
     Permission.DOCUMENTATION_CREATE,
     Permission.DOCUMENTATION_UPDATE,
     Permission.DOCUMENTATION_DELETE,
@@ -594,6 +603,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEAM_REMOVE,
     Permission.TEAM_MANAGE_PERMISSIONS,
     Permission.TEAM_VIEW_ACTIVITY,
+    Permission.TEAM_MEMBER_WIDGET_VIEW,
     
     // Time tracking
     Permission.TIME_TRACKING_CREATE,
@@ -605,6 +615,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
     Permission.TIME_TRACKING_VIEW_ALL_TIMER,
+    Permission.TIME_TRACKING_BULK_UPLOAD_ALL,
     
     // Financial
     Permission.FINANCIAL_READ,
@@ -623,7 +634,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_LOG_REPORT_ACCESS,
     
     // Settings
-    Permission.SETTINGS_READ,
     Permission.SETTINGS_UPDATE,
     Permission.SETTINGS_MANAGE_EMAIL,
     Permission.SETTINGS_MANAGE_DATABASE,
@@ -657,6 +667,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.STORY_UPDATE,
     Permission.STORY_DELETE,
     Permission.STORY_VIEW_ALL,
+    Permission.STORY_MANAGE_ALL,
     
     // Calendar
     Permission.CALENDAR_READ,
@@ -713,12 +724,14 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Projects (assigned projects only)
     Permission.PROJECT_READ,
     
-    // Tasks (assigned tasks)
-    Permission.TASK_CREATE,
+    // Tasks (assigned tasks only)
     Permission.TASK_READ,
     Permission.TASK_UPDATE,
     Permission.TASK_CHANGE_STATUS,
     Permission.TASK_MANAGE_COMMENTS,
+
+    // User Stories (assigned stories only)
+    Permission.STORY_READ,
     
     // Team (read only)
     Permission.TEAM_READ,
@@ -736,10 +749,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_VIEW,
     
     // Settings (own settings)
-    Permission.SETTINGS_READ,
     
     // Epics (read only)
-    Permission.EPIC_CREATE,
     Permission.EPIC_VIEW,
     Permission.EPIC_READ,
     
@@ -790,7 +801,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_VIEW,
     
     // Settings (own settings)
-    Permission.SETTINGS_READ,
     
     // Epics (read only)
     Permission.EPIC_VIEW,
@@ -843,7 +853,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_VIEW,
     
     // Settings (own settings)
-    Permission.SETTINGS_READ,
     
     // Epics (read only)
     Permission.EPIC_VIEW,
@@ -902,7 +911,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_VIEW,
     
     // Settings (own settings)
-    Permission.SETTINGS_READ,
     
     // Epics (read only)
     Permission.EPIC_READ,
@@ -978,7 +986,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_VIEW,
     
     // Settings (own settings)
-    Permission.SETTINGS_READ,
     
     // Epics (read only)
     Permission.EPIC_READ,
@@ -1222,6 +1229,7 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.SPRINT_EVENT_VIEW_ALL,
     Permission.TEAM_INVITE, // Organization-wide permission to invite team members
     Permission.TEAM_EDIT,
+    Permission.TEAM_REMOVE,
     Permission.TEAM_DELETE,
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_VIEW_ASSIGNED,
@@ -1243,7 +1251,6 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.TIME_TRACKING_CREATE,
     Permission.TIME_TRACKING_UPDATE,
     Permission.TIME_TRACKING_DELETE,
-    Permission.SETTINGS_READ,
   ];
   
   if (globalPermissions.includes(permission)) {

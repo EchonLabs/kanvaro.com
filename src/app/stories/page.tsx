@@ -42,6 +42,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { usePermissions } from '@/lib/permissions/permission-context'
+import { PermissionGate } from '@/lib/permissions/permission-components'
 import { extractUserId } from '@/lib/auth/user-utils'
 import { useNotify } from '@/lib/notify'
 
@@ -97,37 +98,63 @@ interface SprintSummary {
   name: string
 }
 
+
 export default function StoriesPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const [stories, setStories] = useState<Story[]>([])
-  const [loading, setLoading] = useState(true)
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [stories, setStories] = useState<Story[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [authError, setAuthError] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [priorityFilter, setPriorityFilter] = useState('all')
-  const [projectFilter, setProjectFilter] = useState('all')
-  const [epicFilter, setEpicFilter] = useState('all')
-  const [sprintFilter, setSprintFilter] = useState('all')
-  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list')
-  const [selectedStory, setSelectedStory] = useState<Story | null>(null)
-  const { formatDate } = useDateTime()
-  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
+  const [authError, setAuthError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [projectFilter, setProjectFilter] = useState('all');
+  const [epicFilter, setEpicFilter] = useState('all');
+  const [sprintFilter, setSprintFilter] = useState('all');
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [selectedStory, setSelectedStory] = useState<Story | null>(null);
+  const { formatDate } = useDateTime();
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [draggedStoryId, setDraggedStoryId] = useState<string | null>(null)
+  const [draggedStoryId, setDraggedStoryId] = useState<string | null>(null);
 
-  const [projectOptions, setProjectOptions] = useState<ProjectSummary[]>([])
-  const [epicOptions, setEpicOptions] = useState<EpicSummary[]>([])
-  const [sprintOptions, setSprintOptions] = useState<SprintSummary[]>([])
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
-  const [totalCount, setTotalCount] = useState(0)
-  const [currentUserId, setCurrentUserId] = useState<string>('')
-  const [creatorDetailsMap, setCreatorDetailsMap] = useState<Record<string, UserSummary>>({})
+  const [projectOptions, setProjectOptions] = useState<ProjectSummary[]>([]);
+  const [epicOptions, setEpicOptions] = useState<EpicSummary[]>([]);
+  const [sprintOptions, setSprintOptions] = useState<SprintSummary[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [creatorDetailsMap, setCreatorDetailsMap] = useState<Record<string, UserSummary>>({});
 
-  const { hasPermission } = usePermissions()
-  const { success: notifySuccess, error: notifyError } = useNotify()
+  // Filter search states
+  const [statusSearch, setStatusSearch] = useState<string>('');
+  const [prioritySearch, setPrioritySearch] = useState<string>('');
+  const [projectSearch, setProjectSearch] = useState<string>('');
+  const [epicSearch, setEpicSearch] = useState<string>('');
+  const [sprintSearch, setSprintSearch] = useState<string>('');
+
+  // Filter options
+  const statusOptions: { value: string; label: string }[] = [
+    { value: 'all', label: 'All Status' },
+    { value: 'backlog', label: 'Backlog' },
+    { value: 'todo', label: 'Todo' },
+    { value: 'inprogress', label: 'In Progress' },
+    { value: 'done', label: 'Done' },
+    { value: 'cancelled', label: 'Cancelled' },
+  ];
+  const priorityOptions: { value: string; label: string }[] = [
+    { value: 'all', label: 'All Priority' },
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' },
+    { value: 'critical', label: 'Critical' },
+  ];
+
+  const { hasPermission } = usePermissions();
+  const { success: notifySuccess, error: notifyError } = useNotify();
+  const canManageAllStories = hasPermission(Permission.STORY_MANAGE_ALL);
 
   const fetchAndSetCurrentUser = useCallback(async () => {
     try {
@@ -238,6 +265,37 @@ export default function StoriesPage() {
       setLoading(false)
     }
   }
+
+  const fetchEpicOptions = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/epics`, {
+        cache: 'no-store'
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (data.success && Array.isArray(data.data)) {
+        const normalizedEpics: EpicSummary[] = data.data
+          .map((epic: any) => ({
+            _id: (epic?._id ?? '').toString(),
+            name: epic?.title || epic?.name || 'Untitled Epic'
+          }))
+          .filter((epic: EpicSummary) => Boolean(epic._id))
+          .sort((a: EpicSummary, b: EpicSummary) => (a.name || '').localeCompare(b.name || ''))
+
+        setEpicOptions(normalizedEpics)
+      } else {
+        setEpicOptions([])
+      }
+    } catch (error) {
+      console.error('Failed to fetch epic filters:', error)
+      setEpicOptions([])
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!currentUserId) return
+    fetchEpicOptions()
+  }, [currentUserId, fetchEpicOptions])
 
   useEffect(() => {
     if (!stories.length) {
@@ -351,13 +409,11 @@ export default function StoriesPage() {
   useEffect(() => {
     if (!stories.length) {
       setProjectOptions([])
-      setEpicOptions([])
       setSprintOptions([])
       return
     }
 
     const projectMap = new Map<string, ProjectSummary>()
-    const epicMap = new Map<string, EpicSummary>()
     const sprintMap = new Map<string, SprintSummary>()
 
     stories.forEach((story) => {
@@ -365,12 +421,6 @@ export default function StoriesPage() {
         projectMap.set(story.project._id, {
           _id: story.project._id,
           name: story.project.name
-        })
-      }
-      if (story.epic?._id) {
-        epicMap.set(story.epic._id, {
-          _id: story.epic._id,
-          name: story.epic.name
         })
       }
       if (story.sprint?._id) {
@@ -388,7 +438,6 @@ export default function StoriesPage() {
     }
 
     setProjectOptions(Array.from(projectMap.values()).sort(safeCompare))
-    setEpicOptions(Array.from(epicMap.values()).sort(safeCompare))
     setSprintOptions(Array.from(sprintMap.values()).sort(safeCompare))
   }, [stories])
 
@@ -610,10 +659,12 @@ export default function StoriesPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">User Stories</h1>
             <p className="text-sm sm:text-base text-muted-foreground">Manage your user stories and requirements</p>
           </div>
-          <Button onClick={() => router.push('/stories/create-story')} className="w-full sm:w-auto">
-            <Plus className="h-4 w-4 mr-2" />
-            New Story
-          </Button>
+          <PermissionGate permission={Permission.STORY_CREATE}>
+            <Button onClick={() => router.push('/stories/create-story')} className="w-full sm:w-auto">
+              <Plus className="h-4 w-4 mr-2" />
+              New Story
+            </Button>
+          </PermissionGate>
         </div>
 
 
@@ -644,12 +695,19 @@ export default function StoriesPage() {
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="backlog">Backlog</SelectItem>
-                      <SelectItem value="todo">Todo</SelectItem>
-                      <SelectItem value="inprogress">In Progress</SelectItem>
-                      <SelectItem value="done">Done</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      <Input
+                        placeholder="Search status..."
+                        className="m-2"
+                        value={statusSearch}
+                        onChange={e => {
+                          setStatusSearch(e.target.value.toLowerCase());
+                        }}
+                        onClick={e => e.stopPropagation()}
+                        onKeyDown={e => e.stopPropagation()}
+                      />
+                      {statusOptions.filter(opt => opt.label.toLowerCase().includes(statusSearch)).map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <Select value={priorityFilter} onValueChange={setPriorityFilter}>
@@ -657,49 +715,84 @@ export default function StoriesPage() {
                       <SelectValue placeholder="Filter by priority" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Priority</SelectItem>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="critical">Critical</SelectItem>
+                      <Input
+                        placeholder="Search priority..."
+                        className="m-2"
+                        value={prioritySearch}
+                        onChange={e => {
+                          setPrioritySearch(e.target.value.toLowerCase());
+                        }}
+                        onClick={e => e.stopPropagation()}
+                        onKeyDown={e => e.stopPropagation()}
+                      />
+                      {priorityOptions.filter(opt => opt.label.toLowerCase().includes(prioritySearch)).map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+                  {/* Project Filter */}
                   <Select value={projectFilter} onValueChange={setProjectFilter}>
                     <SelectTrigger className="w-full sm:w-40">
                       <SelectValue placeholder="Filter by project" />
                     </SelectTrigger>
                     <SelectContent>
+                      <Input
+                        placeholder="Search project..."
+                        className="m-2"
+                        value={projectSearch}
+                        onChange={e => setProjectSearch(e.target.value.toLowerCase())}
+                        onClick={e => e.stopPropagation()}
+                        onKeyDown={e => e.stopPropagation()}
+                      />
                       <SelectItem value="all">All Projects</SelectItem>
-                      {projectOptions.map((project) => (
+                      {projectOptions.filter(project => project.name.toLowerCase().includes(projectSearch)).map((project) => (
                         <SelectItem key={project._id} value={project._id}>
                           {project.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {/* Epic Filter */}
                   <Select value={epicFilter} onValueChange={setEpicFilter}>
                     <SelectTrigger className="w-full sm:w-40">
                       <SelectValue placeholder="Filter by epic" />
                     </SelectTrigger>
                     <SelectContent>
+                      <Input
+                        placeholder="Search epic..."
+                        className="m-2"
+                        value={epicSearch}
+                        onChange={e => setEpicSearch(e.target.value.toLowerCase())}
+                        onClick={e => e.stopPropagation()}
+                        onKeyDown={e => e.stopPropagation()}
+                      />
                       <SelectItem value="all">All Epics</SelectItem>
-                      {epicOptions.map((epic) => (
+                      {epicOptions.filter(epic => epic.name.toLowerCase().includes(epicSearch)).map((epic) => (
                         <SelectItem key={epic._id} value={epic._id}>
                           {epic.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {/* Sprint Filter */}
                   <Select value={sprintFilter} onValueChange={setSprintFilter}>
                     <SelectTrigger className="w-full sm:w-40">
                       <SelectValue placeholder="Filter by sprint" />
                     </SelectTrigger>
                     <SelectContent>
+                      <Input
+                        placeholder="Search sprint..."
+                        className="m-2"
+                        value={sprintSearch}
+                        onChange={e => setSprintSearch(e.target.value.toLowerCase())}
+                        onClick={e => e.stopPropagation()}
+                        onKeyDown={e => e.stopPropagation()}
+                      />
                       <SelectItem value="all">All Sprints</SelectItem>
-                      {sprintOptions.map((sprint) => (
+                      {sprintOptions.filter(sprint => sprint.name.toLowerCase().includes(sprintSearch)).map((sprint) => (
                         <SelectItem key={sprint._id} value={sprint._id}>
                           {sprint.name}
                         </SelectItem>
@@ -847,32 +940,34 @@ export default function StoriesPage() {
                                   <span>View Story</span>
                                 </DropdownMenuItem>
 
-                                <DropdownMenuItem
-                                  disabled={!canEditStory(story)}
-                                  onClick={e => {
-                                    e.stopPropagation()
-                                    if (!canEditStory(story)) return
-                                    router.push(`/stories/${story._id}/edit`)
-                                  }}
-                                  className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
-                                >
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  <span>Edit Story</span>
-                                </DropdownMenuItem>
+                                {canEditStory(story) && (
+                                  <DropdownMenuItem
+                                    onClick={e => {
+                                      e.stopPropagation()
+                                      router.push(`/stories/${story._id}/edit`)
+                                    }}
+                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    <span>Edit Story</span>
+                                  </DropdownMenuItem>
+                                )}
 
-                                <DropdownMenuSeparator className="my-1" />
-                                <DropdownMenuItem
-                                  disabled={!canDeleteStory(story)}
-                                  onClick={e => {
-                                    e.stopPropagation()
-                                    if (!canDeleteStory(story)) return
-                                    handleDeleteClick(story)
-                                  }}
-                                  className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  <span>Delete Story</span>
-                                </DropdownMenuItem>
+                                {canDeleteStory(story) && (
+                                  <>
+                                    <DropdownMenuSeparator className="my-1" />
+                                    <DropdownMenuItem
+                                      onClick={e => {
+                                        e.stopPropagation()
+                                        handleDeleteClick(story)
+                                      }}
+                                      className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      <span>Delete Story</span>
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                             </div>
@@ -933,7 +1028,9 @@ export default function StoriesPage() {
                             </p>
                           ) : (
                             columnStories.map((story) => {
-                              const isDraggable = Boolean(story.sprint?._id)
+                              const isCreator = story.createdBy?.toString() === currentUserId || story.createdBy === currentUserId
+                              const canDragStory = canManageAllStories || isCreator
+                              const isDraggable = Boolean(story.sprint?._id) && canDragStory
                               const creatorDetails = resolveStoryCreator(story)
                               const creatorName = getUserDisplayName(creatorDetails)
                               const creatorInitials = getUserInitials(creatorDetails)

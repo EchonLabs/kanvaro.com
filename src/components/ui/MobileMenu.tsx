@@ -99,6 +99,13 @@ const navigationItems = [
         permission: Permission.BACKLOG_READ
       },
       {
+        id: 'tasks-user-stories',
+        label: 'User Stories',
+        icon: BookOpen,
+        path: '/stories',
+        permission: Permission.STORY_READ
+      },
+      {
         id: 'tasks-sprints',
         label: 'Sprints',
         icon: Zap,
@@ -267,14 +274,14 @@ const navigationItems = [
     label: 'Documentation',
     icon: BookOpen,
     path: '/docs',
-    permission: Permission.SETTINGS_READ
+    permission: Permission.SETTINGS_VIEW
   },
   {
     id: 'settings',
     label: 'Settings',
     icon: Settings,
     path: '/settings',
-    permission: Permission.SETTINGS_READ
+    permission: Permission.SETTINGS_VIEW
   }
 ]
 

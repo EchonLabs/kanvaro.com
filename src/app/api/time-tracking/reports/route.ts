@@ -89,7 +89,12 @@ export async function GET(request: NextRequest) {
 
     if (projectId) baseQuery.project = projectId
     if (userId) baseQuery.user = userId
-    if (assignedBy) baseQuery.approvedBy = assignedBy
+    if (assignedBy) {
+      // Only include entries where approvedBy is set to assignedBy (exclude auto-approved)
+      baseQuery.approvedBy = assignedBy
+      // Ensure we exclude entries where approvedBy is null or missing
+      baseQuery["approvedBy"] = { $eq: assignedBy }
+    }
     if (taskId) baseQuery.task = taskId
 
     switch (reportType) {

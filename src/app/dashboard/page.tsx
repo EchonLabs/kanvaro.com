@@ -16,6 +16,7 @@ import { Loader2, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { PageContent } from '@/components/ui/PageContent'
 import { usePermissionContext } from '@/lib/permissions/permission-context'
+import { useOrganization } from '@/hooks/useOrganization'
 
 interface DashboardData {
   stats: {
@@ -195,9 +196,9 @@ export default function DashboardPage() {
   }, []) // Empty dependency array
 
   // Handle loading states consistently to prevent hydration mismatch
-  // Show loading until permissions are loaded, auth check is complete, initial permission check done, and dashboard data is ready
+  // Show loading until permissions are loaded, auth check is complete, initial permission check done, organization data is loaded, and dashboard data is ready
   // Ensure permissions are fully available and refreshed before showing dashboard
-  const isInitialLoading = permissionsLoading || isLoading || !permissions || !initialPermissionCheckDone || (!permissionsRefreshed && dashboardData);
+  const isInitialLoading = permissionsLoading || isLoading  || !permissions || !initialPermissionCheckDone  || (!permissionsRefreshed && dashboardData);
 
   if (isInitialLoading) {
     return (
@@ -300,7 +301,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex flex-col gap-6 sm:gap-8">
-              {user.id && user.organization && (
+              {user.id && user.organization  && (
                 <TimeTrackingWidget
                   userId={user.id}
                   organizationId={user.organization}

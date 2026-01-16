@@ -1,3 +1,105 @@
+## [1.23.14](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.13...v1.23.14) (2026-01-14)
+
+
+### Bug Fixes
+
+* add chnges ([a2538f5](https://github.com/EchonLabs/kanvaro.com/commit/a2538f59055f6b5e2d57a51aed8e1b58dd1e9c28))
+
+## [1.23.13](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.12...v1.23.13) (2026-01-14)
+
+
+### Bug Fixes
+
+* add fixes in time tracking ([4bb64dc](https://github.com/EchonLabs/kanvaro.com/commit/4bb64dc2c420d2929253821d3bd13b0085aec209))
+* addfixes ([ac8ab42](https://github.com/EchonLabs/kanvaro.com/commit/ac8ab4241994a0fb9aaf9f8be3aec057a57bc83e))
+
+## [1.23.12](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.11...v1.23.12) (2026-01-14)
+
+
+### Bug Fixes
+
+* apply team memeber fixes ([8a8c49a](https://github.com/EchonLabs/kanvaro.com/commit/8a8c49acafab8e7b097c8c642f5c5f4450230fd9))
+
+## [1.23.11](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.10...v1.23.11) (2026-01-14)
+
+
+### Bug Fixes
+
+* add setinngs chnges ([eb2e7b0](https://github.com/EchonLabs/kanvaro.com/commit/eb2e7b04737d0664c8e0df56fec56aad3d1a63bc))
+
+## [1.23.10](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.9...v1.23.10) (2026-01-13)
+
+
+### Bug Fixes
+
+* add settings fixes ([ee5fb87](https://github.com/EchonLabs/kanvaro.com/commit/ee5fb87cc62ca7d48d585ce73861d186f34207dd))
+
+## [1.23.9](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.8...v1.23.9) (2026-01-13)
+
+
+### Bug Fixes
+
+* add fixes ([792b797](https://github.com/EchonLabs/kanvaro.com/commit/792b7974d36049bc1a2fb02571c321c4ae911b92))
+* fix remove memeber button ([2bed6e8](https://github.com/EchonLabs/kanvaro.com/commit/2bed6e8f55fdf86bb9b6022c7d022f437da45f2c))
+
+## [1.23.8](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.7...v1.23.8) (2026-01-13)
+
+
+### Bug Fixes
+
+* add fixes ([a5a57fc](https://github.com/EchonLabs/kanvaro.com/commit/a5a57fcf6832806d86e185f29ef74fe9f0954cde))
+* add permission issues ([12064ac](https://github.com/EchonLabs/kanvaro.com/commit/12064acc88bff3a981fe648cc6ff1489cd1f5f14))
+
+## [1.23.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.6...v1.23.7) (2026-01-13)
+
+
+### Bug Fixes
+
+* add fixes ([7b5e2f6](https://github.com/EchonLabs/kanvaro.com/commit/7b5e2f65acbe6bfc7c06cc3b55c1de0a9bb0b43f))
+
+## [1.23.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.5...v1.23.6) (2026-01-13)
+
+
+### Bug Fixes
+
+* add documentation and auto tiemr off fixes ([96195bb](https://github.com/EchonLabs/kanvaro.com/commit/96195bb837a258eace98a89dabd75d7bf2dc3865))
+
+## [1.23.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.4...v1.23.5) (2026-01-12)
+
+
+### Bug Fixes
+
+* fix attendees ([3fa029b](https://github.com/EchonLabs/kanvaro.com/commit/3fa029b562f60b3ac56fe96a041bf9a8d71fe27c))
+
+## [1.23.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.3...v1.23.4) (2026-01-12)
+
+
+### Bug Fixes
+
+* add chganges ([d99473a](https://github.com/EchonLabs/kanvaro.com/commit/d99473aa5bb13a3ceb77d9b3f654f29bdad79b70))
+
+## [1.23.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.2...v1.23.3) (2026-01-12)
+
+
+### Bug Fixes
+
+* add filtering fixes ([155d44c](https://github.com/EchonLabs/kanvaro.com/commit/155d44cd3ebea45dde4c5071ab27ce9a8dcd3191))
+
+## [1.23.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.1...v1.23.2) (2026-01-12)
+
+
+### Bug Fixes
+
+* add kanbarn board changes ([e75b9c3](https://github.com/EchonLabs/kanvaro.com/commit/e75b9c3abb3d1d7ea8b700b9e9ad82a05a4cf592))
+
+## [1.23.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.0...v1.23.1) (2026-01-12)
+
+
+### Bug Fixes
+
+* add backlog and time log chnges ([b7c9a9f](https://github.com/EchonLabs/kanvaro.com/commit/b7c9a9f5a66d3dc9790bc9f5e9e06ade48f7a9fc))
+* add fixes ([e7d92e7](https://github.com/EchonLabs/kanvaro.com/commit/e7d92e76f7cba988010c6ebbfbdc1939802af19a))
+
 # [1.23.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.22.8...v1.23.0) (2026-01-10)
 
 

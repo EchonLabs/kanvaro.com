@@ -121,7 +121,7 @@ export default function EditSprintPage() {
       setMembersError('')
       const [projectResponse, membersResponse] = await Promise.all([
         fetch(`/api/projects/${projectId}`),
-        fetch('/api/members')
+        fetch('/api/members?limit=10000&page=1')
       ])
 
       const projectData = await projectResponse.json()
@@ -442,6 +442,11 @@ export default function EditSprintPage() {
         setSuccessMessage('Sprint updated successfully')
         setError('')
         notifySuccess({ title: 'Sprint updated successfully' })
+
+        // Redirect back to previous location after successful update
+        setTimeout(() => {
+          router.back()
+        }, 1000)
       } else {
         setError(data.error || 'Failed to save sprint')
         notifyError({ title: data.error || 'Failed to save sprint' })

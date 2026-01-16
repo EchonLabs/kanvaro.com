@@ -64,6 +64,11 @@ interface TimeEntry {
 
 interface ActiveTimerPayload {
   _id: string
+  user?: {
+    _id: string
+    firstName: string
+    lastName: string
+  }
   description: string
   startTime: string
   currentDuration?: number
@@ -218,6 +223,7 @@ export function TimeLogs({
   const [bulkUploadProgress, setBulkUploadProgress] = useState<{ total: number; processed: number; successful: number; failed: number } | null>(null)
   const [bulkUploadErrors, setBulkUploadErrors] = useState<Array<{ row: number; error: string }>>([])
   const [uploadingBulk, setUploadingBulk] = useState(false)
+  const [rowUploadStatus, setRowUploadStatus] = useState<Map<number, { status: 'pending' | 'success' | 'error'; error?: string }>>(new Map())
   const [showErrorAlert, setShowErrorAlert] = useState(true)
   const [showBulkUploadErrorAlert, setShowBulkUploadErrorAlert] = useState(true)
   const [showBulkUploadProgressAlert, setShowBulkUploadProgressAlert] = useState(true)
@@ -372,7 +378,7 @@ export function TimeLogs({
       }
       setFilterEmployeesLoading(true)
       try {
-        const response = await fetch('/api/members')
+        const response = await fetch('/api/members?limit=10000&page=1')
         const data = await response.json()
         if (data.success && Array.isArray(data.data?.members)) {
           setFilterEmployees(data.data.members)
@@ -927,6 +933,7 @@ export function TimeLogs({
   const mapActiveTimerPayload = useCallback((timer: ActiveTimerPayload): ActiveTimerPayload => {
     return {
       _id: timer._id,
+      user: timer.user,
       description: timer.description,
       startTime: timer.startTime,
       currentDuration: timer.currentDuration ?? 0,
@@ -1160,6 +1167,11 @@ export function TimeLogs({
 
     return {
       _id: activeTimerEntry._id,
+      user: activeTimerEntry.user ?? {
+        _id: resolvedUserId || '',
+        firstName: '',
+        lastName: ''
+      },
       description: activeTimerEntry.description,
       startTime: activeTimerEntry.startTime,
       endTime: null,
@@ -1492,7 +1504,7 @@ export function TimeLogs({
   }
 
   // Validate CSV row
-  const validateCSVRow = (row: Record<string, string>, rowIndex: number, taskMap: Map<string, { projectId: string; taskId: string }>): { valid: boolean; error?: string; data?: any } => {
+  const validateCSVRow = (row: Record<string, string>, rowIndex: number, taskMap: Map<string, { projectId: string; taskId: string; assignedTo: any[] }>, canBulkUploadAll: boolean): { valid: boolean; error?: string; data?: any } => {
     const taskNo = row['Task No']?.trim()
     const startDate = row['Start Date']?.trim()
     const startTime = row['Start Time']?.trim()
@@ -1500,133 +1512,179 @@ export function TimeLogs({
     const endTime = row['End Time']?.trim()
     const description = row['Description']?.trim() || ''
 
+    const errors: string[] = []
+
     // Validate Task No (required)
     if (!taskNo) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Task No is required` }
-    }
-
-    // Validate Task No format (should be like "20.7")
-    const taskNoRegex = /^\d+\.\d+$/
-    if (!taskNoRegex.test(taskNo)) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Task No must be in format "ProjectNumber.TaskNumber" (e.g., "20.7")` }
-    }
-
-    // Validate Task exists
-    const taskData = taskMap.get(taskNo)
-    if (!taskData) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Task "${taskNo}" not found or not assigned to you` }
+      errors.push('Task No is required')
+    } else {
+      // Validate Task No format (should be like "20.7")
+      const taskNoRegex = /^\d+\.\d+$/
+      if (!taskNoRegex.test(taskNo)) {
+        errors.push('Task No must be in format "ProjectNumber.TaskNumber" (e.g., "20.7")')
+      } else {
+        // Validate Task exists
+        const taskData = taskMap.get(taskNo)
+        if (!taskData) {
+          errors.push(`Task "${taskNo}" not found`)
+        } else if (!canBulkUploadAll) {
+          // If user doesn't have bulk upload all permission, check if task is assigned to them
+         
+          const isAssigned = taskData.assignedTo.some((assigned: any) => {
+            // Handle different assignedTo formats
+            let userId: string
+            if (typeof assigned === 'string') {
+              userId = assigned
+            } else if (assigned?.user) {
+              // Handle { user: 'id', _id: '...' } format
+              userId = typeof assigned.user === 'string' ? assigned.user : assigned.user?._id?.toString() || assigned.user?.toString()
+            } else if (assigned?._id) {
+              userId = assigned._id?.toString()
+            } else {
+              userId = assigned?.toString()
+            }
+            return userId === resolvedUserId || userId?.toString() === resolvedUserId?.toString()
+          })
+          if (!isAssigned) {
+            errors.push(`Task "${taskNo}" is not assigned to you`)
+          }
+        }
+      }
     }
 
     // Validate Start Date (required)
     if (!startDate) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Start Date is required` }
+      errors.push('Start Date is required')
+    } else {
+      // Validate Start Date format (YYYY-MM-DD)
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+      if (!dateRegex.test(startDate)) {
+        errors.push('Start Date format must be YYYY-MM-DD (e.g., 2024-01-15)')
+      }
     }
 
     // Validate Start Time (required)
     if (!startTime) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Start Time is required` }
+      errors.push('Start Time is required')
+    } else {
+      // Validate Start Time format (HH:MM)
+      const timeRegex = /^\d{2}:\d{2}$/
+      if (!timeRegex.test(startTime)) {
+        errors.push('Start Time format must be HH:MM (e.g., 09:00)')
+      } else {
+        // Validate time values (hours 00-23, minutes 00-59)
+        const [startHour, startMin] = startTime.split(':').map(Number)
+        if (startHour < 0 || startHour > 23 || startMin < 0 || startMin > 59) {
+          errors.push('Start Time must be between 00:00 and 23:59')
+        }
+      }
     }
 
     // Validate End Date (required)
     if (!endDate) {
-      return { valid: false, error: `Row ${rowIndex + 1}: End Date is required` }
+      errors.push('End Date is required')
+    } else {
+      // Validate End Date format (YYYY-MM-DD)
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+      if (!dateRegex.test(endDate)) {
+        errors.push('End Date format must be YYYY-MM-DD (e.g., 2024-01-15)')
+      }
     }
 
     // Validate End Time (required)
     if (!endTime) {
-      return { valid: false, error: `Row ${rowIndex + 1}: End Time is required` }
-    }
-
-    // Validate Start Date format (YYYY-MM-DD)
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/
-    if (!dateRegex.test(startDate)) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Start Date format must be YYYY-MM-DD (e.g., 2024-01-15)` }
-    }
-
-    // Validate End Date format (YYYY-MM-DD)
-    if (!dateRegex.test(endDate)) {
-      return { valid: false, error: `Row ${rowIndex + 1}: End Date format must be YYYY-MM-DD (e.g., 2024-01-15)` }
-    }
-
-    // Validate Start Time format (HH:MM)
-    const timeRegex = /^\d{2}:\d{2}$/
-    if (!timeRegex.test(startTime)) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Start Time format must be HH:MM (e.g., 09:00)` }
-    }
-
-    // Validate End Time format (HH:MM)
-    if (!timeRegex.test(endTime)) {
-      return { valid: false, error: `Row ${rowIndex + 1}: End Time format must be HH:MM (e.g., 17:00)` }
-    }
-
-    // Validate time values (hours 00-23, minutes 00-59)
-    const [startHour, startMin] = startTime.split(':').map(Number)
-    if (startHour < 0 || startHour > 23 || startMin < 0 || startMin > 59) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Start Time must be between 00:00 and 23:59` }
-    }
-
-    const [endHour, endMin] = endTime.split(':').map(Number)
-    if (endHour < 0 || endHour > 23 || endMin < 0 || endMin > 59) {
-      return { valid: false, error: `Row ${rowIndex + 1}: End Time must be between 00:00 and 23:59` }
-    }
-
-    // Validate date values
-    const startDateTime = `${startDate}T${startTime}`
-    const endDateTime = `${endDate}T${endTime}`
-    const start = new Date(startDateTime)
-    const end = new Date(endDateTime)
-
-    if (isNaN(start.getTime())) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Invalid Start Date/Time values` }
-    }
-
-    if (isNaN(end.getTime())) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Invalid End Date/Time values` }
-    }
-
-    if (end <= start) {
-      return { valid: false, error: `Row ${rowIndex + 1}: End Date/Time must be after Start Date/Time` }
-    }
-
-    // Check if description is required
-    if (timeTrackingSettings?.requireDescription === true && !description) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Description is required` }
-    }
-
-    // Set billable to true by default (no Is Billable column in new format)
-    const billable = true
-
-    // Check future time
-    if (!timeTrackingSettings?.allowFutureTime && start > new Date()) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Future time logging not allowed` }
-    }
-
-    // Check past time limit when past time is allowed
-    if (timeTrackingSettings?.allowPastTime === true && timeTrackingSettings?.pastTimeLimitDays) {
-    const daysDiff = Math.ceil((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-      if (daysDiff > timeTrackingSettings.pastTimeLimitDays) {
-        return { valid: false, error: `Row ${rowIndex + 1}: Past time logging not allowed beyond ${timeTrackingSettings.pastTimeLimitDays} days` }
+      errors.push('End Time is required')
+    } else {
+      // Validate End Time format (HH:MM)
+      const timeRegex = /^\d{2}:\d{2}$/
+      if (!timeRegex.test(endTime)) {
+        errors.push('End Time format must be HH:MM (e.g., 17:00)')
+      } else {
+        // Validate time values (hours 00-23, minutes 00-59)
+        const [endHour, endMin] = endTime.split(':').map(Number)
+        if (endHour < 0 || endHour > 23 || endMin < 0 || endMin > 59) {
+          errors.push('End Time must be between 00:00 and 23:59')
+        }
       }
     }
 
-    // Check max session hours
-    const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
-    const durationHours = durationMinutes / 60
-    if (timeTrackingSettings?.allowOvertime === true && timeTrackingSettings?.maxSessionHours && durationHours > timeTrackingSettings.maxSessionHours) {
-      return { valid: false, error: `Row ${rowIndex + 1}: Session duration exceeds maximum allowed (${timeTrackingSettings.maxSessionHours}h)` }
-    }
+    // Validate date values if formats are correct
+    if (startDate && startTime && endDate && endTime && 
+        /^\d{4}-\d{2}-\d{2}$/.test(startDate) && 
+        /^\d{2}:\d{2}$/.test(startTime) &&
+        /^\d{4}-\d{2}-\d{2}$/.test(endDate) && 
+        /^\d{2}:\d{2}$/.test(endTime)) {
+      
+      const startDateTime = `${startDate}T${startTime}`
+      const endDateTime = `${endDate}T${endTime}`
+      const start = new Date(startDateTime)
+      const end = new Date(endDateTime)
 
-    return {
-      valid: true,
-      data: {
-        projectId,
-        taskId,
-        description,
-        startTime: startDateTime,
-        endTime: endDateTime,
-        isBillable: billable && timeTrackingSettings?.allowBillableTime
+      if (isNaN(start.getTime())) {
+        errors.push('Invalid Start Date/Time values')
+      }
+
+      if (isNaN(end.getTime())) {
+        errors.push('Invalid End Date/Time values')
+      }
+
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end <= start) {
+        errors.push('End Date/Time must be after Start Date/Time')
+      }
+
+      // Check if description is required
+      if (timeTrackingSettings?.requireDescription === true && !description) {
+        errors.push('Description is required')
+      }
+
+      // Check future time
+      if (!isNaN(start.getTime()) && !timeTrackingSettings?.allowFutureTime && start > new Date()) {
+        errors.push('Future time logging not allowed')
+      }
+
+      // Check past time limit when past time is allowed
+      if (!isNaN(start.getTime()) && timeTrackingSettings?.allowPastTime === true && timeTrackingSettings?.pastTimeLimitDays) {
+        const daysDiff = Math.ceil((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+        if (daysDiff > timeTrackingSettings.pastTimeLimitDays) {
+          errors.push(`Past time logging not allowed beyond ${timeTrackingSettings.pastTimeLimitDays} days`)
+        }
+      }
+
+      // Check max session hours
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
+        const durationHours = durationMinutes / 60
+        if (timeTrackingSettings?.allowOvertime === true && timeTrackingSettings?.maxSessionHours && durationHours > timeTrackingSettings.maxSessionHours) {
+          errors.push(`Session duration exceeds maximum allowed (${timeTrackingSettings.maxSessionHours}h)`)
+        }
+      }
+
+      // If all validations pass, return data
+      if (errors.length === 0 && taskNo) {
+        const taskData = taskMap.get(taskNo)
+        if (taskData) {
+          const billable = true
+          return {
+            valid: true,
+            data: {
+              projectId: taskData.projectId,
+              taskId: taskData.taskId,
+              description,
+              startTime: startDateTime,
+              endTime: endDateTime,
+              isBillable: billable && timeTrackingSettings?.allowBillableTime
+            }
+          }
+        }
       }
     }
+
+    // Return all errors
+    if (errors.length > 0) {
+      return { valid: false, error: `Row ${rowIndex + 2}: ${errors.join('; ')}` }
+    }
+
+    return { valid: false, error: `Row ${rowIndex + 2}: Unknown error` }
   }
 
   // Handle bulk upload
@@ -1648,55 +1706,62 @@ export function TimeLogs({
       const rows = parseCSV(csvText)
 
       // Build task map using Task No (displayId)
-      const taskMap = new Map<string, { projectId: string; taskId: string }>()
+      const taskMap = new Map<string, { projectId: string; taskId: string; assignedTo: any[] }>()
 
-      // Fetch all projects that allow manual time submission and user is a team member
-      const projectsResponse = await fetch('/api/projects')
-      const projectsData = await projectsResponse.json()
-      if (projectsData.success && Array.isArray(projectsData.data)) {
-        // Filter projects that allow manual time submission and user is a team member
-        const eligibleProjects = projectsData.data.filter((project: any) => {
-          const allowManualSubmission = project?.settings?.allowManualTimeSubmission === true
-          const isTeamMember = Array.isArray(project?.teamMembers) &&
-            project.teamMembers.some((member: any) => {
-              const memberId = typeof member === 'string' ? member : member?.memberId
-              return memberId === resolvedUserId
-            })
-          return allowManualSubmission && isTeamMember
-        })
+      // Check if user has bulk upload all permission
+      const canBulkUploadAll = hasPermission(Permission.TIME_TRACKING_BULK_UPLOAD_ALL)
 
-        // Fetch tasks for eligible projects that are assigned to the user
-        for (const project of eligibleProjects) {
-          try {
-            const tasksResponse = await fetch(`/api/tasks?project=${project._id}&assignedTo=${resolvedUserId}&all=true`)
-            const tasksData = await tasksResponse.json()
-            if (tasksData.success && Array.isArray(tasksData.data)) {
-              tasksData.data.forEach((task: any) => {
-                // Use displayId as key (e.g., "20.7")
-                if (task.displayId) {
-                  taskMap.set(task.displayId, {
-                    projectId: project._id,
-                    taskId: task._id
-                  })
-                }
+      // Fetch tasks directly - simplified approach
+      try {
+        const taskQuery = canBulkUploadAll 
+          ? `/api/tasks?all=true&includeArchived=true&limit=10000` 
+          : `/api/tasks?assignedTo=${resolvedUserId}&all=true&includeArchived=true&limit=10000`
+        
+        const tasksResponse = await fetch(taskQuery)
+        const tasksData = await tasksResponse.json()
+        
+        if (tasksData.success && Array.isArray(tasksData.data)) {
+          tasksData.data.forEach((task: any) => {
+            // Use displayId as key (e.g., "20.7")
+            if (task.displayId) {
+              taskMap.set(task.displayId, {
+                projectId: task.project || task.projectId,
+                taskId: task._id,
+                assignedTo: task.assignedTo || []
               })
             }
-          } catch (err) {
-            console.error(`Failed to fetch tasks for project ${project.name}:`, err)
-          }
+          })
         }
+      } catch (err) {
+        setError('Failed to fetch tasks. Please try again.')
+        setUploadingBulk(false)
+        return
       }
+
+      // Initialize row status tracking
+      const initialRowStatus = new Map<number, { status: 'pending' | 'success' | 'error'; error?: string }>()
+      rows.forEach((_, index) => {
+        initialRowStatus.set(index + 2, { status: 'pending' })
+      })
+      setRowUploadStatus(initialRowStatus)
 
       // Validate all rows
       const validatedRows: Array<{ rowIndex: number; data: any }> = []
       const errors: Array<{ row: number; error: string }> = []
 
       rows.forEach((row, index) => {
-        const validation = validateCSVRow(row, index, taskMap)
+        const validation = validateCSVRow(row, index, taskMap, canBulkUploadAll)
         if (validation.valid && validation.data) {
           validatedRows.push({ rowIndex: index, data: validation.data })
         } else {
-          errors.push({ row: index + 2, error: validation.error || 'Unknown error' })
+          const rowNum = index + 2
+          errors.push({ row: rowNum, error: validation.error || 'Unknown error' })
+          // Mark validation errors immediately
+          setRowUploadStatus(prev => {
+            const updated = new Map(prev)
+            updated.set(rowNum, { status: 'error', error: validation.error || 'Unknown error' })
+            return updated
+          })
         }
       })
 
@@ -1725,6 +1790,7 @@ export function TimeLogs({
       for (let i = 0; i < validatedRows.length; i += batchSize) {
         const batch = validatedRows.slice(i, i + batchSize)
         const batchPromises = batch.map(async ({ rowIndex, data }) => {
+          const rowNum = rowIndex + 2
           try {
             const response = await fetch('/api/time-tracking/entries', {
               method: 'POST',
@@ -1740,13 +1806,33 @@ export function TimeLogs({
 
             if (response.ok) {
               successful++
+              // Mark row as success
+              setRowUploadStatus(prev => {
+                const updated = new Map(prev)
+                updated.set(rowNum, { status: 'success' })
+                return updated
+              })
             } else {
               failed++
-              uploadErrors.push({ row: rowIndex + 2, error: result.error || 'Failed to create time entry' })
+              const errorMsg = result.error || 'Failed to create time entry'
+              uploadErrors.push({ row: rowNum, error: errorMsg })
+              // Mark row as error
+              setRowUploadStatus(prev => {
+                const updated = new Map(prev)
+                updated.set(rowNum, { status: 'error', error: errorMsg })
+                return updated
+              })
             }
           } catch (err) {
             failed++
-            uploadErrors.push({ row: rowIndex + 2, error: err instanceof Error ? err.message : 'Unknown error' })
+            const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+            uploadErrors.push({ row: rowNum, error: errorMsg })
+            // Mark row as error
+            setRowUploadStatus(prev => {
+              const updated = new Map(prev)
+              updated.set(rowNum, { status: 'error', error: errorMsg })
+              return updated
+            })
           }
         })
 
@@ -2333,13 +2419,11 @@ export function TimeLogs({
               {/* Table Header - Hidden on mobile */}
               <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium overflow-x-auto ${
                 showSelectionAndApproval && canApproveTimeLogs 
-                  ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]' 
-                  : showSelectionAndApproval
-                    ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]'
-                    : 'grid-cols-[minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)]'
+                  ? 'grid-cols-[40px_minmax(150px,1.5fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]' 
+                  : 'grid-cols-[minmax(200px,2fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
               }`}>
-                {showSelectionAndApproval && (
-                  <div>
+                {showSelectionAndApproval && canApproveTimeLogs && (
+                  <div className="flex items-center justify-center">
                     <Checkbox
                       checked={allSelected}
                       onCheckedChange={(checked) => handleSelectAll(!!checked)}
@@ -2354,7 +2438,7 @@ export function TimeLogs({
                 <div>Duration</div>
                 <div>Status</div>
                 <div>Billable</div>
-                {showSelectionAndApproval && <div>Approval</div>}
+                <div>Approval</div>
                 <div>Actions</div>
               </div>
 
@@ -2365,7 +2449,7 @@ export function TimeLogs({
                   <div className="md:hidden p-3 space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
-                        {showSelectionAndApproval && !entry.__isActive && (
+                        {showSelectionAndApproval && canApproveTimeLogs && !entry.__isActive && (
                           <Checkbox
                             checked={selectedEntries.includes(entry._id)}
                             onCheckedChange={(checked) => handleSelectEntry(entry._id, checked as boolean)}
@@ -2508,14 +2592,12 @@ export function TimeLogs({
                   </div>
 
                   {/* Desktop Table View */}
-                  <div className={`hidden md:grid gap-2 p-3 overflow-x-auto ${
+                  <div className={`hidden md:grid gap-2 p-3 items-center overflow-x-auto ${
                     showSelectionAndApproval && canApproveTimeLogs 
-                      ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]' 
-                      : showSelectionAndApproval
-                        ? 'grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)_minmax(70px,90px)]'
-                        : 'grid-cols-[minmax(120px,1.2fr)_minmax(100px,1fr)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(60px,80px)_minmax(60px,80px)_minmax(60px,80px)_minmax(70px,90px)]'
+                      ? 'grid-cols-[40px_minmax(150px,1.5fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]' 
+                      : 'grid-cols-[minmax(200px,2fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
                   }`}>
-                    {showSelectionAndApproval && (
+                    {showSelectionAndApproval && canApproveTimeLogs && (
                       <div className="flex items-center justify-center">
                         <Checkbox
                           id={`select-${entry._id}`}
@@ -2598,42 +2680,40 @@ export function TimeLogs({
                         {entry.isBillable ? 'Yes' : 'No'}
                       </Badge>
                     </div>
-                    {showSelectionAndApproval && (
-                      <div>
-                        {(() => {
-                          // If project doesn't require approval, always show as Approved
-                          const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
+                    <div>
+                      {(() => {
+                        // If project doesn't require approval, always show as Approved
+                        const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
 
-                          const isApproved = projectRequiresApproval ? entry.isApproved : true;
-                          const isRejected = entry.isReject;
+                        const isApproved = projectRequiresApproval ? entry.isApproved : true;
+                        const isRejected = entry.isReject;
 
-                          let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
-                          let badgeText = 'Pending';
+                        let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
+                        let badgeText = 'Pending';
 
-                          if (isRejected) {
-                            badgeVariant = 'destructive';
-                            badgeText = 'Rejected';
-                          } else if (isApproved) {
-                            badgeVariant = 'default';
-                            badgeText = 'Approved';
-                          }
+                        if (isRejected) {
+                          badgeVariant = 'destructive';
+                          badgeText = 'Rejected';
+                        } else if (isApproved) {
+                          badgeVariant = 'default';
+                          badgeText = 'Approved';
+                        }
 
-                          return (
-                        <Badge
-                              variant={badgeVariant}
-                          className="text-xs"
-                        >
-                              {badgeText}
-                        </Badge>
-                          );
-                        })()}
-                        {entry.approvedBy && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            by {entry.approvedBy.firstName} {entry.approvedBy.lastName}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                        return (
+                      <Badge
+                            variant={badgeVariant}
+                        className="text-xs whitespace-nowrap"
+                      >
+                            {badgeText}
+                      </Badge>
+                        );
+                      })()}
+                      {entry.approvedBy && (
+                        <div className="text-xs text-muted-foreground mt-1 truncate" title={`by ${entry.approvedBy.firstName} ${entry.approvedBy.lastName}`}>
+                          by {entry.approvedBy.firstName} {entry.approvedBy.lastName}
+                        </div>
+                      )}
+                    </div>
                     <div className="flex items-center">
                       <DropdownMenu.Root>
                         <DropdownMenu.Trigger asChild>
@@ -3379,6 +3459,81 @@ export function TimeLogs({
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-4">
+          {/* Enhanced progress display during bulk upload */}
+          {uploadingBulk && (
+            <div className="absolute inset-0 bg-background/95 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg p-6">
+              <div className="w-full max-w-2xl bg-card border rounded-lg shadow-lg p-6 max-h-[70vh] flex flex-col">
+                <div className="flex items-center gap-3 mb-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary flex-shrink-0" />
+                  <div>
+                    <h3 className="text-lg font-semibold">Processing Time Entries</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {bulkUploadProgress ? `${bulkUploadProgress.processed} of ${bulkUploadProgress.total} rows processed` : 'Reading CSV file...'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                {bulkUploadProgress && (
+                  <div className="mb-4">
+                    <div className="w-full bg-muted rounded-full h-2.5 mb-2">
+                      <div
+                        className="bg-primary h-2.5 rounded-full transition-all duration-300"
+                        style={{ width: `${(bulkUploadProgress.processed / bulkUploadProgress.total) * 100}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Check className="h-3 w-3 text-green-600" />
+                        {bulkUploadProgress.successful} successful
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <X className="h-3 w-3 text-destructive" />
+                        {bulkUploadProgress.failed} failed
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Row-by-row status */}
+                {rowUploadStatus.size > 0 && (
+                  <div className="flex-1 overflow-y-auto space-y-1 border rounded-md p-3 bg-muted/30 min-h-[200px] max-h-[400px]">
+                    {Array.from(rowUploadStatus.entries())
+                      .sort(([a], [b]) => a - b)
+                      .map(([rowNum, status]) => (
+                        <div
+                          key={rowNum}
+                          className={`flex items-center gap-2 p-2 rounded text-sm transition-all ${
+                            status.status === 'success'
+                              ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400'
+                              : status.status === 'error'
+                              ? 'bg-destructive/10 text-destructive'
+                              : 'bg-muted/50 text-muted-foreground'
+                          }`}
+                        >
+                          {status.status === 'pending' && (
+                            <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                          )}
+                          {status.status === 'success' && (
+                            <Check className="h-4 w-4 flex-shrink-0" />
+                          )}
+                          {status.status === 'error' && (
+                            <X className="h-4 w-4 flex-shrink-0" />
+                          )}
+                          <span className="font-medium min-w-[60px]">Row {rowNum}:</span>
+                          <span className="flex-1 truncate">
+                            {status.status === 'pending' && 'Uploading...'}
+                            {status.status === 'success' && 'Successfully uploaded'}
+                            {status.status === 'error' && (status.error || 'Failed to upload')}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {error && showErrorAlert && (
             <Alert variant="destructive">
               <AlertDescription className="flex items-center justify-between">
@@ -3496,6 +3651,7 @@ export function TimeLogs({
                     setBulkUploadSuccess(null)
                     setShowErrorAlert(true)
                     setShowBulkUploadErrorAlert(true)
+                    setRowUploadStatus(new Map())
                   }
                 }}
                 disabled={uploadingBulk}
@@ -3532,6 +3688,7 @@ export function TimeLogs({
                     setBulkUploadFile(null)
                     setBulkUploadErrors([])
                     setError('')
+                    setRowUploadStatus(new Map())
                   }}
                   disabled={uploadingBulk}
                 >
@@ -3568,6 +3725,7 @@ export function TimeLogs({
               setShowErrorAlert(true)
               setShowBulkUploadErrorAlert(true)
               setShowBulkUploadProgressAlert(true)
+              setRowUploadStatus(new Map())
             }}
             disabled={uploadingBulk}
           >

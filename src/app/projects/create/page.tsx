@@ -688,7 +688,8 @@ const [overheadInput, setOverheadInput] = useState('')
   // Fetch available team members
   const fetchAvailableMembers = async () => {
     try {
-      const response = await fetch('/api/members')
+      // Fetch all active members without pagination limit
+      const response = await fetch('/api/members?status=active&limit=1000&page=1')
       const data = await response.json()
 
       if (data.success) {
@@ -1045,7 +1046,7 @@ const [overheadInput, setOverheadInput] = useState('')
             setCurrentStep(targetStep)
           }
         }}>
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-7 mt-2">
             <TabsTrigger value="1">Basic</TabsTrigger>
             <TabsTrigger value="2">Timeline</TabsTrigger>
             <TabsTrigger value="3">Budget</TabsTrigger>

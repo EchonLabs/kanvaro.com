@@ -187,7 +187,7 @@ export default function NotificationsPage() {
                             onClick={() => markAsRead(id)}
                             disabled={!isUnread}
                           >
-                            Mark read
+                            Mark as Read
                           </Button>
                           <Button
                             size="sm"

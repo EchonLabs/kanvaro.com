@@ -45,6 +45,9 @@ import {
 import { format } from 'date-fns'
 import { DateRange } from 'react-day-picker'
 import { useNotify } from '@/lib/notify'
+import { usePermissions } from '@/lib/permissions/permission-hooks'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionGate } from '@/lib/permissions/permission-components'
 
 interface UserSummary {
   _id: string
@@ -128,6 +131,9 @@ export default function BacklogPage() {
   const [loading, setLoading] = useState(true)
   const { success: notifySuccess, error: notifyError } = useNotify()
   const { formatDate } = useDateTime()
+  const { hasPermission } = usePermissions()
+  const canManageSprints = hasPermission(Permission.SPRINT_MANAGE)
+  const canCreateTask = hasPermission(Permission.TASK_CREATE)
   const [deleteError, setDeleteError] = useState('')
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -427,7 +433,40 @@ export default function BacklogPage() {
         }
 
         setProjectOptions(Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name)))
-        setAssignedToOptions(Array.from(assignedToMap.values()).sort((a, b) =>
+        
+        // Fetch unique project team members for assignedTo filter
+        const teamMembersMap = new Map<string, UserSummary>()
+        try {
+          const projectsResponse = await fetch('/api/projects?limit=1000')
+          if (projectsResponse.ok) {
+            const projectsData = await projectsResponse.json()
+            if (projectsData.success && Array.isArray(projectsData.data)) {
+              projectsData.data.forEach((project: any) => {
+                if (Array.isArray(project.teamMembers)) {
+                  project.teamMembers.forEach((member: any) => {
+                    const memberId = member.memberId?._id || member.memberId
+                    const firstName = member.memberId?.firstName || member.firstName
+                    const lastName = member.memberId?.lastName || member.lastName
+                    const email = member.memberId?.email || member.email
+                    
+                    if (memberId && firstName && lastName) {
+                      teamMembersMap.set(memberId, {
+                        _id: memberId,
+                        firstName,
+                        lastName,
+                        email: email || ''
+                      })
+                    }
+                  })
+                }
+              })
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to fetch project team members:', error)
+        }
+        
+        setAssignedToOptions(Array.from(teamMembersMap.values()).sort((a, b) =>
           `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
         ))
         setAssignedByOptions(Array.from(createdByMap.values()).sort((a, b) =>
@@ -1012,7 +1051,8 @@ export default function BacklogPage() {
                 _id: sprint._id,
                 name: sprint.name,
                 status: sprint.status
-              }
+              },
+              status: 'in_progress'  // Match API update
             }
           }
           // Update tasks
@@ -1024,7 +1064,7 @@ export default function BacklogPage() {
                 name: sprint.name,
                 status: sprint.status
               },
-              status: 'sprint'
+              status: 'todo'  // Match API update
             }
           }
           return item
@@ -1364,18 +1404,34 @@ export default function BacklogPage() {
             <p className="text-sm sm:text-base text-muted-foreground">Manage your product backlog and sprint planning</p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-            <Button variant="outline" onClick={() => router.push('/epics/create-epic')} className="w-full sm:w-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              New Epic
+            <Button 
+              variant="outline" 
+              onClick={() => fetchBacklogItems()} 
+              disabled={loading}
+              className="w-full sm:w-auto"
+              title="Refresh backlog items"
+            >
+              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
+              Refresh
             </Button>
-            <Button variant="outline" onClick={() => router.push('/stories/create-story')} className="w-full sm:w-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              New Story
-            </Button>
-            <Button onClick={() => router.push('/tasks/create-new-task')} className="w-full sm:w-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              New Task
-            </Button>
+            <PermissionGate permission={Permission.EPIC_CREATE}>
+              <Button variant="outline" onClick={() => router.push('/epics/create-epic')} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                New Epic
+              </Button>
+            </PermissionGate>
+            <PermissionGate permission={Permission.STORY_CREATE}>
+              <Button variant="outline" onClick={() => router.push('/stories/create-story')} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                New Story
+              </Button>
+            </PermissionGate>
+            {canCreateTask && (
+              <Button onClick={() => router.push('/tasks/create-new-task')} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                New Task
+              </Button>
+            )}
           </div>
         </div>
 
@@ -1469,7 +1525,7 @@ export default function BacklogPage() {
                       <SelectItem value="high">High</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
+                  <Select value={assignedToFilter} onValueChange={(value) => { setAssignedToFilter(value); setAssignedToFilterQuery(''); }}>
                     <SelectTrigger className="w-full sm:w-40">
                       <SelectValue placeholder="Assignee" />
                     </SelectTrigger>
@@ -1637,6 +1693,8 @@ export default function BacklogPage() {
                       size="sm"
                       onClick={handleSelectModeToggle}
                       className="w-full sm:w-auto"
+                      disabled={!canManageSprints}
+                      title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
                     >
                       <List className="h-4 w-4 mr-2" />
                       {selectMode ? 'Cancel Selection' : 'Add to Sprint'}
@@ -1759,18 +1817,20 @@ export default function BacklogPage() {
                         )}
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
                           <div className="flex-1 min-w-0 w-full">
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <h3 className="font-medium text-foreground text-sm sm:text-base truncate flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="font-medium text-foreground text-sm sm:text-base truncate">
                                 {item.title}
                               </h3>
+                              <Badge className={cn(getStatusColor(item.status), "flex-shrink-0 font-semibold")}>
+                                {formatToTitleCase(item.status.replace('_', ' '))}
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
                               <Badge className={getTypeColor(item.type)}>
                                 {formatToTitleCase(item.type)}
                               </Badge>
                               <Badge className={getPriorityColor(item.priority)}>
                                 {formatToTitleCase(item.priority)}
-                              </Badge>
-                              <Badge className={getStatusColor(item.status)}>
-                                {formatToTitleCase(item.status.replace('_', ' '))}
                               </Badge>
                               {item.epic && (
                                 <Badge
@@ -1809,7 +1869,7 @@ export default function BacklogPage() {
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
-                                    {item.description || 'No description'}
+                                    {item.description }
                                   </p>
                                 </TooltipTrigger>
                                 {(item.description && item.description.length > 0) && (
@@ -1986,7 +2046,12 @@ export default function BacklogPage() {
                                         handleOpenSprintModal([], [item._id], { mode: 'assign' })
                                       }
                                     }}
-                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                    disabled={!canManageSprints}
+                                    className={cn(
+                                      'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
+                                      !canManageSprints && 'opacity-50 cursor-not-allowed'
+                                    )}
+                                    title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
                                   >
                                     <Kanban className="h-4 w-4 mr-2" />
                                     <span>Add to Sprint</span>
@@ -2007,7 +2072,12 @@ export default function BacklogPage() {
                                         })
                                       }
                                     }}
-                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                                    disabled={!canManageSprints}
+                                    className={cn(
+                                      'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
+                                      !canManageSprints && 'opacity-50 cursor-not-allowed'
+                                    )}
+                                    title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
                                   >
                                     <Kanban className="h-4 w-4 mr-2" />
                                     <span>Manage Sprint</span>
