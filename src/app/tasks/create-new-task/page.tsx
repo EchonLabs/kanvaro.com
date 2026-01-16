@@ -135,7 +135,7 @@ export default function CreateTaskPage() {
   const [authError, setAuthError] = useState('')
 
   // Use the notification hook
-  const { error: notifyError } = useNotify()
+  const { error: notifyError, success: notifySuccess } = useNotify()
 
   const [projects, setProjects] = useState<Project[]>([])
   const [projectMembers, setProjectMembers] = useState<User[]>([])
@@ -418,6 +418,7 @@ export default function CreateTaskPage() {
       }
 
       if (data.success) {
+        notifySuccess({ title: 'Task Created Successfully', message: 'Your task has been created and assigned.' })
         router.push('/tasks')
         setAttachments([])
       } else {
