@@ -200,8 +200,15 @@ export async function POST(
       status: { $in: ['done', 'completed'] }
     }
 
-    const completedTasks = await Task.find(completedTaskFilter).select('_id')
+    const completedTasks = await Task.find(completedTaskFilter).select('_id epic story')
     const completedTaskIds = completedTasks.map(task => task._id)
+
+    // Also get completed stories from this sprint
+    const completedStories = await Story.find({
+      sprint: sprintId,
+      archived: { $ne: true },
+      status: { $in: ['done', 'completed'] }
+    }).select('_id epic')
 
     if (completedTaskIds.length > 0) {
       await Task.updateMany(
@@ -209,6 +216,33 @@ export async function POST(
         { archived: true }
       )
       // DO NOT remove completed tasks from sprint's tasks array - keep history for display
+    }
+
+    // Check epic and story completion for all completed tasks and stories
+    try {
+      // Check completion for completed tasks
+      for (const task of completedTasks) {
+        // Check story completion if task belongs to a story
+        if (task.story) {
+          await CompletionService.checkStoryCompletion(task.story.toString())
+        }
+        
+        // Check epic completion if task belongs to an epic
+        if (task.epic) {
+          await CompletionService.checkEpicCompletion(task.epic.toString())
+        }
+      }
+
+      // Check completion for completed stories
+      for (const story of completedStories) {
+        // Check epic completion if story belongs to an epic
+        if (story.epic) {
+          await CompletionService.checkEpicCompletion(story.epic.toString())
+        }
+      }
+    } catch (completionError) {
+      console.error('Error checking completion during sprint completion:', completionError)
+      // Don't fail the sprint completion if completion checks fail
     }
 
     const updatedSprint = await Sprint.findById(sprintId)

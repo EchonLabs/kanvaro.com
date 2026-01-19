@@ -1868,7 +1868,7 @@ export default function BacklogPage() {
                               <Badge className={getPriorityColor(item.priority)}>
                                 {formatToTitleCase(item.priority)}
                               </Badge>
-                              {item.epic && (
+                              {item?.epic && (
                                 <Badge
                                   variant="outline"
                                   className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900"
