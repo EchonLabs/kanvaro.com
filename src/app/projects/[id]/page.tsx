@@ -624,7 +624,7 @@ export default function ProjectDetailPage() {
                 {typeof project.projectNumber !== 'undefined' && (
                   <Badge variant="outline" className="flex-shrink-0 hover:bg-transparent dark:hover:bg-transparent">#{project.projectNumber}</Badge>
                 )}
-                {project.isDraft && (
+                {project.isDraft && project.status !== 'draft' && (
                   <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900 flex-shrink-0">
                     Draft
                   </Badge>
@@ -747,7 +747,7 @@ export default function ProjectDetailPage() {
             <TabsTrigger value="tasks" className="text-xs sm:text-sm">Tasks</TabsTrigger>
             <TabsTrigger value="kanban" className="text-xs sm:text-sm">Kanban</TabsTrigger>
             <TabsTrigger value="calendar" className="text-xs sm:text-sm">Calendar</TabsTrigger>
-            <TabsTrigger value="backlog" className="text-xs sm:text-sm">backlog</TabsTrigger>
+            <TabsTrigger value="backlog" className="text-xs sm:text-sm">Backlog</TabsTrigger>
             <TabsTrigger value="testing" className="text-xs sm:text-sm">Testing</TabsTrigger>
             <TabsTrigger value="reports" className="text-xs sm:text-sm">Reports</TabsTrigger>
             <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
