@@ -331,30 +331,64 @@ export default function ColumnSettingsModal({
     setMigratingTasks(true)
 
     try {
+      let tasksMigrated = false
+      let tasksMigrationError = null
+
       // If there are tasks, migrate them first
       if (tasksInColumn > 0 && migrationColumn) {
         const taskIds = taskIdsInColumn.length > 0 ? taskIdsInColumn : []
 
         if (taskIds.length > 0) {
-          // Bulk update tasks to new status
-          const bulkResponse = await fetch('/api/tasks/bulk', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              action: 'update',
-              taskIds,
-              updates: {
-                status: migrationColumn
-              }
+          try {
+            // Bulk update tasks to new status
+            const bulkResponse = await fetch('/api/tasks/bulk', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                action: 'update',
+                taskIds,
+                updates: {
+                  status: migrationColumn
+                }
+              })
             })
-          })
 
-          const bulkData = await bulkResponse.json()
+            if (!bulkResponse.ok) {
+              const errorText = await bulkResponse.text()
+              let errorMessage = `Failed to migrate tasks: ${bulkResponse.status}`
+              try {
+                const errorData = JSON.parse(errorText)
+                errorMessage = errorData.error || errorMessage
+              } catch {
+                // If not JSON, use the text
+                if (errorText.includes('<html>')) {
+                  errorMessage = 'Server error occurred during task migration'
+                } else {
+                  errorMessage = errorText || errorMessage
+                }
+              }
+              throw new Error(errorMessage)
+            }
 
-          if (!bulkResponse.ok || !bulkData.success) {
-            throw new Error(bulkData.error || 'Failed to migrate tasks')
+            const bulkData = await bulkResponse.json()
+
+            if (!bulkData.success) {
+              throw new Error(bulkData.error || 'Failed to migrate tasks')
+            }
+
+            tasksMigrated = true
+          } catch (bulkError) {
+            console.error('Bulk migration error:', bulkError)
+            tasksMigrationError = bulkError instanceof Error ? bulkError.message : 'Unknown error during task migration'
+            
+            // For now, continue with column deletion even if bulk migration fails
+            // In the future, we might want to rollback or handle this differently
+            notifyError({ 
+              title: 'Warning', 
+              message: `Tasks migration failed: ${tasksMigrationError}. Proceeding with column deletion.` 
+            })
           }
         }
       }
@@ -373,8 +407,6 @@ export default function ColumnSettingsModal({
         order: index,
       }))
       
-      setColumns(reorderedColumns)
-
       // Automatically save the changes to persist the deletion
       if (!projectId || projectId.trim() === '') {
         throw new Error('Project ID is missing. Cannot save column deletion.')
@@ -396,8 +428,19 @@ export default function ColumnSettingsModal({
       })
 
       if (!saveResponse.ok) {
-        const errorData = await saveResponse.json().catch(() => ({}))
-        throw new Error(errorData.error || `Failed to save column deletion: ${saveResponse.status}`)
+        const errorText = await saveResponse.text()
+        let errorMessage = `Failed to save column deletion: ${saveResponse.status}`
+        try {
+          const errorData = JSON.parse(errorText)
+          errorMessage = errorData.error || errorMessage
+        } catch {
+          if (errorText.includes('<html>')) {
+            errorMessage = 'Server error occurred during column deletion'
+          } else {
+            errorMessage = errorText || errorMessage
+          }
+        }
+        throw new Error(errorMessage)
       }
 
       const saveData = await saveResponse.json()
@@ -406,7 +449,8 @@ export default function ColumnSettingsModal({
         throw new Error(saveData.error || 'Failed to save column deletion')
       }
 
-      // Update original columns to match current state
+      // Update local state only after successful save
+      setColumns(reorderedColumns)
       setOriginalColumns(JSON.parse(JSON.stringify(reorderedColumns)))
       
       // Close the delete confirmation dialog
@@ -418,9 +462,17 @@ export default function ColumnSettingsModal({
       
       // Show success message
       const totalTasksMoved = tasksInColumn
-      const successMessage = totalTasksMoved > 0 && migrationColumnTitle
-        ? `Column "${column.title}" has been deleted successfully and ${totalTasksMoved} task${totalTasksMoved !== 1 ? 's' : ''} ${totalTasksMoved !== 1 ? 'were' : 'was'} moved to "${migrationColumnTitle}". The status has been completely removed from this project.`
-        : `Column "${column.title}" has been deleted successfully. The status has been completely removed from this project.`
+      let successMessage = `Column "${column.title}" has been deleted successfully.`
+      
+      if (totalTasksMoved > 0 && migrationColumnTitle) {
+        if (tasksMigrated) {
+          successMessage += ` ${totalTasksMoved} task${totalTasksMoved !== 1 ? 's' : ''} ${totalTasksMoved !== 1 ? 'were' : 'was'} moved to "${migrationColumnTitle}".`
+        } else {
+          successMessage += ` Note: ${totalTasksMoved} task${totalTasksMoved !== 1 ? 's' : ''} could not be moved due to an error.`
+        }
+      }
+      
+      successMessage += ' The status has been completely removed from this project.'
 
       notifySuccess({ title: 'Success', message: successMessage })
 
@@ -428,7 +480,8 @@ export default function ColumnSettingsModal({
       onColumnsUpdated()
     } catch (error) {
       console.error('Delete error:', error)
-      notifyError({ title: 'Error', message: error instanceof Error ? error.message : 'Failed to delete column' })
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete column'
+      notifyError({ title: 'Error', message: errorMessage })
       // Don't close the dialog on error so user can retry
     } finally {
       setMigratingTasks(false)

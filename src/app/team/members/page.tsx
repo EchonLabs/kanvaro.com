@@ -65,6 +65,8 @@ interface Member {
     email: string
     role: string
   }
+    memberId?: string
+
 }
 
 interface PendingInvitation {
@@ -729,6 +731,9 @@ export default function MembersPage() {
                             <h3 className="font-semibold text-base sm:text-lg truncate" title={`${member.firstName} ${member.lastName}`}>
                               {member.firstName} {member.lastName}
                             </h3>
+                            <p className="text-xs text-muted-foreground truncate">
+                              ID: {member?.memberId ? member.memberId : '-'}
+                            </p>
                             <p className="text-xs sm:text-sm text-muted-foreground truncate" title={member.email}>
                               {member.email}
                             </p>
@@ -796,6 +801,9 @@ export default function MembersPage() {
                               <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-500 flex-shrink-0" />
                             )}
                           </div>
+                          <p className="text-xs text-muted-foreground truncate mb-1">
+                            ID: {member?.memberId  ? member.memberId : '-'}
+                          </p>
                           <p className="text-xs sm:text-sm text-muted-foreground truncate mb-2" title={member.email}>{member.email}</p>
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge className={`${getRoleColor(member.role, member.customRole?._id)} text-xs flex-shrink-0`}>
