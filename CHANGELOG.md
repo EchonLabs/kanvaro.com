@@ -1,3 +1,10 @@
+## [1.24.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.24.0...v1.24.1) (2026-01-19)
+
+
+### Bug Fixes
+
+* add chnges in time logs and profile ([b4712a6](https://github.com/EchonLabs/kanvaro.com/commit/b4712a65f876ccd7dea9af282d27e4ace4513ed8))
+
 # [1.24.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.14...v1.24.0) (2026-01-16)
 
 

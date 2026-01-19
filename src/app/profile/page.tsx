@@ -13,12 +13,14 @@ import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { detectClientTimezone } from '@/lib/timezone'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useCurrencies } from '@/hooks/useCurrencies'
 import { useProfile } from '@/hooks/useProfile'
-import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { useToast } from '@/components/ui/Toast'
-import { detectClientTimezone } from '@/lib/timezone'
+import { useDateTime } from '@/components/providers/DateTimeProvider'
 import {
   User,
   Settings,
@@ -85,6 +87,8 @@ export default function ProfilePage() {
   const { updateProfile, changePassword, uploadAvatar, loading: profileLoading, error: profileError, success: profileSuccess } = useProfile()
   const { showToast } = useToast()
   const { formatDate: formatDateDisplay, formatTime: formatTimeDisplay, setPreferences } = useDateTime()
+  const { hasPermission } = usePermissions()
+  const canEditProfile = hasPermission(Permission.USER_UPDATE)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState('')
@@ -630,7 +634,7 @@ export default function ProfilePage() {
                             variant="outline"
                             size="sm"
                             onClick={() => document.getElementById('avatar-upload')?.click()}
-                            disabled={profileLoading}
+                            disabled={profileLoading || !canEditProfile}
                           >
                             {profileLoading ? (
                               <>
@@ -645,7 +649,7 @@ export default function ProfilePage() {
                             variant="ghost"
                             size="sm"
                             onClick={handleRemoveAvatar}
-                            disabled={removingAvatar}
+                            disabled={removingAvatar || !canEditProfile}
                             className="text-muted-foreground hover:text-foreground"
                           >
                             {removingAvatar ? (

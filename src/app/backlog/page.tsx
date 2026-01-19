@@ -108,10 +108,10 @@ interface SprintOption {
   } | null
 }
 
-const ALLOWED_BACKLOG_STATUSES: string[] = ['backlog', 'todo', 'inprogress', 'review','done', 'cancelled']
+const ALLOWED_BACKLOG_STATUSES: string[] = ['backlog', 'todo', 'inprogress', 'review', 'testing', 'done', 'cancelled']
 
 const TASK_STATUS_VALUES = ['backlog', 'todo', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const
-const EPIC_STORY_STATUSES: string[] = ['backlog', 'todo', 'inprogress', 'done', 'cancelled']
+const EPIC_STORY_STATUSES: string[] = ['backlog', 'todo', 'inprogress', 'review', 'testing', 'done', 'cancelled']
 
 function truncateText(value: string, maxLength = 20): string {
   if (!value) {

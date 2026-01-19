@@ -1880,7 +1880,12 @@ export function TimeLogs({
       const result = await response.json()
 
       if (response.ok && result.success) {
-        const { results } = result
+        const { results, errors } = result
+
+        // Set detailed errors if available
+        if (errors && Array.isArray(errors)) {
+          setBulkUploadErrors(errors)
+        }
 
         // Update progress with final results
         setBulkUploadProgress({
@@ -2000,7 +2005,7 @@ export function TimeLogs({
           </CardTitle>
           {showManualLogButtons && pathname === '/time-tracking/timer' && canAddManualTimeLog && (
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <Button
+              {/* <Button
                 onClick={() => setShowBulkUploadModal(true)}
                 size="sm"
                 variant="outline"
@@ -2008,7 +2013,7 @@ export function TimeLogs({
               >
                 <Upload className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                 <span className="whitespace-nowrap">Bulk Upload</span>
-              </Button>
+              </Button> */}
               <Button
                 onClick={() => {
                   // Clear form data when opening add modal
@@ -2971,7 +2976,14 @@ export function TimeLogs({
                             <Target className="h-4 w-4 flex-shrink-0" />
                             <div className="flex-1 min-w-0 overflow-hidden">
                               <div className="font-medium truncate flex items-center gap-2 min-w-0">
-                                <span className="truncate">{task.title}</span>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="truncate">{task.title}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{task.title}</p>
+                                  </TooltipContent>
+                                </Tooltip>
                                 {task.isBillable && (
                                   <DollarSign className="h-3 w-3 text-green-600 flex-shrink-0" />
                                 )}
@@ -3281,7 +3293,14 @@ export function TimeLogs({
                       <SelectItem key={task._id} value={task._id}>
                         <div className="flex items-center space-x-2">
                           <Target className="h-4 w-4 flex-shrink-0" />
-                          <span className="truncate">{task.title}</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="truncate">{task.title}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{task.title}</p>
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
                       </SelectItem>
                     ))
@@ -3503,75 +3522,100 @@ export function TimeLogs({
         <DialogBody className="space-y-4">
           {/* Enhanced progress display during bulk upload */}
           {uploadingBulk && (
-            <div className="absolute inset-0 bg-background/95 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg p-6">
-              <div className="w-full max-w-2xl bg-card border rounded-lg shadow-lg p-6 max-h-[70vh] flex flex-col">
-                <div className="flex items-center gap-3 mb-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary flex-shrink-0" />
-                  <div>
-                    <h3 className="text-lg font-semibold">Processing Time Entries</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {bulkUploadProgress ? `${bulkUploadProgress.processed} of ${bulkUploadProgress.total} rows processed` : 'Reading CSV file...'}
-                    </p>
+            <div className="w-full max-w-2xl bg-card border rounded-lg shadow-lg p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Loader2 className="h-6 w-6 animate-spin text-primary flex-shrink-0" />
+                <div>
+                  <h3 className="text-lg font-semibold">Processing Time Entries</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {bulkUploadProgress ? `${bulkUploadProgress.processed} of ${bulkUploadProgress.total} rows processed` : 'Reading CSV file...'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              {bulkUploadProgress && (
+                <div className="mb-4">
+                  <div className="w-full bg-muted rounded-full h-2.5 mb-2">
+                    <div
+                      className="bg-primary h-2.5 rounded-full transition-all duration-300"
+                      style={{ width: `${(bulkUploadProgress.processed / bulkUploadProgress.total) * 100}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Check className="h-3 w-3 text-green-600" />
+                      {bulkUploadProgress.successful} successful
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <X className="h-3 w-3 text-destructive" />
+                      {bulkUploadProgress.failed} failed
+                    </span>
                   </div>
                 </div>
+              )}
 
-                {/* Progress bar */}
-                {bulkUploadProgress && (
-                  <div className="mb-4">
-                    <div className="w-full bg-muted rounded-full h-2.5 mb-2">
+              {/* Row-by-row status */}
+              {rowUploadStatus.size > 0 && (
+                <div className="flex-1 overflow-y-auto space-y-1 border rounded-md p-3 bg-muted/30 min-h-[200px] max-h-[400px]">
+                  {Array.from(rowUploadStatus.entries())
+                    .sort(([a], [b]) => a - b)
+                    .map(([rowNum, status]) => (
                       <div
-                        className="bg-primary h-2.5 rounded-full transition-all duration-300"
-                        style={{ width: `${(bulkUploadProgress.processed / bulkUploadProgress.total) * 100}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Check className="h-3 w-3 text-green-600" />
-                        {bulkUploadProgress.successful} successful
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <X className="h-3 w-3 text-destructive" />
-                        {bulkUploadProgress.failed} failed
-                      </span>
-                    </div>
-                  </div>
-                )}
+                        key={rowNum}
+                        className={`flex items-center gap-2 p-2 rounded text-sm transition-all ${
+                          status.status === 'success'
+                            ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400'
+                            : status.status === 'error'
+                            ? 'bg-destructive/10 text-destructive'
+                            : 'bg-muted/50 text-muted-foreground'
+                        }`}
+                      >
+                        {status.status === 'pending' && (
+                          <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                        )}
+                        {status.status === 'success' && (
+                          <Check className="h-4 w-4 flex-shrink-0" />
+                        )}
+                        {status.status === 'error' && (
+                          <X className="h-4 w-4 flex-shrink-0" />
+                        )}
+                        <span className="font-medium min-w-[60px]">Row {rowNum}:</span>
+                        <span className="flex-1 truncate">
+                          {status.status === 'pending' && 'Uploading...'}
+                          {status.status === 'success' && 'Successfully uploaded'}
+                          {status.status === 'error' && (status.error || 'Failed to upload')}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
 
-                {/* Row-by-row status */}
-                {rowUploadStatus.size > 0 && (
-                  <div className="flex-1 overflow-y-auto space-y-1 border rounded-md p-3 bg-muted/30 min-h-[200px] max-h-[400px]">
-                    {Array.from(rowUploadStatus.entries())
-                      .sort(([a], [b]) => a - b)
-                      .map(([rowNum, status]) => (
-                        <div
-                          key={rowNum}
-                          className={`flex items-center gap-2 p-2 rounded text-sm transition-all ${
-                            status.status === 'success'
-                              ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400'
-                              : status.status === 'error'
-                              ? 'bg-destructive/10 text-destructive'
-                              : 'bg-muted/50 text-muted-foreground'
-                          }`}
-                        >
-                          {status.status === 'pending' && (
-                            <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
-                          )}
-                          {status.status === 'success' && (
-                            <Check className="h-4 w-4 flex-shrink-0" />
-                          )}
-                          {status.status === 'error' && (
-                            <X className="h-4 w-4 flex-shrink-0" />
-                          )}
-                          <span className="font-medium min-w-[60px]">Row {rowNum}:</span>
-                          <span className="flex-1 truncate">
-                            {status.status === 'pending' && 'Uploading...'}
-                            {status.status === 'success' && 'Successfully uploaded'}
-                            {status.status === 'error' && (status.error || 'Failed to upload')}
-                          </span>
-                        </div>
-                      ))}
+          {/* Display bulk upload result after completion */}
+          {!uploadingBulk && bulkUploadProgress && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium">Upload Result</h4>
+              <p className="text-sm text-muted-foreground">
+                {bulkUploadProgress.successful} successful, {bulkUploadProgress.failed} failed
+              </p>
+            </div>
+          )}
+
+          {/* Display bulk upload errors */}
+          {bulkUploadErrors.length > 0 && !uploadingBulk && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-destructive">Upload Errors</h4>
+              <div className="max-h-40 overflow-y-auto space-y-1 border border-destructive/20 rounded-md p-3 bg-destructive/5">
+                {bulkUploadErrors.map((error, index) => (
+                  <div key={index} className="flex items-start gap-2 text-sm">
+                    <X className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                    <span className="text-destructive">
+                      <strong>Row {error.row}:</strong> {error.error}
+                    </span>
                   </div>
-                )}
+                ))}
               </div>
             </div>
           )}
