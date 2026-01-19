@@ -31,10 +31,14 @@ const STATUS_FILTER_MAP: Record<string, { tasks?: string[]; stories?: string[]; 
     epics: ['inprogress']
   },
   review: {
-    tasks: ['review']
+    tasks: ['review'],
+    stories: ['review'],
+    epics: ['review']
   },
   testing: {
-    tasks: ['testing']
+    tasks: ['testing'],
+    stories: ['testing'],
+    epics: ['testing']
   },
   done: {
     tasks: ['done'],

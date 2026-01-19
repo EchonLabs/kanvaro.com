@@ -6,7 +6,7 @@ export interface IEpic extends Document {
   project: mongoose.Types.ObjectId
   createdBy: mongoose.Types.ObjectId
   assignedTo?: mongoose.Types.ObjectId
-  status: 'backlog' | 'todo' | 'inprogress' | 'done' | 'cancelled'
+  status: 'backlog' | 'todo' | 'inprogress' | 'review' | 'testing' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'critical'
   storyPoints?: number
   estimatedHours?: number
