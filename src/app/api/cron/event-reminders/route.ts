@@ -155,7 +155,7 @@ async function createReminderNotifications(
         entityId: event._id,
         action: 'upcoming',
         priority: reminderType === '15min' ? 'high' : 'medium',
-        url: `/sprint-events/${event._id}`,
+        url: `/sprint-events/view-sprint-event/${event._id}`,
         metadata: {
           projectName,
           eventType: event.eventType,

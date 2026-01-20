@@ -981,7 +981,10 @@ const [overheadInput, setOverheadInput] = useState('')
 
   return (
     <TooltipProvider>
-      <MainLayout>
+      <MainLayout breadcrumbItems={[
+        { label: 'Projects', href: '/projects' },
+        { label: isEditMode ? 'Edit Project' : 'Create Project' }
+      ]}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
