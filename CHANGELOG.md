@@ -1,3 +1,11 @@
+## [1.25.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.0...v1.25.1) (2026-01-20)
+
+
+### Bug Fixes
+
+* add chnges ([abb5b48](https://github.com/EchonLabs/kanvaro.com/commit/abb5b485e676eb7d84485978c9bdd7dddb243e6f))
+* addd chnages in event creation ([752d2d7](https://github.com/EchonLabs/kanvaro.com/commit/752d2d744cca60e4b3ea91a8680241063ff0e1d1))
+
 # [1.25.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.24.2...v1.25.0) (2026-01-20)
 
 

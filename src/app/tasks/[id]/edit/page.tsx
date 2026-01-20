@@ -1190,7 +1190,9 @@ export default function EditTaskPage() {
                               
                               return filtered.map((story) => (
                                 <SelectItem key={story._id} value={story._id}>
-                                  {story.title}
+                                  <div className="truncate max-w-xs" title={story.title}>
+                                    {story.title}
+                                  </div>
                                 </SelectItem>
                               ))
                             })()}
@@ -1260,7 +1262,9 @@ export default function EditTaskPage() {
                               
                               return filtered.map((epic) => (
                                 <SelectItem key={epic._id} value={epic._id}>
-                                  {epic.title}
+                                  <div className="truncate max-w-xs" title={epic.title}>
+                                    {epic.title}
+                                  </div>
                                 </SelectItem>
                               ))
                             })()}

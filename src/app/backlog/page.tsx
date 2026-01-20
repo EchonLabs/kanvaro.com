@@ -424,8 +424,19 @@ export default function BacklogPage() {
             const response = await fetch(`/api/epics?ids=${epicIds.join(',')}`)
             if (response.ok) {
               const epicData = await response.json()
+              // Handle both array response (for general queries) and object response (for ID queries)
               if (Array.isArray(epicData)) {
                 epicData.forEach((epic: any) => {
+                  if (epic._id && epic.title) {
+                    epicMap.set(epic._id, {
+                      _id: epic._id,
+                      title: epic.title
+                    })
+                  }
+                })
+              } else if (typeof epicData === 'object' && epicData !== null) {
+                // Handle object response when fetching by IDs
+                Object.values(epicData).forEach((epic: any) => {
                   if (epic._id && epic.title) {
                     epicMap.set(epic._id, {
                       _id: epic._id,
