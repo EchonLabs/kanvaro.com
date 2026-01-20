@@ -22,6 +22,8 @@ interface SprintEvent {
   title: string
   description?: string
   scheduledDate: string
+  startTime?: string
+  endTime?: string
   actualDate?: string
   duration: number
   status: string
@@ -41,7 +43,12 @@ interface SprintEvent {
     decisions: string[]
     actionItems: Array<{
       description: string
-      assignedTo: string
+      assignedTo: string | {
+        _id: string
+        firstName: string
+        lastName: string
+        email: string
+      }
       dueDate: string
       status: string
     }>
@@ -95,14 +102,24 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
   
   // Store initial state to compare changes
   const initialFormData = {
+    eventType: event.eventType,
     title: event.title,
     description: event.description || '',
     duration: event.duration,
     status: event.status,
+    startTime: event.startTime || '',
+    endTime: event.endTime || '',
     attendees: [...attendeeIds].sort(),
     location: event.location || '',
     meetingLink: event.meetingLink || '',
-    outcomes: event.outcomes || {
+    outcomes: event.outcomes ? {
+      ...event.outcomes,
+      actionItems: event.outcomes.actionItems.map(item => ({
+        ...item,
+        assignedTo: typeof item.assignedTo === 'object' && item.assignedTo ? item.assignedTo._id : item.assignedTo,
+        dueDate: item.dueDate
+      }))
+    } : {
       decisions: [],
       actionItems: [],
       notes: '',
@@ -114,14 +131,24 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
   const initialActualDate = event.actualDate ? new Date(event.actualDate) : undefined
   
   const [formData, setFormData] = useState({
+    eventType: event.eventType,
     title: event.title,
     description: event.description || '',
     duration: event.duration,
     status: event.status,
+    startTime: event.startTime || '',
+    endTime: event.endTime || '',
     attendees: attendeeIds,
     location: event.location || '',
     meetingLink: event.meetingLink || '',
-    outcomes: event.outcomes || {
+    outcomes: event.outcomes ? {
+      ...event.outcomes,
+      actionItems: event.outcomes.actionItems.map(item => ({
+        ...item,
+        assignedTo: typeof item.assignedTo === 'object' && item.assignedTo ? item.assignedTo._id : item.assignedTo,
+        dueDate: item.dueDate
+      }))
+    } : {
       decisions: [],
       actionItems: [],
       notes: '',
@@ -257,10 +284,13 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          eventType: formData.eventType,
           title: formData.title,
           description: formData.description || undefined,
           scheduledDate: selectedDate.toISOString(),
           actualDate: actualDate?.toISOString(),
+          startTime: formData.startTime || undefined,
+          endTime: formData.endTime || undefined,
           duration: formData.duration,
           attendees: attendeeIds,
           status: formData.status,
@@ -440,10 +470,13 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
 
     // Compare form data fields
     if (
+      formData.eventType !== initialFormData.eventType ||
       formData.title !== initialFormData.title ||
       formData.description !== initialFormData.description ||
       formData.duration !== initialFormData.duration ||
       formData.status !== initialFormData.status ||
+      formData.startTime !== initialFormData.startTime ||
+      formData.endTime !== initialFormData.endTime ||
       formData.location !== initialFormData.location ||
       formData.meetingLink !== initialFormData.meetingLink
     ) {
@@ -744,7 +777,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
                       onChange={(e) => updateActionItem(index, 'description', e.target.value)}
                       placeholder="Action item description..."
                     />
-                    <Select value={item.assignedTo} onValueChange={(value) => updateActionItem(index, 'assignedTo', value)}>
+                    <Select value={typeof item.assignedTo === 'object' && item.assignedTo ? item.assignedTo : item.assignedTo} onValueChange={(value) => updateActionItem(index, 'assignedTo', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder="Assign to..." />
                       </SelectTrigger>
@@ -758,11 +791,12 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
                     </Select>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      type="date"
-                      value={item.dueDate}
-                      onChange={(e) => updateActionItem(index, 'dueDate', e.target.value)}
-                    />
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Due Date</Label>
+                      <div className="text-sm font-medium p-2 bg-muted rounded border">
+                        {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'No due date'}
+                      </div>
+                    </div>
                     <Select value={item.status} onValueChange={(value) => updateActionItem(index, 'status', value)}>
                       <SelectTrigger>
                         <SelectValue />
