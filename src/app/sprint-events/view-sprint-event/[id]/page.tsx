@@ -117,7 +117,7 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
   const fetchEvent = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/sprint-events/${eventId}`)
+      const response = await fetch(`/api/sprint-events/view-sprint-event/${eventId}`)
       if (response.ok) {
         const data = await response.json()
         setEvent(data)
@@ -148,7 +148,7 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
       return
     }
     try {
-      const response = await fetch(`/api/sprint-events/${eventId}`, {
+      const response = await fetch(`/api/sprint-events/view-sprint-event/${eventId}`, {
         method: 'DELETE'
       })
       if (response.ok) {
@@ -161,7 +161,7 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
 
   const updateStatus = async (newStatus: string) => {
     try {
-      const response = await fetch(`/api/sprint-events/${eventId}`, {
+      const response = await fetch(`/api/sprint-events/view-sprint-event/${eventId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

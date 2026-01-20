@@ -421,7 +421,7 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                               <TooltipTrigger asChild>
                                 <div
                                   className={`text-xs p-1 rounded bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/30 dark:to-indigo-900/30 border border-purple-200 dark:border-purple-800 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${getEventStatusColor(event.status)} border-l-2`}
-                                  onClick={() => router.push(`/sprint-events/${event._id}`)}
+                                  onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
                                 >
                                   <div className="font-medium truncate flex items-center gap-1">
                                     <Video className="h-3 w-3 text-purple-600 dark:text-purple-400" />
@@ -531,7 +531,7 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                           <TooltipTrigger asChild>
                             <div
                               className={`text-xs p-2 rounded bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/30 dark:to-indigo-900/30 border border-purple-200 dark:border-purple-800 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${getEventStatusColor(event.status)} border-l-2`}
-                              onClick={() => router.push(`/sprint-events/${event._id}`)}
+                              onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
                             >
                               <div className="font-medium truncate flex items-center gap-1">
                                 <Video className="h-3 w-3 text-purple-600 dark:text-purple-400" />
@@ -638,7 +638,7 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
                         <div
                           key={event._id}
                           className={`p-3 rounded bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/30 dark:to-indigo-900/30 border border-purple-200 dark:border-purple-800 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${getEventStatusColor(event.status)} border-l-4`}
-                          onClick={() => router.push(`/sprint-events/${event._id}`)}
+                          onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
                         >
                           <div className="flex items-center gap-2">
                             <Video className="h-4 w-4 text-purple-600 dark:text-purple-400" />

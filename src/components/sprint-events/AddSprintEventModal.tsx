@@ -582,6 +582,31 @@ export function AddSprintEventModal({ projectId, onClose, onSuccess }: AddSprint
     calculateDuration()
   }, [formData.startTime, formData.endTime, startTimeError, endTimeError])
 
+  // Auto-set date for Sprint Review events
+  useEffect(() => {
+    if (formData.eventType === 'review' && selectedSprint && selectedSprint.endDate) {
+      const dayAfterSprintEnd = new Date(selectedSprint.endDate)
+      dayAfterSprintEnd.setDate(dayAfterSprintEnd.getDate() + 1)
+      dayAfterSprintEnd.setHours(0, 0, 0, 0)
+
+      // If no date is selected, or if the current date is not valid for review, auto-set it
+      if (!selectedDate || (selectedDate && selectedDate < dayAfterSprintEnd)) {
+        setSelectedDate(dayAfterSprintEnd)
+        setDateError('') // Clear any existing date errors
+      }
+    }
+  }, [formData.eventType, selectedSprint, selectedDate])
+
+  // Update selectedSprint when sprintId changes
+  useEffect(() => {
+    if (formData.sprintId && sprints.length > 0) {
+      const sprint = sprints.find(s => s._id === formData.sprintId)
+      setSelectedSprint(sprint || null)
+    } else {
+      setSelectedSprint(null)
+    }
+  }, [formData.sprintId, sprints])
+
   // Check if form is valid
   const isFormValid = () => {
     const projId = projectId || formData.projectId

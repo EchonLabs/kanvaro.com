@@ -278,7 +278,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
         typeof attendee === 'string' ? attendee : attendee._id
       ).filter(Boolean) as string[]
       
-      const response = await fetch(`/api/sprint-events/${event._id}`, {
+      const response = await fetch(`/api/sprint-events/view-sprint-event/${event._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
