@@ -308,7 +308,7 @@ export default function ContactPage() {
                   Join our community on GitHub Discussions for help, feature requests, and connecting with other users.
                 </p>
                 <Button
-                  onClick={() => window.open('https://github.com/EchonLabs/kanvaro.com/discussions', '_blank')}
+                  onClick={() => window.open('https://github.com/EchonLabs/kanvaro.com/issues', '_blank')}
                   className="rounded-full bg-white text-[#0d9488] hover:bg-white/90"
                 >
                   Join Discussions
