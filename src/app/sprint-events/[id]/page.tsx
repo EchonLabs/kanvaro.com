@@ -55,7 +55,12 @@ interface SprintEvent {
     decisions: string[]
     actionItems: Array<{
       description: string
-      assignedTo: string
+      assignedTo: string | {
+        _id: string
+        firstName: string
+        lastName: string
+        email: string
+      }
       dueDate: string
       status: string
     }>
@@ -514,9 +519,11 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
                                   <div className="flex items-center gap-1">
                                     <Users className="h-3 w-3" />
                                     <span>
-                                      {typeof item.assignedTo === 'object' && item.assignedTo !== null
-                                        ? `${(item.assignedTo as unknown as { firstName?: string; lastName?: string }).firstName || ''} ${(item.assignedTo as unknown as { firstName?: string; lastName?: string }).lastName || ''}`.trim() || 'Unassigned'
-                                        : item.assignedTo || 'Unassigned'}
+                                      {typeof item.assignedTo === 'object' && item.assignedTo !== null && 'firstName' in item.assignedTo
+                                        ? `${item.assignedTo.firstName} ${item.assignedTo.lastName}`.trim()
+                                        : typeof item.assignedTo === 'string' && item.assignedTo.length > 0
+                                        ? item.assignedTo
+                                        : 'Unassigned'}
                                     </span>
                                   </div>
                                 )}
