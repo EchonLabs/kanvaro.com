@@ -1,3 +1,11 @@
+## [1.25.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.1...v1.25.2) (2026-01-21)
+
+
+### Bug Fixes
+
+* add landing page changes ([44a348d](https://github.com/EchonLabs/kanvaro.com/commit/44a348d86703b75c872eca95667b6c9f0668c5f1))
+* fix bugs ([f73175b](https://github.com/EchonLabs/kanvaro.com/commit/f73175b76d70fbcf6bb5e625d6c013e6f28d555a))
+
 ## [1.25.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.0...v1.25.1) (2026-01-20)
 
 
