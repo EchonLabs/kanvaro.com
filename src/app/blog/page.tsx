@@ -124,6 +124,7 @@ export default function BlogPage() {
   const [emailError, setEmailError] = useState('')
   const [isSubscribing, setIsSubscribing] = useState(false)
   const [subscribeSuccess, setSubscribeSuccess] = useState(false)
+  const [subscribedEmails, setSubscribedEmails] = useState<string[]>(['test@example.com', 'user@domain.com']) // Simulated existing subscribers
 
   useEffect(() => {
     setMounted(true)
@@ -159,7 +160,14 @@ export default function BlogPage() {
       await new Promise(resolve => setTimeout(resolve, 1000))
       
       // Check if already subscribed (simulated)
-      // In production, check against database
+      if (subscribedEmails.includes(email.toLowerCase())) {
+        setEmailError('This email is already subscribed to our newsletter.')
+        return
+      }
+      
+      // Add email to subscribed list (simulated)
+      setSubscribedEmails(prev => [...prev, email.toLowerCase()])
+      
       setSubscribeSuccess(true)
       setEmail('')
       
