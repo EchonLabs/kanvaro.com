@@ -198,12 +198,21 @@ const LANDING_PAGE_IMAGES = {
   }
 }
 
+// Demo videos - all videos now available
+const DEMO_VIDEOS = {
+  dashboard: "https://res.cloudinary.com/dichgutd0/video/upload/v1768907076/EL-Core-Assets/Static/Kanvaro/Dashboard_Module_plhivt.mp4",
+  tasks: "https://res.cloudinary.com/dichgutd0/video/upload/v1768907104/EL-Core-Assets/Static/Kanvaro/Tasks_Module_qzwzl8.mp4",
+  projects: "https://res.cloudinary.com/dichgutd0/video/upload/v1768907083/EL-Core-Assets/Static/Kanvaro/Project_Creation_anh2bs.mp4",
+  settings: "https://res.cloudinary.com/dichgutd0/video/upload/v1768907087/EL-Core-Assets/Static/Kanvaro/Settings_Module_fjuv8k.mp4"
+}
+
 export default function LandingPage() {
   const router = useRouter()
   const { theme, setTheme } = useTheme()
   const [ctaLoading, setCtaLoading] = useState(false)
   const [showBackToTop, setShowBackToTop] = useState(false)
   const [showVideoModal, setShowVideoModal] = useState(false)
+  const [currentVideo, setCurrentVideo] = useState<string>('dashboard')
   const [mounted, setMounted] = useState(false)
   
   // Use the hardcoded images directly
@@ -407,18 +416,44 @@ export default function LandingPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56 rounded-xl border-slate-200/80 bg-white/95 backdrop-blur-md shadow-xl dark:border-white/20 dark:bg-slate-900/95 dark:backdrop-blur-md p-2">
                   <DropdownMenuItem 
-                    onClick={() => setShowVideoModal(true)}
+                    onClick={() => {
+                      setCurrentVideo('dashboard')
+                      setShowVideoModal(true)
+                    }}
                     className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
                   >
-                    <Play className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
-                    <span className="font-medium">Guided Tour</span>
+                    <BarChart3 className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">Dashboard Demo</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem 
-                    onClick={handleGetStarted}
+                    onClick={() => {
+                      setCurrentVideo('tasks')
+                      setShowVideoModal(true)
+                    }}
                     className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
                   >
-                    <Zap className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
-                    <span className="font-medium">Interactive Preview</span>
+                    <ListChecks className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">Tasks Demo</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      setCurrentVideo('projects')
+                      setShowVideoModal(true)
+                    }}
+                    className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
+                  >
+                    <Layers className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">Projects Demo</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      setCurrentVideo('settings')
+                      setShowVideoModal(true)
+                    }}
+                    className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
+                  >
+                    <Shield className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">Settings Demo</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -431,14 +466,20 @@ export default function LandingPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56 rounded-xl border-slate-200/80 bg-white/95 backdrop-blur-md shadow-xl dark:border-white/20 dark:bg-slate-900/95 dark:backdrop-blur-md p-2">
                   <DropdownMenuItem 
-                    onClick={() => window.open('/docs/public/self-hosting/docker-deployment', '_blank')}
+                    onClick={() => {
+                      sessionStorage.setItem('docsReferrer', '/');
+                      router.push('/docs/public/self-hosting/docker-deployment');
+                    }}
                     className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
                   >
                     <FileText className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
                     <span className="font-medium">Installation</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem 
-                    onClick={() => window.open('/docs/public/concepts/features', '_blank')}
+                    onClick={() => {
+                      sessionStorage.setItem('docsReferrer', '/');
+                      router.push('/docs/public/concepts/features');
+                    }}
                     className="rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gradient-to-r hover:from-[#7bffde]/10 hover:to-[#7afdea]/10 dark:hover:from-[#7bffde]/20 dark:hover:to-[#7afdea]/20 transition-all duration-200 group"
                   >
                     <BookOpen className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
@@ -526,7 +567,10 @@ export default function LandingPage() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => setShowVideoModal(true)}
+                onClick={() => {
+                  setCurrentVideo('dashboard')
+                  setShowVideoModal(true)
+                }}
                 className="h-14 rounded-full border-slate-300 bg-white px-10 text-base font-semibold text-slate-900 hover:bg-slate-100 dark:border-white/40 dark:bg-transparent dark:text-white dark:hover:bg-white/10"
               >
                 <Play className="mr-2 h-5 w-5" />
@@ -537,7 +581,13 @@ export default function LandingPage() {
 
           <div className="relative mx-auto w-full max-w-2xl lg:max-w-3xl xl:max-w-4xl rounded-[3rem] border border-slate-200 bg-white p-8 text-slate-900 shadow-[0_50px_80px_rgba(15,23,42,0.15)] backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-white dark:shadow-[0_40px_80px_rgba(0,0,0,0.45)]">
             {images.heroDashboard ? (
-              <div className="relative w-full aspect-[16/10] rounded-3xl overflow-hidden shadow-2xl border-2 border-slate-200/50 dark:border-white/10 group hover:border-[#7bffde]/50 transition-all duration-300">
+              <div 
+                className="relative w-full aspect-[16/10] rounded-3xl overflow-hidden shadow-2xl border-2 border-slate-200/50 dark:border-white/10 group hover:border-[#7bffde]/50 transition-all duration-300 cursor-pointer"
+                onClick={() => {
+                  setCurrentVideo('dashboard')
+                  setShowVideoModal(true)
+                }}
+              >
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent z-10" />
                 <Image
                   src={images.heroDashboard}
@@ -548,10 +598,11 @@ export default function LandingPage() {
                   unoptimized
                 />
                 <div className="absolute bottom-6 left-6 right-6 z-20">
-                  <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl p-4 border border-slate-200/50 dark:border-white/10 shadow-lg">
+                  <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl p-4 border border-slate-200/50 dark:border-white/10 shadow-lg group-hover:bg-white/100 dark:group-hover:bg-slate-900/100 transition-colors">
                     <div className="flex items-center gap-2">
                       <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" />
                       <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Live Dashboard Preview</span>
+                      <Play className="h-4 w-4 ml-auto opacity-60 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </div>
                 </div>
@@ -613,7 +664,7 @@ export default function LandingPage() {
           <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#68ffde]">
             Unique Features
           </p>
-          <h2 className="mt-4 text-4xl font-semibold sm:text-5xl">
+          <h2 className="mt-4 text-5xl font-semibold sm:text-6xl">
             What makes Kanvaro different
           </h2>
           <p className="mt-4 text-slate-600 dark:text-white/80">
@@ -674,7 +725,7 @@ export default function LandingPage() {
       <section id="key-features" className="bg-gradient-to-b from-[#eef2ff] to-[#f9fbff] px-6 py-20 dark:from-[#050c1d] dark:to-[#030714] sm:py-28">
         <div className="mx-auto max-w-6xl text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#7bffde]">Key Features</p>
-          <h2 className="mt-4 text-4xl font-semibold sm:text-5xl lg:text-6xl">
+          <h2 className="mt-4 text-5xl font-semibold sm:text-6xl lg:text-7xl">
             Core Project Management Features
           </h2>
           <p className="mt-4 text-lg text-slate-600 dark:text-white/70 max-w-3xl mx-auto">
@@ -783,7 +834,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl">
           <div className="text-center mb-12">
             <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#7bffde]">Workflows</p>
-            <h2 className="mt-4 text-4xl font-semibold sm:text-5xl lg:text-6xl">
+            <h2 className="mt-4 text-5xl font-semibold sm:text-6xl">
               Streamlined Project Workflows
             </h2>
             <p className="mt-4 text-lg text-slate-600 dark:text-white/70 max-w-3xl mx-auto">
@@ -862,7 +913,7 @@ export default function LandingPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#8adfff]">
               Module Walkthrough
             </p>
-            <h2 className="mt-3 text-4xl font-semibold sm:text-5xl">
+            <h2 className="mt-3 text-5xl font-semibold sm:text-6xl">
               Explore all system modules
             </h2>
             <p className="mt-4 text-slate-600 dark:text-white/80 max-w-3xl mx-auto">
@@ -939,7 +990,7 @@ export default function LandingPage() {
 
                   {/* Click to Explore CTA */}
                   <div className="mt-6 pt-4 border-t border-slate-200 dark:border-white/10">
-                    <button className="w-full flex items-center justify-center gap-2 rounded-full bg-[#0d9488]/10 dark:bg-[#7bffde]/20 py-3 text-sm font-semibold text-[#0d9488] dark:text-[#7bffde] hover:bg-[#0d9488] hover:text-white dark:hover:bg-[#7bffde] dark:hover:text-slate-900 transition-colors">
+                    <button className="w-full flex items-center justify-center gap-2 rounded-full bg-[#0d9488]/10 dark:bg-[#7bffde]/20 py-3 text-sm font-semibold text-[#0d9488] dark:text-[#7bffde] hover:bg-[#0d9488] hover:text-white dark:hover:bg-[#7bffde]/20 dark:hover:text-[#7bffde] transition-colors">
                       <span>Click to Explore</span>
                       <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                     </button>
@@ -957,7 +1008,7 @@ export default function LandingPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#7bffde]">
               Comprehensive Reporting & Analytics
             </p>
-            <h2 className="mt-4 text-4xl font-semibold sm:text-5xl">
+            <h2 className="mt-4 text-5xl font-semibold sm:text-6xl">
               Real-time insights for data-driven decisions
             </h2>
             <p className="mt-4 text-slate-600 dark:text-white/80 max-w-3xl mx-auto">
@@ -1009,7 +1060,7 @@ export default function LandingPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0d9488] dark:text-[#7bffde]">
               Team Collaboration
             </p>
-            <h2 className="mt-4 text-4xl font-semibold sm:text-5xl">
+            <h2 className="mt-4 text-5xl font-semibold sm:text-6xl">
               Invite your team and collaborate seamlessly
             </h2>
             <p className="mt-4 text-slate-600 dark:text-white/80 max-w-3xl mx-auto">
@@ -1163,7 +1214,7 @@ export default function LandingPage() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="https://docs.kanvaro.com" target="_blank" rel="noopener noreferrer" className="text-white/70 hover:text-[#7bffde] transition-colors text-sm">
+                  <Link href="/docs/public/concepts/features" className="text-white/70 hover:text-[#7bffde] transition-colors text-sm">
                     User Guide
                   </Link>
                 </li>
@@ -1220,24 +1271,56 @@ export default function LandingPage() {
       <Dialog open={showVideoModal} onOpenChange={setShowVideoModal}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Watch 60s Tour</DialogTitle>
+            <DialogTitle>
+              {currentVideo === 'dashboard' && 'Dashboard Demo'}
+              {currentVideo === 'tasks' && 'Tasks Demo'}
+              {currentVideo === 'projects' && 'Projects Demo'}
+              {currentVideo === 'settings' && 'Settings Demo'}
+            </DialogTitle>
           </DialogHeader>
-          <div className="aspect-video w-full rounded-lg overflow-hidden bg-slate-900">
-            {/* Placeholder for video - replace with actual video URL */}
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="text-center text-white">
+          <div className="aspect-video w-full rounded-lg overflow-hidden bg-slate-900 relative">
+            <video
+              key={currentVideo} // Force re-render when video changes
+              className="w-full h-full"
+              controls
+              autoPlay
+              src={DEMO_VIDEOS[currentVideo as keyof typeof DEMO_VIDEOS]}
+              poster={`https://res.cloudinary.com/dichgutd0/image/upload/v1764044927/EL-Core-Assets/Static/Kanvaro/${currentVideo}_poster.jpg`}
+              onError={(e) => {
+                // Hide video and show placeholder on error
+                const video = e.target as HTMLVideoElement;
+                video.style.display = 'none';
+                const placeholder = video.parentElement?.querySelector('.video-placeholder') as HTMLElement;
+                if (placeholder) {
+                  placeholder.style.display = 'flex';
+                }
+                console.log(`Video failed to load: ${DEMO_VIDEOS[currentVideo as keyof typeof DEMO_VIDEOS]}`);
+              }}
+              onLoadStart={() => {
+                // Hide placeholder when video starts loading
+                const placeholder = document.querySelector('.video-placeholder') as HTMLElement;
+                if (placeholder) {
+                  placeholder.style.display = 'none';
+                }
+              }}
+            >
+              Your browser does not support the video tag.
+            </video>
+            
+            {/* Placeholder - shown when video fails to load */}
+            <div className="video-placeholder absolute inset-0 flex items-center justify-center" style={{ display: 'none' }}>
+              <div className="text-center text-white max-w-md px-4">
                 <Play className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                <p className="text-sm opacity-75">Video tour coming soon</p>
-                <p className="text-xs mt-2 opacity-50">Replace this with your video embed code</p>
+                <p className="text-sm opacity-75 mb-2">
+                  {currentVideo === 'dashboard' && 'Dashboard demo video'}
+                  {currentVideo === 'tasks' && 'Tasks demo video'}
+                  {currentVideo === 'projects' && 'Projects demo video'}
+                  {currentVideo === 'settings' && 'Settings demo video'}
+                </p>
+                <p className="text-xs opacity-50 leading-relaxed">
+                  Video temporarily unavailable. Please try refreshing the page or check your internet connection.
+                </p>
               </div>
-              {/* Uncomment and add your video embed code here:
-              <iframe
-                className="w-full h-full"
-                src="YOUR_VIDEO_URL_HERE"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-              */}
             </div>
           </div>
         </DialogContent>

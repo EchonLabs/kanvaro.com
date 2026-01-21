@@ -134,7 +134,7 @@ export default function RoadmapPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden px-6 py-20">
+      <section className="relative overflow-hidden px-6 py-20 pb-12">
         <div className="absolute inset-0 bg-gradient-to-br from-[#f4f8ff] via-[#ffffff] to-[#e8eeff] dark:from-[#050c1d] dark:via-[#0a1030] dark:to-[#071328]" />
         <div className="relative mx-auto max-w-4xl text-center">
           <div className="inline-flex items-center gap-2 rounded-full bg-[#0d9488]/10 dark:bg-[#7bffde]/20 px-4 py-2 mb-6">
