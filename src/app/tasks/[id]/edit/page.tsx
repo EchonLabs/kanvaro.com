@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useNotify } from '@/lib/notify'
 import { Checkbox } from '@/components/ui/Checkbox'
@@ -980,12 +981,13 @@ export default function EditTaskPage() {
               </div>
               <div>
                 <label className="text-sm font-medium">Description</label>
-                <Textarea
-                  value={task.description}
-                  onChange={(e) => setTask((prev) => prev ? ({ ...prev, description: e.target.value }) : prev)}
-                  className="mt-1"
-                  rows={4}
-                />
+                <div className="mt-1">
+                  <RichTextEditor
+                    value={task.description}
+                    onChange={(value) => setTask((prev) => prev ? ({ ...prev, description: value }) : prev)}
+                    placeholder="Enter task description with rich formatting..."
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
@@ -1462,12 +1464,13 @@ export default function EditTaskPage() {
 
                   <div>
                     <label className="text-sm font-medium">Description</label>
-                    <Textarea
-                      value={subtask.description || ''}
-                      onChange={(e) => updateSubtask(index, 'description', e.target.value)}
-                      placeholder="Subtask description"
-                      rows={2}
-                    />
+                    <div className="mt-1">
+                      <RichTextEditor
+                        value={subtask.description || ''}
+                        onChange={(value) => updateSubtask(index, 'description', value)}
+                        placeholder="Subtask description"
+                      />
+                    </div>
                   </div>
                 </div>
               ))}

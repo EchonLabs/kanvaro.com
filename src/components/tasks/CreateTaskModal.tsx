@@ -20,6 +20,7 @@ import {
   Paperclip,
   Check
 } from 'lucide-react'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { AttachmentList } from '@/components/ui/AttachmentList'
 import { useNotify } from '@/lib/notify'
 
@@ -730,13 +731,13 @@ export default function CreateTaskModal({
 
               <div className="md:col-span-2">
                 <label className="text-sm font-medium text-foreground">Description</label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  placeholder="Enter task description"
-                  className="mt-1"
-                  rows={3}
-                />
+                <div className="mt-1">
+                  <RichTextEditor
+                    value={formData.description}
+                    onChange={(value) => setFormData({...formData, description: value})}
+                    placeholder="Enter task description with rich formatting..."
+                  />
+                </div>
               </div>
 
               <div className="md:col-span-2 space-y-2">
