@@ -473,9 +473,16 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                         </Badge>
                       </div>
                     </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">
-                    {task.description || 'No description'}
-                  </p>
+                  <div className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">
+                    {task.description ? (
+                      <div
+                        className="prose prose-xs max-w-none"
+                        dangerouslySetInnerHTML={{ __html: task.description }}
+                      />
+                    ) : (
+                      'No description'
+                    )}
+                  </div>
                   <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                     {task.assignedTo && task.assignedTo.length > 0 ? (
                       <div className="flex items-center space-x-1 flex-wrap gap-1">

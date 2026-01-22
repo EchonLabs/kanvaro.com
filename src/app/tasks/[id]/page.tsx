@@ -1450,9 +1450,14 @@ export default function TaskDetailPage() {
                 <CardTitle>Description</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">
-                  {task.description || 'No description provided'}
-                </p>
+                {task.description ? (
+                  <div
+                    className="prose prose-sm max-w-none text-foreground"
+                    dangerouslySetInnerHTML={{ __html: task.description }}
+                  />
+                ) : (
+                  <p className="text-muted-foreground">No description provided</p>
+                )}
               </CardContent>
             </Card>
 

@@ -1912,7 +1912,7 @@ export default function BacklogPage() {
                                 </TooltipProvider>
                               )}
                             </div>
-                            <TooltipProvider>
+                            {/* <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
@@ -1925,7 +1925,7 @@ export default function BacklogPage() {
                                   </TooltipContent>
                                 )}
                               </Tooltip>
-                            </TooltipProvider>
+                            </TooltipProvider> */}
                             <p className="text-xs sm:text-sm text-muted-foreground mb-2">
                               {item.assignedTo && item.assignedTo.length > 0
                                 ? item.assignedTo.map((assignment: any) => {
