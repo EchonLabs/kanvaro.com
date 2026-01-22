@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/Checkbox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/Badge'
-import { Checkbox } from '@/components/ui/Checkbox'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { 
   X, 
   Save, 
@@ -619,13 +620,14 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
 
               <div className="md:col-span-2">
                 <label className="text-sm font-medium text-foreground">Description</label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  placeholder="Enter task description"
-                  className="mt-1"
-                  rows={3}
-                />
+                <div className="mt-1">
+                  <RichTextEditor
+                    value={formData.description}
+                    onChange={(value) => setFormData({...formData, description: value})}
+                    placeholder="Enter task description with rich formatting..."
+                    disabled={loading}
+                  />
+                </div>
               </div>
 
               <div>
@@ -1065,12 +1067,14 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
                   
                   <div>
                     <label className="text-sm font-medium text-foreground">Description</label>
-                    <Textarea
-                      value={subtask.description || ''}
-                      onChange={(e) => updateSubtask(index, 'description', e.target.value)}
-                      placeholder="Subtask description"
-                      rows={2}
-                    />
+                    <div className="mt-1">
+                      <RichTextEditor
+                        value={subtask.description || ''}
+                        onChange={(value) => updateSubtask(index, 'description', value)}
+                        placeholder="Subtask description"
+                        disabled={loading}
+                      />
+                    </div>
                   </div>
 
                   <div className="flex items-center space-x-2">
