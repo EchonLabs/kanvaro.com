@@ -1,3 +1,10 @@
+## [1.25.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.2...v1.25.3) (2026-01-22)
+
+
+### Bug Fixes
+
+* add data ([3298def](https://github.com/EchonLabs/kanvaro.com/commit/3298def30df2c6ed7d956c7d32d8c7ae7999c60b))
+
 ## [1.25.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.1...v1.25.2) (2026-01-21)
 
 
