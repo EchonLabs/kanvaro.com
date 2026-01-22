@@ -172,6 +172,7 @@ export enum Permission {
   
   // Sprint Event permissions
   SPRINT_EVENT_VIEW_ALL = 'sprint_event:view_all',
+  SPRINT_EVENT_VIEW='sprint_event:view',
   
   // Kanban permissions
   KANBAN_READ = 'kanban:read',
@@ -354,6 +355,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     
     // Sprint Events
     Permission.SPRINT_EVENT_VIEW_ALL,
+    Permission.SPRINT_EVENT_VIEW,
     
     // Kanban
     Permission.KANBAN_READ,
@@ -500,6 +502,10 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.SPRINT_MANAGE,
     Permission.SPRINT_START,
     Permission.SPRINT_COMPLETE,
+
+    //Sprint Events
+    Permission.SPRINT_EVENT_VIEW_ALL,
+    Permission.SPRINT_EVENT_VIEW,
     
     // Stories
     Permission.STORY_CREATE,
@@ -677,6 +683,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     
     // Sprint Events
     Permission.SPRINT_EVENT_VIEW_ALL,
+    Permission.SPRINT_EVENT_VIEW,
+
     
     // Kanban
     Permission.KANBAN_READ,
@@ -769,6 +777,9 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     
     // backlog (read only)
     Permission.BACKLOG_READ,
+
+    //sprint event
+    Permission.SPRINT_EVENT_VIEW,
 
     // Documentation
     Permission.DOCUMENTATION_VIEW,
@@ -1058,6 +1069,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.SPRINT_UPDATE,
     Permission.SPRINT_DELETE,
     Permission.SPRINT_MANAGE,
+    Permission.SPRINT_EVENT_VIEW,
     Permission.SPRINT_START,
     Permission.SPRINT_COMPLETE,
     Permission.STORY_CREATE,

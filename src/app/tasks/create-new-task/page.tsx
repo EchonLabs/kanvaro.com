@@ -6,7 +6,7 @@ import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useNotify } from '@/lib/notify'
 import { 
@@ -135,7 +135,7 @@ export default function CreateTaskPage() {
   const [authError, setAuthError] = useState('')
 
   // Use the notification hook
-  const { error: notifyError } = useNotify()
+  const { error: notifyError, success: notifySuccess } = useNotify()
 
   const [projects, setProjects] = useState<Project[]>([])
   const [projectMembers, setProjectMembers] = useState<User[]>([])
@@ -418,6 +418,7 @@ export default function CreateTaskPage() {
       }
 
       if (data.success) {
+        notifySuccess({ title: 'Task Created Successfully', message: 'Your task has been created and assigned.' })
         router.push('/tasks')
         setAttachments([])
       } else {
@@ -1007,11 +1008,10 @@ export default function CreateTaskPage() {
 
               <div>
                 <label className="text-sm font-medium text-foreground">Description</label>
-                <Textarea
+                <RichTextEditor
                   value={formData.description}
-                  onChange={(e) => handleChange('description', e.target.value)}
+                  onChange={(value) => handleChange('description', value)}
                   placeholder="Enter task description"
-                  rows={4}
                 />
               </div>
 
@@ -1124,7 +1124,7 @@ export default function CreateTaskPage() {
                     />
                   </div>
 
-                  <div>
+                  {/* <div>
                     <label className="text-sm font-medium text-foreground">Description</label>
                     <Textarea
                       value={subtask.description || ''}
@@ -1132,7 +1132,7 @@ export default function CreateTaskPage() {
                       placeholder="Subtask description"
                       rows={2}
                     />
-                  </div>
+                  </div> */}
                 </div>
               ))}
 

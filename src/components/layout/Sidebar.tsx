@@ -142,7 +142,7 @@ const navigationItems = [
         label: 'Sprint Events',
         icon: Calendar,
         path: '/sprint-events',
-        permission: Permission.SPRINT_MANAGE
+        permission: Permission.SPRINT_EVENT_VIEW
       },
     ]
   },

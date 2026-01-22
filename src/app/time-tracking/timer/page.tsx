@@ -903,7 +903,7 @@ export default function TimerPage() {
     <MainLayout>
       <div className="space-y-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <Button 
+          {/* <Button 
             variant="ghost" 
             onClick={() => {
               // Use browser history to go back to the previous page
@@ -920,7 +920,7 @@ export default function TimerPage() {
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
-          </Button>
+          </Button> */}
           <div className="flex-1 min-w-0">
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground flex items-center space-x-2">
               <Clock className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-blue-600 flex-shrink-0" />

@@ -1,3 +1,66 @@
+## [1.25.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.3...v1.25.4) (2026-01-22)
+
+
+### Bug Fixes
+
+* add deccription ([bf4067e](https://github.com/EchonLabs/kanvaro.com/commit/bf4067ec5a344661214aae020f6c8faa6cc13ea9))
+
+## [1.25.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.2...v1.25.3) (2026-01-22)
+
+
+### Bug Fixes
+
+* add data ([3298def](https://github.com/EchonLabs/kanvaro.com/commit/3298def30df2c6ed7d956c7d32d8c7ae7999c60b))
+
+## [1.25.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.1...v1.25.2) (2026-01-21)
+
+
+### Bug Fixes
+
+* add landing page changes ([44a348d](https://github.com/EchonLabs/kanvaro.com/commit/44a348d86703b75c872eca95667b6c9f0668c5f1))
+* fix bugs ([f73175b](https://github.com/EchonLabs/kanvaro.com/commit/f73175b76d70fbcf6bb5e625d6c013e6f28d555a))
+
+## [1.25.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.0...v1.25.1) (2026-01-20)
+
+
+### Bug Fixes
+
+* add chnges ([abb5b48](https://github.com/EchonLabs/kanvaro.com/commit/abb5b485e676eb7d84485978c9bdd7dddb243e6f))
+* addd chnages in event creation ([752d2d7](https://github.com/EchonLabs/kanvaro.com/commit/752d2d744cca60e4b3ea91a8680241063ff0e1d1))
+
+# [1.25.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.24.2...v1.25.0) (2026-01-20)
+
+
+### Features
+
+* add chnges in sprint event ([4335cad](https://github.com/EchonLabs/kanvaro.com/commit/4335caddff21b3a52df0250c132a405c98262d04))
+
+## [1.24.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.24.1...v1.24.2) (2026-01-19)
+
+
+### Bug Fixes
+
+* add chnges ([4dd7c53](https://github.com/EchonLabs/kanvaro.com/commit/4dd7c53b0376b18044b3ee2dd0192ed1abf36409))
+
+## [1.24.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.24.0...v1.24.1) (2026-01-19)
+
+
+### Bug Fixes
+
+* add chnges in time logs and profile ([b4712a6](https://github.com/EchonLabs/kanvaro.com/commit/b4712a65f876ccd7dea9af282d27e4ace4513ed8))
+
+# [1.24.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.14...v1.24.0) (2026-01-16)
+
+
+### Bug Fixes
+
+* add chnges ([e33a599](https://github.com/EchonLabs/kanvaro.com/commit/e33a59991ff48aaed3d2ea933ac31fd9c1159c68))
+
+
+### Features
+
+* time log fixes ([406d0a8](https://github.com/EchonLabs/kanvaro.com/commit/406d0a85b63a19e7d9384c2404fa11bd2cb7b98b))
+
 ## [1.23.14](https://github.com/EchonLabs/kanvaro.com/compare/v1.23.13...v1.23.14) (2026-01-14)
 
 

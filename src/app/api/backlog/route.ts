@@ -16,9 +16,9 @@ const PRIORITY_WEIGHT: Record<string, number> = {
 
 const STATUS_FILTER_MAP: Record<string, { tasks?: string[]; stories?: string[]; epics?: string[] }> = {
   backlog: {
-    tasks: ['backlog', 'todo'],
-    stories: ['backlog', 'todo'],
-    epics: ['backlog', 'todo']
+    tasks: ['backlog'],
+    stories: ['backlog'],
+    epics: ['backlog']
   },
   todo: {
     tasks: ['todo'],
@@ -31,10 +31,14 @@ const STATUS_FILTER_MAP: Record<string, { tasks?: string[]; stories?: string[]; 
     epics: ['inprogress']
   },
   review: {
-    tasks: ['review']
+    tasks: ['review'],
+    stories: ['review'],
+    epics: ['review']
   },
   testing: {
-    tasks: ['testing']
+    tasks: ['testing'],
+    stories: ['testing'],
+    epics: ['testing']
   },
   done: {
     tasks: ['done'],

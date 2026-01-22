@@ -33,8 +33,11 @@ import { AddSprintEventModal } from '@/components/sprint-events/AddSprintEventMo
 import { EditSprintEventModal } from '@/components/sprint-events/EditSprintEventModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { useNotify } from '@/lib/notify'
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 interface SprintEvent {
   _id: string
@@ -48,11 +51,13 @@ interface SprintEvent {
   duration: number
   status: string
   facilitator: {
+    _id: string
     firstName: string
     lastName: string
     email: string
   }
   attendees: Array<{
+    _id: string
     firstName: string
     lastName: string
     email: string
@@ -61,7 +66,12 @@ interface SprintEvent {
     decisions: string[]
     actionItems: Array<{
       description: string
-      assignedTo: string
+      assignedTo: string | {
+        _id: string
+        firstName: string
+        lastName: string
+        email: string
+      }
       dueDate: string
       status: string
     }>
@@ -99,6 +109,7 @@ export default function SprintEventsPage() {
   const searchParams = useSearchParams()
   const { user, isLoading: authLoading, isAuthenticated } = useAuth()
   const { formatDate, formatTime } = useDateTime()
+  const { setItems } = useBreadcrumb()
   const projectId = params.id as string
   const [events, setEvents] = useState<SprintEvent[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -148,6 +159,7 @@ export default function SprintEventsPage() {
   const [eventToDelete, setEventToDelete] = useState<SprintEvent | null>(null)
   const [isDeletingEvent, setIsDeletingEvent] = useState(false)
   const { success: notifySuccess, error: notifyError } = useNotify()
+  const { hasPermission } = usePermissions()
 
   // Define fetch functions BEFORE useEffect that uses them
   const fetchProjects = useCallback(async (signal?: AbortSignal) => {
@@ -215,6 +227,13 @@ export default function SprintEventsPage() {
       return
     }
   }, [authLoading, isAuthenticated, router])
+
+  useEffect(() => {
+    // Set breadcrumb
+    setItems([
+      { label: 'Sprint Events' }
+    ])
+  }, [setItems])
 
   useEffect(() => {
     if (!isAuthenticated) return
@@ -286,7 +305,7 @@ export default function SprintEventsPage() {
 
     try {
       setIsDeletingEvent(true)
-      const response = await fetch(`/api/sprint-events/${eventToDelete._id}`, {
+      const response = await fetch(`/api/sprint-events/view-sprint-event/${eventToDelete._id}`, {
         method: 'DELETE'
       })
       if (response.ok) {
@@ -618,7 +637,7 @@ export default function SprintEventsPage() {
                       <Card 
                         key={event._id} 
                         className="hover:shadow-md transition-shadow cursor-pointer"
-                        onClick={() => router.push(`/sprint-events/${event._id}`)}
+                        onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
                       >
                         <CardContent className="p-4 sm:p-6">
                           <div className="space-y-3 sm:space-y-4">
@@ -648,31 +667,35 @@ export default function SprintEventsPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={(e) => {
                             e.stopPropagation()
-                            router.push(`/sprint-events/${event._id}`)
+                            router.push(`/sprint-events/view-sprint-event/${event._id}`)
                           }}>
                             <Eye className="h-4 w-4 mr-2" />
                             View Event
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => {
-                            e.stopPropagation()
-                                    // Find the current event data by ID to ensure we have fresh data
-                                    const currentEvent = events.find(ev => ev._id === event._id)
-                                    setEditingEvent(currentEvent || event)
-                          }}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit Event
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteClick(event)
-                            }}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
+                          {hasPermission(Permission.SPRINT_EVENT_VIEW_ALL) || (user && user.id === event.facilitator._id) ? (
+                            <>
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation()
+                                        // Find the current event data by ID to ensure we have fresh data
+                                        const currentEvent = events.find(ev => ev._id === event._id)
+                                        setEditingEvent(currentEvent || event)
+                              }}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit Event
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDeleteClick(event)
+                                }}
+                                className="text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </>
+                          ) : null}
                         </DropdownMenuContent>
                       </DropdownMenu>
                             </div>
@@ -709,7 +732,7 @@ export default function SprintEventsPage() {
               <Card 
                 key={event._id} 
                 className="hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => router.push(`/sprint-events/${event._id}`)}
+                onClick={() => router.push(`/sprint-events/view-sprint-event/${event._id}`)}
               >
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
@@ -764,31 +787,35 @@ export default function SprintEventsPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={(e) => {
                           e.stopPropagation()
-                          router.push(`/sprint-events/${event._id}`)
+                          router.push(`/sprint-events/view-sprint-event/${event._id}`)
                         }}>
                           <Eye className="h-4 w-4 mr-2" />
                           View Event
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => {
-                          e.stopPropagation()
-                          // Find the current event data by ID to ensure we have fresh data
-                          const currentEvent = events.find(ev => ev._id === event._id)
-                          setEditingEvent(currentEvent || event)
-                        }}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit Event
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDeleteClick(event)
-                          }}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
+                        {hasPermission(Permission.SPRINT_EVENT_VIEW_ALL) || (user && user.id === event.facilitator._id) ? (
+                          <>
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation()
+                              // Find the current event data by ID to ensure we have fresh data
+                              const currentEvent = events.find(ev => ev._id === event._id)
+                              setEditingEvent(currentEvent || event)
+                            }}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit Event
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteClick(event)
+                              }}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </>
+                        ) : null}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

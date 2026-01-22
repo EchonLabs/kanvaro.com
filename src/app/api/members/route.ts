@@ -7,6 +7,7 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { normalizeUploadUrl } from '@/lib/file-utils'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
+import { Role } from '@/lib/permissions/permission-definitions'
 
 export async function GET(request: NextRequest) {
   try {
@@ -56,7 +57,15 @@ export async function GET(request: NextRequest) {
     }
     
     if (role) {
-      filters.role = role
+      // Check if the role is a system role or custom role
+      const systemRoles = Object.values(Role)
+      if (systemRoles.includes(role as Role)) {
+        // System role - filter by role field
+        filters.role = role
+      } else {
+        // Custom role - filter by customRole field
+        filters.customRole = role
+      }
     }
     
     if (status === 'active') {

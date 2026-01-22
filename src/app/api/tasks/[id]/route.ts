@@ -466,6 +466,45 @@ export async function PUT(
       currentSprint: currentTask.sprint
     })
 
+    // Handle project changes - regenerate taskNumber and displayId for new project
+    if (updateData.project && updateData.project !== currentTask.project.toString()) {
+      console.log('[Task PUT] Project change detected', {
+        oldProject: currentTask.project,
+        newProject: updateData.project
+      })
+
+      // Import Counter model
+      const { Counter } = await import('@/models/Counter')
+
+      // Get the new project details
+      const Project = (await import('@/models/Project')).Project
+      const newProject = await Project.findById(updateData.project)
+      if (!newProject) {
+        return NextResponse.json(
+          { error: 'New project not found' },
+          { status: 400 }
+        )
+      }
+
+      // Generate new task number for the new project
+      const taskCounter = await Counter.findOneAndUpdate(
+        { scope: 'task', project: newProject._id },
+        { $inc: { seq: 1 }, $setOnInsert: { updatedAt: new Date() } },
+        { new: true, upsert: true }
+      )
+
+      const newTaskNumber = taskCounter.seq
+      const newDisplayId = `${newProject.projectNumber}.${newTaskNumber}`
+
+      updateData.taskNumber = newTaskNumber
+      updateData.displayId = newDisplayId
+
+      console.log('[Task PUT] Generated new identifiers for project change', {
+        newTaskNumber,
+        newDisplayId
+      })
+    }
+
     // If status is changing, set position to end of target column
     if (updateData.status && updateData.status !== currentTask.status) {
       const maxPosition = await Task.findOne(

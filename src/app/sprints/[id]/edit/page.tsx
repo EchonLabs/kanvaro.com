@@ -255,7 +255,7 @@ export default function EditSprintPage() {
           const storiesData = await storiesRes.json()
           if (storiesRes.ok && storiesData.success) {
             const completedStories = (storiesData.data || []).filter(
-              (story: any) => story.status === 'completed'
+              (story: any) => story.status === 'done'
             )
             const velocity = completedStories.reduce(
               (sum: number, story: any) => sum + (story.storyPoints || 0),

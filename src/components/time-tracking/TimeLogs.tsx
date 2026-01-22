@@ -224,8 +224,6 @@ export function TimeLogs({
   const [bulkUploadErrors, setBulkUploadErrors] = useState<Array<{ row: number; error: string }>>([])
   const [uploadingBulk, setUploadingBulk] = useState(false)
   const [rowUploadStatus, setRowUploadStatus] = useState<Map<number, { status: 'pending' | 'success' | 'error'; error?: string }>>(new Map())
-  const [showErrorAlert, setShowErrorAlert] = useState(true)
-  const [showBulkUploadErrorAlert, setShowBulkUploadErrorAlert] = useState(true)
   const [showBulkUploadProgressAlert, setShowBulkUploadProgressAlert] = useState(true)
   const [bulkUploadSuccess, setBulkUploadSuccess] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -1400,12 +1398,22 @@ export function TimeLogs({
       return value
     }
 
-    const headers = ['Task No', 'Start Date', 'Start Time', 'End Date', 'End Time', 'Description']
-    const exampleRow = ['20.7', '2024-01-15', '09:00', '2024-01-15', '17:00', 'Worked on feature']
+    const headers = ['Task No', 'Start Date', 'Start Time', 'End Date', 'End Time']
+    const exampleRows = [
+      ['20.7', '2024-01-15', '09:00', '2024-01-15', '17:00'], // ISO format
+      ['20.8', '01/15/2024', '9:00 AM', '01/15/2024', '5:00 PM'], // US format with AM/PM
+      ['20.9', '15/01/2024', '14:00', '15/01/2024', '18:30'], // European format 24h
+      ['20.10', '15-01-2024', '9 AM', '15-01-2024', '5 PM'] // Dash format with AM/PM
+    ]
+    
+    if (timeTrackingSettings?.requireDescription) {
+      headers.push('Description')
+      exampleRows.forEach(row => row.push('Worked on feature'))
+    }
     
     const csvContent = [
       headers.map(escapeCSV).join(','),
-      exampleRow.map(escapeCSV).join(',')
+      ...exampleRows.map(row => row.map(escapeCSV).join(','))
     ].join('\n')
     
     // Add BOM for Excel compatibility
@@ -1463,7 +1471,9 @@ export function TimeLogs({
 
     const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim())
     const requiredHeaders = ['Task No', 'Start Date', 'Start Time', 'End Date', 'End Time']
-    
+    if (timeTrackingSettings?.requireDescription) {
+      requiredHeaders.push('Description')
+    }
     // Validate CSV format - check if all required headers are present
     const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
     if (missingHeaders.length > 0) {
@@ -1556,27 +1566,163 @@ export function TimeLogs({
     if (!startDate) {
       errors.push('Start Date is required')
     } else {
-      // Validate Start Date format (YYYY-MM-DD)
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/
-      if (!dateRegex.test(startDate)) {
-        errors.push('Start Date format must be YYYY-MM-DD (e.g., 2024-01-15)')
+      // Validate Start Date format (flexible parsing)
+      const parseFlexibleDate = (dateStr: string): boolean => {
+        if (!dateStr) return false
+        
+        // Try YYYY-MM-DD format first
+        const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+        if (isoMatch) {
+          const [, year, month, day] = isoMatch
+          const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+          return !isNaN(date.getTime())
+        }
+        
+        // Try MM/DD/YYYY format
+        const usMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+        if (usMatch) {
+          const [, month, day, year] = usMatch
+          const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+          return !isNaN(date.getTime())
+        }
+        
+        // Try DD/MM/YYYY format
+        const euMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+        if (euMatch) {
+          const [, day, month, year] = euMatch
+          const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+          return !isNaN(date.getTime())
+        }
+        
+        // Try DD-MM-YYYY format
+        const dashMatch = dateStr.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
+        if (dashMatch) {
+          const [, day, month, year] = dashMatch
+          const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+          return !isNaN(date.getTime())
+        }
+        
+        return false
+      }
+      
+      if (!parseFlexibleDate(startDate)) {
+        errors.push('Start Date format must be YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY, or DD-MM-YYYY (e.g., 2024-01-15, 01/15/2024, 15/01/2024, 15-01-2024)')
       }
     }
 
     // Validate Start Time (required)
     if (!startTime) {
-      errors.push('Start Time is required')
+      errors.push('Start Time is required or invalid format. Use HH:MM, H:MM AM/PM, H AM/PM, or just H (24-hour)')
     } else {
-      // Validate Start Time format (HH:MM)
-      const timeRegex = /^\d{2}:\d{2}$/
-      if (!timeRegex.test(startTime)) {
-        errors.push('Start Time format must be HH:MM (e.g., 09:00)')
-      } else {
-        // Validate time values (hours 00-23, minutes 00-59)
-        const [startHour, startMin] = startTime.split(':').map(Number)
-        if (startHour < 0 || startHour > 23 || startMin < 0 || startMin > 59) {
-          errors.push('Start Time must be between 00:00 and 23:59')
+      // Flexible time parsing
+      const parseFlexibleTime = (input: string): string | null => {
+        if (!input) return null;
+        // Remove spaces, lowercase
+        let val = input.trim().toLowerCase();
+        // Replace common AM/PM formats
+        val = val.replace(/\s*am$/i, ' am').replace(/\s*pm$/i, ' pm');
+        // Try to match HH:mm(:ss)? (with optional AM/PM)
+        const timeMatch = val.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?\s*(am|pm)?$/);
+        if (timeMatch) {
+          let hour = parseInt(timeMatch[1], 10);
+          let minute = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+          let second = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
+          const ampm = timeMatch[4];
+          if (ampm) {
+            if (ampm === 'pm' && hour < 12) hour += 12;
+            if (ampm === 'am' && hour === 12) hour = 0;
+          }
+          // Clamp values
+          hour = Math.max(0, Math.min(23, hour));
+          minute = Math.max(0, Math.min(59, minute));
+          // Format as HH:mm
+          return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
         }
+        // Try to match just hour with AM/PM
+        const hourMatch = val.match(/^(\d{1,2})\s*(am|pm)$/);
+        if (hourMatch) {
+          let hour = parseInt(hourMatch[1], 10);
+          const ampm = hourMatch[2];
+          if (ampm === 'pm' && hour < 12) hour += 12;
+          if (ampm === 'am' && hour === 12) hour = 0;
+          hour = Math.max(0, Math.min(23, hour));
+          return `${hour.toString().padStart(2, '0')}:00`;
+        }
+        // Try to match just hour (24h)
+        const hourOnlyMatch = val.match(/^(\d{1,2})$/);
+        if (hourOnlyMatch) {
+          let hour = parseInt(hourOnlyMatch[1], 10);
+          hour = Math.max(0, Math.min(23, hour));
+          return `${hour.toString().padStart(2, '0')}:00`;
+        }
+        return null;
+      };
+
+      const startTimeRaw = row['Start Time']?.trim();
+      const endTimeRaw = row['End Time']?.trim();
+      const startTime = parseFlexibleTime(startTimeRaw);
+      const endTime = parseFlexibleTime(endTimeRaw);
+
+      if (!startTime) {
+        errors.push('Start Time is required or invalid format');
+      }
+    }
+
+    // Validate End Time (required)
+    if (!endTime) {
+      errors.push('End Time is required or invalid format. Use HH:MM, H:MM AM/PM, H AM/PM, or just H (24-hour)')
+    } else {
+      // Flexible time parsing
+      const parseFlexibleTime = (input: string): string | null => {
+        if (!input) return null;
+        // Remove spaces, lowercase
+        let val = input.trim().toLowerCase();
+        // Replace common AM/PM formats
+        val = val.replace(/\s*am$/i, ' am').replace(/\s*pm$/i, ' pm');
+        // Try to match HH:mm(:ss)? (with optional AM/PM)
+        const timeMatch = val.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?\s*(am|pm)?$/);
+        if (timeMatch) {
+          let hour = parseInt(timeMatch[1], 10);
+          let minute = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+          let second = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
+          const ampm = timeMatch[4];
+          if (ampm) {
+            if (ampm === 'pm' && hour < 12) hour += 12;
+            if (ampm === 'am' && hour === 12) hour = 0;
+          }
+          // Clamp values
+          hour = Math.max(0, Math.min(23, hour));
+          minute = Math.max(0, Math.min(59, minute));
+          // Format as HH:mm
+          return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        }
+        // Try to match just hour with AM/PM
+        const hourMatch = val.match(/^(\d{1,2})\s*(am|pm)$/);
+        if (hourMatch) {
+          let hour = parseInt(hourMatch[1], 10);
+          const ampm = hourMatch[2];
+          if (ampm === 'pm' && hour < 12) hour += 12;
+          if (ampm === 'am' && hour === 12) hour = 0;
+          hour = Math.max(0, Math.min(23, hour));
+          return `${hour.toString().padStart(2, '0')}:00`;
+        }
+        // Try to match just hour (24h)
+        const hourOnlyMatch = val.match(/^(\d{1,2})$/);
+        if (hourOnlyMatch) {
+          let hour = parseInt(hourOnlyMatch[1], 10);
+          hour = Math.max(0, Math.min(23, hour));
+          return `${hour.toString().padStart(2, '0')}:00`;
+        }
+        return null;
+      };
+
+      const startTimeRaw = row['Start Time']?.trim();
+      const endTimeRaw = row['End Time']?.trim();
+      const startTime = parseFlexibleTime(startTimeRaw);
+      const endTime = parseFlexibleTime(endTimeRaw);
+
+      if (!endTime) {
+        errors.push('End Time is required or invalid format');
       }
     }
 
@@ -1584,27 +1730,47 @@ export function TimeLogs({
     if (!endDate) {
       errors.push('End Date is required')
     } else {
-      // Validate End Date format (YYYY-MM-DD)
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/
-      if (!dateRegex.test(endDate)) {
-        errors.push('End Date format must be YYYY-MM-DD (e.g., 2024-01-15)')
-      }
-    }
-
-    // Validate End Time (required)
-    if (!endTime) {
-      errors.push('End Time is required')
-    } else {
-      // Validate End Time format (HH:MM)
-      const timeRegex = /^\d{2}:\d{2}$/
-      if (!timeRegex.test(endTime)) {
-        errors.push('End Time format must be HH:MM (e.g., 17:00)')
-      } else {
-        // Validate time values (hours 00-23, minutes 00-59)
-        const [endHour, endMin] = endTime.split(':').map(Number)
-        if (endHour < 0 || endHour > 23 || endMin < 0 || endMin > 59) {
-          errors.push('End Time must be between 00:00 and 23:59')
+      // Validate End Date format (flexible parsing)
+      const parseFlexibleDate = (dateStr: string): boolean => {
+        if (!dateStr) return false
+        
+        // Try YYYY-MM-DD format first
+        const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+        if (isoMatch) {
+          const [, year, month, day] = isoMatch
+          const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+          return !isNaN(date.getTime())
         }
+        
+        // Try MM/DD/YYYY format
+        const usMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+        if (usMatch) {
+          const [, month, day, year] = usMatch
+          const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+          return !isNaN(date.getTime())
+        }
+        
+        // Try DD/MM/YYYY format
+        const euMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+        if (euMatch) {
+          const [, day, month, year] = euMatch
+          const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+          return !isNaN(date.getTime())
+        }
+        
+        // Try DD-MM-YYYY format
+        const dashMatch = dateStr.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
+        if (dashMatch) {
+          const [, day, month, year] = dashMatch
+          const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+          return !isNaN(date.getTime())
+        }
+        
+        return false
+      }
+      
+      if (!parseFlexibleDate(endDate)) {
+        errors.push('End Date format must be YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY, or DD-MM-YYYY (e.g., 2024-01-15, 01/15/2024, 15/01/2024, 15-01-2024)')
       }
     }
 
@@ -1633,7 +1799,7 @@ export function TimeLogs({
       }
 
       // Check if description is required
-      if (timeTrackingSettings?.requireDescription === true && !description) {
+      if (timeTrackingSettings?.requireDescription && !description) {
         errors.push('Description is required')
       }
 
@@ -1696,240 +1862,137 @@ export function TimeLogs({
     setBulkUploadProgress(null)
     setError('')
     setBulkUploadSuccess(null)
-    setShowErrorAlert(true)
-    setShowBulkUploadErrorAlert(true)
-    setShowBulkUploadProgressAlert(true)
 
     try {
-      // Read CSV file
-      const csvText = await bulkUploadFile.text()
-      const rows = parseCSV(csvText)
+      // Create form data for file upload
+      const formData = new FormData()
+      formData.append('file', bulkUploadFile)
 
-      // Build task map using Task No (displayId)
-      const taskMap = new Map<string, { projectId: string; taskId: string; assignedTo: any[] }>()
+      // Initialize progress tracking
+      setBulkUploadProgress({ total: 1, processed: 0, successful: 0, failed: 0 })
 
-      // Check if user has bulk upload all permission
-      const canBulkUploadAll = hasPermission(Permission.TIME_TRACKING_BULK_UPLOAD_ALL)
-
-      // Fetch tasks directly - simplified approach
-      try {
-        const taskQuery = canBulkUploadAll 
-          ? `/api/tasks?all=true&includeArchived=true&limit=10000` 
-          : `/api/tasks?assignedTo=${resolvedUserId}&all=true&includeArchived=true&limit=10000`
-        
-        const tasksResponse = await fetch(taskQuery)
-        const tasksData = await tasksResponse.json()
-        
-        if (tasksData.success && Array.isArray(tasksData.data)) {
-          tasksData.data.forEach((task: any) => {
-            // Use displayId as key (e.g., "20.7")
-            if (task.displayId) {
-              taskMap.set(task.displayId, {
-                projectId: task.project || task.projectId,
-                taskId: task._id,
-                assignedTo: task.assignedTo || []
-              })
-            }
-          })
-        }
-      } catch (err) {
-        setError('Failed to fetch tasks. Please try again.')
-        setUploadingBulk(false)
-        return
-      }
-
-      // Initialize row status tracking
-      const initialRowStatus = new Map<number, { status: 'pending' | 'success' | 'error'; error?: string }>()
-      rows.forEach((_, index) => {
-        initialRowStatus.set(index + 2, { status: 'pending' })
-      })
-      setRowUploadStatus(initialRowStatus)
-
-      // Validate all rows
-      const validatedRows: Array<{ rowIndex: number; data: any }> = []
-      const errors: Array<{ row: number; error: string }> = []
-
-      rows.forEach((row, index) => {
-        const validation = validateCSVRow(row, index, taskMap, canBulkUploadAll)
-        if (validation.valid && validation.data) {
-          validatedRows.push({ rowIndex: index, data: validation.data })
-        } else {
-          const rowNum = index + 2
-          errors.push({ row: rowNum, error: validation.error || 'Unknown error' })
-          // Mark validation errors immediately
-          setRowUploadStatus(prev => {
-            const updated = new Map(prev)
-            updated.set(rowNum, { status: 'error', error: validation.error || 'Unknown error' })
-            return updated
-          })
-        }
+      // Upload file to bulk upload endpoint
+      const response = await fetch('/api/time-tracking/bulk-upload', {
+        method: 'POST',
+        body: formData
       })
 
-      if (errors.length > 0) {
-        setBulkUploadErrors(errors)
-        setShowBulkUploadErrorAlert(true)
-        setUploadingBulk(false)
-        return
-      }
+      const result = await response.json()
 
-      if (validatedRows.length === 0) {
-        setError('No valid rows to upload')
-        setShowErrorAlert(true)
-        setUploadingBulk(false)
-        return
-      }
+      if (response.ok && result.success) {
+        const { results, errors } = result
 
-      // Upload in batches
-      const batchSize = 10
-      let successful = 0
-      let failed = 0
-      const uploadErrors: Array<{ row: number; error: string }> = []
+        // Set detailed errors if available
+        if (errors && Array.isArray(errors)) {
+          setBulkUploadErrors(errors)
+        }
 
-      setBulkUploadProgress({ total: validatedRows.length, processed: 0, successful: 0, failed: 0 })
+        // Update progress with final results
+        setBulkUploadProgress({
+          total: results.processed,
+          processed: results.processed,
+          successful: results.successful,
+          failed: results.failed
+        })
 
-      for (let i = 0; i < validatedRows.length; i += batchSize) {
-        const batch = validatedRows.slice(i, i + batchSize)
-        const batchPromises = batch.map(async ({ rowIndex, data }) => {
-          const rowNum = rowIndex + 2
-          try {
-            const response = await fetch('/api/time-tracking/entries', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
+        // Handle success and errors with toast notifications
+        if (results.successful > 0) {
+          // Show success toast
+          toast.success(`Successfully uploaded ${results.successful} time ${results.successful === 1 ? 'entry' : 'entries'}.`)
+          
+          // Refresh the time entries table
+          setTimeout(async () => {
+            if (!resolvedUserId || !resolvedOrgId) return
+            setIsLoading(true)
+            setError('')
+
+            try {
+              const params = new URLSearchParams({
                 userId: resolvedUserId,
                 organizationId: resolvedOrgId,
-                ...data
+                page: '1',
+                limit: pagination.limit.toString()
               })
-            })
 
-            const result = await response.json()
+              const effectiveProjectId = filters.projectId || (projectId && projectId !== 'undefined' && projectId !== 'null' ? projectId : null)
+              const effectiveTaskId = filters.taskId || taskId || null
 
-            if (response.ok) {
-              successful++
-              // Mark row as success
-              setRowUploadStatus(prev => {
-                const updated = new Map(prev)
-                updated.set(rowNum, { status: 'success' })
-                return updated
-              })
-            } else {
-              failed++
-              const errorMsg = result.error || 'Failed to create time entry'
-              uploadErrors.push({ row: rowNum, error: errorMsg })
-              // Mark row as error
-              setRowUploadStatus(prev => {
-                const updated = new Map(prev)
-                updated.set(rowNum, { status: 'error', error: errorMsg })
-                return updated
-              })
-            }
-          } catch (err) {
-            failed++
-            const errorMsg = err instanceof Error ? err.message : 'Unknown error'
-            uploadErrors.push({ row: rowNum, error: errorMsg })
-            // Mark row as error
-            setRowUploadStatus(prev => {
-              const updated = new Map(prev)
-              updated.set(rowNum, { status: 'error', error: errorMsg })
-              return updated
-            })
-          }
-        })
+              if (effectiveProjectId) params.append('projectId', effectiveProjectId)
+              if (effectiveTaskId) params.append('taskId', effectiveTaskId)
 
-        await Promise.all(batchPromises)
-        setBulkUploadProgress({
-          total: validatedRows.length,
-          processed: Math.min(i + batchSize, validatedRows.length),
-          successful,
-          failed
-        })
-      }
-
-      if (uploadErrors.length > 0) {
-        setBulkUploadErrors(uploadErrors)
-        setShowBulkUploadErrorAlert(true)
-      }
-
-      if (successful > 0) {
-        // Reset pagination to page 1 to show newly uploaded entries at the top
-        setPagination(prev => ({ ...prev, page: 1 }))
-        // Refresh the time entries table to show newly uploaded data
-        // Using setTimeout to ensure pagination state is updated first
-        setTimeout(async () => {
-          if (!resolvedUserId || !resolvedOrgId) return
-          setIsLoading(true)
-          setError('')
-
-          try {
-            const params = new URLSearchParams({
-              userId: resolvedUserId,
-              organizationId: resolvedOrgId,
-              page: '1', // Always load page 1 after bulk upload
-              limit: pagination.limit.toString()
-            })
-
-            const effectiveProjectId = filters.projectId || (projectId && projectId !== 'undefined' && projectId !== 'null' ? projectId : null)
-            const effectiveTaskId = filters.taskId || taskId || null
-            
-            if (effectiveProjectId) params.append('projectId', effectiveProjectId)
-            if (effectiveTaskId) params.append('taskId', effectiveTaskId)
-            
-            if (canViewEmployeeFilter) {
-              if (filters.employeeId) {
-                params.append('userId', filters.employeeId)
+              if (canViewEmployeeFilter) {
+                if (filters.employeeId) {
+                  params.append('userId', filters.employeeId)
+                }
+              } else {
+                params.append('userId', resolvedUserId)
               }
-            } else {
-              params.append('userId', resolvedUserId)
-            }
-            
-            if (filters.startDate) params.append('startDate', filters.startDate)
-            if (filters.endDate) params.append('endDate', filters.endDate)
-            if (filters.status && filters.status !== 'all') params.append('status', filters.status)
-            if (filters.isBillable && filters.isBillable !== 'all') params.append('isBillable', filters.isBillable)
-            if (filters.isApproved && filters.isApproved !== 'all') {
-              params.append('isApproved', filters.isApproved)
-            }
 
-            const response = await fetch(`/api/time-tracking/entries?${params}`)
-            const data = await response.json()
+              if (filters.startDate) params.append('startDate', filters.startDate)
+              if (filters.endDate) params.append('endDate', filters.endDate)
+              if (filters.status && filters.status !== 'all') params.append('status', filters.status)
+              if (filters.isBillable && filters.isBillable !== 'all') params.append('isBillable', filters.isBillable)
+              if (filters.isApproved && filters.isApproved !== 'all') {
+                params.append('isApproved', filters.isApproved)
+              }
 
-            if (response.ok) {
-              // Handle both data.data and data.timeEntries for backward compatibility
-              const entries = data.data || data.timeEntries || []
-              setTimeEntries(Array.isArray(entries) ? entries : [])
-              setPagination(data.pagination)
-            } else {
-              setError(data.error || 'Failed to load time entries')
+              const response = await fetch(`/api/time-tracking/entries?${params}`)
+              const data = await response.json()
+
+              if (response.ok) {
+                const entries = data.data || data.timeEntries || []
+                setTimeEntries(Array.isArray(entries) ? entries : [])
+                setPagination(data.pagination)
+              } else {
+                setError(data.error || 'Failed to load time entries')
+              }
+            } catch (error) {
+              setError('Failed to load time entries')
+            } finally {
+              setIsLoading(false)
             }
-          } catch (error) {
-            setError('Failed to load time entries')
-          } finally {
-            setIsLoading(false)
-          }
-        }, 100)
-        
-        onTimeEntryUpdate?.()
-        if (failed === 0) {
-          setBulkUploadSuccess(`Successfully uploaded ${successful} time ${successful === 1 ? 'entry' : 'entries'}. The table will refresh to show the new entries.`)
+          }, 100)
+
+          onTimeEntryUpdate?.()
+
+          // Auto-close modal after successful upload
           setTimeout(() => {
             setShowBulkUploadModal(false)
             setBulkUploadFile(null)
             setBulkUploadProgress(null)
             setBulkUploadSuccess(null)
-            setShowBulkUploadErrorAlert(true)
-            setShowBulkUploadProgressAlert(true)
-          }, 3000)
-        } else {
-          setBulkUploadSuccess(`Successfully uploaded ${successful} time ${successful === 1 ? 'entry' : 'entries'}, ${failed} failed. The table will refresh to show the new entries.`)
+            setShowBulkUploadProgressAlert(false)
+            setRowUploadStatus(new Map())
+          }, 2000)
         }
+
+        if (results.failed > 0) {
+          // Show error toast for failed entries
+          toast.error(`Failed to upload ${results.failed} time ${results.failed === 1 ? 'entry' : 'entries'}. Check the errors below.`)
+        }
+      } else {
+        toast.error(result.error || 'Bulk upload failed')
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to process CSV file')
-      setShowErrorAlert(true)
+    } catch (error) {
+      console.error('Bulk upload error:', error)
+      toast.error('Failed to upload file. Please try again.')
     } finally {
       setUploadingBulk(false)
     }
   }
+
+  // Ensure bulk upload state resets every time modal is opened
+  useEffect(() => {
+    if (showBulkUploadModal) {
+      setBulkUploadFile(null)
+      setBulkUploadErrors([])
+      setBulkUploadProgress(null)
+      setError('')
+      setBulkUploadSuccess(null)
+      setShowBulkUploadProgressAlert(false)
+      setRowUploadStatus(new Map())
+    }
+  }, [showBulkUploadModal])
 
   return (
     <>
@@ -1942,7 +2005,7 @@ export function TimeLogs({
           </CardTitle>
           {showManualLogButtons && pathname === '/time-tracking/timer' && canAddManualTimeLog && (
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <Button
+              {/* <Button
                 onClick={() => setShowBulkUploadModal(true)}
                 size="sm"
                 variant="outline"
@@ -1950,7 +2013,7 @@ export function TimeLogs({
               >
                 <Upload className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                 <span className="whitespace-nowrap">Bulk Upload</span>
-              </Button>
+              </Button> */}
               <Button
                 onClick={() => {
                   // Clear form data when opening add modal
@@ -1985,22 +2048,6 @@ export function TimeLogs({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
             <p className="text-muted-foreground mt-2 text-sm">Loading your time entries...</p>
           </div>
-        )}
-        {error && showErrorAlert && (
-          <Alert variant="destructive" className="w-full">
-            <AlertDescription className="flex items-center justify-between gap-2">
-              <span className="text-xs sm:text-sm break-words flex-1">{error}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 flex-shrink-0"
-                onClick={() => setShowErrorAlert(false)}
-                aria-label="Dismiss error"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </AlertDescription>
-          </Alert>
         )}
 
         {/* Filters */}
@@ -2879,7 +2926,7 @@ export function TimeLogs({
                     ) : (
                       filteredModalProjects.map((project) => (
                         <SelectItem key={project._id} value={project._id} onMouseDown={(e) => e.preventDefault()}>
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center gap-2">
                             <FolderOpen className="h-4 w-4 flex-shrink-0" />
                             <span className="truncate">{project.name}</span>
                           </div>
@@ -2929,7 +2976,14 @@ export function TimeLogs({
                             <Target className="h-4 w-4 flex-shrink-0" />
                             <div className="flex-1 min-w-0 overflow-hidden">
                               <div className="font-medium truncate flex items-center gap-2 min-w-0">
-                                <span className="truncate">{task.title}</span>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="truncate">{task.title}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{task.title}</p>
+                                  </TooltipContent>
+                                </Tooltip>
                                 {task.isBillable && (
                                   <DollarSign className="h-3 w-3 text-green-600 flex-shrink-0" />
                                 )}
@@ -3197,7 +3251,7 @@ export function TimeLogs({
                     ) : (
                       filteredModalProjects.map((project) => (
                         <SelectItem key={project._id} value={project._id} onMouseDown={(e) => e.preventDefault()}>
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center gap-2">
                             <FolderOpen className="h-4 w-4 flex-shrink-0" />
                             <span className="truncate">{project.name}</span>
                           </div>
@@ -3239,7 +3293,14 @@ export function TimeLogs({
                       <SelectItem key={task._id} value={task._id}>
                         <div className="flex items-center space-x-2">
                           <Target className="h-4 w-4 flex-shrink-0" />
-                          <span className="truncate">{task.title}</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="truncate">{task.title}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{task.title}</p>
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
                       </SelectItem>
                     ))
@@ -3461,166 +3522,102 @@ export function TimeLogs({
         <DialogBody className="space-y-4">
           {/* Enhanced progress display during bulk upload */}
           {uploadingBulk && (
-            <div className="absolute inset-0 bg-background/95 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg p-6">
-              <div className="w-full max-w-2xl bg-card border rounded-lg shadow-lg p-6 max-h-[70vh] flex flex-col">
-                <div className="flex items-center gap-3 mb-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary flex-shrink-0" />
-                  <div>
-                    <h3 className="text-lg font-semibold">Processing Time Entries</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {bulkUploadProgress ? `${bulkUploadProgress.processed} of ${bulkUploadProgress.total} rows processed` : 'Reading CSV file...'}
-                    </p>
+            <div className="w-full max-w-2xl bg-card border rounded-lg shadow-lg p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Loader2 className="h-6 w-6 animate-spin text-primary flex-shrink-0" />
+                <div>
+                  <h3 className="text-lg font-semibold">Processing Time Entries</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {bulkUploadProgress ? `${bulkUploadProgress.processed} of ${bulkUploadProgress.total} rows processed` : 'Reading CSV file...'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              {bulkUploadProgress && (
+                <div className="mb-4">
+                  <div className="w-full bg-muted rounded-full h-2.5 mb-2">
+                    <div
+                      className="bg-primary h-2.5 rounded-full transition-all duration-300"
+                      style={{ width: `${(bulkUploadProgress.processed / bulkUploadProgress.total) * 100}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Check className="h-3 w-3 text-green-600" />
+                      {bulkUploadProgress.successful} successful
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <X className="h-3 w-3 text-destructive" />
+                      {bulkUploadProgress.failed} failed
+                    </span>
                   </div>
                 </div>
+              )}
 
-                {/* Progress bar */}
-                {bulkUploadProgress && (
-                  <div className="mb-4">
-                    <div className="w-full bg-muted rounded-full h-2.5 mb-2">
+              {/* Row-by-row status */}
+              {rowUploadStatus.size > 0 && (
+                <div className="flex-1 overflow-y-auto space-y-1 border rounded-md p-3 bg-muted/30 min-h-[200px] max-h-[400px]">
+                  {Array.from(rowUploadStatus.entries())
+                    .sort(([a], [b]) => a - b)
+                    .map(([rowNum, status]) => (
                       <div
-                        className="bg-primary h-2.5 rounded-full transition-all duration-300"
-                        style={{ width: `${(bulkUploadProgress.processed / bulkUploadProgress.total) * 100}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Check className="h-3 w-3 text-green-600" />
-                        {bulkUploadProgress.successful} successful
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <X className="h-3 w-3 text-destructive" />
-                        {bulkUploadProgress.failed} failed
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Row-by-row status */}
-                {rowUploadStatus.size > 0 && (
-                  <div className="flex-1 overflow-y-auto space-y-1 border rounded-md p-3 bg-muted/30 min-h-[200px] max-h-[400px]">
-                    {Array.from(rowUploadStatus.entries())
-                      .sort(([a], [b]) => a - b)
-                      .map(([rowNum, status]) => (
-                        <div
-                          key={rowNum}
-                          className={`flex items-center gap-2 p-2 rounded text-sm transition-all ${
-                            status.status === 'success'
-                              ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400'
-                              : status.status === 'error'
-                              ? 'bg-destructive/10 text-destructive'
-                              : 'bg-muted/50 text-muted-foreground'
-                          }`}
-                        >
-                          {status.status === 'pending' && (
-                            <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
-                          )}
-                          {status.status === 'success' && (
-                            <Check className="h-4 w-4 flex-shrink-0" />
-                          )}
-                          {status.status === 'error' && (
-                            <X className="h-4 w-4 flex-shrink-0" />
-                          )}
-                          <span className="font-medium min-w-[60px]">Row {rowNum}:</span>
-                          <span className="flex-1 truncate">
-                            {status.status === 'pending' && 'Uploading...'}
-                            {status.status === 'success' && 'Successfully uploaded'}
-                            {status.status === 'error' && (status.error || 'Failed to upload')}
-                          </span>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
+                        key={rowNum}
+                        className={`flex items-center gap-2 p-2 rounded text-sm transition-all ${
+                          status.status === 'success'
+                            ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400'
+                            : status.status === 'error'
+                            ? 'bg-destructive/10 text-destructive'
+                            : 'bg-muted/50 text-muted-foreground'
+                        }`}
+                      >
+                        {status.status === 'pending' && (
+                          <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                        )}
+                        {status.status === 'success' && (
+                          <Check className="h-4 w-4 flex-shrink-0" />
+                        )}
+                        {status.status === 'error' && (
+                          <X className="h-4 w-4 flex-shrink-0" />
+                        )}
+                        <span className="font-medium min-w-[60px]">Row {rowNum}:</span>
+                        <span className="flex-1 truncate">
+                          {status.status === 'pending' && 'Uploading...'}
+                          {status.status === 'success' && 'Successfully uploaded'}
+                          {status.status === 'error' && (status.error || 'Failed to upload')}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           )}
 
-          {error && showErrorAlert && (
-            <Alert variant="destructive">
-              <AlertDescription className="flex items-center justify-between">
-                <span>{error}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0"
-                  onClick={() => setShowErrorAlert(false)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </AlertDescription>
-            </Alert>
+          {/* Display bulk upload result after completion */}
+          {!uploadingBulk && bulkUploadProgress && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium">Upload Result</h4>
+              <p className="text-sm text-muted-foreground">
+                {bulkUploadProgress.successful} successful, {bulkUploadProgress.failed} failed
+              </p>
+            </div>
           )}
 
-          {bulkUploadSuccess && (
-            <Alert>
-              <AlertDescription className="flex items-center justify-between">
-                <span>{bulkUploadSuccess}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0"
-                  onClick={() => setBulkUploadSuccess(null)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {bulkUploadErrors.length > 0 && showBulkUploadErrorAlert && (
-            <Alert variant="destructive">
-              <AlertDescription>
-                <div className="flex items-start justify-between mb-2">
-                  <div className="font-semibold">Errors found:</div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0"
-                    onClick={() => setShowBulkUploadErrorAlert(false)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="max-h-40 overflow-y-auto space-y-1">
-                  {bulkUploadErrors.map((err, idx) => (
-                    <div key={idx} className="text-sm">
-                      Row {err.row}: {err.error}
-                    </div>
-                  ))}
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {bulkUploadProgress && showBulkUploadProgressAlert && (
-            <Alert>
-              <AlertDescription>
-                <div className="flex items-start justify-between mb-2">
-                  <div className="space-y-2 flex-1">
-                    <div className="flex items-center justify-between">
-                      <span>Progress: {bulkUploadProgress.processed} / {bulkUploadProgress.total}</span>
-                      <span>{Math.round((bulkUploadProgress.processed / bulkUploadProgress.total) * 100)}%</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div
-                        className="bg-primary h-2 rounded-full transition-all"
-                        style={{ width: `${(bulkUploadProgress.processed / bulkUploadProgress.total) * 100}%` }}
-                      />
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Successful: {bulkUploadProgress.successful} | Failed: {bulkUploadProgress.failed}
-                    </div>
+          {/* Display bulk upload errors */}
+          {bulkUploadErrors.length > 0 && !uploadingBulk && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-destructive">Upload Errors</h4>
+              <div className="max-h-40 overflow-y-auto space-y-1 border border-destructive/20 rounded-md p-3 bg-destructive/5">
+                {bulkUploadErrors.map((error, index) => (
+                  <div key={index} className="flex items-start gap-2 text-sm">
+                    <X className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                    <span className="text-destructive">
+                      <strong>Row {error.row}:</strong> {error.error}
+                    </span>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 ml-2"
-                    onClick={() => setShowBulkUploadProgressAlert(false)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </AlertDescription>
-            </Alert>
+                ))}
+              </div>
+            </div>
           )}
 
           <div className="space-y-4">
@@ -3649,8 +3646,6 @@ export function TimeLogs({
                     setError('')
                     setBulkUploadErrors([])
                     setBulkUploadSuccess(null)
-                    setShowErrorAlert(true)
-                    setShowBulkUploadErrorAlert(true)
                     setRowUploadStatus(new Map())
                   }
                 }}
@@ -3702,11 +3697,14 @@ export function TimeLogs({
               <AlertDescription className="text-xs">
                 <div className="font-semibold mb-1">CSV Format Requirements:</div>
                 <ul className="list-disc list-inside space-y-1">
-                  <li>Required columns: Task No, Start Date, Start Time, End Date, End Time</li>
-                  <li>Optional columns: Description</li>
-                  <li>Task No format: ProjectNumber.TaskNumber (e.g., 20.7)</li>
-                  <li>Task ID must be correct</li>
+                  <li><strong>Required columns:</strong> Task No, Start Date, Start Time, End Date, End Time</li>
+                  <li><strong>Optional columns:</strong> Description</li>
+                  <li><strong>Task No format:</strong> ProjectNumber.TaskNumber (e.g., 20.7)</li>
+                  <li><strong>Date formats accepted:</strong> YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY, DD-MM-YYYY</li>
+                  <li><strong>Time formats accepted:</strong> HH:MM, H:MM AM/PM, H AM/PM, or just H (24-hour)</li>
+                  <li><strong>Examples:</strong> 9:00, 9:00 AM, 2:30 PM, 14:00, 9 AM</li>
                   <li>End Date/Time must be after Start Date/Time</li>
+                  <li>Task ID must exist and be accessible to you</li>
                 </ul>
               </AlertDescription>
             </Alert>
@@ -3722,8 +3720,6 @@ export function TimeLogs({
               setBulkUploadProgress(null)
               setError('')
               setBulkUploadSuccess(null)
-              setShowErrorAlert(true)
-              setShowBulkUploadErrorAlert(true)
               setShowBulkUploadProgressAlert(true)
               setRowUploadStatus(new Map())
             }}

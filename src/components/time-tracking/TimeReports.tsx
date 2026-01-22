@@ -835,7 +835,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                   <span>No time entries found</span>
                 )}
               </div>
-              {hasActiveFilters && (
+              {/* {hasActiveFilters && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -845,7 +845,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                   <X className="h-3 w-3 mr-1" />
                   Clear Filters
                 </Button>
-              )}
+              )} */}
             </div>
 
             {reportData.detailedEntries.length === 0 ? (

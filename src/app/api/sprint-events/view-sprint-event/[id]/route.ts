@@ -118,6 +118,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       .populate('project', 'name')
       .populate('facilitator', 'firstName lastName email')
       .populate('attendees', 'firstName lastName email')
+      .populate('outcomes.actionItems.assignedTo', 'firstName lastName email')
 
     console.log('Final Populated Sprint Event:', sprintEvent ? {
       _id: sprintEvent._id,
@@ -179,7 +180,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     }
 
     // Check if user has permission to manage sprints for this project
-    const hasAccess = await hasPermission(authResult.user.id, Permission.SPRINT_MANAGE, sprintEvent.project.toString())
+    const hasAccess = await hasPermission(authResult.user.id, Permission.SPRINT_EVENT_VIEW, sprintEvent.project.toString())
     if (!hasAccess) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
@@ -208,7 +209,27 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (duration !== undefined) sprintEvent.duration = duration
     if (attendees !== undefined) sprintEvent.attendees = attendeesWithFacilitator
     if (status !== undefined) sprintEvent.status = status
-    if (outcomes !== undefined) sprintEvent.outcomes = outcomes
+    if (outcomes !== undefined) {
+      // Validate and clean action items
+      if (outcomes.actionItems && Array.isArray(outcomes.actionItems)) {
+        outcomes.actionItems = outcomes.actionItems.filter((item: any) => {
+          // Remove items with empty description or invalid assignedTo
+          return item.description && 
+                 item.description.trim() !== '' && 
+                 item.assignedTo && 
+                 typeof item.assignedTo === 'string' && 
+                 item.assignedTo.trim() !== '' &&
+                 item.dueDate
+        }).map((item: any) => ({
+          ...item,
+          description: item.description.trim(),
+          assignedTo: item.assignedTo.trim(),
+          dueDate: new Date(item.dueDate),
+          status: item.status || 'pending'
+        }))
+      }
+      sprintEvent.outcomes = outcomes
+    }
     if (location !== undefined) sprintEvent.location = location
     if (meetingLink !== undefined) sprintEvent.meetingLink = meetingLink
     if (attachments !== undefined) {
@@ -260,7 +281,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     // Check if user has permission to manage sprints for this project
-    const hasAccess = await hasPermission(authResult.user.id, Permission.SPRINT_MANAGE, sprintEvent.project.toString())
+    const hasAccess = await hasPermission(authResult.user.id, Permission.SPRINT_EVENT_VIEW, sprintEvent.project.toString())
     if (!hasAccess) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
@@ -334,7 +355,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     }
 
     // Check if user has permission to manage sprints for this project
-    const hasAccess = await hasPermission(authResult.user.id, Permission.SPRINT_MANAGE, sprintEvent.project.toString())
+    const hasAccess = await hasPermission(authResult.user.id, Permission.SPRINT_EVENT_VIEW, sprintEvent.project.toString())
     if (!hasAccess) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }

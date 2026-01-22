@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { usePermissions } from '@/lib/permissions/permission-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -55,7 +57,12 @@ interface SprintEvent {
     decisions: string[]
     actionItems: Array<{
       description: string
-      assignedTo: string
+      assignedTo: string | {
+        _id: string
+        firstName: string
+        lastName: string
+        email: string
+      }
       dueDate: string
       status: string
     }>
@@ -88,6 +95,7 @@ export default function SprintEventDetailsPage() {
   const params = useParams()
   const router = useRouter()
   const { user, isLoading: authLoading, isAuthenticated } = useAuth()
+  const { hasPermission } = usePermissions()
   const eventId = params.id as string
   const [event, setEvent] = useState<SprintEvent | null>(null)
   const [fullProject, setFullProject] = useState<{ _id: string; name: string } | null>(null)
@@ -112,7 +120,7 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
   const fetchEvent = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/sprint-events/${eventId}`)
+      const response = await fetch(`/api/sprint-events/view-sprint-event/${eventId}`)
       if (response.ok) {
         const data = await response.json()
         setEvent(data)
@@ -143,7 +151,7 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
       return
     }
     try {
-      const response = await fetch(`/api/sprint-events/${eventId}`, {
+      const response = await fetch(`/api/sprint-events/view-sprint-event/${eventId}`, {
         method: 'DELETE'
       })
       if (response.ok) {
@@ -156,7 +164,7 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
 
   const updateStatus = async (newStatus: string) => {
     try {
-      const response = await fetch(`/api/sprint-events/${eventId}`, {
+      const response = await fetch(`/api/sprint-events/view-sprint-event/${eventId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -321,45 +329,47 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <Button variant="outline" onClick={() => setEditingEvent(event)}>
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  Actions
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {event.status !== 'completed' && (
-                  <DropdownMenuItem onClick={() => updateStatus('completed')}>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Mark as Completed
-                  </DropdownMenuItem>
-                )}
-                {event.status !== 'in_progress' && event.status !== 'completed' && (
-                  <DropdownMenuItem onClick={() => updateStatus('in_progress')}>
-                    <Play className="h-4 w-4 mr-2" />
-                    Mark as In Progress
-                  </DropdownMenuItem>
-                )}
-                {event.status !== 'cancelled' && (
-                  <DropdownMenuItem onClick={() => updateStatus('cancelled')}>
-                    <Square className="h-4 w-4 mr-2" />
-                    Cancel Event
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={handleEventDeleted}
-                  className="text-destructive"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Event
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {hasPermission(Permission.SPRINT_EVENT_VIEW_ALL) || (user && user.id === event.facilitator._id) ? (
+              <><Button variant="outline" onClick={() => setEditingEvent(event)}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </Button><DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                      Actions
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {event.status !== 'completed' && (
+                      <DropdownMenuItem onClick={() => updateStatus('completed')}>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Mark as Completed
+                      </DropdownMenuItem>
+                    )}
+                    {event.status !== 'in_progress' && event.status !== 'completed' && (
+                      <DropdownMenuItem onClick={() => updateStatus('in_progress')}>
+                        <Play className="h-4 w-4 mr-2" />
+                        Mark as In Progress
+                      </DropdownMenuItem>
+                    )}
+                    {event.status !== 'cancelled' && (
+                      <DropdownMenuItem onClick={() => updateStatus('cancelled')}>
+                        <Square className="h-4 w-4 mr-2" />
+                        Cancel Event
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={handleEventDeleted}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Event
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu></>
+            ) : null}
+            
           </div>
         </div>
 
@@ -480,7 +490,7 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
                   {/* Decisions Made */}
                   {event.outcomes.decisions && event.outcomes.decisions.length > 0 && (
                     <div>
-                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 mt-4">
                         <CheckCircle className="h-4 w-4" />
                         Decisions Made
                       </h4>
@@ -500,7 +510,7 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
                   {/* Action Items */}
                   {event.outcomes.actionItems && event.outcomes.actionItems.length > 0 && (
                     <div>
-                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 mt-4">
                         <Target className="h-4 w-4" />
                         Action Items
                       </h4>
@@ -514,9 +524,11 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
                                   <div className="flex items-center gap-1">
                                     <Users className="h-3 w-3" />
                                     <span>
-                                      {typeof item.assignedTo === 'object' && item.assignedTo !== null
-                                        ? `${(item.assignedTo as unknown as { firstName?: string; lastName?: string }).firstName || ''} ${(item.assignedTo as unknown as { firstName?: string; lastName?: string }).lastName || ''}`.trim() || 'Unassigned'
-                                        : item.assignedTo || 'Unassigned'}
+                                      {typeof item.assignedTo === 'object' && item.assignedTo !== null && 'firstName' in item.assignedTo
+                                        ? `${item.assignedTo.firstName} ${item.assignedTo.lastName}`.trim()
+                                        : typeof item.assignedTo === 'string' && item.assignedTo.length > 0
+                                        ? item.assignedTo
+                                        : 'Unassigned'}
                                     </span>
                                   </div>
                                 )}
@@ -542,7 +554,7 @@ const [fullSprint, setFullSprint] = useState<{ _id: string; name: string } | nul
                   {/* Notes */}
                   {event.outcomes.notes && event.outcomes.notes.trim() && (
                     <div>
-                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 mt-4">
                         <FileText className="h-4 w-4" />
                         Notes
                       </h4>

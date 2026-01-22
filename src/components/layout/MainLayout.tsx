@@ -13,9 +13,10 @@ import { DateTimeProvider } from '@/components/providers/DateTimeProvider'
 
 interface MainLayoutProps {
   children: React.ReactNode
+  breadcrumbItems?: Array<{ label: string; href?: string }>
 }
 
-export function MainLayout({ children }: MainLayoutProps) {
+export function MainLayout({ children, breadcrumbItems }: MainLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -118,7 +119,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           
           {/* Breadcrumb */}
           <div className="mb-4">
-            <Breadcrumb />
+            <Breadcrumb items={breadcrumbItems} />
           </div>
           
           {/* Page Content */}

@@ -249,7 +249,7 @@ export default function FeedbackPage() {
                   />
                 </div>
 
-                <div className="mt-10">
+                <div className="mt-12">
                   <Button
                     type="submit"
                     disabled={!selectedCategory || isSubmitting}
@@ -287,10 +287,10 @@ export default function FeedbackPage() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => window.open('https://github.com/EchonLabs/kanvaro.com/discussions', '_blank')}
+                onClick={() => window.open('https://github.com/EchonLabs/kanvaro.com', '_blank')}
                 className="rounded-full"
               >
-                GitHub Discussions
+                GitHub Repository
               </Button>
             </div>
           </div>
