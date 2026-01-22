@@ -404,7 +404,7 @@ export async function POST(req: NextRequest) {
     } = body
 
     // Check if user has permission to manage sprints for this project
-    const hasAccess = await hasPermission(authResult.user.id, Permission.SPRINT_MANAGE, projectId)
+    const hasAccess = await hasPermission(authResult.user.id, Permission.SPRINT_EVENT_VIEW, projectId)
     if (!hasAccess) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }

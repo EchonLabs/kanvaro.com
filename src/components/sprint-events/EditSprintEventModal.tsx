@@ -28,16 +28,16 @@ interface SprintEvent {
   duration: number
   status: string
   facilitator: {
+    _id: string
     firstName: string
     lastName: string
     email: string
   }
   attendees: Array<{
-    _id?: string
+    _id: string
     firstName: string
     lastName: string
     email: string
-    isActive?: boolean
   }>
   outcomes?: {
     decisions: string[]
@@ -67,6 +67,12 @@ interface SprintEvent {
     _id: string
     name: string
   }
+  attachments?: Array<{
+    name: string
+    url: string
+    size: number
+    type: string
+  }>
 }
 
 interface User {
@@ -95,9 +101,9 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
     event.actualDate ? new Date(event.actualDate) : undefined
   )
   const { success: notifySuccess, error: notifyError } = useNotify()
-  const attendeeIds = event.attendees
-    .map(a => (a as any)._id)
-    .filter((id): id is string => Boolean(id))
+  const attendeeIds = event.attendees.map((attendee) => attendee._id).filter(Boolean) as string[]
+  console.log('event.attendees:', event.attendees)
+  console.log('attendeeIds:', attendeeIds)
  
   
   // Store initial state to compare changes
@@ -116,7 +122,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
       ...event.outcomes,
       actionItems: event.outcomes.actionItems.map(item => ({
         ...item,
-        assignedTo: typeof item.assignedTo === 'object' && item.assignedTo ? item.assignedTo._id : item.assignedTo,
+        assignedTo: typeof item.assignedTo === 'object' && item.assignedTo ? item.assignedTo : item.assignedTo,
         dueDate: item.dueDate
       }))
     } : {
@@ -138,14 +144,14 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
     status: event.status,
     startTime: event.startTime || '',
     endTime: event.endTime || '',
-    attendees: attendeeIds,
+    attendees: attendeeIds.map(id => typeof id === 'string' ? id : String(id)), // Ensure all are strings
     location: event.location || '',
     meetingLink: event.meetingLink || '',
     outcomes: event.outcomes ? {
       ...event.outcomes,
       actionItems: event.outcomes.actionItems.map(item => ({
         ...item,
-        assignedTo: typeof item.assignedTo === 'object' && item.assignedTo ? item.assignedTo._id : item.assignedTo,
+        assignedTo: typeof item.assignedTo === 'object' && item.assignedTo ? item.assignedTo : item.assignedTo,
         dueDate: item.dueDate
       }))
     } : {
@@ -170,7 +176,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
       }))
   }
 
-  const includeExistingAttendees = (members: User[]): User[] => {
+  const includeExistingAttendees = async (members: User[]): Promise<User[]> => {
     const memberMap = new Map<string, User>()
     members.forEach(member => {
       if (member?._id) {
@@ -178,19 +184,72 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
       }
     })
 
-    formData.attendees.forEach(attendeeId => {
-      if (!attendeeId || memberMap.has(attendeeId)) return
-      const fallbackAttendee = event.attendees.find(att => att._id === attendeeId)
-      memberMap.set(attendeeId, {
-        _id: attendeeId,
-        firstName: fallbackAttendee?.firstName || 'Unknown',
-        lastName: fallbackAttendee?.lastName || '',
-        email: fallbackAttendee?.email || '',
-        isActive: false
-      })
+    console.log('formData.attendees in includeExistingAttendees:', formData.attendees)
+
+    // Fetch details for existing attendees that are not in the member list
+    const missingAttendeeIds = formData.attendees.filter(attendeeId => {
+      const attendeeIdStr = typeof attendeeId === 'string' ? attendeeId : String(attendeeId)
+      return attendeeIdStr && !memberMap.has(attendeeIdStr)
     })
 
-    return Array.from(memberMap.values())
+    if (missingAttendeeIds.length > 0) {
+      console.log('Missing attendee IDs:', missingAttendeeIds)
+      try {
+        // Fetch user details for missing attendees
+        const userPromises = missingAttendeeIds.map(async (attendeeId) => {
+          const attendeeIdStr = String(attendeeId)
+          console.log('Fetching user for attendeeId:', attendeeIdStr)
+          try {
+            const response = await fetch(`/api/users/${attendeeIdStr}`)
+            if (response.ok) {
+              const userData = await response.json()
+              console.log('Fetched user data:', userData)
+              return {
+                _id: String(userData._id || attendeeIdStr),
+                firstName: userData.firstName || 'Unknown',
+                lastName: userData.lastName || '',
+                email: userData.email || '',
+                isActive: userData.isActive !== false
+              }
+            }
+          } catch (error) {
+            console.error(`Error fetching user ${attendeeIdStr}:`, error)
+          }
+          // Return placeholder if fetch fails
+          return {
+            _id: attendeeIdStr,
+            firstName: 'Unknown',
+            lastName: '',
+            email: '',
+            isActive: false
+          }
+        })
+
+        const fetchedUsers = await Promise.all(userPromises)
+        fetchedUsers.forEach(user => {
+          if (user) {
+            memberMap.set(user._id, user)
+          }
+        })
+      } catch (error) {
+        console.error('Error fetching missing attendees:', error)
+        // Create placeholders for any attendees we couldn't fetch
+        missingAttendeeIds.forEach(attendeeId => {
+          const attendeeIdStr = String(attendeeId)
+          memberMap.set(attendeeIdStr, {
+            _id: attendeeIdStr,
+            firstName: 'Unknown',
+            lastName: '',
+            email: '',
+            isActive: false
+          })
+        })
+      }
+    }
+
+    const finalUsers = Array.from(memberMap.values())
+    console.log('Final users array:', finalUsers)
+    return finalUsers
   }
 
   useEffect(() => {
@@ -230,7 +289,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
           isActive: u.isActive
         })))
 
-        setUsers(includeExistingAttendees(activeMembers))
+        setUsers(await includeExistingAttendees(activeMembers))
       } else {
         // Fallback to /api/users
         const fallbackResponse = await fetch('/api/users')
@@ -252,12 +311,12 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
             isActive: u.isActive
           })))
 
-          setUsers(includeExistingAttendees(activeFallback))
+          setUsers(await includeExistingAttendees(activeFallback))
         }
       }
     } catch (error) {
       console.error('Error fetching users:', error)
-      setUsers(includeExistingAttendees([]))
+      setUsers(await includeExistingAttendees([]))
     } finally {
       setLoadingUsers(false)
     }
@@ -366,8 +425,14 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
   }
 
   const getSelectedAttendees = () => {
-    const selected = users.filter(user => formData.attendees.includes(user._id))
-  
+    console.log('formData.attendees:', formData.attendees)
+    console.log('users:', users)
+    const selected = users.filter(user => {
+      const includes = formData.attendees.includes(user._id)
+      console.log(`User ${user._id} (${user.firstName} ${user.lastName}) included:`, includes)
+      return includes
+    })
+    console.log('selected attendees:', selected)
     return selected
   }
 
@@ -684,7 +749,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
             ) : getSelectedAttendees().length > 0 ? (
               <div className="border rounded-md p-3 flex flex-wrap gap-2">
                 {getSelectedAttendees().map((user) => (
-                  <Badge key={user._id} variant="secondary" className="flex items-center gap-2 px-3 py-1">
+                  <Badge key={user._id || `user-${Math.random()}`} variant="secondary" className="flex items-center gap-2 px-3 py-1">
                     <span className="text-sm">
                       {user.firstName} {user.lastName}
                     </span>
@@ -717,7 +782,7 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
                 <div className="max-h-48 overflow-y-auto space-y-1">
                   {getAvailableAttendees().length > 0 ? (
                     getAvailableAttendees().map((user) => (
-                      <label key={user._id} className="flex items-center space-x-2 p-2 hover:bg-muted rounded cursor-pointer">
+                      <label key={user._id || `available-${Math.random()}`} className="flex items-center space-x-2 p-2 hover:bg-muted rounded cursor-pointer">
                         <Checkbox
                           checked={formData.attendees.includes(user._id)}
                           onCheckedChange={() => handleAttendeeToggle(user._id)}
@@ -777,13 +842,13 @@ export function EditSprintEventModal({ event, onClose, onSuccess }: EditSprintEv
                       onChange={(e) => updateActionItem(index, 'description', e.target.value)}
                       placeholder="Action item description..."
                     />
-                    <Select value={typeof item.assignedTo === 'object' && item.assignedTo ? item.assignedTo : item.assignedTo} onValueChange={(value) => updateActionItem(index, 'assignedTo', value)}>
+                    <Select value={typeof item.assignedTo === 'object' && item.assignedTo ? item.assignedTo._id : item.assignedTo} onValueChange={(value) => updateActionItem(index, 'assignedTo', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder="Assign to..." />
                       </SelectTrigger>
                       <SelectContent>
                         {users.map((user) => (
-                          <SelectItem key={user._id} value={user._id}>
+                          <SelectItem key={user._id || `action-${Math.random()}`} value={user._id}>
                             {user.firstName} {user.lastName}
                           </SelectItem>
                         ))}
