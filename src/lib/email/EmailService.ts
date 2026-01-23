@@ -238,12 +238,19 @@ export class EmailService {
     
     // Fix baseUrl by replacing dashes with dots in domain-like patterns
     const fixBaseUrl = (url: string) => {
-      if (!url) return url
+      if (!url) return 'http://localhost:3000'
       console.log('Original baseUrl:', url)
-      // Replace patterns like "qa-kanvaro-com-web" with "qa.kanvaro.com"
-      const fixed = url.replace(/:\/\/([^\/]+)-([^\/]+)-([^\/]+)-[^\/]+\//, '://$1.$2.$3/')
-      console.log('Fixed baseUrl:', fixed)
-      return fixed
+      
+      // Check if URL contains "kanvaro"
+      if (url.includes('kanvaro')) {
+        // Replace patterns like "qa-kanvaro-com-web" with "qa.kanvaro.com"
+        const fixed = url.replace(/:\/\/([^\/]+)-([^\/]+)-([^\/]+)-[^\/]+\//, '://$1.$2.$3/')
+        console.log('Fixed baseUrl (kanvaro pattern):', fixed)
+        return fixed
+      } else {
+        // If no "kanvaro" in URL, use localhost:3000
+        return 'http://localhost:3000'
+      }
     }
     
     const fixedBaseUrl = baseUrl ? fixBaseUrl(baseUrl) : null
@@ -560,12 +567,20 @@ export class EmailService {
     
     // Fix baseUrl by replacing dashes with dots in domain-like patterns
     const fixBaseUrl = (url: string) => {
-      if (!url) return url
+      if (!url) return 'http://localhost:3000'
       console.log('Welcome Email - Original baseUrl:', url)
-      // Replace patterns like "qa-kanvaro-com-web" with "qa.kanvaro.com"
-      const fixed = url.replace(/:\/\/([^\/]+)-([^\/]+)-([^\/]+)-[^\/]+\//, '://$1.$2.$3/')
-      console.log('Welcome Email - Fixed baseUrl:', fixed)
-      return fixed
+      
+      // Check if URL contains "kanvaro"
+      if (url.includes('kanvaro')) {
+        // Replace patterns like "qa-kanvaro-com-web" with "qa.kanvaro.com"
+        const fixed = url.replace(/:\/\/([^\/]+)-([^\/]+)-([^\/]+)-[^\/]+\//, '://$1.$2.$3/')
+        console.log('Welcome Email - Fixed baseUrl (kanvaro pattern):', fixed)
+        return fixed
+      } else {
+        // If no "kanvaro" in URL, use localhost:3000
+        console.log('Welcome Email - No kanvaro found, using localhost:3000')
+        return 'http://localhost:3000'
+      }
     }
     
     const fixedBaseUrl = baseUrl ? fixBaseUrl(baseUrl) : null
