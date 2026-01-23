@@ -234,7 +234,8 @@ export class EmailService {
     `
   }
 
-  generatePasswordResetConfirmationEmail(organizationName: string = 'Kanvaro'): string {
+  generatePasswordResetConfirmationEmail(organizationName: string = 'Kanvaro', baseUrl?: string): string {
+    const loginLink = baseUrl ? `${baseUrl}/login` : '#'
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -306,7 +307,7 @@ export class EmailService {
         <p>You can now sign in with your new password.</p>
 
         <div style="text-align: center;">
-            <a href="#" class="button">Sign In to Your Account</a>
+            <a href="${loginLink}" class="button">Sign In to Your Account</a>
         </div>
 
         <div class="footer">
@@ -540,10 +541,10 @@ export class EmailService {
     email: string,
     roleDisplayName: string,
     organizationName: string = 'Kanvaro',
-    loginUrl?: string
+    baseUrl?: string
   ): string {
     const fullName = `${firstName} ${lastName}`
-    const loginLink = loginUrl || '#'
+    const loginLink = baseUrl ? `${baseUrl}/login` : '#'
     
     return `
 <!DOCTYPE html>
