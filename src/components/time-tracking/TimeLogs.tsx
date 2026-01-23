@@ -2636,6 +2636,31 @@ export function TimeLogs({
                         </div>
                       </div>
                     )}
+                    {/* Mobile Edit and Delete Actions */}
+                    <div className="flex gap-2 pt-2 border-t border-border">
+                      {canUpdateTime && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 h-8 text-xs"
+                          onClick={() => handleEdit(entry)}
+                        >
+                          <Edit className="h-3 w-3 mr-1" />
+                          Edit
+                        </Button>
+                      )}
+                      {canDeleteTime && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="flex-1 h-8 text-xs"
+                          onClick={() => handleDeleteClick(entry)}
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Delete
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Desktop Table View */}
