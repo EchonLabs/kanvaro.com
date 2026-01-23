@@ -235,7 +235,16 @@ export class EmailService {
   }
 
   generatePasswordResetConfirmationEmail(organizationName: string = 'Kanvaro', baseUrl?: string): string {
-    const loginLink = baseUrl ? `${baseUrl}/login` : '#'
+    
+    // Fix baseUrl by replacing dashes with dots in domain-like patterns
+    const fixBaseUrl = (url: string) => {
+      if (!url) return url
+      // Replace patterns like "qa-kanvaro-com-web" with "qa.kanvaro.com"
+      return url.replace(/:\/\/([^\/]+)-([^\/]+)-([^\/]+)-[^\/]+\//, '://$1.$2.$3/')
+    }
+    
+    const fixedBaseUrl = baseUrl ? fixBaseUrl(baseUrl) : null
+    const loginLink = fixedBaseUrl ? `${fixedBaseUrl}/login` : '#'
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -544,7 +553,16 @@ export class EmailService {
     baseUrl?: string
   ): string {
     const fullName = `${firstName} ${lastName}`
-    const loginLink = baseUrl ? `${baseUrl}/login` : '#'
+    
+    // Fix baseUrl by replacing dashes with dots in domain-like patterns
+    const fixBaseUrl = (url: string) => {
+      if (!url) return url
+      // Replace patterns like "qa-kanvaro-com-web" with "qa.kanvaro.com"
+      return url.replace(/:\/\/([^\/]+)-([^\/]+)-([^\/]+)-[^\/]+\//, '://$1.$2.$3/')
+    }
+    
+    const fixedBaseUrl = baseUrl ? fixBaseUrl(baseUrl) : null
+    const loginLink = fixedBaseUrl ? `${fixedBaseUrl}/login` : '#'
     
     return `
 <!DOCTYPE html>
