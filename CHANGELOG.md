@@ -1,3 +1,38 @@
+# [1.28.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.27.0...v1.28.0) (2026-01-23)
+
+
+### Features
+
+* add routing fix ([556deaf](https://github.com/EchonLabs/kanvaro.com/commit/556deaf9cdf263f4bb1cac60f2ea3da0240bd75e))
+
+# [1.27.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.26.0...v1.27.0) (2026-01-23)
+
+
+### Features
+
+* ad routing fixes ([facce97](https://github.com/EchonLabs/kanvaro.com/commit/facce971ab3c886e4bc956591c049ee5b70b103f))
+
+# [1.26.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.7...v1.26.0) (2026-01-23)
+
+
+### Features
+
+* add chanegs ([37312ca](https://github.com/EchonLabs/kanvaro.com/commit/37312ca881947a81f0b8a5f55b6f4fe336a05715))
+
+## [1.25.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.6...v1.25.7) (2026-01-23)
+
+
+### Bug Fixes
+
+* bug fixing ([ce509ea](https://github.com/EchonLabs/kanvaro.com/commit/ce509eae6142fd16158d415e7d49b23d28e38624))
+
+## [1.25.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.5...v1.25.6) (2026-01-23)
+
+
+### Bug Fixes
+
+* add chanegs ([d2619f7](https://github.com/EchonLabs/kanvaro.com/commit/d2619f7d3e4d365880f032297d90999a1a04d76b))
+
 ## [1.25.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.4...v1.25.5) (2026-01-23)
 
 
