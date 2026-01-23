@@ -201,6 +201,7 @@ export enum Permission {
   TEST_EXECUTION_UPDATE = 'test_execution:update',
   TEST_REPORT_VIEW = 'test_report:view',
   TEST_REPORT_EXPORT = 'test_report:export',
+  TEST_MANAGE = 'test:manage',
 
   // Documentation permissions
   DOCUMENTATION_VIEW = 'documentation:view',
@@ -313,6 +314,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_LOG_REPORT_ACCESS,
     
     // Settings
+    Permission.SETTINGS_VIEW,
     Permission.SETTINGS_UPDATE,
     Permission.SETTINGS_MANAGE_EMAIL,
     Permission.SETTINGS_MANAGE_DATABASE,
@@ -384,13 +386,13 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEST_EXECUTION_UPDATE,
     Permission.TEST_REPORT_VIEW,
     Permission.TEST_REPORT_EXPORT,
+    Permission.TEST_MANAGE,
 
     // Documentation
     Permission.DOCUMENTATION_VIEW,
     Permission.DOCUMENTATION_SEARCH,
     Permission.DOCUMENTATION_CREATE,
     Permission.DOCUMENTATION_UPDATE,
-      Permission.SETTINGS_VIEW,
     Permission.DOCUMENTATION_DELETE,
     Permission.DOCUMENTATION_UPDATE,
     Permission.DOCUMENTATION_DELETE,
@@ -440,7 +442,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Team
     Permission.TEAM_READ,
     Permission.TEAM_INVITE,
-    Permission.TEAM_EDIT,
     Permission.TEAM_DELETE,
     Permission.TEAM_REMOVE,
     Permission.TEAM_MANAGE_PERMISSIONS,
@@ -476,13 +477,13 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_EXPORT,
     Permission.REPORTING_SHARE,
     Permission.TIME_LOG_REPORT_ACCESS,
-    
-    // Settings
+  
+     // Settings
+    Permission.SETTINGS_VIEW,
     Permission.SETTINGS_UPDATE,
     Permission.SETTINGS_MANAGE_EMAIL,
     Permission.SETTINGS_MANAGE_DATABASE,
     Permission.SETTINGS_MANAGE_SECURITY,
-    
     // Epics
     Permission.EPIC_CREATE,
     Permission.EPIC_VIEW,
@@ -604,7 +605,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Team
     Permission.TEAM_READ,
     Permission.TEAM_INVITE,
-    Permission.TEAM_EDIT,
     Permission.TEAM_DELETE,
     Permission.TEAM_REMOVE,
     Permission.TEAM_MANAGE_PERMISSIONS,
@@ -631,6 +631,10 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.FINANCIAL_CREATE_INVOICE,
     Permission.FINANCIAL_SEND_INVOICE,
     Permission.FINANCIAL_MANAGE_PAYMENTS,
+
+    //testing
+    Permission.TEST_MANAGE,
+
     
     // Reporting
     Permission.REPORTING_VIEW,

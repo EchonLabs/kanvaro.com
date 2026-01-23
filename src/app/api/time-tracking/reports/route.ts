@@ -451,7 +451,7 @@ async function getDetailedEntriesReport(query: any, format: string) {
       path: 'project',
       select: 'name budget memberRates'
     })
-    .populate('task', 'title')
+    .populate('task', 'title displayId')
     .populate('approvedBy', 'firstName lastName email')
     .sort({ startTime: -1 })
     .lean()
@@ -463,9 +463,10 @@ async function getDetailedEntriesReport(query: any, format: string) {
     const projectName = entry.project?.name || 'Unknown Project'
     const projectCurrency = entry.project?.budget?.currency || currency // Use project currency, fallback to org currency
     const taskTitle = entry.task?.title || ''
+    const displayId = entry.task?.displayId || ''
     const date = entry.startTime ? new Date(entry.startTime).toISOString().split('T')[0] : ''
-    const startTime = entry.startTime ? new Date(entry.startTime).toISOString() : ''
-    const endTime = entry.endTime ? new Date(entry.endTime).toISOString() : ''
+    const startTime = entry.startTime || null
+    const endTime = entry.endTime || null
     const duration = entry.duration || 0
     
     // Calculate effective hourly rate
@@ -513,6 +514,7 @@ async function getDetailedEntriesReport(query: any, format: string) {
       projectCurrency, // Add project currency
       taskId: entry.task?._id || entry.task,
       taskTitle,
+      displayId,
       date,
       startTime,
       endTime,
@@ -530,7 +532,7 @@ async function getDetailedEntriesReport(query: any, format: string) {
   })
 
   if (format === 'csv') {
-    // Format: Id (sequential), Task, Employee, Start Time, End Time, Total Hours, Earnings, Status
+    // Format: Id (sequential), Task ID, Task, Employee, Start Time, End Time, Total Hours, Earnings, Status
     const rows = formattedEntries.map((e: any, index: number) => {
       // Format duration as "X hrs Y m" or "X hrs" or "Y m"
       const hours = Math.floor(e.duration / 60)
@@ -546,16 +548,27 @@ async function getDetailedEntriesReport(query: any, format: string) {
         durationStr = '0 m'
       }
 
-      // Format start and end times as date-time strings (MM-DD-YYYY HH:MM format)
-      const formatDateTime = (dateStr: string) => {
-        if (!dateStr) return ''
-        const date = new Date(dateStr)
-        const month = String(date.getMonth() + 1).padStart(2, '0')
-        const day = String(date.getDate()).padStart(2, '0')
-        const year = date.getFullYear()
-        const hours = String(date.getHours()).padStart(2, '0')
-        const minutes = String(date.getMinutes()).padStart(2, '0')
-        return `${month}-${day}-${year} ${hours}:${minutes}`
+      // Format start and end times as date-time strings (MM/DD/YYYY HH:MM AM/PM format)
+      const formatDateTime = (dateValue: any) => {
+        if (!dateValue) return ''
+        try {
+          const date = new Date(dateValue)
+          if (isNaN(date.getTime())) return '' // Return empty if invalid
+
+          const month = String(date.getMonth() + 1).padStart(2, '0')
+          const day = String(date.getDate()).padStart(2, '0')
+          const year = date.getFullYear()
+          let hours = date.getHours()
+          const minutes = String(date.getMinutes()).padStart(2, '0')
+          const ampm = hours >= 12 ? 'PM' : 'AM'
+          hours = hours % 12
+          hours = hours ? hours : 12 // the hour '0' should be '12'
+          const hoursStr = String(hours).padStart(2, '0')
+          return `${month}/${day}/${year} ${hoursStr}:${minutes} ${ampm}`
+        } catch (error) {
+          console.error('Error formatting date:', dateValue, error)
+          return ''
+        }
       }
       
       const startTimeStr = formatDateTime(e.startTime)
@@ -563,6 +576,7 @@ async function getDetailedEntriesReport(query: any, format: string) {
 
       return [
         (index + 1).toString(), // Id (sequential: 1, 2, 3...)
+        e.displayId || e.taskId || '', // Task ID (use displayId if available)
         e.taskTitle || '', // Task
         e.userName, // Employee
         startTimeStr, // Start Time
@@ -574,7 +588,7 @@ async function getDetailedEntriesReport(query: any, format: string) {
     })
 
     const csv = buildCsv(
-      ['Id', 'Task', 'Employee', 'Start Time', 'End Time', 'Total Hours', 'Earnings', 'Status'],
+      ['Id', 'Task ID', 'Task', 'Employee', 'Start Time', 'End Time', 'Total Hours', 'Earnings', 'Status'],
       rows
     )
     

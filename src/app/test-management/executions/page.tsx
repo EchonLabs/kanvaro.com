@@ -15,6 +15,8 @@ import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmD
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Play, Calendar, User, Clock, CheckCircle, XCircle, AlertCircle, SkipForward, Edit, Eye, Trash2, MoreVertical } from 'lucide-react'
+import { Permission } from '@/lib/permissions'
+import { PermissionGate } from '@/lib/permissions/permission-components'
 
 interface TestExecution {
   _id?: string
@@ -176,19 +178,20 @@ export default function TestExecutionsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Test Executions</h1>
-            <p className="text-muted-foreground">
-              Track and manage test execution results
-            </p>
+      <PermissionGate permission={Permission.TEST_MANAGE}>
+        <div className="space-y-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold">Test Executions</h1>
+              <p className="text-muted-foreground">
+                Track and manage test execution results
+              </p>
+            </div>
+            <Button onClick={handleExecuteTest} className="w-full sm:w-auto">
+              <Play className="mr-2 h-4 w-4" />
+              Execute Test
+            </Button>
           </div>
-          <Button onClick={handleExecuteTest} className="w-full sm:w-auto">
-            <Play className="mr-2 h-4 w-4" />
-            Execute Test
-          </Button>
-        </div>
 
         <div className="grid gap-6">
           <Card>
@@ -334,6 +337,7 @@ export default function TestExecutionsPage() {
           itemType="Test Execution"
         />
       </div>
+      </PermissionGate>
     </MainLayout>
   )
 }

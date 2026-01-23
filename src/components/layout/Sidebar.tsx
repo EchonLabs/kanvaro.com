@@ -211,7 +211,7 @@ const navigationItems = [
     label: 'Test Management',
     icon: TestTube,
     path: '/test-management',
-    permission: Permission.TEST_SUITE_READ,
+    permission: Permission.TEST_MANAGE,
     children: [
       {
         id: 'test-dashboard',

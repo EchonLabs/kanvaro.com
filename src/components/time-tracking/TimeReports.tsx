@@ -85,6 +85,7 @@ interface ReportData {
     projectCurrency: string
     taskId: string
     taskTitle: string
+    displayId: string
     date: string
     startTime: string
     endTime: string
@@ -450,14 +451,14 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     try {
       if (reportData?.detailedEntries && reportData.detailedEntries.length > 0) {
         const headers = [
+          'Id',
           'No.',
-          'Member ID',
           'Task',
           'Employee',
           'Start Time',
           'End Time',
           'Total Hours',
-          'Cost',
+          'Earnings',
           'Status'
         ]
 
@@ -475,13 +476,29 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
           // Note: If you have a rejected status in your data, add logic here
           // For example: if (entry.status === 'rejected') status = 'Rejected'
 
+          // Custom time formatter for date and time AM/PM format
+          const formatTimeAMPM = (timeString: string) => {
+            if (!timeString) return '-'
+            const date = new Date(timeString)
+            if (isNaN(date.getTime())) return '-'
+            
+            const month = String(date.getMonth() + 1).padStart(2, '0')
+            const day = String(date.getDate()).padStart(2, '0')
+            const year = date.getFullYear()
+            const hours = date.getHours()
+            const minutes = String(date.getMinutes()).padStart(2, '0')
+            const ampm = hours >= 12 ? 'PM' : 'AM'
+            const displayHours = hours % 12 || 12
+            return `${month}/${day}/${year} ${displayHours.toString().padStart(2, '0')}:${minutes} ${ampm}`
+          }
+
           return [
+            sanitize(entry.displayId || entry.taskId || ''), // Task ID (use displayId if available, fallback to taskId)
             sanitize(index + 1), // Numbering
-            sanitize(entry.memberId || ''), // Member ID
             sanitize(entry.taskTitle || '-'), // Task
             sanitize(entry.userName), // Employee
-            sanitize(entry.startTime ? formatTime(entry.startTime) : '-'), // Start Time
-            sanitize(entry.endTime ? formatTime(entry.endTime) : '-'), // End Time
+            sanitize(entry.startTime ? formatTimeAMPM(entry.startTime) : '-'), // Start Time (AM/PM format)
+            sanitize(entry.endTime ? formatTimeAMPM(entry.endTime) : '-'), // End Time (AM/PM format)
             sanitize(formatDurationUtil(entry.duration)), // Total Hours
             sanitize(formatCurrency(entry.cost, orgCurrency)), // Cost
             sanitize(status) // Status
