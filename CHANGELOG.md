@@ -1,3 +1,10 @@
+## [1.28.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.28.0...v1.28.1) (2026-01-23)
+
+
+### Bug Fixes
+
+* add chnges ([ebbe7c7](https://github.com/EchonLabs/kanvaro.com/commit/ebbe7c71dfcdcaf42dcebf3e0f33a341a19e7dc6))
+
 # [1.28.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.27.0...v1.28.0) (2026-01-23)
 
 
