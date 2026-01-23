@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
         user.email,
         roleDisplayName,
         organizationName,
-        loginUrl
+        baseUrl
       )
 
       emailService.sendEmail({
