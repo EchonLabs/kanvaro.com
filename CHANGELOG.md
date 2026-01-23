@@ -1,3 +1,10 @@
+## [1.25.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.4...v1.25.5) (2026-01-23)
+
+
+### Bug Fixes
+
+* add fixes in permissins ans time report ([d13a075](https://github.com/EchonLabs/kanvaro.com/commit/d13a07569ba00665bf19cb1ea5a22ae412a9dead))
+
 ## [1.25.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.3...v1.25.4) (2026-01-22)
 
 
