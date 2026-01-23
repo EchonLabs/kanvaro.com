@@ -11,6 +11,8 @@ import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmD
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Plus, Calendar, Users, CheckSquare, Edit, Trash2 } from 'lucide-react'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { Permission } from '@/lib/permissions'
+import { PermissionGate } from '@/lib/permissions/permission-components'
 
 interface TestPlan {
   _id?: string
@@ -198,19 +200,20 @@ export default function TestPlansPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Test Plans</h1>
-            <p className="text-muted-foreground">
-              Create and manage test plans for your projects
-            </p>
+      <PermissionGate permission={Permission.TEST_MANAGE}>
+        <div className="space-y-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold">Test Plans</h1>
+              <p className="text-muted-foreground">
+                Create and manage test plans for your projects
+              </p>
+            </div>
+            <Button onClick={handleCreateTestPlan} className="w-full sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              Create Test Plan
+            </Button>
           </div>
-          <Button onClick={handleCreateTestPlan} className="w-full sm:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
-            Create Test Plan
-          </Button>
-        </div>
 
         <div className="grid gap-8">
           {testPlans.map((plan) => (
@@ -318,6 +321,7 @@ export default function TestPlansPage() {
           loading={deleting}
         />
       </div>
+      </PermissionGate>
     </MainLayout>
   )
 }

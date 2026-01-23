@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
+import { Permission } from '@/lib/permissions'
+import { PermissionGate } from '@/lib/permissions/permission-components'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { TestPlanForm } from '@/components/test-management/TestPlanForm'
@@ -355,23 +357,24 @@ export default function TestManagementPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Test Management</h1>
-            <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage test suites, cases, and executions</p>
+      <PermissionGate permission={Permission.TEST_MANAGE}>
+        <div className="space-y-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Test Management</h1>
+              <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage test suites, cases, and executions</p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+              <Button variant="outline" onClick={() => router.push('/test-management/reports')} className="w-full sm:w-auto">
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Reports
+              </Button>
+              <Button onClick={handleCreateTestPlan} className="w-full sm:w-auto">
+                <TestTube className="h-4 w-4 mr-2" />
+                New Test Plan
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-            <Button variant="outline" onClick={() => router.push('/test-management/reports')} className="w-full sm:w-auto">
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Reports
-            </Button>
-            <Button onClick={handleCreateTestPlan} className="w-full sm:w-auto">
-              <TestTube className="h-4 w-4 mr-2" />
-              New Test Plan
-            </Button>
-          </div>
-        </div>
 
         {projects.length === 0 ? (
           <Card>
@@ -901,6 +904,7 @@ export default function TestManagementPage() {
           loading={deleting}
         />
       </div>
+      </PermissionGate>
     </MainLayout>
   )
 }

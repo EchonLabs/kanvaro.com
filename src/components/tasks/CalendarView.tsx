@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
 import { useNotify } from '@/lib/notify'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
 import {
   ChevronLeft,
   ChevronRight,
@@ -92,6 +94,7 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
 
   // Use the notification hook
   const { error: notifyError } = useNotify()
+  const { hasPermission } = usePermissions()
 
   useEffect(() => {
     fetchData()
@@ -357,10 +360,12 @@ export default function CalendarView({ projectId, onCreateTask }: CalendarViewPr
               <CalendarIcon className="h-4 w-4 mr-2" />
               Refresh
             </Button>
-            <Button onClick={onCreateTask} className="w-full sm:w-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Task
-            </Button>
+            {hasPermission(Permission.TASK_CREATE) && (
+              <Button onClick={onCreateTask} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Task
+              </Button>
+            )}
           </div>
         </div>
 

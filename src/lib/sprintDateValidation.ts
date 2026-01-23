@@ -10,6 +10,7 @@ interface ValidateSprintDatesParams {
   projectStart?: string | Date | null
   projectEnd?: string | Date | null
   requireBoth?: boolean
+  allowPastDates?: boolean
 }
 
 const normalizeDate = (value?: string | Date | null) => {
@@ -25,7 +26,8 @@ export const validateSprintDates = ({
   endDate,
   projectStart,
   projectEnd,
-  requireBoth = false
+  requireBoth = false,
+  allowPastDates = false
 }: ValidateSprintDatesParams): SprintDateValidationResult => {
   let startError = ''
   let endError = ''
@@ -56,7 +58,7 @@ export const validateSprintDates = ({
   }
 
   // Start date checks
-  if (today && start < today) {
+  if (!allowPastDates && today && start < today) {
     startError = 'Start date cannot be in the past.'
   } else if (start < projectStartDate) {
     startError = `Start date must be on or after the project start (${projectStartDate.toLocaleDateString()}).`
@@ -65,7 +67,7 @@ export const validateSprintDates = ({
   }
 
   // End date checks
-  if (today && end < today) {
+  if (!allowPastDates && today && end < today) {
     endError = 'End date cannot be in the past.'
   } else if (end < projectStartDate) {
     endError = `End date must be on or after the project start (${projectStartDate.toLocaleDateString()}).`
