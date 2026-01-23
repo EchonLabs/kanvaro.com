@@ -9,6 +9,8 @@ import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmD
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Button } from '@/components/ui/Button'
 import { Plus } from 'lucide-react'
+import { Permission } from '@/lib/permissions'
+import { PermissionGate } from '@/lib/permissions/permission-components'
 
 interface TestSuite {
   _id?: string
@@ -117,19 +119,20 @@ export default function TestSuitesPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Test Suites</h1>
-            <p className="text-muted-foreground">
-              Organize your test cases into hierarchical test suites
-            </p>
+      <PermissionGate permission={Permission.TEST_MANAGE}>
+        <div className="space-y-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold">Test Suites</h1>
+              <p className="text-muted-foreground">
+                Organize your test cases into hierarchical test suites
+              </p>
+            </div>
+            <Button onClick={handleCreateTestSuite} className="w-full sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              Create Test Suite
+            </Button>
           </div>
-          <Button onClick={handleCreateTestSuite} className="w-full sm:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
-            Create Test Suite
-          </Button>
-        </div>
 
         <div className="rounded-lg border bg-card p-4 sm:p-6">
           <TestSuiteTree 
@@ -171,6 +174,7 @@ export default function TestSuitesPage() {
           loading={deleting}
         />
       </div>
+      </PermissionGate>
     </MainLayout>
   )
 }

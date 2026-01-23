@@ -234,7 +234,8 @@ export default function EditSprintPage() {
       endDate,
       projectStart: project?.startDate,
       projectEnd: project?.endDate,
-      requireBoth
+      requireBoth,
+      allowPastDates: true // Allow past dates when editing existing sprints
     })
     setStartDateError(result.startError)
     setEndDateError(result.endError)

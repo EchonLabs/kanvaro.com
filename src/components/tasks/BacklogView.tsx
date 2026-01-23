@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/Input'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
 import {
   Search,
   Filter,
@@ -81,6 +83,7 @@ interface Story {
 export default function BacklogView({ projectId, onCreateTask }: BacklogViewProps) {
   const router = useRouter()
   const { formatDate } = useDateTime()
+  const { hasPermission } = usePermissions()
   const [tasks, setTasks] = useState<Task[]>([])
   const [stories, setStories] = useState<Story[]>([])
   const [loading, setLoading] = useState(true)
@@ -640,10 +643,12 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
         <div className="text-center py-8">
           <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">No backlog items found</p>
-          <Button onClick={onCreateTask} className="mt-4">
-            <Plus className="h-4 w-4 mr-2" />
-            Create First Task
-          </Button>
+          {hasPermission(Permission.TASK_CREATE) && (
+            <Button onClick={onCreateTask} className="mt-4">
+              <Plus className="h-4 w-4 mr-2" />
+              Create First Task
+            </Button>
+          )}
         </div>
       )}
     </div>

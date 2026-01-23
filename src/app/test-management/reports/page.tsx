@@ -9,6 +9,8 @@ import { Progress } from '@/components/ui/Progress'
 import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { Permission } from '@/lib/permissions'
+import { PermissionGate } from '@/lib/permissions/permission-components'
 import { 
   BarChart, 
   Download, 
@@ -215,19 +217,20 @@ export default function TestReportsPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Test Reports</h1>
-            <p className="text-muted-foreground">
-              Comprehensive test execution reports and analytics
-            </p>
+      <PermissionGate permission={Permission.TEST_MANAGE}>
+        <div className="space-y-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Test Reports</h1>
+              <p className="text-muted-foreground">
+                Comprehensive test execution reports and analytics
+              </p>
+            </div>
+            <Button onClick={handleExport}>
+              <Download className="mr-2 h-4 w-4" />
+              Export Report
+            </Button>
           </div>
-          <Button onClick={handleExport}>
-            <Download className="mr-2 h-4 w-4" />
-            Export Report
-          </Button>
-        </div>
 
         {/* Summary Cards */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -384,6 +387,7 @@ export default function TestReportsPage() {
           </CardContent>
         </Card>
       </div>
+      </PermissionGate>
     </MainLayout>
   )
 }

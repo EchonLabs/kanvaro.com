@@ -10,6 +10,8 @@ import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Button } from '@/components/ui/Button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, AlertCircle } from 'lucide-react'
+import { Permission } from '@/lib/permissions'
+import { PermissionGate } from '@/lib/permissions/permission-components'
 
 interface TestCase {
   _id: string
@@ -200,19 +202,20 @@ export default function TestCasesPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Test Cases</h1>
-            <p className="text-muted-foreground">
-              Manage and organize your test cases across all projects
-            </p>
+      <PermissionGate permission={Permission.TEST_MANAGE}>
+        <div className="space-y-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold">Test Cases</h1>
+              <p className="text-muted-foreground">
+                Manage and organize your test cases across all projects
+              </p>
+            </div>
+            <Button onClick={handleCreateTestCase} className="w-full sm:w-auto" disabled={!selectedProject}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Test Case
+            </Button>
           </div>
-          <Button onClick={handleCreateTestCase} className="w-full sm:w-auto" disabled={!selectedProject}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Test Case
-          </Button>
-        </div>
 
         {/* Project Selection */}
         <div className="flex items-center gap-4">
@@ -282,6 +285,7 @@ export default function TestCasesPage() {
           loading={deleting}
         />
       </div>
+      </PermissionGate>
     </MainLayout>
   )
 }

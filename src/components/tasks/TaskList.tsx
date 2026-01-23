@@ -10,6 +10,8 @@ import { formatToTitleCase } from '@/lib/utils'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useNotify } from '@/lib/notify'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
 import { 
   Search, 
   Filter, 
@@ -75,6 +77,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   const router = useRouter()
   const { formatDate } = useDateTime()
   const { success: notifySuccess, error: notifyError } = useNotify()
+  const { hasPermission } = usePermissions()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -589,10 +592,12 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         <div className="text-center py-8">
           <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">No tasks found</p>
-          <Button onClick={handleCreateTaskClick} className="mt-4">
-            <Plus className="h-4 w-4 mr-2" />
-            Create First Task
-          </Button>
+          {hasPermission(Permission.TASK_CREATE) && (
+            <Button onClick={handleCreateTaskClick} className="mt-4">
+              <Plus className="h-4 w-4 mr-2" />
+              Create First Task
+            </Button>
+          )}
         </div>
       )}
 

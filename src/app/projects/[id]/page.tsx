@@ -194,6 +194,7 @@ export default function ProjectDetailPage() {
   const { hasPermission } = usePermissions()
   const canUpdateProject = hasPermission(Permission.PROJECT_UPDATE)
   const canCreateTask = hasPermission(Permission.TASK_CREATE)
+  const canManageTests = hasPermission(Permission.TEST_MANAGE)
 
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
@@ -310,6 +311,15 @@ export default function ProjectDetailPage() {
       window.removeEventListener('organization-settings-updated', handleOrganizationSettingsUpdated)
     }
   }, [projectId])
+
+  // Redirect from testing tab if user doesn't have permission
+  useEffect(() => {
+    if (activeTab === 'testing' && !canManageTests) {
+      const newSearchParams = new URLSearchParams(searchParams.toString())
+      newSearchParams.set('tab', 'overview')
+      router.replace(`/projects/${projectId}?${newSearchParams.toString()}`)
+    }
+  }, [activeTab, canManageTests, projectId, router, searchParams])
 
   const fetchExpenses = async () => {
     if (!projectId || !project?.settings?.allowExpenseTracking) return
@@ -733,13 +743,12 @@ export default function ProjectDetailPage() {
           </Card>
         </div>
 
-        {/* Main Content */}
         <Tabs value={activeTab} onValueChange={(value) => {
           const newSearchParams = new URLSearchParams(searchParams.toString())
           newSearchParams.set('tab', value)
           router.push(`/projects/${projectId}?${newSearchParams.toString()}`)
         }} className="space-y-8">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-11 gap-1 overflow-x-auto mt-2">
+          <TabsList className={`grid w-full gap-1 overflow-x-auto mt-2 ${canManageTests ? 'grid-cols-2 sm:grid-cols-4 lg:grid-cols-11' : 'grid-cols-2 sm:grid-cols-4 lg:grid-cols-10'}`}>
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
             <TabsTrigger value="team" className="text-xs sm:text-sm">Team</TabsTrigger>
             <TabsTrigger value="attachments" className="text-xs sm:text-sm">Attachments</TabsTrigger>
@@ -748,7 +757,7 @@ export default function ProjectDetailPage() {
             <TabsTrigger value="kanban" className="text-xs sm:text-sm">Kanban</TabsTrigger>
             <TabsTrigger value="calendar" className="text-xs sm:text-sm">Calendar</TabsTrigger>
             <TabsTrigger value="backlog" className="text-xs sm:text-sm">Backlog</TabsTrigger>
-            <TabsTrigger value="testing" className="text-xs sm:text-sm">Testing</TabsTrigger>
+            {canManageTests && <TabsTrigger value="testing" className="text-xs sm:text-sm">Testing</TabsTrigger>}
             <TabsTrigger value="reports" className="text-xs sm:text-sm">Reports</TabsTrigger>
             <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
           </TabsList>
@@ -1573,43 +1582,47 @@ export default function ProjectDetailPage() {
             />
           </TabsContent>
 
-          <TabsContent value="testing" className="space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-1">
-                <TestSuiteTree
-                  key={`${projectId}-${suitesRefreshCounter}`}
-                  projectId={projectId}
-                  onSuiteSelect={(suite) => console.log('Selected suite:', suite)}
-                  onSuiteCreate={(parentSuiteId) => {
-                    setEditingSuite(null)
-                    setParentSuiteIdForCreate(parentSuiteId)
-                    setSuiteDialogOpen(true)
-                  }}
-                  onSuiteEdit={(suite) => {
-                    setEditingSuite(suite)
-                    setParentSuiteIdForCreate(undefined)
-                    setSuiteDialogOpen(true)
-                  }}
-                  onSuiteDelete={(suiteId) => console.log('Delete suite:', suiteId)}
-                />
-              </div>
-              <div className="lg:col-span-2">
-                <TestCaseList
-                  projectId={projectId}
-                  key={`${projectId}-${testCasesRefreshCounter}`}
-                  onTestCaseSelect={(testCase) => console.log('Selected test case:', testCase)}
-                  onTestCaseCreate={(testSuiteId) => {
-                    setEditingTestCase(null)
-                    setCreateCaseSuiteId(testSuiteId)
-                    setTestCaseDialogOpen(true)
-                  }}
-                  onTestCaseEdit={(testCase) => console.log('Edit test case:', testCase)}
-                  onTestCaseDelete={(testCaseId) => console.log('Delete test case:', testCaseId)}
-                  onTestCaseExecute={(testCase) => console.log('Execute test case:', testCase)}
-                />
-              </div>
-            </div>
-          </TabsContent>
+          {canManageTests && (
+            <TabsContent value="testing" className="space-y-8">
+              <PermissionGate permission={Permission.TEST_MANAGE}>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <div className="lg:col-span-1">
+                    <TestSuiteTree
+                      key={`${projectId}-${suitesRefreshCounter}`}
+                      projectId={projectId}
+                      onSuiteSelect={(suite) => console.log('Selected suite:', suite)}
+                      onSuiteCreate={(parentSuiteId) => {
+                        setEditingSuite(null)
+                        setParentSuiteIdForCreate(parentSuiteId)
+                        setSuiteDialogOpen(true)
+                      }}
+                      onSuiteEdit={(suite) => {
+                        setEditingSuite(suite)
+                        setParentSuiteIdForCreate(undefined)
+                        setSuiteDialogOpen(true)
+                      }}
+                      onSuiteDelete={(suiteId) => console.log('Delete suite:', suiteId)}
+                    />
+                  </div>
+                  <div className="lg:col-span-2">
+                    <TestCaseList
+                      projectId={projectId}
+                      key={`${projectId}-${testCasesRefreshCounter}`}
+                      onTestCaseSelect={(testCase) => console.log('Selected test case:', testCase)}
+                      onTestCaseCreate={(testSuiteId) => {
+                        setEditingTestCase(null)
+                        setCreateCaseSuiteId(testSuiteId)
+                        setTestCaseDialogOpen(true)
+                      }}
+                      onTestCaseEdit={(testCase) => console.log('Edit test case:', testCase)}
+                      onTestCaseDelete={(testCaseId) => console.log('Delete test case:', testCaseId)}
+                      onTestCaseExecute={(testCase) => console.log('Execute test case:', testCase)}
+                    />
+                  </div>
+                </div>
+              </PermissionGate>
+            </TabsContent>
+          )}
 
           <TabsContent value="reports" className="space-y-8">
             <div className="space-y-8">
