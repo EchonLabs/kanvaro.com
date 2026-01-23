@@ -1,3 +1,10 @@
+# [1.26.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.7...v1.26.0) (2026-01-23)
+
+
+### Features
+
+* add chanegs ([37312ca](https://github.com/EchonLabs/kanvaro.com/commit/37312ca881947a81f0b8a5f55b6f4fe336a05715))
+
 ## [1.25.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.6...v1.25.7) (2026-01-23)
 
 
