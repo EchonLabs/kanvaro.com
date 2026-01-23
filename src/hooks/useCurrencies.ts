@@ -80,7 +80,6 @@ const allWorldCurrencies: Currency[] = [
   // Other Global Currencies
   { _id: 'rub', code: 'RUB', name: 'Russian Ruble', symbol: '₽', country: 'Russia', isActive: true, isMajor: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { _id: 'try', code: 'TRY', name: 'Turkish Lira', symbol: '₺', country: 'Turkey', isActive: true, isMajor: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { _id: 'zar', code: 'ZAR', name: 'South African Rand', symbol: 'R', country: 'South Africa', isActive: true, isMajor: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { _id: 'btc', code: 'BTC', name: 'Bitcoin', symbol: '₿', country: 'Cryptocurrency', isActive: true, isMajor: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { _id: 'eth', code: 'ETH', name: 'Ethereum', symbol: 'Ξ', country: 'Cryptocurrency', isActive: true, isMajor: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
 ]
