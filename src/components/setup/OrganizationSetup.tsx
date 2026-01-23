@@ -155,8 +155,8 @@ export const OrganizationSetup = ({ onNext, onBack, initialData }: OrganizationS
         </div>
       </div>
 
-      <div className="bg-card border rounded-lg p-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="bg-card border rounded-lg p-8">
+        <form onSubmit={handleSubmit} className="space-y-8">
           <div className="space-y-2">
             <Label htmlFor="name">Organization Name *</Label>
             <Input
@@ -191,7 +191,7 @@ export const OrganizationSetup = ({ onNext, onBack, initialData }: OrganizationS
           </div>
 
           <div className="space-y-6">
-            <div className="space-y-2">
+            <div className="space-y-2 mb-4">
               <Label>Organization Logo</Label>
               <p className="text-sm text-muted-foreground">
                 Configure your organization logo for the best display across all themes
@@ -199,7 +199,7 @@ export const OrganizationSetup = ({ onNext, onBack, initialData }: OrganizationS
             </div>
 
             {/* Logo Mode Selection */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div
                 className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
                   logoMode === 'light'
@@ -243,7 +243,7 @@ export const OrganizationSetup = ({ onNext, onBack, initialData }: OrganizationS
             </div>
 
             {logoMode === 'light' ? (
-              <div className="bg-card border rounded-lg p-6">
+              <div className="bg-card border rounded-lg p-8">
                 <div className="flex items-center space-x-4">
                   {logoPreview ? (
                     <div className="relative">
@@ -295,7 +295,7 @@ export const OrganizationSetup = ({ onNext, onBack, initialData }: OrganizationS
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 {/* Light Mode Logo */}
-                <div className="bg-card border rounded-lg p-6">
+                <div className="bg-card border rounded-lg p-8">
                   <div className="flex items-center space-x-3 mb-4">
                     <div className="w-4 h-4 bg-white border border-gray-300 rounded"></div>
                     <Label className="text-sm font-medium text-foreground">Light Mode Logo</Label>
@@ -346,7 +346,7 @@ export const OrganizationSetup = ({ onNext, onBack, initialData }: OrganizationS
                 </div>
 
                 {/* Dark Mode Logo */}
-                <div className="bg-card border rounded-lg p-6">
+                <div className="bg-card border rounded-lg p-8">
                   <div className="flex items-center space-x-3 mb-4">
                     <div className="w-4 h-4 bg-gray-800 border border-gray-600 rounded"></div>
                     <Label className="text-sm font-medium text-foreground">Dark Mode Logo</Label>
@@ -424,8 +424,8 @@ export const OrganizationSetup = ({ onNext, onBack, initialData }: OrganizationS
                   {currenciesLoading ? (
                     <SelectItem value="loading" disabled>Loading currencies...</SelectItem>
                   ) : (
-                    currencies.map((currency, index) => (
-                      <SelectItem key={`${currency.code}-${index}`} value={currency.code}>
+                    currencies.map((currency) => (
+                      <SelectItem key={currency._id} value={currency.code}>
                         {formatCurrencyDisplay(currency)}
                       </SelectItem>
                     ))
@@ -471,7 +471,7 @@ export const OrganizationSetup = ({ onNext, onBack, initialData }: OrganizationS
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {organizationSizes.map((size) => {
                 const getIcon = () => {
                   switch (size.value) {
@@ -529,7 +529,7 @@ export const OrganizationSetup = ({ onNext, onBack, initialData }: OrganizationS
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row justify-between gap-3">
+          <div className="flex flex-col sm:flex-row justify-between gap-3 mt-8">
             <Button
               type="button"
               variant="outline"

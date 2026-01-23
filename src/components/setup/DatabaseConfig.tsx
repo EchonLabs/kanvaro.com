@@ -305,7 +305,7 @@ export const DatabaseConfig = ({ onNext, initialData }: DatabaseConfigProps) => 
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 py-4">
                 <Switch
                   id="ssl"
                   checked={formData.ssl}
@@ -433,7 +433,7 @@ export const DatabaseConfig = ({ onNext, initialData }: DatabaseConfigProps) => 
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 py-4">
                 <Switch
                   id="ssl"
                   checked={formData.ssl}

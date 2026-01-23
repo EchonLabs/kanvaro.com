@@ -132,14 +132,14 @@ export const EmailConfig = ({ onNext, onBack, initialData }: EmailConfigProps) =
         </div>
       </div>
 
-      <div className="bg-card border rounded-lg p-6">
+      <div className="bg-card border rounded-lg p-8">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Email Provider Selection */}
           <div className="space-y-4">
             <Label>Email Provider</Label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 my-4">
               <div
-                className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
                   provider === 'smtp'
                     ? 'border-primary bg-primary/5'
                     : 'border-muted hover:border-muted-foreground/50'
@@ -156,7 +156,7 @@ export const EmailConfig = ({ onNext, onBack, initialData }: EmailConfigProps) =
               </div>
 
               <div
-                className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
                   provider === 'azure'
                     ? 'border-primary bg-primary/5'
                     : 'border-muted hover:border-muted-foreground/50'
@@ -173,7 +173,7 @@ export const EmailConfig = ({ onNext, onBack, initialData }: EmailConfigProps) =
               </div>
 
               <div
-                className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
                   provider === 'skip'
                     ? 'border-primary bg-primary/5'
                     : 'border-muted hover:border-muted-foreground/50'
@@ -192,8 +192,8 @@ export const EmailConfig = ({ onNext, onBack, initialData }: EmailConfigProps) =
           </div>
 
         {provider === 'smtp' && (
-          <div className="space-y-4">
-            <Alert>
+          <div className="space-y-4 my-4">
+            <Alert className="my-4">
               <Mail className="h-4 w-4" />
               <AlertTitle>SMTP Configuration</AlertTitle>
               <AlertDescription>
@@ -304,8 +304,8 @@ export const EmailConfig = ({ onNext, onBack, initialData }: EmailConfigProps) =
         )}
 
         {provider === 'azure' && (
-          <div className="space-y-4">
-            <Alert>
+          <div className="space-y-4 my-4">
+            <Alert className="my-4">
               <Mail className="h-4 w-4" />
               <AlertTitle>Azure App Configuration</AlertTitle>
               <AlertDescription>
@@ -394,7 +394,7 @@ export const EmailConfig = ({ onNext, onBack, initialData }: EmailConfigProps) =
         )}
 
         {provider !== 'skip' && (
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between my-8">
             <Button
               type="button"
               variant="outline"
@@ -413,7 +413,7 @@ export const EmailConfig = ({ onNext, onBack, initialData }: EmailConfigProps) =
         )}
 
         {provider === 'skip' && (
-          <Alert>
+          <Alert className="my-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               <p className="font-medium">Email notifications disabled</p>
@@ -422,7 +422,7 @@ export const EmailConfig = ({ onNext, onBack, initialData }: EmailConfigProps) =
           </Alert>
         )}
 
-        <div className="flex flex-col sm:flex-row justify-between gap-3">
+        <div className="flex flex-col sm:flex-row justify-between gap-3 my-12">
           <Button
             type="button"
             variant="outline"
