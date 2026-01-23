@@ -1,3 +1,10 @@
+# [1.27.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.26.0...v1.27.0) (2026-01-23)
+
+
+### Features
+
+* ad routing fixes ([facce97](https://github.com/EchonLabs/kanvaro.com/commit/facce971ab3c886e4bc956591c049ee5b70b103f))
+
 # [1.26.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.25.7...v1.26.0) (2026-01-23)
 
 
