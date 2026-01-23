@@ -234,28 +234,7 @@ export class EmailService {
     `
   }
 
-  generatePasswordResetConfirmationEmail(organizationName: string = 'Kanvaro', baseUrl?: string): string {
-    
-    // Fix baseUrl by replacing dashes with dots in domain-like patterns
-    const fixBaseUrl = (url: string) => {
-      if (!url) return 'http://localhost:3000'
-      console.log('Original baseUrl:', url)
-      
-      // Check if URL contains "kanvaro"
-      if (url.includes('kanvaro')) {
-        // Replace patterns like "qa-kanvaro-com-web" with "qa.kanvaro.com"
-        const fixed = url.replace(/:\/\/([^\/]+)-([^\/]+)-([^\/]+)-[^\/]+\//, '://$1.$2.$3/')
-        console.log('Fixed baseUrl (kanvaro pattern):', fixed)
-        return fixed
-      } else {
-        // If no "kanvaro" in URL, use localhost:3000
-        return 'http://localhost:3000'
-      }
-    }
-    
-    const fixedBaseUrl = baseUrl ? fixBaseUrl(baseUrl) : null
-    const loginLink = fixedBaseUrl ? `${fixedBaseUrl}/login` : '#'
-    console.log('Final loginLink:', loginLink)
+  generatePasswordResetConfirmationEmail(organizationName: string = 'Kanvaro'): string {
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -327,7 +306,7 @@ export class EmailService {
         <p>You can now sign in with your new password.</p>
 
         <div style="text-align: center;">
-            <a href="${loginLink}" class="button">Sign In to Your Account</a>
+            <a href="#" class="button">Sign In to Your Account</a>
         </div>
 
         <div class="footer">
@@ -561,31 +540,10 @@ export class EmailService {
     email: string,
     roleDisplayName: string,
     organizationName: string = 'Kanvaro',
-    baseUrl?: string
+    loginUrl?: string
   ): string {
     const fullName = `${firstName} ${lastName}`
-    
-    // Fix baseUrl by replacing dashes with dots in domain-like patterns
-    const fixBaseUrl = (url: string) => {
-      if (!url) return 'http://localhost:3000'
-      console.log('Welcome Email - Original baseUrl:', url)
-      
-      // Check if URL contains "kanvaro"
-      if (url.includes('kanvaro')) {
-        // Replace patterns like "qa-kanvaro-com-web" with "qa.kanvaro.com"
-        const fixed = url.replace(/:\/\/([^\/]+)-([^\/]+)-([^\/]+)-[^\/]+\//, '://$1.$2.$3/')
-        console.log('Welcome Email - Fixed baseUrl (kanvaro pattern):', fixed)
-        return fixed
-      } else {
-        // If no "kanvaro" in URL, use localhost:3000
-        console.log('Welcome Email - No kanvaro found, using localhost:3000')
-        return 'http://localhost:3000'
-      }
-    }
-    
-    const fixedBaseUrl = baseUrl ? fixBaseUrl(baseUrl) : null
-    const loginLink = fixedBaseUrl ? `${fixedBaseUrl}/login` : '#'
-    console.log('Welcome Email - Final loginLink:', loginLink)
+    const loginLink = loginUrl || '#'
     
     return `
 <!DOCTYPE html>

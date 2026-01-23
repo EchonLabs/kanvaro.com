@@ -78,25 +78,10 @@ export async function POST(request: Request) {
     await user.save()
 
     // Send confirmation email
-    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-    
-    // Try to get base URL from request headers for production
-    if (request instanceof Request) {
-      const url = new URL(request.url)
-      const protocol = url.protocol
-      let host = url.host
-      
-      // Clean up host (remove default ports)
-      host = host.replace(/^(.+):80$/, '$1')
-      host = host.replace(/^(.+):443$/, '$1')
-      
-      baseUrl = `${protocol}//${host}`
-    }
-
     const emailSent = await emailService.sendEmail({
       to: user.email,
       subject: 'Password Reset Successful',
-      html: emailService.generatePasswordResetConfirmationEmail('Kanvaro', baseUrl)
+      html: emailService.generatePasswordResetConfirmationEmail('Kanvaro')
     })
 
     if (!emailSent) {

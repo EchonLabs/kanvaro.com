@@ -268,22 +268,6 @@ export async function POST(request: NextRequest) {
           baseUrl = `${protocol}://${host}`
         }
         
-        // Apply fix for dash-separated domains
-        const fixBaseUrl = (url: string) => {
-          if (!url) return 'http://localhost:3000'
-          // Check if URL contains "kanvaro"
-          if (url.includes('kanvaro')) {
-            // Replace patterns like "qa-kanvaro-com-web" with "qa.kanvaro.com"
-            return url.replace(/:\/\/([^\/]+)-([^\/]+)-([^\/]+)-[^\/]+\//, '://$1.$2.$3/')
-          } else {
-            // If no "kanvaro" in URL, use localhost:3000
-            return 'http://localhost:3000'
-          }
-        }
-        
-        baseUrl = fixBaseUrl(baseUrl)
-        console.log('Final baseUrl after fix:', baseUrl)
-        
         const invitationLink = `${baseUrl}/accept-invitation?token=${token}`
         console.log('invitationLink', invitationLink);
        
