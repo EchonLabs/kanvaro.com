@@ -1,3 +1,10 @@
+# [1.28.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.27.0...v1.28.0) (2026-01-23)
+
+
+### Features
+
+* add routing fix ([556deaf](https://github.com/EchonLabs/kanvaro.com/commit/556deaf9cdf263f4bb1cac60f2ea3da0240bd75e))
+
 # [1.27.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.26.0...v1.27.0) (2026-01-23)
 
 
