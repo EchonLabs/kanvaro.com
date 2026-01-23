@@ -388,7 +388,7 @@ export async function GET(request: NextRequest) {
             metadata: {
               status: task.status,
               priority: task.priority,
-              assignee: getUserName((task as any).assignedTo),
+              assignee: (task as any).assignedTo?.map((a: any) => getUserName(a.user)).filter(Boolean).join(', ') || undefined,
               project: getProjectName((task as any).project),
               createdAt: task.createdAt.toISOString(),
               updatedAt: task.updatedAt.toISOString()
@@ -430,6 +430,7 @@ export async function GET(request: NextRequest) {
             metadata: {
               status: story.status,
               priority: story.priority,
+              assignee: getUserName(story.assignedTo),
               project: getProjectName(story.project),
               createdAt: story.createdAt.toISOString(),
               updatedAt: story.updatedAt.toISOString()
@@ -471,6 +472,7 @@ export async function GET(request: NextRequest) {
             metadata: {
               status: epic.status,
               priority: epic.priority,
+              assignee: getUserName(epic.assignedTo),
               project: getProjectName((epic as any).project),
               createdAt: epic.createdAt.toISOString(),
               updatedAt: epic.updatedAt.toISOString()

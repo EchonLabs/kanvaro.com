@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/Badge'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { 
   X, 
   Save, 
@@ -592,7 +593,8 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col m-4 sm:m-6">
+      <TooltipProvider>
+        <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col m-4 sm:m-6">
         <CardHeader className="flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
@@ -724,7 +726,9 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
                               
                               return filtered.map((story) => (
                                 <SelectItem key={story._id} value={story._id}>
-                                  {story.title}
+                                  <TruncateTooltip text={story.title}>
+                                    <div className="truncate max-w-full">{story.title}</div>
+                                  </TruncateTooltip>
                                 </SelectItem>
                               ))
                             })()}
@@ -794,7 +798,9 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
                               
                               return filtered.map((epic) => (
                                 <SelectItem key={epic._id} value={epic._id}>
-                                  {epic.title}
+                                  <TruncateTooltip text={epic.title}>
+                                    <div className="truncate max-w-full">{epic.title}</div>
+                                  </TruncateTooltip>
                                 </SelectItem>
                               ))
                             })()}
@@ -1125,6 +1131,30 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
           </div>
         </div>
       </Card>
+      </TooltipProvider>
     </div>
+  )
+}
+
+interface TruncateTooltipProps {
+  text?: string | number | null
+  children: React.ReactElement
+}
+
+function TruncateTooltip({ text, children }: TruncateTooltipProps) {
+  const displayText = text === undefined || text === null ? '' : String(text)
+  if (!displayText.trim()) {
+    return children
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {children}
+      </TooltipTrigger>
+      <TooltipContent side="top" align="start">
+        <p className="max-w-sm break-words">{displayText}</p>
+      </TooltipContent>
+    </Tooltip>
   )
 }

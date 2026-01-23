@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/Badge'
 import { Target, Plus } from 'lucide-react'
 import SortableTask from './SortableTask'
 import { ITask } from '@/models/Task'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 interface PopulatedTask extends Omit<ITask, 'assignedTo' | 'project'> {
   project?: {
@@ -55,6 +57,7 @@ export default function VirtualizedColumn({
   canDragTask
 }: VirtualizedColumnProps) {
   const parentRef = useRef<HTMLDivElement | null>(null)
+  const { hasPermission } = usePermissions()
   
   // Add droppable functionality for empty columns
   const { setNodeRef, isOver } = useDroppable({
@@ -86,15 +89,17 @@ export default function VirtualizedColumn({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => onCreateTask(column.key)}
-            className="flex items-center gap-1 h-8 px-3 text-xs"
-          >
-            <Plus className="h-3 w-3" />
-            <span className="hidden sm:inline">Add Task</span>
-          </Button>
+          {hasPermission(Permission.TASK_CREATE) && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => onCreateTask(column.key)}
+              className="flex items-center gap-1 h-8 px-3 text-xs"
+            >
+              <Plus className="h-3 w-3" />
+              <span className="hidden sm:inline">Add Task</span>
+            </Button>
+          )}
         </div>
       </div>
       
