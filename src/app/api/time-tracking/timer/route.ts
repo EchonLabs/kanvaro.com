@@ -225,7 +225,16 @@ async function stopTimerAndBuildResponse(
   const project = projectValue ? await Project.findById(projectValue).select('name settings') : null
   const projectName = project?.name || 'Unknown Project'
   const hoursFormatted = `${Math.floor(hoursLogged)}h ${Math.round((hoursLogged % 1) * 60)}m`
-  const projectUrl = '/time-tracking/logs'
+  
+  // Get base URL for absolute links
+  let baseUrl: string
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    baseUrl = process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
+  } else {
+    // Fallback to localhost for development
+    baseUrl = 'http://localhost:3000'
+  }
+  const projectUrl = `${baseUrl}/time-tracking/logs`
   
   // Check if the formatted duration is "0h 0m" (even if hasTimeLogged is true due to seconds)
   // We don't want to spam users with 0h 0m notifications
@@ -411,7 +420,7 @@ export async function GET(request: NextRequest) {
     const activeTimer = await ActiveTimer.findOne({
       user: userId,
       organization: organizationId
-    }).populate('project', 'name').populate('task', 'title').populate('user', 'firstName lastName')
+    }).populate('project', 'name settings').populate('task', 'title').populate('user', 'firstName lastName')
 
     if (!activeTimer) {
       return NextResponse.json({ activeTimer: null })

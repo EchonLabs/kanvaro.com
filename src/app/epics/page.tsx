@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -90,7 +90,7 @@ export default function EpicsPage() {
   const [epics, setEpics] = useState<Epic[]>([])
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [localSearch, setLocalSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -198,7 +198,7 @@ export default function EpicsPage() {
     } else {
       setCurrentPage(1)
     }
-  }, [searchQuery, statusFilter, priorityFilter])
+  }, [statusFilter, priorityFilter])
 
   const fetchEpics = async () => {
     try {
@@ -206,8 +206,6 @@ export default function EpicsPage() {
       const params = new URLSearchParams()
       params.set('page', currentPage.toString())
       params.set('limit', pageSize.toString())
-      const trimmedSearch = searchQuery.trim()
-      if (trimmedSearch) params.set('search', trimmedSearch)
       if (statusFilter !== 'all') params.set('status', statusFilter)
       if (priorityFilter !== 'all') params.set('priority', priorityFilter)
       
@@ -291,7 +289,23 @@ export default function EpicsPage() {
     }
   }
 
-  const displayedEpics = epics
+  const locallyFilteredEpics = useMemo(() => {
+    if (!localSearch.trim()) return epics
+    const q = localSearch.trim().toLowerCase()
+    return epics.filter(epic => {
+      // Match title, description, project name, tags, or assigned user details
+      if (epic.title?.toLowerCase().includes(q)) return true
+      if (epic.description?.toLowerCase().includes(q)) return true
+      if (epic.project?.name?.toLowerCase().includes(q)) return true
+      if (epic.tags?.some(tag => tag.toLowerCase().includes(q))) return true
+      if (epic.assignedTo?.firstName?.toLowerCase().includes(q)) return true
+      if (epic.assignedTo?.lastName?.toLowerCase().includes(q)) return true
+      if (epic.assignedTo?.email?.toLowerCase().includes(q)) return true
+      return false
+    })
+  }, [localSearch, epics])
+
+  const displayedEpics = locallyFilteredEpics
   const totalEpicsCount = totalCount ?? displayedEpics.length
   const totalPages = Math.max(1, Math.ceil((totalEpicsCount || 0) / pageSize) || 1)
   const pageStartIndex = totalEpicsCount === 0 ? 0 : ((currentPage - 1) * pageSize) + 1
@@ -373,7 +387,7 @@ export default function EpicsPage() {
                 <div>
                   <CardTitle>All Epics</CardTitle>
                   <CardDescription>
-                    {totalEpicsCount} epic{totalEpicsCount !== 1 ? 's' : ''} found
+                    {localSearch ? `${displayedEpics.length} of ${totalCount}` : totalEpicsCount} epic{(localSearch ? displayedEpics.length : totalEpicsCount) !== 1 ? 's' : ''} found
                   </CardDescription>
                 </div>
               </div>
@@ -382,8 +396,8 @@ export default function EpicsPage() {
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   <Input
                     placeholder="Search epics..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    value={localSearch}
+                    onChange={(e) => setLocalSearch(e.target.value)}
                     className="pl-10 w-full"
                   />
                 </div>
@@ -716,7 +730,7 @@ export default function EpicsPage() {
             </Tabs>
 
             {/* Pagination Controls */}
-            {totalEpicsCount > 0 && (
+            {displayedEpics.length > 0 && !localSearch && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>Items per page:</span>
@@ -735,7 +749,10 @@ export default function EpicsPage() {
                     </SelectContent>
                   </Select>
                   <span>
-                    Showing {pageStartIndex} to {pageEndIndex} of {totalEpicsCount}
+                    {localSearch
+                      ? `Showing ${displayedEpics.length} of ${totalCount} filtered results`
+                      : `Showing ${pageStartIndex} to ${pageEndIndex} of ${totalEpicsCount}`
+                    }
                   </span>
                 </div>
                 <div className="flex items-center gap-2">

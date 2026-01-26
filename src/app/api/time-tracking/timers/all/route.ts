@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     // Get all active timers for the organization
     const activeTimers = await ActiveTimer.find(query)
       .populate('user', 'firstName lastName email')
-      .populate('project', 'name')
+      .populate('project', 'name settings')
       .populate('task', 'title')
       .sort({ startTime: -1 })
       .lean()

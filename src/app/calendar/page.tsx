@@ -252,8 +252,8 @@ export default function CalendarPage() {
   const filteredEvents = events.filter(event => {
     const matchesSearch = !searchQuery || 
       event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.project.name.toLowerCase().includes(searchQuery.toLowerCase())
+      event.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      event.project?.name?.toLowerCase().includes(searchQuery.toLowerCase())
     
     const matchesType = typeFilter === 'all' || event.type === typeFilter
     const matchesStatus = statusFilter === 'all' || event.status === statusFilter

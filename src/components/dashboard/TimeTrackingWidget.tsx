@@ -440,7 +440,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
             className="flex-1 text-xs sm:text-sm"
           >
             <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-            Start Timer
+            Time Tracking Details
           </Button>
           <Button
             size="sm"
