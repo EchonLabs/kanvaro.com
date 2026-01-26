@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { TimeTrackingSettings } from '@/models/TimeTrackingSettings'
 import { Organization } from '@/models/Organization'
+import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -74,6 +75,10 @@ export async function GET(request: NextRequest) {
         allowFutureTime: orgTimeTracking.allowFutureTime ?? false,
         allowPastTime: orgTimeTracking.allowPastTime ?? true,
         pastTimeLimitDays: orgTimeTracking.pastTimeLimitDays ?? 30,
+        disableTimeLogEditing: orgTimeTracking.disableTimeLogEditing ?? false,
+        timeLogEditMode: orgTimeTracking.timeLogEditMode,
+        timeLogEditDays: orgTimeTracking.timeLogEditDays ?? 30,
+        timeLogEditDayOfMonth: orgTimeTracking.timeLogEditDayOfMonth ?? 15,
         roundingRules: orgTimeTracking.roundingRules || {
           enabled: false,
           increment: 15,
@@ -108,6 +113,10 @@ export async function GET(request: NextRequest) {
         allowFutureTime: settings.allowFutureTime,
         allowPastTime: settings.allowPastTime,
         pastTimeLimitDays: settings.pastTimeLimitDays,
+        disableTimeLogEditing: settings.disableTimeLogEditing ?? false,
+        timeLogEditMode: settings.timeLogEditMode,
+        timeLogEditDays: settings.timeLogEditDays,
+        timeLogEditDayOfMonth: settings.timeLogEditDayOfMonth,
         roundingRules: settings.roundingRules,
         notifications: settings.notifications
       }
@@ -174,6 +183,10 @@ console.log('userfsdfsdf',user.organization)
     if (settings.allowFutureTime !== undefined) updateFields.allowFutureTime = settings.allowFutureTime
     if (settings.allowPastTime !== undefined) updateFields.allowPastTime = settings.allowPastTime
     if (settings.pastTimeLimitDays !== undefined) updateFields.pastTimeLimitDays = settings.pastTimeLimitDays
+    if (settings.disableTimeLogEditing !== undefined) updateFields.disableTimeLogEditing = settings.disableTimeLogEditing
+    if (settings.timeLogEditMode !== undefined) updateFields.timeLogEditMode = settings.timeLogEditMode
+    if (settings.timeLogEditDays !== undefined) updateFields.timeLogEditDays = settings.timeLogEditDays
+    if (settings.timeLogEditDayOfMonth !== undefined) updateFields.timeLogEditDayOfMonth = settings.timeLogEditDayOfMonth
     if (settings.roundingRules !== undefined) updateFields.roundingRules = settings.roundingRules
     if (settings.notifications !== undefined) updateFields.notifications = settings.notifications
 
@@ -220,6 +233,10 @@ console.log('userfsdfsdf',user.organization)
         if (settings.allowFutureTime !== undefined) organization.settings.timeTracking.allowFutureTime = settings.allowFutureTime
         if (settings.allowPastTime !== undefined) organization.settings.timeTracking.allowPastTime = settings.allowPastTime
         if (settings.pastTimeLimitDays !== undefined) organization.settings.timeTracking.pastTimeLimitDays = settings.pastTimeLimitDays
+        if (settings.disableTimeLogEditing !== undefined) organization.settings.timeTracking.disableTimeLogEditing = settings.disableTimeLogEditing
+        if (settings.timeLogEditMode !== undefined) organization.settings.timeTracking.timeLogEditMode = settings.timeLogEditMode
+        if (settings.timeLogEditDays !== undefined) organization.settings.timeTracking.timeLogEditDays = settings.timeLogEditDays
+        if (settings.timeLogEditDayOfMonth !== undefined) organization.settings.timeTracking.timeLogEditDayOfMonth = settings.timeLogEditDayOfMonth
         if (settings.roundingRules !== undefined) organization.settings.timeTracking.roundingRules = settings.roundingRules
         if (settings.notifications !== undefined) organization.settings.timeTracking.notifications = settings.notifications
 
@@ -234,12 +251,25 @@ console.log('userfsdfsdf',user.organization)
       // Don't fail the request if org sync fails - the main TimeTrackingSettings was saved
     }
 
-    console.log('TimeTrackingSettings updated successfully:', {
-      allowFutureTime: timeTrackingSettings.allowFutureTime,
-      requireDescription: timeTrackingSettings.requireDescription,
-      requireApproval: timeTrackingSettings.requireApproval,
-      allowOvertime: timeTrackingSettings.allowOvertime
-    })
+    // Cascade requireApproval setting to all projects in the organization (only when turning off approval)
+    if (settings.requireApproval === false) {
+      try {
+        await Project.updateMany(
+          {
+            organization: organizationId,
+            is_deleted: { $ne: true }
+          },
+          {
+            $set: {
+              'settings.requireApproval': settings.requireApproval
+            }
+          }
+        )
+      } catch (projectError) {
+        console.error('Error cascading requireApproval to projects:', projectError)
+      }
+    }
+
 
     return NextResponse.json({
       success: true,

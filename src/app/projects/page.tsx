@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -95,6 +95,8 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [localSearch, setLocalSearch] = useState('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -104,6 +106,7 @@ export default function ProjectsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Seed filters from URL search params on mount
   useEffect(() => {
@@ -111,6 +114,8 @@ export default function ProjectsPage() {
     const s = searchParams.get('status') || 'all'
     const p = searchParams.get('priority') || 'all'
     setSearchQuery(q)
+    setLocalSearch(q)
+    setDebouncedSearchQuery(q) // Also set debounced query for immediate search
     setStatusFilter(s)
     setPriorityFilter(p)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -158,7 +163,16 @@ export default function ProjectsPage() {
     if (!loading && !authError) {
       fetchProjects()
     }
-  }, [searchQuery, statusFilter, priorityFilter, currentPage, pageSize])
+  }, [debouncedSearchQuery, statusFilter, priorityFilter, currentPage, pageSize])
+
+  // Debounce search query to avoid excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+    }, 300) // 300ms delay
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   // Refresh projects when page regains focus (user returns from another page)
   useEffect(() => {
@@ -188,7 +202,7 @@ export default function ProjectsPage() {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      if (searchQuery) params.set('search', searchQuery)
+      if (debouncedSearchQuery) params.set('search', debouncedSearchQuery)
       if (statusFilter !== 'all') params.set('status', statusFilter)
       if (priorityFilter !== 'all') params.set('priority', priorityFilter)
       params.set('page', currentPage.toString())
@@ -282,7 +296,19 @@ export default function ProjectsPage() {
     }
   }
 
-  const filteredProjects = projects
+  const filteredProjects = projects.filter(project =>
+    !localSearch ||
+    project.name.toLowerCase().includes(localSearch.toLowerCase()) ||
+    project.description?.toLowerCase().includes(localSearch.toLowerCase()) ||
+    project.teamMembers.some(member =>
+      member.firstName?.toLowerCase().includes(localSearch.toLowerCase()) ||
+      member.lastName?.toLowerCase().includes(localSearch.toLowerCase()) ||
+      member.email?.toLowerCase().includes(localSearch.toLowerCase())
+    ) ||
+    project.client?.firstName?.toLowerCase().includes(localSearch.toLowerCase()) ||
+    project.client?.lastName?.toLowerCase().includes(localSearch.toLowerCase()) ||
+    project.client?.email?.toLowerCase().includes(localSearch.toLowerCase())
+  )
 
   if (loading) {
     return (
@@ -339,7 +365,7 @@ export default function ProjectsPage() {
               <div>
                 <CardTitle className="text-lg sm:text-xl">All Projects</CardTitle>
                 <CardDescription className="text-xs sm:text-sm">
-                  {totalCount} project{totalCount !== 1 ? 's' : ''} found
+                  {localSearch ? `${filteredProjects.length} of ${totalCount}` : totalCount} project{(localSearch ? filteredProjects.length : totalCount) !== 1 ? 's' : ''} found
                 </CardDescription>
               </div>
             </div>
@@ -347,9 +373,16 @@ export default function ProjectsPage() {
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <Input
+                  ref={searchInputRef}
                   placeholder="Search projects..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={localSearch}
+                  onChange={(e) => setLocalSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setSearchQuery(localSearch)
+                    }
+                  }}
+                  onBlur={() => setSearchQuery(localSearch)}
                   className="pl-10 w-full text-sm sm:text-base"
                 />
               </div>
@@ -697,7 +730,7 @@ export default function ProjectsPage() {
           </Tabs>
 
           {/* Pagination Controls */}
-          {filteredProjects.length > 0 && (
+          {filteredProjects.length > 0 && !localSearch && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>Items per page:</span>
@@ -716,7 +749,10 @@ export default function ProjectsPage() {
                   </SelectContent>
                 </Select>
                 <span>
-                  Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}
+                  {localSearch
+                    ? `Showing ${filteredProjects.length} of ${totalCount} filtered results`
+                    : `Showing ${((currentPage - 1) * pageSize) + 1} to ${Math.min(currentPage * pageSize, totalCount)} of ${totalCount}`
+                  }
                 </span>
               </div>
               <div className="flex items-center gap-2">

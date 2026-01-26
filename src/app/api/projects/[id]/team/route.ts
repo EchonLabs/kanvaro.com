@@ -6,6 +6,7 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { normalizeUploadUrl } from '@/lib/file-utils'
+import { notificationService, NotificationService } from '@/lib/notification-service'
 
 // GET /api/projects/[id]/team - Get project team members
 export async function GET(
@@ -360,6 +361,14 @@ export async function POST(
     }
 
     await project.save()
+
+    // Send notification to the added member
+    await notificationService.notifyProjectTeamMemberAdded(
+      projectId,
+      [memberId],
+      organizationId,
+      project.name
+    )
 
     // Populate and return updated team
     const updatedProject = await Project.findById(projectId)

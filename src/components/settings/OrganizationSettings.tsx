@@ -47,6 +47,10 @@ export function OrganizationSettings() {
           allowFutureTime: false,
           allowPastTime: true,
           pastTimeLimitDays: '30',
+          disableTimeLogEditing: false,
+          timeLogEditMode: undefined as 'days' | 'dayOfMonth' | undefined,
+          timeLogEditDays: '30',
+          timeLogEditDayOfMonth: '15',
           roundingRules: {
             enabled: false,
             increment: '15',
@@ -217,6 +221,10 @@ export function OrganizationSettings() {
           allowFutureTime: false,
           allowPastTime: true,
           pastTimeLimitDays: '30',
+          disableTimeLogEditing: false,
+          timeLogEditMode: undefined,
+          timeLogEditDays: '30',
+          timeLogEditDayOfMonth: '15',
           roundingRules: {
             enabled: false,
             increment: '15',
@@ -262,6 +270,10 @@ export function OrganizationSettings() {
                   allowFutureTime: data.settings.allowFutureTime ?? prev.timeTracking.allowFutureTime,
                   allowPastTime: data.settings.allowPastTime ?? prev.timeTracking.allowPastTime,
                   pastTimeLimitDays: data.settings.pastTimeLimitDays ?? prev.timeTracking.pastTimeLimitDays,
+                  disableTimeLogEditing: data.settings.disableTimeLogEditing ?? prev.timeTracking.disableTimeLogEditing ?? false,
+                  timeLogEditMode: data.settings.timeLogEditMode as 'days' | 'dayOfMonth' | undefined ?? prev.timeTracking.timeLogEditMode,
+                  timeLogEditDays: data.settings.timeLogEditDays ?? prev.timeTracking.timeLogEditDays,
+                  timeLogEditDayOfMonth: data.settings.timeLogEditDayOfMonth ?? prev.timeTracking.timeLogEditDayOfMonth,
                   roundingRules: data.settings.roundingRules ?? prev.timeTracking.roundingRules,
                   notifications: data.settings.notifications ?? prev.timeTracking.notifications
                 }
@@ -415,11 +427,15 @@ export function OrganizationSettings() {
         body: JSON.stringify({
           settings: {
             ...formData.timeTracking,
+            disableTimeLogEditing: formData.timeTracking.disableTimeLogEditing ?? false,
             defaultHourlyRate: parseFloat(formData.timeTracking.defaultHourlyRate) || 0,
             maxDailyHours: parseInt(formData.timeTracking.maxDailyHours) || 12,
             maxWeeklyHours: parseInt(formData.timeTracking.maxWeeklyHours) || 60,
             maxSessionHours: parseInt(formData.timeTracking.maxSessionHours) || 8,
             pastTimeLimitDays: parseInt(formData.timeTracking.pastTimeLimitDays?.toString()) || 30,
+            timeLogEditMode: formData.timeTracking.timeLogEditMode,
+            timeLogEditDays: formData.timeTracking.timeLogEditDays ? parseInt(formData.timeTracking.timeLogEditDays.toString()) : 30,
+            timeLogEditDayOfMonth: formData.timeTracking.timeLogEditDayOfMonth ? parseInt(formData.timeTracking.timeLogEditDayOfMonth.toString()) : 15,
             roundingRules: {
               ...formData.timeTracking.roundingRules,
               increment: parseInt(formData.timeTracking.roundingRules?.increment?.toString()) || 15
@@ -1279,81 +1295,193 @@ export function OrganizationSettings() {
                 </div>
               )}
 
-          <div className="space-y-5">
-                <h4 className="text-sm sm:text-base font-medium">Rounding Rules</h4>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-                  <div className="space-y-0.5 flex-1 min-w-0">
-                    <Label className="text-xs sm:text-sm">Enable Rounding</Label>
-                    <p className="text-xs sm:text-sm text-muted-foreground break-words">
-                      Round time entries to specified increments
-                    </p>
-                  </div>
-                  <Switch
-                    checked={formData.timeTracking.roundingRules.enabled}
-                    onCheckedChange={(checked) => setFormData({ 
-                      ...formData, 
-                      timeTracking: { 
-                        ...formData.timeTracking, 
-                        roundingRules: { ...formData.timeTracking.roundingRules, enabled: checked }
-                      }
-                    })}
-                    className="flex-shrink-0"
-                  />
+              <div className="space-y-3 sm:space-y-4">
+                <div className="border-t border-border pt-4 sm:pt-6">
+                  <h4 className="text-base sm:text-lg font-semibold text-foreground mb-3 sm:mb-4">Time Log Editing Rules</h4>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-6">
+                    Control when and how time entries can be edited after creation
+                  </p>
                 </div>
-
-                {formData.timeTracking.roundingRules.enabled && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6">
-                    <div>
-                      <Label htmlFor="roundingIncrement" className="text-xs sm:text-sm">Increment (minutes)</Label>
-                      <Input
-                        id="roundingIncrement"
-                        type="number"
-                        value={roundingIncrementInput}
-                        onChange={(e) => {
-                          const value = e.target.value
-                          const parsedValue = Number(value)
-                          setRoundingIncrementInput(value)
-                          setFormData({ 
-                            ...formData, 
-                            timeTracking: { 
-                              ...formData.timeTracking, 
-                              roundingRules: {
-                                ...formData.timeTracking.roundingRules,
-                                increment: value
-                              }
-                            }
-                          })
-                        }}
-                        min="1"
-                        max="60"
-                        className="text-xs sm:text-sm"
-                      />
+                <div className="space-y-3 sm:space-y-4 ml-0">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <Label className="text-xs sm:text-sm">Disable Time Log Editing</Label>
+                      <p className="text-xs sm:text-sm text-muted-foreground break-words">
+                        Prevent editing of time logs after specified timeframes
+                      </p>
                     </div>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-                      <div className="space-y-0.5 flex-1 min-w-0">
-                        <Label className="text-xs sm:text-sm">Round Up</Label>
-                        <p className="text-xs sm:text-sm text-muted-foreground break-words">
-                          Round up instead of down
-                        </p>
-                      </div>
-                      <Switch
-                        checked={formData.timeTracking.roundingRules.roundUp}
-                        onCheckedChange={(checked) => setFormData({ 
-                          ...formData, 
-                          timeTracking: { 
-                            ...formData.timeTracking, 
-                            roundingRules: { ...formData.timeTracking.roundingRules, roundUp: checked }
-                          }
-                        })}
-                        className="flex-shrink-0"
-                      />
-                    </div>
+                    <Switch
+                      checked={formData.timeTracking.disableTimeLogEditing ?? false}
+                      onCheckedChange={(checked) => setFormData({
+                        ...formData,
+                        timeTracking: {
+                          ...formData.timeTracking,
+                          disableTimeLogEditing: checked,
+                          timeLogEditMode: checked ? (formData.timeTracking.timeLogEditMode || 'days') : undefined
+                        }
+                      })}
+                      className="flex-shrink-0"
+                    />
                   </div>
-                )}
+
+                  {formData.timeTracking.disableTimeLogEditing && (
+                    <div className="ml-3 sm:ml-6 pl-3 sm:pl-4 border-l-2 border-muted space-y-4 sm:space-y-6 bg-muted/20 p-3 sm:p-4 rounded-lg">
+                      <div>
+                        <Label className="text-xs sm:text-sm font-medium">Editing Mode</Label>
+                        <Select
+                          value={formData.timeTracking.timeLogEditMode}
+                          onValueChange={(value: 'days' | 'dayOfMonth') => setFormData({
+                            ...formData,
+                            timeTracking: { ...formData.timeTracking, timeLogEditMode: value }
+                          })}
+                        >
+                          <SelectTrigger className="text-xs sm:text-sm mt-1">
+                            <SelectValue placeholder="Select editing mode" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="days" className="text-xs sm:text-sm">
+                              Days After Creation
+                            </SelectItem>
+                            <SelectItem value="dayOfMonth" className="text-xs sm:text-sm">
+                              Day of Month
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {formData.timeTracking.timeLogEditMode === 'days' && (
+                        <div>
+                          <Label htmlFor="timeLogEditDays" className="text-xs sm:text-sm font-medium">Days After Creation</Label>
+                          <Input
+                            id="timeLogEditDays"
+                            type="number"
+                            value={formData.timeTracking.timeLogEditDays}
+                            onChange={(e) => setFormData({
+                              ...formData,
+                              timeTracking: { ...formData.timeTracking, timeLogEditDays: e.target.value }
+                            })}
+                            min="1"
+                            max="365"
+                            className="text-xs sm:text-sm mt-1"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Time logs can be edited within this many days after creation
+                          </p>
+                        </div>
+                      )}
+
+                      {formData.timeTracking.timeLogEditMode === 'dayOfMonth' && (
+                        <div>
+                          <Label htmlFor="timeLogEditDayOfMonth" className="text-xs sm:text-sm font-medium">Day of Month</Label>
+                          <Input
+                            id="timeLogEditDayOfMonth"
+                            type="number"
+                            value={formData.timeTracking.timeLogEditDayOfMonth}
+                            onChange={(e) => setFormData({
+                              ...formData,
+                              timeTracking: { ...formData.timeTracking, timeLogEditDayOfMonth: e.target.value }
+                            })}
+                            min="1"
+                            max="31"
+                            className="text-xs sm:text-sm mt-1"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Time logs can be edited until this day of the month
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-3 sm:space-y-4">
-                <h4 className="text-sm sm:text-base font-medium">Time Tracking Notifications</h4>
+                <div className="border-t border-border pt-4 sm:pt-6">
+                  <h4 className="text-base sm:text-lg font-semibold text-foreground mb-3 sm:mb-4">Rounding Rules</h4>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-6">
+                    Automatically round time entries to specific time increments
+                  </p>
+                </div>
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <Label className="text-xs sm:text-sm">Enable Rounding</Label>
+                      <p className="text-xs sm:text-sm text-muted-foreground break-words">
+                        Round time entries to specified increments
+                      </p>
+                    </div>
+                    <Switch
+                      checked={formData.timeTracking.roundingRules.enabled}
+                      onCheckedChange={(checked) => setFormData({
+                        ...formData,
+                        timeTracking: {
+                          ...formData.timeTracking,
+                          roundingRules: { ...formData.timeTracking.roundingRules, enabled: checked }
+                        }
+                      })}
+                      className="flex-shrink-0"
+                    />
+                  </div>
+
+                  {formData.timeTracking.roundingRules.enabled && (
+                    <div className="ml-3 sm:ml-6 pl-3 sm:pl-4 border-l-2 border-muted space-y-4 sm:space-y-6 bg-muted/20 p-3 sm:p-4 rounded-lg">
+                      <div>
+                        <Label htmlFor="roundingIncrement" className="text-xs sm:text-sm font-medium">Increment (minutes)</Label>
+                        <Input
+                          id="roundingIncrement"
+                          type="number"
+                          value={roundingIncrementInput}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            const parsedValue = Number(value)
+                            setRoundingIncrementInput(value)
+                            setFormData({
+                              ...formData,
+                              timeTracking: {
+                                ...formData.timeTracking,
+                                roundingRules: {
+                                  ...formData.timeTracking.roundingRules,
+                                  increment: value
+                                }
+                              }
+                            })
+                          }}
+                          min="1"
+                          max="60"
+                          className="text-xs sm:text-sm mt-1"
+                        />
+                      </div>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                        <div className="space-y-0.5 flex-1 min-w-0">
+                          <Label className="text-xs sm:text-sm font-medium">Round Up</Label>
+                          <p className="text-xs sm:text-sm text-muted-foreground break-words">
+                            Round up instead of down
+                          </p>
+                        </div>
+                        <Switch
+                          checked={formData.timeTracking.roundingRules.roundUp}
+                          onCheckedChange={(checked) => setFormData({
+                            ...formData,
+                            timeTracking: {
+                              ...formData.timeTracking,
+                              roundingRules: { ...formData.timeTracking.roundingRules, roundUp: checked }
+                            }
+                          })}
+                          className="flex-shrink-0"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-3 sm:space-y-4">
+                <div className="border-t border-border pt-4 sm:pt-6">
+                  <h4 className="text-base sm:text-lg font-semibold text-foreground mb-3 sm:mb-4">Time Tracking Notifications</h4>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-6">
+                    Configure when team members receive notifications about time tracking activities
+                  </p>
+                </div>
                 <div className="space-y-3 sm:space-y-4">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
                     <div className="space-y-0.5 flex-1 min-w-0">
@@ -1364,10 +1492,10 @@ export function OrganizationSettings() {
                     </div>
                     <Switch
                       checked={formData.timeTracking.notifications.onTimerStart}
-                      onCheckedChange={(checked) => setFormData({ 
-                        ...formData, 
-                        timeTracking: { 
-                          ...formData.timeTracking, 
+                      onCheckedChange={(checked) => setFormData({
+                        ...formData,
+                        timeTracking: {
+                          ...formData.timeTracking,
                           notifications: { ...formData.timeTracking.notifications, onTimerStart: checked }
                         }
                       })}
@@ -1384,10 +1512,10 @@ export function OrganizationSettings() {
                     </div>
                     <Switch
                       checked={formData.timeTracking.notifications.onTimerStop}
-                      onCheckedChange={(checked) => setFormData({ 
-                        ...formData, 
-                        timeTracking: { 
-                          ...formData.timeTracking, 
+                      onCheckedChange={(checked) => setFormData({
+                        ...formData,
+                        timeTracking: {
+                          ...formData.timeTracking,
                           notifications: { ...formData.timeTracking.notifications, onTimerStop: checked }
                         }
                       })}
@@ -1404,10 +1532,10 @@ export function OrganizationSettings() {
                     </div>
                     <Switch
                       checked={formData.timeTracking.notifications.onOvertime}
-                      onCheckedChange={(checked) => setFormData({ 
-                        ...formData, 
-                        timeTracking: { 
-                          ...formData.timeTracking, 
+                      onCheckedChange={(checked) => setFormData({
+                        ...formData,
+                        timeTracking: {
+                          ...formData.timeTracking,
                           notifications: { ...formData.timeTracking.notifications, onOvertime: checked }
                         }
                       })}
@@ -1424,10 +1552,10 @@ export function OrganizationSettings() {
                     </div>
                     <Switch
                       checked={formData.timeTracking.notifications.onApprovalNeeded}
-                      onCheckedChange={(checked) => setFormData({ 
-                        ...formData, 
-                        timeTracking: { 
-                          ...formData.timeTracking, 
+                      onCheckedChange={(checked) => setFormData({
+                        ...formData,
+                        timeTracking: {
+                          ...formData.timeTracking,
                           notifications: { ...formData.timeTracking.notifications, onApprovalNeeded: checked }
                         }
                       })}
@@ -1444,10 +1572,10 @@ export function OrganizationSettings() {
                     </div>
                     <Switch
                       checked={formData.timeTracking.notifications.onTimeSubmitted}
-                      onCheckedChange={(checked) => setFormData({ 
-                        ...formData, 
-                        timeTracking: { 
-                          ...formData.timeTracking, 
+                      onCheckedChange={(checked) => setFormData({
+                        ...formData,
+                        timeTracking: {
+                          ...formData.timeTracking,
                           notifications: { ...formData.timeTracking.notifications, onTimeSubmitted: checked }
                         }
                       })}

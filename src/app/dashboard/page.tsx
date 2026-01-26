@@ -12,8 +12,9 @@ import { QuickActions } from '@/components/dashboard/QuickActions'
 import { TimeTrackingWidget } from '@/components/dashboard/TimeTrackingWidget'
 import { ActiveTimersWidget } from '@/components/dashboard/ActiveTimersWidget'
 import { NotificationsWidget } from '@/components/dashboard/NotificationsWidget'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { Loader2, RefreshCw, Play, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { Card, CardContent } from '@/components/ui/Card'
 import { PageContent } from '@/components/ui/PageContent'
 import { usePermissionContext } from '@/lib/permissions/permission-context'
 import { useOrganization } from '@/hooks/useOrganization'
@@ -301,6 +302,24 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex flex-col gap-6 sm:gap-8">
+              {/* Quick Actions */}
+              <div className="grid grid-cols-1 gap-6">
+                <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/time-tracking/timer')}>
+                  <CardContent className="p-6">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-lg">
+                        <Play className="h-6 w-6 text-green-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-foreground">Start Timer</h3>
+                        <p className="text-sm text-muted-foreground">Begin tracking time for a task</p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
               {user.id && user.organization  && (
                 <TimeTrackingWidget
                   userId={user.id}

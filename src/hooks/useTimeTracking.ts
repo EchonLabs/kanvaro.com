@@ -17,6 +17,9 @@ interface TimeTrackingSettings {
   allowFutureTime: boolean
   allowPastTime: boolean
   pastTimeLimitDays: number
+  timeLogEditMode?: 'days' | 'dayOfMonth'
+  timeLogEditDays?: number
+  timeLogEditDayOfMonth?: number
   roundingRules: {
     enabled: boolean
     increment: number

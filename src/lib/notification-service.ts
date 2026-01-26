@@ -32,6 +32,19 @@ export class NotificationService {
   }
 
   /**
+   * Get base URL for absolute links in notifications
+   */
+  private getBaseUrl(): string {
+    // First, check if NEXT_PUBLIC_APP_URL is explicitly set (recommended for all environments)
+    if (process.env.NEXT_PUBLIC_APP_URL) {
+      return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '') // Remove trailing slash
+    }
+
+    // Fallback to localhost for development
+    return 'http://localhost:3000'
+  }
+
+  /**
    * Create and send a notification to a single user
    */
   async createNotification(
@@ -302,6 +315,8 @@ export class NotificationService {
             color: white;
             font-size: 24px;
             font-weight: bold;
+            text-align: center;
+            line-height: 1;
         }
         .notification-content {
             background: #f8fafc;
@@ -313,12 +328,25 @@ export class NotificationService {
         .button {
             display: inline-block;
             background: ${color};
-            color: white;
+            color: #ffffff !important;
             padding: 12px 24px;
             text-decoration: none;
             border-radius: 6px;
             font-weight: 500;
             margin: 20px 0;
+            text-align: center;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+            font-size: 14px;
+            line-height: 1.2;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+        .button:hover {
+            background: ${this.adjustColor(color, -20)};
+            color: #ffffff !important;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         }
         .footer {
             margin-top: 30px;
@@ -333,7 +361,9 @@ export class NotificationService {
 <body>
     <div class="container">
         <div class="header">
-            <div class="logo">${notification.type.charAt(0).toUpperCase()}</div>
+            <div class="logo">
+                ${this.getTypeIcon(notification.type)}
+            </div>
             <h1>${notification.title}</h1>
         </div>
 
@@ -387,7 +417,7 @@ export class NotificationService {
         entityId: taskId,
         action,
         priority: action === 'overdue' ? 'high' : 'medium',
-        url: `/tasks/${taskId}`
+        url: `${this.getBaseUrl()}/tasks/${taskId}`
       },
       sendEmail: true,
       sendPush: true
@@ -420,7 +450,7 @@ export class NotificationService {
         entityId: projectId,
         action: action === 'deadline_approaching' ? 'reminder' : action,
         priority: action === 'deadline_approaching' ? 'high' : 'medium',
-        url: `/projects/${projectId}`
+        url: `${this.getBaseUrl()}/projects/${projectId}`
       },
       sendEmail: true,
       sendPush: true
@@ -458,6 +488,31 @@ export class NotificationService {
   }
 
   /**
+   * Notify user when added to a project team
+   */
+  async notifyProjectTeamMemberAdded(
+    projectId: string,
+    userIds: string[],
+    organizationId: string,
+    projectName: string
+  ): Promise<void> {
+    await this.createBulkNotifications(userIds, organizationId, {
+      type: 'project',
+      title: 'Added to Project',
+      message: `You have been added as a member to the project – ${projectName}.`,
+      data: {
+        entityType: 'project',
+        entityId: projectId,
+        action: 'assigned',
+        priority: 'medium',
+        url: `${this.getBaseUrl()}/projects/${projectId}`
+      },
+      sendEmail: true,
+      sendPush: true
+    })
+  }
+
+  /**
    * Create budget-related notifications
    */
   async notifyBudgetUpdate(
@@ -483,11 +538,52 @@ export class NotificationService {
         entityId: projectId,
         action: action === 'budget_exceeded' ? 'overdue' : action === 'budget_warning' ? 'reminder' : 'updated',
         priority: action === 'budget_exceeded' ? 'critical' : 'high',
-        url: `/projects/${projectId}`
+        url: `${this.getBaseUrl()}/projects/${projectId}`
       },
       sendEmail: true,
       sendPush: true
     })
+  }
+
+  /**
+   * Helper method to adjust color brightness for hover effects
+   */
+  private adjustColor(color: string, amount: number): string {
+    // Remove # if present
+    const usePound = color[0] === '#'
+    const col = usePound ? color.slice(1) : color
+
+    // Convert to RGB
+    const num = parseInt(col, 16)
+    let r = (num >> 16) + amount
+    let g = (num >> 8 & 0x00FF) + amount
+    let b = (num & 0x0000FF) + amount
+
+    // Ensure values stay within 0-255
+    r = r > 255 ? 255 : r < 0 ? 0 : r
+    g = g > 255 ? 255 : g < 0 ? 0 : g
+    b = b > 255 ? 255 : b < 0 ? 0 : b
+
+    // Convert back to hex
+    return (usePound ? '#' : '') + (r << 16 | g << 8 | b).toString(16)
+  }
+
+  /**
+   * Get appropriate icon for notification type
+   */
+  private getTypeIcon(type: string): string {
+    const icons = {
+      task: '✓',
+      project: '📁',
+      team: '👥',
+      system: '⚙️',
+      budget: '💰',
+      deadline: '⏰',
+      reminder: '🔔',
+      invitation: '📨',
+      time_tracking: '⏱️'
+    }
+    return icons[type as keyof typeof icons] || type.charAt(0).toUpperCase()
   }
 }
 
