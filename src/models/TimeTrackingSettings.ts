@@ -17,6 +17,10 @@ export interface ITimeTrackingSettings extends Document {
   allowFutureTime: boolean
   allowPastTime: boolean
   pastTimeLimitDays: number // How many days back can users log time
+  disableTimeLogEditing: boolean // Whether time log editing is enabled
+  timeLogEditMode?: 'days' | 'dayOfMonth' // Mode for time log editing restrictions
+  timeLogEditDays?: number // Days after creation within which logs can be edited
+  timeLogEditDayOfMonth?: number // Day of month up to which logs can be edited
   roundingRules: {
     enabled: boolean
     increment: number // in minutes (e.g., 15 for 15-minute increments)
@@ -108,6 +112,27 @@ const TimeTrackingSettingsSchema = new Schema<ITimeTrackingSettings>({
     default: 30,
     min: 1,
     max: 365
+  },
+  disableTimeLogEditing: {
+    type: Boolean,
+    default: false
+  },
+  timeLogEditMode: {
+    type: String,
+    enum: ['days', 'dayOfMonth'],
+    default: undefined
+  },
+  timeLogEditDays: {
+    type: Number,
+    default: 30,
+    min: 1,
+    max: 365
+  },
+  timeLogEditDayOfMonth: {
+    type: Number,
+    default: 15,
+    min: 1,
+    max: 31
   },
   roundingRules: {
     enabled: {
