@@ -48,6 +48,38 @@ export async function PUT(
       return NextResponse.json({ error: 'Cannot modify approved time entry' }, { status: 400 })
     }
 
+    // Check time-based editing restrictions
+    const settings = await TimeTrackingSettings.findOne({
+      organization: timeEntry.organization,
+      $or: [
+        { project: timeEntry.project },
+        { project: null }
+      ]
+    }).sort({ project: -1 }) // Prefer project-specific settings
+
+    if (settings?.timeLogEditMode) {
+      const now = new Date()
+      const entryDate = new Date(timeEntry.createdAt || timeEntry.startTime)
+
+      if (settings.timeLogEditMode === 'days') {
+        const daysDiff = Math.floor((now.getTime() - entryDate.getTime()) / (1000 * 60 * 60 * 24))
+        const maxDays = settings.timeLogEditDays || 30
+        if (daysDiff > maxDays) {
+          return NextResponse.json({ 
+            error: `Cannot modify time entry. Editing is only allowed within ${maxDays} days of creation.` 
+          }, { status: 400 })
+        }
+      } else if (settings.timeLogEditMode === 'dayOfMonth') {
+        const maxDayOfMonth = settings.timeLogEditDayOfMonth || 15
+        const entryDayOfMonth = entryDate.getDate()
+        if (entryDayOfMonth <= maxDayOfMonth) {
+          return NextResponse.json({ 
+            error: `Cannot modify time entry. Editing is only allowed for entries created after day ${maxDayOfMonth} of each month.` 
+          }, { status: 400 })
+        }
+      }
+    }
+
     // Update fields
     if (description) timeEntry.description = description
     if (startTime) timeEntry.startTime = new Date(startTime)
@@ -94,6 +126,38 @@ export async function DELETE(
     // Check if time entry is already approved
     if (timeEntry.isApproved) {
       return NextResponse.json({ error: 'Cannot delete approved time entry' }, { status: 400 })
+    }
+
+    // Check time-based editing restrictions
+    const settings = await TimeTrackingSettings.findOne({
+      organization: timeEntry.organization,
+      $or: [
+        { project: timeEntry.project },
+        { project: null }
+      ]
+    }).sort({ project: -1 }) // Prefer project-specific settings
+
+    if (settings?.timeLogEditMode) {
+      const now = new Date()
+      const entryDate = new Date(timeEntry.createdAt || timeEntry.startTime)
+
+      if (settings.timeLogEditMode === 'days') {
+        const daysDiff = Math.floor((now.getTime() - entryDate.getTime()) / (1000 * 60 * 60 * 24))
+        const maxDays = settings.timeLogEditDays || 30
+        if (daysDiff > maxDays) {
+          return NextResponse.json({ 
+            error: `Cannot delete time entry. Deletion is only allowed within ${maxDays} days of creation.` 
+          }, { status: 400 })
+        }
+      } else if (settings.timeLogEditMode === 'dayOfMonth') {
+        const maxDayOfMonth = settings.timeLogEditDayOfMonth || 15
+        const entryDayOfMonth = entryDate.getDate()
+        if (entryDayOfMonth <= maxDayOfMonth) {
+          return NextResponse.json({ 
+            error: `Cannot delete time entry. Deletion is only allowed for entries created after day ${maxDayOfMonth} of each month.` 
+          }, { status: 400 })
+        }
+      }
     }
 
     await TimeEntry.findByIdAndDelete(params.id)

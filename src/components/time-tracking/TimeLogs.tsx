@@ -282,6 +282,54 @@ export function TimeLogs({
     return hasPermission(Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ)
   }, [hasPermission])
 
+  // Function to check if a time entry can be edited/deleted based on time tracking settings
+  const canEditTimeEntry = useCallback((entry: TimeEntry): boolean => {
+    if (!timeTrackingSettings?.disableTimeLogEditing) {
+      console.log('Time log editing not disabled, allowing edit for entry:', entry._id)
+      return true
+    }
+
+    const entryDate = new Date(entry.startTime)
+    const now = new Date()
+
+    console.log('Checking edit permission for entry:', {
+      entryId: entry._id,
+      entryDate: entryDate.toISOString(),
+      entryDay: entryDate.getDate(),
+      entryMonth: entryDate.getMonth(),
+      entryYear: entryDate.getFullYear(),
+      now: now.toISOString(),
+      nowDay: now.getDate(),
+      nowMonth: now.getMonth(),
+      nowYear: now.getFullYear(),
+      mode: timeTrackingSettings.timeLogEditMode,
+      dayOfMonth: timeTrackingSettings.timeLogEditDayOfMonth,
+      days: timeTrackingSettings.timeLogEditDays
+    })
+
+    if (timeTrackingSettings.timeLogEditMode === 'days') {
+      const diffTime = now.getTime() - entryDate.getTime()
+      const diffDays = diffTime / (1000 * 3600 * 24)
+      const canEdit = diffDays <= timeTrackingSettings.timeLogEditDays
+      console.log('Days mode check:', { diffDays, maxDays: timeTrackingSettings.timeLogEditDays, canEdit })
+      return canEdit
+    } else if (timeTrackingSettings.timeLogEditMode === 'dayOfMonth') {
+      // Allow editing if entry is from a previous month/year
+      if (entryDate.getFullYear() < now.getFullYear() || 
+          (entryDate.getFullYear() === now.getFullYear() && entryDate.getMonth() < now.getMonth())) {
+        console.log('Entry from previous month, allowing edit')
+        return true
+      }
+      // For current month, allow editing if entry day is on or after the threshold
+      const canEdit = entryDate.getDate() >= timeTrackingSettings.timeLogEditDayOfMonth
+      console.log('Day of month mode check:', { entryDay: entryDate.getDate(), threshold: timeTrackingSettings.timeLogEditDayOfMonth, canEdit })
+      return canEdit
+    }
+
+    console.log('Unknown mode or no restriction, allowing edit')
+    return true
+  }, [timeTrackingSettings])
+
   // Fetch current user role
   useEffect(() => {
     const fetchUserRole = async () => {
@@ -418,6 +466,16 @@ export function TimeLogs({
         if (response.ok) {
           const data = await response.json()
           if (data.settings) {
+            console.log('Fetched time tracking settings:', data.settings)
+            if(data.settings.disableTimeLogEditing) {
+              if(data.settings.timeLogEditMode === 'dayOfMonth') {
+                const disble_from_month = data.settings.timeLogEditDayOfMonth
+                const disable_from_created_date = null
+              }else{
+                const disable_from_created_date = data.settings.timeLogEditDays
+               const disble_from_month = null
+              }
+            }
             setTimeTrackingSettings(data.settings)
           }
         }
@@ -2580,6 +2638,10 @@ export function TimeLogs({
                         <div className="text-muted-foreground">Approval</div>
                         <div className="mt-1">
                           {(() => {
+                            // For running timers, don't show approval status
+                            if (entry.__isActive) {
+                              return <span className="text-muted-foreground">-</span>
+                            }
 
                             // If project doesn't require approval, always show as Approved
                             const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
@@ -2638,7 +2700,7 @@ export function TimeLogs({
                     )}
                     {/* Mobile Edit and Delete Actions */}
                     <div className="flex gap-2 pt-2 border-t border-border">
-                      {canUpdateTime && (
+                      {canUpdateTime && canEditTimeEntry(entry) && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -2649,7 +2711,7 @@ export function TimeLogs({
                           Edit
                         </Button>
                       )}
-                      {canDeleteTime && (
+                      {canDeleteTime && canEditTimeEntry(entry) && (
                         <Button
                           size="sm"
                           variant="destructive"
@@ -2754,6 +2816,11 @@ export function TimeLogs({
                     </div>
                     <div>
                       {(() => {
+                        // For running timers, don't show approval status
+                        if (entry.__isActive) {
+                          return <span className="text-muted-foreground">-</span>
+                        }
+
                         // If project doesn't require approval, always show as Approved
                         const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
 
@@ -2793,6 +2860,7 @@ export function TimeLogs({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 p-0"
+                            disabled={!canEditTimeEntry(entry)}
                           >
                             <MoreHorizontal className="h-4 w-4" />
                             <span className="sr-only">Open menu</span>
@@ -2800,7 +2868,7 @@ export function TimeLogs({
                         </DropdownMenu.Trigger>
                         <DropdownMenu.Portal>
                           <DropdownMenu.Content className="min-w-[120px] bg-popover dark:bg-popover rounded-md p-1 shadow-lg border border-border dark:border-border z-50">
-                            {canUpdateTime && (
+                            {canUpdateTime && canEditTimeEntry(entry) && (
                               <DropdownMenu.Item
                                 className="flex items-center px-2 py-1.5 text-sm rounded hover:bg-accent dark:hover:bg-accent hover:text-accent-foreground dark:hover:text-accent-foreground cursor-pointer outline-none text-foreground dark:text-foreground"
                                 onSelect={() => handleEdit(entry)}
@@ -2809,7 +2877,7 @@ export function TimeLogs({
                                 <span>Edit</span>
                               </DropdownMenu.Item>
                             )}
-                            {canDeleteTime && (
+                            {canDeleteTime && canEditTimeEntry(entry) && (
                               <DropdownMenu.Item
                                 className="flex items-center px-2 py-1.5 text-sm rounded text-destructive dark:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 cursor-pointer outline-none"
                                 onSelect={() => handleDeleteClick(entry)}
