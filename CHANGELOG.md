@@ -1,3 +1,10 @@
+## [1.28.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.28.2...v1.28.3) (2026-01-28)
+
+
+### Bug Fixes
+
+* add chnges in time trcking ([da64bfd](https://github.com/EchonLabs/kanvaro.com/commit/da64bfd6a0acf7725c7c9db9d6c5477b93a35aa6))
+
 ## [1.28.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.28.1...v1.28.2) (2026-01-26)
 
 
