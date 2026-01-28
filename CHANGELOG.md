@@ -1,3 +1,10 @@
+## [1.28.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.28.3...v1.28.4) (2026-01-28)
+
+
+### Bug Fixes
+
+* add timer fixess ([7f9eb2f](https://github.com/EchonLabs/kanvaro.com/commit/7f9eb2f91bb7ae80a7292306f806ea088f52e6c0))
+
 ## [1.28.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.28.2...v1.28.3) (2026-01-28)
 
 
