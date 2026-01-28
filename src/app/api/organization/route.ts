@@ -360,7 +360,7 @@ export async function PUT(request: NextRequest) {
         maxWeeklyHours: sourceTimeTracking.maxWeeklyHours ?? undefined,
         maxSessionHours: sourceTimeTracking.maxSessionHours ?? undefined,
         allowOvertime: sourceTimeTracking.allowOvertime ?? undefined,
-        requireDescription: sourceTimeTracking.requireDescription ?? undefined,
+       // requireDescription: sourceTimeTracking.requireDescription ?? undefined,
         requireCategory: sourceTimeTracking.requireCategory ?? undefined,
         allowFutureTime: sourceTimeTracking.allowFutureTime ?? undefined,
         allowPastTime: sourceTimeTracking.allowPastTime ?? undefined,
@@ -431,7 +431,7 @@ export async function PUT(request: NextRequest) {
       setIfDefined('settings.timeTracking.maxWeeklyHours', timeTracking.maxWeeklyHours)
       setIfDefined('settings.timeTracking.maxSessionHours', timeTracking.maxSessionHours)
       setIfDefined('settings.timeTracking.allowOvertime', timeTracking.allowOvertime)
-      setIfDefined('settings.timeTracking.requireDescription', timeTracking.requireDescription)
+     // setIfDefined('settings.timeTracking.requireDescription', timeTracking.requireDescription)
       setIfDefined('settings.timeTracking.requireCategory', timeTracking.requireCategory)
       setIfDefined('settings.timeTracking.allowFutureTime', timeTracking.allowFutureTime)
       setIfDefined('settings.timeTracking.allowPastTime', timeTracking.allowPastTime)
@@ -487,7 +487,7 @@ export async function PUT(request: NextRequest) {
         if (timeTracking.maxWeeklyHours !== undefined) updateFields.maxWeeklyHours = timeTracking.maxWeeklyHours
         if (timeTracking.maxSessionHours !== undefined) updateFields.maxSessionHours = timeTracking.maxSessionHours
         if (timeTracking.allowOvertime !== undefined) updateFields.allowOvertime = timeTracking.allowOvertime
-        if (timeTracking.requireDescription !== undefined) updateFields.requireDescription = timeTracking.requireDescription
+        //if (timeTracking.requireDescription !== undefined) updateFields.requireDescription = timeTracking.requireDescription
         if (timeTracking.requireCategory !== undefined) updateFields.requireCategory = timeTracking.requireCategory
         if (timeTracking.allowFutureTime !== undefined) updateFields.allowFutureTime = timeTracking.allowFutureTime
         if (timeTracking.allowPastTime !== undefined) updateFields.allowPastTime = timeTracking.allowPastTime
@@ -513,14 +513,7 @@ export async function PUT(request: NextRequest) {
 
         if (!orgTimeTrackingSettings) {
           console.warn('Failed to sync TimeTrackingSettings collection with organization settings')
-        } else {
-          console.log('TimeTrackingSettings synced successfully:', {
-            requireDescription: orgTimeTrackingSettings.requireDescription,
-            requireApproval: orgTimeTrackingSettings.requireApproval,
-            allowOvertime: orgTimeTrackingSettings.allowOvertime,
-            allowFutureTime: orgTimeTrackingSettings.allowFutureTime
-          })
-        }
+        } 
       } catch (error) {
         console.error('Error syncing TimeTrackingSettings:', error)
         // Don't fail the entire request if TimeTrackingSettings sync fails

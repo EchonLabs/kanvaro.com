@@ -12,7 +12,7 @@ interface TimeTrackingSettings {
   maxWeeklyHours: number
   maxSessionHours: number
   allowOvertime: boolean
-  requireDescription: boolean
+ // requireDescription: boolean
   requireCategory: boolean
   allowFutureTime: boolean
   allowPastTime: boolean
