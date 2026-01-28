@@ -141,14 +141,16 @@ export async function GET(request: NextRequest) {
     // Handle approval status filtering
     if (isApproved !== null) {
       if (isApproved === 'true') {
-        // Approved entries
+        // Approved entries: isApproved = true AND isReject = false
         query.isApproved = true
+        query.isReject = false
       } else if (isApproved === 'false') {
-        // Pending entries (not approved and not rejected)
+        // Pending entries: isApproved = false AND isReject = false
         query.isApproved = false
         query.isReject = false
       } else if (isApproved === 'rejected') {
-        // Rejected entries
+        // Rejected entries: isApproved = false AND isReject = true
+        query.isApproved = false
         query.isReject = true
       }
     }

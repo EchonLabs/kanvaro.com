@@ -80,7 +80,7 @@ interface TimeTrackingSettings {
   maxWeeklyHours: number
   maxSessionHours: number
   allowOvertime: boolean
-  requireDescription: boolean
+//  requireDescription: boolean
   requireCategory: boolean
   allowFutureTime: boolean
   allowPastTime: boolean
@@ -528,8 +528,8 @@ export default function TimerPage() {
     }
 
     // Only validate description if it's explicitly required
-    if (timeTrackingSettings?.requireDescription === true && !manualLogData.description.trim()) {
-      setError('⚠️ Description required: Please enter a description for this time entry. A description is required based on your organization settings.')
+    if ( !manualLogData.description.trim()) {
+      setError('⚠️ Memo required: Please enter a Memo for this time entry.')
       return
     }
 
@@ -1098,29 +1098,23 @@ export default function TimerPage() {
 
                 <div className="space-y-3">
                   <Label htmlFor="description">
-                    Description {timeTrackingSettings?.requireDescription ? '*' : ''}
+                    Memo *
                   </Label>
                   <Textarea
                     id="description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder={
-                      selectedProject 
-                        ? (timeTrackingSettings?.requireDescription 
-                            ? 'What are you working on? (required)' 
-                            : 'What are you working on? (optional)')
-                        : 'Select a project to enable time tracking'
+                      'What are you working on? (required)' 
                     }
                     rows={2}
-                    required={timeTrackingSettings?.requireDescription === true}
+                    required={true}
                     disabled={!timeTrackingSettings?.allowTimeTracking || !selectedProject || !selectedTask}
                     className="w-full"
                   />
                   {timeTrackingSettings && (
                     <p className="text-xs text-muted-foreground">
-                      {timeTrackingSettings.requireDescription 
-                        ? 'Description is required to log time' 
-                        : 'Description is optional - time can be logged without it'}
+                      {'Memo is required to log time'}
                     </p>
                   )}
                 </div>
@@ -1139,7 +1133,7 @@ export default function TimerPage() {
                           taskId={selectedTask || undefined}
                           description={description}
                           isBillable={isBillable}
-                          requireDescription={timeTrackingSettings?.requireDescription === true}
+                        //  requireDescription={timeTrackingSettings?.requireDescription === true}
                           allowOvertime={timeTrackingSettings?.allowOvertime ?? false}
                           onTimerUpdate={(timer) => {
                         if (!timer) {

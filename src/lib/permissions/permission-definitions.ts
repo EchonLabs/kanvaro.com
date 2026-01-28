@@ -289,7 +289,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Time tracking
     Permission.TIME_TRACKING_CREATE,
     Permission.TIME_TRACKING_READ,
-    Permission.TIME_TRACKING_UPDATE,
     Permission.TIME_TRACKING_DELETE,
     Permission.TIME_TRACKING_APPROVE,
     Permission.TIME_TRACKING_EXPORT,
@@ -614,7 +613,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Time tracking
     Permission.TIME_TRACKING_CREATE,
     Permission.TIME_TRACKING_READ,
-    Permission.TIME_TRACKING_UPDATE,
     Permission.TIME_TRACKING_DELETE,
     Permission.TIME_TRACKING_APPROVE,
     Permission.TIME_TRACKING_EXPORT,
@@ -751,7 +749,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Time tracking (own time)
     Permission.TIME_TRACKING_CREATE,
     Permission.TIME_TRACKING_READ,
-    Permission.TIME_TRACKING_UPDATE,
     Permission.TIME_TRACKING_DELETE,
     
     // Financial (read only)
@@ -1100,7 +1097,6 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.TEAM_READ,
     Permission.TIME_TRACKING_CREATE,
     Permission.TIME_TRACKING_READ,
-    Permission.TIME_TRACKING_UPDATE,
     Permission.TIME_TRACKING_DELETE,
     Permission.FINANCIAL_READ,
     Permission.EPIC_READ,

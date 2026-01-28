@@ -734,6 +734,81 @@ export async function PUT(
 
         const assignedUsersChanged = JSON.stringify(currentAssignedToIds.sort()) !== JSON.stringify(newAssignedToIds.sort())
 
+              let baseUrl: string
+        
+        // First, check if NEXT_PUBLIC_APP_URL is explicitly set (recommended for all environments)
+        if (process.env.NEXT_PUBLIC_APP_URL) {
+          baseUrl = process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '') // Remove trailing slash
+        } else {
+          // Fall back to detecting from request headers
+          // When behind a proxy/load balancer, check x-forwarded-* headers first
+          const forwardedHost = request.headers.get('x-forwarded-host')
+          const forwardedProto = request.headers.get('x-forwarded-proto')
+          
+          // Get the host from various sources, prioritizing origin/referer headers for external URLs
+          const originHeader = request.headers.get('origin')
+          const refererHeader = request.headers.get('referer')
+          const hostHeader = request.headers.get('host')
+          
+          // Extract host from origin or referer (these usually have the correct external domain)
+          let extractedHost: string | null = null
+          let extractedProtocol: string | null = null
+          
+          if (originHeader) {
+            try {
+              const originUrl = new URL(originHeader)
+              extractedHost = originUrl.host
+              extractedProtocol = originUrl.protocol.replace(':', '')
+            } catch (e) {
+              // Invalid origin, continue
+            }
+          }
+          
+          if (!extractedHost && refererHeader) {
+            try {
+              const refererUrl = new URL(refererHeader)
+              extractedHost = refererUrl.host
+              extractedProtocol = refererUrl.protocol.replace(':', '')
+            } catch (e) {
+              // Invalid referer, continue
+            }
+          }
+          
+          // Determine protocol
+          let protocol: string
+          if (extractedProtocol) {
+            protocol = extractedProtocol
+          } else if (forwardedProto) {
+            protocol = forwardedProto.split(',')[0].trim() // Use first proto if multiple
+          } else if (hostHeader?.includes('localhost') || hostHeader?.includes('127.0.0.1')) {
+            protocol = 'http'
+          } else {
+            protocol = 'https' // Default to https for production domains
+          }
+          
+          // Determine host - prefer extracted host from origin/referer, then forwarded host, then host header
+          let host: string
+          if (extractedHost && !extractedHost.includes('localhost') && !extractedHost.includes('127.0.0.1')) {
+            // Use extracted host if it's a valid external domain
+            host = extractedHost
+          } else if (forwardedHost) {
+            host = forwardedHost.split(',')[0].trim() // Use first host if multiple
+          } else if (hostHeader) {
+            host = hostHeader.replace(/^https?:\/\//, '') // Remove protocol if present
+          } else {
+            host = 'localhost:3000' // Fallback
+            protocol = 'http'
+          }
+          
+          // Clean up host (remove any protocol prefix, remove trailing slash, remove port if default)
+          host = host.replace(/^https?:\/\//, '').replace(/\/$/, '')
+          // Remove default ports
+          host = host.replace(/^(.+):80$/, '$1')
+          host = host.replace(/^(.+):443$/, '$1')
+          
+          baseUrl = `${protocol}://${host}`
+        }
+
         if (assignedUsersChanged && newAssignedToIds.length > 0) {
           // Find newly assigned users (users in newAssignedToIds but not in currentAssignedToIds)
           const newlyAssignedUsers = newAssignedToIds.filter(id => !currentAssignedToIds.includes(id))
@@ -749,7 +824,8 @@ export async function PUT(
                   userId,
                   organizationId,
                   task.title,
-                  project?.name
+                  project?.name,
+                  baseUrl
                 )
               }).catch(error => {
                 console.error('Failed to send assignment notification:', error)
@@ -776,7 +852,8 @@ export async function PUT(
                   String(createdById),
                   organizationId,
                   task.title,
-                  project?.name
+                  project?.name,
+                  baseUrl
                 )
               }
             }).catch(error => {
@@ -790,6 +867,7 @@ export async function PUT(
           ? currentTask.assignedTo.map((id: any) => id.toString())
           : currentTask.assignedTo ? [currentTask.assignedTo.toString()] : []
 
+          
         currentAssignees.forEach((assigneeId: string) => {
           if (assigneeId !== userId) {
             notificationPromises.push(
@@ -802,7 +880,8 @@ export async function PUT(
                   assigneeId,
                   organizationId,
                   task.title,
-                  project?.name
+                  project?.name,
+                  baseUrl
                 )
               }).catch(error => {
                 console.error('Failed to send update notification:', error)

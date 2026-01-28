@@ -41,7 +41,7 @@ const ActiveTimerSchema = new Schema<IActiveTimer>({
   },
   description: {
     type: String,
-    required: false, // Made optional - validation is handled by requireDescription setting
+    required: true, 
     trim: true,
     maxlength: 500,
     default: ''

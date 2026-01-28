@@ -17,7 +17,7 @@ interface TimerProps {
   taskId?: string
   description?: string
   isBillable?: boolean
-  requireDescription?: boolean
+ // requireDescription?: boolean
   allowOvertime?: boolean
   onTimerUpdate?: (timer: any) => void
   onAutoStop?: (reason: string) => void
@@ -45,7 +45,7 @@ export function Timer({
   taskId,
   description = '',
   isBillable,
-  requireDescription = true,
+ // requireDescription = true,
   allowOvertime = true,
   onTimerUpdate,
   onAutoStop
@@ -396,7 +396,7 @@ export function Timer({
           isLoading || 
           !projectId || 
           !taskId || 
-          (requireDescription && !description.trim())
+          (!description.trim())
         }
         className="w-full"
       >

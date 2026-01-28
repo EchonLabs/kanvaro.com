@@ -149,7 +149,7 @@ async function stopExpiredTimer(activeTimer: IActiveTimer): Promise<{
       duration: finalDuration,
       isBillable: activeTimer.isBillable,
       hourlyRate: activeTimer.hourlyRate,
-      status: (requiresApproval || requiresProjectApproval) ? 'pending' : 'completed',
+      status: 'completed',
       category: activeTimer.category,
       tags: activeTimer.tags || [],
       isApproved: !(requiresApproval || requiresProjectApproval)

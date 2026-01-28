@@ -292,20 +292,7 @@ export function TimeLogs({
     const entryDate = new Date(entry.startTime)
     const now = new Date()
 
-    console.log('Checking edit permission for entry:', {
-      entryId: entry._id,
-      entryDate: entryDate.toISOString(),
-      entryDay: entryDate.getDate(),
-      entryMonth: entryDate.getMonth(),
-      entryYear: entryDate.getFullYear(),
-      now: now.toISOString(),
-      nowDay: now.getDate(),
-      nowMonth: now.getMonth(),
-      nowYear: now.getFullYear(),
-      mode: timeTrackingSettings.timeLogEditMode,
-      dayOfMonth: timeTrackingSettings.timeLogEditDayOfMonth,
-      days: timeTrackingSettings.timeLogEditDays
-    })
+   
 
     if (timeTrackingSettings.timeLogEditMode === 'days') {
       const diffTime = now.getTime() - entryDate.getTime()
@@ -767,8 +754,8 @@ export function TimeLogs({
       return
     }
 
-    if (timeTrackingSettings?.requireDescription === true && !manualLogData.description.trim()) {
-      setError('Description is required')
+    if ( !manualLogData.description.trim()) {
+      setError('Memo is required')
       return
     }
 
@@ -859,8 +846,8 @@ export function TimeLogs({
       return
     }
 
-    if (timeTrackingSettings?.requireDescription === true && !manualLogData.description.trim()) {
-      setError('Description is required')
+    if ( !manualLogData.description.trim()) {
+      setError('Memo is required')
       return
     }
 
@@ -1456,18 +1443,16 @@ export function TimeLogs({
       return value
     }
 
-    const headers = ['Task No', 'Start Date', 'Start Time', 'End Date', 'End Time']
+    const headers = ['Task No', 'Start Date', 'Start Time', 'End Date', 'End Time','Memo']
     const exampleRows = [
-      ['20.7', '2024-01-15', '09:00', '2024-01-15', '17:00'], // ISO format
-      ['20.8', '01/15/2024', '9:00 AM', '01/15/2024', '5:00 PM'], // US format with AM/PM
-      ['20.9', '15/01/2024', '14:00', '15/01/2024', '18:30'], // European format 24h
-      ['20.10', '15-01-2024', '9 AM', '15-01-2024', '5 PM'] // Dash format with AM/PM
+      ['20.7', '2024-01-15', '09:00', '2024-01-15', '17:00','Worked on feature'], // ISO format
+      ['20.8', '01/15/2024', '9:00 AM', '01/15/2024', '5:00 PM','Worked on feature'], // US format with AM/PM
+      ['20.9', '15/01/2024', '14:00', '15/01/2024', '18:30','Worked on feature'], // European format 24h
+      ['20.10', '15-01-2024', '9 AM', '15-01-2024', '5 PM','Worked on feature'] // Dash format with AM/PM
+      
     ]
     
-    if (timeTrackingSettings?.requireDescription) {
-      headers.push('Description')
-      exampleRows.forEach(row => row.push('Worked on feature'))
-    }
+    
     
     const csvContent = [
       headers.map(escapeCSV).join(','),
@@ -1528,10 +1513,8 @@ export function TimeLogs({
     }
 
     const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim())
-    const requiredHeaders = ['Task No', 'Start Date', 'Start Time', 'End Date', 'End Time']
-    if (timeTrackingSettings?.requireDescription) {
-      requiredHeaders.push('Description')
-    }
+    const requiredHeaders = ['Task No', 'Start Date', 'Start Time', 'End Date', 'End Time','Memo']
+   
     // Validate CSV format - check if all required headers are present
     const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
     if (missingHeaders.length > 0) {
@@ -1578,7 +1561,7 @@ export function TimeLogs({
     const startTime = row['Start Time']?.trim()
     const endDate = row['End Date']?.trim()
     const endTime = row['End Time']?.trim()
-    const description = row['Description']?.trim() || ''
+    const description = row['Memo']?.trim() || ''
 
     const errors: string[] = []
 
@@ -1857,8 +1840,8 @@ export function TimeLogs({
       }
 
       // Check if description is required
-      if (timeTrackingSettings?.requireDescription && !description) {
-        errors.push('Description is required')
+      if ( !description) {
+        errors.push('Memo is required')
       }
 
       // Check future time
@@ -2643,10 +2626,8 @@ export function TimeLogs({
                               return <span className="text-muted-foreground">-</span>
                             }
 
-                            // If project doesn't require approval, always show as Approved
-                            const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
-
-                            const isApproved = projectRequiresApproval ? entry.isApproved : true;
+                            // Use actual approval status from database
+                            const isApproved = entry.isApproved;
                             const isRejected = entry.isReject;
 
                             let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
@@ -2821,10 +2802,8 @@ export function TimeLogs({
                           return <span className="text-muted-foreground">-</span>
                         }
 
-                        // If project doesn't require approval, always show as Approved
-                        const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
-
-                        const isApproved = projectRequiresApproval ? entry.isApproved : true;
+                        // Use actual approval status from database
+                        const isApproved = entry.isApproved;
                         const isRejected = entry.isReject;
 
                         let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
@@ -3204,19 +3183,17 @@ export function TimeLogs({
 
           <div className="space-y-2">
             <Label htmlFor="modal-description">
-              Description {timeTrackingSettings?.requireDescription ? '*' : ''}
+              Memo *
             </Label>
             <Textarea
               id="modal-description"
               value={manualLogData.description}
               onChange={(e) => setManualLogData(prev => ({ ...prev, description: e.target.value }))}
               placeholder={
-                timeTrackingSettings?.requireDescription 
-                  ? 'What did you work on? (required)' 
-                  : 'What did you work on? (optional)'
+                'What did you work on? (required)' 
               }
               rows={3}
-              required={timeTrackingSettings?.requireDescription === true}
+              required={true}
               disabled={!selectedProjectForLog}
               className="w-full"
             />
@@ -3257,7 +3234,7 @@ export function TimeLogs({
               !manualLogData.endDate ||
               !manualLogData.endTime ||
               !!(startDateError || startTimeError || endDateError || endTimeError) ||
-              (timeTrackingSettings?.requireDescription === true && !manualLogData.description.trim())
+              !manualLogData.description.trim()
             }
           >
             {submittingManualLog ? (
@@ -3507,19 +3484,15 @@ export function TimeLogs({
 
           <div className="space-y-2">
             <Label htmlFor="edit-description">
-              Description {timeTrackingSettings?.requireDescription ? '*' : ''}
+              Memo *
             </Label>
             <Textarea
               id="edit-description"
               value={manualLogData.description}
               onChange={(e) => setManualLogData(prev => ({ ...prev, description: e.target.value }))}
-              placeholder={
-                timeTrackingSettings?.requireDescription 
-                  ? 'What did you work on? (required)' 
-                  : 'What did you work on? (optional)'
-              }
+              placeholder={'What did you work on? (required)' }
               rows={3}
-              required={timeTrackingSettings?.requireDescription === true}
+              required={true}
               className="w-full"
             />
           </div>
@@ -3561,7 +3534,7 @@ export function TimeLogs({
               !manualLogData.endTime ||
               !!(startDateError || startTimeError || endDateError || endTimeError) ||
               !hasEditChanges ||
-              (timeTrackingSettings?.requireDescription === true && !manualLogData.description.trim())
+              ( !manualLogData.description.trim())
             }
           >
             {submittingManualLog ? (

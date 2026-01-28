@@ -12,7 +12,7 @@ export interface ITimeTrackingSettings extends Document {
   maxWeeklyHours: number
   maxSessionHours: number // Auto-stop timer after this many hours
   allowOvertime: boolean
-  requireDescription: boolean
+ // requireDescription: boolean
   requireCategory: boolean
   allowFutureTime: boolean
   allowPastTime: boolean
@@ -91,10 +91,10 @@ const TimeTrackingSettingsSchema = new Schema<ITimeTrackingSettings>({
     type: Boolean,
     default: false
   },
-  requireDescription: {
-    type: Boolean,
-    default: true
-  },
+  // requireDescription: {
+  //   type: Boolean,
+  //   default: true
+  // },
   requireCategory: {
     type: Boolean,
     default: false
