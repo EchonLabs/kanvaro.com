@@ -2643,10 +2643,8 @@ export function TimeLogs({
                               return <span className="text-muted-foreground">-</span>
                             }
 
-                            // If project doesn't require approval, always show as Approved
-                            const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
-
-                            const isApproved = projectRequiresApproval ? entry.isApproved : true;
+                            // Use actual approval status from database
+                            const isApproved = entry.isApproved;
                             const isRejected = entry.isReject;
 
                             let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
@@ -2821,10 +2819,8 @@ export function TimeLogs({
                           return <span className="text-muted-foreground">-</span>
                         }
 
-                        // If project doesn't require approval, always show as Approved
-                        const projectRequiresApproval = entry.project?.settings?.requireApproval === true;
-
-                        const isApproved = projectRequiresApproval ? entry.isApproved : true;
+                        // Use actual approval status from database
+                        const isApproved = entry.isApproved;
                         const isRejected = entry.isReject;
 
                         let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
