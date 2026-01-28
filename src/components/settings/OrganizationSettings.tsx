@@ -42,7 +42,7 @@ export function OrganizationSettings() {
           maxWeeklyHours: '60',
           maxSessionHours: '8',
           allowOvertime: false,
-          requireDescription: true,
+        //  requireDescription: true,
           requireCategory: false,
           allowFutureTime: false,
           allowPastTime: true,
@@ -216,7 +216,7 @@ export function OrganizationSettings() {
           maxWeeklyHours: '60',
           maxSessionHours: '8',
           allowOvertime: false,
-          requireDescription: true,
+        //  requireDescription: true,
           requireCategory: false,
           allowFutureTime: false,
           allowPastTime: true,
@@ -265,7 +265,7 @@ export function OrganizationSettings() {
                   maxWeeklyHours: data.settings.maxWeeklyHours ?? prev.timeTracking.maxWeeklyHours,
                   maxSessionHours: data.settings.maxSessionHours ?? prev.timeTracking.maxSessionHours,
                   allowOvertime: data.settings.allowOvertime ?? prev.timeTracking.allowOvertime,
-                  requireDescription: data.settings.requireDescription ?? prev.timeTracking.requireDescription,
+                //  requireDescription: data.settings.requireDescription ?? prev.timeTracking.requireDescription,
                   requireCategory: data.settings.requireCategory ?? prev.timeTracking.requireCategory,
                   allowFutureTime: data.settings.allowFutureTime ?? prev.timeTracking.allowFutureTime,
                   allowPastTime: data.settings.allowPastTime ?? prev.timeTracking.allowPastTime,
@@ -1209,7 +1209,7 @@ export function OrganizationSettings() {
                 />
               </div>
 
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+              {/* <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
                 <div className="space-y-0.5 flex-1 min-w-0">
                   <Label className="text-xs sm:text-sm">Require Description</Label>
                   <p className="text-xs sm:text-sm text-muted-foreground break-words">
@@ -1224,7 +1224,7 @@ export function OrganizationSettings() {
                   })}
                   className="flex-shrink-0"
                 />
-              </div>
+              </div> */}
 
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
                 <div className="space-y-0.5 flex-1 min-w-0">

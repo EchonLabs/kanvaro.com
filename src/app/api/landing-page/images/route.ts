@@ -171,7 +171,7 @@ export async function PUT(request: NextRequest) {
             maxWeeklyHours: 60,
             maxSessionHours: 8,
             allowOvertime: false,
-            requireDescription: false,
+            //requireDescription: false,
             requireCategory: false,
             allowFutureTime: false,
             allowPastTime: true,

@@ -29,7 +29,7 @@ export interface IOrganization extends Document {
       maxWeeklyHours: number
       maxSessionHours: number
       allowOvertime: boolean
-      requireDescription: boolean
+      //requireDescription: boolean
       requireCategory: boolean
       allowFutureTime: boolean
       allowPastTime: boolean
@@ -134,7 +134,7 @@ const OrganizationSchema = new Schema<IOrganization>({
       maxWeeklyHours: { type: Number, default: 60, min: 1, max: 168 },
       maxSessionHours: { type: Number, default: 8, min: 1, max: 24 },
       allowOvertime: { type: Boolean, default: false },
-      requireDescription: { type: Boolean, default: true },
+     // requireDescription: { type: Boolean, default: true },
       requireCategory: { type: Boolean, default: false },
       allowFutureTime: { type: Boolean, default: false },
       allowPastTime: { type: Boolean, default: true },
