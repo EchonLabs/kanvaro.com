@@ -1,3 +1,10 @@
+## [1.29.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.29.0...v1.29.1) (2026-01-29)
+
+
+### Bug Fixes
+
+* minimize crone job from 10 min to 1 min ([327a8c3](https://github.com/EchonLabs/kanvaro.com/commit/327a8c373ce6f7c840c22570d0166d6f7f53d5e9))
+
 # [1.29.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.28.5...v1.29.0) (2026-01-29)
 
 
