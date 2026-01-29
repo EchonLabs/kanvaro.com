@@ -65,26 +65,13 @@ export async function GET(request: NextRequest) {
     const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Default to last 30 days
     const end = endDate ? new Date(endDate) : new Date()
 
-    // Build base query - Reports should show approved time entries or entries from projects that don't require approval
-    // Excluding rejected entries
+    // Build base query - Reports should show only approved time entries (isApproved = true and isReject = false)
     const baseQuery: any = {
       organization: organizationId,
       startTime: { $gte: start, $lte: end },
       status: 'completed',
-      isReject: { $ne: true }, // Exclude rejected entries
-      $or: [
-        { isApproved: true }, // Explicitly approved entries
-        // Entries from projects that don't require approval (auto-approved)
-        {
-          $and: [
-            {
-              project: {
-                $in: await getProjectsWithoutApprovalRequirement(organizationId)
-              }
-            }
-          ]
-        }
-      ]
+      isApproved: true, // Only approved entries
+      isReject: { $ne: true } // Exclude rejected entries (isReject should be false or null)
     }
 
     if (projectId) baseQuery.project = projectId

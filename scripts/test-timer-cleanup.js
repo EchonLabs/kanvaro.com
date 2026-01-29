@@ -47,6 +47,7 @@ async function testTimerCleanup() {
     console.log('─────────────────────────────')
     console.log(`Total Checked: ${data.summary?.totalChecked || 0}`)
     console.log(`Stopped: ${data.summary?.stopped || 0}`)
+    console.log(`Notified: ${data.summary?.notified || 0}`)
     console.log(`Skipped: ${data.summary?.skipped || 0}`)
     console.log(`Errors: ${data.summary?.errors || 0}`)
     console.log('─────────────────────────────\n')
