@@ -259,7 +259,8 @@ console.log('userfsdfsdf',user.organization)
         },
         {
           $set: {
-            'settings.requireApproval': settings.requireApproval
+            'settings.requireApproval': settings.requireApproval,
+            'settings.allowManualTimeSubmission': settings.allowManualTimeSubmission
           }
         }
       )

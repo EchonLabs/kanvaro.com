@@ -801,7 +801,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                   </div>
 
                   {/* Project Role Preview */}
-                  <div className="space-y-2 p-4 border rounded-lg bg-muted/30">
+                  {/* <div className="space-y-2 p-4 border rounded-lg bg-muted/30">
                     <label className="text-sm font-medium">Project Role (Auto-assigned)</label>
                     <div className="flex items-center">
                       <Badge className={getRoleColor(getProjectRoleFromOrganizationRole(selectedMember.role))}>
@@ -811,7 +811,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                         Based on organization role: {formatOrganizationRole(selectedMember.role)}
                       </p>
                     </div>
-                  </div>
+                  </div> */}
                 </>
               )}
 
