@@ -843,7 +843,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
           <CardHeader>
             <CardTitle>Approved Time Entries</CardTitle>
             <CardDescription>
-              Shows approved entries and entries from projects that don't require approval
+              Shows only approved time entries (isApproved = true and isReject = false)
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -879,9 +879,9 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
 
             {reportData.detailedEntries.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No time entries found for the selected filters.
+                No approved time entries found for the selected filters.
                 <div className="text-sm mt-2">
-                  This includes both approved entries and entries from projects that don't require approval.
+                  Only entries that have been approved and not rejected are shown.
                 </div>
               </div>
             ) : (
