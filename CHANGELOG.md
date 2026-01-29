@@ -1,3 +1,10 @@
+## [1.29.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.29.1...v1.29.2) (2026-01-29)
+
+
+### Bug Fixes
+
+* add chnges in timer ([a201edd](https://github.com/EchonLabs/kanvaro.com/commit/a201edd6cd855d7482fa8ca27aa859a2be6b3b6c))
+
 ## [1.29.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.29.0...v1.29.1) (2026-01-29)
 
 
