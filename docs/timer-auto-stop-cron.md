@@ -8,7 +8,7 @@ The timer cleanup cron job automatically stops timers that exceed their `maxSess
 
 **URL:** `/api/cron/timer-cleanup`  
 **Method:** `GET`  
-**Frequency:** Every 5-15 minutes (recommended: 10 minutes)
+**Frequency:** Every minute
 
 ## How It Works
 
@@ -35,13 +35,13 @@ The timer cleanup cron job automatically stops timers that exceed their `maxSess
   "crons": [
     {
       "path": "/api/cron/timer-cleanup",
-      "schedule": "*/10 * * * *"
+      "schedule": "* * * * *"
     }
   ]
 }
 ```
 
-2. Deploy to Vercel - the cron job will run automatically every 10 minutes
+2. Deploy to Vercel - the cron job will run automatically every minute
 
 ### Option 2: External Cron Service (e.g., cron-job.org, EasyCron)
 
@@ -56,11 +56,11 @@ The timer cleanup cron job automatically stops timers that exceed their `maxSess
    Header: Authorization: Bearer your-random-secret-key
    ```
 
-3. Set frequency to every 10 minutes: `*/10 * * * *`
+3. Set frequency to every minute: `* * * * *`
 
 ### Option 3: AWS EventBridge (for AWS deployments)
 
-1. Create an EventBridge rule with schedule: `rate(10 minutes)`
+1. Create an EventBridge rule with schedule: `rate(1 minute)`
 2. Target: API Destination pointing to your endpoint
 3. Add authorization header if using `CRON_SECRET`
 
@@ -72,7 +72,7 @@ Create `.github/workflows/timer-cleanup.yml`:
 name: Timer Cleanup
 on:
   schedule:
-    - cron: '*/10 * * * *'  # Every 10 minutes
+    - cron: '* * * * *'  # Every minute
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
@@ -190,6 +190,7 @@ MONGODB_URI=your-mongodb-connection-string
 ## Cron Schedule Reference
 
 ```
+* * * * *       # Every minute
 */10 * * * *   # Every 10 minutes
 */5 * * * *    # Every 5 minutes
 */15 * * * *   # Every 15 minutes
