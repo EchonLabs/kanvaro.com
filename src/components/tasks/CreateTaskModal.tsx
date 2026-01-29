@@ -222,7 +222,7 @@ export default function CreateTaskModal({
   const fetchProjects = async () => {
     setLoadingProjects(true)
     try {
-      const res = await fetch('/api/projects')
+      const res = await fetch('/api/projects?limit=1000')
       const data = await res.json()
       if (data.success && Array.isArray(data.data)) {
         setProjects(data.data)
