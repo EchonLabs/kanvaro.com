@@ -22,7 +22,6 @@ export async function GET(request: NextRequest) {
 
     const { user } = authResult
     const organizationId = user.organization.toString()
-    console.log('userfsdfsdf',user.organization.toString())
 
     // Get query params for optional projectId
     const { searchParams } = new URL(request.url)
@@ -251,23 +250,21 @@ console.log('userfsdfsdf',user.organization)
       // Don't fail the request if org sync fails - the main TimeTrackingSettings was saved
     }
 
-    // Cascade requireApproval setting to all projects in the organization (only when turning off approval)
-    if (settings.requireApproval === false) {
-      try {
-        await Project.updateMany(
-          {
-            organization: organizationId,
-            is_deleted: { $ne: true }
-          },
-          {
-            $set: {
-              'settings.requireApproval': settings.requireApproval
-            }
+    // Cascade requireApproval setting to all projects in the organization
+    try {
+      await Project.updateMany(
+        {
+          organization: organizationId,
+          is_deleted: { $ne: true }
+        },
+        {
+          $set: {
+            'settings.requireApproval': settings.requireApproval
           }
-        )
-      } catch (projectError) {
-        console.error('Error cascading requireApproval to projects:', projectError)
-      }
+        }
+      )
+    } catch (projectError) {
+      console.error('Error cascading requireApproval to projects:', projectError)
     }
 
 

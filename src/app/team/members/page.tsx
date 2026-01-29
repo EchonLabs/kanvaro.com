@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -97,6 +97,7 @@ export default function MembersPage() {
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [localSearch, setLocalSearch] = useState('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [showInviteModal, setShowInviteModal] = useState(false)
@@ -128,31 +129,11 @@ export default function MembersPage() {
   const canDeleteMembers = hasPermission(Permission.TEAM_REMOVE)
 
   // Check if any filters are active
-  const hasActiveFilters = localSearch !== '' || roleFilter !== 'all' || statusFilter !== 'all'
-
-  // Client-side filtering for local search
-  const locallyFilteredMembers = useMemo(() => {
-    if (!localSearch.trim()) return members
-    const q = localSearch.trim().toLowerCase()
-    return members.filter(member => {
-      // Match first name, last name, email, role, or custom role name
-      if (member.firstName?.toLowerCase().includes(q)) return true
-      if (member.lastName?.toLowerCase().includes(q)) return true
-      if (member.email?.toLowerCase().includes(q)) return true
-      if (member.role?.toLowerCase().includes(q)) return true
-      if (member.customRole?.name?.toLowerCase().includes(q)) return true
-      if (member.projectManager?.firstName?.toLowerCase().includes(q)) return true
-      if (member.projectManager?.lastName?.toLowerCase().includes(q)) return true
-      if (member.humanResourcePartner?.firstName?.toLowerCase().includes(q)) return true
-      if (member.humanResourcePartner?.lastName?.toLowerCase().includes(q)) return true
-      return false
-    })
-  }, [localSearch, members])
+  const hasActiveFilters = searchQuery !== '' || roleFilter !== 'all' || statusFilter !== 'all'
 
   // Reset all filters
   const resetFilters = () => {
     setSearchQuery('')
-    setLocalSearch('')
     setRoleFilter('all')
     setStatusFilter('all')
   }
@@ -449,9 +430,29 @@ export default function MembersPage() {
     setMembersPagination(prev => ({ ...prev, page: 1 }))
   }, [searchQuery, roleFilter, statusFilter])
 
-  // Server returns paginated data, use it directly when no local search
-  // When local search is active, use client-side filtered results
-  const paginatedMembers = localSearch ? locallyFilteredMembers : members
+  // Keep localSearch in sync with searchQuery
+  useEffect(() => {
+    setLocalSearch(searchQuery)
+  }, [searchQuery])
+
+  // Add debouncing for search with 1000ms delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(localSearch)
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [localSearch])
+
+  // Fetch members when filters change
+  useEffect(() => {
+    if (!loading && !authError) {
+      fetchMembers()
+    }
+  }, [searchQuery, roleFilter, statusFilter, membersPagination.page, membersPagination.limit])
+
+  // Server returns paginated data, use it directly
+  const paginatedMembers = members
 
   // Client-side pagination for invitations
   const paginatedInvitations = pendingInvitations.slice(
@@ -612,7 +613,7 @@ export default function MembersPage() {
           <TabsTrigger value="members" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <span className="truncate">Members</span>
-            <span className="ml-1 flex-shrink-0">({localSearch ? locallyFilteredMembers.length : members.length})</span>
+            <span className="ml-1 flex-shrink-0">({membersPagination.total})</span>
           </TabsTrigger>
           <TabsTrigger value="invitations" className="flex items-center gap-2">
             <Mail className="h-4 w-4" />
@@ -650,6 +651,7 @@ export default function MembersPage() {
                   <div className="relative w-full">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none flex-shrink-0" />
                     <Input
+                      ref={searchInputRef}
                       placeholder="Search members..."
                       value={localSearch}
                       onChange={(e) => setLocalSearch(e.target.value)}
@@ -690,16 +692,16 @@ export default function MembersPage() {
                 <div className="text-sm text-muted-foreground">
                   {hasActiveFilters ? (
                     <span>
-                      Showing <span className="font-medium text-foreground">{paginatedMembers.length}</span> team members
+                      Showing <span className="font-medium text-foreground">{membersPagination.total}</span> team members
                       <span className="ml-2 text-xs">
-                        {localSearch && `• "${localSearch}"`}
+                        {searchQuery && `• "${searchQuery}"`}
                         {roleFilter !== 'all' && roleFilter && `• ${organizationRoles.find(r => r.key === roleFilter)?.name || formatToTitleCase(roleFilter.replace(/_/g, ' '))}`}
                         {statusFilter !== 'all' && `• ${statusFilter === 'active' ? 'Active' : 'Inactive'}`}
                       </span>
                     </span>
                   ) : (
                     <span>
-                      <span className="font-medium text-foreground">{members.length}</span> team members total
+                      <span className="font-medium text-foreground">{membersPagination.total}</span> team members total
                     </span>
                   )}
                 </div>

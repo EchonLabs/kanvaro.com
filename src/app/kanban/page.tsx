@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { formatToTitleCase, cn } from '@/lib/utils'
 import { useTaskSync, useTaskState } from '@/hooks/useTaskSync'
-import { useNotify } from '@/lib/notify'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { usePermissions } from '@/lib/permissions/permission-context'
+import { Permission } from '@/lib/permissions/permission-definitions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/Button'
@@ -74,6 +75,7 @@ import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { DateRange } from 'react-day-picker'
 import { format } from 'date-fns'
+import { useNotify } from '@/lib/notify'
 
 interface Task {
   _id: string
@@ -160,6 +162,7 @@ function ColumnDropZone({
   onEditTask,
   onDeleteTask,
   pendingUpdates,
+  canCreateTask,
   canDragTask
 }: {
   column: any,
@@ -168,6 +171,7 @@ function ColumnDropZone({
   onEditTask?: (task: Task) => void,
   onDeleteTask?: (taskId: string) => void,
   pendingUpdates?: Set<string>
+  canCreateTask?: boolean
   canDragTask?: (task: Task) => boolean
 }) {
   const router = useRouter()
@@ -216,13 +220,15 @@ function ColumnDropZone({
               {tasks.length}
             </span>
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => onCreateTask?.(column.id)}
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
+          {canCreateTask && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => onCreateTask?.(column.id)}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          )}
         </div>
         
         <SortableContext 
@@ -272,6 +278,8 @@ export default function KanbanPage() {
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState('')
   const { success: notifySuccess, error: notifyError } = useNotify()
+  const permissions = usePermissions()
+  const canCreateTask = permissions?.hasPermission(Permission.TASK_CREATE) || false
   const [searchQuery, setSearchQuery] = useState('')
   const [projectFilter, setProjectFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
@@ -991,10 +999,12 @@ export default function KanbanPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Kanban Board</h1>
             <p className="text-sm sm:text-base text-muted-foreground">Visual task management with drag and drop</p>
           </div>
-          <Button onClick={() => handleCreateTask()} className="w-full sm:w-auto">
-            <Plus className="h-4 w-4 mr-2" />
-            New Task
-          </Button>
+          {canCreateTask && (
+            <Button onClick={() => handleCreateTask()} className="w-full sm:w-auto">
+              <Plus className="h-4 w-4 mr-2" />
+              New Task
+            </Button>
+          )}
         </div>
 
 
@@ -1411,6 +1421,7 @@ export default function KanbanPage() {
                       onEditTask={handleEditTask}
                       onDeleteTask={handleDeleteTask}
                       pendingUpdates={pendingUpdates}
+                      canCreateTask={canCreateTask}
                       canDragTask={(task) => {
                         // Allow dragging if task is not in backlog, or if it is in backlog but assigned to a sprint
                         return task.status !== 'backlog'

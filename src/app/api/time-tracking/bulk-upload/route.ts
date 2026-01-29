@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
         maxWeeklyHours: orgTimeTracking.maxWeeklyHours ?? 168,
         maxSessionHours: orgTimeTracking.maxSessionHours ?? 12,
         allowOvertime: orgTimeTracking.allowOvertime ?? false,
-        requireDescription: orgTimeTracking.requireDescription ?? false,
+      //  requireDescription: orgTimeTracking.requireDescription ?? false,
         requireCategory: orgTimeTracking.requireCategory ?? false,
         allowFutureTime: orgTimeTracking.allowFutureTime ?? false,
         allowPastTime: orgTimeTracking.allowPastTime ?? true,
@@ -192,11 +192,11 @@ export async function POST(request: NextRequest) {
         }
 
         // Validate description if required
-        const requireDescription = settings.requireDescription === true
+     //   const requireDescription = settings.requireDescription === true
         const hasDescription = row.Description && typeof row.Description === 'string' && row.Description.trim().length > 0
 
-        if (requireDescription && !hasDescription) {
-          results.errors.push({ row: rowNum, error: 'Description is required for time entries' })
+        if ( !hasDescription) {
+          results.errors.push({ row: rowNum, error: 'Memo is required for time entries' })
           results.failed++
           continue
         }

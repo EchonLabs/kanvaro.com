@@ -31,18 +31,7 @@ export class NotificationService {
     return NotificationService.instance
   }
 
-  /**
-   * Get base URL for absolute links in notifications
-   */
-  private getBaseUrl(): string {
-    // First, check if NEXT_PUBLIC_APP_URL is explicitly set (recommended for all environments)
-    if (process.env.NEXT_PUBLIC_APP_URL) {
-      return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '') // Remove trailing slash
-    }
 
-    // Fallback to localhost for development
-    return 'http://localhost:3000'
-  }
 
   /**
    * Create and send a notification to a single user
@@ -398,7 +387,8 @@ export class NotificationService {
     assignedUserId: string,
     organizationId: string,
     taskTitle: string,
-    projectName?: string
+    projectName?: string,
+    baseUrl?: string
   ): Promise<void> {
     const messages = {
       created: `A new task "${taskTitle}" has been created${projectName ? ` in project "${projectName}"` : ''}`,
@@ -417,7 +407,7 @@ export class NotificationService {
         entityId: taskId,
         action,
         priority: action === 'overdue' ? 'high' : 'medium',
-        url: `${this.getBaseUrl()}/tasks/${taskId}`
+        url: `${baseUrl}/tasks/${taskId}`
       },
       sendEmail: true,
       sendPush: true
@@ -432,7 +422,8 @@ export class NotificationService {
     action: 'created' | 'updated' | 'deadline_approaching' | 'completed',
     userIds: string[],
     organizationId: string,
-    projectName: string
+    projectName: string,
+    baseUrl: string
   ): Promise<void> {
     const messages = {
       created: `New project "${projectName}" has been created`,
@@ -450,7 +441,7 @@ export class NotificationService {
         entityId: projectId,
         action: action === 'deadline_approaching' ? 'reminder' : action,
         priority: action === 'deadline_approaching' ? 'high' : 'medium',
-        url: `${this.getBaseUrl()}/projects/${projectId}`
+        url: `${baseUrl}/projects/${projectId}`
       },
       sendEmail: true,
       sendPush: true
@@ -494,7 +485,8 @@ export class NotificationService {
     projectId: string,
     userIds: string[],
     organizationId: string,
-    projectName: string
+    projectName: string,
+    baseUrl: string
   ): Promise<void> {
     await this.createBulkNotifications(userIds, organizationId, {
       type: 'project',
@@ -505,7 +497,7 @@ export class NotificationService {
         entityId: projectId,
         action: 'assigned',
         priority: 'medium',
-        url: `${this.getBaseUrl()}/projects/${projectId}`
+        url: `${baseUrl}/projects/${projectId}`
       },
       sendEmail: true,
       sendPush: true
@@ -521,7 +513,8 @@ export class NotificationService {
     userIds: string[],
     organizationId: string,
     projectName: string,
-    budgetInfo?: string
+    budgetInfo?: string,
+    baseUrl?: string
   ): Promise<void> {
     const messages = {
       budget_exceeded: `Project "${projectName}" has exceeded its budget${budgetInfo ? `: ${budgetInfo}` : ''}`,
@@ -538,7 +531,7 @@ export class NotificationService {
         entityId: projectId,
         action: action === 'budget_exceeded' ? 'overdue' : action === 'budget_warning' ? 'reminder' : 'updated',
         priority: action === 'budget_exceeded' ? 'critical' : 'high',
-        url: `${this.getBaseUrl()}/projects/${projectId}`
+        url: `${baseUrl}/projects/${projectId}`
       },
       sendEmail: true,
       sendPush: true

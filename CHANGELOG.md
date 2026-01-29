@@ -1,3 +1,24 @@
+## [1.28.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.28.4...v1.28.5) (2026-01-28)
+
+
+### Bug Fixes
+
+* fix memeber filter ([2478c6d](https://github.com/EchonLabs/kanvaro.com/commit/2478c6d185b67fbff1562b7d2f3c45439ef0b9a3))
+
+## [1.28.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.28.3...v1.28.4) (2026-01-28)
+
+
+### Bug Fixes
+
+* add timer fixess ([7f9eb2f](https://github.com/EchonLabs/kanvaro.com/commit/7f9eb2f91bb7ae80a7292306f806ea088f52e6c0))
+
+## [1.28.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.28.2...v1.28.3) (2026-01-28)
+
+
+### Bug Fixes
+
+* add chnges in time trcking ([da64bfd](https://github.com/EchonLabs/kanvaro.com/commit/da64bfd6a0acf7725c7c9db9d6c5477b93a35aa6))
+
 ## [1.28.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.28.1...v1.28.2) (2026-01-26)
 
 

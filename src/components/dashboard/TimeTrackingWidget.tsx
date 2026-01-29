@@ -247,212 +247,214 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
     }
   }
 
-  if (activeTimer) {
-    return (
-      <Card className="overflow-x-hidden border-primary/20">
+  return (
+    <div className="space-y-4">
+      {/* Active Timer Widget - Conditionally Visible */}
+      {activeTimer && (
+        <Card className="overflow-x-hidden border-primary/20">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+              <Clock className="h-5 w-5 text-primary flex-shrink-0" />
+              <span className="truncate">Active Timer</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-center py-2">
+              <div className="text-4xl font-mono font-bold text-primary break-words mb-2">
+                {displayTime}
+              </div>
+              {/* {activeTimer.hourlyRate != null && activeTimer.hourlyRate > 0  && (
+                <div className="text-sm font-medium text-green-600 dark:text-green-400">
+                  <span className="break-words">{formatCurrency((activeTimer.hourlyRate * activeTimer.currentDuration) / 60)}</span>
+                </div>
+              )} */}
+            </div>
+
+            <div className="border-t pt-4 space-y-2.5">
+              <div className="text-sm break-words">
+                <span className="font-semibold text-foreground">Project:</span>{' '}
+                {activeTimer.project?.name ? (
+                  <span
+                    className={activeTimer.project.name.length > 20 ? 'truncate' : ''}
+                    title={activeTimer.project.name.length > 20 ? activeTimer.project.name : undefined}
+                  >
+                    {activeTimer.project.name.length > 20
+                      ? `${activeTimer.project.name.slice(0, 20)}…`
+                      : activeTimer.project.name}
+                  </span>
+                ) : (
+                  <span className="italic text-muted-foreground">Unknown project</span>
+                )}
+              </div>
+              {activeTimer.task && (
+                <div className="text-sm break-words">
+                  <span className="font-semibold text-foreground">Task:</span>{' '}
+                  <span className="truncate">{activeTimer.task.title}</span>
+                </div>
+              )}
+              {activeTimer.description && (
+                <div className="text-sm">
+                  <span className="font-semibold text-foreground">Description:</span>{' '}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="line-clamp-2 text-muted-foreground cursor-default inline-block max-w-full">
+                          {activeTimer.description}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs break-words">{activeTimer.description}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <Badge 
+                  variant={activeTimer.isPaused ? 'secondary' : 'default'} 
+                  className={`text-xs flex-shrink-0 ${activeTimer.isPaused ? 'hover:!bg-secondary dark:hover:!bg-secondary' : 'hover:!bg-primary dark:hover:!bg-primary'}`}
+                >
+                  {activeTimer.isPaused ? 'Paused' : 'Running'}
+                </Badge>
+                {activeTimer.isBillable && (
+                  <Badge variant="outline" className="text-xs flex-shrink-0 hover:bg-transparent dark:hover:bg-transparent">Billable</Badge>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isLoading}
+                onClick={() => updateTimerAction(activeTimer.isPaused ? 'resume' : 'pause')}
+                className="w-full text-xs sm:text-sm whitespace-nowrap"
+              >
+                {activeTimer.isPaused ? (
+                  <>
+                    <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                    Resume
+                  </>
+                ) : (
+                  <>
+                    <Pause className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                    Pause
+                  </>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={isLoading}
+                onClick={() => updateTimerAction('stop')}
+                className="w-full text-xs sm:text-sm whitespace-nowrap"
+              >
+                <Square className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                Stop
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const pid = activeTimer.project && activeTimer.project._id ? `projectId=${encodeURIComponent(activeTimer.project._id)}` : ''
+                  const pname = activeTimer.project && activeTimer.project.name ? `projectName=${encodeURIComponent(activeTimer.project.name)}` : ''
+                  const tid = activeTimer.task && activeTimer.task._id ? `taskId=${encodeURIComponent(activeTimer.task._id)}` : ''
+                  const tname = activeTimer.task && activeTimer.task.title ? `taskName=${encodeURIComponent(activeTimer.task.title)}` : ''
+                  const qs = [pid, pname, tid, tname].filter(Boolean).join('&')
+                  router.push(qs ? `/time-tracking/timer?${qs}` : '/time-tracking/timer')
+                }}
+                className="w-full text-xs sm:text-sm whitespace-nowrap"
+              >
+                <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                Manage<span className="hidden sm:inline"> Timer</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Time Tracking Widget - Always Visible */}
+      <Card className="overflow-x-hidden">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-            <Clock className="h-5 w-5 text-primary flex-shrink-0" />
-            <span className="truncate">Active Timer</span>
+            <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+            <span className="truncate">Time Tracking</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="text-center py-2">
-            <div className="text-4xl font-mono font-bold text-primary break-words mb-2">
-              {displayTime}
-            </div>
-            {/* {activeTimer.hourlyRate != null && activeTimer.hourlyRate > 0  && (
-              <div className="text-sm font-medium text-green-600 dark:text-green-400">
-                <span className="break-words">{formatCurrency((activeTimer.hourlyRate * activeTimer.currentDuration) / 60)}</span>
-              </div>
-            )} */}
-          </div>
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription className="text-xs sm:text-sm break-words">{error}</AlertDescription>
+            </Alert>
+          )}
 
-          <div className="border-t pt-4 space-y-2.5">
-            <div className="text-sm break-words">
-              <span className="font-semibold text-foreground">Project:</span>{' '}
-              {activeTimer.project?.name ? (
-                <span
-                  className={activeTimer.project.name.length > 20 ? 'truncate' : ''}
-                  title={activeTimer.project.name.length > 20 ? activeTimer.project.name : undefined}
-                >
-                  {activeTimer.project.name.length > 20
-                    ? `${activeTimer.project.name.slice(0, 20)}…`
-                    : activeTimer.project.name}
-                </span>
-              ) : (
-                <span className="italic text-muted-foreground">Unknown project</span>
-              )}
-            </div>
-            {activeTimer.task && (
-              <div className="text-sm break-words">
-                <span className="font-semibold text-foreground">Task:</span>{' '}
-                <span className="truncate">{activeTimer.task.title}</span>
+          {timeStats && (
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
+              <div>
+                <div className="text-lg sm:text-2xl font-bold text-primary break-words">
+                  {formatDuration(timeStats.todayDuration)}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">Today</div>
               </div>
-            )}
-            {activeTimer.description && (
-              <div className="text-sm">
-                <span className="font-semibold text-foreground">Description:</span>{' '}
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="line-clamp-2 text-muted-foreground cursor-default inline-block max-w-full">
-                        {activeTimer.description}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="max-w-xs break-words">{activeTimer.description}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+              <div>
+                <div className="text-lg sm:text-2xl font-bold text-blue-600 break-words">
+                  {formatDuration(timeStats.weekDuration)}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">This Week</div>
               </div>
-            )}
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <Badge 
-                variant={activeTimer.isPaused ? 'secondary' : 'default'} 
-                className={`text-xs flex-shrink-0 ${activeTimer.isPaused ? 'hover:!bg-secondary dark:hover:!bg-secondary' : 'hover:!bg-primary dark:hover:!bg-primary'}`}
-              >
-                {activeTimer.isPaused ? 'Paused' : 'Running'}
-              </Badge>
-              {activeTimer.isBillable && (
-                <Badge variant="outline" className="text-xs flex-shrink-0 hover:bg-transparent dark:hover:bg-transparent">Billable</Badge>
-              )}
+              <div>
+                <div className="text-lg sm:text-2xl font-bold text-green-600 break-words">
+                  {formatDuration(timeStats.monthDuration)}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">This Month</div>
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {timeStats && (timeStats.todayCost > 0 || timeStats.weekCost > 0 || timeStats.monthCost > 0) && (
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
+              <div>
+                <div className="text-sm sm:text-lg font-semibold text-green-600 break-words">
+                  {formatCurrency(timeStats.todayCost)}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">Today</div>
+              </div>
+              <div>
+                <div className="text-sm sm:text-lg font-semibold text-green-600 break-words">
+                  {formatCurrency(timeStats.weekCost)}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">This Week</div>
+              </div>
+              <div>
+                <div className="text-sm sm:text-lg font-semibold text-green-600 break-words">
+                  {formatCurrency(timeStats.monthCost)}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">This Month</div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button
               size="sm"
-              variant="outline"
-              disabled={isLoading}
-              onClick={() => updateTimerAction(activeTimer.isPaused ? 'resume' : 'pause')}
-              className="w-full text-xs sm:text-sm whitespace-nowrap"
+              onClick={() => router.push('/time-tracking')}
+              className="flex-1 text-xs sm:text-sm"
             >
-              {activeTimer.isPaused ? (
-                <>
-                  <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                  Resume
-                </>
-              ) : (
-                <>
-                  <Pause className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                  Pause
-                </>
-              )}
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              disabled={isLoading}
-              onClick={() => updateTimerAction('stop')}
-              className="w-full text-xs sm:text-sm whitespace-nowrap"
-            >
-              <Square className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-              Stop
+              <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+              Time Tracking Details
             </Button>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => {
-                const pid = activeTimer.project && activeTimer.project._id ? `projectId=${encodeURIComponent(activeTimer.project._id)}` : ''
-                const pname = activeTimer.project && activeTimer.project.name ? `projectName=${encodeURIComponent(activeTimer.project.name)}` : ''
-                const tid = activeTimer.task && activeTimer.task._id ? `taskId=${encodeURIComponent(activeTimer.task._id)}` : ''
-                const tname = activeTimer.task && activeTimer.task.title ? `taskName=${encodeURIComponent(activeTimer.task.title)}` : ''
-                const qs = [pid, pname, tid, tname].filter(Boolean).join('&')
-                router.push(qs ? `/time-tracking/timer?${qs}` : '/time-tracking/timer')
-              }}
-              className="w-full text-xs sm:text-sm whitespace-nowrap"
+              onClick={() => router.push('/time-tracking/logs')}
+              className="flex-1 sm:flex-initial text-xs sm:text-sm"
             >
-              <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-              Manage<span className="hidden sm:inline"> Timer</span>
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+              View Logs
             </Button>
           </div>
         </CardContent>
       </Card>
-    )
-  }
-
-  return (
-    <Card className="overflow-x-hidden">
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-          <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-          <span className="truncate">Time Tracking</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription className="text-xs sm:text-sm break-words">{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {timeStats && (
-          <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
-            <div>
-              <div className="text-lg sm:text-2xl font-bold text-primary break-words">
-                {formatDuration(timeStats.todayDuration)}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">Today</div>
-            </div>
-            <div>
-              <div className="text-lg sm:text-2xl font-bold text-blue-600 break-words">
-                {formatDuration(timeStats.weekDuration)}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">This Week</div>
-            </div>
-            <div>
-              <div className="text-lg sm:text-2xl font-bold text-green-600 break-words">
-                {formatDuration(timeStats.monthDuration)}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">This Month</div>
-            </div>
-          </div>
-        )}
-
-        {timeStats && (timeStats.todayCost > 0 || timeStats.weekCost > 0 || timeStats.monthCost > 0) && (
-          <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
-            <div>
-              <div className="text-sm sm:text-lg font-semibold text-green-600 break-words">
-                {formatCurrency(timeStats.todayCost)}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">Today</div>
-            </div>
-            <div>
-              <div className="text-sm sm:text-lg font-semibold text-green-600 break-words">
-                {formatCurrency(timeStats.weekCost)}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">This Week</div>
-            </div>
-            <div>
-              <div className="text-sm sm:text-lg font-semibold text-green-600 break-words">
-                {formatCurrency(timeStats.monthCost)}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">This Month</div>
-            </div>
-          </div>
-        )}
-
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Button
-            size="sm"
-            onClick={() => router.push('/time-tracking')}
-            className="flex-1 text-xs sm:text-sm"
-          >
-            <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-            Time Tracking Details
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => router.push('/time-tracking/logs')}
-            className="flex-1 sm:flex-initial text-xs sm:text-sm"
-          >
-            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-            View Logs
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    </div>
   )
 }

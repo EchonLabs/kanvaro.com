@@ -14,6 +14,7 @@ import { useOrganization } from '@/hooks/useOrganization'
 import { applyRoundingRules } from '@/lib/utils'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { Permission, Role, ROLE_PERMISSIONS } from '@/lib/permissions/permission-definitions'
 
 interface TimeReportsProps {
   userId?: string
@@ -125,7 +126,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   const [error, setError] = useState('')
   const [orgCurrency, setOrgCurrency] = useState<string>('USD')
   const [projects, setProjects] = useState<Array<{ _id: string; name: string }>>([])
-  const [users, setUsers] = useState<Array<{ _id: string; firstName: string; lastName: string; email: string }>>([])
+  const [users, setUsers] = useState<Array<{ _id: string; firstName: string; lastName: string; email: string; role: string }>>([])
   const [tasks, setTasks] = useState<Array<{ _id: string; title: string }>>([])
   const [projectFilterQuery, setProjectFilterQuery] = useState('')
   const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
@@ -302,7 +303,8 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
               _id: u._id,
               firstName: u.firstName || '',
               lastName: u.lastName || '',
-              email: u.email || ''
+              email: u.email || '',
+              role: u.role || ''
             })))
           }
         }
@@ -363,8 +365,18 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
 
   const filteredAssignedByOptions = useMemo(() => {
     const query = assignedByFilterQuery.trim().toLowerCase()
-    if (!query) return users
-    return users.filter((user) =>
+    
+    // First filter users by role permissions (must have TIME_TRACKING_APPROVE)
+    const usersWithApprovePermission = users.filter((user) => {
+      const userRole = user.role as Role
+      if (!userRole || !ROLE_PERMISSIONS[userRole]) return false
+      const rolePermissions = ROLE_PERMISSIONS[userRole] || []
+      return rolePermissions.includes(Permission.TIME_TRACKING_APPROVE)
+    })
+    
+    // Then apply search filter
+    if (!query) return usersWithApprovePermission
+    return usersWithApprovePermission.filter((user) =>
       `${user.firstName} ${user.lastName}`.toLowerCase().includes(query) ||
       user.email.toLowerCase().includes(query)
     )
