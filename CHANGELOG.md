@@ -1,3 +1,10 @@
+## [1.28.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.28.4...v1.28.5) (2026-01-28)
+
+
+### Bug Fixes
+
+* fix memeber filter ([2478c6d](https://github.com/EchonLabs/kanvaro.com/commit/2478c6d185b67fbff1562b7d2f3c45439ef0b9a3))
+
 ## [1.28.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.28.3...v1.28.4) (2026-01-28)
 
 

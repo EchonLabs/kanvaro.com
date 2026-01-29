@@ -52,7 +52,11 @@ export async function GET(request: NextRequest) {
       filters.$or = [
         { firstName: { $regex: search, $options: 'i' } },
         { lastName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
+        { email: { $regex: search, $options: 'i' } },
+        { "projectManager.firstName": { $regex: search, $options: 'i' } },
+        { "projectManager.lastName": { $regex: search, $options: 'i' } },
+        { "humanResourcePartner.firstName": { $regex: search, $options: 'i' } },
+        { "humanResourcePartner.lastName": { $regex: search, $options: 'i' } }
       ]
     }
     
