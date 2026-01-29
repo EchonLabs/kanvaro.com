@@ -1,3 +1,10 @@
+# [1.29.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.28.5...v1.29.0) (2026-01-29)
+
+
+### Features
+
+* fix project limit ([ed15c10](https://github.com/EchonLabs/kanvaro.com/commit/ed15c1025c52ee6031a6de9741b1dde16d37672f))
+
 ## [1.28.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.28.4...v1.28.5) (2026-01-28)
 
 
