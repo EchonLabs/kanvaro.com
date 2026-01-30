@@ -4,6 +4,9 @@ import { Task, TASK_STATUS_VALUES, TaskStatus } from '@/models/Task'
 import { Project } from '@/models/Project'
 import { invalidateCache } from '@/lib/redis'
 import { Counter } from '@/models/Counter'
+import { authenticateUser } from '@/lib/auth-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { Permission } from '@/lib/permissions/permission-definitions'
 
 const TASK_STATUS_SET = new Set<TaskStatus>(TASK_STATUS_VALUES)
 
@@ -138,20 +141,17 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB()
 
-    // Skip authentication for bulk create
-    // Get userId and organizationId from query params or use defaults
-    const { searchParams } = new URL(request.url)
-    let userId = searchParams.get('userId') || '000000000000000000000000' // Use valid ObjectId for system user
-    
-    // Validate userId is a valid ObjectId if provided
-    if (searchParams.get('userId') && !/^[0-9a-fA-F]{24}$/.test(searchParams.get('userId')!)) {
+    // Authenticate user
+    const authResult = await authenticateUser()
+    if ('error' in authResult) {
       return NextResponse.json(
-        { success: false, error: 'Invalid userId format - must be a valid ObjectId' },
-        { status: 400 }
+        { success: false, error: authResult.error },
+        { status: authResult.status }
       )
     }
-    
-    let organizationId = searchParams.get('organizationId')
+
+    const userId = authResult.user.id
+    const organizationId = authResult.user.organization
 
     let body
     try {
@@ -281,8 +281,7 @@ export async function POST(request: NextRequest) {
         )
       }
     }
-
-    // Skip permission checks for no-auth mode
+// Skip permission checks for no-auth mode
     // for (const project of projects) {
     //   const canCreateTask = await PermissionService.hasPermission(userId, Permission.TASK_CREATE, project._id.toString())
     //   if (!canCreateTask) {
@@ -292,6 +291,16 @@ export async function POST(request: NextRequest) {
     //     )
     //   }
     // }
+    // Check permissions for each project
+    for (const project of projects) {
+      const canCreateTask = await PermissionService.hasPermission(userId, Permission.TASK_CREATE, project._id.toString())
+      if (!canCreateTask) {
+        return NextResponse.json(
+          { success: false, error: `Access denied to create tasks in project: ${project.name}` },
+          { status: 403 }
+        )
+      }
+    }
 
     // Create a map of project ID to team members and organization
     const projectTeamMap = new Map()
