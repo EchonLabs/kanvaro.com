@@ -203,7 +203,7 @@ export default function EditStoryPage() {
     }
 
     try {
-      const response = await fetch(`/api/sprints?project=${projectId}`)
+      const response = await fetch(`/api/sprints?project=${projectId}&status=planning,active`)
       const data = await response.json()
       if (data.success && Array.isArray(data.data)) {
         setSprints(data.data)

@@ -1322,11 +1322,11 @@ export function TimeLogs({
 
     setTasksLoading(true)
     try {
-      // Fetch tasks for the selected project where user is assigned (matching timer page)
+      // Fetch tasks for the selected project using the new endpoint
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout (matching timer page)
+      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
 
-      const url = `/api/tasks?project=${projectId}&assignedTo=${resolvedUserId}&all=true&minimal=true`
+      const url = `/api/projects/${projectId}/tasks`
 
       const res = await fetch(url, {
         cache: 'no-store',
@@ -2518,7 +2518,7 @@ export function TimeLogs({
                     />
                   </div>
                 )}
-                <div>Description</div>
+                <div>Memo</div>
                 <div>Project (Task)</div>
                 <div>Employee</div>
                 <div>Start Time</div>
@@ -3764,7 +3764,7 @@ export function TimeLogs({
                 <div className="font-semibold mb-1">CSV Format Requirements:</div>
                 <ul className="list-disc list-inside space-y-1">
                   <li><strong>Required columns:</strong> Task No, Start Date, Start Time, End Date, End Time</li>
-                  <li><strong>Optional columns:</strong> Description</li>
+                  <li><strong>Required columns:</strong> Memo</li>
                   <li><strong>Task No format:</strong> ProjectNumber.TaskNumber (e.g., 20.7)</li>
                   <li><strong>Date formats accepted:</strong> YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY, DD-MM-YYYY</li>
                   <li><strong>Time formats accepted:</strong> HH:MM, H:MM AM/PM, H AM/PM, or just H (24-hour)</li>

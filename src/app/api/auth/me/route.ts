@@ -44,6 +44,7 @@ export async function GET() {
             id: user._id,
             firstName: user.firstName,
             lastName: user.lastName,
+            memberId: user.memberId,
             email: user.email,
             role: user.role,
             customRole: user.customRole ? {
@@ -102,6 +103,7 @@ export async function GET() {
                 id: user._id,
                 firstName: user.firstName,
                 lastName: user.lastName,
+                memberId: user.memberId,
                 email: user.email,
                 role: user.role,
                 customRole: user.customRole ? {
@@ -172,6 +174,7 @@ export async function GET() {
             id: user._id,
             firstName: user.firstName,
             lastName: user.lastName,
+            memberId: user.memberId,
             email: user.email,
             role: user.role,
             customRole: user.customRole ? {

@@ -281,7 +281,7 @@ export async function GET(req: NextRequest) {
     }
 
     // First get raw events to check sprint references
-    const rawSprintEvents = await SprintEvent.find(query).sort({ scheduledDate: 1 })
+    const rawSprintEvents = await SprintEvent.find(query).sort({ createdAt: -1 })
 
     console.log('Raw sprint events before population:', rawSprintEvents.map(event => ({
       _id: event._id,
@@ -295,7 +295,7 @@ export async function GET(req: NextRequest) {
       .populate('project', 'name')
       .populate('facilitator', 'firstName lastName email')
       .populate('attendees', 'firstName lastName email')
-      .sort({ scheduledDate: 1 })
+      .sort({ createdAt: -1 })
 
     // Debug sprint population and fix data integrity issues
     for (const event of sprintEvents) {

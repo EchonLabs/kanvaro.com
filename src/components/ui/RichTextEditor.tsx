@@ -11,9 +11,23 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
-  Type
+  Type,
+  ChevronDown
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/DropdownMenu'
 
 interface RichTextEditorProps {
   value: string
@@ -21,6 +35,8 @@ interface RichTextEditorProps {
   placeholder?: string
   className?: string
   disabled?: boolean
+  maxLength?: number
+  showCharCount?: boolean
 }
 
 export function RichTextEditor({
@@ -28,7 +44,9 @@ export function RichTextEditor({
   onChange,
   placeholder = 'Enter text...',
   className,
-  disabled = false
+  disabled = false,
+  maxLength,
+  showCharCount = false
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const [isActive, setIsActive] = useState<Record<string, boolean>>({})
@@ -53,13 +71,36 @@ export function RichTextEditor({
     setIsActive(newStates)
   }, [])
 
+  const stripHtml = useCallback((html: string): string => {
+    const tmp = document.createElement('div')
+    tmp.innerHTML = html
+    return tmp.textContent || tmp.innerText || ''
+  }, [])
+
+  const getCharCount = useCallback((html: string): number => {
+    return stripHtml(html).length
+  }, [stripHtml])
+
   const handleInput = useCallback(() => {
     if (editorRef.current) {
-      const html = editorRef.current.innerHTML
+      let html = editorRef.current.innerHTML
+
+      // Enforce maxLength if provided
+      if (maxLength) {
+        const textContent = stripHtml(html)
+        if (textContent.length > maxLength) {
+          // Truncate the text content
+          const truncatedText = textContent.substring(0, maxLength)
+          // Convert back to HTML (simple approach - may not preserve all formatting)
+          html = truncatedText.replace(/\n/g, '<br>')
+          editorRef.current.innerHTML = html
+        }
+      }
+
       onChange(html)
       updateActiveStates()
     }
-  }, [onChange, updateActiveStates])
+  }, [onChange, updateActiveStates, maxLength, stripHtml])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Tab') {
@@ -68,67 +109,152 @@ export function RichTextEditor({
     }
   }, [execCommand])
 
-  const insertUnorderedList = useCallback(() => {
+  const insertUnorderedList = useCallback((listType: string = 'disc') => {
     if (disabled || !editorRef.current) return
-    const selection = window.getSelection()
-    if (!selection) return
 
-    editorRef.current.focus()
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return
+
     const range = selection.getRangeAt(0)
     const selectedText = range.toString()
 
-    if (selectedText) {
-      // Wrap selected text in list
-      const listHTML = `<ul><li>${selectedText.replace(/\n/g, '</li><li>')}</li></ul>`
+    editorRef.current.focus()
+
+    if (selectedText.trim()) {
+      // Convert selected text to list items
+      const lines = selectedText.split('\n').filter(line => line.trim())
+      const listItems = lines.map(line => `<li>${line.trim()}</li>`).join('')
+      const listHTML = `<ul style="list-style-type: ${listType};">${listItems}</ul>`
       document.execCommand('insertHTML', false, listHTML)
     } else {
-      // Insert new list
-      const listHTML = '<ul><li><br></li></ul>'
+      // Insert new empty list
+      const listHTML = `<ul style="list-style-type: ${listType};"><li><br></li></ul>`
       document.execCommand('insertHTML', false, listHTML)
-      // Move cursor into the list item
-      const newRange = document.createRange()
-      const listItems = editorRef.current.querySelectorAll('ul li')
-      if (listItems.length > 0) {
-        const lastLi = listItems[listItems.length - 1]
-        newRange.setStart(lastLi, 0)
-        newRange.setEnd(lastLi, 0)
-        selection.removeAllRanges()
-        selection.addRange(newRange)
-      }
+
+      // Move cursor to the list item
+      setTimeout(() => {
+        const lists = editorRef.current?.querySelectorAll('ul')
+        if (lists && lists.length > 0) {
+          const lastList = lists[lists.length - 1]
+          const listItems = lastList.querySelectorAll('li')
+          if (listItems.length > 0) {
+            const lastItem = listItems[listItems.length - 1]
+            const newRange = document.createRange()
+            newRange.setStart(lastItem, 0)
+            newRange.setEnd(lastItem, 0)
+            selection.removeAllRanges()
+            selection.addRange(newRange)
+          }
+        }
+      }, 0)
     }
+
     handleInput()
   }, [disabled, handleInput])
 
-  const insertOrderedList = useCallback(() => {
+  const insertOrderedList = useCallback((listType: string = 'decimal') => {
     if (disabled || !editorRef.current) return
-    const selection = window.getSelection()
-    if (!selection) return
 
-    editorRef.current.focus()
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return
+
     const range = selection.getRangeAt(0)
     const selectedText = range.toString()
 
-    if (selectedText) {
-      // Wrap selected text in list
-      const listHTML = `<ol><li>${selectedText.replace(/\n/g, '</li><li>')}</li></ol>`
+    editorRef.current.focus()
+
+    if (selectedText.trim()) {
+      // Convert selected text to numbered list items
+      const lines = selectedText.split('\n').filter(line => line.trim())
+      const listItems = lines.map(line => `<li>${line.trim()}</li>`).join('')
+      const listHTML = `<ol style="list-style-type: ${listType};">${listItems}</ol>`
       document.execCommand('insertHTML', false, listHTML)
     } else {
-      // Insert new list
-      const listHTML = '<ol><li><br></li></ol>'
+      // Insert new empty numbered list
+      const listHTML = `<ol style="list-style-type: ${listType};"><li><br></li></ol>`
       document.execCommand('insertHTML', false, listHTML)
-      // Move cursor into the list item
-      const newRange = document.createRange()
-      const listItems = editorRef.current.querySelectorAll('ol li')
-      if (listItems.length > 0) {
-        const lastLi = listItems[listItems.length - 1]
-        newRange.setStart(lastLi, 0)
-        newRange.setEnd(lastLi, 0)
-        selection.removeAllRanges()
-        selection.addRange(newRange)
-      }
+
+      // Move cursor to the list item
+      setTimeout(() => {
+        const lists = editorRef.current?.querySelectorAll('ol')
+        if (lists && lists.length > 0) {
+          const lastList = lists[lists.length - 1]
+          const listItems = lastList.querySelectorAll('li')
+          if (listItems.length > 0) {
+            const lastItem = listItems[listItems.length - 1]
+            const newRange = document.createRange()
+            newRange.setStart(lastItem, 0)
+            newRange.setEnd(lastItem, 0)
+            selection.removeAllRanges()
+            selection.addRange(newRange)
+          }
+        }
+      }, 0)
     }
+
     handleInput()
   }, [disabled, handleInput])
+
+  const fontSizes = [
+    { label: '8pt', value: '1' },
+    { label: '10pt', value: '2' },
+    { label: '12pt', value: '3' },
+    { label: '14pt', value: '4' },
+    { label: '16pt', value: '5' },
+    { label: '18pt', value: '6' },
+    { label: '20pt', value: '7' },
+    { label: '24pt', value: '8' },
+    { label: '28pt', value: '9' },
+    { label: '32pt', value: '10' },
+    { label: '36pt', value: '11' },
+    { label: '48pt', value: '12' }
+  ]
+
+  const fontFamilies = [
+    { label: 'Arial', value: 'Arial, sans-serif' },
+    { label: 'Times New Roman', value: '"Times New Roman", serif' },
+    { label: 'Courier New', value: '"Courier New", monospace' },
+    { label: 'Georgia', value: 'Georgia, serif' },
+    { label: 'Verdana', value: 'Verdana, sans-serif' },
+    { label: 'Helvetica', value: 'Helvetica, sans-serif' },
+    { label: 'Trebuchet MS', value: '"Trebuchet MS", sans-serif' },
+    { label: 'Impact', value: 'Impact, sans-serif' }
+  ]
+
+  const [selectedFontSize, setSelectedFontSize] = useState<string>('5') // Default to 16pt
+  const [selectedFontFamily, setSelectedFontFamily] = useState<string>('Arial, sans-serif') // Default to Arial
+
+  const increaseFontSize = useCallback(() => {
+    if (disabled) return
+
+    const currentIndex = fontSizes.findIndex(size => size.value === selectedFontSize)
+    const newIndex = Math.min(currentIndex + 1, fontSizes.length - 1)
+    const newSize = fontSizes[newIndex].value
+    setSelectedFontSize(newSize)
+    execCommand('fontSize', newSize)
+  }, [execCommand, disabled, selectedFontSize, fontSizes])
+
+  const decreaseFontSize = useCallback(() => {
+    if (disabled) return
+
+    const currentIndex = fontSizes.findIndex(size => size.value === selectedFontSize)
+    const newIndex = Math.max(currentIndex - 1, 0)
+    const newSize = fontSizes[newIndex].value
+    setSelectedFontSize(newSize)
+    execCommand('fontSize', newSize)
+  }, [execCommand, disabled, selectedFontSize, fontSizes])
+
+  const applyFontSize = useCallback((size: string) => {
+    if (disabled) return
+    setSelectedFontSize(size)
+    execCommand('fontSize', size)
+  }, [execCommand, disabled])
+
+  const applyFontFamily = useCallback((fontFamily: string) => {
+    if (disabled) return
+    setSelectedFontFamily(fontFamily)
+    execCommand('fontName', fontFamily)
+  }, [execCommand, disabled])
 
   const formatAsHeading = useCallback(() => {
     if (disabled) return
@@ -222,42 +348,123 @@ export function RichTextEditor({
 
         <div className="w-px h-6 bg-border mx-1" />
 
+        <Select value={selectedFontFamily} onValueChange={applyFontFamily} disabled={disabled}>
+          <SelectTrigger className="w-32 h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {fontFamilies.map((font) => (
+              <SelectItem key={font.value} value={font.value}>
+                <span style={{ fontFamily: font.value }}>{font.label}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedFontSize} onValueChange={applyFontSize} disabled={disabled}>
+          <SelectTrigger className="w-20 h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {fontSizes.map((size) => (
+              <SelectItem key={size.value} value={size.value}>
+                {size.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          onClick={insertUnorderedList}
-          className="h-8 w-8 p-0"
+          onClick={increaseFontSize}
           disabled={disabled}
-          title="Bullet List"
+          className="h-8 w-8 p-0"
+          title="Increase Font Size"
         >
-          <List className="h-4 w-4" />
+          <Type className="h-5 w-5" />
         </Button>
 
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          onClick={insertOrderedList}
-          className="h-8 w-8 p-0"
+          onClick={decreaseFontSize}
           disabled={disabled}
-          title="Numbered List"
+          className="h-8 w-8 p-0"
+          title="Decrease Font Size"
         >
-          <ListOrdered className="h-4 w-4" />
+          <Type className="h-3 w-3" />
         </Button>
 
         <div className="w-px h-6 bg-border mx-1" />
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={formatAsHeading}
-          disabled={disabled}
-          title="Heading"
-        >
-          <Type className="h-4 w-4" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              disabled={disabled}
+              title="Bullet List Options"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onClick={() => insertUnorderedList('disc')}>
+              <span className="w-4 h-4 rounded-full bg-current mr-2" style={{ listStyleType: 'disc' }}></span>
+              Filled Circle
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => insertUnorderedList('circle')}>
+              <span className="w-4 h-4 rounded-full border border-current mr-2" style={{ listStyleType: 'circle' }}></span>
+              Empty Circle
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => insertUnorderedList('square')}>
+              <span className="w-4 h-4 bg-current mr-2" style={{ listStyleType: 'square', width: '6px', height: '6px' }}></span>
+              Square
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              disabled={disabled}
+              title="Numbered List Options"
+            >
+              <ListOrdered className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onClick={() => insertOrderedList('decimal')}>
+              <span className="w-6 text-center mr-2">1.</span>
+              Numbers (1, 2, 3...)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => insertOrderedList('lower-alpha')}>
+              <span className="w-6 text-center mr-2">a.</span>
+              Lowercase Letters (a, b, c...)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => insertOrderedList('upper-alpha')}>
+              <span className="w-6 text-center mr-2">A.</span>
+              Uppercase Letters (A, B, C...)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => insertOrderedList('lower-roman')}>
+              <span className="w-6 text-center mr-2">i.</span>
+              Lowercase Roman (i, ii, iii...)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => insertOrderedList('upper-roman')}>
+              <span className="w-6 text-center mr-2">I.</span>
+              Uppercase Roman (I, II, III...)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Editor */}
@@ -269,7 +476,7 @@ export function RichTextEditor({
         onMouseUp={updateActiveStates}
         onKeyUp={updateActiveStates}
         className={cn(
-          'min-h-[120px] p-3 focus:outline-none prose prose-sm max-w-none',
+          'rich-text-editor min-h-[120px] p-3 focus:outline-none prose prose-sm max-w-none',
           'prose-headings:font-semibold prose-headings:text-foreground',
           'prose-p:text-foreground prose-p:leading-relaxed',
           'prose-strong:font-semibold prose-strong:text-foreground',
@@ -285,6 +492,22 @@ export function RichTextEditor({
         }}
         data-placeholder={placeholder}
       />
+
+      {/* Character Count */}
+      {showCharCount && maxLength && (
+        <div className="px-3 py-2 border-t bg-muted/30 text-xs text-muted-foreground flex justify-between items-center">
+          <span className="text-xs">
+            Characters: {getCharCount(value)} / {maxLength}
+          </span>
+          <span className={cn(
+            'text-xs font-medium',
+            getCharCount(value) > maxLength * 0.9 ? 'text-destructive' :
+            getCharCount(value) > maxLength * 0.8 ? 'text-yellow-600' : 'text-muted-foreground'
+          )}>
+            {maxLength - getCharCount(value)} remaining
+          </span>
+        </div>
+      )}
     </div>
   )
 }

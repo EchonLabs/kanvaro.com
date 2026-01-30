@@ -437,6 +437,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TASK_CHANGE_STATUS,
     Permission.TASK_MANAGE_COMMENTS,
     Permission.TASK_MANAGE_ATTACHMENTS,
+    Permission.TASK_VIEW_ALL,
     
     // Team
     Permission.TEAM_READ,
