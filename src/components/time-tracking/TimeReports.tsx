@@ -843,7 +843,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
           <CardHeader>
             <CardTitle>Approved Time Entries</CardTitle>
             <CardDescription>
-              Shows only approved time entries (isApproved = true and isReject = false)
+              Shows only approved time entries
             </CardDescription>
           </CardHeader>
           <CardContent>
