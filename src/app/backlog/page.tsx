@@ -48,6 +48,7 @@ import { useNotify } from '@/lib/notify'
 import { usePermissions } from '@/lib/permissions/permission-hooks'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionGate } from '@/lib/permissions/permission-components'
+import { extractUserId } from '@/lib/auth/user-utils'
 
 interface UserSummary {
   _id: string
@@ -135,6 +136,33 @@ export default function BacklogPage() {
   const { hasPermission } = usePermissions()
   const canManageSprints = hasPermission(Permission.SPRINT_MANAGE)
   const canCreateTask = hasPermission(Permission.TASK_CREATE)
+  const [user, setUser] = useState<any>(null)
+
+  // Permission functions for backlog items
+  const canEditTask = useCallback((task: BacklogItem) => {
+    return hasPermission(Permission.TASK_EDIT_ALL) || task.createdBy._id === user?.id
+  }, [hasPermission, user?.id])
+
+  const canDeleteTask = useCallback((task: BacklogItem) => {
+    return hasPermission(Permission.TASK_DELETE_ALL) || task.createdBy._id === user?.id
+  }, [hasPermission, user?.id])
+
+  const canEditStory = useCallback((story: BacklogItem) => {
+    return hasPermission(Permission.STORY_UPDATE, story.project?._id) || story.createdBy._id === user?.id
+  }, [hasPermission, user?.id])
+
+  const canDeleteStory = useCallback((story: BacklogItem) => {
+    return hasPermission(Permission.STORY_DELETE, story.project?._id) || story.createdBy._id === user?.id
+  }, [hasPermission, user?.id])
+
+  const canEditEpic = useCallback((epic: BacklogItem) => {
+    return hasPermission(Permission.EPIC_EDIT) || epic.createdBy._id === user?.id
+  }, [hasPermission, user?.id])
+
+  const canDeleteEpic = useCallback((epic: BacklogItem) => {
+    return hasPermission(Permission.EPIC_DELETE) || epic.createdBy._id === user?.id
+  }, [hasPermission, user?.id])
+
   const [deleteError, setDeleteError] = useState('')
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -278,6 +306,9 @@ export default function BacklogPage() {
       const response = await fetch('/api/auth/me')
       
       if (response.ok) {
+        const data = await response.json()
+        const userId = extractUserId(data)
+        if (userId) setUser({ id: userId.toString() })
         setAuthError('')
         await fetchBacklogItems()
       } else if (response.status === 401) {
@@ -286,6 +317,9 @@ export default function BacklogPage() {
         })
         
         if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          const userId = extractUserId(refreshData)
+          if (userId) setUser({ id: userId.toString() })
           setAuthError('')
           await fetchBacklogItems()
         } else {
@@ -2056,7 +2090,7 @@ export default function BacklogPage() {
                                 )}
 
                                 {/* Edit */}
-                                {item.type === 'task' && (
+                                {item.type === 'task' && canEditTask(item) && (
                                   <DropdownMenuItem
                                     onClick={() => router.push(`/tasks/${item._id}/edit`)}
                                     className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
@@ -2065,7 +2099,7 @@ export default function BacklogPage() {
                                     <span>Edit Task</span>
                                   </DropdownMenuItem>
                                 )}
-                                {item.type === 'story' && (
+                                {item.type === 'story' && canEditStory(item) && (
                                   <DropdownMenuItem
                                     onClick={() => router.push(`/stories/${item._id}/edit`)}
                                     className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
@@ -2074,7 +2108,7 @@ export default function BacklogPage() {
                                     <span>Edit Story</span>
                                   </DropdownMenuItem>
                                 )}
-                                {item.type === 'epic' && (
+                                {item.type === 'epic' && canEditEpic(item) && (
                                   <DropdownMenuItem
                                     onClick={() => router.push(`/epics/${item._id}/edit`)}
                                     className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
@@ -2150,15 +2184,19 @@ export default function BacklogPage() {
                                 )}
 
                                 {/* Delete */}
-                                <DropdownMenuItem
-                                  onClick={() => handleDeleteClick(item)}
-                                  className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  <span>
-                                    Delete {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-                                  </span>
-                                </DropdownMenuItem>
+                                {((item.type === 'task' && canDeleteTask(item)) ||
+                                  (item.type === 'story' && canDeleteStory(item)) ||
+                                  (item.type === 'epic' && canDeleteEpic(item))) && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleDeleteClick(item)}
+                                    className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    <span>
+                                      Delete {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                                    </span>
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>

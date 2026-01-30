@@ -1012,7 +1012,12 @@ export default function CreateTaskPage() {
                   value={formData.description}
                   onChange={(value) => handleChange('description', value)}
                   placeholder="Enter task description"
+                  maxLength={10000}
+                  showCharCount={true}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Maximum 10,000 characters.
+                </p>
               </div>
 
               <div className="space-y-2">

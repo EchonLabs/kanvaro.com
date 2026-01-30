@@ -11,6 +11,7 @@ export interface INotification extends Document {
     entityId?: mongoose.Types.ObjectId
     action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'completed' | 'overdue' | 'reminder' | 'upcoming'
     priority?: 'low' | 'medium' | 'high' | 'critical'
+    projectName?: string
     url?: string
     metadata?: Record<string, any>
   }

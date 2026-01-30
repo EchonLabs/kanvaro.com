@@ -546,7 +546,7 @@ export const SecuritySchemas = {
   
   task: z.object({
     title: z.string().min(1).max(200),
-    description: z.string().max(2000).optional(),
+    description: z.string().max(10000).optional(),
     priority: z.enum(['low', 'medium', 'high', 'critical']),
     status: z.enum(['todo', 'in-progress', 'review', 'done', 'cancelled']),
   }),
