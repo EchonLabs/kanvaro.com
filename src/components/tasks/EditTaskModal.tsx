@@ -628,8 +628,13 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
                     onChange={(value) => setFormData({...formData, description: value})}
                     placeholder="Enter task description with rich formatting..."
                     disabled={loading}
+                    maxLength={10000}
+                    showCharCount={true}
                   />
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Maximum 10,000 characters.
+                </p>
               </div>
 
               <div>
@@ -1079,8 +1084,13 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
                         onChange={(value) => updateSubtask(index, 'description', value)}
                         placeholder="Subtask description"
                         disabled={loading}
+                        maxLength={2000}
+                        showCharCount={true}
                       />
                     </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Supports rich text formatting. Maximum 2,000 characters.
+                    </p>
                   </div>
 
                   <div className="flex items-center space-x-2">

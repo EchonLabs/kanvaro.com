@@ -5,6 +5,8 @@ import { Story } from '@/models/Story'
 import { Epic } from '@/models/Epic'
 import { Project } from '@/models/Project'
 import { authenticateUser } from '@/lib/auth-utils'
+import { PermissionService } from '@/lib/permissions/permission-service'
+import { Permission } from '@/lib/permissions/permission-definitions'
 import '@/models/Sprint'
 
 const PRIORITY_WEIGHT: Record<string, number> = {
@@ -305,7 +307,14 @@ export async function GET(request: NextRequest) {
     }
 
     const { user } = authResult
+    const userId = user.id
     const organizationId = user.organization
+
+    // Check permissions for task visibility
+    const [canViewAllTasks, hasTaskViewAll] = await Promise.all([
+      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
+      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL)
+    ])
 
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
@@ -350,6 +359,25 @@ export async function GET(request: NextRequest) {
       organization: organizationId,
       project: project ? project : { $in: projectIds },
       archived: false
+    }
+
+    // Apply task visibility permissions (same as tasks API)
+    if (!canViewAllTasks && !hasTaskViewAll) {
+      const userFilters: any[] = [{ 'assignedTo.user': { $in: [userId] } }, { createdBy: userId }]
+
+      // If assignedTo filter is provided and it's the current user, use it
+      // Otherwise, ignore the filter and use default user restriction
+      if (assignedTo && assignedTo === userId) {
+        taskFilter['assignedTo.user'] = { $in: [userId] }
+      } else if (createdBy && createdBy === userId) {
+        taskFilter.createdBy = userId
+      } else {
+        taskFilter.$or = userFilters
+      }
+    } else {
+      // User can view all tasks, so apply filters as requested
+      if (assignedTo) taskFilter['assignedTo.user'] = { $in: [assignedTo] }
+      if (createdBy) taskFilter.createdBy = createdBy
     }
 
     const storyFilter: Record<string, unknown> = {

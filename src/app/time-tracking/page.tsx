@@ -26,6 +26,8 @@ export default function TimeTrackingPage() {
   const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [authError, setAuthError] = useState('')
+  const [stats, setStats] = useState<any>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
@@ -68,6 +70,42 @@ export default function TimeTrackingPage() {
 
     checkAuth()
   }, [router])
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!user) return
+
+      try {
+        setStatsLoading(true)
+        const response = await fetch('/api/time-tracking/stats')
+        
+        if (response.ok) {
+          const statsData = await response.json()
+          setStats(statsData)
+        }
+      } catch (error) {
+        console.error('Failed to fetch time tracking stats:', error)
+      } finally {
+        setStatsLoading(false)
+      }
+    }
+
+    fetchStats()
+  }, [user])
+
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+    if (hours > 0) {
+      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
+    }
+    return `${mins}m`
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', { weekday: 'long' })
+  }
 
   if (isLoading) {
     return (
@@ -211,15 +249,21 @@ export default function TimeTrackingPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Time Tracked</span>
-                  <span className="font-medium">0h 0m</span>
+                  <span className="font-medium">
+                    {statsLoading ? '...' : formatDuration(stats?.todaySummary?.timeTracked || 0)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Billable Time</span>
-                  <span className="font-medium">0h 0m</span>
+                  <span className="font-medium">
+                    {statsLoading ? '...' : formatDuration(stats?.todaySummary?.billableTime || 0)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Tasks Completed</span>
-                  <span className="font-medium">0</span>
+                  <span className="font-medium">
+                    {statsLoading ? '...' : (stats?.todaySummary?.tasksCompleted || 0)}
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -234,15 +278,21 @@ export default function TimeTrackingPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Total Hours</span>
-                  <span className="font-medium">0h 0m</span>
+                  <span className="font-medium">
+                    {statsLoading ? '...' : formatDuration(stats?.weekSummary?.totalHours || 0)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Average Daily</span>
-                  <span className="font-medium">0h 0m</span>
+                  <span className="font-medium">
+                    {statsLoading ? '...' : formatDuration(stats?.weekSummary?.averageDaily || 0)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Most Active Day</span>
-                  <span className="font-medium">-</span>
+                  <span className="font-medium">
+                    {statsLoading ? '...' : (stats?.weekSummary?.mostActiveDay ? formatDate(stats.weekSummary.mostActiveDay.date) : '-')}
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -261,19 +311,65 @@ export default function TimeTrackingPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8">
-              <div className="p-4 bg-muted rounded-lg inline-block mb-4">
-                <CheckCircle2 className="h-12 w-12 text-muted-foreground" />
+            {statsLoading ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+                <p className="text-muted-foreground">Loading recent activity...</p>
               </div>
-              <h3 className="text-lg font-medium mb-2">No Recent Activity</h3>
-              <p className="text-muted-foreground mb-4">
-                Start tracking time to see your activity here
-              </p>
-              <Button variant="outline" onClick={() => router.push('/time-tracking/logs')}>
-                <FileText className="h-4 w-4 mr-2" />
-                View All Logs
-              </Button>
-            </div>
+            ) : stats?.recentActivity && stats.recentActivity.length > 0 ? (
+              <div className="space-y-4">
+                {stats.recentActivity.map((entry: any) => (
+                  <div key={entry._id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{entry.description}</p>
+                      <div className="flex items-center space-x-2 text-xs text-muted-foreground mt-1">
+                        {entry.project && (
+                          <span className="flex items-center space-x-1">
+                            <Target className="h-3 w-3" />
+                            <span>{entry.project.name}</span>
+                          </span>
+                        )}
+                        {entry.task && (
+                          <span className="flex items-center space-x-1">
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span>{entry.task.title}</span>
+                          </span>
+                        )}
+                        {entry.isBillable && (
+                          <Badge variant="secondary" className="text-xs">Billable</Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-sm">{formatDuration(entry.duration)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(entry.startTime).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                <div className="pt-4 border-t">
+                  <Button variant="outline" onClick={() => router.push('/time-tracking/logs')} className="w-full">
+                    <FileText className="h-4 w-4 mr-2" />
+                    View All Logs
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="p-4 bg-muted rounded-lg inline-block mb-4">
+                  <CheckCircle2 className="h-12 w-12 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-medium mb-2">No Recent Activity</h3>
+                <p className="text-muted-foreground mb-4">
+                  Start tracking time to see your activity here
+                </p>
+                <Button variant="outline" onClick={() => router.push('/time-tracking/logs')}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  View All Logs
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 

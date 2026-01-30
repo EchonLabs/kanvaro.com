@@ -736,8 +736,13 @@ export default function CreateTaskModal({
                     value={formData.description}
                     onChange={(value) => setFormData({...formData, description: value})}
                     placeholder="Enter task description with rich formatting..."
+                    maxLength={10000}
+                    showCharCount={true}
                   />
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Maximum 10,000 characters.
+                </p>
               </div>
 
               <div className="md:col-span-2 space-y-2">
@@ -1213,7 +1218,7 @@ export default function CreateTaskModal({
                     />
                   </div>
 
-                  <div>
+                  {/* <div>
                     <label className="text-sm font-medium text-foreground">Description</label>
                     <Textarea
                       value={subtask.description || ''}
@@ -1221,7 +1226,7 @@ export default function CreateTaskModal({
                       placeholder="Subtask description"
                       rows={2}
                     />
-                  </div>
+                  </div> */}
                 </div>
               ))}
 

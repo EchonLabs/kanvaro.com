@@ -739,6 +739,7 @@ export async function PUT(
         // First, check if NEXT_PUBLIC_APP_URL is explicitly set (recommended for all environments)
         if (process.env.NEXT_PUBLIC_APP_URL) {
           baseUrl = process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '') // Remove trailing slash
+          console.log('baseUrl from NEXT_PUBLIC_APP_URL:', baseUrl)
         } else {
           // Fall back to detecting from request headers
           // When behind a proxy/load balancer, check x-forwarded-* headers first
@@ -807,6 +808,7 @@ export async function PUT(
           host = host.replace(/^(.+):443$/, '$1')
           
           baseUrl = `${protocol}://${host}`
+          console.log('baseUrl from fallback logic:', baseUrl)
         }
 
         if (assignedUsersChanged && newAssignedToIds.length > 0) {
@@ -814,6 +816,7 @@ export async function PUT(
           const newlyAssignedUsers = newAssignedToIds.filter(id => !currentAssignedToIds.includes(id))
 
           newlyAssignedUsers.forEach(userId => {
+            console.log('Using baseUrl for assignment notification:', baseUrl)
             notificationPromises.push(
               Project.findById(taskProjectId).select('name').lean().then(projectResult => {
                 const projectResultTyped = Array.isArray(projectResult) ? projectResult[0] : projectResult
@@ -836,6 +839,7 @@ export async function PUT(
 
         // Notify if task was completed
         if (updateData.status === 'done' && currentTask.status !== 'done') {
+          console.log('Using baseUrl for completion notification:', baseUrl)
           notificationPromises.push(
             Project.findById(taskProjectId).select('name').lean().then(projectResult => {
               const projectResultTyped = Array.isArray(projectResult) ? projectResult[0] : projectResult
@@ -870,6 +874,7 @@ export async function PUT(
           
         currentAssignees.forEach((assigneeId: string) => {
           if (assigneeId !== userId) {
+            console.log('Using baseUrl for update notification:', baseUrl)
             notificationPromises.push(
               Project.findById(taskProjectId).select('name').lean().then(projectResult => {
                 const projectResultTyped = Array.isArray(projectResult) ? projectResult[0] : projectResult

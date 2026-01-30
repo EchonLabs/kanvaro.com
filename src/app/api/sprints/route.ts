@@ -7,6 +7,118 @@ import { Story } from '@/models/Story'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { EmailService } from '@/lib/email/EmailService'
+
+// Helper function to send sprint assignment email to team members
+async function sendSprintAssignmentEmails(
+  sprint: any,
+  teamMembers: any[],
+  projectName: string
+) {
+  try {
+    const emailService = EmailService.getInstance()
+    const startDate = new Date(sprint.startDate).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+    const endDate = new Date(sprint.endDate).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+
+    const emailPromises = teamMembers.map(async (member: any) => {
+      if (!member.email) return
+
+      const emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; }
+            .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+            .sprint-card { background: white; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+            .sprint-title { font-size: 20px; font-weight: bold; color: #1a1a1a; margin-bottom: 15px; }
+            .sprint-detail { display: flex; margin-bottom: 10px; }
+            .sprint-label { font-weight: 600; color: #666; width: 120px; }
+            .sprint-value { color: #333; }
+            .button { display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin-top: 15px; }
+            .footer { text-align: center; color: #888; font-size: 12px; margin-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1 style="margin: 0;">🎯 Sprint Assignment</h1>
+              <p style="margin: 10px 0 0 0; opacity: 0.9;">You've been assigned to a new sprint</p>
+            </div>
+            <div class="content">
+              <p>Hi ${member.firstName},</p>
+              <p>You have been assigned to a new sprint in the <strong>${projectName}</strong> project.</p>
+
+              <div class="sprint-card">
+                <div class="sprint-title">${sprint.name}</div>
+                <div class="sprint-detail">
+                  <span class="sprint-label">📅 Start Date:</span>
+                  <span class="sprint-value">${startDate}</span>
+                </div>
+                <div class="sprint-detail">
+                  <span class="sprint-label">📅 End Date:</span>
+                  <span class="sprint-value">${endDate}</span>
+                </div>
+                <div class="sprint-detail">
+                  <span class="sprint-label">📊 Status:</span>
+                  <span class="sprint-value">${sprint.status.charAt(0).toUpperCase() + sprint.status.slice(1)}</span>
+                </div>
+                ${sprint.capacity ? `
+                <div class="sprint-detail">
+                  <span class="sprint-label">⏱️ Capacity:</span>
+                  <span class="sprint-value">${sprint.capacity} hours</span>
+                </div>
+                ` : ''}
+                ${sprint.goal ? `
+                <div class="sprint-detail">
+                  <span class="sprint-label">🎯 Goal:</span>
+                  <span class="sprint-value">${sprint.goal}</span>
+                </div>
+                ` : ''}
+                ${sprint.description ? `
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                  <strong>Description:</strong>
+                  <p style="margin: 10px 0 0 0; color: #555;">${sprint.description}</p>
+                </div>
+                ` : ''}
+              </div>
+
+              <p style="color: #666;">Please review the sprint details and prepare for the upcoming work. You can access the sprint through the project management dashboard.</p>
+
+              <div class="footer">
+                <p>This is an automated message from Kanvaro Project Management</p>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+
+      await emailService.sendEmail({
+        to: member.email,
+        subject: `🎯 Sprint Assignment: ${sprint.name} - ${projectName}`,
+        html: emailHtml
+      })
+    })
+
+    await Promise.allSettled(emailPromises)
+  } catch (error) {
+    console.error('Error sending sprint assignment emails:', error)
+    // Don't throw - email sending failure shouldn't block sprint creation
+  }
+}
  
 export async function GET(request: NextRequest) {
   try {
@@ -96,7 +208,13 @@ export async function GET(request: NextRequest) {
     }
 
     if (status) {
-      filters.status = status
+      // Support comma-separated status values
+      const statusArray = status.split(',').map(s => s.trim())
+      if (statusArray.length === 1) {
+        filters.status = status
+      } else {
+        filters.status = { $in: statusArray }
+      }
     }
 
     // Query sprints - if user has SPRINT_VIEW_ALL, show all sprints; otherwise only projects they belong to
@@ -346,6 +464,21 @@ export async function POST(request: NextRequest) {
       .populate('project', 'name')
       .populate('createdBy', 'firstName lastName email')
       .populate('teamMembers', 'firstName lastName email')
+
+    // Send email notifications to team members (asynchronously)
+    if (teamMembers && teamMembers.length > 0) {
+      const User = (await import('@/models/User')).User
+      const teamMemberUsers = await User.find({ _id: { $in: teamMembers } }).select('firstName lastName email')
+
+      if (teamMemberUsers.length > 0) {
+        // Send emails in background - don't await
+        sendSprintAssignmentEmails(
+          populatedSprint,
+          teamMemberUsers,
+          populatedSprint.project.name
+        ).catch(err => console.error('Background email sending failed:', err))
+      }
+    }
 
     return NextResponse.json({
       success: true,

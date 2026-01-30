@@ -208,7 +208,7 @@ export default function CreateStoryPage() {
     }
 
     try {
-      const response = await fetch(`/api/sprints?project=${projectId}`)
+      const response = await fetch(`/api/sprints?project=${projectId}&status=planning,active`)
       const data = await response.json()
       if (data.success && Array.isArray(data.data)) {
         setSprints(data.data)
@@ -229,6 +229,20 @@ export default function CreateStoryPage() {
     // Validate epic field - REQUIRED
     if (!formData.epic || formData.epic === 'none') {
       notifyError({ title: 'Validation Error', message: 'Please select an epic for this story' })
+      setLoading(false)
+      return
+    }
+
+    // Validate story points - REQUIRED
+    if (!formData.storyPoints || formData.storyPoints.trim() === '') {
+      notifyError({ title: 'Validation Error', message: 'Please enter story points for this story' })
+      setLoading(false)
+      return
+    }
+
+    const storyPointsNum = parseInt(formData.storyPoints)
+    if (isNaN(storyPointsNum) || storyPointsNum < 1) {
+      notifyError({ title: 'Validation Error', message: 'Story points must be a positive number' })
       setLoading(false)
       return
     }
@@ -342,12 +356,15 @@ export default function CreateStoryPage() {
 
   // Add required field validation
   const isFormValid = () => {
+    const hasValidStoryPoints = !!formData.storyPoints && formData.storyPoints.trim() !== '' && !isNaN(parseInt(formData.storyPoints)) && parseInt(formData.storyPoints) >= 1
+
     return (
       !!formData.title.trim() &&
       !!formData.project &&
       !!formData.epic &&
       formData.epic !== 'none' &&
-      !!formData.dueDate
+      !!formData.dueDate &&
+      hasValidStoryPoints
     )
   }
 
@@ -602,7 +619,7 @@ export default function CreateStoryPage() {
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-foreground">Story Points</label>
+                    <label className="text-sm font-medium text-foreground">Story Points *</label>
                     <Select value={formData.storyPoints} onValueChange={(value) => handleChange('storyPoints', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select story points" />
