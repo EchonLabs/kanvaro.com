@@ -1,3 +1,10 @@
+## [1.30.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.0...v1.30.1) (2026-01-30)
+
+
+### Bug Fixes
+
+* fix cron issue ([5dc448b](https://github.com/EchonLabs/kanvaro.com/commit/5dc448bb65b3df46015ab72c8547ac9c81e882f5))
+
 # [1.30.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.29.3...v1.30.0) (2026-01-30)
 
 
