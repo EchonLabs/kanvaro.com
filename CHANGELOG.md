@@ -1,3 +1,15 @@
+# [1.30.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.29.3...v1.30.0) (2026-01-30)
+
+
+### Bug Fixes
+
+* add chnges in time entry ([49f1c47](https://github.com/EchonLabs/kanvaro.com/commit/49f1c470fa4926b1bde7e7a69b8c1c06f6e67dbe))
+
+
+### Features
+
+* add chnges in bulk upload ([cd000d2](https://github.com/EchonLabs/kanvaro.com/commit/cd000d21983ce0bb6eb2ab69c43c9d1a8e3852f9))
+
 ## [1.29.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.29.2...v1.29.3) (2026-01-30)
 
 
