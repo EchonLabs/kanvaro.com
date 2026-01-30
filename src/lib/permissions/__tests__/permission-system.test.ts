@@ -180,7 +180,7 @@ describe('Permission System', () => {
       
       expect(getPermissionScope(Permission.USER_READ)).toBe('own');
       expect(getPermissionScope(Permission.TIME_TRACKING_CREATE)).toBe('own');
-      expect(getPermissionScope(Permission.SETTINGS_READ)).toBe('own');
+      expect(getPermissionScope(Permission.SETTINGS_VIEW)).toBe('own');
     });
   });
 

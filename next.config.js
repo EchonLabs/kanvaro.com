@@ -16,21 +16,21 @@ const nextConfig = {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
   // Optimize CSS loading
-  experimental: {
-    optimizeCss: true,
-  },
+  // experimental: {
+  //   optimizeCss: true,
+  // },
   // Ensure proper CSS chunking
-  webpack: (config, { dev, isServer }) => {
-    if (!dev && !isServer) {
-      config.optimization.splitChunks.cacheGroups.styles = {
-        name: 'styles',
-        test: /\.(css|scss)$/,
-        chunks: 'all',
-        enforce: true,
-      };
-    }
-    return config;
-  },
+  // webpack: (config, { dev, isServer }) => {
+  //   if (!dev && !isServer) {
+  //     config.optimization.splitChunks.cacheGroups.styles = {
+  //       name: 'styles',
+  //       test: /\.(css|scss)$/,
+  //       chunks: 'all',
+  //       enforce: true,
+  //     };
+  //   }
+  //   return config;
+  // },
   async rewrites() {
     return [
       {

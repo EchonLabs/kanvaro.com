@@ -47,6 +47,7 @@ interface UserProfile {
   _id: string
   firstName: string
   lastName: string
+  memberId: string
   email: string
   role: string
   avatar?: string
@@ -619,6 +620,7 @@ export default function ProfilePage() {
                     <div className="flex-1 space-y-3 text-center md:text-left">
                       <div>
                         <h3 className="text-lg font-semibold">{profile?.firstName} {profile?.lastName}</h3>
+                        <p className="text-xs text-muted-foreground">Member ID: {profile?.memberId}</p>
                         <p className="text-sm text-muted-foreground">{profile?.email}</p>
                       </div>
                       <input

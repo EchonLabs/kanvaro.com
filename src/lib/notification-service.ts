@@ -13,6 +13,7 @@ export interface NotificationData {
     action?: 'created' | 'updated' | 'deleted' | 'assigned' | 'completed' | 'overdue' | 'reminder'
     priority?: 'low' | 'medium' | 'high' | 'critical'
     url?: string
+    projectName?: string
     metadata?: Record<string, any>
   }
   sendEmail?: boolean
@@ -287,25 +288,11 @@ export class NotificationService {
             border-radius: 8px;
             padding: 40px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            position: relative;
         }
         .header {
             text-align: center;
             margin-bottom: 30px;
-        }
-        .logo {
-            width: 60px;
-            height: 60px;
-            background: ${color};
-            border-radius: 8px;
-            margin: 0 auto 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-            text-align: center;
-            line-height: 1;
         }
         .notification-content {
             background: #f8fafc;
@@ -313,6 +300,26 @@ export class NotificationService {
             padding: 20px;
             margin: 20px 0;
             border-radius: 0 8px 8px 0;
+        }
+        .notification-details {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .detail-label {
+            font-weight: 600;
+            color: #6b7280;
+        }
+        .detail-value {
+            color: #111827;
         }
         .button {
             display: inline-block;
@@ -345,15 +352,23 @@ export class NotificationService {
             color: #6b7280;
             font-size: 14px;
         }
+        .priority-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: ${color}20;
+            color: ${color};
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <div class="logo">
-                ${this.getTypeIcon(notification.type)}
-            </div>
-            <h1>${notification.title}</h1>
+            <h1>${notification.title} <span class="priority-badge">${priority}</span></h1>
         </div>
 
         <p>Hello ${userName},</p>
@@ -361,6 +376,15 @@ export class NotificationService {
         <div class="notification-content">
             <p>${notification.message}</p>
         </div>
+
+        ${notification.data ? `
+        <div class="notification-details">
+            ${notification.data.entityType ? `<div class="detail-row"><span class="detail-label">Type:</span> <span class="detail-value">${notification.data.entityType.charAt(0).toUpperCase() + notification.data.entityType.slice(1)}</span></div>` : ''}
+            ${notification.data.projectName ? `<div class="detail-row"><span class="detail-label">Project:</span> <span class="detail-value">${notification.data.projectName}</span></div>` : ''}
+            <div class="detail-row"><span class="detail-label">Priority:</span> <span class="detail-value">${priority.charAt(0).toUpperCase() + priority.slice(1)}</span></div>
+            <div class="detail-row"><span class="detail-label">Time:</span> <span class="detail-value">${new Date(notification.createdAt || Date.now()).toLocaleString()}</span></div>
+        </div>
+        ` : ''}
 
         ${notification.data?.url ? `
         <div style="text-align: center;">
@@ -407,7 +431,8 @@ export class NotificationService {
         entityId: taskId,
         action,
         priority: action === 'overdue' ? 'high' : 'medium',
-        url: `${baseUrl}/tasks/${taskId}`
+        url: `${baseUrl}/tasks/${taskId}`,
+        projectName: projectName
       },
       sendEmail: true,
       sendPush: true
@@ -441,7 +466,8 @@ export class NotificationService {
         entityId: projectId,
         action: action === 'deadline_approaching' ? 'reminder' : action,
         priority: action === 'deadline_approaching' ? 'high' : 'medium',
-        url: `${baseUrl}/projects/${projectId}`
+        url: `${baseUrl}/projects/${projectId}`,
+        projectName: projectName
       },
       sendEmail: true,
       sendPush: true
@@ -497,7 +523,8 @@ export class NotificationService {
         entityId: projectId,
         action: 'assigned',
         priority: 'medium',
-        url: `${baseUrl}/projects/${projectId}`
+        url: `${baseUrl}/projects/${projectId}`,
+        projectName: projectName
       },
       sendEmail: true,
       sendPush: true
@@ -531,7 +558,8 @@ export class NotificationService {
         entityId: projectId,
         action: action === 'budget_exceeded' ? 'overdue' : action === 'budget_warning' ? 'reminder' : 'updated',
         priority: action === 'budget_exceeded' ? 'critical' : 'high',
-        url: `${baseUrl}/projects/${projectId}`
+        url: `${baseUrl}/projects/${projectId}`,
+        projectName: projectName
       },
       sendEmail: true,
       sendPush: true
@@ -553,30 +581,13 @@ export class NotificationService {
     let b = (num & 0x0000FF) + amount
 
     // Ensure values stay within 0-255
-    r = r > 255 ? 255 : r < 0 ? 0 : r
-    g = g > 255 ? 255 : g < 0 ? 0 : g
-    b = b > 255 ? 255 : b < 0 ? 0 : b
+    r = Math.max(0, Math.min(255, r))
+    g = Math.max(0, Math.min(255, g))
+    b = Math.max(0, Math.min(255, b))
 
-    // Convert back to hex
-    return (usePound ? '#' : '') + (r << 16 | g << 8 | b).toString(16)
-  }
-
-  /**
-   * Get appropriate icon for notification type
-   */
-  private getTypeIcon(type: string): string {
-    const icons = {
-      task: '✓',
-      project: '📁',
-      team: '👥',
-      system: '⚙️',
-      budget: '💰',
-      deadline: '⏰',
-      reminder: '🔔',
-      invitation: '📨',
-      time_tracking: '⏱️'
-    }
-    return icons[type as keyof typeof icons] || type.charAt(0).toUpperCase()
+    // Convert back to hex with proper padding
+    const hex = ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')
+    return (usePound ? '#' : '') + hex
   }
 }
 

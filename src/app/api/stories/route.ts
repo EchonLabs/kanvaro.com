@@ -194,6 +194,22 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Validate story points - REQUIRED
+    if (storyPoints === undefined || storyPoints === null || storyPoints === '') {
+      return NextResponse.json(
+        { error: 'Story points are required' },
+        { status: 400 }
+      )
+    }
+
+    const storyPointsNum = parseInt(storyPoints)
+    if (isNaN(storyPointsNum) || storyPointsNum < 1) {
+      return NextResponse.json(
+        { error: 'Story points must be a positive number' },
+        { status: 400 }
+      )
+    }
     // Verify project exists and user has access
     const projectDoc = await Project.findOne({
       _id: project,
