@@ -470,8 +470,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
           'Start Time',
           'End Time',
           'Total Hours',
-          'Earnings',
-          'Status'
+          'Earnings'
         ]
 
         const sanitize = (value: string | number | null | undefined) => {
@@ -512,8 +511,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
             sanitize(entry.startTime ? formatTimeAMPM(entry.startTime) : '-'), // Start Time (AM/PM format)
             sanitize(entry.endTime ? formatTimeAMPM(entry.endTime) : '-'), // End Time (AM/PM format)
             sanitize(formatDurationUtil(entry.duration)), // Total Hours
-            sanitize(formatCurrency(entry.cost, orgCurrency)), // Cost
-            sanitize(status) // Status
+            sanitize(formatCurrency(entry.cost, orgCurrency)) // Cost
           ]
         })
 
