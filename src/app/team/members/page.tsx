@@ -624,44 +624,40 @@ export default function MembersPage() {
         </TabsList>
 
         <TabsContent value="members" className="space-y-4 mt-4 overflow-x-hidden">
-          <Card className="overflow-x-hidden">
-            <CardHeader className="p-4 sm:p-6">
-              <div className="space-y-3 sm:space-y-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div>
-                    <CardTitle className="text-lg sm:text-xl break-words">Team Members</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm break-words">
-                      Manage your team members and their roles
-                    </CardDescription>
-                  </div>
-                  <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'grid' | 'list')}>
-                    <TabsList className="grid w-full grid-cols-2 h-9 sm:h-10">
-                      <TabsTrigger value="grid" className="text-xs sm:text-sm">
-                        <Grid3x3 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
-                        Grid
-                      </TabsTrigger>
-                      <TabsTrigger value="list" className="text-xs sm:text-sm">
-                        <List className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
-                        List
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
-                <div className="flex flex-col gap-2 sm:gap-3">
-                  <div className="relative w-full">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none flex-shrink-0" />
-                    <Input
-                      ref={searchInputRef}
-                      placeholder="Search members..."
-                      value={localSearch}
-                      onChange={(e) => setLocalSearch(e.target.value)}
-                      className="pl-10 w-full text-sm sm:text-base min-h-[44px] touch-target"
-                    />
-                  </div>
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+          {/* View mode toggle */}
+          <div className="flex justify-end">
+            <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'grid' | 'list')}>
+              <TabsList className="grid w-full grid-cols-2 h-9 sm:h-10">
+                <TabsTrigger value="grid" className="text-xs sm:text-sm">
+                  <Grid3x3 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
+                  Grid
+                </TabsTrigger>
+                <TabsTrigger value="list" className="text-xs sm:text-sm">
+                  <List className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
+                  List
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+          
+          {/* Search and Filters */}
+          <div className="space-y-3">
+            {/* Search bar */}
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none flex-shrink-0" />
+              <Input
+                ref={searchInputRef}
+                placeholder="Search members..."
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
+                className="pl-10 w-full text-sm sm:text-base min-h-[44px] touch-target"
+              />
+            </div>
+            {/* Filter options - compact grid layout */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Select value={roleFilter} onValueChange={setRoleFilter}>
-                      <SelectTrigger className="w-full sm:w-[160px] text-sm min-h-[44px] touch-target">
-                        <SelectValue placeholder="Filter by role" />
+                      <SelectTrigger className="w-full text-sm min-h-[44px] touch-target">
+                        <SelectValue placeholder="Role" />
                       </SelectTrigger>
                       <SelectContent className="z-[10050]">
                         <SelectItem value="all">All Roles</SelectItem>
@@ -673,8 +669,8 @@ export default function MembersPage() {
                       </SelectContent>
                     </Select>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-full sm:w-[160px] text-sm min-h-[44px] touch-target">
-                        <SelectValue placeholder="Filter by status" />
+                      <SelectTrigger className="w-full text-sm min-h-[44px] touch-target">
+                        <SelectValue placeholder="Status" />
                       </SelectTrigger>
                       <SelectContent className="z-[10050]">
                         <SelectItem value="all">All Status</SelectItem>
@@ -682,13 +678,9 @@ export default function MembersPage() {
                         <SelectItem value="inactive">Inactive</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6 pt-0">
-              {/* Results Count */}
-              <div className="flex items-center justify-between mb-4 pb-3 border-b">
+            </div>
+            {/* Member count */}
+            <div className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">
                   {hasActiveFilters ? (
                     <span>
@@ -716,9 +708,12 @@ export default function MembersPage() {
                     Clear Filters
                   </Button>
                 )}
-              </div>
-
-              {paginatedMembers.length === 0 ? (
+            </div>
+          </div>
+          
+          {/* Members View */}
+          <div>
+            {paginatedMembers.length === 0 ? (
                 <div className="text-center py-8 sm:py-12 text-muted-foreground">
                   <Users className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50 flex-shrink-0" />
                   <p className="text-sm sm:text-base break-words">No members found</p>
@@ -919,8 +914,7 @@ export default function MembersPage() {
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="invitations" className="space-y-4 mt-4 overflow-x-hidden">
