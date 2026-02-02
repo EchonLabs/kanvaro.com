@@ -1768,71 +1768,68 @@ export default function BacklogPage() {
         {/* Action buttons */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                    <Button
-                      variant={selectMode ? 'secondary' : 'outline'}
-                      size="sm"
-                      onClick={handleSelectModeToggle}
-                      className="w-full sm:w-auto"
-                      disabled={!canManageSprints}
-                      title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
-                    >
-                      <List className="h-4 w-4 mr-2" />
-                      {selectMode ? 'Cancel Selection' : 'Add to Sprint'}
-                    </Button>
-                    {selectMode && (
-                      <>
-                    <Button
-                      size="sm"
-                      onClick={() => handleOpenSprintModal(selectedTaskIds, selectedStoryIds)}
-                      disabled={(selectedTaskCount === 0 && selectedStoryCount === 0) || assigningSprint}
-                      className="w-full sm:w-auto"
-                    >
-                          {assigningSprint ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          ) : (
-                            <Kanban className="h-4 w-4 mr-2" />
-                          )}
-                          {assigningSprint ? 'Processing...' : 'Add Selected to Sprint'}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={clearSelection}
-                          disabled={selectedTaskCount === 0}
-                          className="w-full sm:w-auto"
-                        >
-                          <XCircle className="h-4 w-4 mr-2" />
-                          Clear
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                  {selectMode && (
-                    <div className="text-sm text-muted-foreground w-full sm:w-auto text-left sm:text-right">
-                      {(() => {
-                        const parts: string[] = []
-                        if (selectedStoryCount > 0) {
-                          parts.push(`${selectedStoryCount} story${selectedStoryCount !== 1 ? 'ies' : ''}`)
-                        }
-                        if (selectedTaskCount > 0) {
-                          parts.push(`${selectedTaskCount} task${selectedTaskCount !== 1 ? 's' : ''}`)
-                        }
-                        return parts.length > 0 ? parts.join(' and ') + ' selected' : 'No items selected'
-                      })()}
-                    </div>
+            <Button
+              variant={selectMode ? 'secondary' : 'outline'}
+              size="sm"
+              onClick={handleSelectModeToggle}
+              className="w-full sm:w-auto"
+              disabled={!canManageSprints}
+              title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
+            >
+              <List className="h-4 w-4 mr-2" />
+              {selectMode ? 'Cancel Selection' : 'Add to Sprint'}
+            </Button>
+            {selectMode && (
+              <>
+                <Button
+                  size="sm"
+                  onClick={() => handleOpenSprintModal(selectedTaskIds, selectedStoryIds)}
+                  disabled={(selectedTaskCount === 0 && selectedStoryCount === 0) || assigningSprint}
+                  className="w-full sm:w-auto"
+                >
+                  {assigningSprint ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Kanban className="h-4 w-4 mr-2" />
                   )}
-                </div>
-                {selectMode && (
-                  <p className="text-xs text-muted-foreground">
-                    Select stories or tasks to add to a sprint. When a story is selected, all its related tasks will be automatically included. 
-                    <span className="block mt-1 text-amber-600 dark:text-amber-400">
-                      Note: Items already in a sprint cannot be selected.
-                    </span>
-                  </p>
-                )}
+                  {assigningSprint ? 'Processing...' : 'Add Selected to Sprint'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearSelection}
+                  disabled={selectedTaskCount === 0}
+                  className="w-full sm:w-auto"
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Clear
+                </Button>
+              </>
+            )}
           </div>
+          {selectMode && (
+            <div className="text-sm text-muted-foreground w-full sm:w-auto text-left sm:text-right">
+              {(() => {
+                const parts: string[] = []
+                if (selectedStoryCount > 0) {
+                  parts.push(`${selectedStoryCount} story${selectedStoryCount !== 1 ? 'ies' : ''}`)
+                }
+                if (selectedTaskCount > 0) {
+                  parts.push(`${selectedTaskCount} task${selectedTaskCount !== 1 ? 's' : ''}`)
+                }
+                return parts.length > 0 ? parts.join(' and ') + ' selected' : 'No items selected'
+              })()}
+            </div>
+          )}
+        </div>
+        {selectMode && (
+          <p className="text-xs text-muted-foreground">
+            Select stories or tasks to add to a sprint. When a story is selected, all its related tasks will be automatically included. 
+            <span className="block mt-1 text-amber-600 dark:text-amber-400">
+              Note: Items already in a sprint cannot be selected.
+            </span>
+          </p>
+        )}
         
         {/* Backlog Items */}
         <div className="space-y-4">
