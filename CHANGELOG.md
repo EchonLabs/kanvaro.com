@@ -1,3 +1,10 @@
+## [1.30.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.1...v1.30.2) (2026-02-02)
+
+
+### Bug Fixes
+
+* add time entry chnges ([3d1476d](https://github.com/EchonLabs/kanvaro.com/commit/3d1476d01f8f661b48d2522f626e0d7a338e49e9))
+
 ## [1.30.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.0...v1.30.1) (2026-01-30)
 
 
