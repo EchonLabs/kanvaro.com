@@ -168,11 +168,10 @@ export const DatabaseConfig = ({ onNext, initialData }: DatabaseConfigProps) => 
       {/* Connection Type Selection */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div
-          className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
-            connectionType === 'existing'
+          className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${connectionType === 'existing'
               ? 'border-primary bg-primary/5'
               : 'border-muted hover:border-muted-foreground/50'
-          }`}
+            }`}
           onClick={() => setConnectionType('existing')}
         >
           <div className="text-center">
@@ -185,11 +184,10 @@ export const DatabaseConfig = ({ onNext, initialData }: DatabaseConfigProps) => 
         </div>
 
         <div
-          className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
-            connectionType === 'create'
+          className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${connectionType === 'create'
               ? 'border-primary bg-primary/5'
               : 'border-muted hover:border-muted-foreground/50'
-          }`}
+            }`}
           onClick={() => setConnectionType('create')}
         >
           <div className="text-center">
@@ -338,7 +336,7 @@ export const DatabaseConfig = ({ onNext, initialData }: DatabaseConfigProps) => 
                 <Database className="h-4 w-4" />
                 <AlertTitle>Automatic Database Setup</AlertTitle>
                 <AlertDescription>
-                  We'll automatically prepare your MongoDB database for Kanvaro. 
+                  We'll automatically prepare your MongoDB database for Kanvaro.
                   For Docker deployment, use "localhost" as the host - it will automatically connect to the internal MongoDB service.
                 </AlertDescription>
               </Alert>
