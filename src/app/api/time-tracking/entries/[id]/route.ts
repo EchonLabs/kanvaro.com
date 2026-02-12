@@ -44,9 +44,9 @@ export async function PUT(
     }
 
     // Check if time entry is already approved
-    if (timeEntry.isApproved) {
-      return NextResponse.json({ error: 'Cannot modify approved time entry' }, { status: 400 })
-    }
+    // if (timeEntry.isApproved) {
+    //   return NextResponse.json({ error: 'Cannot modify approved time entry' }, { status: 400 })
+    // }
 
     // Check time-based editing restrictions
     const settings = await TimeTrackingSettings.findOne({
@@ -124,9 +124,9 @@ export async function DELETE(
     }
 
     // Check if time entry is already approved
-    if (timeEntry.isApproved) {
-      return NextResponse.json({ error: 'Cannot delete approved time entry' }, { status: 400 })
-    }
+    // if (timeEntry.isApproved) {
+    //   return NextResponse.json({ error: 'Cannot delete approved time entry' }, { status: 400 })
+    // }
 
     // Check time-based editing restrictions
     const settings = await TimeTrackingSettings.findOne({

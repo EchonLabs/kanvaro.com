@@ -116,37 +116,37 @@ export function RichTextEditor({
     if (!selection || selection.rangeCount === 0) return
 
     const range = selection.getRangeAt(0)
-    const selectedText = range.toString()
-
     editorRef.current.focus()
 
-    if (selectedText.trim()) {
-      // Convert selected text to list items
-      const lines = selectedText.split('\n').filter(line => line.trim())
-      const listItems = lines.map(line => `<li>${line.trim()}</li>`).join('')
-      const listHTML = `<ul style="list-style-type: ${listType};">${listItems}</ul>`
-      document.execCommand('insertHTML', false, listHTML)
-    } else {
-      // Insert new empty list
-      const listHTML = `<ul style="list-style-type: ${listType};"><li><br></li></ul>`
-      document.execCommand('insertHTML', false, listHTML)
+  // Clone selected content as HTML
+  const container = document.createElement('div')
+  container.appendChild(range.cloneContents())
 
-      // Move cursor to the list item
-      setTimeout(() => {
-        const lists = editorRef.current?.querySelectorAll('ul')
-        if (lists && lists.length > 0) {
-          const lastList = lists[lists.length - 1]
-          const listItems = lastList.querySelectorAll('li')
-          if (listItems.length > 0) {
-            const lastItem = listItems[listItems.length - 1]
-            const newRange = document.createRange()
-            newRange.setStart(lastItem, 0)
-            newRange.setEnd(lastItem, 0)
-            selection.removeAllRanges()
-            selection.addRange(newRange)
-          }
-        }
-      }, 0)
+  // Extract lines properly (div, p, br)
+  let lines: string[] = []
+
+  container.childNodes.forEach((node) => {
+    if (node.nodeName === 'DIV' || node.nodeName === 'P') {
+      lines.push((node as HTMLElement).innerText.trim())
+    } else if (node.nodeName === 'BR') {
+      // ignore empty lines
+    } else {
+      const text = node.textContent?.trim()
+      if (text) lines.push(text)
+    }
+  })
+
+  if (lines.length > 0) {
+    const listItems = lines
+      .filter(l => l)
+      .map(line => `<li>${line}</li>`)
+      .join('')
+
+    const listHTML = `<ul style="list-style-type: ${listType}; padding-left: 1.5rem;">${listItems}</ul>`
+    document.execCommand('insertHTML', false, listHTML)
+  } else {
+    const listHTML = `<ul style="list-style-type: ${listType}; padding-left: 1.5rem;"><li><br></li></ul>`
+    document.execCommand('insertHTML', false, listHTML)
     }
 
     handleInput()
@@ -159,37 +159,35 @@ export function RichTextEditor({
     if (!selection || selection.rangeCount === 0) return
 
     const range = selection.getRangeAt(0)
-    const selectedText = range.toString()
-
     editorRef.current.focus()
 
-    if (selectedText.trim()) {
-      // Convert selected text to numbered list items
-      const lines = selectedText.split('\n').filter(line => line.trim())
-      const listItems = lines.map(line => `<li>${line.trim()}</li>`).join('')
-      const listHTML = `<ol style="list-style-type: ${listType};">${listItems}</ol>`
-      document.execCommand('insertHTML', false, listHTML)
-    } else {
-      // Insert new empty numbered list
-      const listHTML = `<ol style="list-style-type: ${listType};"><li><br></li></ol>`
-      document.execCommand('insertHTML', false, listHTML)
+  const container = document.createElement('div')
+  container.appendChild(range.cloneContents())
 
-      // Move cursor to the list item
-      setTimeout(() => {
-        const lists = editorRef.current?.querySelectorAll('ol')
-        if (lists && lists.length > 0) {
-          const lastList = lists[lists.length - 1]
-          const listItems = lastList.querySelectorAll('li')
-          if (listItems.length > 0) {
-            const lastItem = listItems[listItems.length - 1]
-            const newRange = document.createRange()
-            newRange.setStart(lastItem, 0)
-            newRange.setEnd(lastItem, 0)
-            selection.removeAllRanges()
-            selection.addRange(newRange)
-          }
-        }
-      }, 0)
+  let lines: string[] = []
+
+  container.childNodes.forEach((node) => {
+    if (node.nodeName === 'DIV' || node.nodeName === 'P') {
+      lines.push((node as HTMLElement).innerText.trim())
+    } else if (node.nodeName === 'BR') {
+      // ignore
+    } else {
+      const text = node.textContent?.trim()
+      if (text) lines.push(text)
+    }
+  })
+
+  if (lines.length > 0) {
+    const listItems = lines
+      .filter(l => l)
+      .map(line => `<li>${line}</li>`)
+      .join('')
+
+      const listHTML = `<ol style="list-style-type: ${listType}; padding-left: 1.5rem;">${listItems}</ol>`
+      document.execCommand('insertHTML', false, listHTML)
+  } else {
+    const listHTML = `<ol style="list-style-type: ${listType}; padding-left: 1.5rem;"><li><br></li></ol>`
+    document.execCommand('insertHTML', false, listHTML)
     }
 
     handleInput()
@@ -352,7 +350,7 @@ export function RichTextEditor({
           <SelectTrigger className="w-32 h-8">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="z-[10050]">
             {fontFamilies.map((font) => (
               <SelectItem key={font.value} value={font.value}>
                 <span style={{ fontFamily: font.value }}>{font.label}</span>
@@ -365,7 +363,7 @@ export function RichTextEditor({
           <SelectTrigger className="w-20 h-8">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="z-[10050]">
             {fontSizes.map((size) => (
               <SelectItem key={size.value} value={size.value}>
                 {size.label}
@@ -413,7 +411,7 @@ export function RichTextEditor({
               <List className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
+          <DropdownMenuContent align="start" className="z-[10050]">
             <DropdownMenuItem onClick={() => insertUnorderedList('disc')}>
               <span className="w-4 h-4 rounded-full bg-current mr-2" style={{ listStyleType: 'disc' }}></span>
               Filled Circle
@@ -442,7 +440,7 @@ export function RichTextEditor({
               <ListOrdered className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
+          <DropdownMenuContent align="start" className="z-[10050]">
             <DropdownMenuItem onClick={() => insertOrderedList('decimal')}>
               <span className="w-6 text-center mr-2">1.</span>
               Numbers (1, 2, 3...)

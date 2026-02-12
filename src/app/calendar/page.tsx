@@ -7,8 +7,6 @@ import { formatToTitleCase } from '@/lib/utils'
 import { useTaskSync, useTaskState } from '@/hooks/useTaskSync'
 import { useNotify } from '@/lib/notify'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
@@ -405,7 +403,17 @@ export default function CalendarPage() {
       <div className="space-y-8 sm:space-y-10 lg:space-y-10">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">Calendar</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">Calendar</h1>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isConnected ? 'Real-time sync active' : 'Real-time sync inactive'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
             <p className="text-sm sm:text-base text-muted-foreground mt-1">Timeline and schedule management</p>
           </div>
           <div className="flex items-center space-x-2 w-full sm:w-auto">
@@ -420,42 +428,22 @@ export default function CalendarPage() {
             </Button>
           </div>
         </div>
-
-
-        {/* Real-time connection status */}
-        {isConnected && (
-          <Alert className="mb-6">
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-              <span className="text-sm">Real-time sync active</span>
-            </div>
-          </Alert>
-        )}
-
-        <Card>
-          <CardHeader className="p-4 sm:p-6">
-            <div className="space-y-4 sm:space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div>
-                  <CardTitle className="text-lg sm:text-xl">Calendar View</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">
-                    {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''} found
-                  </CardDescription>
-                </div>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                <div className="relative flex-1 sm:max-w-xs">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  <Input
-                    placeholder="Search events..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 w-full text-sm sm:text-base"
-                  />
-                </div>
-                <div className="flex flex-wrap gap-3 sm:gap-4">
+        {/* Search and Filters */}
+        <div className="space-y-3">
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <Input
+              placeholder="Search events..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 w-full text-sm sm:text-base"
+            />
+          </div>
+          {/* Filter options - compact grid layout */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <Select value={typeFilter} onValueChange={setTypeFilter}>
-                    <SelectTrigger className="w-full sm:w-[140px] text-sm">
+                    <SelectTrigger className="w-full text-sm">
                       <SelectValue placeholder="Type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -468,7 +456,7 @@ export default function CalendarPage() {
                     </SelectContent>
                   </Select>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full sm:w-[140px] text-sm">
+                    <SelectTrigger className="w-full text-sm">
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -480,7 +468,7 @@ export default function CalendarPage() {
                     </SelectContent>
                   </Select>
                   <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                    <SelectTrigger className="w-full sm:w-[140px] text-sm">
+                    <SelectTrigger className="w-full text-sm">
                       <SelectValue placeholder="Priority" />
                     </SelectTrigger>
                     <SelectContent>
@@ -491,32 +479,38 @@ export default function CalendarPage() {
                       <SelectItem value="critical">Critical</SelectItem>
                     </SelectContent>
                   </Select>
-                  {hasActiveFilters && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={resetFilters}
-                            className="text-xs"
-                            aria-label="Reset all filters"
-                          >
-                            <RotateCcw className="h-4 w-4 mr-1" />
-                            Reset Filters
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Reset filters</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6">
+          </div>
+          {/* Event count and reset filters */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''} found
+            </p>
+            {hasActiveFilters && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={resetFilters}
+                      className="text-xs"
+                      aria-label="Reset all filters"
+                    >
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                      Reset Filters
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Reset filters</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+        </div>
+        
+        {/* Calendar View */}
+        <div>
             <div className="space-y-6 sm:space-y-8">
               {/* Calendar Navigation */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
@@ -799,8 +793,7 @@ export default function CalendarPage() {
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
+        </div>
       </div>
     </MainLayout>
   )

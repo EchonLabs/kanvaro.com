@@ -1504,37 +1504,29 @@ export default function BacklogPage() {
         </div>
 
 
-        <Card>
-          <CardHeader>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Backlog Items</CardTitle>
-                  <CardDescription>
-                    {totalCount} item{totalCount !== 1 ? 's' : ''} found
-                  </CardDescription>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2 sm:gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <Input
-                    ref={searchInputRef}
-                    placeholder="Search backlog..."
-                    value={localSearch}
-                    onChange={e => setLocalSearch(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        setSearchQuery(localSearch)
-                      }
-                    }}
-                    onBlur={() => setSearchQuery(localSearch)}
-                    className="pl-10 w-full"
-                  />
-                </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+        {/* Search and Filters */}
+        <div className="space-y-3">
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              ref={searchInputRef}
+              placeholder="Search backlog..."
+              value={localSearch}
+              onChange={e => setLocalSearch(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  setSearchQuery(localSearch)
+                }
+              }}
+              onBlur={() => setSearchQuery(localSearch)}
+              className="pl-10 w-full"
+            />
+          </div>
+          {/* Filter options - compact grid layout */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
                   <Select value={projectFilterValue} onValueChange={setProjectFilterValue}>
-                    <SelectTrigger className="w-full sm:w-32">
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Project" />
                     </SelectTrigger>
                     <SelectContent className="z-[10050] p-0">
@@ -1566,7 +1558,7 @@ export default function BacklogPage() {
                     </SelectContent>
                   </Select>
                   <Select value={typeFilter} onValueChange={setTypeFilter}>
-                    <SelectTrigger className="w-full sm:w-32">
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1577,7 +1569,7 @@ export default function BacklogPage() {
                     </SelectContent>
                   </Select>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full sm:w-32">
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1590,7 +1582,7 @@ export default function BacklogPage() {
                     </SelectContent>
                   </Select>
                   <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                    <SelectTrigger className="w-full sm:w-32">
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Priority" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1601,7 +1593,7 @@ export default function BacklogPage() {
                     </SelectContent>
                   </Select>
                   <Select value={assignedToFilter} onValueChange={(value) => { setAssignedToFilter(value); setAssignedToFilterQuery(''); }}>
-                    <SelectTrigger className="w-full sm:w-40">
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Assignee" />
                     </SelectTrigger>
                     <SelectContent className="z-[10050] p-0">
@@ -1633,7 +1625,7 @@ export default function BacklogPage() {
                     </SelectContent>
                   </Select>
                   <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
-                    <SelectTrigger className="w-full sm:w-40">
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Creator" />
                     </SelectTrigger>
                     <SelectContent className="z-[10050] p-0">
@@ -1665,7 +1657,7 @@ export default function BacklogPage() {
                     </SelectContent>
                   </Select>
                   <Select value={sortBy} onValueChange={setSortBy}>
-                    <SelectTrigger className="w-full sm:w-32">
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Sort by" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1682,7 +1674,7 @@ export default function BacklogPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                          className="w-full sm:w-auto"
+                          className="w-full"
                           aria-label={sortOrder === 'asc' ? 'Click to sort descending' : 'Click to sort ascending'}
                         >
                           {sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
@@ -1693,143 +1685,154 @@ export default function BacklogPage() {
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
-                  {hasActiveFilters && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={resetFilters}
-                            className="w-full sm:w-auto"
-                            aria-label="Reset all filters"
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Reset filters</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
-                  <Label className="text-xs sm:text-sm font-medium text-muted-foreground w-full sm:w-auto">Created Date Range:</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full sm:w-[200px] justify-start text-left font-normal",
-                          !createdDateRange.from && "text-muted-foreground"
-                        )}
-                      >
-                        <Calendar className="mr-2 h-4 w-4" />
-                        {createdDateRange.from ? format(createdDateRange.from, "PPP") : "From"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <DateRangeCalendar
-                        mode="single"
-                        selected={createdDateRange.from}
-                        onSelect={(date) => handleCreatedDateChange('from', date)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full sm:w-[200px] justify-start text-left font-normal",
-                          !createdDateRange.to && "text-muted-foreground"
-                        )}
-                      >
-                        <Calendar className="mr-2 h-4 w-4" />
-                        {createdDateRange.to ? format(createdDateRange.to, "PPP") : "To"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <DateRangeCalendar
-                        mode="single"
-                        selected={createdDateRange.to}
-                        onSelect={(date) => handleCreatedDateChange('to', date)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                    <Button
-                      variant={selectMode ? 'secondary' : 'outline'}
-                      size="sm"
-                      onClick={handleSelectModeToggle}
-                      className="w-full sm:w-auto"
-                      disabled={!canManageSprints}
-                      title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
-                    >
-                      <List className="h-4 w-4 mr-2" />
-                      {selectMode ? 'Cancel Selection' : 'Add to Sprint'}
-                    </Button>
-                    {selectMode && (
-                      <>
-                    <Button
-                      size="sm"
-                      onClick={() => handleOpenSprintModal(selectedTaskIds, selectedStoryIds)}
-                      disabled={(selectedTaskCount === 0 && selectedStoryCount === 0) || assigningSprint}
-                      className="w-full sm:w-auto"
-                    >
-                          {assigningSprint ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          ) : (
-                            <Kanban className="h-4 w-4 mr-2" />
-                          )}
-                          {assigningSprint ? 'Processing...' : 'Add Selected to Sprint'}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={clearSelection}
-                          disabled={selectedTaskCount === 0}
-                          className="w-full sm:w-auto"
-                        >
-                          <XCircle className="h-4 w-4 mr-2" />
-                          Clear
-                        </Button>
-                      </>
+          </div>
+          {/* Date range filters */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center">Created Date Range:</Label>
+            <div className="flex gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal text-sm",
+                      !createdDateRange.from && "text-muted-foreground"
                     )}
-                  </div>
-                  {selectMode && (
-                    <div className="text-sm text-muted-foreground w-full sm:w-auto text-left sm:text-right">
-                      {(() => {
-                        const parts: string[] = []
-                        if (selectedStoryCount > 0) {
-                          parts.push(`${selectedStoryCount} story${selectedStoryCount !== 1 ? 'ies' : ''}`)
-                        }
-                        if (selectedTaskCount > 0) {
-                          parts.push(`${selectedTaskCount} task${selectedTaskCount !== 1 ? 's' : ''}`)
-                        }
-                        return parts.length > 0 ? parts.join(' and ') + ' selected' : 'No items selected'
-                      })()}
-                    </div>
-                  )}
-                </div>
-                {selectMode && (
-                  <p className="text-xs text-muted-foreground">
-                    Select stories or tasks to add to a sprint. When a story is selected, all its related tasks will be automatically included. 
-                    <span className="block mt-1 text-amber-600 dark:text-amber-400">
-                      Note: Items already in a sprint cannot be selected.
-                    </span>
-                  </p>
-                )}
-              </div>
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {createdDateRange.from ? format(createdDateRange.from, "PPP") : "From"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <DateRangeCalendar
+                    mode="single"
+                    selected={createdDateRange.from}
+                    onSelect={(date) => handleCreatedDateChange('from', date)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal text-sm",
+                      !createdDateRange.to && "text-muted-foreground"
+                    )}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {createdDateRange.to ? format(createdDateRange.to, "PPP") : "To"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <DateRangeCalendar
+                    mode="single"
+                    selected={createdDateRange.to}
+                    onSelect={(date) => handleCreatedDateChange('to', date)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+          </div>
+          {/* Item count and reset filters */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {totalCount} item{totalCount !== 1 ? 's' : ''} found
+            </p>
+            {hasActiveFilters && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={resetFilters}
+                      className="text-xs"
+                      aria-label="Reset all filters"
+                    >
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                      Reset Filters
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Reset filters</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+        </div>
+        
+        {/* Action buttons */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            <Button
+              variant={selectMode ? 'secondary' : 'outline'}
+              size="sm"
+              onClick={handleSelectModeToggle}
+              className="w-full sm:w-auto"
+              disabled={!canManageSprints}
+              title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
+            >
+              <List className="h-4 w-4 mr-2" />
+              {selectMode ? 'Cancel Selection' : 'Add to Sprint'}
+            </Button>
+            {selectMode && (
+              <>
+                <Button
+                  size="sm"
+                  onClick={() => handleOpenSprintModal(selectedTaskIds, selectedStoryIds)}
+                  disabled={(selectedTaskCount === 0 && selectedStoryCount === 0) || assigningSprint}
+                  className="w-full sm:w-auto"
+                >
+                  {assigningSprint ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Kanban className="h-4 w-4 mr-2" />
+                  )}
+                  {assigningSprint ? 'Processing...' : 'Add Selected to Sprint'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearSelection}
+                  disabled={selectedTaskCount === 0}
+                  className="w-full sm:w-auto"
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Clear
+                </Button>
+              </>
+            )}
+          </div>
+          {selectMode && (
+            <div className="text-sm text-muted-foreground w-full sm:w-auto text-left sm:text-right">
+              {(() => {
+                const parts: string[] = []
+                if (selectedStoryCount > 0) {
+                  parts.push(`${selectedStoryCount} story${selectedStoryCount !== 1 ? 'ies' : ''}`)
+                }
+                if (selectedTaskCount > 0) {
+                  parts.push(`${selectedTaskCount} task${selectedTaskCount !== 1 ? 's' : ''}`)
+                }
+                return parts.length > 0 ? parts.join(' and ') + ' selected' : 'No items selected'
+              })()}
+            </div>
+          )}
+        </div>
+        {selectMode && (
+          <p className="text-xs text-muted-foreground">
+            Select stories or tasks to add to a sprint. When a story is selected, all its related tasks will be automatically included. 
+            <span className="block mt-1 text-amber-600 dark:text-amber-400">
+              Note: Items already in a sprint cannot be selected.
+            </span>
+          </p>
+        )}
+        
+        {/* Backlog Items */}
+        <div className="space-y-4">
               {displayedItems.map((item) => {
                 
                 const isTask = item.type === 'task'
@@ -2207,8 +2210,6 @@ export default function BacklogPage() {
                 )
               })}
             </div>
-          </CardContent>
-        </Card>
 
         <ConfirmationModal
           isOpen={showDeleteConfirmModal}
