@@ -224,7 +224,7 @@ export default function LandingPage() {
     demo: false,
     documentation: false
   })
-
+  
   // Use the hardcoded images directly
   const images = LANDING_PAGE_IMAGES
 
@@ -253,23 +253,9 @@ export default function LandingPage() {
     if (ctaLoading) return
     setCtaLoading(true)
     try {
-      // Check if setup is already completed
-      const setupResponse = await fetch('/api/setup/status')
-      if (setupResponse.ok) {
-        const setupData = await setupResponse.json()
-        if (setupData.setupCompleted) {
-          // Setup already completed, redirect to login
-          router.push('/login')
-        } else {
-          // Setup not completed, allow setup wizard
-          router.push('/setup')
-        }
-      } else {
-        // If status check fails, default to setup
-        router.push('/setup')
-      }
+      // Interactive preview - redirect to setup page for exploration without signup
+      router.push('/setup')
     } catch (error) {
-      // If error occurs, default to setup
       router.push('/setup')
     } finally {
       setCtaLoading(false)
@@ -279,7 +265,7 @@ export default function LandingPage() {
   const startGuidedTour = () => {
     // Close video modal if open
     setShowVideoModal(false)
-
+    
     // Scroll to first section and highlight it
     const sections = [
       'unique-features',
@@ -289,9 +275,9 @@ export default function LandingPage() {
       'reporting-analytics',
       'team-collaboration'
     ]
-
+    
     let currentIndex = 0
-
+    
     const scrollToNext = () => {
       if (currentIndex < sections.length) {
         scrollToSection(sections[currentIndex])
@@ -301,7 +287,7 @@ export default function LandingPage() {
         }
       }
     }
-
+    
     // Start the tour
     scrollToNext()
   }
@@ -311,7 +297,7 @@ export default function LandingPage() {
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur()
     }
-
+    
     // Delay to ensure dropdown closes and DOM updates
     requestAnimationFrame(() => {
       setTimeout(() => {
@@ -327,7 +313,7 @@ export default function LandingPage() {
             top: Math.max(0, offsetPosition),
             behavior: 'smooth'
           })
-
+          
           // Ensure page remains scrollable after scroll completes
           setTimeout(() => {
             document.body.style.overflow = ''
@@ -361,10 +347,10 @@ export default function LandingPage() {
                 <Zap className="h-5 w-5 text-slate-900" />
               </div>
               <span className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-[#7bffde] dark:to-white bg-clip-text text-transparent group-hover:from-[#0f766e] group-hover:via-[#14b8a6] group-hover:to-[#0f766e] dark:group-hover:from-[#7bffde] dark:group-hover:via-white dark:group-hover:to-[#7bffde] transition-all duration-300">
-                Kanvaro
-              </span>
+            Kanvaro
+          </span>
             </button>
-
+            
             <nav className="hidden md:flex items-center gap-2 overflow-x-auto md:overflow-visible">
               {/* Features Dropdown */}
               <DropdownMenu>
@@ -373,7 +359,7 @@ export default function LandingPage() {
                   <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56 rounded-xl border-slate-200/80 bg-white/95 backdrop-blur-md shadow-xl dark:border-white/20 dark:bg-slate-900/95 dark:backdrop-blur-md p-2">
-                  <DropdownMenuItem
+                  <DropdownMenuItem 
                     onSelect={() => {
                       scrollToSection('unique-features')
                     }}
@@ -382,7 +368,7 @@ export default function LandingPage() {
                     <Zap className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
                     <span className="font-medium">Unique Features</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem
+                  <DropdownMenuItem 
                     onSelect={() => {
                       scrollToSection('key-features')
                     }}
@@ -391,7 +377,7 @@ export default function LandingPage() {
                     <ListChecks className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
                     <span className="font-medium">Key Features</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem
+                  <DropdownMenuItem 
                     onSelect={() => {
                       scrollToSection('workflows')
                     }}
@@ -402,7 +388,7 @@ export default function LandingPage() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-
+              
               {/* Modules Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-slate-700 hover:text-slate-900 dark:text-white/90 dark:hover:text-white transition-all duration-200 hover:bg-slate-100 dark:hover:bg-white/10 group">
@@ -410,7 +396,7 @@ export default function LandingPage() {
                   <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56 rounded-xl border-slate-200/80 bg-white/95 backdrop-blur-md shadow-xl dark:border-white/20 dark:bg-slate-900/95 dark:backdrop-blur-md p-2">
-                  <DropdownMenuItem
+                  <DropdownMenuItem 
                     onSelect={() => {
                       scrollToSection('module-walkthrough')
                     }}
@@ -419,7 +405,7 @@ export default function LandingPage() {
                     <Layers className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
                     <span className="font-medium">Module Walkthrough</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem
+                  <DropdownMenuItem 
                     onSelect={() => {
                       scrollToSection('reporting-analytics')
                     }}
@@ -428,7 +414,7 @@ export default function LandingPage() {
                     <BarChart3 className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
                     <span className="font-medium">Reports & Analytics</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem
+                  <DropdownMenuItem 
                     onSelect={() => {
                       scrollToSection('team-collaboration')
                     }}
@@ -439,7 +425,7 @@ export default function LandingPage() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-
+              
               {/* Demo Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-slate-700 hover:text-slate-900 dark:text-white/90 dark:hover:text-white transition-all duration-200 hover:bg-slate-100 dark:hover:bg-white/10 group">
@@ -447,7 +433,7 @@ export default function LandingPage() {
                   <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56 rounded-xl border-slate-200/80 bg-white/95 backdrop-blur-md shadow-xl dark:border-white/20 dark:bg-slate-900/95 dark:backdrop-blur-md p-2">
-                  <DropdownMenuItem
+                  <DropdownMenuItem 
                     onClick={() => {
                       setCurrentVideo('dashboard')
                       setShowVideoModal(true)
@@ -457,7 +443,7 @@ export default function LandingPage() {
                     <BarChart3 className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
                     <span className="font-medium">Dashboard Demo</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem
+                  <DropdownMenuItem 
                     onClick={() => {
                       setCurrentVideo('tasks')
                       setShowVideoModal(true)
@@ -467,7 +453,7 @@ export default function LandingPage() {
                     <ListChecks className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
                     <span className="font-medium">Tasks Demo</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem
+                  <DropdownMenuItem 
                     onClick={() => {
                       setCurrentVideo('projects')
                       setShowVideoModal(true)
@@ -477,7 +463,7 @@ export default function LandingPage() {
                     <Layers className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
                     <span className="font-medium">Projects Demo</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem
+                  <DropdownMenuItem 
                     onClick={() => {
                       setCurrentVideo('settings')
                       setShowVideoModal(true)
@@ -489,7 +475,7 @@ export default function LandingPage() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-
+              
               {/* Documentation Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-slate-700 hover:text-slate-900 dark:text-white/90 dark:hover:text-white transition-all duration-200 hover:bg-slate-100 dark:hover:bg-white/10 group">
@@ -497,7 +483,7 @@ export default function LandingPage() {
                   <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56 rounded-xl border-slate-200/80 bg-white/95 backdrop-blur-md shadow-xl dark:border-white/20 dark:bg-slate-900/95 dark:backdrop-blur-md p-2">
-                  <DropdownMenuItem
+                  <DropdownMenuItem 
                     onClick={() => {
                       sessionStorage.setItem('docsReferrer', '/');
                       router.push('/docs/public/self-hosting/docker-deployment');
@@ -507,7 +493,7 @@ export default function LandingPage() {
                     <FileText className="mr-2.5 h-4 w-4 text-[#7bffde] group-hover:scale-110 transition-transform" />
                     <span className="font-medium">Installation</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem
+                  <DropdownMenuItem 
                     onClick={() => {
                       sessionStorage.setItem('docsReferrer', '/');
                       router.push('/docs/public/concepts/features');
@@ -521,7 +507,7 @@ export default function LandingPage() {
               </DropdownMenu>
             </nav>
           </div>
-
+          
           <div className="flex items-center gap-4">
             {/* Mobile Menu Button - Right Aligned */}
             <button
@@ -534,33 +520,35 @@ export default function LandingPage() {
                 <Menu className="h-5 w-5" />
               )}
             </button>
-
+            
             {/* Theme Toggle - Horizontal */}
             {mounted && (
               <div className="hidden sm:flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 dark:border-white/20 dark:bg-white/5">
                 <button
                   onClick={() => setTheme('light')}
-                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${theme === 'light'
-                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                    : 'text-slate-600 hover:text-slate-900 dark:text-white/70 dark:hover:text-white'
-                    }`}
+                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    theme === 'light'
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-white/70 dark:hover:text-white'
+                  }`}
                 >
                   <Sun className="h-3.5 w-3.5" />
                   Light
                 </button>
                 <button
                   onClick={() => setTheme('dark')}
-                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${theme === 'dark'
-                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                    : 'text-slate-600 hover:text-slate-900 dark:text-white/70 dark:hover:text-white'
-                    }`}
+                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    theme === 'dark'
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-white/70 dark:hover:text-white'
+                  }`}
                 >
                   <Moon className="h-3.5 w-3.5" />
                   Dark
                 </button>
               </div>
             )}
-
+            
             {/* Right-side CTAs */}
             <div className="flex items-center gap-3">
               <Button
@@ -573,7 +561,7 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
-
+        
         {/* Mobile Menu Overlay */}
         {isMobileMenuOpen && (
           <div className="fixed inset-0 z-50 md:hidden">
@@ -597,7 +585,7 @@ export default function LandingPage() {
                     <X className="h-5 w-5" />
                   </button>
                 </div>
-
+                
                 {/* Mobile Menu Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                   {/* Features Section */}
@@ -678,7 +666,7 @@ export default function LandingPage() {
                       </div>
                     )}
                   </div>
-
+                  
                   {/* Modules Section */}
                   <div className="space-y-3">
                     <button
@@ -713,7 +701,7 @@ export default function LandingPage() {
                       </div>
                     )}
                   </div>
-
+                  
                   {/* Demo Section */}
                   <div className="space-y-3">
                     <button
@@ -776,7 +764,7 @@ export default function LandingPage() {
                       </div>
                     )}
                   </div>
-
+                  
                   {/* Documentation Section */}
                   <div className="space-y-3">
                     <button
@@ -818,7 +806,7 @@ export default function LandingPage() {
                     )}
                   </div>
                 </div>
-
+                
                 {/* Mobile Menu Footer */}
                 <div className="border-t border-slate-200 dark:border-white/10 p-6 space-y-4">
                   {/* Theme Toggle */}
@@ -826,27 +814,29 @@ export default function LandingPage() {
                     <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 dark:border-white/20 dark:bg-white/5">
                       <button
                         onClick={() => setTheme('light')}
-                        className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${theme === 'light'
-                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                          : 'text-slate-600 hover:text-slate-900 dark:text-white/70 dark:hover:text-white'
-                          }`}
+                        className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                          theme === 'light'
+                            ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                            : 'text-slate-600 hover:text-slate-900 dark:text-white/70 dark:hover:text-white'
+                        }`}
                       >
                         <Sun className="h-3.5 w-3.5" />
                         Light
                       </button>
                       <button
                         onClick={() => setTheme('dark')}
-                        className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${theme === 'dark'
-                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                          : 'text-slate-600 hover:text-slate-900 dark:text-white/70 dark:hover:text-white'
-                          }`}
+                        className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                          theme === 'dark'
+                            ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                            : 'text-slate-600 hover:text-slate-900 dark:text-white/70 dark:hover:text-white'
+                        }`}
                       >
                         <Moon className="h-3.5 w-3.5" />
                         Dark
                       </button>
                     </div>
                   )}
-
+                  
                   {/* Login Button */}
                   <Button
                     onClick={() => {
@@ -862,7 +852,7 @@ export default function LandingPage() {
             </div>
           </div>
         )}
-
+        
         <div className="relative mx-auto flex max-w-7xl flex-col gap-16 px-6 pt-20 pb-20 lg:flex-row lg:items-center lg:pt-24 lg:pb-32">
           <div className="space-y-10 text-center lg:text-left lg:flex-1">
             <p className="inline-flex items-center gap-2 rounded-full border border-slate-300/60 bg-white/70 px-5 py-2 text-sm uppercase tracking-[0.3em] text-slate-600 dark:border-white/15 dark:bg-white/5 dark:text-white/80">
@@ -881,7 +871,7 @@ export default function LandingPage() {
             </div>
             <div className="flex flex-col gap-4 sm:flex-row sm:justify-center lg:justify-start">
               <Button
-                onClick={handleGetStarted}
+                onClick={() => router.push('/setup')}
                 disabled={ctaLoading}
                 className="h-14 rounded-full bg-[#0d9488] dark:bg-[#7bffde] px-10 text-base font-semibold text-white dark:text-slate-900 shadow-[0_20px_45px_rgba(13,148,136,0.35)] dark:shadow-[0_20px_45px_rgba(123,255,222,0.35)] transition hover:-translate-y-1 hover:bg-[#0f766e] dark:hover:bg-[#62f5cf] disabled:opacity-70"
               >
@@ -913,7 +903,7 @@ export default function LandingPage() {
 
           <div className="relative mx-auto w-full max-w-2xl lg:max-w-3xl xl:max-w-4xl rounded-[3rem] border border-slate-200 bg-white p-8 text-slate-900 shadow-[0_50px_80px_rgba(15,23,42,0.15)] backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-white dark:shadow-[0_40px_80px_rgba(0,0,0,0.45)]">
             {images.heroDashboard ? (
-              <div
+              <div 
                 className="relative w-full aspect-[16/10] rounded-3xl overflow-hidden shadow-2xl border-2 border-slate-200/50 dark:border-white/10 group hover:border-[#7bffde]/50 transition-all duration-300 cursor-pointer"
                 onClick={() => {
                   setCurrentVideo('dashboard')
@@ -941,49 +931,50 @@ export default function LandingPage() {
               </div>
             ) : (
               <div className="rounded-3xl bg-white p-6 text-slate-900 shadow-inner dark:bg-[#0d1329] dark:text-white">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-slate-500 dark:text-white/60">Sprint cockpit</p>
-                  <span className="rounded-full bg-[#0fdbb3]/20 px-3 py-1 text-xs text-[#1c9b84] dark:bg-[#0fdbb3]/10 dark:text-[#75ffdf]">
-                    Live sync
-                  </span>
-                </div>
-                <h3 className="mt-4 text-2xl font-semibold tracking-tight">
-                  Aurora Dashboard Launch
-                </h3>
-                <p className="mt-2 text-sm text-slate-500 dark:text-white/60">Tasks | Projects | Members</p>
-                <div className="mt-6 space-y-4">
-                  <div>
-                    <div className="flex items-center justify-between text-xs uppercase tracking-[0.4em] text-slate-400 dark:text-white/40">
-                      <span>Progress</span>
-                      <span>76%</span>
-                    </div>
-                    <div className="mt-2 h-2 rounded-full bg-slate-200 dark:bg-[#1d2440]">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-[#43ffd9] to-[#7c6fff]"
-                        style={{ width: '76%' }}
-                      />
-                    </div>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-500 dark:text-white/60">Sprint cockpit</p>
+                <span className="rounded-full bg-[#0fdbb3]/20 px-3 py-1 text-xs text-[#1c9b84] dark:bg-[#0fdbb3]/10 dark:text-[#75ffdf]">
+                  Live sync
+                </span>
+              </div>
+              <h3 className="mt-4 text-2xl font-semibold tracking-tight">
+                Aurora Dashboard Launch
+              </h3>
+              <p className="mt-2 text-sm text-slate-500 dark:text-white/60">Tasks | Projects | Members</p>
+              <div className="mt-6 space-y-4">
+                <div>
+                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.4em] text-slate-400 dark:text-white/40">
+                    <span>Progress</span>
+                    <span>76%</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-3 text-center text-xs font-semibold uppercase tracking-[0.3em]">
-                    {['Plan', 'Design', 'Build'].map((phase, idx) => (
-                      <div
-                        key={phase}
-                        className={`rounded-2xl border px-3 py-4 ${idx <= 1
+                  <div className="mt-2 h-2 rounded-full bg-slate-200 dark:bg-[#1d2440]">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-[#43ffd9] to-[#7c6fff]"
+                      style={{ width: '76%' }}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-center text-xs font-semibold uppercase tracking-[0.3em]">
+                  {['Plan', 'Design', 'Build'].map((phase, idx) => (
+                    <div
+                      key={phase}
+                      className={`rounded-2xl border px-3 py-4 ${
+                        idx <= 1
                           ? 'border-[#7bffde]/40 bg-[#e3fbf6] text-slate-900 dark:bg-[#0c1a2e] dark:text-white'
                           : 'border-slate-200 bg-white text-slate-500 dark:border-white/10 dark:bg-transparent dark:text-white/50'
-                          }`}
-                      >
-                        {phase}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#0d152f]">
-                    <p className="text-xs text-slate-500 dark:text-white/50">Next milestone</p>
-                    <p className="text-base font-semibold text-slate-900 dark:text-white">Executive review & KPI sync</p>
-                    <span className="text-xs text-slate-500 dark:text-white/50">4 days left</span>
-                  </div>
+                      }`}
+                    >
+                      {phase}
+                    </div>
+                  ))}
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#0d152f]">
+                  <p className="text-xs text-slate-500 dark:text-white/50">Next milestone</p>
+                  <p className="text-base font-semibold text-slate-900 dark:text-white">Executive review & KPI sync</p>
+                  <span className="text-xs text-slate-500 dark:text-white/50">4 days left</span>
                 </div>
               </div>
+            </div>
             )}
           </div>
         </div>
@@ -1065,64 +1056,64 @@ export default function LandingPage() {
         </div>
         <div className="mx-auto mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {[
-            {
-              name: 'Project Creation & Management',
+            { 
+              name: 'Project Creation & Management', 
               description: 'Create projects with templates, manage hierarchies, track lifecycles, and visualize timelines.',
               icon: <Layers className="h-6 w-6" />,
               iconColor: 'text-blue-600 dark:text-blue-400',
               iconBg: 'bg-blue-50 dark:bg-blue-900/30',
               features: ['Project Templates', 'Hierarchical Structure', 'Status Tracking', 'Visual Timeline']
             },
-            {
-              name: 'Task Management with Scrum & Kanban',
+            { 
+              name: 'Task Management with Scrum & Kanban', 
               description: 'Full Scrum & Kanban support with sprint planning, backlog management, and velocity tracking.',
               icon: <ListChecks className="h-6 w-6" />,
               iconColor: 'text-emerald-600 dark:text-emerald-400',
               iconBg: 'bg-emerald-50 dark:bg-emerald-900/30',
               features: ['Kanban Boards', 'Sprint Planning', 'Burndown Charts', 'Velocity Metrics']
             },
-            {
-              name: 'Team Collaboration & User Management',
+            { 
+              name: 'Team Collaboration & User Management', 
               description: 'Invite members, assign roles, manage permissions, and collaborate with real-time activity feeds.',
               icon: <Users className="h-6 w-6" />,
               iconColor: 'text-purple-600 dark:text-purple-400',
               iconBg: 'bg-purple-50 dark:bg-purple-900/30',
               features: ['Role-Based Access', 'Team Invitations', 'Activity Tracking', 'Audit Logs']
             },
-            {
-              name: 'Invoicing & Billing Capabilities',
+            { 
+              name: 'Invoicing & Billing Capabilities', 
               description: 'Generate professional invoices, track payments, manage billing cycles, and automate financial workflows.',
               icon: <FileText className="h-6 w-6" />,
               iconColor: 'text-rose-600 dark:text-rose-400',
               iconBg: 'bg-rose-50 dark:bg-rose-900/30',
               features: ['Invoice Generation', 'Payment Tracking', 'Billing Automation', 'Financial Reports']
             },
-            {
-              name: 'File Management & Document Sharing',
+            { 
+              name: 'File Management & Document Sharing', 
               description: 'Upload, organize, and share files securely. Attach documents to tasks, projects, and collaborate in real-time.',
               icon: <Layers className="h-6 w-6" />,
               iconColor: 'text-amber-600 dark:text-amber-400',
               iconBg: 'bg-amber-50 dark:bg-amber-900/30',
               features: ['File Uploads', 'Document Sharing', 'Version Control', 'Secure Storage']
             },
-            {
-              name: 'Time Tracking & Reporting',
+            { 
+              name: 'Time Tracking & Reporting', 
               description: 'Track billable hours with built-in timers, approval workflows, and comprehensive time reports.',
               icon: <Watch className="h-6 w-6" />,
               iconColor: 'text-cyan-600 dark:text-cyan-400',
               iconBg: 'bg-cyan-50 dark:bg-cyan-900/30',
               features: ['Live Timer', 'Billable Hours', 'Time Approval', 'Capacity Planning']
             },
-            {
-              name: 'Budget Allocation & Financial Management',
+            { 
+              name: 'Budget Allocation & Financial Management', 
               description: 'Budget allocation, expense tracking, invoicing, and ROI analytics with multi-currency support.',
               icon: <TrendingUp className="h-6 w-6" />,
               iconColor: 'text-orange-600 dark:text-orange-400',
               iconBg: 'bg-orange-50 dark:bg-orange-900/30',
               features: ['Budget Tracking', 'Cost Centers', 'Expense Management', 'ROI Analytics']
             },
-            {
-              name: 'Reports & Analytics',
+            { 
+              name: 'Reports & Analytics', 
               description: 'Real-time dashboards, Gantt charts, team performance metrics, and exportable custom reports.',
               icon: <BarChart3 className="h-6 w-6" />,
               iconColor: 'text-indigo-600 dark:text-indigo-400',
@@ -1173,66 +1164,66 @@ export default function LandingPage() {
             </p>
           </div>
           <div className="mx-auto grid gap-8 lg:grid-cols-3">
-            {flows.map((step, idx) => {
-              // Get the appropriate image based on imageKey
-              let imageUrl: string | null = null
-              if (step.imageKey === 'heroDashboard') {
-                imageUrl = images.heroDashboard
-              } else if (step.imageKey === 'tasks') {
-                imageUrl = images.showcaseImages?.tasks || null
-              } else if (step.imageKey === 'members') {
-                imageUrl = images.showcaseImages?.members || null
-              }
+          {flows.map((step, idx) => {
+            // Get the appropriate image based on imageKey
+            let imageUrl: string | null = null
+            if (step.imageKey === 'heroDashboard') {
+              imageUrl = images.heroDashboard
+            } else if (step.imageKey === 'tasks') {
+              imageUrl = images.showcaseImages?.tasks || null
+            } else if (step.imageKey === 'members') {
+              imageUrl = images.showcaseImages?.members || null
+            }
 
-              return (
-                <div
-                  key={step.title}
-                  className="rounded-[32px] border border-slate-200 bg-white p-8 shadow-[0_25px_55px_rgba(15,23,42,0.08)] dark:border-white/20 dark:bg-gradient-to-br dark:from-[#0f1329] dark:via-[#151c3d] dark:to-[#0a1f3b] dark:shadow-[0_35px_65px_rgba(0,0,0,0.6)]"
-                >
-                  <p className="text-xs uppercase tracking-[0.6em] text-slate-400 dark:text-white/60">Flow {idx + 1}</p>
-                  <h3 className="mt-4 text-2xl font-semibold text-slate-900 dark:text-white">{step.title}</h3>
-                  <p className="mt-4 text-base text-slate-600 dark:text-white/80 leading-relaxed">{step.description}</p>
-                  {step.steps && (
-                    <div className="mt-6 flex flex-wrap gap-2">
-                      {step.steps.map((flowStep, stepIdx) => (
-                        <span
-                          key={stepIdx}
-                          className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 dark:bg-white/20 dark:text-white/90"
-                        >
-                          {flowStep}
-                        </span>
-                      ))}
+            return (
+              <div
+                key={step.title}
+                className="rounded-[32px] border border-slate-200 bg-white p-8 shadow-[0_25px_55px_rgba(15,23,42,0.08)] dark:border-white/20 dark:bg-gradient-to-br dark:from-[#0f1329] dark:via-[#151c3d] dark:to-[#0a1f3b] dark:shadow-[0_35px_65px_rgba(0,0,0,0.6)]"
+              >
+                <p className="text-xs uppercase tracking-[0.6em] text-slate-400 dark:text-white/60">Flow {idx + 1}</p>
+                <h3 className="mt-4 text-2xl font-semibold text-slate-900 dark:text-white">{step.title}</h3>
+                <p className="mt-4 text-base text-slate-600 dark:text-white/80 leading-relaxed">{step.description}</p>
+                {step.steps && (
+                  <div className="mt-6 flex flex-wrap gap-2">
+                    {step.steps.map((flowStep, stepIdx) => (
+                      <span
+                        key={stepIdx}
+                        className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 dark:bg-white/20 dark:text-white/90"
+                      >
+                        {flowStep}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {imageUrl ? (
+                  <div className="mt-6 aspect-[16/10] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 group relative">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
+                    <div className="absolute top-4 left-4 z-20 bg-[#7bffde]/90 dark:bg-[#7bffde]/80 backdrop-blur-sm rounded-lg px-3 py-1.5">
+                      <span className="text-xs font-semibold text-slate-900 dark:text-slate-900">Module {idx + 1}</span>
                     </div>
-                  )}
-                  {imageUrl ? (
-                    <div className="mt-6 aspect-[16/10] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 group relative">
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
-                      <div className="absolute top-4 left-4 z-20 bg-[#7bffde]/90 dark:bg-[#7bffde]/80 backdrop-blur-sm rounded-lg px-3 py-1.5">
-                        <span className="text-xs font-semibold text-slate-900 dark:text-slate-900">Module {idx + 1}</span>
+                    <Image
+                      src={imageUrl}
+                      alt={step.title}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className="mt-6 aspect-[16/10] rounded-2xl border border-white/10 p-4"
+                    style={{ backgroundImage: `linear-gradient(135deg, ${step.gradient})` }}
+                  >
+                    <div className="h-full w-full rounded-xl bg-white/20 backdrop-blur">
+                      <div className="flex h-full flex-col justify-between p-4 text-left">
+                        <span className="text-xs uppercase tracking-[0.5em] text-white/90">{step.caption}</span>
                       </div>
-                      <Image
-                        src={imageUrl}
-                        alt={step.title}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-500"
-                        unoptimized
-                      />
                     </div>
-                  ) : (
-                    <div
-                      className="mt-6 aspect-[16/10] rounded-2xl border border-white/10 p-4"
-                      style={{ backgroundImage: `linear-gradient(135deg, ${step.gradient})` }}
-                    >
-                      <div className="h-full w-full rounded-xl bg-white/20 backdrop-blur">
-                        <div className="flex h-full flex-col justify-between p-4 text-left">
-                          <span className="text-xs uppercase tracking-[0.5em] text-white/90">{step.caption}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
           </div>
         </div>
       </section>
@@ -1264,7 +1255,7 @@ export default function LandingPage() {
               }
               const imageKey = imageKeyMap[showcase.name]
               const imageUrl = imageKey ? images.showcaseImages?.[imageKey] : null
-
+              
               return (
                 <div
                   key={showcase.name}
@@ -1343,29 +1334,29 @@ export default function LandingPage() {
               Real-time insights for data-driven decisions
             </h2>
             <p className="mt-4 text-slate-600 dark:text-white/80 max-w-3xl mx-auto">
-              Generate detailed reports for financial analysis, team performance, project progress, and time tracking.
+              Generate detailed reports for financial analysis, team performance, project progress, and time tracking. 
               Export data, visualize with Gantt charts, and make informed decisions with comprehensive analytics.
             </p>
           </div>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {[
-              {
-                name: 'Financial Reports',
+              { 
+                name: 'Financial Reports', 
                 desc: 'Budget tracking, expenses, invoicing, and financial analytics with cost center breakdowns',
                 icon: <TrendingUp className="h-5 w-5 text-[#0d9488] dark:text-[#7bffde]" />
               },
-              {
-                name: 'Team Reports',
+              { 
+                name: 'Team Reports', 
                 desc: 'Performance metrics, workload analysis, team productivity, and utilization dashboards',
                 icon: <Users className="h-5 w-5 text-[#6366f1]" />
               },
-              {
-                name: 'Project Reports',
+              { 
+                name: 'Project Reports', 
                 desc: 'Gantt charts, progress tracking, project health dashboards, and milestone analytics',
                 icon: <Layers className="h-5 w-5 text-[#d946ef]" />
               },
-              {
-                name: 'Time Reports',
+              { 
+                name: 'Time Reports', 
                 desc: 'Billable hours, capacity planning, utilization analytics, and time entry approvals',
                 icon: <Watch className="h-5 w-5 text-[#06b6d4]" />
               }
@@ -1395,7 +1386,7 @@ export default function LandingPage() {
               Invite your team and collaborate seamlessly
             </h2>
             <p className="mt-4 text-slate-600 dark:text-white/80 max-w-3xl mx-auto">
-              Bring your entire team together. Invite members, assign roles, manage permissions,
+              Bring your entire team together. Invite members, assign roles, manage permissions, 
               and work together on projects with real-time collaboration and activity tracking.
             </p>
           </div>
@@ -1438,34 +1429,34 @@ export default function LandingPage() {
             <div className="inline-flex items-center gap-2 rounded-full bg-[#0d9488]/10 dark:bg-[#7bffde]/20 px-4 py-2 mb-6">
               <Zap className="h-4 w-4 text-[#0d9488] dark:text-[#7bffde]" />
               <span className="text-sm font-semibold text-[#0d9488] dark:text-[#7bffde]">Get Started Today</span>
-            </div>
+        </div>
             <h2 className="text-3xl font-bold text-slate-900 dark:text-white sm:text-4xl lg:text-5xl">
-              Ready to transform your project management?
-            </h2>
+            Ready to transform your project management?
+          </h2>
             <p className="mt-6 text-lg text-slate-600 dark:text-white/90 max-w-2xl mx-auto leading-relaxed">
               Explore Kanvaro without signing up. Take a guided tour to discover all features, or chat with our team for personalized assistance.
-            </p>
+          </p>
             <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center">
-              <Button
+            <Button
                 onClick={startGuidedTour}
-                disabled={ctaLoading}
+              disabled={ctaLoading}
                 className="h-14 rounded-full bg-[#0d9488] dark:bg-[#7bffde] px-10 text-base font-bold text-white dark:text-slate-900 shadow-[0_20px_45px_rgba(13,148,136,0.35)] dark:shadow-[0_20px_45px_rgba(123,255,222,0.35)] hover:bg-[#0f766e] dark:hover:bg-[#68f0cf] hover:shadow-[0_25px_55px_rgba(13,148,136,0.45)] dark:hover:shadow-[0_25px_55px_rgba(123,255,222,0.45)] disabled:opacity-70 transition-all"
-              >
+            >
                 <Play className="mr-2 h-5 w-5" />
                 Start the Guided Tour
-              </Button>
-              <Button
-                variant="outline"
+            </Button>
+            <Button
+              variant="outline"
                 onClick={() => {
                   // Open chat widget or contact form
                   // For now, opening contact page - can be replaced with chat widget integration
                   router.push('/contact')
                 }}
                 className="h-14 rounded-full border-2 border-slate-300 bg-white px-10 text-base font-semibold text-slate-900 hover:bg-slate-50 dark:border-white/40 dark:bg-transparent dark:text-white dark:hover:bg-white/20"
-              >
+            >
                 <MessageCircle className="mr-2 h-5 w-5" />
                 Chat with the Team
-              </Button>
+            </Button>
             </div>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-slate-500 dark:text-white/70">
               <div className="flex items-center gap-2">
@@ -1559,35 +1550,35 @@ export default function LandingPage() {
               © {new Date().getFullYear()} Kanvaro. All rights reserved.
             </p>
             <div className="flex items-center gap-3 sm:gap-4 flex-wrap justify-center">
-              <Link
-                href="https://github.com/EchonLabs/kanvaro.com"
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link 
+                href="https://github.com/EchonLabs/kanvaro.com" 
+                target="_blank" 
+                rel="noopener noreferrer" 
                 className="text-white/70 hover:text-[#7bffde] transition-colors"
                 aria-label="GitHub"
               >
                 <Github className="h-5 w-5" />
               </Link>
-              <Link
-                href="https://x.com/kanvaro"
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link 
+                href="https://x.com/kanvaro" 
+                target="_blank" 
+                rel="noopener noreferrer" 
                 className="text-white/70 hover:text-[#7bffde] transition-colors"
                 aria-label="Twitter/X"
               >
                 <Twitter className="h-5 w-5" />
               </Link>
-              <Link
-                href="https://www.linkedin.com/company/kanvaro"
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link 
+                href="https://www.linkedin.com/company/kanvaro" 
+                target="_blank" 
+                rel="noopener noreferrer" 
                 className="text-white/70 hover:text-[#7bffde] transition-colors"
                 aria-label="LinkedIn"
               >
                 <Linkedin className="h-5 w-5" />
               </Link>
-              <Link
-                href="mailto:kanvaro@echonlabs.com"
+              <Link 
+                href="mailto:kanvaro@echonlabs.com" 
                 className="text-white/70 hover:text-[#7bffde] transition-colors"
                 aria-label="Email"
               >
@@ -1637,7 +1628,7 @@ export default function LandingPage() {
             >
               Your browser does not support the video tag.
             </video>
-
+            
             {/* Placeholder - shown when video fails to load */}
             <div className="video-placeholder absolute inset-0 flex items-center justify-center" style={{ display: 'none' }}>
               <div className="text-center text-white max-w-md px-4">
@@ -1672,11 +1663,11 @@ export default function LandingPage() {
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           {/* Backdrop */}
-          <div
+          <div 
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setIsMobileMenuOpen(false)}
           />
-
+          
           {/* Menu Panel */}
           <div className="absolute right-0 top-0 h-full w-80 max-w-[90vw] bg-white dark:bg-slate-900 shadow-2xl transform transition-transform duration-300 ease-in-out">
             <div className="flex flex-col h-full">
@@ -1697,7 +1688,7 @@ export default function LandingPage() {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-
+              
               {/* Menu Content */}
               <div className="flex-1 overflow-y-auto p-6 space-y-4">
                 {/* Features Section */}
@@ -1962,7 +1953,7 @@ export default function LandingPage() {
                   )}
                 </div>
               </div>
-
+              
               {/* Footer Actions */}
               <div className="p-6 border-t border-slate-200 dark:border-white/10 space-y-3">
                 {/* Theme Toggle */}
@@ -1970,27 +1961,29 @@ export default function LandingPage() {
                   <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 dark:border-white/20 dark:bg-white/5">
                     <button
                       onClick={() => setTheme('light')}
-                      className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors flex-1 justify-center ${theme === 'light'
-                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                        : 'text-slate-600 hover:text-slate-900 dark:text-white/70 dark:hover:text-white'
-                        }`}
+                      className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors flex-1 justify-center ${
+                        theme === 'light'
+                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                          : 'text-slate-600 hover:text-slate-900 dark:text-white/70 dark:hover:text-white'
+                      }`}
                     >
                       <Sun className="h-3.5 w-3.5" />
                       Light
                     </button>
                     <button
                       onClick={() => setTheme('dark')}
-                      className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors flex-1 justify-center ${theme === 'dark'
-                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                        : 'text-slate-600 hover:text-slate-900 dark:text-white/70 dark:hover:text-white'
-                        }`}
+                      className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors flex-1 justify-center ${
+                        theme === 'dark'
+                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                          : 'text-slate-600 hover:text-slate-900 dark:text-white/70 dark:hover:text-white'
+                      }`}
                     >
                       <Moon className="h-3.5 w-3.5" />
                       Dark
                     </button>
                   </div>
                 )}
-
+                
                 {/* Login Button */}
                 <Button
                   variant="ghost"
@@ -2002,12 +1995,12 @@ export default function LandingPage() {
                 >
                   Login
                 </Button>
-
+                
                 {/* Get Started Button */}
                 <Button
-                  onClick={async () => {
+                  onClick={() => {
+                    router.push('/setup')
                     setIsMobileMenuOpen(false)
-                    await handleGetStarted()
                   }}
                   className="w-full bg-[#0d9488] dark:bg-[#7bffde] text-white dark:text-slate-900 hover:bg-[#0f766e] dark:hover:bg-[#62f5cf] transition-colors"
                 >
