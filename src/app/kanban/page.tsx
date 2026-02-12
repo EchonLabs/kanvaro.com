@@ -9,7 +9,6 @@ import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
@@ -247,7 +246,7 @@ function ColumnDropZone({
             <div className="h-full flex items-center justify-center text-muted-foreground">
              <div className="text-center">
                 <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Drop tasks here</p>
+                <p className="text-sm">Drag tasks here to update status</p>
               </div>
             </div>
           ) : (
@@ -996,8 +995,18 @@ export default function KanbanPage() {
       <div className="space-y-8 sm:space-y-10">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Kanban Board</h1>
-            <p className="text-sm sm:text-base text-muted-foreground">Visual task management with drag and drop</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Kanban Board</h1>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isConnected ? 'Real-time sync active' : 'Real-time sync inactive'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <p className="text-sm sm:text-base text-muted-foreground">Streamline workflow with intuitive drag-and-drop task management</p>
           </div>
           {canCreateTask && (
             <Button onClick={() => handleCreateTask()} className="w-full sm:w-auto">
@@ -1006,43 +1015,22 @@ export default function KanbanPage() {
             </Button>
           )}
         </div>
-
-
-        {/* Real-time connection status */}
-        {isConnected && (
-          <Alert className="mb-4">
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-              <span className="text-sm">Real-time sync active</span>
-            </div>
-          </Alert>
-        )}
-
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Task Board</CardTitle>
-                  <CardDescription>
-                    {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} found
-                  </CardDescription>
-                </div>
-              </div>
-              {/* Search bar - full width on its own line */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                <Input
-                  placeholder="Search tasks..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-full"
-                />
-              </div>
-              {/* Filter options - on the next line */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2 flex-wrap">
+        {/* Search and Filters */}
+        <div className="space-y-3">
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 w-full"
+            />
+          </div>
+          {/* Filter options - compact grid layout */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
                 <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger className="w-full sm:w-40">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Project" />
                   </SelectTrigger>
                   <SelectContent className="z-[10050] p-0">
@@ -1088,7 +1076,7 @@ export default function KanbanPage() {
                   </SelectContent>
                 </Select>
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                  <SelectTrigger className="w-full sm:w-40">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Priority" />
                   </SelectTrigger>
                   <SelectContent className="z-[10050] p-0">
@@ -1134,7 +1122,7 @@ export default function KanbanPage() {
                   </SelectContent>
                 </Select>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-full sm:w-40">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Type" />
                   </SelectTrigger>
                   <SelectContent className="z-[10050] p-0">
@@ -1179,8 +1167,6 @@ export default function KanbanPage() {
                     </div>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
                 <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Assigned To" />
@@ -1227,7 +1213,6 @@ export default function KanbanPage() {
                     </div>
                   </SelectContent>
                 </Select>
-
                 <Select value={assignedByFilter} onValueChange={setAssignedByFilter}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Assigned By" />
@@ -1274,7 +1259,6 @@ export default function KanbanPage() {
                     </div>
                   </SelectContent>
                 </Select>
-
                 <Select value={taskNumberFilter} onValueChange={setTaskNumberFilter}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select Task Number" />
@@ -1321,80 +1305,81 @@ export default function KanbanPage() {
                     </div>
                   </SelectContent>
                 </Select>
-
-                <div className="border border-dashed border-border/40 dark:border-border/60 hover:border-border/70 dark:hover:border-border rounded-lg bg-background/80 shadow-sm p-0.5 transition-colors">
-                  <div className="flex flex-col gap-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          'w-full justify-start text-left font-normal',
-                          !dateRangeFilter?.from && !dateRangeFilter?.to && 'text-muted-foreground'
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateRangeFilter?.from ? (
-                          dateRangeFilter.to ? (
-                            `${format(dateRangeFilter.from, 'LLL dd, y')} - ${format(dateRangeFilter.to, 'LLL dd, y')}`
-                          ) : (
-                            `${format(dateRangeFilter.from, 'LLL dd, y')} - …`
-                          )
-                        ) : (
-                          'Select due date range'
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <DateRangeCalendar
-                        initialFocus
-                        mode="range"
-                        defaultMonth={dateRangeFilter?.from}
-                        selected={dateRangeFilter}
-                        onSelect={setDateRangeFilter}
-                        numberOfMonths={2}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <div className="flex justify-end">
+                <Popover>
+                  <PopoverTrigger asChild>
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearDateFilters}
-                      disabled={!dateRangeFilter?.from && !dateRangeFilter?.to}
+                      variant="outline"
+                      className={cn(
+                        'w-full justify-start text-left font-normal',
+                        !dateRangeFilter?.from && !dateRangeFilter?.to && 'text-muted-foreground'
+                      )}
                     >
-                      Clear dates
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRangeFilter?.from ? (
+                        dateRangeFilter.to ? (
+                          `${format(dateRangeFilter.from, 'LLL dd, y')} - ${format(dateRangeFilter.to, 'LLL dd, y')}`
+                        ) : (
+                          `${format(dateRangeFilter.from, 'LLL dd, y')} - …`
+                        )
+                      ) : (
+                        'Date Range'
+                      )}
                     </Button>
-                  </div>
-                </div>
-                </div>
-              </div>
-              {hasActiveFilters && (
-                <div className="flex justify-start mt-2">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={resetFilters}
-                          className="text-xs"
-                          aria-label="Reset all filters"
-                        >
-                          <RotateCcw className="h-4 w-4 mr-1" />
-                          Reset Filters
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Reset filters</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <DateRangeCalendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={dateRangeFilter?.from}
+                      selected={dateRangeFilter}
+                      onSelect={setDateRangeFilter}
+                      numberOfMonths={2}
+                    />
+                    <div className="p-3 border-t">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearDateFilters}
+                        disabled={!dateRangeFilter?.from && !dateRangeFilter?.to}
+                        className="w-full"
+                      >
+                        Clear dates
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+          </div>
+          {/* Task count and reset filters */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} found
+            </p>
+            {hasActiveFilters && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={resetFilters}
+                      className="text-xs"
+                      aria-label="Reset all filters"
+                    >
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                      Reset Filters
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Reset filters</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+        </div>
+        
+        {/* Kanban Board */}
+        <div>
             <DndContext
               sensors={sensors}
               collisionDetection={closestCorners}
@@ -1445,8 +1430,7 @@ export default function KanbanPage() {
                 ) : null}
               </DragOverlay>
             </DndContext>
-          </CardContent>
-        </Card>
+        </div>
       </div>
       </TooltipProvider>
       {/* Modals */}

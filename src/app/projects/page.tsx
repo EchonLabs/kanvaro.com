@@ -358,37 +358,29 @@ export default function ProjectsPage() {
       </div>
 
 
-      <Card>
-        <CardHeader className="p-4 sm:p-6">
-          <div className="space-y-3 sm:space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div>
-                <CardTitle className="text-lg sm:text-xl">All Projects</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">
-                  {localSearch ? `${filteredProjects.length} of ${totalCount}` : totalCount} project{(localSearch ? filteredProjects.length : totalCount) !== 1 ? 's' : ''} found
-                </CardDescription>
-              </div>
-            </div>
-            <div className="flex flex-col gap-2 sm:gap-3">
-              <div className="relative w-full">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                <Input
-                  ref={searchInputRef}
-                  placeholder="Search projects..."
-                  value={localSearch}
-                  onChange={(e) => setLocalSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      setSearchQuery(localSearch)
-                    }
-                  }}
-                  onBlur={() => setSearchQuery(localSearch)}
-                  className="pl-10 w-full text-sm sm:text-base"
-                />
-              </div>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+      {/* Search and Filters */}
+      <div className="space-y-3">
+        {/* Search bar */}
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <Input
+            ref={searchInputRef}
+            placeholder="Search projects..."
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setSearchQuery(localSearch)
+              }
+            }}
+            onBlur={() => setSearchQuery(localSearch)}
+            className="pl-10 w-full text-sm sm:text-base"
+          />
+        </div>
+        {/* Filter options - compact grid layout */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full sm:w-[140px] text-sm">
+                  <SelectTrigger className="w-full text-sm">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -402,7 +394,7 @@ export default function ProjectsPage() {
                   </SelectContent>
                 </Select>
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                  <SelectTrigger className="w-full sm:w-[140px] text-sm">
+                  <SelectTrigger className="w-full text-sm">
                     <SelectValue placeholder="Priority" />
                   </SelectTrigger>
                   <SelectContent>
@@ -413,11 +405,17 @@ export default function ProjectsPage() {
                     <SelectItem value="critical">Critical</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6 pt-0">
+        </div>
+        {/* Project count */}
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            {localSearch ? `${filteredProjects.length} of ${totalCount}` : totalCount} project{(localSearch ? filteredProjects.length : totalCount) !== 1 ? 's' : ''} found
+          </p>
+        </div>
+      </div>
+      
+      {/* Projects View */}
+      <div>
           <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'grid' | 'list')}>
             <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
               <TabsTrigger value="grid" className="text-xs sm:text-sm">Grid View</TabsTrigger>
@@ -778,8 +776,7 @@ export default function ProjectsPage() {
               </div>
             </div>
           )}
-        </CardContent>
-        </Card>
+        </div>
         </div>
 
         <ConfirmationModal

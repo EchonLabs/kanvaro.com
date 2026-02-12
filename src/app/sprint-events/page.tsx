@@ -495,31 +495,28 @@ export default function SprintEventsPage() {
 
         {/* Success/Error Messages */}
 
-        {/* Filters */}
-        <Card>
-          <CardContent className="p-3 sm:p-4">
-            <div className="space-y-4">
-              {/* Search Input */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search events..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-
-              {/* Filter Controls */}
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+        {/* Search and Filters */}
+        <div className="space-y-3">
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search events..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          {/* Filter options - compact grid layout */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {!projectId && (
                   <Select 
                     value={filterProject} 
                     onValueChange={setFilterProject}
                     onOpenChange={(open) => { if (open) setProjectQuery('') }}
                   >
-                    <SelectTrigger className="w-full sm:w-[180px]">
-                      <SelectValue placeholder="All Projects" />
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Project" />
                     </SelectTrigger>
                     <SelectContent className="z-[10050] p-0">
                       <div className="p-2">
@@ -556,7 +553,7 @@ export default function SprintEventsPage() {
                   </Select>
                 )}
                 <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger className="w-full sm:w-[150px]">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Event Type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -570,7 +567,7 @@ export default function SprintEventsPage() {
                   </SelectContent>
                 </Select>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="w-full sm:w-[150px]">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -579,34 +576,37 @@ export default function SprintEventsPage() {
                     <SelectItem value="in_progress">In Progress</SelectItem>
                     <SelectItem value="completed">Completed</SelectItem>
                     <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
+                    </SelectContent>
                 </Select>
-                {hasActiveFilters && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={resetFilters}
-                          className="text-xs w-full sm:w-auto"
-                          aria-label="Reset all filters"
-                        >
-                          <RotateCcw className="h-4 w-4 mr-1" />
-                          <span className="hidden sm:inline">Reset Filters</span>
-                          <span className="sm:hidden">Reset</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Reset filters</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+          {/* Event count and reset filters */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''} found
+            </p>
+            {hasActiveFilters && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={resetFilters}
+                      className="text-xs"
+                      aria-label="Reset all filters"
+                    >
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                      Reset Filters
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Reset filters</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+        </div>
 
         {/* Events Display */}
         {filteredEvents.length === 0 ? (

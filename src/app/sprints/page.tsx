@@ -188,6 +188,29 @@ export default function SprintsPage() {
     }, 3000)
   }, [])
 
+  const fetchSprints = useCallback(async () => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams()
+      params.set('page', currentPage.toString())
+      params.set('limit', pageSize.toString())
+
+      const response = await fetch(`/api/sprints?${params.toString()}`)
+      const data = await response.json()
+
+      if (data.success) {
+        setSprints(data.data)
+        setTotalCount(data.pagination?.total || data.data.length)
+      } else {
+        setError(data.error || 'Failed to fetch sprints')
+      }
+    } catch (err) {
+      setError('Failed to fetch sprints')
+    } finally {
+      setLoading(false)
+    }
+  }, [currentPage, pageSize])
+
   const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me')
@@ -219,7 +242,7 @@ export default function SprintsPage() {
         router.push('/login')
       }, 2000)
     }
-  }, [router])
+  }, [router, fetchSprints])
 
   useEffect(() => {
     checkAuth()
@@ -246,30 +269,7 @@ export default function SprintsPage() {
     if (!loading && !authError) {
       fetchSprints()
     }
-  }, [currentPage, pageSize])
-
-  const fetchSprints = async () => {
-    try {
-      setLoading(true)
-      const params = new URLSearchParams()
-      params.set('page', currentPage.toString())
-      params.set('limit', pageSize.toString())
-
-      const response = await fetch(`/api/sprints?${params.toString()}`)
-      const data = await response.json()
-
-      if (data.success) {
-        setSprints(data.data)
-        setTotalCount(data.pagination?.total || data.data.length)
-      } else {
-        setError(data.error || 'Failed to fetch sprints')
-      }
-    } catch (err) {
-      setError('Failed to fetch sprints')
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [fetchSprints, loading, authError])
 
   const handleDeleteClick = (sprintId: string) => {
     if (!canDeleteSprint) {
@@ -724,11 +724,16 @@ export default function SprintsPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'planning': return <Calendar className="h-4 w-4" />
-      case 'active': return <Play className="h-4 w-4" />
-      case 'completed': return <CheckCircle className="h-4 w-4" />
-      case 'cancelled': return <XCircle className="h-4 w-4" />
-      default: return <Calendar className="h-4 w-4" />
+      case 'planning': 
+        return (<Calendar className="h-4 w-4" />)
+      case 'active': 
+        return (<Play className="h-4 w-4" />)
+      case 'completed': 
+        return (<CheckCircle className="h-4 w-4" />)
+      case 'cancelled': 
+        return (<XCircle className="h-4 w-4" />)
+      default: 
+        return (<Calendar className="h-4 w-4" />)
     }
   }
 
@@ -826,112 +831,110 @@ export default function SprintsPage() {
 
        
 
-        <Card className="overflow-x-hidden">
-          <CardHeader>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>All Sprints</CardTitle>
-                  <CardDescription>
-                    {filteredSprints.length} sprint{filteredSprints.length !== 1 ? 's' : ''} found
-                  </CardDescription>
+        {/* Search and Filters */}
+        <div className="space-y-3">
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              placeholder="Search sprints..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 w-full"
+            />
+          </div>
+          {/* Filter options - compact grid layout */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="planning">Planning</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={projectFilter} onValueChange={setProjectFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Project" />
+              </SelectTrigger>
+              <SelectContent className="z-[10050] p-0">
+                <div className="p-2">
+                  <div className="relative mb-2">
+                    <Input
+                      value={projectFilterQuery}
+                      onChange={(e) => setProjectFilterQuery(e.target.value)}
+                      placeholder="Search projects"
+                      className="pr-10"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                    {projectFilterQuery && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setProjectFilterQuery('')
+                          setProjectFilter('all')
+                        }}
+                        className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                        aria-label="Clear project filter"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-56 overflow-y-auto">
+                    <SelectItem value="all">All Projects</SelectItem>
+                    {filteredProjectOptions.length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                    ) : (
+                      filteredProjectOptions.map((project) => (
+                        <SelectItem key={project._id} value={project._id}>
+                          {project.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="flex flex-col gap-2 sm:gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <Input
-                    placeholder="Search sprints..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 w-full"
-                  />
-                </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full sm:w-40">
-                      <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="planning">Planning</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={projectFilter} onValueChange={setProjectFilter}>
-                    <SelectTrigger className="w-full sm:w-40">
-                      <SelectValue placeholder="Project" />
-                    </SelectTrigger>
-                    <SelectContent className="z-[10050] p-0">
-                      <div className="p-2">
-                        <div className="relative mb-2">
-                          <Input
-                            value={projectFilterQuery}
-                            onChange={(e) => setProjectFilterQuery(e.target.value)}
-                            placeholder="Search projects"
-                            className="pr-10"
-                            onKeyDown={(e) => e.stopPropagation()}
-                            onMouseDown={(e) => e.stopPropagation()}
-                          />
-                          {projectFilterQuery && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                setProjectFilterQuery('')
-                                setProjectFilter('all')
-                              }}
-                              className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                              aria-label="Clear project filter"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                        <div className="max-h-56 overflow-y-auto">
-                          <SelectItem value="all">All Projects</SelectItem>
-                          {filteredProjectOptions.length === 0 ? (
-                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
-                          ) : (
-                            filteredProjectOptions.map((project) => (
-                              <SelectItem key={project._id} value={project._id}>
-                                {project.name}
-                              </SelectItem>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </SelectContent>
-                  </Select>
-                  {hasActiveFilters && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={resetFilters}
-                            className="text-xs"
-                            aria-label="Reset all filters"
-                          >
-                            <RotateCcw className="h-4 w-4 mr-1" />
-                            Reset Filters
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Reset filters</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
+              </SelectContent>
+            </Select>
+          </div>
+          {/* Sprint count and reset filters */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {filteredSprints.length} sprint{filteredSprints.length !== 1 ? 's' : ''} found
+            </p>
+            {hasActiveFilters && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={resetFilters}
+                      className="text-xs"
+                      aria-label="Reset all filters"
+                    >
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                      Reset Filters
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Reset filters</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+        </div>
+
+        {/* Sprints View */}
+        <div>
             <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'grid' | 'list')}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="grid">Grid View</TabsTrigger>
@@ -1384,9 +1387,8 @@ export default function SprintsPage() {
                 </div>
               </TabsContent>
             </Tabs>
-          </CardContent>
-        </Card>
-
+        </div>
+        
         <ResponsiveDialog
           open={completeModalOpen}
           onOpenChange={(open) => {
@@ -1403,12 +1405,7 @@ export default function SprintsPage() {
             setCompleteModalOpen(true)
           }}
           title="Complete Sprint"
-          description={
-            incompleteTasks.length
-              ? `There are ${incompleteTasks.length} incomplete task${incompleteTasks.length === 1 ? '' : 's'
-              }. Move them before completing the sprint.`
-              : 'All tasks are completed. You can finish the sprint now.'
-          }
+          description={incompleteTasks.length > 0 ? `There are ${incompleteTasks.length} incomplete task${incompleteTasks.length === 1 ? '' : 's'}. Move them before completing the sprint.` : 'All tasks are completed. You can finish the sprint now.'}
           footer={
             <div className="flex flex-col sm:flex-row sm:justify-end gap-2 w-full">
               <Button
@@ -1508,8 +1505,7 @@ export default function SprintsPage() {
                       const isSelected = selectedTaskIds.has(task._id)
 
                       return (
-                        <div key={task._id} className={`rounded-md border px-3 py-2 space-y-2 transition-colors ${isSelected ? 'bg-muted/40 border-primary/30' : 'bg-muted/20 border-muted'
-                          }`}>
+                        <div key={task._id} className={`rounded-md border px-3 py-2 space-y-2 transition-colors ${isSelected ? 'bg-muted/40 border-primary/30' : 'bg-muted/20 border-muted'}`}>
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <input
@@ -1586,8 +1582,7 @@ export default function SprintsPage() {
                                         </div>
                                       </div>
                                       <Badge
-                                        className={`${TASK_STATUS_BADGE_MAP[subtask.status] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-                                          } text-[10px] flex-shrink-0`}
+                                        className={`${TASK_STATUS_BADGE_MAP[subtask.status] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'} text-[10px] flex-shrink-0`}
                                       >
                                         {formatTaskStatusLabel(subtask.status)}
                                       </Badge>
@@ -1744,74 +1739,20 @@ export default function SprintsPage() {
             )}
           </div>
         </ResponsiveDialog>
-
-        {/* Pagination Controls */}
-        {
-          filteredSprints.length > 0 && (
-            <Card className="mt-6">
-              <CardContent className="p-4">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>Items per page:</span>
-                    <Select value={pageSize.toString()} onValueChange={(value) => {
-                      setPageSize(parseInt(value))
-                      setCurrentPage(1)
-                    }}>
-                      <SelectTrigger className="w-20 h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="10">10</SelectItem>
-                        <SelectItem value="20">20</SelectItem>
-                        <SelectItem value="50">50</SelectItem>
-                        <SelectItem value="100">100</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <span>
-                      Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredSprints.length)} of {filteredSprints.length}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      onClick={() => setCurrentPage(currentPage - 1)}
-                      disabled={currentPage === 1 || loading}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Previous
-                    </Button>
-                    <span className="text-sm text-muted-foreground px-2">
-                      Page {currentPage} of {Math.ceil(filteredSprints.length / pageSize) || 1}
-                    </span>
-                    <Button
-                      onClick={() => setCurrentPage(currentPage + 1)}
-                      disabled={currentPage >= Math.ceil(filteredSprints.length / pageSize) || loading}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        }
-      </div >
-      <ConfirmationModal
-  isOpen={showDeleteConfirmModal}
-  onClose={() => {
-    setShowDeleteConfirmModal(false)
-    setSelectedSprintId(null)
-  }}
-  onConfirm={handleDeleteConfirm}
-  title="Delete Sprint"
-  description="Are you sure you want to delete this sprint? This action cannot be undone."
-  confirmText={deleting ? 'Deleting...' : 'Delete'}
-  cancelText="Cancel"
-  variant="destructive"
-/>
-
-    </MainLayout >
+        <ConfirmationModal
+          isOpen={showDeleteConfirmModal}
+          onClose={() => {
+            setShowDeleteConfirmModal(false)
+            setSelectedSprintId(null)
+          }}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Sprint"
+          description="Are you sure you want to delete this sprint? This action cannot be undone."
+          confirmText={deleting ? 'Deleting...' : 'Delete'}
+          cancelText="Cancel"
+          variant="destructive"
+        />
+      </div>
+    </MainLayout>
   )
 }

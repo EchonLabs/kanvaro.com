@@ -1,3 +1,14 @@
+---
+slug: "operations/timer-auto-stop-cron"
+title: "Timer Auto-Stop Cron Job Setup"
+summary: "Configure the cron endpoint that automatically stops timers exceeding their allowed session limit."
+visibility: "internal"
+audiences: ["admin", "self_host_admin"]
+category: "operations"
+order: 30
+updated: "2026-02-02"
+---
+
 # Timer Auto-Stop Cron Job Setup
 
 ## Overview
