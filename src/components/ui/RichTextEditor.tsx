@@ -109,91 +109,91 @@ export function RichTextEditor({
     }
   }, [execCommand])
 
- const insertUnorderedList = useCallback((listType: string = 'disc') => {
-  if (disabled || !editorRef.current) return
+  const insertUnorderedList = useCallback((listType: string = 'disc') => {
+    if (disabled || !editorRef.current) return
 
-  const selection = window.getSelection()
-  if (!selection || selection.rangeCount === 0) return
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return
 
-  const range = selection.getRangeAt(0)
-  editorRef.current.focus()
+    const range = selection.getRangeAt(0)
+    const selectedText = range.toString()
 
-  // Clone selected content as HTML
-  const container = document.createElement('div')
-  container.appendChild(range.cloneContents())
+    editorRef.current.focus()
 
-  // Extract lines properly (div, p, br)
-  let lines: string[] = []
-
-  container.childNodes.forEach((node) => {
-    if (node.nodeName === 'DIV' || node.nodeName === 'P') {
-      lines.push((node as HTMLElement).innerText.trim())
-    } else if (node.nodeName === 'BR') {
-      // ignore empty lines
+    if (selectedText.trim()) {
+      // Convert selected text to list items
+      const lines = selectedText.split('\n').filter(line => line.trim())
+      const listItems = lines.map(line => `<li>${line.trim()}</li>`).join('')
+      const listHTML = `<ul style="list-style-type: ${listType};">${listItems}</ul>`
+      document.execCommand('insertHTML', false, listHTML)
     } else {
-      const text = node.textContent?.trim()
-      if (text) lines.push(text)
+      // Insert new empty list
+      const listHTML = `<ul style="list-style-type: ${listType};"><li><br></li></ul>`
+      document.execCommand('insertHTML', false, listHTML)
+
+      // Move cursor to the list item
+      setTimeout(() => {
+        const lists = editorRef.current?.querySelectorAll('ul')
+        if (lists && lists.length > 0) {
+          const lastList = lists[lists.length - 1]
+          const listItems = lastList.querySelectorAll('li')
+          if (listItems.length > 0) {
+            const lastItem = listItems[listItems.length - 1]
+            const newRange = document.createRange()
+            newRange.setStart(lastItem, 0)
+            newRange.setEnd(lastItem, 0)
+            selection.removeAllRanges()
+            selection.addRange(newRange)
+          }
+        }
+      }, 0)
     }
-  })
 
-  if (lines.length > 0) {
-    const listItems = lines
-      .filter(l => l)
-      .map(line => `<li>${line}</li>`)
-      .join('')
+    handleInput()
+  }, [disabled, handleInput])
 
-    const listHTML = `<ul style="list-style-type: ${listType}; padding-left: 1.5rem;">${listItems}</ul>`
-    document.execCommand('insertHTML', false, listHTML)
-  } else {
-    const listHTML = `<ul style="list-style-type: ${listType}; padding-left: 1.5rem;"><li><br></li></ul>`
-    document.execCommand('insertHTML', false, listHTML)
-  }
+  const insertOrderedList = useCallback((listType: string = 'decimal') => {
+    if (disabled || !editorRef.current) return
 
-  handleInput()
-}, [disabled, handleInput])
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return
 
+    const range = selection.getRangeAt(0)
+    const selectedText = range.toString()
 
-const insertOrderedList = useCallback((listType: string = 'decimal') => {
-  if (disabled || !editorRef.current) return
+    editorRef.current.focus()
 
-  const selection = window.getSelection()
-  if (!selection || selection.rangeCount === 0) return
-
-  const range = selection.getRangeAt(0)
-  editorRef.current.focus()
-
-  const container = document.createElement('div')
-  container.appendChild(range.cloneContents())
-
-  let lines: string[] = []
-
-  container.childNodes.forEach((node) => {
-    if (node.nodeName === 'DIV' || node.nodeName === 'P') {
-      lines.push((node as HTMLElement).innerText.trim())
-    } else if (node.nodeName === 'BR') {
-      // ignore
+    if (selectedText.trim()) {
+      // Convert selected text to numbered list items
+      const lines = selectedText.split('\n').filter(line => line.trim())
+      const listItems = lines.map(line => `<li>${line.trim()}</li>`).join('')
+      const listHTML = `<ol style="list-style-type: ${listType};">${listItems}</ol>`
+      document.execCommand('insertHTML', false, listHTML)
     } else {
-      const text = node.textContent?.trim()
-      if (text) lines.push(text)
+      // Insert new empty numbered list
+      const listHTML = `<ol style="list-style-type: ${listType};"><li><br></li></ol>`
+      document.execCommand('insertHTML', false, listHTML)
+
+      // Move cursor to the list item
+      setTimeout(() => {
+        const lists = editorRef.current?.querySelectorAll('ol')
+        if (lists && lists.length > 0) {
+          const lastList = lists[lists.length - 1]
+          const listItems = lastList.querySelectorAll('li')
+          if (listItems.length > 0) {
+            const lastItem = listItems[listItems.length - 1]
+            const newRange = document.createRange()
+            newRange.setStart(lastItem, 0)
+            newRange.setEnd(lastItem, 0)
+            selection.removeAllRanges()
+            selection.addRange(newRange)
+          }
+        }
+      }, 0)
     }
-  })
 
-  if (lines.length > 0) {
-    const listItems = lines
-      .filter(l => l)
-      .map(line => `<li>${line}</li>`)
-      .join('')
-
-    const listHTML = `<ol style="list-style-type: ${listType}; padding-left: 1.5rem;">${listItems}</ol>`
-    document.execCommand('insertHTML', false, listHTML)
-  } else {
-    const listHTML = `<ol style="list-style-type: ${listType}; padding-left: 1.5rem;"><li><br></li></ol>`
-    document.execCommand('insertHTML', false, listHTML)
-  }
-
-  handleInput()
-}, [disabled, handleInput])
-
+    handleInput()
+  }, [disabled, handleInput])
 
   const fontSizes = [
     { label: '8pt', value: '1' },
@@ -352,7 +352,7 @@ const insertOrderedList = useCallback((listType: string = 'decimal') => {
           <SelectTrigger className="w-32 h-8">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="z-[10050]">
+          <SelectContent>
             {fontFamilies.map((font) => (
               <SelectItem key={font.value} value={font.value}>
                 <span style={{ fontFamily: font.value }}>{font.label}</span>
@@ -365,7 +365,7 @@ const insertOrderedList = useCallback((listType: string = 'decimal') => {
           <SelectTrigger className="w-20 h-8">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="z-[10050]">
+          <SelectContent>
             {fontSizes.map((size) => (
               <SelectItem key={size.value} value={size.value}>
                 {size.label}
@@ -413,7 +413,7 @@ const insertOrderedList = useCallback((listType: string = 'decimal') => {
               <List className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="z-[10050]">
+          <DropdownMenuContent align="start">
             <DropdownMenuItem onClick={() => insertUnorderedList('disc')}>
               <span className="w-4 h-4 rounded-full bg-current mr-2" style={{ listStyleType: 'disc' }}></span>
               Filled Circle
@@ -442,7 +442,7 @@ const insertOrderedList = useCallback((listType: string = 'decimal') => {
               <ListOrdered className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="z-[10050]">
+          <DropdownMenuContent align="start">
             <DropdownMenuItem onClick={() => insertOrderedList('decimal')}>
               <span className="w-6 text-center mr-2">1.</span>
               Numbers (1, 2, 3...)
