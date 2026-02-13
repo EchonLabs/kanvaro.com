@@ -133,7 +133,22 @@ async function stopTimerAndBuildResponse(
     return { status: 500, body: { error: 'Time tracking settings not found' } }
   }
 
-  const endTime = options.now || new Date()
+  let endTime = options.now || new Date()
+  
+  // When auto-stopping due to max session limit, calculate the correct end time
+  // and cap the duration at maxSessionHours
+  const isAutoStopMaxSession = options.reason === 'auto_max_session'
+  let maxSessionLimitMinutes: number | null = null
+  
+  if (isAutoStopMaxSession && stopSettings.maxSessionHours && stopSettings.allowOvertime === false) {
+    maxSessionLimitMinutes = stopSettings.maxSessionHours * MINUTES_PER_HOUR
+    
+    // Calculate the exact end time based on max session hours
+    // This ensures the time entry reflects when the timer SHOULD have stopped, not when the user returned
+    const maxDurationMs = maxSessionLimitMinutes * 60 * 1000
+    const totalPausedMs = (activeTimer.totalPausedDuration || 0) * 60 * 1000
+    endTime = new Date(activeTimer.startTime.getTime() + maxDurationMs + totalPausedMs)
+  }
 
   const descriptionSource = options.description ?? activeTimer.description ?? ''
   const finalDescription =
@@ -146,7 +161,13 @@ async function stopTimerAndBuildResponse(
     return { status: 400, body: { error: 'Description is required for time entries' } }
   }
 
-  const totalDuration = calculateCurrentDurationMinutes(activeTimer, endTime)
+  let totalDuration = calculateCurrentDurationMinutes(activeTimer, endTime)
+  
+  // Cap duration at maxSessionHours when auto-stopping due to session limit
+  if (isAutoStopMaxSession && maxSessionLimitMinutes !== null && totalDuration > maxSessionLimitMinutes) {
+    totalDuration = maxSessionLimitMinutes
+  }
+  
   let finalDuration = totalDuration
   if (stopSettings.roundingRules?.enabled) {
     finalDuration = applyRoundingRules(totalDuration, {
