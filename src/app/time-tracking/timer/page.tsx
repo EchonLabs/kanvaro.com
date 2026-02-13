@@ -136,12 +136,25 @@ export default function TimerPage() {
   const [sessionHoursError, setSessionHoursError] = useState('')
   const [activeTab, setActiveTab] = useState<'timer' | 'manual'>('timer')
   const autoStopNotifiedRef = useRef(false)
+  const [projectSearch, setProjectSearch] = useState('')
+  const [taskSearch, setTaskSearch] = useState('')
+
+
 
   // Helper function to combine date and time into datetime-local format
   const combineDateTime = (date: string, time: string): string => {
     if (!date || !time) return ''
     return `${date}T${time}`
   }
+
+  const filteredProjects = projects.filter((project) =>
+  project.name.toLowerCase().includes(projectSearch.toLowerCase())
+)
+
+const filteredTasks = tasks.filter((task) =>
+  task.title.toLowerCase().includes(taskSearch.toLowerCase())
+)
+
 
   // Validate maxSessionHours and future time when dates/times change
   const validateSessionHours = useCallback(() => {
@@ -1014,17 +1027,33 @@ export default function TimerPage() {
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a project" />
                       </SelectTrigger>
-                      <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
-                        {Array.isArray(projects) && projects.map((project) => (
-                          <SelectItem key={project._id} value={project._id}>
-                            <div className="flex items-center space-x-2 min-w-0">
-                              <FolderOpen className="h-4 w-4 flex-shrink-0" />
-                              <span className="truncate">{project.name}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                     <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
+                     <div className="p-2 sticky top-0 bg-background z-10">
+                       <Input
+                       placeholder="Type project name..."
+                       value={projectSearch}
+                       onChange={(e) => setProjectSearch(e.target.value)}
+                       className="h-8"
+                       />
+                     </div>
+
+                     {Array.isArray(filteredProjects) && filteredProjects.length > 0 ? (
+                     filteredProjects.map((project) => (
+                     <SelectItem key={project._id} value={project._id}>
+                     <div className="flex items-center space-x-2 min-w-0">
+                       <FolderOpen className="h-4 w-4 flex-shrink-0" />
+                       <span className="truncate">{project.name}</span>
+                     </div>
+                     </SelectItem>
+                     ))
+                     ) : (
+                     <div className="p-3 text-sm text-muted-foreground text-center">
+                       No projects found
+                     </div>
+                     )}
+                     </SelectContent>
+
+                     </Select>
                   </div>
 
                   <div className="space-y-2">
@@ -1046,38 +1075,50 @@ export default function TimerPage() {
                       {tasksLoading && (
                         <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                       )}
-                      <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
-                        {tasksLoading ? (
-                          <div className="flex items-center justify-center p-4">
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            <span className="text-sm text-muted-foreground">Loading tasks...</span>
-                          </div>
-                        ) : (
-                          Array.isArray(tasks) && tasks.map((task) => {
-                            const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
-                            return (
-                              <SelectItem 
-                                key={task._id} 
-                                value={task._id}
-                                disabled={isBillableDisabled}
-                              >
-                                <div className="flex items-center space-x-2 min-w-0 w-full">
-                                  <Target className="h-4 w-4 flex-shrink-0" />
-                                  <div className="flex-1 min-w-0 overflow-hidden">
-                                    <div className="font-medium truncate flex items-center gap-2 min-w-0">
-                                      <span className="truncate">{task.title}</span>
-                                    </div>
-                                    <div className="text-xs sm:text-sm text-muted-foreground truncate">
-                                      {task.status} • {task.priority}
-                                      {isBillableDisabled && ' • Billable time not allowed'}
-                                    </div>
-                                  </div>
-                                </div>
-                              </SelectItem>
-                            )
-                          })
-                        )}
-                      </SelectContent>
+                     <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
+                     {!tasksLoading && (
+                     <div className="p-2 sticky top-0 bg-background z-10">
+                      <Input
+                       placeholder="Type task name..."
+                       value={taskSearch}
+                       onChange={(e) => setTaskSearch(e.target.value)}
+                       className="h-8"
+                      />
+                    </div> )}
+
+                {tasksLoading ? (
+                    <div className="flex items-center justify-center p-4">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <span className="text-sm text-muted-foreground">Loading tasks...</span>
+                    </div>
+                  ) : (
+                    Array.isArray(filteredTasks) && filteredTasks.length > 0 ? (
+                    filteredTasks.map((task) => {
+                    const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
+                    return (
+                       <SelectItem 
+                       key={task._id} 
+                       value={task._id}
+                       disabled={isBillableDisabled}>
+                       <div className="flex items-center space-x-2 min-w-0 w-full">
+                       <Target className="h-4 w-4 flex-shrink-0" />
+                       <div className="flex-1 min-w-0 overflow-hidden">
+                       <div className="font-medium truncate flex items-center gap-2 min-w-0">
+                       <span className="truncate">{task.title}</span>
+                       </div>
+                       <div className="text-xs sm:text-sm text-muted-foreground truncate">
+                       {task.status} • {task.priority}
+                       {isBillableDisabled && ' • Billable time not allowed'}
+                       </div>
+                       </div>
+                       </div>
+                     </SelectItem>)})
+                     ) : (
+                       <div className="p-3 text-sm text-muted-foreground text-center">
+                         No tasks found
+                       </div>))}
+                   </SelectContent>
+
                     </Select>
                     {selectedProject && !tasksLoading && Array.isArray(tasks) && tasks.length === 0 && (
                       <p className="text-xs text-muted-foreground">

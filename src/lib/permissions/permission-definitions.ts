@@ -44,7 +44,6 @@ export enum Permission {
   SYSTEM_ADMIN = 'system:admin',
   SYSTEM_MONITOR = 'system:monitor',
   SYSTEM_MAINTENANCE = 'system:maintenance',
-  
   // User management permissions
   USER_CREATE = 'user:create',
   USER_READ = 'user:read',
@@ -54,14 +53,14 @@ export enum Permission {
   USER_ACTIVATE = 'user:activate',
   USER_DEACTIVATE = 'user:deactivate',
   USER_MANAGE_ROLES = 'user:manage_roles',
-  
+
   // Organization permissions
   ORGANIZATION_READ = 'organization:read',
   ORGANIZATION_UPDATE = 'organization:update',
   ORGANIZATION_DELETE = 'organization:delete',
   ORGANIZATION_MANAGE_SETTINGS = 'organization:manage_settings',
   ORGANIZATION_MANAGE_BILLING = 'organization:manage_billing',
-  
+
   // Project permissions
   PROJECT_CREATE = 'project:create',
   PROJECT_READ = 'project:read',
@@ -72,7 +71,7 @@ export enum Permission {
   PROJECT_ARCHIVE = 'project:archive',
   PROJECT_RESTORE = 'project:restore',
   PROJECT_VIEW_ALL = 'project:view_all', // Admin can see all projects
-  
+
   // Task permissions
   TASK_CREATE = 'task:create',
   TASK_READ = 'task:read',
@@ -85,7 +84,7 @@ export enum Permission {
   TASK_VIEW_ALL = 'task:view_all',
   TASK_EDIT_ALL = 'task:edit_all',
   TASK_DELETE_ALL = 'task:delete_all',
-  
+
   // Team permissions
   TEAM_READ = 'team:read',
   TEAM_INVITE = 'team:invite',
@@ -95,7 +94,7 @@ export enum Permission {
   TEAM_MANAGE_PERMISSIONS = 'team:manage_permissions',
   TEAM_VIEW_ACTIVITY = 'team:view_activity',
   TEAM_MEMBER_WIDGET_VIEW = 'team_member_widget:view',
-  
+
   // Time tracking permissions
   TIME_TRACKING_CREATE = 'time_tracking:create',
   TIME_TRACKING_READ = 'time_tracking:read',
@@ -109,7 +108,7 @@ export enum Permission {
   TIME_TRACKING_EMPLOYEE_FILTER_READ = 'time_tracking:employee_filter:read',
   TIME_TRACKING_VIEW_ALL_TIMER = 'time_tracking:view_all_timer',
   TIME_TRACKING_BULK_UPLOAD_ALL = 'time_tracking:bulk_upload_all',
-  
+
   // Financial permissions
   FINANCIAL_READ = 'financial:read',
   FINANCIAL_MANAGE_BUDGET = 'financial:manage_budget',
@@ -119,21 +118,21 @@ export enum Permission {
   FINANCIAL_CREATE_INVOICE = 'financial:create_invoice',
   FINANCIAL_SEND_INVOICE = 'financial:send_invoice',
   FINANCIAL_MANAGE_PAYMENTS = 'financial:manage_payments',
-  
+
   // Reporting permissions
   REPORTING_VIEW = 'reporting:view',
   REPORTING_CREATE = 'reporting:create',
   REPORTING_EXPORT = 'reporting:export',
   REPORTING_SHARE = 'reporting:share',
   TIME_LOG_REPORT_ACCESS = 'time_tracking:report_access',
-  
+
   // Settings permissions
-    SETTINGS_VIEW = 'settings:view',
+  SETTINGS_VIEW = 'settings:view',
   SETTINGS_UPDATE = 'settings:update',
   SETTINGS_MANAGE_EMAIL = 'settings:manage_email',
   SETTINGS_MANAGE_DATABASE = 'settings:manage_database',
   SETTINGS_MANAGE_SECURITY = 'settings:manage_security',
-  
+
   // Epic permissions
   EPIC_CREATE = 'epic:create',
   EPIC_VIEW = 'epic:view',
@@ -143,7 +142,7 @@ export enum Permission {
   EPIC_DELETE = 'epic:delete',
   EPIC_REMOVE = 'epic:remove',
   EPIC_VIEW_ALL = 'epic:view_all',
-  
+
   // Sprint permissions
   SPRINT_CREATE = 'sprint:create',
   SPRINT_VIEW = 'sprint:view',
@@ -155,7 +154,7 @@ export enum Permission {
   SPRINT_VIEW_ALL = 'sprint:view_all',
   SPRINT_START = 'sprint:start',
   SPRINT_COMPLETE = 'sprint:complete',
-  
+
   // Story permissions
   STORY_CREATE = 'story:create',
   STORY_READ = 'story:read',
@@ -163,25 +162,25 @@ export enum Permission {
   STORY_DELETE = 'story:delete',
   STORY_VIEW_ALL = 'story:view_all',
   STORY_MANAGE_ALL = 'story:manage_all',
-  
+
   // Calendar permissions
   CALENDAR_READ = 'calendar:read',
   CALENDAR_CREATE = 'calendar:create',
   CALENDAR_UPDATE = 'calendar:update',
   CALENDAR_DELETE = 'calendar:delete',
-  
+
   // Sprint Event permissions
   SPRINT_EVENT_VIEW_ALL = 'sprint_event:view_all',
-  SPRINT_EVENT_VIEW='sprint_event:view',
-  
+  SPRINT_EVENT_VIEW = 'sprint_event:view',
+
   // Kanban permissions
   KANBAN_READ = 'kanban:read',
   KANBAN_MANAGE = 'kanban:manage',
-  
+
   // backlog permissions
   BACKLOG_READ = 'backlog:read',
   BACKLOG_MANAGE = 'backlog:manage',
-  
+
   // Test management permissions
   TEST_SUITE_CREATE = 'test_suite:create',
   TEST_SUITE_READ = 'test_suite:read',
@@ -235,7 +234,7 @@ export enum ProjectRole {
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   [Role.SUPER_ADMIN]: Object.values(Permission),
-  
+
   [Role.ADMIN]: [
     // User management
     Permission.USER_CREATE,
@@ -246,13 +245,13 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.USER_ACTIVATE,
     Permission.USER_DEACTIVATE,
     Permission.USER_MANAGE_ROLES,
-    
+
     // Organization
     Permission.ORGANIZATION_READ,
     Permission.ORGANIZATION_UPDATE,
     Permission.ORGANIZATION_MANAGE_SETTINGS,
     Permission.ORGANIZATION_MANAGE_BILLING,
-    
+
     // Projects (can see all projects)
     Permission.PROJECT_CREATE,
     Permission.PROJECT_READ,
@@ -263,7 +262,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.PROJECT_ARCHIVE,
     Permission.PROJECT_RESTORE,
     Permission.PROJECT_VIEW_ALL,
-    
+
     // Tasks
     Permission.TASK_CREATE,
     Permission.TASK_READ,
@@ -274,9 +273,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TASK_MANAGE_COMMENTS,
     Permission.TASK_MANAGE_ATTACHMENTS,
     Permission.TASK_VIEW_ALL,
-    Permission.TASK_EDIT_ALL,
-    Permission.TASK_DELETE_ALL,
-    
+
     // Team
     Permission.TEAM_READ,
     Permission.TEAM_INVITE,
@@ -285,7 +282,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEAM_MANAGE_PERMISSIONS,
     Permission.TEAM_VIEW_ACTIVITY,
     Permission.TEAM_MEMBER_WIDGET_VIEW,
-    
+
     // Time tracking
     Permission.TIME_TRACKING_CREATE,
     Permission.TIME_TRACKING_READ,
@@ -295,7 +292,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
     Permission.TIME_TRACKING_VIEW_ALL_TIMER,
-    
+
     // Financial
     Permission.FINANCIAL_READ,
     Permission.FINANCIAL_MANAGE_BUDGET,
@@ -305,20 +302,20 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.FINANCIAL_CREATE_INVOICE,
     Permission.FINANCIAL_SEND_INVOICE,
     Permission.FINANCIAL_MANAGE_PAYMENTS,
-    
+
     // Reporting
     Permission.REPORTING_CREATE,
     Permission.REPORTING_EXPORT,
     Permission.REPORTING_SHARE,
     Permission.TIME_LOG_REPORT_ACCESS,
-    
+
     // Settings
     Permission.SETTINGS_VIEW,
     Permission.SETTINGS_UPDATE,
     Permission.SETTINGS_MANAGE_EMAIL,
     Permission.SETTINGS_MANAGE_DATABASE,
     Permission.SETTINGS_MANAGE_SECURITY,
-    
+
     // Epics
     Permission.EPIC_CREATE,
     Permission.EPIC_VIEW,
@@ -328,7 +325,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.EPIC_DELETE,
     Permission.EPIC_REMOVE,
     Permission.EPIC_VIEW_ALL,
-    
+
     // Sprints
     Permission.SPRINT_CREATE,
     Permission.SPRINT_VIEW,
@@ -340,28 +337,28 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.SPRINT_VIEW_ALL,
     Permission.SPRINT_START,
     Permission.SPRINT_COMPLETE,
-    
+
     // Stories
     Permission.STORY_CREATE,
     Permission.STORY_READ,
     Permission.STORY_UPDATE,
     Permission.STORY_DELETE,
     Permission.STORY_VIEW_ALL,
-    
+
     // Calendar
     Permission.CALENDAR_READ,
     Permission.CALENDAR_CREATE,
     Permission.CALENDAR_UPDATE,
     Permission.CALENDAR_DELETE,
-    
+
     // Sprint Events
     Permission.SPRINT_EVENT_VIEW_ALL,
     Permission.SPRINT_EVENT_VIEW,
-    
+
     // Kanban
     Permission.KANBAN_READ,
     Permission.KANBAN_MANAGE,
-    
+
     // backlog
     Permission.BACKLOG_READ,
     Permission.BACKLOG_MANAGE,
@@ -410,13 +407,13 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.USER_ACTIVATE,
     Permission.USER_DEACTIVATE,
     Permission.USER_MANAGE_ROLES,
-    
+
     // Organization
     Permission.ORGANIZATION_READ,
     Permission.ORGANIZATION_UPDATE,
     Permission.ORGANIZATION_MANAGE_SETTINGS,
     Permission.ORGANIZATION_MANAGE_BILLING,
-    
+
     // Projects (can see all projects)
     Permission.PROJECT_CREATE,
     Permission.PROJECT_READ,
@@ -427,7 +424,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.PROJECT_ARCHIVE,
     Permission.PROJECT_RESTORE,
     Permission.PROJECT_VIEW_ALL,
-    
+
     // Tasks
     Permission.TASK_CREATE,
     Permission.TASK_READ,
@@ -438,7 +435,9 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TASK_MANAGE_COMMENTS,
     Permission.TASK_MANAGE_ATTACHMENTS,
     Permission.TASK_VIEW_ALL,
-    
+    Permission.TASK_EDIT_ALL,
+    Permission.TASK_DELETE_ALL,
+
     // Team
     Permission.TEAM_READ,
     Permission.TEAM_INVITE,
@@ -447,7 +446,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEAM_MANAGE_PERMISSIONS,
     Permission.TEAM_VIEW_ACTIVITY,
     Permission.TEAM_MEMBER_WIDGET_VIEW,
-    
+
     // Time tracking
     Permission.TIME_TRACKING_CREATE,
     Permission.TIME_TRACKING_READ,
@@ -461,7 +460,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_VIEW_ALL_TIMER,
     Permission.TIME_TRACKING_BULK_UPLOAD_ALL,
     Permission.TIME_TRACKING_BULK_UPLOAD_ALL,
-    
+
     // Financial
     Permission.FINANCIAL_READ,
     Permission.FINANCIAL_MANAGE_BUDGET,
@@ -470,15 +469,15 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.FINANCIAL_APPROVE_EXPENSE,
     Permission.FINANCIAL_CREATE_INVOICE,
     Permission.FINANCIAL_SEND_INVOICE,
-    
+
     // Reporting
     Permission.REPORTING_VIEW,
     Permission.REPORTING_CREATE,
     Permission.REPORTING_EXPORT,
     Permission.REPORTING_SHARE,
     Permission.TIME_LOG_REPORT_ACCESS,
-  
-     // Settings
+
+    // Settings
     Permission.SETTINGS_VIEW,
     Permission.SETTINGS_UPDATE,
     Permission.SETTINGS_MANAGE_EMAIL,
@@ -492,7 +491,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.EPIC_UPDATE,
     Permission.EPIC_DELETE,
     Permission.EPIC_REMOVE,
-    
+
     // Sprints
     Permission.SPRINT_CREATE,
     Permission.SPRINT_VIEW,
@@ -507,29 +506,29 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     //Sprint Events
     Permission.SPRINT_EVENT_VIEW_ALL,
     Permission.SPRINT_EVENT_VIEW,
-    
+
     // Stories
     Permission.STORY_CREATE,
     Permission.STORY_READ,
     Permission.STORY_UPDATE,
     Permission.STORY_DELETE,
-    
+
     Permission.STORY_MANAGE_ALL,
-    
+
     // Calendar
     Permission.CALENDAR_READ,
     Permission.CALENDAR_CREATE,
     Permission.CALENDAR_UPDATE,
     Permission.CALENDAR_DELETE,
-    
+
     // Kanban
     Permission.KANBAN_READ,
     Permission.KANBAN_MANAGE,
-    
+
     // backlog
     Permission.BACKLOG_READ,
     Permission.BACKLOG_MANAGE,
-    
+
     // Test Management
     Permission.TEST_SUITE_CREATE,
     Permission.TEST_SUITE_READ,
@@ -571,13 +570,13 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.USER_ACTIVATE,
     Permission.USER_DEACTIVATE,
     Permission.USER_MANAGE_ROLES,
-    
+
     // Organization
     Permission.ORGANIZATION_READ,
     Permission.ORGANIZATION_UPDATE,
     Permission.ORGANIZATION_MANAGE_SETTINGS,
     Permission.ORGANIZATION_MANAGE_BILLING,
-    
+
     // Projects (can see all projects)
     Permission.PROJECT_CREATE,
     Permission.PROJECT_READ,
@@ -588,7 +587,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.PROJECT_ARCHIVE,
     Permission.PROJECT_RESTORE,
     Permission.PROJECT_VIEW_ALL,
-    
+
     // Tasks
     Permission.TASK_CREATE,
     Permission.TASK_READ,
@@ -599,9 +598,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TASK_MANAGE_COMMENTS,
     Permission.TASK_MANAGE_ATTACHMENTS,
     Permission.TASK_VIEW_ALL,
-    Permission.TASK_EDIT_ALL,
-    Permission.TASK_DELETE_ALL,
-    
+
     // Team
     Permission.TEAM_READ,
     Permission.TEAM_INVITE,
@@ -610,7 +607,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEAM_MANAGE_PERMISSIONS,
     Permission.TEAM_VIEW_ACTIVITY,
     Permission.TEAM_MEMBER_WIDGET_VIEW,
-    
+
     // Time tracking
     Permission.TIME_TRACKING_CREATE,
     Permission.TIME_TRACKING_READ,
@@ -621,7 +618,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ,
     Permission.TIME_TRACKING_VIEW_ALL_TIMER,
     Permission.TIME_TRACKING_BULK_UPLOAD_ALL,
-    
+
     // Financial
     Permission.FINANCIAL_READ,
     Permission.FINANCIAL_MANAGE_BUDGET,
@@ -634,20 +631,20 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     //testing
     Permission.TEST_MANAGE,
 
-    
+
     // Reporting
     Permission.REPORTING_VIEW,
     Permission.REPORTING_CREATE,
     Permission.REPORTING_EXPORT,
     Permission.REPORTING_SHARE,
     Permission.TIME_LOG_REPORT_ACCESS,
-    
+
     // Settings
     Permission.SETTINGS_UPDATE,
     Permission.SETTINGS_MANAGE_EMAIL,
     Permission.SETTINGS_MANAGE_DATABASE,
     Permission.SETTINGS_MANAGE_SECURITY,
-    
+
     // Epics
     Permission.EPIC_CREATE,
     Permission.EPIC_VIEW,
@@ -657,7 +654,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.EPIC_DELETE,
     Permission.EPIC_REMOVE,
     Permission.EPIC_VIEW_ALL,
-    
+
     // Sprints
     Permission.SPRINT_CREATE,
     Permission.SPRINT_VIEW,
@@ -669,7 +666,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.SPRINT_VIEW_ALL,
     Permission.SPRINT_START,
     Permission.SPRINT_COMPLETE,
-    
+
     // Stories
     Permission.STORY_CREATE,
     Permission.STORY_READ,
@@ -677,22 +674,22 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.STORY_DELETE,
     Permission.STORY_VIEW_ALL,
     Permission.STORY_MANAGE_ALL,
-    
+
     // Calendar
     Permission.CALENDAR_READ,
     Permission.CALENDAR_CREATE,
     Permission.CALENDAR_UPDATE,
     Permission.CALENDAR_DELETE,
-    
+
     // Sprint Events
     Permission.SPRINT_EVENT_VIEW_ALL,
     Permission.SPRINT_EVENT_VIEW,
 
-    
+
     // Kanban
     Permission.KANBAN_READ,
     Permission.KANBAN_MANAGE,
-    
+
     // backlog
     Permission.BACKLOG_READ,
     Permission.BACKLOG_MANAGE,
@@ -728,13 +725,13 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   [Role.TEAM_MEMBER]: [
     // User management (own profile only)
     Permission.USER_READ,
-    
+
     // Organization (read only)
     Permission.ORGANIZATION_READ,
-    
+
     // Projects (assigned projects only)
     Permission.PROJECT_READ,
-    
+
     // Tasks (assigned tasks only)
     Permission.TASK_READ,
     Permission.TASK_UPDATE,
@@ -743,40 +740,40 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 
     // User Stories (assigned stories only)
     Permission.STORY_READ,
-    
+
     // Team (read only)
     Permission.TEAM_READ,
-    
+
     // Time tracking (own time)
     Permission.TIME_TRACKING_CREATE,
     Permission.TIME_TRACKING_READ,
     Permission.TIME_TRACKING_DELETE,
-    
+
     // Financial (read only)
     Permission.FINANCIAL_READ,
-    
+
     // Reporting (limited)
     Permission.REPORTING_VIEW,
-    
+
     // Settings (own settings)
-    
+
     // Epics (read only)
     Permission.EPIC_VIEW,
     Permission.EPIC_READ,
-    
+
     // Sprints (read only)
     Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
-    
+
     // Stories (read only)
     Permission.STORY_READ,
-    
+
     // Calendar (read only)
     Permission.CALENDAR_READ,
-    
+
     // Kanban (read only)
     Permission.KANBAN_READ,
-    
+
     // backlog (read only)
     Permission.BACKLOG_READ,
 
@@ -791,47 +788,47 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   [Role.CLIENT]: [
     // User management (own profile only)
     Permission.USER_READ,
-    
+
     // Organization (read only)
     Permission.ORGANIZATION_READ,
-    
+
     // Projects (assigned projects only)
     Permission.PROJECT_READ,
-    
+
     // Tasks (read only)
     Permission.TASK_READ,
-    
+
     // Team (read only)
     Permission.TEAM_READ,
-    
+
     // Time tracking (read only)
     Permission.TIME_TRACKING_READ,
-    
+
     // Financial (read only)
     Permission.FINANCIAL_READ,
-    
+
     // Reporting (read only)
     Permission.REPORTING_VIEW,
-    
+
     // Settings (own settings)
-    
+
     // Epics (read only)
     Permission.EPIC_VIEW,
     Permission.EPIC_READ,
-    
+
     // Sprints (read only)
     Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
-    
+
     // Stories (read only)
     Permission.STORY_READ,
-    
+
     // Calendar (read only)
     Permission.CALENDAR_READ,
-    
+
     // Kanban (read only)
     Permission.KANBAN_READ,
-    
+
     // backlog (read only)
     Permission.BACKLOG_READ,
 
@@ -843,47 +840,47 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   [Role.VIEWER]: [
     // User management (own profile only)
     Permission.USER_READ,
-    
+
     // Organization (read only)
     Permission.ORGANIZATION_READ,
-    
+
     // Projects (assigned projects only)
     Permission.PROJECT_READ,
-    
+
     // Tasks (read only)
     Permission.TASK_READ,
-    
+
     // Team (read only)
     Permission.TEAM_READ,
-    
+
     // Time tracking (read only)
     Permission.TIME_TRACKING_READ,
-    
+
     // Financial (read only)
     Permission.FINANCIAL_READ,
-    
+
     // Reporting (read only)
     Permission.REPORTING_VIEW,
-    
+
     // Settings (own settings)
-    
+
     // Epics (read only)
     Permission.EPIC_VIEW,
     Permission.EPIC_READ,
-    
+
     // Sprints (read only)
     Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
-    
+
     // Stories (read only)
     Permission.STORY_READ,
-    
+
     // Calendar (read only)
     Permission.CALENDAR_READ,
-    
+
     // Kanban (read only)
     Permission.KANBAN_READ,
-    
+
     // backlog (read only)
     Permission.BACKLOG_READ,
 
@@ -895,55 +892,59 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   [Role.QA_ENGINEER]: [
     // User management (read only)
     Permission.USER_READ,
-    
+
     // Organization (read only)
     Permission.ORGANIZATION_READ,
-    
+
     // Projects (assigned projects only)
     Permission.PROJECT_READ,
-    
+
     // Tasks (full access for bug management)
     Permission.TASK_CREATE,
     Permission.TASK_READ,
     Permission.TASK_UPDATE,
+    Permission.TASK_DELETE,
     Permission.TASK_ASSIGN,
     Permission.TASK_CHANGE_STATUS,
     Permission.TASK_MANAGE_COMMENTS,
     Permission.TASK_MANAGE_ATTACHMENTS,
-    
+    Permission.TASK_VIEW_ALL,
+    Permission.TASK_EDIT_ALL,
+    Permission.TASK_DELETE_ALL,
+
     // Team (read only)
     Permission.TEAM_READ,
-    
+
     // Time tracking (read only)
     Permission.TIME_TRACKING_READ,
-    
+
     // Financial (read only)
     Permission.FINANCIAL_READ,
-    
+
     // Reporting (read only)
     Permission.REPORTING_VIEW,
-    
+
     // Settings (own settings)
-    
+
     // Epics (read only)
     Permission.EPIC_READ,
-    
+
     // Sprints (read only)
     Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
-    
+
     // Stories (read only)
     Permission.STORY_READ,
-    
+
     // Calendar (read only)
     Permission.CALENDAR_READ,
-    
+
     // Kanban (read only)
     Permission.KANBAN_READ,
-    
+
     // backlog (read only)
     Permission.BACKLOG_READ,
-    
+
     // Test management (full test management permissions)
     Permission.TEST_SUITE_CREATE,
     Permission.TEST_SUITE_READ,
@@ -972,53 +973,53 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   [Role.TESTER]: [
     // User management (read only)
     Permission.USER_READ,
-    
+
     // Organization (read only)
     Permission.ORGANIZATION_READ,
-    
+
     // Projects (assigned projects only)
     Permission.PROJECT_READ,
-    
+
     // Tasks (create bugs only)
     Permission.TASK_CREATE,
     Permission.TASK_READ,
     Permission.TASK_UPDATE,
     Permission.TASK_MANAGE_COMMENTS,
     Permission.TASK_MANAGE_ATTACHMENTS,
-    
+
     // Team (read only)
     Permission.TEAM_READ,
-    
+
     // Time tracking (read only)
     Permission.TIME_TRACKING_READ,
-    
+
     // Financial (read only)
     Permission.FINANCIAL_READ,
-    
+
     // Reporting (read only)
     Permission.REPORTING_VIEW,
-    
+
     // Settings (own settings)
-    
+
     // Epics (read only)
     Permission.EPIC_READ,
-    
+
     // Sprints (read only)
     Permission.SPRINT_VIEW,
     Permission.SPRINT_READ,
-    
+
     // Stories (read only)
     Permission.STORY_READ,
-    
+
     // Calendar (read only)
     Permission.CALENDAR_READ,
-    
+
     // Kanban (read only)
     Permission.KANBAN_READ,
-    
+
     // backlog (read only)
     Permission.BACKLOG_READ,
-    
+
     // Test management (execution and reporting only)
     Permission.TEST_SUITE_READ,
     Permission.TEST_CASE_READ,
@@ -1087,7 +1088,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.BACKLOG_READ,
     Permission.BACKLOG_MANAGE,
   ],
-  
+
   [ProjectRole.PROJECT_MEMBER]: [
     Permission.PROJECT_READ,
     Permission.TASK_CREATE,
@@ -1110,7 +1111,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.KANBAN_READ,
     Permission.BACKLOG_READ,
   ],
-  
+
   [ProjectRole.PROJECT_VIEWER]: [
     Permission.PROJECT_READ,
     Permission.TASK_READ,
@@ -1125,7 +1126,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.KANBAN_READ,
     Permission.BACKLOG_READ,
   ],
-  
+
   [ProjectRole.PROJECT_CLIENT]: [
     Permission.PROJECT_READ,
     Permission.TASK_READ,
@@ -1140,7 +1141,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.KANBAN_READ,
     Permission.BACKLOG_READ,
   ],
-  
+
   [ProjectRole.PROJECT_QA_LEAD]: [
     Permission.PROJECT_READ,
     Permission.TASK_CREATE,
@@ -1180,7 +1181,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.TEST_REPORT_VIEW,
     Permission.TEST_REPORT_EXPORT,
   ],
-  
+
   [ProjectRole.PROJECT_TESTER]: [
     Permission.PROJECT_READ,
     Permission.TASK_CREATE,
@@ -1257,7 +1258,7 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.SETTINGS_MANAGE_DATABASE,
     Permission.SETTINGS_MANAGE_SECURITY,
   ];
-  
+
   const ownPermissions = [
     Permission.USER_READ,
     Permission.USER_UPDATE,
@@ -1265,14 +1266,14 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.TIME_TRACKING_UPDATE,
     Permission.TIME_TRACKING_DELETE,
   ];
-  
+
   if (globalPermissions.includes(permission)) {
     return PermissionScope.GLOBAL;
   }
-  
+
   if (ownPermissions.includes(permission)) {
     return PermissionScope.OWN;
   }
-  
+
   return PermissionScope.PROJECT;
 }
