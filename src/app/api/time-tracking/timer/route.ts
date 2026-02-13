@@ -135,16 +135,12 @@ async function stopTimerAndBuildResponse(
 
   let endTime = options.now || new Date()
   
-  // When auto-stopping due to max session limit, calculate the correct end time
-  // and cap the duration at maxSessionHours
   const isAutoStopMaxSession = options.reason === 'auto_max_session'
   let maxSessionLimitMinutes: number | null = null
   
   if (isAutoStopMaxSession && stopSettings.maxSessionHours && stopSettings.allowOvertime === false) {
     maxSessionLimitMinutes = stopSettings.maxSessionHours * MINUTES_PER_HOUR
     
-    // Calculate the exact end time based on max session hours
-    // This ensures the time entry reflects when the timer SHOULD have stopped, not when the user returned
     const maxDurationMs = maxSessionLimitMinutes * 60 * 1000
     const totalPausedMs = (activeTimer.totalPausedDuration || 0) * 60 * 1000
     endTime = new Date(activeTimer.startTime.getTime() + maxDurationMs + totalPausedMs)
@@ -163,7 +159,6 @@ async function stopTimerAndBuildResponse(
 
   let totalDuration = calculateCurrentDurationMinutes(activeTimer, endTime)
   
-  // Cap duration at maxSessionHours when auto-stopping due to session limit
   if (isAutoStopMaxSession && maxSessionLimitMinutes !== null && totalDuration > maxSessionLimitMinutes) {
     totalDuration = maxSessionLimitMinutes
   }
