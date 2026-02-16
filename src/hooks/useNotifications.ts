@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { INotification } from '@/models/Notification'
 
 interface UseNotificationsOptions {
@@ -36,10 +36,15 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     error: null
   })
 
+  // Use refs to avoid recreating callbacks and causing infinite loops
+  const optionsRef = useRef({ limit, offset, unreadOnly, type })
+  optionsRef.current = { limit, offset, unreadOnly, type }
+
   const fetchNotifications = useCallback(async () => {
     try {
       setData(prev => ({ ...prev, loading: true, error: null }))
 
+      const { limit, offset, unreadOnly, type } = optionsRef.current
       const params = new URLSearchParams({
         limit: limit.toString(),
         offset: offset.toString(),
@@ -77,7 +82,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
         error: error instanceof Error ? error.message : 'Failed to fetch notifications'
       }))
     }
-  }, [limit, offset, unreadOnly, type])
+  }, []) // No dependencies - uses refs instead
 
   const markAsRead = useCallback(async (notificationId: string) => {
     try {
@@ -168,18 +173,63 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     fetchNotifications()
   }, [fetchNotifications])
 
-  // Initial fetch
+  // Initial fetch and refetch when options change
   useEffect(() => {
     fetchNotifications()
-  }, [fetchNotifications])
+  }, [fetchNotifications, limit, offset, unreadOnly, type])
 
-  // Auto-refresh
+  // Smart auto-refresh: only poll when tab is visible
+  // Use refs to avoid recreating intervals on every render
+  const autoRefreshRef = useRef(autoRefresh)
+  const refreshIntervalRef = useRef(refreshInterval)
+  autoRefreshRef.current = autoRefresh
+  refreshIntervalRef.current = refreshInterval
+
   useEffect(() => {
-    if (!autoRefresh) return
+    if (!autoRefreshRef.current) return
 
-    const interval = setInterval(fetchNotifications, refreshInterval)
-    return () => clearInterval(interval)
-  }, [autoRefresh, refreshInterval, fetchNotifications])
+    let interval: NodeJS.Timeout | null = null
+    let isVisible = !document.hidden
+
+    const startPolling = () => {
+      if (interval) clearInterval(interval)
+      if (isVisible && autoRefreshRef.current) {
+        interval = setInterval(() => {
+          if (autoRefreshRef.current) {
+            fetchNotifications()
+          }
+        }, refreshIntervalRef.current)
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      isVisible = !document.hidden
+      if (isVisible) {
+        // Fetch immediately when tab becomes visible
+        if (autoRefreshRef.current) {
+          fetchNotifications()
+        }
+        startPolling()
+      } else {
+        // Stop polling when tab is hidden
+        if (interval) {
+          clearInterval(interval)
+          interval = null
+        }
+      }
+    }
+
+    // Start polling if tab is visible
+    startPolling()
+
+    // Listen for visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      if (interval) clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [fetchNotifications]) // Only depend on stable fetchNotifications
 
   return {
     ...data,
@@ -214,9 +264,35 @@ export function useNotificationCount() {
   useEffect(() => {
     fetchCount()
     
-    // Refresh count every 30 seconds
-    const interval = setInterval(fetchCount, 30000)
-    return () => clearInterval(interval)
+    // Smart polling: only when tab is visible, increased to 60 seconds
+    let interval: NodeJS.Timeout | null = null
+    
+    const startPolling = () => {
+      if (interval) clearInterval(interval)
+      if (!document.hidden) {
+        interval = setInterval(fetchCount, 60000) // 60 seconds instead of 30
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchCount()
+        startPolling()
+      } else {
+        if (interval) {
+          clearInterval(interval)
+          interval = null
+        }
+      }
+    }
+
+    startPolling()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      if (interval) clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [fetchCount])
 
   return { unreadCount, loading, refresh: fetchCount }

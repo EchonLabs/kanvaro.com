@@ -15,7 +15,7 @@ export function NotificationsWidget() {
     limit: 10,
     unreadOnly: false,
     autoRefresh: true,
-    refreshInterval: 30000 // Refresh every 30 seconds
+    refreshInterval: 60000 // Refresh every 60 seconds (SSE handles real-time)
   })
 
   const handleNotificationClick = (notification: any) => {
