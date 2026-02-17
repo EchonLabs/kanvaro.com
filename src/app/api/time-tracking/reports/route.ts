@@ -46,7 +46,7 @@ async function getProjectsWithoutApprovalRequirement(organizationId: string) {
 export async function GET(request: NextRequest) {
   try {
     await connectDB()
-    
+
     const { searchParams } = new URL(request.url)
     const organizationId = searchParams.get('organizationId')
     const projectId = searchParams.get('projectId')
@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
 async function getSummaryReport(query: any, format: string) {
   // Summary report includes approved entries or entries from projects that don't require approval
   const approvedQuery = { ...query }
-  
+
   const summary = await TimeEntry.aggregate([
     { $match: approvedQuery },
     {
@@ -180,7 +180,7 @@ async function getSummaryReport(query: any, format: string) {
 async function getUserReport(query: any, format: string) {
   // User report includes approved entries or entries from projects that don't require approval
   const approvedQuery = { ...query }
-  
+
   const userReport = await TimeEntry.aggregate([
     { $match: approvedQuery },
     {
@@ -240,7 +240,7 @@ async function getUserReport(query: any, format: string) {
 async function getProjectReport(query: any, format: string) {
   // Project report includes approved entries or entries from projects that don't require approval
   const approvedQuery = { ...query }
-  
+
   const projectReport = await TimeEntry.aggregate([
     { $match: approvedQuery },
     {
@@ -298,7 +298,7 @@ async function getProjectReport(query: any, format: string) {
 async function getTaskReport(query: any, format: string) {
   // Task report includes approved entries or entries from projects that don't require approval
   const approvedQuery = { ...query, task: { $exists: true, $ne: null } }
-  
+
   const taskReport = await TimeEntry.aggregate([
     { $match: approvedQuery },
     {
@@ -356,7 +356,7 @@ async function getTaskReport(query: any, format: string) {
 async function getBillableReport(query: any, format: string) {
   // Billable report includes approved entries or entries from projects that don't require approval
   const billableQuery = { ...query, isBillable: true }
-  
+
   const billableReport = await TimeEntry.aggregate([
     { $match: billableQuery },
     {
@@ -426,12 +426,12 @@ async function getBillableReport(query: any, format: string) {
 async function getDetailedEntriesReport(query: any, format: string) {
   // Detailed entries report includes approved entries or entries from projects that don't require approval
   const approvedQuery = { ...query }
-  
+
   // Fetch organization to get currency and default rate
   const organization = await Organization.findById(query.organization).lean()
   const currency = (organization as any)?.currency || 'USD'
   const orgDefaultRate = (organization as any)?.settings?.timeTracking?.defaultHourlyRate || 0
-  
+
   const entries = await TimeEntry.find(approvedQuery)
     .populate('user', 'firstName lastName email hourlyRate')
     .populate({
@@ -444,7 +444,7 @@ async function getDetailedEntriesReport(query: any, format: string) {
     .lean()
 
   const formattedEntries = entries.map((entry: any) => {
-    const userName = entry.user 
+    const userName = entry.user
       ? `${entry.user.firstName || ''} ${entry.user.lastName || ''}`.trim() || entry.user.email
       : 'Unknown User'
     const projectName = entry.project?.name || 'Unknown Project'
@@ -455,7 +455,7 @@ async function getDetailedEntriesReport(query: any, format: string) {
     const startTime = entry.startTime || null
     const endTime = entry.endTime || null
     const duration = entry.duration || 0
-    
+
     // Calculate effective hourly rate
     let effectiveHourlyRate = 0
     let rateSource = 'organization' // Default fallback
@@ -511,6 +511,8 @@ async function getDetailedEntriesReport(query: any, format: string) {
       cost,
       notes,
       isBillable,
+      isApproved: entry.isApproved || false,
+      isReject: entry.isReject || false,
       approvedBy: entry.approvedBy?._id || entry.approvedBy,
       approvedByName: entry.approvedBy
         ? `${entry.approvedBy.firstName || ''} ${entry.approvedBy.lastName || ''}`.trim() || entry.approvedBy.email
@@ -557,9 +559,17 @@ async function getDetailedEntriesReport(query: any, format: string) {
           return ''
         }
       }
-      
+
       const startTimeStr = formatDateTime(e.startTime)
       const endTimeStr = formatDateTime(e.endTime)
+
+      // Determine status based on isApproved and isReject fields
+      let status = 'Pending'
+      if (e.isReject) {
+        status = 'Rejected'
+      } else if (e.isApproved) {
+        status = 'Approved'
+      }
 
       return [
         (index + 1).toString(), // Id (sequential: 1, 2, 3...)
@@ -570,7 +580,7 @@ async function getDetailedEntriesReport(query: any, format: string) {
         endTimeStr, // End Time
         durationStr, // Total Hours
         e.cost > 0 ? `${e.projectCurrency}${Math.round(e.cost)}` : `${e.projectCurrency}0`, // Earnings (using project currency)
-        'Approved' // Status (all entries are approved)
+        status // Status (based on isApproved and isReject)
       ]
     })
 
@@ -578,11 +588,11 @@ async function getDetailedEntriesReport(query: any, format: string) {
       ['Id', 'Task ID', 'Task', 'Employee', 'Start Time', 'End Time', 'Total Hours', 'Earnings', 'Status'],
       rows
     )
-    
+
     // Add BOM for UTF-8 encoding (Excel compatibility)
     const bom = '\uFEFF'
     const csvWithBom = bom + csv
-    
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, '').slice(0, -5)
     return new NextResponse(csvWithBom, {
       status: 200,
@@ -594,7 +604,7 @@ async function getDetailedEntriesReport(query: any, format: string) {
     })
   }
 
-  return NextResponse.json({ 
+  return NextResponse.json({
     detailedEntries: formattedEntries,
     organizationCurrency: currency // Include organization currency in response
   })
