@@ -65,6 +65,11 @@ export async function GET(request: NextRequest) {
     const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Default to last 30 days
     const end = endDate ? new Date(endDate) : new Date()
 
+    // Set end date to end of day (23:59:59.999) to include all entries from that day
+    if (endDate) {
+      end.setHours(23, 59, 59, 999)
+    }
+
     // Build base query - Reports should show only approved time entries (isApproved = true and isReject = false)
     const baseQuery: any = {
       organization: organizationId,
