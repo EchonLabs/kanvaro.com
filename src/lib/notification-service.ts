@@ -1,6 +1,7 @@
 import { Notification, INotification } from '@/models/Notification'
 import { User } from '@/models/User'
 import { emailService } from './email/EmailService'
+import { broadcastNotification, broadcastToUsers } from './notification-broadcaster'
 import connectDB from './db-config'
 
 export interface NotificationData {
@@ -70,6 +71,9 @@ export class NotificationService {
       })
 
       await notification.save()
+
+      // Broadcast notification via SSE for real-time delivery
+      broadcastNotification(userId, notification.toObject())
 
       // Send email if enabled
       if (email && (notificationData.sendEmail ?? false)) {

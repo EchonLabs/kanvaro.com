@@ -131,6 +131,8 @@ export default function BacklogPage() {
   const searchParams = useSearchParams()
   const [backlogItems, setBacklogItems] = useState<BacklogItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [searching, setSearching] = useState(false)
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
   const { success: notifySuccess, error: notifyError } = useNotify()
   const { formatDate } = useDateTime()
   const { hasPermission } = usePermissions()
@@ -169,7 +171,7 @@ export default function BacklogPage() {
   const [selectedForDelete, setSelectedForDelete] = useState<{ id: string; type: BacklogItem['type']; title: string } | null>(null)
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [localSearch, setLocalSearch] = useState('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [typeFilter, setTypeFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
@@ -240,20 +242,21 @@ export default function BacklogPage() {
 
   // Check if any filters are active
   const hasActiveFilters = searchQuery !== '' ||
-                          typeFilter !== 'all' ||
-                          priorityFilter !== 'all' ||
-                          statusFilter !== 'all' ||
-                          projectFilterValue !== 'all' ||
-                          assignedToFilter !== 'all' ||
-                          assignedByFilter !== 'all' ||
-                          createdByFilter !== 'all' ||
-                          dateRangeFilter !== undefined ||
-                          createdDateRange.from !== undefined ||
-                          createdDateRange.to !== undefined
+    typeFilter !== 'all' ||
+    priorityFilter !== 'all' ||
+    statusFilter !== 'all' ||
+    projectFilterValue !== 'all' ||
+    assignedToFilter !== 'all' ||
+    assignedByFilter !== 'all' ||
+    createdByFilter !== 'all' ||
+    dateRangeFilter !== undefined ||
+    createdDateRange.from !== undefined ||
+    createdDateRange.to !== undefined
 
   // Reset all filters
   const resetFilters = () => {
     setSearchQuery('')
+    setDebouncedSearchQuery('')
     setTypeFilter('all')
     setPriorityFilter('all')
     setStatusFilter('all')
@@ -304,7 +307,7 @@ export default function BacklogPage() {
   const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me')
-      
+
       if (response.ok) {
         const data = await response.json()
         const userId = extractUserId(data)
@@ -315,7 +318,7 @@ export default function BacklogPage() {
         const refreshResponse = await fetch('/api/auth/refresh', {
           method: 'POST'
         })
-        
+
         if (refreshResponse.ok) {
           const refreshData = await refreshResponse.json()
           const userId = extractUserId(refreshData)
@@ -344,22 +347,25 @@ export default function BacklogPage() {
     checkAuth()
   }, [checkAuth])
 
+  // Debounce search query to avoid excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+    }, 300) // 300ms delay
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
   // Fetch when pagination or filters change (after initial load)
   useEffect(() => {
     if (!loading && !authError) {
-      // Only fetch if searchQuery changes (not localSearch)
       if (currentPage === 1) {
         fetchBacklogItems()
       } else {
         setCurrentPage(1)
       }
     }
-  }, [searchQuery, typeFilter, priorityFilter, statusFilter, projectFilterValue, assignedToFilter, assignedByFilter, createdByFilter, dateRangeFilter, createdDateRange, sortBy, sortOrder])
-
-  // Keep localSearch in sync with searchQuery
-  useEffect(() => {
-    setLocalSearch(searchQuery)
-  }, [searchQuery])
+  }, [debouncedSearchQuery, typeFilter, priorityFilter, statusFilter, projectFilterValue, assignedToFilter, assignedByFilter, createdByFilter, dateRangeFilter, createdDateRange, sortBy, sortOrder])
 
   // Fetch when pagination changes
   useEffect(() => {
@@ -377,13 +383,18 @@ export default function BacklogPage() {
 
   const fetchBacklogItems = async () => {
     try {
-      setLoading(true)
+      // Only show full loading state on initial load
+      if (isInitialLoad) {
+        setLoading(true)
+      } else {
+        setSearching(true)
+      }
       const params = new URLSearchParams()
       params.set('page', currentPage.toString())
       params.set('limit', pageSize.toString())
-      
-      // Add filters to API call
-      if (searchQuery) params.set('search', searchQuery)
+
+      // Add filters to API call - use debounced search query
+      if (debouncedSearchQuery) params.set('search', debouncedSearchQuery)
       if (typeFilter !== 'all') params.set('type', typeFilter)
       if (priorityFilter !== 'all') params.set('priority', priorityFilter)
       if (statusFilter !== 'all') params.set('status', statusFilter)
@@ -397,7 +408,7 @@ export default function BacklogPage() {
       if (createdDateRange.to) params.set('createdAtTo', createdDateRange.to.toISOString())
       params.set('sortBy', sortBy)
       params.set('sortOrder', sortOrder)
-      
+
       const response = await fetch(`/api/backlog?${params.toString()}`)
       const data = await response.json()
 
@@ -486,7 +497,7 @@ export default function BacklogPage() {
         }
 
         setProjectOptions(Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name)))
-        
+
         // Fetch unique project team members for assignedTo filter
         const teamMembersMap = new Map<string, UserSummary>()
         try {
@@ -501,7 +512,7 @@ export default function BacklogPage() {
                     const firstName = member.memberId?.firstName || member.firstName
                     const lastName = member.memberId?.lastName || member.lastName
                     const email = member.memberId?.email || member.email
-                    
+
                     if (memberId && firstName && lastName) {
                       teamMembersMap.set(memberId, {
                         _id: memberId,
@@ -518,7 +529,7 @@ export default function BacklogPage() {
         } catch (error) {
           console.warn('Failed to fetch project team members:', error)
         }
-        
+
         setAssignedToOptions(Array.from(teamMembersMap.values()).sort((a, b) =>
           `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
         ))
@@ -535,7 +546,12 @@ export default function BacklogPage() {
     } catch (err) {
       notifyError({ title: 'Error', message: 'Failed to fetch backlog items' })
     } finally {
-      setLoading(false)
+      if (isInitialLoad) {
+        setLoading(false)
+        setIsInitialLoad(false)
+      } else {
+        setSearching(false)
+      }
     }
   }
 
@@ -633,7 +649,7 @@ export default function BacklogPage() {
     try {
       // Get story titles for display
       const storyMap = new Map<string, string>()
-      
+
       for (const storyId of storyIds) {
         try {
           const storyResponse = await fetch(`/api/stories/${storyId}`)
@@ -652,16 +668,16 @@ export default function BacklogPage() {
       // - An object with _id property - when populated
       // - An object with _id as ObjectId - when populated from MongoDB
       const tasksFromStoriesList: BacklogItem[] = []
-      
+
       backlogItems.forEach((item) => {
         if (item.type !== 'task') return
-        
+
         // Check if this task belongs to any of the selected stories
         let taskStoryId: string | null = null
-        
+
         // Access story field from the item (it may not be in the TypeScript interface but exists in runtime)
         const taskStory = (item as any).story
-        
+
         // Handle different formats of story field
         if (taskStory) {
           if (typeof taskStory === 'string') {
@@ -670,8 +686,8 @@ export default function BacklogPage() {
           } else if (typeof taskStory === 'object') {
             // Story is populated - could be { _id: string } or { _id: ObjectId }
             if (taskStory._id) {
-              taskStoryId = typeof taskStory._id === 'string' 
-                ? taskStory._id 
+              taskStoryId = typeof taskStory._id === 'string'
+                ? taskStory._id
                 : taskStory._id.toString()
             } else if (taskStory.toString) {
               // Might be a Mongoose ObjectId directly
@@ -679,7 +695,7 @@ export default function BacklogPage() {
             }
           }
         }
-        
+
         // Check if task's story ID matches any selected story ID
         // Normalize both IDs to strings for comparison
         if (taskStoryId) {
@@ -688,14 +704,14 @@ export default function BacklogPage() {
             const normalizedStoryId = storyId.toString()
             return normalizedTaskStoryId === normalizedStoryId
           })
-          
+
           if (matchesStory) {
             // Find which story this task belongs to
-            const matchedStoryId = storyIds.find(storyId => 
+            const matchedStoryId = storyIds.find(storyId =>
               storyId.toString() === normalizedTaskStoryId
             )
             const storyTitle = matchedStoryId ? storyMap.get(matchedStoryId) || 'Unknown Story' : 'Unknown Story'
-            
+
             tasksFromStoriesList.push({
               ...item,
               // Store story info for display
@@ -710,7 +726,7 @@ export default function BacklogPage() {
       const uniqueTasks = Array.from(
         new Map(tasksFromStoriesList.map(task => [task._id, task])).values()
       )
-      
+
       setTasksFromStories(uniqueTasks)
     } catch (error) {
       console.error('Failed to fetch tasks for stories:', error)
@@ -734,16 +750,16 @@ export default function BacklogPage() {
     const sourceTaskIds = isManageMode
       ? taskIds
       : taskIds.filter((taskId) => {
-          const task = backlogItems.find((item) => item.type === 'task' && item._id === taskId)
-          return task && !task.sprint
-        })
+        const task = backlogItems.find((item) => item.type === 'task' && item._id === taskId)
+        return task && !task.sprint
+      })
 
     const sourceStoryIds = isManageMode
       ? storyIds
       : storyIds.filter((storyId) => {
-          const story = backlogItems.find((item) => item.type === 'story' && item._id === storyId)
-          return story && !story.sprint
-        })
+        const story = backlogItems.find((item) => item.type === 'story' && item._id === storyId)
+        return story && !story.sprint
+      })
 
     const uniqueTaskIds = Array.from(new Set(sourceTaskIds.filter(Boolean)))
     const uniqueStoryIds = Array.from(new Set(sourceStoryIds.filter(Boolean)))
@@ -768,14 +784,14 @@ export default function BacklogPage() {
     if (isManageMode && options?.existingSprint?._id) {
       setSelectedSprintId(options.existingSprint._id)
     }
-    
+
     // Fetch tasks for selected stories
     if (uniqueStoryIds.length > 0) {
       await fetchTasksForStories(uniqueStoryIds)
     } else {
       setTasksFromStories([])
     }
-    
+
     setShowSprintModal(true)
   }
 
@@ -862,31 +878,31 @@ export default function BacklogPage() {
         _sourceStoryId: undefined,
         _sourceStoryTitle: undefined
       }))
-    
+
     // Mark tasks from stories
     const tasksFromStoriesMarked = tasksFromStories.map(task => ({
       ...task,
       _isDirectlySelected: false
     }))
-    
+
     // Combine all tasks
     const allTasks = [...directTasks, ...tasksFromStoriesMarked]
-    
+
     // Remove duplicates based on _id, prioritizing directly selected tasks
     const taskMap = new Map<string, typeof directTasks[0] | typeof tasksFromStoriesMarked[0]>()
-    
+
     // First add tasks from stories
     tasksFromStoriesMarked.forEach(task => {
       if (!taskMap.has(task._id)) {
         taskMap.set(task._id, task)
       }
     })
-    
+
     // Then add directly selected tasks (they will overwrite if duplicate, which is correct)
     directTasks.forEach(task => {
       taskMap.set(task._id, task)
     })
-    
+
     return Array.from(taskMap.values())
   }, [backlogItems, taskIdsForSprint, tasksFromStories])
 
@@ -965,22 +981,22 @@ export default function BacklogPage() {
         ? `Manage Sprint for ${allTasksForSprint.length} Tasks`
         : 'Manage Sprint Assignment'
       : (() => {
-          const hasStories = storiesForSprint.length > 0
-          const hasTasks = taskIdsForSprint.length > 0
-          const totalItems = storiesForSprint.length + taskIdsForSprint.length
-          
-          if (hasStories && hasTasks) {
-            return `Add ${storiesForSprint.length} Story${storiesForSprint.length !== 1 ? 'ies' : ''} and ${taskIdsForSprint.length} Task${taskIdsForSprint.length !== 1 ? 's' : ''} to Sprint`
-          } else if (hasStories) {
-            return storiesForSprint.length > 1
-              ? `Add ${storiesForSprint.length} Stories to Sprint`
-              : 'Add Story to Sprint'
-          } else {
-            return taskIdsForSprint.length > 1
-              ? `Add ${taskIdsForSprint.length} Tasks to Sprint`
-              : 'Add Task to Sprint'
-          }
-        })()
+        const hasStories = storiesForSprint.length > 0
+        const hasTasks = taskIdsForSprint.length > 0
+        const totalItems = storiesForSprint.length + taskIdsForSprint.length
+
+        if (hasStories && hasTasks) {
+          return `Add ${storiesForSprint.length} Story${storiesForSprint.length !== 1 ? 'ies' : ''} and ${taskIdsForSprint.length} Task${taskIdsForSprint.length !== 1 ? 's' : ''} to Sprint`
+        } else if (hasStories) {
+          return storiesForSprint.length > 1
+            ? `Add ${storiesForSprint.length} Stories to Sprint`
+            : 'Add Story to Sprint'
+        } else {
+          return taskIdsForSprint.length > 1
+            ? `Add ${taskIdsForSprint.length} Tasks to Sprint`
+            : 'Add Task to Sprint'
+        }
+      })()
 
   const sprintModalDescription =
     sprintModalMode === 'manage'
@@ -1353,10 +1369,10 @@ export default function BacklogPage() {
         prev.map((item) =>
           item._id === statusChangeTaskId
             ? {
-                ...item,
-                status: statusChangeValue,
-                sprint: statusChangeValue === 'sprint' ? item.sprint : statusChangeValue === 'backlog' ? undefined : item.sprint
-              }
+              ...item,
+              status: statusChangeValue,
+              sprint: statusChangeValue === 'sprint' ? item.sprint : statusChangeValue === 'backlog' ? undefined : item.sprint
+            }
             : item
         )
       )
@@ -1405,21 +1421,8 @@ export default function BacklogPage() {
   }
 
   // When assigning work to a sprint, temporarily narrow items to the sprint's project
-  // Local filter for search bar (includes displayId)
-  const locallyFilteredItems = useMemo(() => {
-    if (!localSearch.trim()) return backlogItems
-    const q = localSearch.trim().toLowerCase()
-    return backlogItems.filter(item => {
-      // Match title, description, or displayId (for tasks)
-      if (item.title?.toLowerCase().includes(q)) return true
-      if (item.description?.toLowerCase().includes(q)) return true
-      if (item.type === 'task' && (item as any).displayId && ((item as any).displayId + '').toLowerCase().includes(q)) return true
-      return false
-    })
-  }, [localSearch, backlogItems])
-
   const displayedItems = useMemo(() => {
-    let items = locallyFilteredItems
+    let items = backlogItems
     if (selectedSprintId) {
       const selectedSprint = sprints.find((s) => s._id === selectedSprintId)
       if (selectedSprint?.project?._id) {
@@ -1427,7 +1430,7 @@ export default function BacklogPage() {
       }
     }
     return items
-  }, [locallyFilteredItems, selectedSprintId, sprints])
+  }, [backlogItems, selectedSprintId, sprints])
 
   const totalPages = Math.max(1, Math.ceil((totalCount || 0) / pageSize) || 1)
   const pageStartIndex = totalCount === 0 ? 0 : ((currentPage - 1) * pageSize) + 1
@@ -1471,8 +1474,8 @@ export default function BacklogPage() {
             <Button
               variant="outline"
               onClick={() => {
-                setLocalSearch('');
                 setSearchQuery('');
+                setDebouncedSearchQuery('');
                 fetchBacklogItems();
               }}
               disabled={loading}
@@ -1834,7 +1837,7 @@ export default function BacklogPage() {
         {/* Backlog Items */}
         <div className="space-y-4">
               {displayedItems.map((item) => {
-                
+
                 const isTask = item.type === 'task'
                 const isStory = item.type === 'story'
                 const isTaskSelected = isTask && selectedTaskIds.includes(item._id)
@@ -1904,7 +1907,7 @@ export default function BacklogPage() {
                               </Badge>
                               {/* Display displayId for tasks only */}
                               {item.type === 'task' && item.displayId && (
-                                <Badge className="bg-gray-200 text-gray-800 dark:bg-gray-800 dark:text-gray-200 ml-1 font-mono text-xs" title={`Task ID: ${item.displayId}`}> 
+                                <Badge className="bg-gray-200 text-gray-800 dark:bg-gray-800 dark:text-gray-200 ml-1 font-mono text-xs" title={`Task ID: ${item.displayId}`}>
                                   #{item.displayId}
                                 </Badge>
                               )}
@@ -1966,14 +1969,14 @@ export default function BacklogPage() {
                             <p className="text-xs sm:text-sm text-muted-foreground mb-2">
                               {item.assignedTo && item.assignedTo.length > 0
                                 ? item.assignedTo.map((assignment: any) => {
-                                    // Try to get user data from populated user field first, then from denormalized fields
-                                    const firstName = assignment?.user?.firstName || assignment?.firstName;
-                                    const lastName = assignment?.user?.lastName || assignment?.lastName;
-                                    if (firstName && lastName) {
-                                      return `${firstName} ${lastName}`;
-                                    }
-                                    return 'Unknown User';
-                                  }).join(', ')
+                                  // Try to get user data from populated user field first, then from denormalized fields
+                                  const firstName = assignment?.user?.firstName || assignment?.firstName;
+                                  const lastName = assignment?.user?.lastName || assignment?.lastName;
+                                  if (firstName && lastName) {
+                                    return `${firstName} ${lastName}`;
+                                  }
+                                  return 'Unknown User';
+                                }).join(', ')
                                 : 'Not assigned'}
                             </p>
                             <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
@@ -2050,9 +2053,9 @@ export default function BacklogPage() {
                           <div className="flex items-center space-x-2 flex-shrink-0">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   className="flex-shrink-0"
                                   onClick={(e) => e.stopPropagation()}
                                 >
@@ -2190,23 +2193,23 @@ export default function BacklogPage() {
                                 {((item.type === 'task' && canDeleteTask(item)) ||
                                   (item.type === 'story' && canDeleteStory(item)) ||
                                   (item.type === 'epic' && canDeleteEpic(item))) && (
-                                  <DropdownMenuItem
-                                    onClick={() => handleDeleteClick(item)}
-                                    className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    <span>
-                                      Delete {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-                                    </span>
-                                  </DropdownMenuItem>
-                                )}
+                                    <DropdownMenuItem
+                                      onClick={() => handleDeleteClick(item)}
+                                      className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      <span>
+                                        Delete {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                                      </span>
+                                    </DropdownMenuItem>
+                                  )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
                         </div>
                       </div>
                     </CardContent>
-                </Card>
+                  </Card>
                 )
               })}
             </div>
@@ -2435,15 +2438,14 @@ export default function BacklogPage() {
                     const isFromStory = !!(task as any)._sourceStoryId
                     const isDirectlySelected = (task as any)._isDirectlySelected === true
                     const sourceStoryTitle = (task as any)._sourceStoryTitle
-                    
+
                     return (
                       <li
                         key={task._id}
-                        className={`flex flex-col gap-2 text-sm p-2 rounded-md ${
-                          isFromStory 
-                            ? 'bg-muted/50 border border-border' 
+                        className={`flex flex-col gap-2 text-sm p-2 rounded-md ${isFromStory
+                            ? 'bg-muted/50 border border-border'
                             : 'bg-background border border-border/50'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between gap-2 flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-1 min-w-0">

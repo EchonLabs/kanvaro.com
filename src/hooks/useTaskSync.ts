@@ -23,21 +23,32 @@ export function useTaskSync(options: UseTaskSyncOptions = {}) {
   const [lastUpdate, setLastUpdate] = useState<string | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const isVisibleRef = useRef(!document.hidden)
 
   const {
     onTaskUpdate,
     onTaskCreate,
     onTaskDelete,
-    refreshInterval = 5000 // 5 seconds
+    refreshInterval = 30000 // Increased to 30 seconds (was 5 seconds)
   } = options
 
-  // Polling mechanism for real-time updates
+  // Polling mechanism for real-time updates with visibility awareness
   const startPolling = useCallback(async () => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
     }
 
+    // Only poll when tab is visible
+    if (!isVisibleRef.current) {
+      return
+    }
+
     intervalRef.current = setInterval(async () => {
+      // Skip if tab is not visible
+      if (!isVisibleRef.current) {
+        return
+      }
+
       try {
         const response = await fetch('/api/tasks/sync', {
           method: 'GET',
@@ -145,6 +156,30 @@ export function useTaskSync(options: UseTaskSyncOptions = {}) {
       }
     }
   }, [stopPolling])
+
+  // Handle visibility changes to pause/resume polling
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      isVisibleRef.current = !document.hidden
+      if (document.hidden) {
+        // Pause polling when tab is hidden
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current)
+          intervalRef.current = null
+        }
+      } else {
+        // Resume polling when tab becomes visible (if was connected)
+        if (isConnected) {
+          startPolling()
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [isConnected, startPolling])
 
   return {
     isConnected,

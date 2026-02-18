@@ -39,7 +39,8 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
   const { theme, setTheme } = useTheme()
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, loading } = useNotifications({
     limit: 10,
-    autoRefresh: true
+    autoRefresh: true,
+    refreshInterval: 60000 // Poll every 60 seconds (SSE handles real-time updates)
   })
 
   useEffect(() => {

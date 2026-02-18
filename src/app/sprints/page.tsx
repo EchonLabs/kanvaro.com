@@ -104,6 +104,8 @@ interface Sprint {
 
 export default function SprintsPage() {
   const router = useRouter()
+  const routerRef = useRef(router)
+  routerRef.current = router
   const searchParams = useSearchParams()
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [loading, setLoading] = useState(true)
@@ -119,8 +121,8 @@ export default function SprintsPage() {
 
   // Check if any filters are active
   const hasActiveFilters = searchQuery !== '' ||
-                          statusFilter !== 'all' ||
-                          projectFilter !== 'all'
+    statusFilter !== 'all' ||
+    projectFilter !== 'all'
 
   // Reset all filters
   const resetFilters = () => {
@@ -141,7 +143,7 @@ export default function SprintsPage() {
   const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null)
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  
+
   const [completeError, setCompleteError] = useState('')
   const [incompleteTasks, setIncompleteTasks] = useState<Array<{
     _id: string
@@ -166,6 +168,7 @@ export default function SprintsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
+  const initialLoadDone = useRef(false)
 
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { hasPermission } = usePermissions()
@@ -229,32 +232,35 @@ export default function SprintsPage() {
         } else {
           setAuthError('Session expired')
           setTimeout(() => {
-            router.push('/login')
+            routerRef.current.push('/login')
           }, 2000)
         }
       } else {
-        router.push('/login')
+        routerRef.current.push('/login')
       }
     } catch (error) {
       console.error('Auth check failed:', error)
       setAuthError('Authentication failed')
       setTimeout(() => {
-        router.push('/login')
+        routerRef.current.push('/login')
       }, 2000)
     }
   }, [router, fetchSprints])
 
   useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true
+      checkAuth()
+    }
+  }, [])
 
   useEffect(() => {
     const successParam = searchParams?.get('success')
     if (successParam === 'sprint-created') {
       notifySuccess({ title: 'Sprint created successfully' })
-      router.replace('/sprints', { scroll: false })
+      routerRef.current.replace('/sprints', { scroll: false })
     }
-  }, [searchParams, showSuccess, router])
+  }, [searchParams])
 
   useEffect(() => {
     return () => {
@@ -266,7 +272,7 @@ export default function SprintsPage() {
 
   // Fetch when pagination changes (after initial load)
   useEffect(() => {
-    if (!loading && !authError) {
+    if (initialLoadDone.current) {
       fetchSprints()
     }
   }, [fetchSprints, loading, authError])
@@ -279,18 +285,18 @@ export default function SprintsPage() {
     setSelectedSprintId(sprintId)
     setShowDeleteConfirmModal(true)
   }
-  
+
   const handleDeleteConfirm = async () => {
     if (!selectedSprintId) return
-  
+
     try {
       setDeleting(true)
-  
+
       const res = await fetch(`/api/sprints/${selectedSprintId}`, {
         method: 'DELETE'
       })
       const data = await res.json()
-  
+
       if (res.ok && data.success) {
         setSprints(prev => prev.filter(s => s._id !== selectedSprintId))
         notifySuccess({ title: 'Sprint deleted successfully' })
@@ -309,7 +315,7 @@ export default function SprintsPage() {
       setDeleting(false)
     }
   }
-  
+
   const formatDateInputValue = (date: Date): string => {
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -829,7 +835,7 @@ export default function SprintsPage() {
           </Button>
         </div>
 
-       
+
 
         {/* Search and Filters */}
         <div className="space-y-3">
@@ -1266,17 +1272,17 @@ export default function SprintsPage() {
                                     size="sm"
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                  if (!canStartSprint || !hasTasks) return
-                                  handleSprintLifecycleAction(sprint._id, 'start', hasTasks)
+                                      if (!canStartSprint || !hasTasks) return
+                                      handleSprintLifecycleAction(sprint._id, 'start', hasTasks)
                                     }}
-                                disabled={updatingSprintId === sprint._id || !hasTasks || !canStartSprint}
-                                title={
-                                  !hasTasks
-                                    ? 'Add tasks to this sprint before starting it.'
-                                    : !canStartSprint
-                                      ? 'You need sprint:start permission to start a sprint.'
-                                      : undefined
-                                }
+                                    disabled={updatingSprintId === sprint._id || !hasTasks || !canStartSprint}
+                                    title={
+                                      !hasTasks
+                                        ? 'Add tasks to this sprint before starting it.'
+                                        : !canStartSprint
+                                          ? 'You need sprint:start permission to start a sprint.'
+                                          : undefined
+                                    }
                                   >
                                     <Play className="h-4 w-4 mr-1" />
                                     {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
@@ -1288,17 +1294,17 @@ export default function SprintsPage() {
                                     variant="secondary"
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                  if (!canCompleteSprint || !hasTasks) return
-                                  handleSprintLifecycleAction(sprint._id, 'complete', hasTasks)
+                                      if (!canCompleteSprint || !hasTasks) return
+                                      handleSprintLifecycleAction(sprint._id, 'complete', hasTasks)
                                     }}
-                                disabled={updatingSprintId === sprint._id || !hasTasks || !canCompleteSprint}
-                                title={
-                                  !hasTasks
-                                    ? 'Add tasks to this sprint before completing it.'
-                                    : !canCompleteSprint
-                                      ? 'You need sprint:complete permission to complete a sprint.'
-                                      : undefined
-                                }
+                                    disabled={updatingSprintId === sprint._id || !hasTasks || !canCompleteSprint}
+                                    title={
+                                      !hasTasks
+                                        ? 'Add tasks to this sprint before completing it.'
+                                        : !canCompleteSprint
+                                          ? 'You need sprint:complete permission to complete a sprint.'
+                                          : undefined
+                                    }
                                   >
                                     <CheckCircle className="h-4 w-4 mr-1" />
                                     {updatingSprintId === sprint._id ? 'Completing...' : 'Complete Sprint'}

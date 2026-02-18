@@ -388,41 +388,39 @@ const filteredTasks = tasks.filter((task) =>
       const response = await fetch('/api/projects')
       const data = await response.json()
       if (data.success && Array.isArray(data.data)) {
-        const effectiveUser = currentUser ?? user
-      // Filter projects by strict requirements:
-      // 1. project.settings.allowTimeTracking === true (explicitly enabled)
-      // 2. project.teamMembers contains logged user as memberId
-      const filtered = data.data.filter((project: any) => {
-        const u = effectiveUser
-        if (!u) return false
+        const effectiveUser = currentUser ?? user     // Filter projects by strict requirements:
+    // 1. project.settings.allowTimeTracking === true (explicitly enabled)     // 2. project.teamMembers contains logged user as memberId
+        const filtered = data.data.filter((project: any) => {
+          const u = effectiveUser
+          if (!u) return false
 
-        // Check project-level time tracking setting - must be explicitly true
-        const projectAllowsTimeTracking = project?.settings?.allowTimeTracking === true
-        if (!projectAllowsTimeTracking) return false
+          // Check project-level time tracking setting - must be explicitly true
+          const projectAllowsTimeTracking = project?.settings?.allowTimeTracking === true
+          if (!projectAllowsTimeTracking) return false
 
-        // Check if user is in teamMembers array as memberId
-        const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
-        const isUserTeamMember = teamMembers.some((member: any) => {
-          if (typeof member === 'object' && member !== null) {
-            return member.memberId === u.id || member.memberId?._id === u.id || member.memberId?.id === u.id
+          // Check if user is in teamMembers array as memberId
+          const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
+          const isUserTeamMember = teamMembers.some((member: any) => {
+            if (typeof member === 'object' && member !== null) {
+              return member.memberId === u.id || member.memberId?._id === u.id || member.memberId?.id === u.id
             }
             return false
           })
 
-        return isUserTeamMember
-      })
+          return isUserTeamMember
+        })
 
-      console.log('Time tracking - Filtered projects:', {
-        userId: effectiveUser?.id,
-        totalProjects: data.data.length,
-        filteredProjects: filtered.length,
-        projects: filtered.map((p: any) => ({
-          _id: p._id,
-          name: p.name,
-          allowTimeTracking: p.settings?.allowTimeTracking,
-          teamMembers: p.teamMembers?.map((tm: any) => tm.memberId)
-        }))
-      })
+        console.log('Time tracking - Filtered projects:', {
+          userId: effectiveUser?.id,
+          totalProjects: data.data.length,
+          filteredProjects: filtered.length,
+          projects: filtered.map((p: any) => ({
+            _id: p._id,
+            name: p.name,
+            allowTimeTracking: p.settings?.allowTimeTracking,
+            teamMembers: p.teamMembers?.map((tm: any) => tm.memberId)
+          }))
+        })
 
         setProjects(filtered)
       } else {
@@ -1028,32 +1026,36 @@ const filteredTasks = tasks.filter((task) =>
                         <SelectValue placeholder="Select a project" />
                       </SelectTrigger>
                      <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
-                     <div className="p-2 sticky top-0 bg-background z-10">
-                       <Input
-                       placeholder="Type project name..."
-                       value={projectSearch}
-                       onChange={(e) => setProjectSearch(e.target.value)}
-                       className="h-8"
-                       />
-                     </div>
+                     <div className="p-2 sticky top-0 bg-background z-10">                      <Input
+                            placeholder="Type project name..."
+                            value={projectSearch}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              setProjectSearch(e.target.value)
+                            }}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-8"
+                          />
+                        </div>
 
-                     {Array.isArray(filteredProjects) && filteredProjects.length > 0 ? (
-                     filteredProjects.map((project) => (
-                     <SelectItem key={project._id} value={project._id}>
-                     <div className="flex items-center space-x-2 min-w-0">
-                       <FolderOpen className="h-4 w-4 flex-shrink-0" />
-                       <span className="truncate">{project.name}</span>
-                     </div>
-                     </SelectItem>
-                     ))
-                     ) : (
-                     <div className="p-3 text-sm text-muted-foreground text-center">
-                       No projects found
-                     </div>
-                     )}
-                     </SelectContent>
+                        {Array.isArray(filteredProjects) && filteredProjects.length > 0 ? (
+                          filteredProjects.map((project) => (
+                            <SelectItem key={project._id} value={project._id}>
+                              <div className="flex items-center space-x-2 min-w-0">
+                                <FolderOpen className="h-4 w-4 flex-shrink-0" />
+                                <span className="truncate">{project.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-3 text-sm text-muted-foreground text-center">
+                            No projects found
+                          </div>
+                        )}
+                      </SelectContent>
 
-                     </Select>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
@@ -1065,59 +1067,65 @@ const filteredTasks = tasks.filter((task) =>
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder={
-                          tasksLoading 
-                            ? 'Loading tasks...' 
-                            : selectedProject 
-                              ? (Array.isArray(tasks) && tasks.length > 0 ? 'Select a task' : 'No tasks available') 
+                          tasksLoading
+                            ? 'Loading tasks...'
+                            : selectedProject
+                              ? (Array.isArray(tasks) && tasks.length > 0 ? 'Select a task' : 'No tasks available')
                               : 'Select a project first'
                         } />
                       </SelectTrigger>
                       {tasksLoading && (
                         <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                       )}
-                     <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
-                     {!tasksLoading && (
-                     <div className="p-2 sticky top-0 bg-background z-10">
-                      <Input
-                       placeholder="Type task name..."
-                       value={taskSearch}
-                       onChange={(e) => setTaskSearch(e.target.value)}
-                       className="h-8"
-                      />
-                    </div> )}
+                      <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
+                        {!tasksLoading && (
+                          <div className="p-2 sticky top-0 bg-background z-10">
+                            <Input
+                              placeholder="Type task name..."
+                              value={taskSearch}
+                              onChange={(e) => {
+                                e.stopPropagation()
+                                setTaskSearch(e.target.value)
+                              }}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
+                              className="h-8"
+                            />
+                          </div> )}
 
-                {tasksLoading ? (
-                    <div className="flex items-center justify-center p-4">
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      <span className="text-sm text-muted-foreground">Loading tasks...</span>
-                    </div>
-                  ) : (
-                    Array.isArray(filteredTasks) && filteredTasks.length > 0 ? (
-                    filteredTasks.map((task) => {
-                    const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
-                    return (
-                       <SelectItem 
-                       key={task._id} 
-                       value={task._id}
-                       disabled={isBillableDisabled}>
-                       <div className="flex items-center space-x-2 min-w-0 w-full">
-                       <Target className="h-4 w-4 flex-shrink-0" />
-                       <div className="flex-1 min-w-0 overflow-hidden">
-                       <div className="font-medium truncate flex items-center gap-2 min-w-0">
-                       <span className="truncate">{task.title}</span>
-                       </div>
-                       <div className="text-xs sm:text-sm text-muted-foreground truncate">
-                       {task.status} • {task.priority}
-                       {isBillableDisabled && ' • Billable time not allowed'}
-                       </div>
-                       </div>
-                       </div>
-                     </SelectItem>)})
-                     ) : (
-                       <div className="p-3 text-sm text-muted-foreground text-center">
-                         No tasks found
-                       </div>))}
-                   </SelectContent>
+                        {tasksLoading ? (
+                          <div className="flex items-center justify-center p-4">
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            <span className="text-sm text-muted-foreground">Loading tasks...</span>
+                          </div>
+                        ) : (
+                          Array.isArray(filteredTasks) && filteredTasks.length > 0 ? (
+                            filteredTasks.map((task) => {
+                              const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
+                              return (
+                                <SelectItem
+                                  key={task._id}
+                                  value={task._id}
+                                  disabled={isBillableDisabled}>
+                                  <div className="flex items-center space-x-2 min-w-0 w-full">
+                                    <Target className="h-4 w-4 flex-shrink-0" />
+                                    <div className="flex-1 min-w-0 overflow-hidden">
+                                      <div className="font-medium truncate flex items-center gap-2 min-w-0">
+                                        <span className="truncate">{task.title}</span>
+                                      </div>
+                                      <div className="text-xs sm:text-sm text-muted-foreground truncate">
+                                        {task.status} • {task.priority}
+                                        {isBillableDisabled && ' • Billable time not allowed'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </SelectItem>)
+                            })
+                          ) : (
+                            <div className="p-3 text-sm text-muted-foreground text-center">
+                              No tasks found
+                            </div>))}
+                      </SelectContent>
 
                     </Select>
                     {selectedProject && !tasksLoading && Array.isArray(tasks) && tasks.length === 0 && (
@@ -1143,7 +1151,7 @@ const filteredTasks = tasks.filter((task) =>
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder={
-                      'What are you working on? (required)' 
+                      'What are you working on? (required)'
                     }
                     rows={2}
                     required={true}
@@ -1171,42 +1179,42 @@ const filteredTasks = tasks.filter((task) =>
                           taskId={selectedTask || undefined}
                           description={description}
                           isBillable={isBillable}
-                        //  requireDescription={timeTrackingSettings?.requireDescription === true}
+                          //  requireDescription={timeTrackingSettings?.requireDescription === true}
                           allowOvertime={timeTrackingSettings?.allowOvertime ?? false}
                           onTimerUpdate={(timer) => {
-                        if (!timer) {
-                          resetTimerForm()
-                          // Timer stopped - notifications will be shown by backend notification system only if time was logged
-                        } else if (timer.hasTimeLogged && timer.timeEntry) {
-                          // Timer stopped with time logged - reset form but don't show notification here
-                          // Backend notification system will show the appropriate notifications
-                          resetTimerForm()
-                          setLiveActiveTimer(null)
-                        } else {
-                          // Timer is active/running
-                          setActiveTimerSnapshot(timer)
-                          setLiveActiveTimer(timer)
-                          if (timeTrackingSettings?.notifications?.onTimerStart && !hadActiveTimerRef.current) {
+                            if (!timer) {
+                              resetTimerForm()
+                              // Timer stopped - notifications will be shown by backend notification system only if time was logged
+                            } else if (timer.hasTimeLogged && timer.timeEntry) {
+                              // Timer stopped with time logged - reset form but don't show notification here
+                              // Backend notification system will show the appropriate notifications
+                              resetTimerForm()
+                              setLiveActiveTimer(null)
+                            } else {
+                              // Timer is active/running
+                              setActiveTimerSnapshot(timer)
+                              setLiveActiveTimer(timer)
+                              if (timeTrackingSettings?.notifications?.onTimerStart && !hadActiveTimerRef.current) {
+                                showToast({
+                                  type: 'success',
+                                  title: 'Timer Started',
+                                  message: 'Your timer has started successfully.',
+                                  duration: 5000
+                                })
+                              }
+                              // Reset auto-stop notification flag when timer starts
+                              autoStopNotifiedRef.current = false
+                            }
+                            setTimeLogsRefreshKey((prev) => prev + 1)
+                          }}
+                          onAutoStop={(message) => {
                             showToast({
-                              type: 'success',
-                              title: 'Timer Started',
-                              message: 'Your timer has started successfully.',
-                              duration: 5000
+                              type: 'info',
+                              title: 'Timer Auto-Stopped',
+                              message,
+                              duration: 8000
                             })
-                          }
-                          // Reset auto-stop notification flag when timer starts
-                          autoStopNotifiedRef.current = false
-                        }
-                        setTimeLogsRefreshKey((prev) => prev + 1)
-                      }}
-                      onAutoStop={(message) => {
-                        showToast({
-                          type: 'info',
-                          title: 'Timer Auto-Stopped',
-                          message,
-                          duration: 8000
-                        })
-                      }}
+                          }}
                         />
                       )
                     })()}
