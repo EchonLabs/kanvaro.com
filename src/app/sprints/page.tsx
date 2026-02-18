@@ -245,7 +245,7 @@ export default function SprintsPage() {
         routerRef.current.push('/login')
       }, 2000)
     }
-  }, [router, fetchSprints])
+  }, [fetchSprints])
 
   useEffect(() => {
     if (!initialLoadDone.current) {
@@ -275,7 +275,7 @@ export default function SprintsPage() {
     if (initialLoadDone.current) {
       fetchSprints()
     }
-  }, [fetchSprints, loading, authError])
+  }, [currentPage, pageSize])
 
   const handleDeleteClick = (sprintId: string) => {
     if (!canDeleteSprint) {
@@ -1040,361 +1040,361 @@ export default function SprintsPage() {
                                       <Trash2 className="h-4 w-4 mr-2" />
                                       Delete Sprint
                                     </DropdownMenuItem>
-                                  </>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                                 </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-3 sm:p-6 pt-0 space-y-3 sm:space-y-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center space-x-2">
+                            <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
+                              {getStatusIcon(sprint?.status)}
+                              <span className="ml-1 hidden sm:inline">{formatToTitleCase(sprint?.status)}</span>
+                            </Badge>
                           </div>
-                        </CardHeader>
-                        <CardContent className="p-3 sm:p-6 pt-0 space-y-3 sm:space-y-4">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center space-x-2">
+                          {sprint?.project?.name && (
+                            <div className="flex items-center space-x-1 min-w-0">
+                              <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                              <span
+                                className="text-xs sm:text-sm text-muted-foreground truncate"
+                                title={sprint.project.name}
+                              >
+                                {sprint.project.name}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs sm:text-sm">
+                            <span className="text-muted-foreground">Progress</span>
+                            <span className="font-medium">{sprint?.progress?.completionPercentage || 0}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
+                            <div
+                              className="bg-blue-600 dark:bg-blue-500 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
+                              style={{
+                                width: `${sprint?.progress?.completionPercentage || 0}%`,
+                                minWidth: sprint?.progress?.completionPercentage || 0 > 0 ? '2px' : '0'
+                              }}
+                            />
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {sprint?.progress?.tasksCompleted || 0} of {sprint?.progress?.totalTasks || 0} tasks completed
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs sm:text-sm">
+                            <span className="text-muted-foreground">Story Points</span>
+                            <span className="font-medium">
+                              {storyPointsCompleted} / {totalStoryPoints}
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
+                            <div
+                              className="bg-emerald-500 dark:bg-emerald-400 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
+                              style={{
+                                width: `${storyPointsPercentage}%`,
+                                minWidth: storyPointsPercentage > 0 ? '2px' : '0'
+                              }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-xs sm:text-sm">
+                            <span className="text-muted-foreground">Velocity</span>
+                            <span className="font-medium">{sprint?.velocity || 0}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground">
+                          <div className="flex items-center space-x-1">
+                            <Users className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <span className="truncate">{sprint?.teamMembers?.length} members</span>
+                          </div>
+                          <div className="flex items-center space-x-1 flex-shrink-0">
+                            <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="whitespace-nowrap">{formatDate(sprint?.startDate)}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 text-xs sm:text-sm">
+                          <div className="text-muted-foreground truncate">
+                            {formatDate(sprint?.startDate)} - {formatDate(sprint?.endDate)}
+                          </div>
+                          <div className="text-muted-foreground whitespace-nowrap flex-shrink-0">
+                            {Math.ceil((new Date(sprint?.endDate).getTime() - new Date(sprint?.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          {sprint.status === 'planning' && (
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (!canStartSprint || !hasTasks) return
+                                handleSprintLifecycleAction(sprint._id, 'start', hasTasks)
+                              }}
+                              disabled={updatingSprintId === sprint._id || !hasTasks || !canStartSprint}
+                              title={
+                                !hasTasks
+                                  ? 'Add tasks to this sprint before starting it.'
+                                  : !canStartSprint
+                                    ? 'You need sprint:start permission to start a sprint.'
+                                    : undefined
+                              }
+                            >
+                              <Play className="h-4 w-4 mr-1" />
+                              {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
+                            </Button>
+                          )}
+                          {sprint.status === 'active' && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (!canCompleteSprint || !hasTasks) return
+                                handleSprintLifecycleAction(sprint._id, 'complete', hasTasks)
+                              }}
+                              disabled={updatingSprintId === sprint._id || !hasTasks || !canCompleteSprint}
+                              title={
+                                !hasTasks
+                                  ? 'Add tasks to this sprint before completing it.'
+                                  : !canCompleteSprint
+                                    ? 'You need sprint:complete permission to complete a sprint.'
+                                    : undefined
+                              }
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              {updatingSprintId === sprint._id ? 'Completing...' : 'Complete Sprint'}
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="list" className="space-y-4">
+              <div className="space-y-4">
+                {filteredSprints.map((sprint) => {
+                  const totalTasks = sprint?.progress?.totalTasks ?? (Array.isArray(sprint?.tasks) ? sprint.tasks.length : 0)
+                  const hasTasks = (totalTasks ?? 0) > 0
+                  const completionPercentage = Math.min(
+                    100,
+                    Math.max(0, sprint?.progress?.completionPercentage ?? 0)
+                  )
+                  const storyPointsPercentage = (() => {
+                    if (typeof sprint?.progress?.storyPointsCompletionPercentage === 'number') {
+                      return Math.min(
+                        100,
+                        Math.max(0, sprint.progress.storyPointsCompletionPercentage)
+                      )
+                    }
+                    const completed = sprint?.progress?.storyPointsCompleted ?? 0
+                    const total = sprint?.progress?.totalStoryPoints ?? 0
+                    if (!total) return 0
+                    return Math.min(100, Math.max(0, Math.round((completed / total) * 100)))
+                  })()
+                  const storyPointsCompleted = sprint?.progress?.storyPointsCompleted ?? 0
+                  const totalStoryPoints = sprint?.progress?.totalStoryPoints ?? 0
+
+                  return (
+                    <Card
+                      key={sprint?._id}
+                      className={`hover:shadow-md transition-shadow overflow-x-hidden ${canViewSprint ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                      onClick={() => {
+                        if (!canViewSprint || !sprint?._id) return
+                        router.push(`/sprints/${sprint?._id}`)
+                      }}
+                    >
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
+                          <div className="flex-1 min-w-0 w-full">
+                            <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2 mb-2">
                               <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
                                 {getStatusIcon(sprint?.status)}
                                 <span className="ml-1 hidden sm:inline">{formatToTitleCase(sprint?.status)}</span>
                               </Badge>
                             </div>
-                            {sprint?.project?.name && (
+                            <div className="flex items-start gap-2 mb-2">
+                              <h3 className="font-medium text-sm sm:text-base text-foreground truncate flex-1 min-w-0" title={sprint?.name}>
+                                {sprint?.name}
+                              </h3>
+                            </div>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
+                                    {sprint?.description || 'No description'}
+                                  </p>
+                                </TooltipTrigger>
+                                {(sprint?.description && sprint.description.length > 0) && (
+                                  <TooltipContent>
+                                    <p className="max-w-xs break-words">{sprint.description}</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                               <div className="flex items-center space-x-1 min-w-0">
                                 <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                                 <span
-                                  className="text-xs sm:text-sm text-muted-foreground truncate"
-                                  title={sprint.project.name}
+                                  className="truncate"
+                                  title={sprint?.project?.name && sprint?.project?.name.length > 10 ? sprint?.project?.name : undefined}
                                 >
-                                  {sprint.project.name}
+                                  {sprint?.project?.name && sprint?.project?.name.length > 10 ? `${sprint?.project?.name.slice(0, 10)}…` : sprint?.project?.name}
                                 </span>
                               </div>
-                            )}
-                          </div>
-
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-xs sm:text-sm">
-                              <span className="text-muted-foreground">Progress</span>
-                              <span className="font-medium">{sprint?.progress?.completionPercentage || 0}%</span>
-                            </div>
-                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
-                              <div
-                                className="bg-blue-600 dark:bg-blue-500 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
-                                style={{
-                                  width: `${sprint?.progress?.completionPercentage || 0}%`,
-                                  minWidth: sprint?.progress?.completionPercentage || 0 > 0 ? '2px' : '0'
-                                }}
-                              />
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {sprint?.progress?.tasksCompleted || 0} of {sprint?.progress?.totalTasks || 0} tasks completed
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-xs sm:text-sm">
-                              <span className="text-muted-foreground">Story Points</span>
-                              <span className="font-medium">
-                                {storyPointsCompleted} / {totalStoryPoints}
-                              </span>
-                            </div>
-                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
-                              <div
-                                className="bg-emerald-500 dark:bg-emerald-400 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
-                                style={{
-                                  width: `${storyPointsPercentage}%`,
-                                  minWidth: storyPointsPercentage > 0 ? '2px' : '0'
-                                }}
-                              />
-                            </div>
-                            <div className="flex items-center justify-between text-xs sm:text-sm">
-                              <span className="text-muted-foreground">Velocity</span>
-                              <span className="font-medium">{sprint?.velocity || 0}</span>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground">
-                            <div className="flex items-center space-x-1">
-                              <Users className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                              <span className="truncate">{sprint?.teamMembers?.length} members</span>
-                            </div>
-                            <div className="flex items-center space-x-1 flex-shrink-0">
-                              <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span className="whitespace-nowrap">{formatDate(sprint?.startDate)}</span>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 text-xs sm:text-sm">
-                            <div className="text-muted-foreground truncate">
-                              {formatDate(sprint?.startDate)} - {formatDate(sprint?.endDate)}
-                            </div>
-                            <div className="text-muted-foreground whitespace-nowrap flex-shrink-0">
-                              {Math.ceil((new Date(sprint?.endDate).getTime() - new Date(sprint?.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                            {sprint.status === 'planning' && (
-                              <Button
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (!canStartSprint || !hasTasks) return
-                                  handleSprintLifecycleAction(sprint._id, 'start', hasTasks)
-                                }}
-                                disabled={updatingSprintId === sprint._id || !hasTasks || !canStartSprint}
-                                title={
-                                  !hasTasks
-                                    ? 'Add tasks to this sprint before starting it.'
-                                    : !canStartSprint
-                                      ? 'You need sprint:start permission to start a sprint.'
-                                      : undefined
-                                }
-                              >
-                                <Play className="h-4 w-4 mr-1" />
-                                {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
-                              </Button>
-                            )}
-                            {sprint.status === 'active' && (
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (!canCompleteSprint || !hasTasks) return
-                                  handleSprintLifecycleAction(sprint._id, 'complete', hasTasks)
-                                }}
-                                disabled={updatingSprintId === sprint._id || !hasTasks || !canCompleteSprint}
-                                title={
-                                  !hasTasks
-                                    ? 'Add tasks to this sprint before completing it.'
-                                    : !canCompleteSprint
-                                      ? 'You need sprint:complete permission to complete a sprint.'
-                                      : undefined
-                                }
-                              >
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                {updatingSprintId === sprint._id ? 'Completing...' : 'Complete Sprint'}
-                              </Button>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )
-                  })}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="list" className="space-y-4">
-                <div className="space-y-4">
-                  {filteredSprints.map((sprint) => {
-                    const totalTasks = sprint?.progress?.totalTasks ?? (Array.isArray(sprint?.tasks) ? sprint.tasks.length : 0)
-                    const hasTasks = (totalTasks ?? 0) > 0
-                    const completionPercentage = Math.min(
-                      100,
-                      Math.max(0, sprint?.progress?.completionPercentage ?? 0)
-                    )
-                    const storyPointsPercentage = (() => {
-                      if (typeof sprint?.progress?.storyPointsCompletionPercentage === 'number') {
-                        return Math.min(
-                          100,
-                          Math.max(0, sprint.progress.storyPointsCompletionPercentage)
-                        )
-                      }
-                      const completed = sprint?.progress?.storyPointsCompleted ?? 0
-                      const total = sprint?.progress?.totalStoryPoints ?? 0
-                      if (!total) return 0
-                      return Math.min(100, Math.max(0, Math.round((completed / total) * 100)))
-                    })()
-                    const storyPointsCompleted = sprint?.progress?.storyPointsCompleted ?? 0
-                    const totalStoryPoints = sprint?.progress?.totalStoryPoints ?? 0
-
-                    return (
-                      <Card
-                        key={sprint?._id}
-                        className={`hover:shadow-md transition-shadow overflow-x-hidden ${canViewSprint ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
-                        onClick={() => {
-                          if (!canViewSprint || !sprint?._id) return
-                          router.push(`/sprints/${sprint?._id}`)
-                        }}
-                      >
-                        <CardContent className="p-3 sm:p-4">
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
-                            <div className="flex-1 min-w-0 w-full">
-                              <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2 mb-2">
-                                <Badge className={`${getStatusColor(sprint?.status)} text-xs`}>
-                                  {getStatusIcon(sprint?.status)}
-                                  <span className="ml-1 hidden sm:inline">{formatToTitleCase(sprint?.status)}</span>
-                                </Badge>
+                              <div className="flex items-center space-x-1 flex-shrink-0">
+                                <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+                                <span className="whitespace-nowrap">{sprint?.teamMembers?.length} members</span>
                               </div>
-                              <div className="flex items-start gap-2 mb-2">
-                                <h3 className="font-medium text-sm sm:text-base text-foreground truncate flex-1 min-w-0" title={sprint?.name}>
-                                  {sprint?.name}
-                                </h3>
+                              <div className="flex items-center space-x-1 min-w-0">
+                                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                <span className="truncate">
+                                  {formatDate(sprint?.startDate)} - {formatDate(sprint?.endDate)}
+                                </span>
                               </div>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
-                                      {sprint?.description || 'No description'}
-                                    </p>
-                                  </TooltipTrigger>
-                                  {(sprint?.description && sprint.description.length > 0) && (
-                                    <TooltipContent>
-                                      <p className="max-w-xs break-words">{sprint.description}</p>
-                                    </TooltipContent>
-                                  )}
-                                </Tooltip>
-                              </TooltipProvider>
-                              <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                                <div className="flex items-center space-x-1 min-w-0">
-                                  <Target className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                  <span
-                                    className="truncate"
-                                    title={sprint?.project?.name && sprint?.project?.name.length > 10 ? sprint?.project?.name : undefined}
-                                  >
-                                    {sprint?.project?.name && sprint?.project?.name.length > 10 ? `${sprint?.project?.name.slice(0, 10)}…` : sprint?.project?.name}
-                                  </span>
-                                </div>
-                                <div className="flex items-center space-x-1 flex-shrink-0">
-                                  <Users className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span className="whitespace-nowrap">{sprint?.teamMembers?.length} members</span>
-                                </div>
-                                <div className="flex items-center space-x-1 min-w-0">
-                                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                  <span className="truncate">
-                                    {formatDate(sprint?.startDate)} - {formatDate(sprint?.endDate)}
-                                  </span>
-                                </div>
-                                <div className="flex items-center space-x-1 flex-shrink-0 whitespace-nowrap">
-                                  <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span>Velocity: {sprint?.velocity || 0}</span>
-                                </div>
-                              </div>
-                              <div className="flex flex-wrap gap-2 mt-3">
-                                {sprint.status === 'planning' && (
-                                  <Button
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      if (!canStartSprint || !hasTasks) return
-                                      handleSprintLifecycleAction(sprint._id, 'start', hasTasks)
-                                    }}
-                                    disabled={updatingSprintId === sprint._id || !hasTasks || !canStartSprint}
-                                    title={
-                                      !hasTasks
-                                        ? 'Add tasks to this sprint before starting it.'
-                                        : !canStartSprint
-                                          ? 'You need sprint:start permission to start a sprint.'
-                                          : undefined
-                                    }
-                                  >
-                                    <Play className="h-4 w-4 mr-1" />
-                                    {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
-                                  </Button>
-                                )}
-                                {sprint.status === 'active' && (
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      if (!canCompleteSprint || !hasTasks) return
-                                      handleSprintLifecycleAction(sprint._id, 'complete', hasTasks)
-                                    }}
-                                    disabled={updatingSprintId === sprint._id || !hasTasks || !canCompleteSprint}
-                                    title={
-                                      !hasTasks
-                                        ? 'Add tasks to this sprint before completing it.'
-                                        : !canCompleteSprint
-                                          ? 'You need sprint:complete permission to complete a sprint.'
-                                          : undefined
-                                    }
-                                  >
-                                    <CheckCircle className="h-4 w-4 mr-1" />
-                                    {updatingSprintId === sprint._id ? 'Completing...' : 'Complete Sprint'}
-                                  </Button>
-                                )}
+                              <div className="flex items-center space-x-1 flex-shrink-0 whitespace-nowrap">
+                                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
+                                <span>Velocity: {sprint?.velocity || 0}</span>
                               </div>
                             </div>
-                            <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
-                              <div className="text-right sm:text-left">
-                                <div className="text-xs sm:text-sm font-medium text-foreground">{completionPercentage}%</div>
-                                <div className="w-16 sm:w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
-                                  <div
-                                    className="bg-blue-600 dark:bg-blue-500 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
-                                    style={{
-                                      width: `${completionPercentage}%`,
-                                      minWidth: completionPercentage > 0 ? '2px' : '0'
-                                    }}
-                                  />
-                                </div>
-                                <div className="text-[11px] text-muted-foreground mt-1">
-                                  Story Points: {storyPointsCompleted} / {totalStoryPoints}
-                                </div>
-                                <div className="w-16 sm:w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden mt-1">
-                                  <div
-                                    className="bg-emerald-500 dark:bg-emerald-400 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
-                                    style={{
-                                      width: `${storyPointsPercentage}%`,
-                                      minWidth: storyPointsPercentage > 0 ? '2px' : '0'
-                                    }}
-                                  />
-                                </div>
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              {sprint.status === 'planning' && (
+                                <Button
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!canStartSprint || !hasTasks) return
+                                    handleSprintLifecycleAction(sprint._id, 'start', hasTasks)
+                                  }}
+                                  disabled={updatingSprintId === sprint._id || !hasTasks || !canStartSprint}
+                                  title={
+                                    !hasTasks
+                                      ? 'Add tasks to this sprint before starting it.'
+                                      : !canStartSprint
+                                        ? 'You need sprint:start permission to start a sprint.'
+                                        : undefined
+                                  }
+                                >
+                                  <Play className="h-4 w-4 mr-1" />
+                                  {updatingSprintId === sprint._id ? 'Starting...' : 'Start Sprint'}
+                                </Button>
+                              )}
+                              {sprint.status === 'active' && (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!canCompleteSprint || !hasTasks) return
+                                    handleSprintLifecycleAction(sprint._id, 'complete', hasTasks)
+                                  }}
+                                  disabled={updatingSprintId === sprint._id || !hasTasks || !canCompleteSprint}
+                                  title={
+                                    !hasTasks
+                                      ? 'Add tasks to this sprint before completing it.'
+                                      : !canCompleteSprint
+                                        ? 'You need sprint:complete permission to complete a sprint.'
+                                        : undefined
+                                  }
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                  {updatingSprintId === sprint._id ? 'Completing...' : 'Complete Sprint'}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                            <div className="text-right sm:text-left">
+                              <div className="text-xs sm:text-sm font-medium text-foreground">{completionPercentage}%</div>
+                              <div className="w-16 sm:w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden">
+                                <div
+                                  className="bg-blue-600 dark:bg-blue-500 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
+                                  style={{
+                                    width: `${completionPercentage}%`,
+                                    minWidth: completionPercentage > 0 ? '2px' : '0'
+                                  }}
+                                />
                               </div>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                              <div className="text-[11px] text-muted-foreground mt-1">
+                                Story Points: {storyPointsCompleted} / {totalStoryPoints}
+                              </div>
+                              <div className="w-16 sm:w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2 overflow-hidden mt-1">
+                                <div
+                                  className="bg-emerald-500 dark:bg-emerald-400 h-1.5 sm:h-2 rounded-full transition-all duration-300 ease-out"
+                                  style={{
+                                    width: `${storyPointsPercentage}%`,
+                                    minWidth: storyPointsPercentage > 0 ? '2px' : '0'
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenuItem
+                                  disabled={!canViewSprint}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!canViewSprint) return
+                                    router.push(`/sprints/${sprint._id}`)
+                                  }}
+                                >
+                                  <Zap className="h-4 w-4 mr-2" />
+                                  View Sprint
+                                </DropdownMenuItem>
+                                {canEditSprint && (
                                   <DropdownMenuItem
-                                    disabled={!canViewSprint}
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      if (!canViewSprint) return
-                                      router.push(`/sprints/${sprint._id}`)
+                                      router.push(`/sprints/${sprint._id}/edit`)
                                     }}
                                   >
-                                    <Zap className="h-4 w-4 mr-2" />
-                                    View Sprint
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit Sprint
                                   </DropdownMenuItem>
-                                  {canEditSprint && (
+                                )}
+                                {canDeleteSprint && (
+                                  <>
+                                    <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        router.push(`/sprints/${sprint._id}/edit`)
-                                      }}
-                                    >
-                                      <Edit className="h-4 w-4 mr-2" />
-                                      Edit Sprint
-                                    </DropdownMenuItem>
-                                  )}
-                                  {canDeleteSprint && (
-                                    <>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleDeleteClick(sprint._id)
+                                        handleDeleteClick(sprint._id)
 
-                                        }}
-                                        className="text-destructive focus:text-destructive"
-                                      >
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        Delete Sprint
-                                      </DropdownMenuItem>
-                                    </>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
+                                      }}
+                                      className="text-destructive focus:text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete Sprint
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
-                        </CardContent>
-                      </Card>
-                    )
-                  })}
-                </div>
-              </TabsContent>
-            </Tabs>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
-        
+
         <ResponsiveDialog
           open={completeModalOpen}
           onOpenChange={(open) => {
