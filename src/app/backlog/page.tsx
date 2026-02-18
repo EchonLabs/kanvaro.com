@@ -1515,179 +1515,173 @@ export default function BacklogPage() {
             <Input
               ref={searchInputRef}
               placeholder="Search backlog..."
-              value={localSearch}
-              onChange={e => setLocalSearch(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  setSearchQuery(localSearch)
-                }
-              }}
-              onBlur={() => setSearchQuery(localSearch)}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
               className="pl-10 w-full"
             />
           </div>
           {/* Filter options - compact grid layout */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                  <Select value={projectFilterValue} onValueChange={setProjectFilterValue}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Project" />
-                    </SelectTrigger>
-                    <SelectContent className="z-[10050] p-0">
-                      <div className="p-2">
-                        <Input
-                          value={projectFilterQuery}
-                          onChange={(e) => {
-                            e.stopPropagation()
-                            setProjectFilterQuery(e.target.value)
-                          }}
-                          onKeyDown={(e) => e.stopPropagation()}
-                          onClick={(e) => e.stopPropagation()}
-                          placeholder="Search projects"
-                          className="mb-2"
-                        />
-                        <div className="max-h-56 overflow-y-auto">
-                          <SelectItem value="all">All Projects</SelectItem>
-                          {filteredProjectOptions.length === 0 ? (
-                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
-                          ) : (
-                            filteredProjectOptions.map((project) => (
-                              <SelectItem key={project._id} value={project._id}>
-                                {project.name}
-                              </SelectItem>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </SelectContent>
-                  </Select>
-                  <Select value={typeFilter} onValueChange={setTypeFilter}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="epic">Epics</SelectItem>
-                      <SelectItem value="story">Stories</SelectItem>
-                      <SelectItem value="task">Tasks</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      {availableStatusOptions.map((status: string) => (
-                        <SelectItem key={status} value={status}>
-                          {formatToTitleCase(status.replace('_', ' '))}
+            <Select value={projectFilterValue} onValueChange={setProjectFilterValue}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Project" />
+              </SelectTrigger>
+              <SelectContent className="z-[10050] p-0">
+                <div className="p-2">
+                  <Input
+                    value={projectFilterQuery}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      setProjectFilterQuery(e.target.value)
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                    placeholder="Search projects"
+                    className="mb-2"
+                  />
+                  <div className="max-h-56 overflow-y-auto">
+                    <SelectItem value="all">All Projects</SelectItem>
+                    {filteredProjectOptions.length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                    ) : (
+                      filteredProjectOptions.map((project) => (
+                        <SelectItem key={project._id} value={project._id}>
+                          {project.name}
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Priority</SelectItem>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={assignedToFilter} onValueChange={(value) => { setAssignedToFilter(value); setAssignedToFilterQuery(''); }}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Assignee" />
-                    </SelectTrigger>
-                    <SelectContent className="z-[10050] p-0">
-                      <div className="p-2">
-                        <Input
-                          value={assignedToFilterQuery}
-                          onChange={(e) => {
-                            e.stopPropagation()
-                            setAssignedToFilterQuery(e.target.value)
-                          }}
-                          onKeyDown={(e) => e.stopPropagation()}
-                          onClick={(e) => e.stopPropagation()}
-                          placeholder="Search assignees"
-                          className="mb-2"
-                        />
-                        <div className="max-h-56 overflow-y-auto">
-                          <SelectItem value="all">All Assignees</SelectItem>
-                          {filteredAssignedToOptions.length === 0 ? (
-                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching members</div>
-                          ) : (
-                            filteredAssignedToOptions.map((member) => (
-                              <SelectItem key={member._id} value={member._id}>
-                                {member.firstName} {member.lastName}
-                              </SelectItem>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </SelectContent>
-                  </Select>
-                  <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Creator" />
-                    </SelectTrigger>
-                    <SelectContent className="z-[10050] p-0">
-                      <div className="p-2">
-                        <Input
-                          value={createdByFilterQuery}
-                          onChange={(e) => {
-                            e.stopPropagation()
-                            setCreatedByFilterQuery(e.target.value)
-                          }}
-                          onKeyDown={(e) => e.stopPropagation()}
-                          onClick={(e) => e.stopPropagation()}
-                          placeholder="Search creators"
-                          className="mb-2"
-                        />
-                        <div className="max-h-56 overflow-y-auto">
-                          <SelectItem value="all">All Creators</SelectItem>
-                          {filteredCreatedByOptions.length === 0 ? (
-                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching members</div>
-                          ) : (
-                            filteredCreatedByOptions.map((member) => (
-                              <SelectItem key={member._id} value={member._id}>
-                                {member.firstName} {member.lastName}
-                              </SelectItem>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </SelectContent>
-                  </Select>
-                  <Select value={sortBy} onValueChange={setSortBy}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Sort by" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="priority">Priority</SelectItem>
-                      <SelectItem value="title">Title</SelectItem>
-                      <SelectItem value="created">Created</SelectItem>
-                      <SelectItem value="dueDate">Due Date</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                          className="w-full"
-                          aria-label={sortOrder === 'asc' ? 'Click to sort descending' : 'Click to sort ascending'}
-                        >
-                          {sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{sortOrder === 'asc' ? 'Click to sort descending' : 'Click to sort ascending'}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </SelectContent>
+            </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="epic">Epics</SelectItem>
+                <SelectItem value="story">Stories</SelectItem>
+                <SelectItem value="task">Tasks</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                {availableStatusOptions.map((status: string) => (
+                  <SelectItem key={status} value={status}>
+                    {formatToTitleCase(status.replace('_', ' '))}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Priority</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={assignedToFilter} onValueChange={(value) => { setAssignedToFilter(value); setAssignedToFilterQuery(''); }}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Assignee" />
+              </SelectTrigger>
+              <SelectContent className="z-[10050] p-0">
+                <div className="p-2">
+                  <Input
+                    value={assignedToFilterQuery}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      setAssignedToFilterQuery(e.target.value)
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                    placeholder="Search assignees"
+                    className="mb-2"
+                  />
+                  <div className="max-h-56 overflow-y-auto">
+                    <SelectItem value="all">All Assignees</SelectItem>
+                    {filteredAssignedToOptions.length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-muted-foreground">No matching members</div>
+                    ) : (
+                      filteredAssignedToOptions.map((member) => (
+                        <SelectItem key={member._id} value={member._id}>
+                          {member.firstName} {member.lastName}
+                        </SelectItem>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </SelectContent>
+            </Select>
+            <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Creator" />
+              </SelectTrigger>
+              <SelectContent className="z-[10050] p-0">
+                <div className="p-2">
+                  <Input
+                    value={createdByFilterQuery}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      setCreatedByFilterQuery(e.target.value)
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                    placeholder="Search creators"
+                    className="mb-2"
+                  />
+                  <div className="max-h-56 overflow-y-auto">
+                    <SelectItem value="all">All Creators</SelectItem>
+                    {filteredCreatedByOptions.length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-muted-foreground">No matching members</div>
+                    ) : (
+                      filteredCreatedByOptions.map((member) => (
+                        <SelectItem key={member._id} value={member._id}>
+                          {member.firstName} {member.lastName}
+                        </SelectItem>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="priority">Priority</SelectItem>
+                <SelectItem value="title">Title</SelectItem>
+                <SelectItem value="created">Created</SelectItem>
+                <SelectItem value="dueDate">Due Date</SelectItem>
+              </SelectContent>
+            </Select>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                    className="w-full"
+                    aria-label={sortOrder === 'asc' ? 'Click to sort descending' : 'Click to sort ascending'}
+                  >
+                    {sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{sortOrder === 'asc' ? 'Click to sort descending' : 'Click to sort ascending'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           {/* Date range filters */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1767,7 +1761,7 @@ export default function BacklogPage() {
             )}
           </div>
         </div>
-        
+
         {/* Action buttons */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
@@ -1827,132 +1821,132 @@ export default function BacklogPage() {
         </div>
         {selectMode && (
           <p className="text-xs text-muted-foreground">
-            Select stories or tasks to add to a sprint. When a story is selected, all its related tasks will be automatically included. 
+            Select stories or tasks to add to a sprint. When a story is selected, all its related tasks will be automatically included.
             <span className="block mt-1 text-amber-600 dark:text-amber-400">
               Note: Items already in a sprint cannot be selected.
             </span>
           </p>
         )}
-        
+
         {/* Backlog Items */}
         <div className="space-y-4">
-              {displayedItems.map((item) => {
+          {displayedItems.map((item) => {
 
-                const isTask = item.type === 'task'
-                const isStory = item.type === 'story'
-                const isTaskSelected = isTask && selectedTaskIds.includes(item._id)
-                const isStorySelected = isStory && selectedStoryIds.includes(item._id)
-                const isSelected = isTaskSelected || isStorySelected
-                const isInSprint = !!(item.sprint && item.sprint._id)
-                const showCheckbox = selectMode && (isTask || isStory)
-                const canSelect = !isInSprint // Can only select if not already in a sprint
+            const isTask = item.type === 'task'
+            const isStory = item.type === 'story'
+            const isTaskSelected = isTask && selectedTaskIds.includes(item._id)
+            const isStorySelected = isStory && selectedStoryIds.includes(item._id)
+            const isSelected = isTaskSelected || isStorySelected
+            const isInSprint = !!(item.sprint && item.sprint._id)
+            const showCheckbox = selectMode && (isTask || isStory)
+            const canSelect = !isInSprint // Can only select if not already in a sprint
 
-                return (
-                  <Card
-                    key={item._id}
-                    className={cn(
-                      'hover:shadow-md transition-shadow cursor-pointer',
-                      showCheckbox && isSelected && 'border-primary/60 bg-primary/5',
-                      showCheckbox && !canSelect && 'opacity-60'
+            return (
+              <Card
+                key={item._id}
+                className={cn(
+                  'hover:shadow-md transition-shadow cursor-pointer',
+                  showCheckbox && isSelected && 'border-primary/60 bg-primary/5',
+                  showCheckbox && !canSelect && 'opacity-60'
+                )}
+                onClick={(e) => {
+                  // Don't navigate if clicking on checkbox, dropdown, or buttons
+                  const target = e.target as HTMLElement
+                  if (
+                    target.closest('button') ||
+                    target.closest('[role="checkbox"]') ||
+                    target.closest('[role="menuitem"]') ||
+                    target.closest('.dropdown-menu')
+                  ) {
+                    return
+                  }
+                  // Navigate based on item type
+                  if (isTask) {
+                    router.push(`/tasks/${item._id}`)
+                  } else if (isStory) {
+                    router.push(`/stories/${item._id}`)
+                  } else if (item.type === 'epic') {
+                    router.push(`/epics/${item._id}`)
+                  }
+                }}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    {showCheckbox && (
+                      <Checkbox
+                        checked={isSelected}
+                        disabled={!canSelect}
+                        onCheckedChange={(checked) => {
+                          if (!canSelect) return // Prevent selection if already in sprint
+                          if (isTask) {
+                            setTaskSelected(item._id, Boolean(checked))
+                          } else if (isStory) {
+                            setStorySelected(item._id, Boolean(checked))
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={canSelect ? `Select ${item.title}` : `${item.title} is already in a sprint and cannot be selected`}
+                        className="mt-1"
+                        title={!canSelect ? `This ${item.type} is already in a sprint and cannot be selected` : undefined}
+                      />
                     )}
-                    onClick={(e) => {
-                      // Don't navigate if clicking on checkbox, dropdown, or buttons
-                      const target = e.target as HTMLElement
-                      if (
-                        target.closest('button') ||
-                        target.closest('[role="checkbox"]') ||
-                        target.closest('[role="menuitem"]') ||
-                        target.closest('.dropdown-menu')
-                      ) {
-                        return
-                      }
-                      // Navigate based on item type
-                      if (isTask) {
-                        router.push(`/tasks/${item._id}`)
-                      } else if (isStory) {
-                        router.push(`/stories/${item._id}`)
-                      } else if (item.type === 'epic') {
-                        router.push(`/epics/${item._id}`)
-                      }
-                    }}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-3">
-                        {showCheckbox && (
-                          <Checkbox
-                            checked={isSelected}
-                            disabled={!canSelect}
-                            onCheckedChange={(checked) => {
-                              if (!canSelect) return // Prevent selection if already in sprint
-                              if (isTask) {
-                                setTaskSelected(item._id, Boolean(checked))
-                              } else if (isStory) {
-                                setStorySelected(item._id, Boolean(checked))
-                              }
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={canSelect ? `Select ${item.title}` : `${item.title} is already in a sprint and cannot be selected`}
-                            className="mt-1"
-                            title={!canSelect ? `This ${item.type} is already in a sprint and cannot be selected` : undefined}
-                          />
-                        )}
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
-                          <div className="flex-1 min-w-0 w-full">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="font-medium text-foreground text-sm sm:text-base truncate">
-                                {item.title}
-                              </h3>
-                              <Badge className={cn(getStatusColor(item.status), "flex-shrink-0 font-semibold")}>
-                                {formatToTitleCase(item.status.replace('_', ' '))}
-                              </Badge>
-                              {/* Display displayId for tasks only */}
-                              {item.type === 'task' && item.displayId && (
-                                <Badge className="bg-gray-200 text-gray-800 dark:bg-gray-800 dark:text-gray-200 ml-1 font-mono text-xs" title={`Task ID: ${item.displayId}`}>
-                                  #{item.displayId}
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <Badge className={getTypeColor(item.type)}>
-                                {formatToTitleCase(item.type)}
-                              </Badge>
-                              <Badge className={getPriorityColor(item.priority)}>
-                                {formatToTitleCase(item.priority)}
-                              </Badge>
-                              {item?.epic && (
-                                <Badge
-                                  variant="outline"
-                                  className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900"
-                                >
-                                  {(() => {
-                                    if (typeof item.epic === 'string') {
-                                      const epicData = epicMap.get(item.epic)
-                                      return epicData ? formatToTitleCase(epicData.title) : formatToTitleCase('Epic')
-                                    }
-                                    const epicObj = item.epic as { _id: string; name?: string; title?: string }
-                                    return formatToTitleCase(epicObj.title || epicObj.name || 'Epic')
-                                  })()}
-                                </Badge>
-                              )}
-                              {item.sprint && (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Badge
-                                        variant="outline"
-                                        className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900 cursor-default"
-                                      >
-                                        {truncateText(formatToTitleCase(item.sprint.name), 18)}
-                                      </Badge>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>{formatToTitleCase(item.sprint.name)}</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              )}
-                            </div>
-                            {/* <TooltipProvider>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
+                      <div className="flex-1 min-w-0 w-full">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="font-medium text-foreground text-sm sm:text-base truncate">
+                            {item.title}
+                          </h3>
+                          <Badge className={cn(getStatusColor(item.status), "flex-shrink-0 font-semibold")}>
+                            {formatToTitleCase(item.status.replace('_', ' '))}
+                          </Badge>
+                          {/* Display displayId for tasks only */}
+                          {item.type === 'task' && item.displayId && (
+                            <Badge className="bg-gray-200 text-gray-800 dark:bg-gray-800 dark:text-gray-200 ml-1 font-mono text-xs" title={`Task ID: ${item.displayId}`}>
+                              #{item.displayId}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <Badge className={getTypeColor(item.type)}>
+                            {formatToTitleCase(item.type)}
+                          </Badge>
+                          <Badge className={getPriorityColor(item.priority)}>
+                            {formatToTitleCase(item.priority)}
+                          </Badge>
+                          {item?.epic && (
+                            <Badge
+                              variant="outline"
+                              className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900"
+                            >
+                              {(() => {
+                                if (typeof item.epic === 'string') {
+                                  const epicData = epicMap.get(item.epic)
+                                  return epicData ? formatToTitleCase(epicData.title) : formatToTitleCase('Epic')
+                                }
+                                const epicObj = item.epic as { _id: string; name?: string; title?: string }
+                                return formatToTitleCase(epicObj.title || epicObj.name || 'Epic')
+                              })()}
+                            </Badge>
+                          )}
+                          {item.sprint && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge
+                                    variant="outline"
+                                    className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900 cursor-default"
+                                  >
+                                    {truncateText(formatToTitleCase(item.sprint.name), 18)}
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{formatToTitleCase(item.sprint.name)}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
+                        {/* <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
@@ -1966,253 +1960,253 @@ export default function BacklogPage() {
                                 )}
                               </Tooltip>
                             </TooltipProvider> */}
-                            <p className="text-xs sm:text-sm text-muted-foreground mb-2">
-                              {item.assignedTo && item.assignedTo.length > 0
-                                ? item.assignedTo.map((assignment: any) => {
-                                  // Try to get user data from populated user field first, then from denormalized fields
-                                  const firstName = assignment?.user?.firstName || assignment?.firstName;
-                                  const lastName = assignment?.user?.lastName || assignment?.lastName;
+                        <p className="text-xs sm:text-sm text-muted-foreground mb-2">
+                          {item.assignedTo && item.assignedTo.length > 0
+                            ? item.assignedTo.map((assignment: any) => {
+                              // Try to get user data from populated user field first, then from denormalized fields
+                              const firstName = assignment?.user?.firstName || assignment?.firstName;
+                              const lastName = assignment?.user?.lastName || assignment?.lastName;
+                              if (firstName && lastName) {
+                                return `${firstName} ${lastName}`;
+                              }
+                              return 'Unknown User';
+                            }).join(', ')
+                            : 'Not assigned'}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                          <div className="flex items-center space-x-1">
+                            <Target className="h-3 w-3 sm:h-4 sm:w-4" />
+                            {item.project?.name ? (
+                              <span
+                                className="truncate"
+                                title={
+                                  item.project.name && item.project.name.length > 10
+                                    ? item.project.name
+                                    : undefined
+                                }
+                              >
+                                {item.project.name && item.project.name.length > 10
+                                  ? `${item.project.name.slice(0, 10)}…`
+                                  : item.project.name}
+                              </span>
+                            ) : (
+                              <span className="truncate italic text-muted-foreground">
+                                Project deleted or unavailable
+                              </span>
+                            )}
+                          </div>
+                          {item.dueDate && (
+                            <div className="flex items-center space-x-1">
+                              <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <span>Due {formatDate(item.dueDate)}</span>
+                            </div>
+                          )}
+                          {item.storyPoints && (
+                            <div className="flex items-center space-x-1">
+                              <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <span>{item.storyPoints} points</span>
+                            </div>
+                          )}
+                          {item.estimatedHours && (
+                            <div className="flex items-center space-x-1">
+                              <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <span>{item.estimatedHours}h estimated</span>
+                            </div>
+                          )}
+                          {item.labels.length > 0 && (
+                            <div className="flex items-center space-x-1">
+                              <Star className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <span className="truncate">
+                                {truncateText(item.labels.join(', '), 30)}
+                              </span>
+                            </div>
+                          )}
+                          {item.createdBy && (
+                            <div className="flex items-center space-x-1">
+                              <span className="text-muted-foreground">Created by:</span>
+                              <span className="font-medium">
+                                {(() => {
+                                  const firstName = item.createdBy?.firstName;
+                                  const lastName = item.createdBy?.lastName;
                                   if (firstName && lastName) {
                                     return `${firstName} ${lastName}`;
                                   }
                                   return 'Unknown User';
-                                }).join(', ')
-                                : 'Not assigned'}
-                            </p>
-                            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                              <div className="flex items-center space-x-1">
-                                <Target className="h-3 w-3 sm:h-4 sm:w-4" />
-                                {item.project?.name ? (
-                                  <span
-                                    className="truncate"
-                                    title={
-                                      item.project.name && item.project.name.length > 10
-                                        ? item.project.name
-                                        : undefined
-                                    }
-                                  >
-                                    {item.project.name && item.project.name.length > 10
-                                      ? `${item.project.name.slice(0, 10)}…`
-                                      : item.project.name}
-                                  </span>
-                                ) : (
-                                  <span className="truncate italic text-muted-foreground">
-                                    Project deleted or unavailable
-                                  </span>
-                                )}
-                              </div>
-                              {item.dueDate && (
-                                <div className="flex items-center space-x-1">
-                                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span>Due {formatDate(item.dueDate)}</span>
-                                </div>
-                              )}
-                              {item.storyPoints && (
-                                <div className="flex items-center space-x-1">
-                                  <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span>{item.storyPoints} points</span>
-                                </div>
-                              )}
-                              {item.estimatedHours && (
-                                <div className="flex items-center space-x-1">
-                                  <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span>{item.estimatedHours}h estimated</span>
-                                </div>
-                              )}
-                              {item.labels.length > 0 && (
-                                <div className="flex items-center space-x-1">
-                                  <Star className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span className="truncate">
-                                    {truncateText(item.labels.join(', '), 30)}
-                                  </span>
-                                </div>
-                              )}
-                              {item.createdBy && (
-                                <div className="flex items-center space-x-1">
-                                  <span className="text-muted-foreground">Created by:</span>
-                                  <span className="font-medium">
-                                    {(() => {
-                                      const firstName = item.createdBy?.firstName;
-                                      const lastName = item.createdBy?.lastName;
-                                      if (firstName && lastName) {
-                                        return `${firstName} ${lastName}`;
-                                      }
-                                      return 'Unknown User';
-                                    })()}
-                                  </span>
-                                </div>
-                              )}
-                              {item.createdAt && (
-                                <div className="flex items-center space-x-1">
-                                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span>Created {formatDate(item.createdAt)}</span>
-                                </div>
-                              )}
+                                })()}
+                              </span>
                             </div>
-                          </div>
-                          <div className="flex items-center space-x-2 flex-shrink-0">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="flex-shrink-0"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent
-                                align="end"
-                                className="min-w-[172px] py-2 rounded-md shadow-lg border border-border bg-background z-[10000]"
-                              >
-                                {/* View */}
-                                {item.type === 'task' && (
-                                  <DropdownMenuItem
-                                    onClick={() => router.push(`/tasks/${item._id}`)}
-                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
-                                  >
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    <span>View Task</span>
-                                  </DropdownMenuItem>
-                                )}
-                                {item.type === 'story' && (
-                                  <DropdownMenuItem
-                                    onClick={() => router.push(`/stories/${item._id}`)}
-                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
-                                  >
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    <span>View Story</span>
-                                  </DropdownMenuItem>
-                                )}
-                                {item.type === 'epic' && (
-                                  <DropdownMenuItem
-                                    onClick={() => router.push(`/epics/${item._id}`)}
-                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
-                                  >
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    <span>View Epic</span>
-                                  </DropdownMenuItem>
-                                )}
-
-                                {/* Edit */}
-                                {item.type === 'task' && canEditTask(item) && (
-                                  <DropdownMenuItem
-                                    onClick={() => router.push(`/tasks/${item._id}/edit`)}
-                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    <span>Edit Task</span>
-                                  </DropdownMenuItem>
-                                )}
-                                {item.type === 'story' && canEditStory(item) && (
-                                  <DropdownMenuItem
-                                    onClick={() => router.push(`/stories/${item._id}/edit`)}
-                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    <span>Edit Story</span>
-                                  </DropdownMenuItem>
-                                )}
-                                {item.type === 'epic' && canEditEpic(item) && (
-                                  <DropdownMenuItem
-                                    onClick={() => router.push(`/epics/${item._id}/edit`)}
-                                    className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    <span>Edit Epic</span>
-                                  </DropdownMenuItem>
-                                )}
-
-                                {(item.type === 'task' || item.type === 'story') && !item.sprint && (
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      if (item.type === 'task') {
-                                        handleOpenSprintModal([item._id], [], { mode: 'assign' })
-                                      } else if (item.type === 'story') {
-                                        handleOpenSprintModal([], [item._id], { mode: 'assign' })
-                                      }
-                                    }}
-                                    disabled={!canManageSprints}
-                                    className={cn(
-                                      'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
-                                      !canManageSprints && 'opacity-50 cursor-not-allowed'
-                                    )}
-                                    title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
-                                  >
-                                    <Kanban className="h-4 w-4 mr-2" />
-                                    <span>Add to Sprint</span>
-                                  </DropdownMenuItem>
-                                )}
-                                {(item.type === 'task' || item.type === 'story') && item.sprint && (
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      if (item.type === 'task') {
-                                        handleOpenSprintModal([item._id], [], {
-                                          mode: 'manage',
-                                          existingSprint: { _id: item.sprint!._id, name: item.sprint!.name }
-                                        })
-                                      } else if (item.type === 'story') {
-                                        handleOpenSprintModal([], [item._id], {
-                                          mode: 'manage',
-                                          existingSprint: { _id: item.sprint!._id, name: item.sprint!.name }
-                                        })
-                                      }
-                                    }}
-                                    disabled={!canManageSprints}
-                                    className={cn(
-                                      'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
-                                      !canManageSprints && 'opacity-50 cursor-not-allowed'
-                                    )}
-                                    title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
-                                  >
-                                    <Kanban className="h-4 w-4 mr-2" />
-                                    <span>Manage Sprint</span>
-                                  </DropdownMenuItem>
-                                )}
-
-                                {item.type === 'task' && (
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      if (!item.sprint) return
-                                      openStatusChangeModal(item)
-                                    }}
-                                    disabled={!item.sprint}
-                                    className={cn(
-                                      'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
-                                      !item.sprint && 'opacity-50 cursor-not-allowed'
-                                    )}
-                                    title={!item.sprint ? 'Assign the task to a sprint to change its status' : undefined}
-                                  >
-                                    <CheckCircle className="h-4 w-4 mr-2" />
-                                    <span>Change Status</span>
-                                  </DropdownMenuItem>
-                                )}
-
-                                {/* Delete */}
-                                {((item.type === 'task' && canDeleteTask(item)) ||
-                                  (item.type === 'story' && canDeleteStory(item)) ||
-                                  (item.type === 'epic' && canDeleteEpic(item))) && (
-                                    <DropdownMenuItem
-                                      onClick={() => handleDeleteClick(item)}
-                                      className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      <span>
-                                        Delete {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-                                      </span>
-                                    </DropdownMenuItem>
-                                  )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                          )}
+                          {item.createdAt && (
+                            <div className="flex items-center space-x-1">
+                              <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <span>Created {formatDate(item.createdAt)}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
+                      <div className="flex items-center space-x-2 flex-shrink-0">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="flex-shrink-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="min-w-[172px] py-2 rounded-md shadow-lg border border-border bg-background z-[10000]"
+                          >
+                            {/* View */}
+                            {item.type === 'task' && (
+                              <DropdownMenuItem
+                                onClick={() => router.push(`/tasks/${item._id}`)}
+                                className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                <span>View Task</span>
+                              </DropdownMenuItem>
+                            )}
+                            {item.type === 'story' && (
+                              <DropdownMenuItem
+                                onClick={() => router.push(`/stories/${item._id}`)}
+                                className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                <span>View Story</span>
+                              </DropdownMenuItem>
+                            )}
+                            {item.type === 'epic' && (
+                              <DropdownMenuItem
+                                onClick={() => router.push(`/epics/${item._id}`)}
+                                className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                <span>View Epic</span>
+                              </DropdownMenuItem>
+                            )}
+
+                            {/* Edit */}
+                            {item.type === 'task' && canEditTask(item) && (
+                              <DropdownMenuItem
+                                onClick={() => router.push(`/tasks/${item._id}/edit`)}
+                                className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                <span>Edit Task</span>
+                              </DropdownMenuItem>
+                            )}
+                            {item.type === 'story' && canEditStory(item) && (
+                              <DropdownMenuItem
+                                onClick={() => router.push(`/stories/${item._id}/edit`)}
+                                className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                <span>Edit Story</span>
+                              </DropdownMenuItem>
+                            )}
+                            {item.type === 'epic' && canEditEpic(item) && (
+                              <DropdownMenuItem
+                                onClick={() => router.push(`/epics/${item._id}/edit`)}
+                                className="flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer"
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                <span>Edit Epic</span>
+                              </DropdownMenuItem>
+                            )}
+
+                            {(item.type === 'task' || item.type === 'story') && !item.sprint && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  if (item.type === 'task') {
+                                    handleOpenSprintModal([item._id], [], { mode: 'assign' })
+                                  } else if (item.type === 'story') {
+                                    handleOpenSprintModal([], [item._id], { mode: 'assign' })
+                                  }
+                                }}
+                                disabled={!canManageSprints}
+                                className={cn(
+                                  'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
+                                  !canManageSprints && 'opacity-50 cursor-not-allowed'
+                                )}
+                                title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
+                              >
+                                <Kanban className="h-4 w-4 mr-2" />
+                                <span>Add to Sprint</span>
+                              </DropdownMenuItem>
+                            )}
+                            {(item.type === 'task' || item.type === 'story') && item.sprint && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  if (item.type === 'task') {
+                                    handleOpenSprintModal([item._id], [], {
+                                      mode: 'manage',
+                                      existingSprint: { _id: item.sprint!._id, name: item.sprint!.name }
+                                    })
+                                  } else if (item.type === 'story') {
+                                    handleOpenSprintModal([], [item._id], {
+                                      mode: 'manage',
+                                      existingSprint: { _id: item.sprint!._id, name: item.sprint!.name }
+                                    })
+                                  }
+                                }}
+                                disabled={!canManageSprints}
+                                className={cn(
+                                  'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
+                                  !canManageSprints && 'opacity-50 cursor-not-allowed'
+                                )}
+                                title={!canManageSprints ? 'You do not have permission to manage sprints' : undefined}
+                              >
+                                <Kanban className="h-4 w-4 mr-2" />
+                                <span>Manage Sprint</span>
+                              </DropdownMenuItem>
+                            )}
+
+                            {item.type === 'task' && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  if (!item.sprint) return
+                                  openStatusChangeModal(item)
+                                }}
+                                disabled={!item.sprint}
+                                className={cn(
+                                  'flex items-center space-x-2 px-4 py-2 focus:bg-accent cursor-pointer',
+                                  !item.sprint && 'opacity-50 cursor-not-allowed'
+                                )}
+                                title={!item.sprint ? 'Assign the task to a sprint to change its status' : undefined}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                <span>Change Status</span>
+                              </DropdownMenuItem>
+                            )}
+
+                            {/* Delete */}
+                            {((item.type === 'task' && canDeleteTask(item)) ||
+                              (item.type === 'story' && canDeleteStory(item)) ||
+                              (item.type === 'epic' && canDeleteEpic(item))) && (
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteClick(item)}
+                                  className="flex items-center space-x-2 px-4 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  <span>
+                                    Delete {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                                  </span>
+                                </DropdownMenuItem>
+                              )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
 
         <ConfirmationModal
           isOpen={showDeleteConfirmModal}
@@ -2443,8 +2437,8 @@ export default function BacklogPage() {
                       <li
                         key={task._id}
                         className={`flex flex-col gap-2 text-sm p-2 rounded-md ${isFromStory
-                            ? 'bg-muted/50 border border-border'
-                            : 'bg-background border border-border/50'
+                          ? 'bg-muted/50 border border-border'
+                          : 'bg-background border border-border/50'
                           }`}
                       >
                         <div className="flex items-center justify-between gap-2 flex-1 min-w-0">

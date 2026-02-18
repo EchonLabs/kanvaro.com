@@ -23,7 +23,7 @@ export function useTaskSync(options: UseTaskSyncOptions = {}) {
   const [lastUpdate, setLastUpdate] = useState<string | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
-  const isVisibleRef = useRef(!document.hidden)
+  const isVisibleRef = useRef(true) // default to true; will be synced client-side in useEffect
 
   const {
     onTaskUpdate,
@@ -60,7 +60,7 @@ export function useTaskSync(options: UseTaskSyncOptions = {}) {
 
         if (response.ok) {
           const data = await response.json()
-          
+
           if (data.success && data.updates) {
             data.updates.forEach((update: any) => {
               if (update.type === 'update' && onTaskUpdate) {
@@ -71,7 +71,7 @@ export function useTaskSync(options: UseTaskSyncOptions = {}) {
                 onTaskDelete(update.data.taskId)
               }
             })
-            
+
             if (data.lastModified) {
               setLastUpdate(data.lastModified)
             }
@@ -96,7 +96,7 @@ export function useTaskSync(options: UseTaskSyncOptions = {}) {
 
   // Optimistic update function with concurrency handling
   const updateTaskOptimistically = useCallback(async (
-    taskId: string, 
+    taskId: string,
     updates: Partial<TaskUpdate>,
     currentVersion?: string
   ) => {
@@ -133,7 +133,7 @@ export function useTaskSync(options: UseTaskSyncOptions = {}) {
       }
 
       const result = await response.json()
-      
+
       // Update the last modified timestamp
       if (result.data?.updatedAt) {
         setLastUpdate(result.data.updatedAt)
@@ -159,6 +159,9 @@ export function useTaskSync(options: UseTaskSyncOptions = {}) {
 
   // Handle visibility changes to pause/resume polling
   useEffect(() => {
+    // Sync the initial visibility state on the client
+    isVisibleRef.current = !document.hidden
+
     const handleVisibilityChange = () => {
       isVisibleRef.current = !document.hidden
       if (document.hidden) {
@@ -197,8 +200,8 @@ export function useTaskState(initialTasks: any[] = []) {
   const [error, setError] = useState<string | null>(null)
 
   const handleTaskUpdate = useCallback((update: TaskUpdate) => {
-    setTasks(prev => prev.map(task => 
-      task._id === update.taskId 
+    setTasks(prev => prev.map(task =>
+      task._id === update.taskId
         ? { ...task, ...update }
         : task
     ))
@@ -215,7 +218,7 @@ export function useTaskState(initialTasks: any[] = []) {
   const updateTask = useCallback(async (taskId: string, updates: Partial<TaskUpdate>) => {
     setIsLoading(true)
     setError(null)
-    
+
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
@@ -230,7 +233,7 @@ export function useTaskState(initialTasks: any[] = []) {
       }
 
       const result = await response.json()
-      
+
       if (result.success) {
         handleTaskUpdate({
           taskId,
@@ -252,7 +255,7 @@ export function useTaskState(initialTasks: any[] = []) {
   const deleteTask = useCallback(async (taskId: string) => {
     setIsLoading(true)
     setError(null)
-    
+
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'DELETE'
