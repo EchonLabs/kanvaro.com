@@ -53,10 +53,27 @@ export function RichTextEditor({
 
   const execCommand = useCallback((command: string, value: string = '') => {
     if (disabled) return
+
+    // Save the current selection
+    const selection = window.getSelection()
+    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
+
     editorRef.current?.focus()
     document.execCommand(command, false, value)
+
+    // Restore selection if it existed
+    if (range && selection) {
+      try {
+        selection.removeAllRanges()
+        selection.addRange(range)
+      } catch (e) {
+        // Selection restoration failed, ignore
+      }
+    }
+
     updateActiveStates()
-  }, [disabled])
+    handleInput()
+  }, [disabled])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateActiveStates = useCallback(() => {
     if (!editorRef.current) return
@@ -118,35 +135,75 @@ export function RichTextEditor({
     const range = selection.getRangeAt(0)
     editorRef.current.focus()
 
-  // Clone selected content as HTML
-  const container = document.createElement('div')
-  container.appendChild(range.cloneContents())
+    // Check if we're inside a list (UL or OL)
+    let listElement: HTMLElement | null = null
+    let currentNode: Node | null = range.commonAncestorContainer
 
-  // Extract lines properly (div, p, br)
-  let lines: string[] = []
-
-  container.childNodes.forEach((node) => {
-    if (node.nodeName === 'DIV' || node.nodeName === 'P') {
-      lines.push((node as HTMLElement).innerText.trim())
-    } else if (node.nodeName === 'BR') {
-      // ignore empty lines
-    } else {
-      const text = node.textContent?.trim()
-      if (text) lines.push(text)
+    // Traverse up to find if we're in a list
+    while (currentNode && currentNode !== editorRef.current) {
+      if (currentNode.nodeName === 'UL' || currentNode.nodeName === 'OL') {
+        listElement = currentNode as HTMLElement
+        break
+      }
+      currentNode = currentNode.parentNode
     }
-  })
 
-  if (lines.length > 0) {
-    const listItems = lines
-      .filter(l => l)
-      .map(line => `<li>${line}</li>`)
-      .join('')
+    // If we found a list, convert it
+    if (listElement) {
+      const listItems = Array.from(listElement.querySelectorAll('li'))
+      const newList = document.createElement('ul')
+      newList.style.listStyleType = listType
+      newList.style.paddingLeft = '1.5rem'
 
-    const listHTML = `<ul style="list-style-type: ${listType}; padding-left: 1.5rem;">${listItems}</ul>`
-    document.execCommand('insertHTML', false, listHTML)
-  } else {
-    const listHTML = `<ul style="list-style-type: ${listType}; padding-left: 1.5rem;"><li><br></li></ul>`
-    document.execCommand('insertHTML', false, listHTML)
+      listItems.forEach(li => {
+        const newLi = document.createElement('li')
+        newLi.innerHTML = li.innerHTML
+        newList.appendChild(newLi)
+      })
+
+      listElement.parentNode?.replaceChild(newList, listElement)
+      handleInput()
+      return
+    }
+
+    // Clone selected content as HTML
+    const container = document.createElement('div')
+    container.appendChild(range.cloneContents())
+
+    // Extract lines properly (div, p, br, li)
+    let lines: string[] = []
+
+    const extractText = (node: Node) => {
+      if (node.nodeName === 'LI') {
+        const text = (node as HTMLElement).innerText.trim()
+        if (text) lines.push(text)
+      } else if (node.nodeName === 'DIV' || node.nodeName === 'P') {
+        const text = (node as HTMLElement).innerText.trim()
+        if (text) lines.push(text)
+      } else if (node.nodeName === 'BR') {
+        // ignore empty lines
+      } else if (node.nodeName === 'UL' || node.nodeName === 'OL') {
+        // Extract list items
+        node.childNodes.forEach(child => extractText(child))
+      } else {
+        const text = node.textContent?.trim()
+        if (text) lines.push(text)
+      }
+    }
+
+    container.childNodes.forEach(node => extractText(node))
+
+    if (lines.length > 0) {
+      const listItems = lines
+        .filter(l => l)
+        .map(line => `<li>${line}</li>`)
+        .join('')
+
+      const listHTML = `<ul style="list-style-type: ${listType}; padding-left: 1.5rem;">${listItems}</ul>`
+      document.execCommand('insertHTML', false, listHTML)
+    } else {
+      const listHTML = `<ul style="list-style-type: ${listType}; padding-left: 1.5rem;"><li><br></li></ul>`
+      document.execCommand('insertHTML', false, listHTML)
     }
 
     handleInput()
@@ -161,33 +218,75 @@ export function RichTextEditor({
     const range = selection.getRangeAt(0)
     editorRef.current.focus()
 
-  const container = document.createElement('div')
-  container.appendChild(range.cloneContents())
+    // Check if we're inside a list (UL or OL)
+    let listElement: HTMLElement | null = null
+    let currentNode: Node | null = range.commonAncestorContainer
 
-  let lines: string[] = []
-
-  container.childNodes.forEach((node) => {
-    if (node.nodeName === 'DIV' || node.nodeName === 'P') {
-      lines.push((node as HTMLElement).innerText.trim())
-    } else if (node.nodeName === 'BR') {
-      // ignore
-    } else {
-      const text = node.textContent?.trim()
-      if (text) lines.push(text)
+    // Traverse up to find if we're in a list
+    while (currentNode && currentNode !== editorRef.current) {
+      if (currentNode.nodeName === 'UL' || currentNode.nodeName === 'OL') {
+        listElement = currentNode as HTMLElement
+        break
+      }
+      currentNode = currentNode.parentNode
     }
-  })
 
-  if (lines.length > 0) {
-    const listItems = lines
-      .filter(l => l)
-      .map(line => `<li>${line}</li>`)
-      .join('')
+    // If we found a list, convert it
+    if (listElement) {
+      const listItems = Array.from(listElement.querySelectorAll('li'))
+      const newList = document.createElement('ol')
+      newList.style.listStyleType = listType
+      newList.style.paddingLeft = '1.5rem'
+
+      listItems.forEach(li => {
+        const newLi = document.createElement('li')
+        newLi.innerHTML = li.innerHTML
+        newList.appendChild(newLi)
+      })
+
+      listElement.parentNode?.replaceChild(newList, listElement)
+      handleInput()
+      return
+    }
+
+    // Clone selected content as HTML
+    const container = document.createElement('div')
+    container.appendChild(range.cloneContents())
+
+    // Extract lines properly (div, p, br, li)
+    let lines: string[] = []
+
+    const extractText = (node: Node) => {
+      if (node.nodeName === 'LI') {
+        const text = (node as HTMLElement).innerText.trim()
+        if (text) lines.push(text)
+      } else if (node.nodeName === 'DIV' || node.nodeName === 'P') {
+        const text = (node as HTMLElement).innerText.trim()
+        if (text) lines.push(text)
+      } else if (node.nodeName === 'BR') {
+        // ignore
+      } else if (node.nodeName === 'UL' || node.nodeName === 'OL') {
+        // Extract list items
+        node.childNodes.forEach(child => extractText(child))
+      } else {
+        const text = node.textContent?.trim()
+        if (text) lines.push(text)
+      }
+    }
+
+    container.childNodes.forEach(node => extractText(node))
+
+    if (lines.length > 0) {
+      const listItems = lines
+        .filter(l => l)
+        .map(line => `<li>${line}</li>`)
+        .join('')
 
       const listHTML = `<ol style="list-style-type: ${listType}; padding-left: 1.5rem;">${listItems}</ol>`
       document.execCommand('insertHTML', false, listHTML)
-  } else {
-    const listHTML = `<ol style="list-style-type: ${listType}; padding-left: 1.5rem;"><li><br></li></ol>`
-    document.execCommand('insertHTML', false, listHTML)
+    } else {
+      const listHTML = `<ol style="list-style-type: ${listType}; padding-left: 1.5rem;"><li><br></li></ol>`
+      document.execCommand('insertHTML', false, listHTML)
     }
 
     handleInput()
@@ -500,7 +599,7 @@ export function RichTextEditor({
           <span className={cn(
             'text-xs font-medium',
             getCharCount(value) > maxLength * 0.9 ? 'text-destructive' :
-            getCharCount(value) > maxLength * 0.8 ? 'text-yellow-600' : 'text-muted-foreground'
+              getCharCount(value) > maxLength * 0.8 ? 'text-yellow-600' : 'text-muted-foreground'
           )}>
             {maxLength - getCharCount(value)} remaining
           </span>

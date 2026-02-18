@@ -142,7 +142,7 @@ export function TimeLogs({
   const filteredTasks = useMemo(() => {
     if (!taskSearch.trim()) return filterTasks
     const searchLower = taskSearch.toLowerCase()
-    return filterTasks.filter(task => 
+    return filterTasks.filter(task =>
       task.title?.toLowerCase().includes(searchLower)
     )
   }, [filterTasks, taskSearch])
@@ -168,7 +168,7 @@ export function TimeLogs({
   const filteredStatusOptions = useMemo(() => {
     if (!statusSearch.trim()) return statusOptions
     const searchLower = statusSearch.toLowerCase()
-    return statusOptions.filter(option => 
+    return statusOptions.filter(option =>
       option.label.toLowerCase().includes(searchLower)
     )
   }, [statusSearch])
@@ -275,7 +275,7 @@ export function TimeLogs({
   const canViewAllTime = hasPermission(Permission.TIME_TRACKING_VIEW_ALL)
   const canUpdateTime = hasPermission(Permission.TIME_TRACKING_UPDATE)
   const canDeleteTime = hasPermission(Permission.TIME_TRACKING_DELETE)
-  const canApproveTimeLogs = hasPermission(Permission.TIME_TRACKING_APPROVE)
+  const canApproveTimeLogs = hasPermission(Permission.TIME_TRACKING_APPROVE) 
 
   // Check if user can view employee filter using permission
   const canViewEmployeeFilter = useMemo(() => {
@@ -285,14 +285,13 @@ export function TimeLogs({
   // Function to check if a time entry can be edited/deleted based on time tracking settings
   const canEditTimeEntry = useCallback((entry: TimeEntry): boolean => {
     if (!timeTrackingSettings?.disableTimeLogEditing) {
-      console.log('Time log editing not disabled, allowing edit for entry:', entry._id)
       return true
     }
 
     const entryDate = new Date(entry.startTime)
     const now = new Date()
 
-   
+
 
     if (timeTrackingSettings.timeLogEditMode === 'days') {
       const diffTime = now.getTime() - entryDate.getTime()
@@ -302,8 +301,8 @@ export function TimeLogs({
       return canEdit
     } else if (timeTrackingSettings.timeLogEditMode === 'dayOfMonth') {
       // Allow editing if entry is from a previous month/year
-      if (entryDate.getFullYear() < now.getFullYear() || 
-          (entryDate.getFullYear() === now.getFullYear() && entryDate.getMonth() < now.getMonth())) {
+      if (entryDate.getFullYear() < now.getFullYear() ||
+        (entryDate.getFullYear() === now.getFullYear() && entryDate.getMonth() < now.getMonth())) {
         console.log('Entry from previous month, allowing edit')
         return true
       }
@@ -460,7 +459,7 @@ export function TimeLogs({
                 const disable_from_created_date = null
               }else{
                 const disable_from_created_date = data.settings.timeLogEditDays
-               const disble_from_month = null
+                const disble_from_month = null
               }
             }
             setTimeTrackingSettings(data.settings)
@@ -502,7 +501,7 @@ export function TimeLogs({
   const canAddManualTimeLog = useMemo(() => {
     // Application level (organization settings) - default to true (database default)
     const orgLevelEnabled = organizationSettings?.allowManualTimeSubmission ?? true
-    
+
     // Project level - check project.settings.allowManualTimeSubmission if projectId is provided
     let projectLevelEnabled = true // Default to true if no project
     if (projectId) {
@@ -512,7 +511,7 @@ export function TimeLogs({
       // No project context, use timeTrackingSettings (organization-level)
       projectLevelEnabled = timeTrackingSettings?.allowManualTimeSubmission ?? true
     }
-    
+
     return orgLevelEnabled && projectLevelEnabled
   }, [organizationSettings, timeTrackingSettings, projectSettings, projectId])
 
@@ -935,7 +934,7 @@ export function TimeLogs({
         roundUp: roundingRules.roundUp ?? true
       })
     }
-    
+
     const hours = Math.floor(displayMinutes / 60)
     const mins = Math.floor(displayMinutes % 60)
     const secs = Math.floor((displayMinutes % 1) * 60)
@@ -1070,10 +1069,10 @@ export function TimeLogs({
       // Use filter projectId/taskId if provided, otherwise use props
       const effectiveProjectId = filters.projectId || (projectId && projectId !== 'undefined' && projectId !== 'null' ? projectId : null)
       const effectiveTaskId = filters.taskId || taskId || null
-      
+
       if (effectiveProjectId) params.append('projectId', effectiveProjectId)
       if (effectiveTaskId) params.append('taskId', effectiveTaskId)
-      
+
       // Employee scoping:
       // - If user has employee filter permission and an employee is selected, request that user's logs
       // - If user has permission but no employee selected, omit userId so the server scopes to assigned users
@@ -1173,7 +1172,7 @@ export function TimeLogs({
   const handleFilterChange = (key: string, value: string) => {
     setFilters(prev => {
       const newFilters = { ...prev, [key]: value }
-      
+
       // If project filter changes, clear task filter if task doesn't belong to new project
       if (key === 'projectId') {
         if (value && prev.taskId) {
@@ -1187,7 +1186,7 @@ export function TimeLogs({
           newFilters.taskId = ''
         }
       }
-      
+
       return newFilters
     })
     setPagination(prev => ({ ...prev, page: 1 }))
@@ -1285,8 +1284,8 @@ export function TimeLogs({
   )
 
   const toggleEntrySelection = (entryId: string) => {
-    setSelectedEntries(prev => 
-      prev.includes(entryId) 
+    setSelectedEntries(prev =>
+      prev.includes(entryId)
         ? prev.filter(id => id !== entryId)
         : [...prev, entryId]
     )
@@ -1363,7 +1362,7 @@ export function TimeLogs({
     } else {
       setTasks([])
     }
-    
+
     // Format dates and times for the form using the user's local timezone
     const start = new Date(entry.startTime)
     const end = entry.endTime ? new Date(entry.endTime) : new Date()
@@ -1389,7 +1388,7 @@ export function TimeLogs({
       endTime: endTimeLocal,
       description: entry.description || ''
     })
-    
+
     // Load tasks if project is set
     if (entry.project?._id) {
       loadTasksForProject(entry.project._id, entry.task || null)
@@ -1418,13 +1417,20 @@ export function TimeLogs({
 
   const handleConfirmDelete = async () => {
     if (!entryToDelete) return
-    
+
     try {
-      // TODO: Implement delete API call
-      // await deleteTimeEntry(entryToDelete._id)
-      // Refresh entries after deletion
-      loadTimeEntries()
-      toast.success('Time entry deleted successfully')
+      const response = await fetch(`/api/time-tracking/entries/${entryToDelete._id}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        loadTimeEntries()
+        onTimeEntryUpdate?.()
+        toast.success('Time entry deleted successfully')
+      } else {
+        const data = await response.json().catch(() => ({}))
+        toast.error((data as any).error || 'Failed to delete time entry')
+      }
     } catch (error) {
       console.error('Error deleting time entry:', error)
       toast.error('Failed to delete time entry')
@@ -1449,16 +1455,16 @@ export function TimeLogs({
       ['20.8', '01/15/2024', '9:00 AM', '01/15/2024', '5:00 PM','Worked on feature'], // US format with AM/PM
       ['20.9', '15/01/2024', '14:00', '15/01/2024', '18:30','Worked on feature'], // European format 24h
       ['20.10', '15-01-2024', '9 AM', '15-01-2024', '5 PM','Worked on feature'] // Dash format with AM/PM
-      
+
     ]
-    
-    
-    
+
+
+
     const csvContent = [
       headers.map(escapeCSV).join(','),
       ...exampleRows.map(row => row.map(escapeCSV).join(','))
     ].join('\n')
-    
+
     // Add BOM for Excel compatibility
     const bom = '\uFEFF'
     const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -1484,11 +1490,11 @@ export function TimeLogs({
       const result: string[] = []
       let current = ''
       let inQuotes = false
-      
+
       for (let i = 0; i < line.length; i++) {
         const char = line[i]
         const nextChar = line[i + 1]
-        
+
         if (char === '"') {
           if (inQuotes && nextChar === '"') {
             // Escaped quote
@@ -1506,15 +1512,15 @@ export function TimeLogs({
           current += char
         }
       }
-      
+
       // Add last field
       result.push(current.trim())
       return result
     }
 
     const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim())
-    const requiredHeaders = ['Task No', 'Start Date', 'Start Time', 'End Date', 'End Time','Memo']
-   
+    const requiredHeaders = ['Task No', 'Start Date', 'Start Time', 'End Date', 'End Time', 'Memo']
+
     // Validate CSV format - check if all required headers are present
     const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
     if (missingHeaders.length > 0) {
@@ -1529,7 +1535,7 @@ export function TimeLogs({
     const rows: Array<Record<string, string>> = []
     for (let i = 1; i < lines.length; i++) {
       const values = parseCSVLine(lines[i]).map(v => v.replace(/^"|"$/g, '').trim())
-      
+
       // Skip completely empty rows
       if (values.every(v => !v || v === '')) {
         continue
@@ -1580,7 +1586,7 @@ export function TimeLogs({
           errors.push(`Task "${taskNo}" not found`)
         } else if (!canBulkUploadAll) {
           // If user doesn't have bulk upload all permission, check if task is assigned to them
-         
+
           const isAssigned = taskData.assignedTo.some((assigned: any) => {
             // Handle different assignedTo formats
             let userId: string
@@ -1610,7 +1616,7 @@ export function TimeLogs({
       // Validate Start Date format (flexible parsing)
       const parseFlexibleDate = (dateStr: string): boolean => {
         if (!dateStr) return false
-        
+
         // Try YYYY-MM-DD format first
         const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
         if (isoMatch) {
@@ -1618,7 +1624,7 @@ export function TimeLogs({
           const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
           return !isNaN(date.getTime())
         }
-        
+
         // Try MM/DD/YYYY format
         const usMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
         if (usMatch) {
@@ -1626,7 +1632,7 @@ export function TimeLogs({
           const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
           return !isNaN(date.getTime())
         }
-        
+
         // Try DD/MM/YYYY format
         const euMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
         if (euMatch) {
@@ -1634,7 +1640,7 @@ export function TimeLogs({
           const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
           return !isNaN(date.getTime())
         }
-        
+
         // Try DD-MM-YYYY format
         const dashMatch = dateStr.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
         if (dashMatch) {
@@ -1642,10 +1648,10 @@ export function TimeLogs({
           const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
           return !isNaN(date.getTime())
         }
-        
+
         return false
       }
-      
+
       if (!parseFlexibleDate(startDate)) {
         errors.push('Start Date format must be YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY, or DD-MM-YYYY (e.g., 2024-01-15, 01/15/2024, 15/01/2024, 15-01-2024)')
       }
@@ -1774,7 +1780,7 @@ export function TimeLogs({
       // Validate End Date format (flexible parsing)
       const parseFlexibleDate = (dateStr: string): boolean => {
         if (!dateStr) return false
-        
+
         // Try YYYY-MM-DD format first
         const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
         if (isoMatch) {
@@ -1782,7 +1788,7 @@ export function TimeLogs({
           const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
           return !isNaN(date.getTime())
         }
-        
+
         // Try MM/DD/YYYY format
         const usMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
         if (usMatch) {
@@ -1790,7 +1796,7 @@ export function TimeLogs({
           const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
           return !isNaN(date.getTime())
         }
-        
+
         // Try DD/MM/YYYY format
         const euMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
         if (euMatch) {
@@ -1798,7 +1804,7 @@ export function TimeLogs({
           const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
           return !isNaN(date.getTime())
         }
-        
+
         // Try DD-MM-YYYY format
         const dashMatch = dateStr.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
         if (dashMatch) {
@@ -1806,22 +1812,22 @@ export function TimeLogs({
           const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
           return !isNaN(date.getTime())
         }
-        
+
         return false
       }
-      
+
       if (!parseFlexibleDate(endDate)) {
         errors.push('End Date format must be YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY, or DD-MM-YYYY (e.g., 2024-01-15, 01/15/2024, 15/01/2024, 15-01-2024)')
       }
     }
 
     // Validate date values if formats are correct
-    if (startDate && startTime && endDate && endTime && 
-        /^\d{4}-\d{2}-\d{2}$/.test(startDate) && 
-        /^\d{2}:\d{2}$/.test(startTime) &&
-        /^\d{4}-\d{2}-\d{2}$/.test(endDate) && 
-        /^\d{2}:\d{2}$/.test(endTime)) {
-      
+    if (startDate && startTime && endDate && endTime &&
+      /^\d{4}-\d{2}-\d{2}$/.test(startDate) &&
+      /^\d{2}:\d{2}$/.test(startTime) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(endDate) &&
+      /^\d{2}:\d{2}$/.test(endTime)) {
+
       const startDateTime = `${startDate}T${startTime}`
       const endDateTime = `${endDate}T${endTime}`
       const start = new Date(startDateTime)
@@ -1940,7 +1946,7 @@ export function TimeLogs({
         if (results.successful > 0) {
           // Show success toast
           toast.success(`Successfully uploaded ${results.successful} time ${results.successful === 1 ? 'entry' : 'entries'}.`)
-          
+
           // Refresh the time entries table
           setTimeout(async () => {
             if (!resolvedUserId || !resolvedOrgId) return
@@ -2037,16 +2043,16 @@ export function TimeLogs({
 
   return (
     <>
-    <Card className="w-full overflow-x-hidden">
-      <CardHeader className="pb-3 sm:pb-4 px-3 sm:px-4 lg:px-6 pt-4 sm:pt-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg min-w-0">
-            {/* <Clock className="h-5 w-5" />
+      <Card className="w-full overflow-x-hidden">
+        <CardHeader className="pb-3 sm:pb-4 px-3 sm:px-4 lg:px-6 pt-4 sm:pt-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg min-w-0">
+              {/* <Clock className="h-5 w-5" />
             Time Logs */}
-          </CardTitle>
-          {showManualLogButtons && pathname === '/time-tracking/timer' && canAddManualTimeLog && (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              {/* <Button
+            </CardTitle>
+            {showManualLogButtons && pathname === '/time-tracking/timer' && canAddManualTimeLog && (
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                {/* <Button
                 onClick={() => setShowBulkUploadModal(true)}
                 size="sm"
                 variant="outline"
@@ -2055,90 +2061,90 @@ export function TimeLogs({
                 <Upload className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                 <span className="whitespace-nowrap">Bulk Upload</span>
               </Button> */}
-              <Button
-                onClick={() => {
-                  // Clear form data when opening add modal
-                  setManualLogData({
-                    startDate: '',
-                    startTime: '',
-                    endDate: '',
-                    endTime: '',
-                    description: ''
-                  })
-                  setSelectedProjectForLog('')
-                  setSelectedTaskForLog('')
-                  setTasks([])
-                  setModalProjectSearch('')
-                  setError('')
-                  clearFieldErrors()
-                  setShowAddTimeLogModal(true)
-                }}
-                size="sm"
-                className="h-8 sm:h-8 px-3 text-xs justify-start w-full sm:w-auto"
-              >
-                <Plus className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
-                <span className="whitespace-nowrap">Add Time Log</span>
-              </Button>
+                <Button
+                  onClick={() => {
+                    // Clear form data when opening add modal
+                    setManualLogData({
+                      startDate: '',
+                      startTime: '',
+                      endDate: '',
+                      endTime: '',
+                      description: ''
+                    })
+                    setSelectedProjectForLog('')
+                    setSelectedTaskForLog('')
+                    setTasks([])
+                    setModalProjectSearch('')
+                    setError('')
+                    clearFieldErrors()
+                    setShowAddTimeLogModal(true)
+                  }}
+                  size="sm"
+                  className="h-8 sm:h-8 px-3 text-xs justify-start w-full sm:w-auto"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                  <span className="whitespace-nowrap">Add Time Log</span>
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 p-3 sm:p-4 lg:p-6 pt-2 sm:pt-4 overflow-x-hidden">
+          {authResolving && (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="text-muted-foreground mt-2 text-sm">Loading your time entries...</p>
             </div>
           )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4 p-3 sm:p-4 lg:p-6 pt-2 sm:pt-4 overflow-x-hidden">
-        {authResolving && (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="text-muted-foreground mt-2 text-sm">Loading your time entries...</p>
-          </div>
-        )}
 
-        {/* Filters */}
-        <div className="space-y-3 sm:space-y-4 w-full overflow-x-hidden">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <Label className="text-sm font-medium whitespace-nowrap">Filters</Label>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 w-full">
-            <div className="space-y-1.5 sm:space-y-2 min-w-0">
-              <Label htmlFor="filter-project" className="text-xs sm:text-sm font-medium">Project</Label>
-              <Select 
-                value={filters.projectId || 'all'} 
-                onValueChange={(value) => {
-                  handleFilterChange('projectId', value === 'all' ? '' : value)
-                  if (value === 'all') {
-                    handleFilterChange('taskId', '')
-                  }
-                }}
-              >
-                <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-project">
-                  <SelectValue placeholder="All projects" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[200px]">
-                  <div className="p-2 border-b">
-                    <div className="relative">
-                      <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        placeholder="Search projects..."
-                        value={projectSearch}
-                        onChange={(e) => setProjectSearch(e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        className="h-8 pl-7 pr-7 text-xs"
-                      />
-                      {projectSearch && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setProjectSearch('')
-                          }}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
-                          aria-label="Clear search"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
+          {/* Filters */}
+          <div className="space-y-3 sm:space-y-4 w-full overflow-x-hidden">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <Label className="text-sm font-medium whitespace-nowrap">Filters</Label>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 w-full">
+              <div className="space-y-1.5 sm:space-y-2 min-w-0">
+                <Label htmlFor="filter-project" className="text-xs sm:text-sm font-medium">Project</Label>
+                <Select
+                  value={filters.projectId || 'all'}
+                  onValueChange={(value) => {
+                    handleFilterChange('projectId', value === 'all' ? '' : value)
+                    if (value === 'all') {
+                      handleFilterChange('taskId', '')
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-project">
+                    <SelectValue placeholder="All projects" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px]">
+                    <div className="p-2 border-b">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search projects..."
+                          value={projectSearch}
+                          onChange={(e) => setProjectSearch(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="h-8 pl-7 pr-7 text-xs"
+                        />
+                        {projectSearch && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setProjectSearch('')
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                            aria-label="Clear search"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
                     <SelectItem value="all" onMouseDown={(e) => e.preventDefault()}>
                       All projects
                     </SelectItem>
@@ -2163,52 +2169,52 @@ export function TimeLogs({
                         </SelectItem>
                       ))
                     )}
-                </SelectContent>
-              </Select>
-            </div>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-1.5 sm:space-y-2 min-w-0">
-              <Label htmlFor="filter-task" className="text-xs sm:text-sm font-medium">Task</Label>
-              <Select 
-                value={filters.taskId || 'all'} 
-                onValueChange={(value) => handleFilterChange('taskId', value === 'all' ? '' : value)}
-                disabled={filterTasksLoading}
-              >
-                <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-task">
-                  <SelectValue placeholder={
-                    filterTasksLoading
-                        ? 'Loading...' 
+              <div className="space-y-1.5 sm:space-y-2 min-w-0">
+                <Label htmlFor="filter-task" className="text-xs sm:text-sm font-medium">Task</Label>
+                <Select
+                  value={filters.taskId || 'all'}
+                  onValueChange={(value) => handleFilterChange('taskId', value === 'all' ? '' : value)}
+                  disabled={filterTasksLoading}
+                >
+                  <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-task">
+                    <SelectValue placeholder={
+                      filterTasksLoading
+                        ? 'Loading...'
                         : 'All tasks'
-                  } />
-                </SelectTrigger>
-                <SelectContent className="max-h-[200px]">
-                  <div className="p-2 border-b">
-                    <div className="relative">
-                      <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        placeholder="Search tasks..."
-                        value={taskSearch}
-                        onChange={(e) => setTaskSearch(e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        className="h-8 pl-7 pr-7 text-xs"
-                        disabled={!filters.projectId}
-                      />
-                      {taskSearch && !(!filters.projectId) && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setTaskSearch('')
-                          }}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
-                          aria-label="Clear search"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
+                    } />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px]">
+                    <div className="p-2 border-b">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search tasks..."
+                          value={taskSearch}
+                          onChange={(e) => setTaskSearch(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="h-8 pl-7 pr-7 text-xs"
+                          disabled={!filters.projectId}
+                        />
+                        {taskSearch && !(!filters.projectId) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setTaskSearch('')
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                            aria-label="Clear search"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
                     <SelectItem value="all">All tasks</SelectItem>
                     {filterTasksLoading ? (
                       <SelectItem value="loading" disabled>
@@ -2231,50 +2237,50 @@ export function TimeLogs({
                         </SelectItem>
                       ))
                     )}
-                </SelectContent>
-              </Select>
-            </div>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {canViewEmployeeFilter && (
-              <div className="space-y-1.5 sm:space-y-2 min-w-0">
-                <Label htmlFor="filter-employee" className="text-xs sm:text-sm font-medium">Employee</Label>
-                <Select 
-                  value={filters.employeeId || 'all'} 
-                  onValueChange={(value) => handleFilterChange('employeeId', value === 'all' ? '' : value)}
-                  disabled={filterEmployeesLoading}
-                >
-                  <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-employee">
-                    <SelectValue placeholder={
-                      filterEmployeesLoading ? 'Loading...' : 'All employees'
-                    } />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
-                    <div className="p-2 border-b">
-                      <div className="relative">
-                        <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          placeholder="Search employees..."
-                          value={employeeSearch}
-                          onChange={(e) => setEmployeeSearch(e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => e.stopPropagation()}
-                          className="h-8 pl-7 pr-7 text-xs"
-                        />
-                        {employeeSearch && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setEmployeeSearch('')
-                            }}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
-                            aria-label="Clear search"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        )}
+              {canViewEmployeeFilter && (
+                <div className="space-y-1.5 sm:space-y-2 min-w-0">
+                  <Label htmlFor="filter-employee" className="text-xs sm:text-sm font-medium">Employee</Label>
+                  <Select
+                    value={filters.employeeId || 'all'}
+                    onValueChange={(value) => handleFilterChange('employeeId', value === 'all' ? '' : value)}
+                    disabled={filterEmployeesLoading}
+                  >
+                    <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-employee">
+                      <SelectValue placeholder={
+                        filterEmployeesLoading ? 'Loading...' : 'All employees'
+                      } />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[200px]">
+                      <div className="p-2 border-b">
+                        <div className="relative">
+                          <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            placeholder="Search employees..."
+                            value={employeeSearch}
+                            onChange={(e) => setEmployeeSearch(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            className="h-8 pl-7 pr-7 text-xs"
+                          />
+                          {employeeSearch && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setEmployeeSearch('')
+                              }}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                              aria-label="Clear search"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
                       <SelectItem value="all">All employees</SelectItem>
                       {filterEmployeesLoading ? (
                         <SelectItem value="loading" disabled>
@@ -2299,112 +2305,112 @@ export function TimeLogs({
                           </SelectItem>
                         ))
                       )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-1.5 sm:space-y-2 min-w-0">
+                <Label htmlFor="startDate" className="text-xs sm:text-sm font-medium">Start Date</Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={filters.startDate}
+                  onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                  className="w-full h-9 sm:h-10 text-xs sm:text-sm"
+                />
+              </div>
+              <div className="space-y-1.5 sm:space-y-2 min-w-0">
+                <Label htmlFor="endDate" className="text-xs sm:text-sm font-medium">End Date</Label>
+                <Input
+                  id="endDate"
+                  type="date"
+                  value={filters.endDate}
+                  onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                  className="w-full h-9 sm:h-10 text-xs sm:text-sm"
+                />
+              </div>
+              <div className="space-y-1.5 sm:space-y-2 min-w-0">
+                <Label htmlFor="status" className="text-xs sm:text-sm font-medium">Status</Label>
+                <Select value={filters.status || 'all'} onValueChange={handleStatusFilterChange}>
+                  <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px]">
+                    <div className="p-2 border-b">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search status..."
+                          value={statusSearch}
+                          onChange={(e) => setStatusSearch(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="h-8 pl-7 pr-7 text-xs"
+                        />
+                        {statusSearch && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setStatusSearch('')
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                            aria-label="Clear search"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="max-h-[200px] overflow-y-auto">
+                      {filteredStatusOptions.length === 0 ? (
+                        <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                          No status found
+                        </div>
+                      ) : (
+                        filteredStatusOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value} onMouseDown={(e) => e.preventDefault()}>
+                            {option.label}
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
                   </SelectContent>
                 </Select>
               </div>
-            )}
-
-            <div className="space-y-1.5 sm:space-y-2 min-w-0">
-              <Label htmlFor="startDate" className="text-xs sm:text-sm font-medium">Start Date</Label>
-              <Input
-                id="startDate"
-                type="date"
-                value={filters.startDate}
-                onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                className="w-full h-9 sm:h-10 text-xs sm:text-sm"
-              />
-            </div>
-            <div className="space-y-1.5 sm:space-y-2 min-w-0">
-              <Label htmlFor="endDate" className="text-xs sm:text-sm font-medium">End Date</Label>
-              <Input
-                id="endDate"
-                type="date"
-                value={filters.endDate}
-                onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                className="w-full h-9 sm:h-10 text-xs sm:text-sm"
-              />
-            </div>
-            <div className="space-y-1.5 sm:space-y-2 min-w-0">
-              <Label htmlFor="status" className="text-xs sm:text-sm font-medium">Status</Label>
-              <Select value={filters.status || 'all'} onValueChange={handleStatusFilterChange}>
-                <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[200px]">
-                  <div className="p-2 border-b">
-                    <div className="relative">
-                      <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        placeholder="Search status..."
-                        value={statusSearch}
-                        onChange={(e) => setStatusSearch(e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        className="h-8 pl-7 pr-7 text-xs"
-                      />
-                      {statusSearch && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setStatusSearch('')
-                          }}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
-                          aria-label="Clear search"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="max-h-[200px] overflow-y-auto">
-                    {filteredStatusOptions.length === 0 ? (
-                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-                        No status found
-                      </div>
-                    ) : (
-                      filteredStatusOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value} onMouseDown={(e) => e.preventDefault()}>
-                          {option.label}
-                        </SelectItem>
-                      ))
-                    )}
-                  </div>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5 sm:space-y-2 min-w-0">
-              <Label htmlFor="isBillable" className="text-xs sm:text-sm font-medium">Billable</Label>
-              <Select value={filters.isBillable} onValueChange={(value) => handleFilterChange('isBillable', value)}>
-                <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
-                  <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[200px]">
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="true">Billable</SelectItem>
-                  <SelectItem value="false">Non-billable</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {showSelectionAndApproval && (
               <div className="space-y-1.5 sm:space-y-2 min-w-0">
-                <Label htmlFor="isApproved" className="text-xs sm:text-sm font-medium">Approved</Label>
-                <Select value={filters.isApproved} onValueChange={(value) => handleFilterChange('isApproved', value)}>
+                <Label htmlFor="isBillable" className="text-xs sm:text-sm font-medium">Billable</Label>
+                <Select value={filters.isBillable} onValueChange={(value) => handleFilterChange('isBillable', value)}>
                   <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
                     <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="true">Approved</SelectItem>
-                    <SelectItem value="false">Pending</SelectItem>
-                    <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="true">Billable</SelectItem>
+                    <SelectItem value="false">Non-billable</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            )}
-          </div>
+              {showSelectionAndApproval && (
+                <div className="space-y-1.5 sm:space-y-2 min-w-0">
+                  <Label htmlFor="isApproved" className="text-xs sm:text-sm font-medium">Approved</Label>
+                  <Select value={filters.isApproved} onValueChange={(value) => handleFilterChange('isApproved', value)}>
+                    <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[200px]">
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="true">Approved</SelectItem>
+                      <SelectItem value="false">Pending</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
 
-          {/* Clear Filters Button */}
+            {/* Clear Filters Button */}
             <div className="flex justify-center sm:justify-end items-center pt-2 w-full">
               <Button
                 variant="outline"
@@ -2433,1385 +2439,1385 @@ export function TimeLogs({
                 <RotateCcw className="h-4 w-4" />
               </Button>
             </div>
-        </div>
-
-        {/* Bulk Actions */}
-        {showSelectionAndApproval && selectedEntries.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 sm:p-4 bg-muted rounded-lg w-full overflow-x-hidden">
-            <span className="text-xs sm:text-sm text-muted-foreground flex-1 min-w-0 break-words">
-              {selectedEntries.length} {selectedEntries.length === 1 ? 'entry' : 'entries'} selected
-            </span>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <Button
-                size="sm"
-                onClick={() => handleApproveEntries('approve')}
-                className="h-9 sm:h-10 flex-1 sm:flex-initial text-xs sm:text-sm min-w-[100px]"
-              >
-                <Check className="h-4 w-4 mr-1.5 sm:mr-2" />
-                Approve
-              </Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={() => handleApproveEntries('reject')}
-                className="h-9 sm:h-10 flex-1 sm:flex-initial text-xs sm:text-sm min-w-[100px]"
-              >
-                <X className="h-4 w-4 mr-1.5 sm:mr-2" />
-                Reject
-              </Button>
-            </div>
           </div>
-        )}
 
-        {/* Time Entries Table */}
-        <div className="space-y-2 w-full overflow-x-hidden">
-          {isLoading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="text-muted-foreground mt-2 text-sm">Loading time entries...</p>
-            </div>
-          ) : displayedEntries.length === 0 ? (
-            <div className="text-center py-8">
-              <Clock className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-sm sm:text-base text-muted-foreground">No time entries found</p>
-            </div>
-          ) : (
-            <div className="space-y-2 w-full overflow-x-hidden">
-              {/* Total Time Widget */}
-              <div className="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <Clock className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground">Total Time Logged</h3>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-primary">
-                      {(() => {
-                        const totalMinutes = displayedEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0)
-                        const hours = Math.floor(totalMinutes / 60)
-                        const minutes = Math.floor(totalMinutes % 60)
-                        return `${hours}h ${minutes}m`
-                      })()}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {displayedEntries.length} {displayedEntries.length === 1 ? 'entry' : 'entries'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Table Header - Hidden on mobile */}
-              <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium overflow-x-auto ${
-                showSelectionAndApproval && canApproveTimeLogs 
-                  ? 'grid-cols-[40px_minmax(150px,1.5fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]' 
-                  : 'grid-cols-[minmax(200px,2fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
-              }`}>
-                {showSelectionAndApproval && canApproveTimeLogs && (
-                  <div className="flex items-center justify-center">
-                    <Checkbox
-                      checked={allSelected}
-                      onCheckedChange={(checked) => handleSelectAll(!!checked)}
-                    />
-                  </div>
-                )}
-                <div>Memo</div>
-                <div>Project (Task)</div>
-                <div>Employee</div>
-                <div>Start Time</div>
-                <div>End Time</div>
-                <div>Duration</div>
-                <div>Status</div>
-                <div>Billable</div>
-                <div>Approval</div>
-                <div>Actions</div>
-              </div>
-
-              {/* Table Rows */}
-              {displayedEntries.map((entry) => (
-                <div key={entry._id} className="border rounded-lg overflow-hidden">
-                  {/* Mobile Card View */}
-                  <div className="md:hidden p-3 space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        {showSelectionAndApproval && canApproveTimeLogs && !entry.__isActive && (
-                          <Checkbox
-                            checked={selectedEntries.includes(entry._id)}
-                            onCheckedChange={(checked) => handleSelectEntry(entry._id, checked as boolean)}
-                            className="flex-shrink-0"
-                          />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate" title={entry.description}>{entry.description}</div>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div className="text-xs text-muted-foreground truncate mt-1 cursor-default">
-                                  {entry?.project?.name ? (
-                                    <>
-                                      <span className="text-foreground">{entry.project.name}</span>
-                                      {entry?.task?.title ? (
-                                        <span className="text-muted-foreground"> ({entry.task.title})</span>
-                                      ) : entry.task ? (
-                                        <span className="text-muted-foreground italic"> (Task deleted)</span>
-                                      ) : null}
-                                    </>
-                                  ) : (
-                                    <span className="text-muted-foreground italic">Project deleted or unavailable</span>
-                                  )}
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>
-                                  {entry?.project?.name 
-                                    ? `${entry.project.name}${entry?.task?.title ? `(${entry.task.title})` : entry.task ? '(Task deleted)' : ''}`
-                                    : 'Project deleted or unavailable'
-                                  }
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <div className="text-muted-foreground">Employee</div>
-                        <div className="mt-1 font-medium">
-                          {([entry.user?.firstName, entry.user?.lastName].filter(Boolean).join(' ') || 'Unknown')}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground">Start Time</div>
-                        <div className="mt-1">
-                          <div>{formatDateTimeSafe(entry.startTime)}</div>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground">End Time</div>
-                        {entry.endTime ? (
-                          <div className="mt-1">
-                            <div>{formatDateTimeSafe(entry.endTime)}</div>
-                          </div>
-                        ) : <div className="mt-1">-</div>}
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground">Duration</div>
-                        <div className="mt-1">{formatDuration(entry.duration)}</div>
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground">Status</div>
-                        <div className="mt-1">
-                          <Badge variant={entry.status === 'completed' ? 'default' : 'secondary'} className="text-xs">
-                            {entry.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <Badge variant={entry.isBillable ? 'default' : 'outline'} className="text-xs">
-                        {entry.isBillable ? 'Billable' : 'Non-billable'}
-                      </Badge>
-                    </div>
-                    {showSelectionAndApproval && (
-                      <div>
-                        <div className="text-muted-foreground">Approval</div>
-                        <div className="mt-1">
-                          {(() => {
-                            // For running timers, don't show approval status
-                            if (entry.__isActive) {
-                              return <span className="text-muted-foreground">-</span>
-                            }
-
-                            // Use actual approval status from database
-                            const isApproved = entry.isApproved;
-                            const isRejected = entry.isReject;
-
-                            let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
-                            let badgeText = 'Pending';
-
-                            if (isRejected) {
-                              badgeVariant = 'destructive';
-                              badgeText = 'Rejected';
-                            } else if (isApproved) {
-                              badgeVariant = 'default';
-                              badgeText = 'Approved';
-                            }
-
-                            return (
-                          <Badge
-                                variant={badgeVariant}
-                            className="text-xs"
-                          >
-                                {badgeText}
-                          </Badge>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    )}
-                    {showSelectionAndApproval && canApproveTime && !entry.__isActive && (
-                      <div>
-                        <div className="text-muted-foreground">Actions</div>
-                        <div className="mt-1 flex gap-1">
-                          {!entry.isApproved ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-6 px-2 text-xs"
-                              onClick={() => handleApproveEntries('approve', entry._id)}
-                            >
-                              <Check className="h-3 w-3" />
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-6 px-2 text-xs"
-                              onClick={() => handleApproveEntries('reject', entry._id)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    {/* Mobile Edit and Delete Actions */}
-                    <div className="flex gap-2 pt-2 border-t border-border">
-                      {canUpdateTime && canEditTimeEntry(entry) && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1 h-8 text-xs"
-                          onClick={() => handleEdit(entry)}
-                        >
-                          <Edit className="h-3 w-3 mr-1" />
-                          Edit
-                        </Button>
-                      )}
-                      {canDeleteTime && canEditTimeEntry(entry) && (
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="flex-1 h-8 text-xs"
-                          onClick={() => handleDeleteClick(entry)}
-                        >
-                          <Trash2 className="h-3 w-3 mr-1" />
-                          Delete
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Desktop Table View */}
-                  <div className={`hidden md:grid gap-2 p-3 items-center overflow-x-auto ${
-                    showSelectionAndApproval && canApproveTimeLogs 
-                      ? 'grid-cols-[40px_minmax(150px,1.5fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]' 
-                      : 'grid-cols-[minmax(200px,2fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
-                  }`}>
-                    {showSelectionAndApproval && canApproveTimeLogs && (
-                      <div className="flex items-center justify-center">
-                        <Checkbox
-                          id={`select-${entry._id}`}
-                          checked={selectedEntries.includes(entry._id)}
-                          onCheckedChange={() => toggleEntrySelection(entry._id)}
-                          className="h-4 w-4"
-                        />
-                        <label htmlFor={`select-${entry._id}`} className="sr-only">
-                          Select entry
-                        </label>
-                      </div>
-                    )}
-                    <div className="truncate">
-                      <div className="font-medium text-xs sm:text-sm truncate" title={entry.description}>{entry.description}</div>
-                    </div>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="text-xs sm:text-sm truncate cursor-default">
-                            {entry?.project?.name ? (
-                              <>
-                                <span className="text-foreground">{entry.project.name}</span>
-                                {entry?.task?.title ? (
-                                  <span className="text-muted-foreground"> ({entry.task.title})</span>
-                                ) : entry.task ? (
-                                  <span className="text-muted-foreground italic"> (Task deleted)</span>
-                                ) : null}
-                              </>
-                            ) : (
-                              <span className="text-muted-foreground italic">
-                                Project deleted
-                              </span>
-                            )}
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>
-                            {entry?.project?.name 
-                              ? `${entry.project.name}${entry?.task?.title ? `(${entry.task.title})` : entry.task ? '(Task deleted)' : ''}`
-                              : 'Project deleted or unavailable'
-                            }
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <div className="text-xs sm:text-sm">
-                      {([entry.user?.firstName, entry.user?.lastName].filter(Boolean).join(' ') || 'Unknown')}
-                    </div>
-                    <div className="text-xs sm:text-sm leading-tight">
-                      {(() => {
-                        const formatted = formatDateTimeSafe(entry.startTime)
-                        return formatted
-                      })()}
-                    </div>
-                    <div className="text-xs sm:text-sm leading-tight">
-                      {entry.endTime ? (() => {
-                        const formatted = formatDateTimeSafe(entry.endTime)
-                        return formatted
-                      })() : '-'}
-                    </div>
-                    <div className="text-xs sm:text-sm">
-                      {formatDuration(entry.duration)}
-                    </div>
-                    <div className="flex items-center">
-                      <Badge
-                        variant={
-                          entry.status === 'completed'
-                            ? 'default'
-                            : entry.status === 'running'
-                            ? 'default'
-                            : 'secondary'
-                        }
-                        className="text-xs capitalize whitespace-nowrap"
-                      >
-                        {entry.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center">
-                      <Badge variant={entry.isBillable ? 'default' : 'outline'} className="text-xs whitespace-nowrap">
-                        {entry.isBillable ? 'Yes' : 'No'}
-                      </Badge>
-                    </div>
-                    <div>
-                      {(() => {
-                        // For running timers, don't show approval status
-                        if (entry.__isActive) {
-                          return <span className="text-muted-foreground">-</span>
-                        }
-
-                        // Use actual approval status from database
-                        const isApproved = entry.isApproved;
-                        const isRejected = entry.isReject;
-
-                        let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
-                        let badgeText = 'Pending';
-
-                        if (isRejected) {
-                          badgeVariant = 'destructive';
-                          badgeText = 'Rejected';
-                        } else if (isApproved) {
-                          badgeVariant = 'default';
-                          badgeText = 'Approved';
-                        }
-
-                        return (
-                      <Badge
-                            variant={badgeVariant}
-                        className="text-xs whitespace-nowrap"
-                      >
-                            {badgeText}
-                      </Badge>
-                        );
-                      })()}
-                      {entry.approvedBy && (
-                        <div className="text-xs text-muted-foreground mt-1 truncate" title={`by ${entry.approvedBy.firstName} ${entry.approvedBy.lastName}`}>
-                          by {entry.approvedBy.firstName} {entry.approvedBy.lastName}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center">
-                      <DropdownMenu.Root>
-                        <DropdownMenu.Trigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 p-0"
-                            disabled={!canEditTimeEntry(entry)}
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Open menu</span>
-                          </Button>
-                        </DropdownMenu.Trigger>
-                        <DropdownMenu.Portal>
-                          <DropdownMenu.Content className="min-w-[120px] bg-popover dark:bg-popover rounded-md p-1 shadow-lg border border-border dark:border-border z-50">
-                            {canUpdateTime && canEditTimeEntry(entry) && (
-                              <DropdownMenu.Item
-                                className="flex items-center px-2 py-1.5 text-sm rounded hover:bg-accent dark:hover:bg-accent hover:text-accent-foreground dark:hover:text-accent-foreground cursor-pointer outline-none text-foreground dark:text-foreground"
-                                onSelect={() => handleEdit(entry)}
-                              >
-                                <Edit className="mr-2 h-4 w-4" />
-                                <span>Edit</span>
-                              </DropdownMenu.Item>
-                            )}
-                            {canDeleteTime && canEditTimeEntry(entry) && (
-                              <DropdownMenu.Item
-                                className="flex items-center px-2 py-1.5 text-sm rounded text-destructive dark:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 cursor-pointer outline-none"
-                                onSelect={() => handleDeleteClick(entry)}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                <span>Delete</span>
-                              </DropdownMenu.Item>
-                            )}
-                          </DropdownMenu.Content>
-                        </DropdownMenu.Portal>
-                      </DropdownMenu.Root>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Pagination */}
-        {pagination.total > 0 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-xs sm:text-sm text-muted-foreground">Items per page:</span>
-                <Select
-                  value={pagination.limit.toString()}
-                  onValueChange={(value) => {
-                    const newLimit = parseInt(value)
-                    setPagination(prev => ({
-                      ...prev,
-                      limit: newLimit,
-                      page: 1 // Reset to first page when changing limit
-                    }))
-                  }}
-                >
-                  <SelectTrigger className="w-16 h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="text-xs sm:text-sm text-muted-foreground">
-                Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(pagination.page - 1)}
-                disabled={pagination.page === 1}
-              >
-                Previous
-              </Button>
-              <span className="text-xs sm:text-sm text-muted-foreground">
-                Page {pagination.page} of {pagination.pages}
+          {/* Bulk Actions */}
+          {showSelectionAndApproval && selectedEntries.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 sm:p-4 bg-muted rounded-lg w-full overflow-x-hidden">
+              <span className="text-xs sm:text-sm text-muted-foreground flex-1 min-w-0 break-words">
+                {selectedEntries.length} {selectedEntries.length === 1 ? 'entry' : 'entries'} selected
               </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(pagination.page + 1)}
-                disabled={pagination.page === pagination.pages}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-
-    {/* Add Manual Time Log Modal */}
-    <Dialog open={showAddTimeLogModal} onOpenChange={setShowAddTimeLogModal}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Add Time Log</DialogTitle>
-          <DialogDescription>
-            Log time manually by selecting start and end times
-          </DialogDescription>
-        </DialogHeader>
-        <DialogBody className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="modal-project">Project *</Label>
-              <Select
-                value={selectedProjectForLog}
-                onValueChange={(value) => {
-                  setSelectedProjectForLog(value)
-                  setSelectedTaskForLog('')
-                  setTasks([])
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a project" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[200px]">
-                  <div className="p-2 border-b">
-                    <div className="relative">
-                      <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        placeholder="Search projects..."
-                        value={modalProjectSearch}
-                        onChange={(e) => setModalProjectSearch(e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        className="h-8 pl-7 pr-7 text-xs"
-                      />
-                      {modalProjectSearch && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setModalProjectSearch('')
-                          }}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
-                          aria-label="Clear search"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="max-h-[200px] overflow-y-auto">
-                    {filteredModalProjects.length === 0 ? (
-                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-                        No projects found
-                      </div>
-                    ) : (
-                      filteredModalProjects.map((project) => (
-                        <SelectItem key={project._id} value={project._id} onMouseDown={(e) => e.preventDefault()}>
-                          <div className="flex items-center gap-2">
-                            <FolderOpen className="h-4 w-4 flex-shrink-0" />
-                            <span className="truncate">{project.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))
-                    )}
-                  </div>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="modal-task">Task *</Label>
-              <Select
-                value={selectedTaskForLog}
-                onValueChange={setSelectedTaskForLog}
-                disabled={!selectedProjectForLog || tasks.length === 0}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={
-                    tasksLoading 
-                      ? 'Loading tasks...' 
-                      : selectedProjectForLog 
-                        ? (tasks.length > 0 ? 'Select a task' : 'No tasks available') 
-                        : 'Select a project first'
-                  } />
-                </SelectTrigger>
-                {tasksLoading && (
-                  <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
-                )}
-                <SelectContent className="max-h-[200px]">
-                  {tasksLoading ? (
-                    <div className="flex items-center justify-center p-4">
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      <span className="text-sm text-muted-foreground">Loading tasks...</span>
-                    </div>
-                  ) : (
-                    tasks.map((task) => {
-                      const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
-                      return (
-                        <SelectItem 
-                          key={task._id} 
-                          value={task._id}
-                          disabled={isBillableDisabled}
-                        >
-                          <div className="flex items-center space-x-2 min-w-0 w-full">
-                            <Target className="h-4 w-4 flex-shrink-0" />
-                            <div className="flex-1 min-w-0 overflow-hidden">
-                              <div className="font-medium truncate flex items-center gap-2 min-w-0">
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="truncate">{task.title}</span>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>{task.title}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                                {task.isBillable && (
-                                  <DollarSign className="h-3 w-3 text-green-600 flex-shrink-0" />
-                                )}
-                              </div>
-                              <div className="text-xs sm:text-sm text-muted-foreground truncate">
-                                {task.status} • {task.priority}
-                                {isBillableDisabled && ' • Billable time not allowed'}
-                                </div>
-                            </div>
-                          </div>
-                        </SelectItem>
-                      )
-                    })
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="start-date">Start Date *</Label>
-              <Input
-                id="start-date"
-                type="date"
-                value={manualLogData.startDate}
-                onChange={(e) => {
-                  setManualLogData(prev => ({ ...prev, startDate: e.target.value }))
-                  setError('')
-                }}
-                disabled={!selectedProjectForLog}
-                className={`w-full ${startDateError ? 'border-destructive' : ''}`}
-              />
-              {startDateError && (
-                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
-                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-destructive font-medium leading-relaxed">{startDateError}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="start-time">Start Time *</Label>
-              <Input
-                id="start-time"
-                type="time"
-                value={manualLogData.startTime}
-                onChange={(e) => {
-                  setManualLogData(prev => ({ ...prev, startTime: e.target.value }))
-                  setError('')
-                }}
-                disabled={!selectedProjectForLog}
-                className={`w-full ${startTimeError ? 'border-destructive' : ''}`}
-              />
-              {startTimeError && (
-                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
-                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-destructive font-medium leading-relaxed">{startTimeError}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="end-date">End Date *</Label>
-              <Input
-                id="end-date"
-                type="date"
-                value={manualLogData.endDate}
-                onChange={(e) => {
-                  setManualLogData(prev => ({ ...prev, endDate: e.target.value }))
-                  setError('')
-                }}
-                disabled={!selectedProjectForLog}
-                className={`w-full ${endDateError ? 'border-destructive' : ''}`}
-              />
-              {endDateError && (
-                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
-                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-destructive font-medium leading-relaxed">{endDateError}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="end-time">End Time *</Label>
-              <Input
-                id="end-time"
-                type="time"
-                value={manualLogData.endTime}
-                onChange={(e) => {
-                  setManualLogData(prev => ({ ...prev, endTime: e.target.value }))
-                  setError('')
-                }}
-                disabled={!selectedProjectForLog}
-                className={`w-full ${endTimeError ? 'border-destructive' : ''}`}
-              />
-              {endTimeError && (
-                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
-                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-destructive font-medium leading-relaxed">{endTimeError}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Duration Display */}
-          {calculatedDuration && (
-            <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50 border border-border">
-              <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground">
-                  Duration: {calculatedDuration.hours}h {calculatedDuration.minutes}m
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
-                  {timeTrackingSettings?.maxSessionHours && !(startDateError || startTimeError || endDateError || endTimeError) && (
-                    <span className="ml-1">
-                      (Max: {timeTrackingSettings.maxSessionHours}h)
-                    </span>
-                  )}
-                </p>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Button
+                  size="sm"
+                  onClick={() => handleApproveEntries('approve')}
+                  className="h-9 sm:h-10 flex-1 sm:flex-initial text-xs sm:text-sm min-w-[100px]"
+                >
+                  <Check className="h-4 w-4 mr-1.5 sm:mr-2" />
+                  Approve
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => handleApproveEntries('reject')}
+                  className="h-9 sm:h-10 flex-1 sm:flex-initial text-xs sm:text-sm min-w-[100px]"
+                >
+                  <X className="h-4 w-4 mr-1.5 sm:mr-2" />
+                  Reject
+                </Button>
               </div>
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="modal-description">
-              Memo *
-            </Label>
-            <Textarea
-              id="modal-description"
-              value={manualLogData.description}
-              onChange={(e) => setManualLogData(prev => ({ ...prev, description: e.target.value }))}
-              placeholder={
-                'What did you work on? (required)' 
-              }
-              rows={3}
-              required={true}
-              disabled={!selectedProjectForLog}
-              className="w-full"
-            />
-          </div>
-
-        </DialogBody>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setShowAddTimeLogModal(false)
-              setManualLogData({
-                startDate: '',
-                startTime: '',
-                endDate: '',
-                endTime: '',
-                description: ''
-              })
-              setSelectedProjectForLog('')
-              setSelectedTaskForLog('')
-              setTasks([])
-              setModalProjectSearch('')
-              setError('')
-              clearFieldErrors()
-            }}
-            disabled={submittingManualLog}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmitManualLog}
-            disabled={
-              submittingManualLog || 
-              !selectedProjectForLog || 
-              !selectedTaskForLog ||
-              !manualLogData.startDate ||
-              !manualLogData.startTime ||
-              !manualLogData.endDate ||
-              !manualLogData.endTime ||
-              !!(startDateError || startTimeError || endDateError || endTimeError) ||
-              !manualLogData.description.trim()
-            }
-          >
-            {submittingManualLog ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Logging...
-              </>
+          {/* Time Entries Table */}
+          <div className="space-y-2 w-full overflow-x-hidden">
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="text-muted-foreground mt-2 text-sm">Loading time entries...</p>
+              </div>
+            ) : displayedEntries.length === 0 ? (
+              <div className="text-center py-8">
+                <Clock className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-sm sm:text-base text-muted-foreground">No time entries found</p>
+              </div>
             ) : (
-              <>
-                <Plus className="h-4 w-4 mr-2" />
-                Log Time
-              </>
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    
-    <Dialog open={isEditing} onOpenChange={setIsEditing}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Edit Time Log</DialogTitle>
-          <DialogDescription>
-            Update the time log details
-          </DialogDescription>
-        </DialogHeader>
-        <DialogBody className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="edit-project">Project *</Label>
-              <Select
-                value={selectedProjectForLog}
-                onValueChange={(value) => {
-                  setSelectedProjectForLog(value)
-                  setSelectedTaskForLog('')
-                  setTasks([])
-                  loadTasksForProject(value)
-                }}
-                disabled={true}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a project" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[200px]">
-                  <div className="p-2 border-b">
-                    <div className="relative">
-                      <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        placeholder="Search projects..."
-                        value={modalProjectSearch}
-                        onChange={(e) => setModalProjectSearch(e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        className="h-8 pl-7 pr-7 text-xs"
-                        disabled={true}
-                      />
-                      {modalProjectSearch && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setModalProjectSearch('')
-                          }}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
-                          aria-label="Clear search"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="max-h-[200px] overflow-y-auto">
-                    {filteredModalProjects.length === 0 ? (
-                      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-                        No projects found
+              <div className="space-y-2 w-full overflow-x-hidden">
+                {/* Total Time Widget */}
+                <div className="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <Clock className="h-5 w-5 text-primary" />
                       </div>
-                    ) : (
-                      filteredModalProjects.map((project) => (
-                        <SelectItem key={project._id} value={project._id} onMouseDown={(e) => e.preventDefault()}>
-                          <div className="flex items-center gap-2">
-                            <FolderOpen className="h-4 w-4 flex-shrink-0" />
-                            <span className="truncate">{project.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))
-                    )}
-                  </div>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-task">Task *</Label>
-              <Select
-                value={selectedTaskForLog}
-                onValueChange={setSelectedTaskForLog}
-                disabled={!selectedProjectForLog || tasks.length === 0}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={
-                    tasksLoading 
-                      ? 'Loading tasks...' 
-                      : selectedProjectForLog 
-                        ? (tasks.length > 0 ? 'Select a task' : 'No tasks available') 
-                        : 'Select a project first'
-                  } />
-                </SelectTrigger>
-                {tasksLoading && (
-                  <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
-                )}
-                <SelectContent className="max-h-[200px]">
-                  {tasksLoading ? (
-                    <div className="flex items-center justify-center p-4">
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      <span className="text-sm text-muted-foreground">Loading tasks...</span>
+                      <div>
+                        <h3 className="font-semibold text-foreground">Total Time Logged</h3>
+                      </div>
                     </div>
-                  ) : (
-                    tasks.map((task) => (
-                      <SelectItem key={task._id} value={task._id}>
-                        <div className="flex items-center space-x-2">
-                          <Target className="h-4 w-4 flex-shrink-0" />
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="truncate">{task.title}</span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{task.title}</p>
-                            </TooltipContent>
-                          </Tooltip>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-primary">
+                        {(() => {
+                          const totalMinutes = displayedEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0)
+                          const hours = Math.floor(totalMinutes / 60)
+                          const minutes = Math.floor(totalMinutes % 60)
+                          return `${hours}h ${minutes}m`
+                        })()}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {displayedEntries.length} {displayedEntries.length === 1 ? 'entry' : 'entries'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Table Header - Hidden on mobile */}
+                <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium overflow-x-auto ${
+                  showSelectionAndApproval && canApproveTimeLogs
+                    ? 'grid-cols-[40px_minmax(150px,1.5fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
+                    : 'grid-cols-[minmax(200px,2fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
+                  }`}>
+                  {showSelectionAndApproval && canApproveTimeLogs && (
+                    <div className="flex items-center justify-center">
+                      <Checkbox
+                        checked={allSelected}
+                        onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                      />
+                    </div>
+                  )}
+                  <div>Memo</div>
+                  <div>Project (Task)</div>
+                  <div>Employee</div>
+                  <div>Start Time</div>
+                  <div>End Time</div>
+                  <div>Duration</div>
+                  <div>Status</div>
+                  <div>Billable</div>
+                  <div>Approval</div>
+                  <div>Actions</div>
+                </div>
+
+                {/* Table Rows */}
+                {displayedEntries.map((entry) => (
+                  <div key={entry._id} className="border rounded-lg overflow-hidden">
+                    {/* Mobile Card View */}
+                    <div className="md:hidden p-3 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          {showSelectionAndApproval && canApproveTimeLogs && !entry.__isActive && (
+                            <Checkbox
+                              checked={selectedEntries.includes(entry._id)}
+                              onCheckedChange={(checked) => handleSelectEntry(entry._id, checked as boolean)}
+                              className="flex-shrink-0"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm truncate" title={entry.description}>{entry.description}</div>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="text-xs text-muted-foreground truncate mt-1 cursor-default">
+                                    {entry?.project?.name ? (
+                                      <>
+                                        <span className="text-foreground">{entry.project.name}</span>
+                                        {entry?.task?.title ? (
+                                          <span className="text-muted-foreground"> ({entry.task.title})</span>
+                                        ) : entry.task ? (
+                                          <span className="text-muted-foreground italic"> (Task deleted)</span>
+                                        ) : null}
+                                      </>
+                                    ) : (
+                                      <span className="text-muted-foreground italic">Project deleted or unavailable</span>
+                                    )}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>
+                                    {entry?.project?.name
+                                      ? `${entry.project.name}${entry?.task?.title ? `(${entry.task.title})` : entry.task ? '(Task deleted)' : ''}`
+                                      : 'Project deleted or unavailable'
+                                    }
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
                         </div>
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="edit-start-date">Start Date *</Label>
-              <Input
-                id="edit-start-date"
-                type="date"
-                value={manualLogData.startDate}
-                onChange={(e) => {
-                  setManualLogData(prev => ({ ...prev, startDate: e.target.value }))
-                  setError('')
-                }}
-                className={`w-full ${startDateError ? 'border-destructive' : ''}`}
-              />
-              {startDateError && (
-                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
-                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-destructive font-medium leading-relaxed">{startDateError}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-start-time">Start Time *</Label>
-              <Input
-                id="edit-start-time"
-                type="time"
-                value={manualLogData.startTime}
-                onChange={(e) => {
-                  setManualLogData(prev => ({ ...prev, startTime: e.target.value }))
-                  setError('')
-                }}
-                className={`w-full ${startTimeError ? 'border-destructive' : ''}`}
-              />
-              {startTimeError && (
-                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
-                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-destructive font-medium leading-relaxed">{startTimeError}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-end-date">End Date *</Label>
-              <Input
-                id="edit-end-date"
-                type="date"
-                value={manualLogData.endDate}
-                onChange={(e) => {
-                  setManualLogData(prev => ({ ...prev, endDate: e.target.value }))
-                  setError('')
-                }}
-                className={`w-full ${endDateError ? 'border-destructive' : ''}`}
-              />
-              {endDateError && (
-                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
-                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-destructive font-medium leading-relaxed">{endDateError}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-end-time">End Time *</Label>
-              <Input
-                id="edit-end-time"
-                type="time"
-                value={manualLogData.endTime}
-                onChange={(e) => {
-                  setManualLogData(prev => ({ ...prev, endTime: e.target.value }))
-                  setError('')
-                }}
-                className={`w-full ${endTimeError ? 'border-destructive' : ''}`}
-              />
-              {endTimeError && (
-                <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
-                  <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-destructive font-medium leading-relaxed">{endTimeError}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Duration Display */}
-          {calculatedDuration && (
-            <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50 border border-border">
-              <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground">
-                  Duration: {calculatedDuration.hours}h {calculatedDuration.minutes}m
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
-                  {timeTrackingSettings?.maxSessionHours && !(startDateError || startTimeError || endDateError || endTimeError) && (
-                    <span className="ml-1">
-                      (Max: {timeTrackingSettings.maxSessionHours}h)
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="edit-description">
-              Memo *
-            </Label>
-            <Textarea
-              id="edit-description"
-              value={manualLogData.description}
-              onChange={(e) => setManualLogData(prev => ({ ...prev, description: e.target.value }))}
-              placeholder={'What did you work on? (required)' }
-              rows={3}
-              required={true}
-              className="w-full"
-            />
-          </div>
-
-        </DialogBody>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setIsEditing(false)
-              setManualLogData({
-                startDate: '',
-                startTime: '',
-                endDate: '',
-                endTime: '',
-                description: ''
-              })
-              setSelectedProjectForLog('')
-              setSelectedTaskForLog('')
-              setTasks([])
-              setModalProjectSearch('')
-              setError('')
-              clearFieldErrors()
-              setEditInitial(null)
-            }}
-            disabled={submittingManualLog}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleUpdateTimeLog}
-            disabled={
-              submittingManualLog || 
-              !selectedProjectForLog || 
-              !selectedTaskForLog ||
-              !manualLogData.startDate ||
-              !manualLogData.startTime ||
-              !manualLogData.endDate ||
-              !manualLogData.endTime ||
-              !!(startDateError || startTimeError || endDateError || endTimeError) ||
-              !hasEditChanges ||
-              ( !manualLogData.description.trim())
-            }
-          >
-            {submittingManualLog ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Updating...
-              </>
-            ) : (
-              'Update Time Log'
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    
-    <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Delete Time Entry</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to delete this time entry? This action cannot be undone.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button 
-            variant="outline" 
-            onClick={() => setShowDeleteDialog(false)}
-          >
-            Cancel
-          </Button>
-          <Button 
-            variant="destructive"
-            onClick={handleConfirmDelete}
-          >
-            Delete
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    {/* Bulk Upload Modal */}
-    <Dialog open={showBulkUploadModal} onOpenChange={setShowBulkUploadModal}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Bulk Upload Time Logs</DialogTitle>
-          <DialogDescription>
-            Upload multiple time entries using a CSV file. Download the template to see the required format.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogBody className="space-y-4">
-          {/* Enhanced progress display during bulk upload */}
-          {uploadingBulk && (
-            <div className="w-full max-w-2xl bg-card border rounded-lg shadow-lg p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <Loader2 className="h-6 w-6 animate-spin text-primary flex-shrink-0" />
-                <div>
-                  <h3 className="text-lg font-semibold">Processing Time Entries</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {bulkUploadProgress ? `${bulkUploadProgress.processed} of ${bulkUploadProgress.total} rows processed` : 'Reading CSV file...'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Progress bar */}
-              {bulkUploadProgress && (
-                <div className="mb-4">
-                  <div className="w-full bg-muted rounded-full h-2.5 mb-2">
-                    <div
-                      className="bg-primary h-2.5 rounded-full transition-all duration-300"
-                      style={{ width: `${(bulkUploadProgress.processed / bulkUploadProgress.total) * 100}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Check className="h-3 w-3 text-green-600" />
-                      {bulkUploadProgress.successful} successful
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <X className="h-3 w-3 text-destructive" />
-                      {bulkUploadProgress.failed} failed
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Row-by-row status */}
-              {rowUploadStatus.size > 0 && (
-                <div className="flex-1 overflow-y-auto space-y-1 border rounded-md p-3 bg-muted/30 min-h-[200px] max-h-[400px]">
-                  {Array.from(rowUploadStatus.entries())
-                    .sort(([a], [b]) => a - b)
-                    .map(([rowNum, status]) => (
-                      <div
-                        key={rowNum}
-                        className={`flex items-center gap-2 p-2 rounded text-sm transition-all ${
-                          status.status === 'success'
-                            ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400'
-                            : status.status === 'error'
-                            ? 'bg-destructive/10 text-destructive'
-                            : 'bg-muted/50 text-muted-foreground'
-                        }`}
-                      >
-                        {status.status === 'pending' && (
-                          <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
-                        )}
-                        {status.status === 'success' && (
-                          <Check className="h-4 w-4 flex-shrink-0" />
-                        )}
-                        {status.status === 'error' && (
-                          <X className="h-4 w-4 flex-shrink-0" />
-                        )}
-                        <span className="font-medium min-w-[60px]">Row {rowNum}:</span>
-                        <span className="flex-1 truncate">
-                          {status.status === 'pending' && 'Uploading...'}
-                          {status.status === 'success' && 'Successfully uploaded'}
-                          {status.status === 'error' && (status.error || 'Failed to upload')}
-                        </span>
                       </div>
-                    ))}
-                </div>
-              )}
-            </div>
-          )}
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <div className="text-muted-foreground">Employee</div>
+                          <div className="mt-1 font-medium">
+                            {([entry.user?.firstName, entry.user?.lastName].filter(Boolean).join(' ') || 'Unknown')}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-muted-foreground">Start Time</div>
+                          <div className="mt-1">
+                            <div>{formatDateTimeSafe(entry.startTime)}</div>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-muted-foreground">End Time</div>
+                          {entry.endTime ? (
+                            <div className="mt-1">
+                              <div>{formatDateTimeSafe(entry.endTime)}</div>
+                            </div>
+                          ) : <div className="mt-1">-</div>}
+                        </div>
+                        <div>
+                          <div className="text-muted-foreground">Duration</div>
+                          <div className="mt-1">{formatDuration(entry.duration)}</div>
+                        </div>
+                        <div>
+                          <div className="text-muted-foreground">Status</div>
+                          <div className="mt-1">
+                            <Badge variant={entry.status === 'completed' ? 'default' : 'secondary'} className="text-xs">
+                              {entry.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <Badge variant={entry.isBillable ? 'default' : 'outline'} className="text-xs">
+                          {entry.isBillable ? 'Billable' : 'Non-billable'}
+                        </Badge>
+                      </div>
+                      {showSelectionAndApproval && (
+                        <div>
+                          <div className="text-muted-foreground">Approval</div>
+                          <div className="mt-1">
+                            {(() => {
+                              // For running timers, don't show approval status
+                              if (entry.__isActive) {
+                                return <span className="text-muted-foreground">-</span>
+                              }
 
-          {/* Display bulk upload result after completion */}
-          {!uploadingBulk && bulkUploadProgress && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium">Upload Result</h4>
-              <p className="text-sm text-muted-foreground">
-                {bulkUploadProgress.successful} successful, {bulkUploadProgress.failed} failed
-              </p>
-            </div>
-          )}
+                              // Use actual approval status from database
+                              const isApproved = entry.isApproved;
+                              const isRejected = entry.isReject;
 
-          {/* Display bulk upload errors */}
-          {bulkUploadErrors.length > 0 && !uploadingBulk && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-destructive">Upload Errors</h4>
-              <div className="max-h-40 overflow-y-auto space-y-1 border border-destructive/20 rounded-md p-3 bg-destructive/5">
-                {bulkUploadErrors.map((error, index) => (
-                  <div key={index} className="flex items-start gap-2 text-sm">
-                    <X className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                    <span className="text-destructive">
-                      <strong>Row {error.row}:</strong> {error.error}
-                    </span>
+                              let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
+                              let badgeText = 'Pending';
+
+                              if (isRejected) {
+                                badgeVariant = 'destructive';
+                                badgeText = 'Rejected';
+                              } else if (isApproved) {
+                                badgeVariant = 'default';
+                                badgeText = 'Approved';
+                              }
+
+                              return (
+                                <Badge
+                                  variant={badgeVariant}
+                                  className="text-xs"
+                                >
+                                  {badgeText}
+                                </Badge>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                      {showSelectionAndApproval && canApproveTime && !entry.__isActive && (
+                        <div>
+                          <div className="text-muted-foreground">Actions</div>
+                          <div className="mt-1 flex gap-1">
+                            {!entry.isApproved ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-2 text-xs"
+                                onClick={() => handleApproveEntries('approve', entry._id)}
+                              >
+                                <Check className="h-3 w-3" />
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-2 text-xs"
+                                onClick={() => handleApproveEntries('reject', entry._id)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {/* Mobile Edit and Delete Actions */}
+                      <div className="flex gap-2 pt-2 border-t border-border">
+                        {canUpdateTime && canEditTimeEntry(entry) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 h-8 text-xs"
+                            onClick={() => handleEdit(entry)}
+                          >
+                            <Edit className="h-3 w-3 mr-1" />
+                            Edit
+                          </Button>
+                        )}
+                        {canDeleteTime && canEditTimeEntry(entry) && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="flex-1 h-8 text-xs"
+                            onClick={() => handleDeleteClick(entry)}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Desktop Table View */}
+                    <div className={`hidden md:grid gap-2 p-3 items-center overflow-x-auto ${
+                      showSelectionAndApproval && canApproveTimeLogs
+                        ? 'grid-cols-[40px_minmax(150px,1.5fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
+                        : 'grid-cols-[minmax(200px,2fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
+                      }`}>
+                      {showSelectionAndApproval && canApproveTimeLogs && (
+                        <div className="flex items-center justify-center">
+                          <Checkbox
+                            id={`select-${entry._id}`}
+                            checked={selectedEntries.includes(entry._id)}
+                            onCheckedChange={() => toggleEntrySelection(entry._id)}
+                            className="h-4 w-4"
+                          />
+                          <label htmlFor={`select-${entry._id}`} className="sr-only">
+                            Select entry
+                          </label>
+                        </div>
+                      )}
+                      <div className="truncate">
+                        <div className="font-medium text-xs sm:text-sm truncate" title={entry.description}>{entry.description}</div>
+                      </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="text-xs sm:text-sm truncate cursor-default">
+                              {entry?.project?.name ? (
+                                <>
+                                  <span className="text-foreground">{entry.project.name}</span>
+                                  {entry?.task?.title ? (
+                                    <span className="text-muted-foreground"> ({entry.task.title})</span>
+                                  ) : entry.task ? (
+                                    <span className="text-muted-foreground italic"> (Task deleted)</span>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <span className="text-muted-foreground italic">
+                                  Project deleted
+                                </span>
+                              )}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>
+                              {entry?.project?.name
+                                ? `${entry.project.name}${entry?.task?.title ? `(${entry.task.title})` : entry.task ? '(Task deleted)' : ''}`
+                                : 'Project deleted or unavailable'
+                              }
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <div className="text-xs sm:text-sm">
+                        {([entry.user?.firstName, entry.user?.lastName].filter(Boolean).join(' ') || 'Unknown')}
+                      </div>
+                      <div className="text-xs sm:text-sm leading-tight">
+                        {(() => {
+                          const formatted = formatDateTimeSafe(entry.startTime)
+                          return formatted
+                        })()}
+                      </div>
+                      <div className="text-xs sm:text-sm leading-tight">
+                        {entry.endTime ? (() => {
+                          const formatted = formatDateTimeSafe(entry.endTime)
+                          return formatted
+                        })() : '-'}
+                      </div>
+                      <div className="text-xs sm:text-sm">
+                        {formatDuration(entry.duration)}
+                      </div>
+                      <div className="flex items-center">
+                        <Badge
+                          variant={
+                            entry.status === 'completed'
+                              ? 'default'
+                              : entry.status === 'running'
+                                ? 'default'
+                                : 'secondary'
+                          }
+                          className="text-xs capitalize whitespace-nowrap"
+                        >
+                          {entry.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center">
+                        <Badge variant={entry.isBillable ? 'default' : 'outline'} className="text-xs whitespace-nowrap">
+                          {entry.isBillable ? 'Yes' : 'No'}
+                        </Badge>
+                      </div>
+                      <div>
+                        {(() => {
+                          // For running timers, don't show approval status
+                          if (entry.__isActive) {
+                            return <span className="text-muted-foreground">-</span>
+                          }
+
+                          // Use actual approval status from database
+                          const isApproved = entry.isApproved;
+                          const isRejected = entry.isReject;
+
+                          let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
+                          let badgeText = 'Pending';
+
+                          if (isRejected) {
+                            badgeVariant = 'destructive';
+                            badgeText = 'Rejected';
+                          } else if (isApproved) {
+                            badgeVariant = 'default';
+                            badgeText = 'Approved';
+                          }
+
+                          return (
+                            <Badge
+                              variant={badgeVariant}
+                              className="text-xs whitespace-nowrap"
+                            >
+                              {badgeText}
+                            </Badge>
+                          );
+                        })()}
+                        {entry.approvedBy && (
+                          <div className="text-xs text-muted-foreground mt-1 truncate" title={`by ${entry.approvedBy.firstName} ${entry.approvedBy.lastName}`}>
+                            by {entry.approvedBy.firstName} {entry.approvedBy.lastName}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center">
+                        <DropdownMenu.Root>
+                          <DropdownMenu.Trigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 p-0"
+                              disabled={!canEditTimeEntry(entry)}
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Open menu</span>
+                            </Button>
+                          </DropdownMenu.Trigger>
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content className="min-w-[120px] bg-popover dark:bg-popover rounded-md p-1 shadow-lg border border-border dark:border-border z-50">
+                              {canUpdateTime && canEditTimeEntry(entry) && (
+                                <DropdownMenu.Item
+                                  className="flex items-center px-2 py-1.5 text-sm rounded hover:bg-accent dark:hover:bg-accent hover:text-accent-foreground dark:hover:text-accent-foreground cursor-pointer outline-none text-foreground dark:text-foreground"
+                                  onSelect={() => handleEdit(entry)}
+                                >
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  <span>Edit</span>
+                                </DropdownMenu.Item>
+                              )}
+                              {canDeleteTime && canEditTimeEntry(entry) && (
+                                <DropdownMenu.Item
+                                  className="flex items-center px-2 py-1.5 text-sm rounded text-destructive dark:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 cursor-pointer outline-none"
+                                  onSelect={() => handleDeleteClick(entry)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  <span>Delete</span>
+                                </DropdownMenu.Item>
+                              )}
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {pagination.total > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Items per page:</span>
+                  <Select
+                    value={pagination.limit.toString()}
+                    onValueChange={(value) => {
+                      const newLimit = parseInt(value)
+                      setPagination(prev => ({
+                        ...prev,
+                        limit: newLimit,
+                        page: 1 // Reset to first page when changing limit
+                      }))
+                    }}
+                  >
+                    <SelectTrigger className="w-16 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[200px]">
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="text-xs sm:text-sm text-muted-foreground">
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page === 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-xs sm:text-sm text-muted-foreground">
+                  Page {pagination.page} of {pagination.pages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page === pagination.pages}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
+        </CardContent>
+      </Card>
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label>CSV File</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={downloadCSVTemplate}
-                disabled={uploadingBulk}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download Template
-              </Button>
-            </div>
+      {/* Add Manual Time Log Modal */}
+      <Dialog open={showAddTimeLogModal} onOpenChange={setShowAddTimeLogModal}>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Add Time Log</DialogTitle>
+            <DialogDescription>
+              Log time manually by selecting start and end times
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-              <input
-                type="file"
-                accept=".csv"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) {
-                    setBulkUploadFile(file)
-                    setError('')
-                    setBulkUploadErrors([])
-                    setBulkUploadSuccess(null)
-                    setRowUploadStatus(new Map())
-                  }
-                }}
-                disabled={uploadingBulk}
-                className="hidden"
-                id="bulk-upload-file"
-              />
-              <label
-                htmlFor="bulk-upload-file"
-                className="cursor-pointer flex flex-col items-center gap-2"
-              >
-                <Upload className="h-8 w-8 text-muted-foreground" />
-                <div className="text-sm">
-                  {bulkUploadFile ? (
-                    <span className="font-medium">{bulkUploadFile.name}</span>
-                  ) : (
-                    <>
-                      <span className="font-medium">Click to upload</span> or drag and drop
-                    </>
-                  )}
-                </div>
-                <div className="text-xs text-muted-foreground">CSV file only</div>
-              </label>
-            </div>
-
-            {bulkUploadFile && (
-              <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                <FileText className="h-4 w-4" />
-                <span className="text-sm flex-1">{bulkUploadFile.name}</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setBulkUploadFile(null)
-                    setBulkUploadErrors([])
-                    setError('')
-                    setRowUploadStatus(new Map())
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="modal-project">Project *</Label>
+                <Select
+                  value={selectedProjectForLog}
+                  onValueChange={(value) => {
+                    setSelectedProjectForLog(value)
+                    setSelectedTaskForLog('')
+                    setTasks([])
                   }}
-                  disabled={uploadingBulk}
                 >
-                  <X className="h-4 w-4" />
-                </Button>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a project" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px]">
+                    <div className="p-2 border-b">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search projects..."
+                          value={modalProjectSearch}
+                          onChange={(e) => setModalProjectSearch(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="h-8 pl-7 pr-7 text-xs"
+                        />
+                        {modalProjectSearch && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setModalProjectSearch('')
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                            aria-label="Clear search"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="max-h-[200px] overflow-y-auto">
+                      {filteredModalProjects.length === 0 ? (
+                        <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                          No projects found
+                        </div>
+                      ) : (
+                        filteredModalProjects.map((project) => (
+                          <SelectItem key={project._id} value={project._id} onMouseDown={(e) => e.preventDefault()}>
+                            <div className="flex items-center gap-2">
+                              <FolderOpen className="h-4 w-4 flex-shrink-0" />
+                              <span className="truncate">{project.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="modal-task">Task *</Label>
+                <Select
+                  value={selectedTaskForLog}
+                  onValueChange={setSelectedTaskForLog}
+                  disabled={!selectedProjectForLog || tasks.length === 0}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={
+                      tasksLoading
+                        ? 'Loading tasks...'
+                        : selectedProjectForLog
+                          ? (tasks.length > 0 ? 'Select a task' : 'No tasks available')
+                          : 'Select a project first'
+                    } />
+                  </SelectTrigger>
+                  {tasksLoading && (
+                    <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
+                  )}
+                  <SelectContent className="max-h-[200px]">
+                    {tasksLoading ? (
+                      <div className="flex items-center justify-center p-4">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <span className="text-sm text-muted-foreground">Loading tasks...</span>
+                      </div>
+                    ) : (
+                      tasks.map((task) => {
+                        const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
+                        return (
+                          <SelectItem
+                            key={task._id}
+                            value={task._id}
+                            disabled={isBillableDisabled}
+                          >
+                            <div className="flex items-center space-x-2 min-w-0 w-full">
+                              <Target className="h-4 w-4 flex-shrink-0" />
+                              <div className="flex-1 min-w-0 overflow-hidden">
+                                <div className="font-medium truncate flex items-center gap-2 min-w-0">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="truncate">{task.title}</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>{task.title}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  {task.isBillable && (
+                                    <DollarSign className="h-3 w-3 text-green-600 flex-shrink-0" />
+                                  )}
+                                </div>
+                                <div className="text-xs sm:text-sm text-muted-foreground truncate">
+                                  {task.status} • {task.priority}
+                                  {isBillableDisabled && ' • Billable time not allowed'}
+                                </div>
+                              </div>
+                            </div>
+                          </SelectItem>
+                        )
+                      })
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="start-date">Start Date *</Label>
+                <Input
+                  id="start-date"
+                  type="date"
+                  value={manualLogData.startDate}
+                  onChange={(e) => {
+                    setManualLogData(prev => ({ ...prev, startDate: e.target.value }))
+                    setError('')
+                  }}
+                  disabled={!selectedProjectForLog}
+                  className={`w-full ${startDateError ? 'border-destructive' : ''}`}
+                />
+                {startDateError && (
+                  <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                    <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-destructive font-medium leading-relaxed">{startDateError}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="start-time">Start Time *</Label>
+                <Input
+                  id="start-time"
+                  type="time"
+                  value={manualLogData.startTime}
+                  onChange={(e) => {
+                    setManualLogData(prev => ({ ...prev, startTime: e.target.value }))
+                    setError('')
+                  }}
+                  disabled={!selectedProjectForLog}
+                  className={`w-full ${startTimeError ? 'border-destructive' : ''}`}
+                />
+                {startTimeError && (
+                  <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                    <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-destructive font-medium leading-relaxed">{startTimeError}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="end-date">End Date *</Label>
+                <Input
+                  id="end-date"
+                  type="date"
+                  value={manualLogData.endDate}
+                  onChange={(e) => {
+                    setManualLogData(prev => ({ ...prev, endDate: e.target.value }))
+                    setError('')
+                  }}
+                  disabled={!selectedProjectForLog}
+                  className={`w-full ${endDateError ? 'border-destructive' : ''}`}
+                />
+                {endDateError && (
+                  <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                    <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-destructive font-medium leading-relaxed">{endDateError}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="end-time">End Time *</Label>
+                <Input
+                  id="end-time"
+                  type="time"
+                  value={manualLogData.endTime}
+                  onChange={(e) => {
+                    setManualLogData(prev => ({ ...prev, endTime: e.target.value }))
+                    setError('')
+                  }}
+                  disabled={!selectedProjectForLog}
+                  className={`w-full ${endTimeError ? 'border-destructive' : ''}`}
+                />
+                {endTimeError && (
+                  <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                    <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-destructive font-medium leading-relaxed">{endTimeError}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Duration Display */}
+            {calculatedDuration && (
+              <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50 border border-border">
+                <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-foreground">
+                    Duration: {calculatedDuration.hours}h {calculatedDuration.minutes}m
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
+                    {timeTrackingSettings?.maxSessionHours && !(startDateError || startTimeError || endDateError || endTimeError) && (
+                      <span className="ml-1">
+                        (Max: {timeTrackingSettings.maxSessionHours}h)
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
             )}
 
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription className="text-xs">
-                <div className="font-semibold mb-1">CSV Format Requirements:</div>
-                <ul className="list-disc list-inside space-y-1">
-                  <li><strong>Required columns:</strong> Task No, Start Date, Start Time, End Date, End Time</li>
-                  <li><strong>Required columns:</strong> Memo</li>
-                  <li><strong>Task No format:</strong> ProjectNumber.TaskNumber (e.g., 20.7)</li>
-                  <li><strong>Date formats accepted:</strong> YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY, DD-MM-YYYY</li>
-                  <li><strong>Time formats accepted:</strong> HH:MM, H:MM AM/PM, H AM/PM, or just H (24-hour)</li>
-                  <li><strong>Examples:</strong> 9:00, 9:00 AM, 2:30 PM, 14:00, 9 AM</li>
-                  <li>End Date/Time must be after Start Date/Time</li>
-                  <li>Task ID must exist and be accessible to you</li>
-                </ul>
-              </AlertDescription>
-            </Alert>
-          </div>
-        </DialogBody>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setShowBulkUploadModal(false)
-              setBulkUploadFile(null)
-              setBulkUploadErrors([])
-              setBulkUploadProgress(null)
-              setError('')
-              setBulkUploadSuccess(null)
-              setShowBulkUploadProgressAlert(true)
-              setRowUploadStatus(new Map())
-            }}
-            disabled={uploadingBulk}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleBulkUpload}
-            disabled={!bulkUploadFile || uploadingBulk}
-          >
-            {uploadingBulk ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              <>
-                <Upload className="h-4 w-4 mr-2" />
-                Upload
-              </>
+            <div className="space-y-2">
+              <Label htmlFor="modal-description">
+                Memo *
+              </Label>
+              <Textarea
+                id="modal-description"
+                value={manualLogData.description}
+                onChange={(e) => setManualLogData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder={
+                  'What did you work on? (required)'
+                }
+                rows={3}
+                required={true}
+                disabled={!selectedProjectForLog}
+                className="w-full"
+              />
+            </div>
+
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAddTimeLogModal(false)
+                setManualLogData({
+                  startDate: '',
+                  startTime: '',
+                  endDate: '',
+                  endTime: '',
+                  description: ''
+                })
+                setSelectedProjectForLog('')
+                setSelectedTaskForLog('')
+                setTasks([])
+                setModalProjectSearch('')
+                setError('')
+                clearFieldErrors()
+              }}
+              disabled={submittingManualLog}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmitManualLog}
+              disabled={
+                submittingManualLog ||
+                !selectedProjectForLog ||
+                !selectedTaskForLog ||
+                !manualLogData.startDate ||
+                !manualLogData.startTime ||
+                !manualLogData.endDate ||
+                !manualLogData.endTime ||
+                !!(startDateError || startTimeError || endDateError || endTimeError) ||
+                !manualLogData.description.trim()
+              }
+            >
+              {submittingManualLog ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Logging...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Log Time
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
+      <Dialog open={isEditing} onOpenChange={setIsEditing}>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Edit Time Log</DialogTitle>
+            <DialogDescription>
+              Update the time log details
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-project">Project *</Label>
+                <Select
+                  value={selectedProjectForLog}
+                  onValueChange={(value) => {
+                    setSelectedProjectForLog(value)
+                    setSelectedTaskForLog('')
+                    setTasks([])
+                    loadTasksForProject(value)
+                  }}
+                  disabled={true}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a project" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px]">
+                    <div className="p-2 border-b">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search projects..."
+                          value={modalProjectSearch}
+                          onChange={(e) => setModalProjectSearch(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="h-8 pl-7 pr-7 text-xs"
+                          disabled={true}
+                        />
+                        {modalProjectSearch && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setModalProjectSearch('')
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                            aria-label="Clear search"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="max-h-[200px] overflow-y-auto">
+                      {filteredModalProjects.length === 0 ? (
+                        <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                          No projects found
+                        </div>
+                      ) : (
+                        filteredModalProjects.map((project) => (
+                          <SelectItem key={project._id} value={project._id} onMouseDown={(e) => e.preventDefault()}>
+                            <div className="flex items-center gap-2">
+                              <FolderOpen className="h-4 w-4 flex-shrink-0" />
+                              <span className="truncate">{project.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-task">Task *</Label>
+                <Select
+                  value={selectedTaskForLog}
+                  onValueChange={setSelectedTaskForLog}
+                  disabled={!selectedProjectForLog || tasks.length === 0}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={
+                      tasksLoading
+                        ? 'Loading tasks...'
+                        : selectedProjectForLog
+                          ? (tasks.length > 0 ? 'Select a task' : 'No tasks available')
+                          : 'Select a project first'
+                    } />
+                  </SelectTrigger>
+                  {tasksLoading && (
+                    <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
+                  )}
+                  <SelectContent className="max-h-[200px]">
+                    {tasksLoading ? (
+                      <div className="flex items-center justify-center p-4">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <span className="text-sm text-muted-foreground">Loading tasks...</span>
+                      </div>
+                    ) : (
+                      tasks.map((task) => (
+                        <SelectItem key={task._id} value={task._id}>
+                          <div className="flex items-center space-x-2">
+                            <Target className="h-4 w-4 flex-shrink-0" />
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="truncate">{task.title}</span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{task.title}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-start-date">Start Date *</Label>
+                <Input
+                  id="edit-start-date"
+                  type="date"
+                  value={manualLogData.startDate}
+                  onChange={(e) => {
+                    setManualLogData(prev => ({ ...prev, startDate: e.target.value }))
+                    setError('')
+                  }}
+                  className={`w-full ${startDateError ? 'border-destructive' : ''}`}
+                />
+                {startDateError && (
+                  <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                    <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-destructive font-medium leading-relaxed">{startDateError}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-start-time">Start Time *</Label>
+                <Input
+                  id="edit-start-time"
+                  type="time"
+                  value={manualLogData.startTime}
+                  onChange={(e) => {
+                    setManualLogData(prev => ({ ...prev, startTime: e.target.value }))
+                    setError('')
+                  }}
+                  className={`w-full ${startTimeError ? 'border-destructive' : ''}`}
+                />
+                {startTimeError && (
+                  <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                    <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-destructive font-medium leading-relaxed">{startTimeError}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-end-date">End Date *</Label>
+                <Input
+                  id="edit-end-date"
+                  type="date"
+                  value={manualLogData.endDate}
+                  onChange={(e) => {
+                    setManualLogData(prev => ({ ...prev, endDate: e.target.value }))
+                    setError('')
+                  }}
+                  className={`w-full ${endDateError ? 'border-destructive' : ''}`}
+                />
+                {endDateError && (
+                  <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                    <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-destructive font-medium leading-relaxed">{endDateError}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-end-time">End Time *</Label>
+                <Input
+                  id="edit-end-time"
+                  type="time"
+                  value={manualLogData.endTime}
+                  onChange={(e) => {
+                    setManualLogData(prev => ({ ...prev, endTime: e.target.value }))
+                    setError('')
+                  }}
+                  className={`w-full ${endTimeError ? 'border-destructive' : ''}`}
+                />
+                {endTimeError && (
+                  <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                    <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-destructive font-medium leading-relaxed">{endTimeError}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Duration Display */}
+            {calculatedDuration && (
+              <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50 border border-border">
+                <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-foreground">
+                    Duration: {calculatedDuration.hours}h {calculatedDuration.minutes}m
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
+                    {timeTrackingSettings?.maxSessionHours && !(startDateError || startTimeError || endDateError || endTimeError) && (
+                      <span className="ml-1">
+                        (Max: {timeTrackingSettings.maxSessionHours}h)
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">
+                Memo *
+              </Label>
+              <Textarea
+                id="edit-description"
+                value={manualLogData.description}
+                onChange={(e) => setManualLogData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder={'What did you work on? (required)' }
+                rows={3}
+                required={true}
+                className="w-full"
+              />
+            </div>
+
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditing(false)
+                setManualLogData({
+                  startDate: '',
+                  startTime: '',
+                  endDate: '',
+                  endTime: '',
+                  description: ''
+                })
+                setSelectedProjectForLog('')
+                setSelectedTaskForLog('')
+                setTasks([])
+                setModalProjectSearch('')
+                setError('')
+                clearFieldErrors()
+                setEditInitial(null)
+              }}
+              disabled={submittingManualLog}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateTimeLog}
+              disabled={
+                submittingManualLog ||
+                !selectedProjectForLog ||
+                !selectedTaskForLog ||
+                !manualLogData.startDate ||
+                !manualLogData.startTime ||
+                !manualLogData.endDate ||
+                !manualLogData.endTime ||
+                !!(startDateError || startTimeError || endDateError || endTimeError) ||
+                !hasEditChanges ||
+                ( !manualLogData.description.trim())
+              }
+            >
+              {submittingManualLog ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Update Time Log'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Time Entry</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this time entry? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Upload Modal */}
+      <Dialog open={showBulkUploadModal} onOpenChange={setShowBulkUploadModal}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Bulk Upload Time Logs</DialogTitle>
+            <DialogDescription>
+              Upload multiple time entries using a CSV file. Download the template to see the required format.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            {/* Enhanced progress display during bulk upload */}
+            {uploadingBulk && (
+              <div className="w-full max-w-2xl bg-card border rounded-lg shadow-lg p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary flex-shrink-0" />
+                  <div>
+                    <h3 className="text-lg font-semibold">Processing Time Entries</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {bulkUploadProgress ? `${bulkUploadProgress.processed} of ${bulkUploadProgress.total} rows processed` : 'Reading CSV file...'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                {bulkUploadProgress && (
+                  <div className="mb-4">
+                    <div className="w-full bg-muted rounded-full h-2.5 mb-2">
+                      <div
+                        className="bg-primary h-2.5 rounded-full transition-all duration-300"
+                        style={{ width: `${(bulkUploadProgress.processed / bulkUploadProgress.total) * 100}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Check className="h-3 w-3 text-green-600" />
+                        {bulkUploadProgress.successful} successful
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <X className="h-3 w-3 text-destructive" />
+                        {bulkUploadProgress.failed} failed
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Row-by-row status */}
+                {rowUploadStatus.size > 0 && (
+                  <div className="flex-1 overflow-y-auto space-y-1 border rounded-md p-3 bg-muted/30 min-h-[200px] max-h-[400px]">
+                    {Array.from(rowUploadStatus.entries())
+                      .sort(([a], [b]) => a - b)
+                      .map(([rowNum, status]) => (
+                        <div
+                          key={rowNum}
+                          className={`flex items-center gap-2 p-2 rounded text-sm transition-all ${
+                            status.status === 'success'
+                              ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400'
+                              : status.status === 'error'
+                                ? 'bg-destructive/10 text-destructive'
+                                : 'bg-muted/50 text-muted-foreground'
+                            }`}
+                        >
+                          {status.status === 'pending' && (
+                            <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                          )}
+                          {status.status === 'success' && (
+                            <Check className="h-4 w-4 flex-shrink-0" />
+                          )}
+                          {status.status === 'error' && (
+                            <X className="h-4 w-4 flex-shrink-0" />
+                          )}
+                          <span className="font-medium min-w-[60px]">Row {rowNum}:</span>
+                          <span className="flex-1 truncate">
+                            {status.status === 'pending' && 'Uploading...'}
+                            {status.status === 'success' && 'Successfully uploaded'}
+                            {status.status === 'error' && (status.error || 'Failed to upload')}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Display bulk upload result after completion */}
+            {!uploadingBulk && bulkUploadProgress && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium">Upload Result</h4>
+                <p className="text-sm text-muted-foreground">
+                  {bulkUploadProgress.successful} successful, {bulkUploadProgress.failed} failed
+                </p>
+              </div>
+            )}
+
+            {/* Display bulk upload errors */}
+            {bulkUploadErrors.length > 0 && !uploadingBulk && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-destructive">Upload Errors</h4>
+                <div className="max-h-40 overflow-y-auto space-y-1 border border-destructive/20 rounded-md p-3 bg-destructive/5">
+                  {bulkUploadErrors.map((error, index) => (
+                    <div key={index} className="flex items-start gap-2 text-sm">
+                      <X className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                      <span className="text-destructive">
+                        <strong>Row {error.row}:</strong> {error.error}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label>CSV File</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={downloadCSVTemplate}
+                  disabled={uploadingBulk}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Template
+                </Button>
+              </div>
+
+              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      setBulkUploadFile(file)
+                      setError('')
+                      setBulkUploadErrors([])
+                      setBulkUploadSuccess(null)
+                      setRowUploadStatus(new Map())
+                    }
+                  }}
+                  disabled={uploadingBulk}
+                  className="hidden"
+                  id="bulk-upload-file"
+                />
+                <label
+                  htmlFor="bulk-upload-file"
+                  className="cursor-pointer flex flex-col items-center gap-2"
+                >
+                  <Upload className="h-8 w-8 text-muted-foreground" />
+                  <div className="text-sm">
+                    {bulkUploadFile ? (
+                      <span className="font-medium">{bulkUploadFile.name}</span>
+                    ) : (
+                      <>
+                        <span className="font-medium">Click to upload</span> or drag and drop
+                      </>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground">CSV file only</div>
+                </label>
+              </div>
+
+              {bulkUploadFile && (
+                <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                  <FileText className="h-4 w-4" />
+                  <span className="text-sm flex-1">{bulkUploadFile.name}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setBulkUploadFile(null)
+                      setBulkUploadErrors([])
+                      setError('')
+                      setRowUploadStatus(new Map())
+                    }}
+                    disabled={uploadingBulk}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  <div className="font-semibold mb-1">CSV Format Requirements:</div>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li><strong>Required columns:</strong> Task No, Start Date, Start Time, End Date, End Time</li>
+                    <li><strong>Required columns:</strong> Memo</li>
+                    <li><strong>Task No format:</strong> ProjectNumber.TaskNumber (e.g., 20.7)</li>
+                    <li><strong>Date formats accepted:</strong> YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY, DD-MM-YYYY</li>
+                    <li><strong>Time formats accepted:</strong> HH:MM, H:MM AM/PM, H AM/PM, or just H (24-hour)</li>
+                    <li><strong>Examples:</strong> 9:00, 9:00 AM, 2:30 PM, 14:00, 9 AM</li>
+                    <li>End Date/Time must be after Start Date/Time</li>
+                    <li>Task ID must exist and be accessible to you</li>
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowBulkUploadModal(false)
+                setBulkUploadFile(null)
+                setBulkUploadErrors([])
+                setBulkUploadProgress(null)
+                setError('')
+                setBulkUploadSuccess(null)
+                setShowBulkUploadProgressAlert(true)
+                setRowUploadStatus(new Map())
+              }}
+              disabled={uploadingBulk}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBulkUpload}
+              disabled={!bulkUploadFile || uploadingBulk}
+            >
+              {uploadingBulk ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

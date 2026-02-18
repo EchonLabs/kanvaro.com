@@ -87,22 +87,47 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
   const [tasks, setTasks] = useState<Task[]>([])
   const [stories, setStories] = useState<Story[]>([])
   const [loading, setLoading] = useState(true)
+  const [searching, setSearching] = useState(false)
   const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
   const [sortBy, setSortBy] = useState('priority')
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
 
   useEffect(() => {
     fetchTasks()
     fetchStories()
-  }, [projectId])
+  }, [projectId, debouncedSearchQuery, priorityFilter, typeFilter])
+
+  // Debounce search query to avoid excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+    }, 300) // 300ms delay
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   const fetchTasks = async () => {
     try {
-      setLoading(true)
+      // Only show full loading state on initial load
+      if (isInitialLoad) {
+        setLoading(true)
+      } else {
+        setSearching(true)
+      }
       setError('')
-      const url = projectId === 'all' ? '/api/tasks' : `/api/tasks?project=${projectId}`
+
+      // Build query parameters
+      const params = new URLSearchParams()
+      if (projectId !== 'all') params.set('project', projectId)
+      if (debouncedSearchQuery) params.set('search', debouncedSearchQuery)
+      if (priorityFilter !== 'all') params.set('priority', priorityFilter)
+      if (typeFilter !== 'all') params.set('type', typeFilter)
+
+      const url = `/api/tasks?${params.toString()}`
       const response = await fetch(url)
       const data = await response.json()
 
@@ -114,7 +139,12 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
     } catch (err) {
       setError('Failed to fetch tasks')
     } finally {
-      setLoading(false)
+      if (isInitialLoad) {
+        setLoading(false)
+        setIsInitialLoad(false)
+      } else {
+        setSearching(false)
+      }
     }
   }
 
@@ -168,17 +198,8 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
     }
   }
 
+  // Sort tasks client-side (filtering is now done server-side)
   const filteredAndSortedTasks = tasks
-    .filter(task => {
-      const matchesSearch = !searchQuery ||
-        task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.description.toLowerCase().includes(searchQuery.toLowerCase())
-
-      const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
-      const matchesType = typeFilter === 'all' || task.type === typeFilter
-
-      return matchesSearch && matchesPriority && matchesType
-    })
     .sort((a, b) => {
       switch (sortBy) {
         case 'priority':
