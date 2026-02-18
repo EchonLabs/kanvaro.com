@@ -380,31 +380,23 @@ export default function EpicsPage() {
         </div>
 
 
-        <Card className="overflow-x-hidden">
-          <CardHeader>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>All Epics</CardTitle>
-                  <CardDescription>
-                    {localSearch ? `${displayedEpics.length} of ${totalCount}` : totalEpicsCount} epic{(localSearch ? displayedEpics.length : totalEpicsCount) !== 1 ? 's' : ''} found
-                  </CardDescription>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2 sm:gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <Input
-                    placeholder="Search epics..."
-                    value={localSearch}
-                    onChange={(e) => setLocalSearch(e.target.value)}
-                    className="pl-10 w-full"
-                  />
-                </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+        {/* Search and Filters */}
+        <div className="space-y-3">
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              placeholder="Search epics..."
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              className="pl-10 w-full"
+            />
+          </div>
+          {/* Filter options - compact grid layout */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full sm:w-40">
-                      <SelectValue placeholder="Filter by status" />
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
@@ -416,8 +408,8 @@ export default function EpicsPage() {
                     </SelectContent>
                   </Select>
                   <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                    <SelectTrigger className="w-full sm:w-40">
-                      <SelectValue placeholder="Filter by priority" />
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Priority" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Priority</SelectItem>
@@ -427,11 +419,17 @@ export default function EpicsPage() {
                       <SelectItem value="critical">Critical</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
+          </div>
+          {/* Epic count */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {localSearch ? `${displayedEpics.length} of ${totalCount}` : totalEpicsCount} epic{(localSearch ? displayedEpics.length : totalEpicsCount) !== 1 ? 's' : ''} found
+            </p>
+          </div>
+        </div>
+        
+        {/* Epics View */}
+        <div>
             <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'grid' | 'list')}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="grid">Grid View</TabsTrigger>
@@ -778,8 +776,7 @@ export default function EpicsPage() {
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+        </div>
       </div>
       <ConfirmationModal
         isOpen={showDeleteConfirmModal}

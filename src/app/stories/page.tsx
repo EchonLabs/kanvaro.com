@@ -668,31 +668,23 @@ export default function StoriesPage() {
         </div>
 
 
-        <Card>
-          <CardHeader>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>All Stories</CardTitle>
-                  <CardDescription>
-                    {filteredStories.length} story{filteredStories.length !== 1 ? 'ies' : ''} found
-                  </CardDescription>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2 sm:gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <Input
-                    placeholder="Search stories..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 w-full"
-                  />
-                </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+        {/* Search and Filters */}
+        <div className="space-y-3">
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              placeholder="Search stories..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 w-full"
+            />
+          </div>
+          {/* Filter options - compact grid layout */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full sm:w-40">
-                      <SelectValue placeholder="Filter by status" />
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
                       <Input
@@ -711,8 +703,8 @@ export default function StoriesPage() {
                     </SelectContent>
                   </Select>
                   <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                    <SelectTrigger className="w-full sm:w-40">
-                      <SelectValue placeholder="Filter by priority" />
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Priority" />
                     </SelectTrigger>
                     <SelectContent>
                       <Input
@@ -733,10 +725,9 @@ export default function StoriesPage() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
-                  {/* Project Filter */}
                   <Select value={projectFilter} onValueChange={setProjectFilter}>
-                    <SelectTrigger className="w-full sm:w-40">
-                      <SelectValue placeholder="Filter by project" />
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Project" />
                     </SelectTrigger>
                     <SelectContent>
                       <Input
@@ -755,10 +746,9 @@ export default function StoriesPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {/* Epic Filter */}
                   <Select value={epicFilter} onValueChange={setEpicFilter}>
-                    <SelectTrigger className="w-full sm:w-40">
-                      <SelectValue placeholder="Filter by epic" />
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Epic" />
                     </SelectTrigger>
                     <SelectContent>
                       <Input
@@ -777,10 +767,9 @@ export default function StoriesPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {/* Sprint Filter */}
                   <Select value={sprintFilter} onValueChange={setSprintFilter}>
-                    <SelectTrigger className="w-full sm:w-40">
-                      <SelectValue placeholder="Filter by sprint" />
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Sprint" />
                     </SelectTrigger>
                     <SelectContent>
                       <Input
@@ -799,11 +788,17 @@ export default function StoriesPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
+          </div>
+          {/* Story count */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {filteredStories.length} story{filteredStories.length !== 1 ? 'ies' : ''} found
+            </p>
+          </div>
+        </div>
+        
+        {/* Stories View */}
+        <div>
             <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'list' | 'kanban')}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="list">List View</TabsTrigger>
@@ -1172,8 +1167,7 @@ export default function StoriesPage() {
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+        </div>
       </div>
       <ConfirmationModal
         isOpen={showDeleteConfirmModal}

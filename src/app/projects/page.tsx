@@ -356,65 +356,69 @@ export default function ProjectsPage() {
           </div>
 
 
-          <Card>
-            <CardHeader className="p-4 sm:p-6">
-              <div className="space-y-3 sm:space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-lg sm:text-xl">All Projects</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">
-                      {totalCount} project{totalCount !== 1 ? 's' : ''} found
-                    </CardDescription>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2 sm:gap-3">
-                  <div className="relative w-full">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                    <Input
-                      ref={searchInputRef}
-                      placeholder="Search projects..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 w-full text-sm sm:text-base"
-                    />
-                  </div>
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-full sm:w-[140px] text-sm">
-                        <SelectValue placeholder="Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="planning">Planning</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="on_hold">On Hold</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                      <SelectTrigger className="w-full sm:w-[140px] text-sm">
-                        <SelectValue placeholder="Priority" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Priority</SelectItem>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="critical">Critical</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6 pt-0">
-              <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'grid' | 'list')}>
-                <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
-                  <TabsTrigger value="grid" className="text-xs sm:text-sm">Grid View</TabsTrigger>
-                  <TabsTrigger value="list" className="text-xs sm:text-sm">List View</TabsTrigger>
-                </TabsList>
+      {/* Search and Filters */}
+      <div className="space-y-3">
+        {/* Search bar */}
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <Input
+            ref={searchInputRef}
+            placeholder="Search projects..."
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setSearchQuery(localSearch)
+              }
+            }}
+            onBlur={() => setSearchQuery(localSearch)}
+            className="pl-10 w-full text-sm sm:text-base"
+          />
+        </div>
+        {/* Filter options - compact grid layout */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full text-sm">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="planning">Planning</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="on_hold">On Hold</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <SelectTrigger className="w-full text-sm">
+                    <SelectValue placeholder="Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Priority</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+        </div>
+        {/* Project count */}
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            {localSearch ? `${filteredProjects.length} of ${totalCount}` : totalCount} project{(localSearch ? filteredProjects.length : totalCount) !== 1 ? 's' : ''} found
+          </p>
+        </div>
+      </div>
+      
+      {/* Projects View */}
+      <div>
+          <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'grid' | 'list')}>
+            <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
+              <TabsTrigger value="grid" className="text-xs sm:text-sm">Grid View</TabsTrigger>
+              <TabsTrigger value="list" className="text-xs sm:text-sm">List View</TabsTrigger>
+            </TabsList>
 
 
                 <TabsContent value="grid" className="space-y-4 mt-0">
@@ -721,54 +725,56 @@ export default function ProjectsPage() {
                 </TabsContent>
               </Tabs>
 
-              {/* Pagination Controls */}
-              {projects.length > 0 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>Items per page:</span>
-                    <Select value={pageSize.toString()} onValueChange={(value) => {
-                      setPageSize(parseInt(value))
-                      setCurrentPage(1)
-                    }}>
-                      <SelectTrigger className="w-20 h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="10">10</SelectItem>
-                        <SelectItem value="20">20</SelectItem>
-                        <SelectItem value="50">50</SelectItem>
-                        <SelectItem value="100">100</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <span>
-                      Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      onClick={() => setCurrentPage(currentPage - 1)}
-                      disabled={currentPage === 1 || loading}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Previous
-                    </Button>
-                    <span className="text-sm text-muted-foreground px-2">
-                      Page {currentPage} of {Math.ceil(totalCount / pageSize) || 1}
-                    </span>
-                    <Button
-                      onClick={() => setCurrentPage(currentPage + 1)}
-                      disabled={currentPage >= Math.ceil(totalCount / pageSize) || loading}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {/* Pagination Controls */}
+          {filteredProjects.length > 0 && !localSearch && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Items per page:</span>
+                <Select value={pageSize.toString()} onValueChange={(value) => {
+                  setPageSize(parseInt(value))
+                  setCurrentPage(1)
+                }}>
+                  <SelectTrigger className="w-20 h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span>
+                  {localSearch
+                    ? `Showing ${filteredProjects.length} of ${totalCount} filtered results`
+                    : `Showing ${((currentPage - 1) * pageSize) + 1} to ${Math.min(currentPage * pageSize, totalCount)} of ${totalCount}`
+                  }
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1 || loading}
+                  variant="outline"
+                  size="sm"
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground px-2">
+                  Page {currentPage} of {Math.ceil(totalCount / pageSize) || 1}
+                </span>
+                <Button
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage >= Math.ceil(totalCount / pageSize) || loading}
+                  variant="outline"
+                  size="sm"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
         </div>
 
         <ConfirmationModal
