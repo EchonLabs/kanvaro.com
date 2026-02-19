@@ -26,6 +26,10 @@ function LoginForm() {
   const { organization, loading: orgLoading } = useOrganization()
 
 
+  // Get the redirect destination (only allow relative paths to prevent open redirects)
+  const rawRedirect = searchParams.get('redirect')
+  const redirectTo = rawRedirect?.startsWith('/') ? rawRedirect : '/dashboard'
+
   useEffect(() => {
     const message = searchParams.get('message')
     const error = searchParams.get('error')
@@ -39,6 +43,21 @@ function LoginForm() {
       setError(error)
     }
   }, [searchParams])
+
+  // Auto-redirect if user is already logged in
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' })
+        if (res.ok) {
+          router.replace(redirectTo)
+        }
+      } catch {
+        // Not logged in, stay on login page
+      }
+    }
+    checkSession()
+  }, [redirectTo, router])
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -66,7 +85,7 @@ function LoginForm() {
         // Login successful, now load permissions before redirecting
         setIsLoading(false)
         setIsLoadingPermissions(true)
-        
+
         try {
 
           // Fetch permissions to ensure they're loaded before redirecting
@@ -74,21 +93,21 @@ function LoginForm() {
             method: 'GET',
             credentials: 'include'
           })
-          
-          if (permissionsResponse.ok) {
-            console.log('Permissions loaded successfully, redirecting to dashboard')
 
-            // Permissions will be cached by the permission context, redirect to dashboard
-            router.push('/dashboard')
+          if (permissionsResponse.ok) {
+            console.log('Permissions loaded successfully, redirecting to:', redirectTo)
+
+            // Redirect to the intended destination (from email link) or dashboard
+            router.push(redirectTo)
           } else {
             console.error('Failed to load permissions:', permissionsResponse.status)
-            // Even if permissions fail, redirect to dashboard (it will handle loading there)
-            router.push('/dashboard')
+            // Even if permissions fail, redirect to intended destination
+            router.push(redirectTo)
           }
         } catch (permError) {
           console.error('Error loading permissions:', permError)
-          // Even if permissions fail, redirect to dashboard (it will handle loading there)
-          router.push('/dashboard')
+          // Even if permissions fail, redirect to intended destination
+          router.push(redirectTo)
         } finally {
           setIsLoadingPermissions(false)
         }
@@ -116,8 +135,8 @@ function LoginForm() {
               {orgLoading ? (
                 <div className="h-8 w-8 rounded bg-primary/20 animate-pulse" />
               ) : (
-                <OrganizationLogo 
-                  lightLogo={organization?.logo} 
+                <OrganizationLogo
+                  lightLogo={organization?.logo}
                   darkLogo={organization?.darkLogo}
                   logoMode={organization?.logoMode}
                   fallbackText={organization?.name?.charAt(0) || 'K'}

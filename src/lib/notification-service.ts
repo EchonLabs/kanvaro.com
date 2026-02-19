@@ -24,7 +24,7 @@ export interface NotificationData {
 export class NotificationService {
   private static instance: NotificationService
 
-  private constructor() {}
+  private constructor() { }
 
   static getInstance(): NotificationService {
     if (!NotificationService.instance) {
@@ -216,7 +216,7 @@ export class NotificationService {
       if (!user) return
 
       const emailHtml = this.generateNotificationEmail(notification, user.firstName || 'User')
-      
+
       await emailService.sendEmail({
         to: user.email,
         subject: notification.title,
@@ -435,7 +435,7 @@ export class NotificationService {
         entityId: taskId,
         action,
         priority: action === 'overdue' ? 'high' : 'medium',
-        url: `${baseUrl}/tasks/${taskId}`,
+        url: `${baseUrl}/login?redirect=/tasks/${taskId}`,
         projectName: projectName
       },
       sendEmail: true,
@@ -470,7 +470,7 @@ export class NotificationService {
         entityId: projectId,
         action: action === 'deadline_approaching' ? 'reminder' : action,
         priority: action === 'deadline_approaching' ? 'high' : 'medium',
-        url: `${baseUrl}/projects/${projectId}`,
+        url: `${baseUrl}/login?redirect=/projects/${projectId}`,
         projectName: projectName
       },
       sendEmail: true,
@@ -527,7 +527,7 @@ export class NotificationService {
         entityId: projectId,
         action: 'assigned',
         priority: 'medium',
-        url: `${baseUrl}/projects/${projectId}`,
+        url: `${baseUrl}/login?redirect=/projects/${projectId}`,
         projectName: projectName
       },
       sendEmail: true,
@@ -562,7 +562,7 @@ export class NotificationService {
         entityId: projectId,
         action: action === 'budget_exceeded' ? 'overdue' : action === 'budget_warning' ? 'reminder' : 'updated',
         priority: action === 'budget_exceeded' ? 'critical' : 'high',
-        url: `${baseUrl}/projects/${projectId}`,
+        url: `${baseUrl}/login?redirect=/projects/${projectId}`,
         projectName: projectName
       },
       sendEmail: true,
