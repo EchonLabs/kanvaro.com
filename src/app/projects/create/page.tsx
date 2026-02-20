@@ -2347,21 +2347,13 @@ const [overheadInput, setOverheadInput] = useState('')
                   {formData.settings.allowTimeTracking && (
                     <div className="ml-6 pl-4 border-l-2 border-muted">
                       <div className="flex items-center justify-between">
-                        <div className="flex-1">
+                        <div>
                           <Label>Allow Manual Time Submission</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Allow team members to submit time entries manually after completing tasks
-                            {globalTimeTrackingSettings && !globalTimeTrackingSettings.allowManualTimeSubmission && (
-                              <span className="block text-xs text-amber-600 dark:text-amber-400 mt-1">
-                                ⚠️ Disabled globally in Application Settings
-                              </span>
-                            )}
-                          </p>
+                          <p className="text-sm text-muted-foreground">Allow team members to submit time entries manually after completing tasks</p>
                         </div>
                         <input
                           type="checkbox"
-                          checked={formData.settings.allowManualTimeSubmission && (globalTimeTrackingSettings?.allowManualTimeSubmission ?? true)}
-                          disabled={globalTimeTrackingSettings && !globalTimeTrackingSettings.allowManualTimeSubmission}
+                          checked={formData.settings.allowManualTimeSubmission}
                           onChange={(e) => setFormData(prev => ({
                             ...prev,
                             settings: { ...prev.settings, allowManualTimeSubmission: e.target.checked }
