@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { BarChart3, PieChart, TrendingUp, Download, Calendar, Users, DollarSign, Clock, X, RotateCcw } from 'lucide-react'
+import { BarChart3, PieChart, TrendingUp, Download, Calendar, Users, DollarSign, Clock, X, RotateCcw, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -159,11 +159,11 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   // Check if any filters are active (not default values)
   const hasActiveFilters = useMemo(() => {
     return filters.startDate !== '' ||
-           filters.endDate !== '' ||
-           filters.projectId !== (projectId || 'all') ||
-           filters.assignedTo !== (userId || 'all') ||
-           filters.assignedBy !== 'all' ||
-           filters.taskId !== 'all'
+      filters.endDate !== '' ||
+      filters.projectId !== (projectId || 'all') ||
+      filters.assignedTo !== (userId || 'all') ||
+      filters.assignedBy !== 'all' ||
+      filters.taskId !== 'all'
   }, [filters, projectId, userId])
 
   // Reset all filters to default values
@@ -215,7 +215,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
         } else {
           setReportData(data)
         }
-        
+
         // Set organization currency from API response
         if (data.organizationCurrency) {
           setOrgCurrency(data.organizationCurrency)
@@ -321,7 +321,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     const loadTasks = async () => {
       try {
         let tasksUrl = `/api/tasks?limit=1000&page=1`
-        
+
         // If a specific project is selected, filter tasks by that project
         if (filters.projectId && filters.projectId !== 'all') {
           tasksUrl += `&project=${filters.projectId}`
@@ -365,7 +365,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
 
   const filteredAssignedByOptions = useMemo(() => {
     const query = assignedByFilterQuery.trim().toLowerCase()
-    
+
     // First filter users by role permissions (must have TIME_TRACKING_APPROVE)
     const usersWithApprovePermission = users.filter((user) => {
       const userRole = user.role as Role
@@ -373,7 +373,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       const rolePermissions = ROLE_PERMISSIONS[userRole] || []
       return rolePermissions.includes(Permission.TIME_TRACKING_APPROVE)
     })
-    
+
     // Then apply search filter
     if (!query) return usersWithApprovePermission
     return usersWithApprovePermission.filter((user) =>
@@ -408,7 +408,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   // Simple currency conversion rates (you can replace with real-time API later)
   const getCurrencyConversionRate = (fromCurrency: string, toCurrency: string): number => {
     if (fromCurrency === toCurrency) return 1
-    
+
     // Base rates to USD (approximate rates, should be fetched from API in production)
     const ratesToUSD: Record<string, number> = {
       'USD': 1,
@@ -421,10 +421,10 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       'JPY': 0.0067,
       'CNY': 0.14
     }
-    
+
     const fromRate = ratesToUSD[fromCurrency] || 1
     const toRate = ratesToUSD[toCurrency] || 1
-    
+
     // Convert from source currency to USD, then to target currency
     return fromRate / toRate
   }
@@ -443,10 +443,10 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     return reportData.detailedEntries.reduce((acc, entry) => {
       acc.totalEntries += 1
       acc.totalDuration += entry.duration
-      
+
       // Just sum the costs - no currency conversion
       acc.totalCost += entry.cost
-      
+
       if (entry.isBillable) {
         acc.billableDuration += entry.duration
       }
@@ -458,6 +458,96 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       billableDuration: 0
     })
   }, [reportData?.detailedEntries])
+
+  const monthlyReportData = useMemo(() => {
+    if (!reportData?.detailedEntries || reportData.detailedEntries.length === 0) return []
+
+    const entries = reportData.detailedEntries
+
+    // Group by month then project then employee
+    const byMonth: Record<string, Record<string, Record<string, { name: string; email: string; duration: number; cost: number; entries: number }>>> = {}
+
+    for (const entry of entries) {
+      const d = new Date(entry.startTime || entry.date)
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const monthLabel = d.toLocaleString('default', { month: 'long', year: 'numeric' })
+      const projectKey = entry.projectId
+      const projectName = entry.projectName
+      const userKey = entry.userId
+
+      if (!byMonth[monthKey]) byMonth[monthKey] = {}
+      if (!byMonth[monthKey][projectKey]) byMonth[monthKey][projectKey] = {}
+      const proj = byMonth[monthKey][projectKey]
+      if (!proj[userKey]) {
+        proj[userKey] = { name: entry.userName, email: entry.userEmail, duration: 0, cost: 0, entries: 0 }
+      }
+      proj[userKey].duration += entry.duration
+      proj[userKey].cost += entry.cost
+      proj[userKey].entries += 1
+    }
+
+    // Flatten into sorted array
+    return Object.entries(byMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([monthKey, projects]) => {
+        const d = new Date(monthKey + '-01')
+        const monthLabel = d.toLocaleString('default', { month: 'long', year: 'numeric' })
+        const projectList = Object.entries(projects).map(([projectId, employees]) => {
+          const employeeList = Object.entries(employees).map(([userId, emp]) => ({
+            userId, ...emp
+          })).sort((a, b) => b.duration - a.duration)
+          const totalDuration = employeeList.reduce((s, e) => s + e.duration, 0)
+          const totalCost = employeeList.reduce((s, e) => s + e.cost, 0)
+          const totalEntries = employeeList.reduce((s, e) => s + e.entries, 0)
+          // find project name from first employee group
+          const projectName = (projects[projectId] && Object.values(projects[projectId])[0])
+            ? entries.find(e => e.projectId === projectId)?.projectName || projectId
+            : projectId
+          return { projectId, projectName, totalDuration, totalCost, totalEntries, employees: employeeList }
+        }).sort((a, b) => b.totalDuration - a.totalDuration)
+        const monthTotal = projectList.reduce((s, p) => s + p.totalDuration, 0)
+        return { monthKey, monthLabel, projects: projectList, monthTotal }
+      })
+  }, [reportData?.detailedEntries])
+
+  const handleMonthlyReportExport = () => {
+    if (monthlyReportData.length === 0) return
+
+    const headers = ['Row', 'Employee', 'Project', 'Total Time']
+    const rows: { empName: string; projName: string; hours: string }[] = []
+
+    for (const { projects } of monthlyReportData) {
+      for (const proj of projects) {
+        for (const emp of proj.employees) {
+          const h = Math.floor(emp.duration / 60)
+          const m = emp.duration % 60
+          rows.push({ empName: emp.name, projName: proj.projectName, hours: `${h}:${String(m).padStart(2, '0')}` })
+        }
+      }
+    }
+
+    // Sort: Employee Name asc, then Project Name asc
+    rows.sort((a, b) =>
+      a.empName.localeCompare(b.empName) || a.projName.localeCompare(b.projName)
+    )
+
+    const csvRows = rows.map((r, i) => [String(i + 1), r.empName, r.projName, r.hours])
+
+    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
+    const csv = [headers, ...csvRows].map(r => r.map(escape).join(',')).join('\r\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const dateRange = filters.startDate && filters.endDate
+      ? `_${filters.startDate}_to_${filters.endDate}`
+      : ''
+    a.download = `Monthly_Report${dateRange}.csv`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+  }
 
   const handleExport = async () => {
     try {
@@ -493,7 +583,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
             if (!timeString) return '-'
             const date = new Date(timeString)
             if (isNaN(date.getTime())) return '-'
-            
+
             const month = String(date.getMonth() + 1).padStart(2, '0')
             const day = String(date.getDate()).padStart(2, '0')
             const year = date.getFullYear()
@@ -771,6 +861,10 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
               title="Clear all filters"
             >
               <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" onClick={handleMonthlyReportExport}>
+              <FileText className="h-4 w-4 mr-2" />
+              Monthly Report
             </Button>
             <Button onClick={handleExport}>
               <Download className="h-4 w-4 mr-2" />
