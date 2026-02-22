@@ -470,7 +470,8 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
           'Start Time',
           'End Time',
           'Total Hours',
-          'Earnings'
+          'Earnings',
+          'Status'
         ]
 
         const sanitize = (value: string | number | null | undefined) => {
@@ -479,13 +480,13 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
         }
 
         const rows = reportData.detailedEntries.map((entry, index) => {
-          // Determine status based on approvedBy field
+          // Determine status based on isApproved and isReject fields
           let status = 'Pending'
-          if (entry.approvedBy) {
+          if ((entry as any).isReject) {
+            status = 'Rejected'
+          } else if ((entry as any).isApproved) {
             status = 'Approved'
           }
-          // Note: If you have a rejected status in your data, add logic here
-          // For example: if (entry.status === 'rejected') status = 'Rejected'
 
           // Custom time formatter for date and time AM/PM format
           const formatTimeAMPM = (timeString: string) => {
@@ -511,7 +512,8 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
             sanitize(entry.startTime ? formatTimeAMPM(entry.startTime) : '-'), // Start Time (AM/PM format)
             sanitize(entry.endTime ? formatTimeAMPM(entry.endTime) : '-'), // End Time (AM/PM format)
             sanitize(formatDurationUtil(entry.duration)), // Total Hours
-            sanitize(formatCurrency(entry.cost, orgCurrency)) // Cost
+            sanitize(formatCurrency(entry.cost, orgCurrency)), // Cost
+            sanitize(status) // Status based on isApproved and isReject
           ]
         })
 
@@ -887,7 +889,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 <div className="min-w-full">
                   {/* Desktop Table View */}
                   <div className="hidden md:block">
-                    <div className="grid grid-cols-11 gap-4 p-4 border-b font-semibold text-sm text-muted-foreground">
+                    <div className="grid grid-cols-12 gap-4 p-4 border-b font-semibold text-sm text-muted-foreground">
                       <div className="col-span-2">Employee</div>
                       <div className="col-span-2">Project (Task)</div>
                       <div className="col-span-1">Date</div>
@@ -897,9 +899,10 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                       <div className="col-span-1">Rate</div>
                       <div className="col-span-1">Cost</div>
                       <div className="col-span-1">Billable</div>
+                      <div className="col-span-1">Approval Status</div>
                     </div>
                     {getPaginatedDetailedEntries.map((entry) => (
-                      <div key={entry._id} className="grid grid-cols-11 gap-4 p-4 border-b hover:bg-muted/50">
+                      <div key={entry._id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-muted/50">
                         <div className="col-span-2">
                           <div className="font-medium text-sm">{entry.userName}</div>
                           <div className="text-xs text-muted-foreground">{entry.userEmail}</div>
@@ -941,6 +944,32 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                           ) : (
                             <Badge variant="outline" className="text-xs">No</Badge>
                           )}
+                        </div>
+                        <div className="col-span-1">
+                          {(() => {
+                            const isApproved = (entry as any).isApproved;
+                            const isRejected = (entry as any).isReject;
+
+                            if (isRejected) {
+                              return (
+                                <Badge variant="destructive" className="text-xs">
+                                  Rejected
+                                </Badge>
+                              );
+                            } else if (isApproved) {
+                              return (
+                                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-400">
+                                  Approved
+                                </Badge>
+                              );
+                            } else {
+                              return (
+                                <Badge variant="secondary" className="text-xs">
+                                  Pending
+                                </Badge>
+                              );
+                            }
+                          })()}
                         </div>
                       </div>
                     ))}
@@ -991,6 +1020,33 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                               Cost = {formatDurationUtil(entry.duration)} × {formatCurrency(entry.hourlyRate, orgCurrency)}/hr
                             </div>
                           </div>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Approval Status: </span>
+                          {(() => {
+                            const isApproved = (entry as any).isApproved;
+                            const isRejected = (entry as any).isReject;
+
+                            if (isRejected) {
+                              return (
+                                <Badge variant="destructive" className="text-xs">
+                                  Rejected
+                                </Badge>
+                              );
+                            } else if (isApproved) {
+                              return (
+                                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-400">
+                                  Approved
+                                </Badge>
+                              );
+                            } else {
+                              return (
+                                <Badge variant="secondary" className="text-xs">
+                                  Pending
+                                </Badge>
+                              );
+                            }
+                          })()}
                         </div>
                       </div>
                     ))}
