@@ -355,7 +355,7 @@ export function Timer({
               </div>
             )}
             <div>
-              <Label className="text-sm font-medium">Description</Label>
+              <Label className="text-sm font-medium">Memo</Label>
               <p className="text-sm text-muted-foreground">{activeTimer.description}</p>
             </div>
           </div>
