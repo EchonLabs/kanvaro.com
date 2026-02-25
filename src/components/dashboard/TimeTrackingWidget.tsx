@@ -64,7 +64,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
     try {
       const response = await fetch(`/api/time-tracking/timer?userId=${userId}&organizationId=${organizationId}`)
       const data = await response.json()
-      
+
       if (response.ok) {
         setActiveTimer(data.activeTimer)
       }
@@ -191,7 +191,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
         roundUp: roundingRules.roundUp ?? true
       })
     }
-    
+
     const totalSeconds = Math.floor(displayMinutes * 60)
     const hours = Math.floor(totalSeconds / 3600)
     const mins = Math.floor((totalSeconds % 3600) / 60)
@@ -294,11 +294,11 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
               )}
               {activeTimer.description && (
                 <div className="text-sm">
-                  <span className="font-semibold text-foreground">Description:</span>{' '}
+                  <span className="font-semibold text-foreground">Memo:</span>{' '}
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span className="line-clamp-2 text-muted-foreground cursor-default inline-block max-w-full">
+                        <span>
                           {activeTimer.description}
                         </span>
                       </TooltipTrigger>
