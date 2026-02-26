@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useMemo } from 'react'
 import { usePathname } from 'next/navigation'
-import { Clock, Edit, Trash2, Check, X, Filter, Download, Plus, AlertTriangle, FolderOpen, Target, Loader2, Upload, FileText, User, Search, MoreHorizontal, DollarSign, RotateCcw } from 'lucide-react'
+import { Clock, Edit, Trash2, Check, X, Filter, Download, Plus, AlertTriangle, FolderOpen, Target, Loader2, Upload, FileText, User, UserPlus, Search, MoreHorizontal, DollarSign, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -23,6 +23,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { toast } from 'sonner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { detectClientTimezone } from '@/lib/timezone'
+import { HRManualTimeLogModal } from '@/components/time-tracking/HRManualTimeLogModal'
 
 interface TimeLogsProps {
   userId: string
@@ -218,6 +219,7 @@ export function TimeLogs({
   const [startTimeError, setStartTimeError] = useState('')
   const [endDateError, setEndDateError] = useState('')
   const [endTimeError, setEndTimeError] = useState('')
+  const [showHRManualLogModal, setShowHRManualLogModal] = useState(false)
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
   const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null)
   const [bulkUploadProgress, setBulkUploadProgress] = useState<{ total: number; processed: number; successful: number; failed: number } | null>(null)
@@ -2050,6 +2052,18 @@ export function TimeLogs({
               {/* <Clock className="h-5 w-5" />
             Time Logs */}
             </CardTitle>
+            {/* HR Manual Time Log Button - visible only to HR role */}
+            {currentUserRole === 'human_resource' && (
+              <Button
+                onClick={() => setShowHRManualLogModal(true)}
+                size="sm"
+                variant="outline"
+                className="h-8 sm:h-8 px-3 text-xs justify-start w-full sm:w-auto border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-950"
+              >
+                <UserPlus className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                <span className="whitespace-nowrap">Add Manual Time Log</span>
+              </Button>
+            )}
             {showManualLogButtons && pathname === '/time-tracking/timer' && canAddManualTimeLog && (
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 {/* <Button
@@ -3581,6 +3595,17 @@ export function TimeLogs({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* HR Manual Time Log Modal */}
+      <HRManualTimeLogModal
+        open={showHRManualLogModal}
+        onOpenChange={setShowHRManualLogModal}
+        organizationId={resolvedOrgId}
+        onSuccess={() => {
+          loadTimeEntries()
+          onTimeEntryUpdate?.()
+        }}
+      />
 
       {/* Bulk Upload Modal */}
       <Dialog open={showBulkUploadModal} onOpenChange={setShowBulkUploadModal}>

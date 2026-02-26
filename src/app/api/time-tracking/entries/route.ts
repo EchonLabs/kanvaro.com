@@ -319,9 +319,10 @@ export async function POST(request: NextRequest) {
     requesterId = requester._id.toString()
 
     // Verify the requester can create time entries for the specified user
-    // Allow if: 1) Creating for themselves, OR 2) Has bulk_upload_all permission
+    // Allow if: 1) Creating for themselves, OR 2) Has bulk_upload_all permission, OR 3) Is HR/admin role
     const isCreatingSelf = userId === requesterId
-    const hasBulkUploadAll = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_BULK_UPLOAD_ALL)
+    const isHROrAdmin = ['admin', 'human_resource'].includes(requester.role)
+    const hasBulkUploadAll = isHROrAdmin || await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_BULK_UPLOAD_ALL)
     
     if (!isCreatingSelf && !hasBulkUploadAll) {
       return NextResponse.json({ error: 'You do not have permission to create time entries for other users' }, { status: 403 })
@@ -419,7 +420,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!settings.allowManualTimeSubmission) {
+    // HR and admin users can always add manual time logs, bypass the setting check
+    if (!settings.allowManualTimeSubmission && !isHROrAdmin) {
       return NextResponse.json({ error: 'Manual time submission not allowed' }, { status: 403 })
     }
 
@@ -444,8 +446,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Description is required for time entries' }, { status: 400 })
     }
     
-    // If description is not required and empty, use empty string or default
-    const finalDescription = description || ''
+    // If description is not required and empty, use a default placeholder
+    const finalDescription = (description && description.trim()) ? description.trim() : 'Manual time entry'
 
     // Validate time
     const start = new Date(startTime)
