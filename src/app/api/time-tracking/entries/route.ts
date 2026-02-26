@@ -425,29 +425,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Manual time submission not allowed' }, { status: 403 })
     }
 
-    // Validate description if required
-    // Explicitly check if requireDescription is true (handle both boolean true and undefined as false)
-    const requireDescription = settings.requireDescription === true
+    // Validate description - always required for manual time entries
     const hasDescription = description && typeof description === 'string' && description.trim().length > 0
     
-    console.log('Manual time entry - Description validation:', {
-      requireDescription,
-      hasDescription,
-      descriptionValue: description,
-      descriptionType: typeof description,
-      descriptionLength: description?.length,
-      settingsRequireDescription: settings.requireDescription,
-      settingsRequireDescriptionType: typeof settings.requireDescription
-    })
-    
-    // Only validate description if it's explicitly required
-    if (requireDescription === true && !hasDescription) {
-      console.log('Validation failed: Description is required but missing')
+    if (!hasDescription) {
       return NextResponse.json({ error: 'Description is required for time entries' }, { status: 400 })
     }
     
-    // If description is not required and empty, use a default placeholder
-    const finalDescription = (description && description.trim()) ? description.trim() : 'Manual time entry'
+    const finalDescription = description.trim()
 
     // Validate time
     const start = new Date(startTime)

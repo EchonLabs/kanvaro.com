@@ -95,6 +95,12 @@ export function HRManualTimeLogModal({
     memo: ''
   })
 
+  // Time tracking settings (for maxSessionHours validation)
+  const [timeTrackingSettings, setTimeTrackingSettings] = useState<{
+    maxSessionHours?: number
+    allowOvertime?: boolean
+  } | null>(null)
+
   // Errors
   const [error, setError] = useState('')
   const [startDateError, setStartDateError] = useState('')
@@ -134,6 +140,7 @@ export function HRManualTimeLogModal({
     if (open) {
       resetForm()
       loadEmployees()
+      loadTimeTrackingSettings()
     }
   }, [open])
 
@@ -159,10 +166,6 @@ export function HRManualTimeLogModal({
     }
   }, [selectedEmployeeId, selectedProjectId])
 
-  // Validate times when date/time fields change
-  useEffect(() => {
-    validateDateTime()
-  }, [formData.startDate, formData.startTime, formData.endDate, formData.endTime])
 
   const resetForm = () => {
     setSelectedEmployeeId('')
@@ -203,6 +206,20 @@ export function HRManualTimeLogModal({
       toast.error('Failed to load employees')
     } finally {
       setEmployeesLoading(false)
+    }
+  }
+
+  const loadTimeTrackingSettings = async () => {
+    try {
+      const res = await fetch('/api/time-tracking/settings')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.settings) {
+          setTimeTrackingSettings(data.settings)
+        }
+      }
+    } catch {
+      // silently ignore – validation will just be skipped
     }
   }
 
@@ -256,7 +273,7 @@ export function HRManualTimeLogModal({
     return `${date}T${time}`
   }
 
-  const validateDateTime = () => {
+  const validateDateTime = useCallback(() => {
     setStartDateError('')
     setStartTimeError('')
     setEndDateError('')
@@ -282,13 +299,31 @@ export function HRManualTimeLogModal({
 
     if (end <= start) {
       setEndTimeError('End time must be after start time')
+      return
     }
 
     // Check if start is in the future
     if (start > new Date()) {
       setStartDateError('Start date/time cannot be in the future')
+      return
     }
-  }
+
+    // Validate against maxSessionHours
+    if (timeTrackingSettings?.maxSessionHours) {
+      const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60)
+      const maxHours = timeTrackingSettings.maxSessionHours
+      if (durationHours > maxHours) {
+        setEndTimeError(
+          `Session duration (${durationHours.toFixed(2)}h) exceeds the maximum allowed session length (${maxHours}h). Please adjust the start or end time.`
+        )
+      }
+    }
+  }, [formData.startDate, formData.startTime, formData.endDate, formData.endTime, timeTrackingSettings])
+
+  // Validate times when date/time fields change
+  useEffect(() => {
+    validateDateTime()
+  }, [validateDateTime])
 
   // Calculate duration for display
   const calculatedDuration = useMemo(() => {
@@ -330,6 +365,10 @@ export function HRManualTimeLogModal({
     }
     if (!formData.endDate || !formData.endTime) {
       setError('End date and time are required')
+      return
+    }
+    if (!formData.memo || !formData.memo.trim()) {
+      setError('Description is required')
       return
     }
 
@@ -754,6 +793,9 @@ export function HRManualTimeLogModal({
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Total: {(calculatedDuration.totalMinutes / 60).toFixed(2)} hours
+                  {timeTrackingSettings?.maxSessionHours && !(endTimeError) && (
+                    <span className="ml-1 text-muted-foreground">(Max: {timeTrackingSettings.maxSessionHours}h)</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -762,7 +804,7 @@ export function HRManualTimeLogModal({
           {/* Memo */}
           <div className="space-y-2">
             <Label htmlFor="hr-memo">
-              Memo <span className="text-xs text-muted-foreground">(optional, max 500 characters)</span>
+              Memo *<span className="text-xs text-muted-foreground">(max 500 characters)</span>
             </Label>
             <Textarea
               id="hr-memo"
@@ -807,6 +849,7 @@ export function HRManualTimeLogModal({
               !formData.startTime ||
               !formData.endDate ||
               !formData.endTime ||
+              !formData.memo.trim() ||
               !!(startDateError || startTimeError || endDateError || endTimeError)
             }
           >
