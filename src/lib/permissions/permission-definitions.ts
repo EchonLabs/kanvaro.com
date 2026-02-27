@@ -1250,6 +1250,7 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.TIME_TRACKING_VIEW_ALL,
     Permission.TIME_TRACKING_VIEW_ASSIGNED,
     Permission.TIME_TRACKING_VIEW_ALL_TIMER, // View all active timers in organization
+    Permission.TIME_TRACKING_BULK_UPLOAD_ALL, // Allow creating time entries for other users
     Permission.FINANCIAL_READ,
     Permission.BUDGET_HANDLING,
     Permission.REPORTING_VIEW,

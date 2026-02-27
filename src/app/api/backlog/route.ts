@@ -340,6 +340,17 @@ export async function GET(request: NextRequest) {
         }
       : {}
 
+    const taskSearchFilter = search
+      ? {
+          $or: [
+            { title: { $regex: search, $options: 'i' } },
+            { description: { $regex: search, $options: 'i' } },
+            { displayId: { $regex: search, $options: 'i' } },
+            ...(!isNaN(Number(search)) ? [{ taskNumber: Number(search) }] : [])
+          ]
+        }
+      : {}
+
     const includeTasks = !type || type === 'task'
     const includeStories = !type || type === 'story'
     const includeEpics = !type || type === 'epic'
@@ -355,7 +366,7 @@ export async function GET(request: NextRequest) {
     }
 
     const taskFilter: Record<string, unknown> = {
-      ...searchFilter,
+      ...taskSearchFilter,
       organization: organizationId,
       project: project ? project : { $in: projectIds },
       archived: false
