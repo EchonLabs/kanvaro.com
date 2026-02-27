@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -11,12 +11,12 @@ import { formatToTitleCase } from '@/lib/utils'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreHorizontal, 
-  Calendar, 
+import {
+  Plus,
+  Search,
+  Filter,
+  MoreHorizontal,
+  Calendar,
   Clock,
   CheckCircle,
   Pause,
@@ -104,6 +104,8 @@ export default function StoriesPage() {
   const searchParams = useSearchParams();
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
+  const isFirstFetch = useRef(true);
 
   const [authError, setAuthError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -182,7 +184,7 @@ export default function StoriesPage() {
         const refreshResponse = await fetch('/api/auth/refresh', {
           method: 'POST'
         })
-        
+
         if (refreshResponse.ok) {
           const meResponse = await fetchAndSetCurrentUser()
           if (meResponse.ok) {
@@ -228,9 +230,16 @@ export default function StoriesPage() {
   // Fetch when pagination changes (after initial load)
   useEffect(() => {
     if (!loading && !authError) {
-      fetchStories()
+      fetchStories(currentPage)
     }
-  }, [currentPage, pageSize])
+  }, [currentPage, pageSize]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-fetch from page 1 whenever filters/search change
+  useEffect(() => {
+    if (authError) return
+    setCurrentPage(1)
+    fetchStories(1)
+  }, [searchQuery, statusFilter, priorityFilter, projectFilter, epicFilter, sprintFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check for success message from query params (after story edit)
   useEffect(() => {
@@ -243,13 +252,23 @@ export default function StoriesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, router])
 
-  const fetchStories = async () => {
+  const fetchStories = async (page = currentPage) => {
     try {
-      setLoading(true)
+      if (isFirstFetch.current) {
+        setLoading(true)
+      } else {
+        setIsFetching(true)
+      }
       const params = new URLSearchParams()
-      params.set('page', currentPage.toString())
+      params.set('page', page.toString())
       params.set('limit', pageSize.toString())
-      
+      if (searchQuery.trim()) params.set('search', searchQuery.trim())
+      if (statusFilter !== 'all') params.set('status', statusFilter)
+      if (priorityFilter !== 'all') params.set('priority', priorityFilter)
+      if (projectFilter !== 'all') params.set('projectId', projectFilter)
+      if (epicFilter !== 'all') params.set('epicId', epicFilter)
+      if (sprintFilter !== 'all') params.set('sprintId', sprintFilter)
+
       const response = await fetch(`/api/stories?${params.toString()}`)
       const data = await response.json()
 
@@ -262,7 +281,12 @@ export default function StoriesPage() {
     } catch (err) {
       notifyError({ title: 'Failed to Load Stories', message: 'Failed to fetch stories' })
     } finally {
-      setLoading(false)
+      if (isFirstFetch.current) {
+        setLoading(false)
+        isFirstFetch.current = false
+      } else {
+        setIsFetching(false)
+      }
     }
   }
 
@@ -561,30 +585,8 @@ export default function StoriesPage() {
   const canDeleteStory = (story: Story) =>
     hasPermission(Permission.STORY_DELETE, story.project?._id) || isCreator(story)
 
-  const filteredStories = stories.filter(story => {
-    const matchesSearch = !searchQuery || 
-      story.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      story.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (story.project?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
-    
-    const matchesStatus = statusFilter === 'all' || story.status === statusFilter
-    const matchesPriority = priorityFilter === 'all' || story.priority === priorityFilter
-    const matchesProject =
-      projectFilter === 'all' || (story.project?._id ? story.project._id === projectFilter : false)
-    const matchesEpic =
-      epicFilter === 'all' || (story.epic?._id ? story.epic._id === epicFilter : false)
-    const matchesSprint =
-      sprintFilter === 'all' || (story.sprint?._id ? story.sprint._id === sprintFilter : false)
-
-    return (
-      matchesSearch &&
-      matchesStatus &&
-      matchesPriority &&
-      matchesProject &&
-      matchesEpic &&
-      matchesSprint
-    )
-  })
+  // Server handles all filtering — stories returned are already filtered
+  const filteredStories = stories
 
   const kanbanStatuses: Array<Story['status']> = ['backlog', 'todo', 'inprogress', 'done', 'cancelled']
 
@@ -682,244 +684,245 @@ export default function StoriesPage() {
           </div>
           {/* Filter options - compact grid layout */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <Input
-                        placeholder="Search status..."
-                        className="m-2"
-                        value={statusSearch}
-                        onChange={e => {
-                          setStatusSearch(e.target.value.toLowerCase());
-                        }}
-                        onClick={e => e.stopPropagation()}
-                        onKeyDown={e => e.stopPropagation()}
-                      />
-                      {statusOptions.filter(opt => opt.label.toLowerCase().includes(statusSearch)).map(opt => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <Input
-                        placeholder="Search priority..."
-                        className="m-2"
-                        value={prioritySearch}
-                        onChange={e => {
-                          setPrioritySearch(e.target.value.toLowerCase());
-                        }}
-                        onClick={e => e.stopPropagation()}
-                        onKeyDown={e => e.stopPropagation()}
-                      />
-                      {priorityOptions.filter(opt => opt.label.toLowerCase().includes(prioritySearch)).map(opt => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <Input
+                  placeholder="Search status..."
+                  className="m-2"
+                  value={statusSearch}
+                  onChange={e => {
+                    setStatusSearch(e.target.value.toLowerCase());
+                  }}
+                  onClick={e => e.stopPropagation()}
+                  onKeyDown={e => e.stopPropagation()}
+                />
+                {statusOptions.filter(opt => opt.label.toLowerCase().includes(statusSearch)).map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <Input
+                  placeholder="Search priority..."
+                  className="m-2"
+                  value={prioritySearch}
+                  onChange={e => {
+                    setPrioritySearch(e.target.value.toLowerCase());
+                  }}
+                  onClick={e => e.stopPropagation()}
+                  onKeyDown={e => e.stopPropagation()}
+                />
+                {priorityOptions.filter(opt => opt.label.toLowerCase().includes(prioritySearch)).map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
-                  <Select value={projectFilter} onValueChange={setProjectFilter}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <Input
-                        placeholder="Search project..."
-                        className="m-2"
-                        value={projectSearch}
-                        onChange={e => setProjectSearch(e.target.value.toLowerCase())}
-                        onClick={e => e.stopPropagation()}
-                        onKeyDown={e => e.stopPropagation()}
-                      />
-                      <SelectItem value="all">All Projects</SelectItem>
-                      {projectOptions.filter(project => project.name.toLowerCase().includes(projectSearch)).map((project) => (
-                        <SelectItem key={project._id} value={project._id}>
-                          {project.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={epicFilter} onValueChange={setEpicFilter}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Epic" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <Input
-                        placeholder="Search epic..."
-                        className="m-2"
-                        value={epicSearch}
-                        onChange={e => setEpicSearch(e.target.value.toLowerCase())}
-                        onClick={e => e.stopPropagation()}
-                        onKeyDown={e => e.stopPropagation()}
-                      />
-                      <SelectItem value="all">All Epics</SelectItem>
-                      {epicOptions.filter(epic => epic.name.toLowerCase().includes(epicSearch)).map((epic) => (
-                        <SelectItem key={epic._id} value={epic._id}>
-                          {epic.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={sprintFilter} onValueChange={setSprintFilter}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Sprint" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <Input
-                        placeholder="Search sprint..."
-                        className="m-2"
-                        value={sprintSearch}
-                        onChange={e => setSprintSearch(e.target.value.toLowerCase())}
-                        onClick={e => e.stopPropagation()}
-                        onKeyDown={e => e.stopPropagation()}
-                      />
-                      <SelectItem value="all">All Sprints</SelectItem>
-                      {sprintOptions.filter(sprint => sprint.name.toLowerCase().includes(sprintSearch)).map((sprint) => (
-                        <SelectItem key={sprint._id} value={sprint._id}>
-                          {sprint.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
+            <Select value={projectFilter} onValueChange={setProjectFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Project" />
+              </SelectTrigger>
+              <SelectContent>
+                <Input
+                  placeholder="Search project..."
+                  className="m-2"
+                  value={projectSearch}
+                  onChange={e => setProjectSearch(e.target.value.toLowerCase())}
+                  onClick={e => e.stopPropagation()}
+                  onKeyDown={e => e.stopPropagation()}
+                />
+                <SelectItem value="all">All Projects</SelectItem>
+                {projectOptions.filter(project => project.name.toLowerCase().includes(projectSearch)).map((project) => (
+                  <SelectItem key={project._id} value={project._id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={epicFilter} onValueChange={setEpicFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Epic" />
+              </SelectTrigger>
+              <SelectContent>
+                <Input
+                  placeholder="Search epic..."
+                  className="m-2"
+                  value={epicSearch}
+                  onChange={e => setEpicSearch(e.target.value.toLowerCase())}
+                  onClick={e => e.stopPropagation()}
+                  onKeyDown={e => e.stopPropagation()}
+                />
+                <SelectItem value="all">All Epics</SelectItem>
+                {epicOptions.filter(epic => epic.name.toLowerCase().includes(epicSearch)).map((epic) => (
+                  <SelectItem key={epic._id} value={epic._id}>
+                    {epic.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={sprintFilter} onValueChange={setSprintFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Sprint" />
+              </SelectTrigger>
+              <SelectContent>
+                <Input
+                  placeholder="Search sprint..."
+                  className="m-2"
+                  value={sprintSearch}
+                  onChange={e => setSprintSearch(e.target.value.toLowerCase())}
+                  onClick={e => e.stopPropagation()}
+                  onKeyDown={e => e.stopPropagation()}
+                />
+                <SelectItem value="all">All Sprints</SelectItem>
+                {sprintOptions.filter(sprint => sprint.name.toLowerCase().includes(sprintSearch)).map((sprint) => (
+                  <SelectItem key={sprint._id} value={sprint._id}>
+                    {sprint.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           {/* Story count */}
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              {filteredStories.length} story{filteredStories.length !== 1 ? 'ies' : ''} found
+            <p className="text-sm text-muted-foreground flex items-center gap-2">
+              {isFetching && <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}
+              {totalCount} stor{totalCount !== 1 ? 'ies' : 'y'} found
             </p>
           </div>
         </div>
-        
+
         {/* Stories View */}
         <div>
-            <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'list' | 'kanban')}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="list">List View</TabsTrigger>
-                <TabsTrigger value="kanban">Kanban View</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="list" className="space-y-4">
-                <div className="space-y-4">
-                  {filteredStories.map((story) => (
-                    <Card 
-                      key={story._id} 
-                      className={`hover:shadow-md transition-shadow ${story.project ? 'cursor-pointer' : 'cursor-pointer'}`}
-                      onClick={() => { if (story.project) router.push(`/stories/${story._id}`); }}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4 min-w-0">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center mb-2 min-w-0">
-                                <BookOpen className="h-5 w-5 text-blue-600 flex-shrink-0" />
-                                <div className="flex-1 min-w-0 ml-2">
-                                  <h3 className="font-medium text-foreground text-sm sm:text-base truncate min-w-0">{story.title}</h3>
-                                </div>
-                                <div className="flex flex-shrink-0 items-center space-x-2 ml-2">
-                                  <Badge className={getStatusColor(story.status) }>
-                                    {getStatusIcon(story.status)}
-                                    <span className="ml-1">{formatToTitleCase(story.status)}</span>
-                                  </Badge>
-                                  <Badge className={getPriorityColor(story.priority)}>
-                                    {formatToTitleCase(story.priority)}
-                                  </Badge>
-                                </div>
+          <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'list' | 'kanban')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="list">List View</TabsTrigger>
+              <TabsTrigger value="kanban">Kanban View</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="list" className="space-y-4">
+              <div className="space-y-4">
+                {filteredStories.map((story) => (
+                  <Card
+                    key={story._id}
+                    className={`hover:shadow-md transition-shadow ${story.project ? 'cursor-pointer' : 'cursor-pointer'}`}
+                    onClick={() => { if (story.project) router.push(`/stories/${story._id}`); }}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4 min-w-0">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center mb-2 min-w-0">
+                              <BookOpen className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                              <div className="flex-1 min-w-0 ml-2">
+                                <h3 className="font-medium text-foreground text-sm sm:text-base truncate min-w-0">{story.title}</h3>
                               </div>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <p className="text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
-                                      {story.description || 'No description'}
-                                    </p>
-                                  </TooltipTrigger>
-                                  {(story.description && story.description.length > 0) && (
-                                    <TooltipContent>
-                                      <p className="max-w-xs break-words">{story.description}</p>
-                                    </TooltipContent>
-                                  )}
-                                </Tooltip>
-                              </TooltipProvider>
-                              <div className="flex items-center space-x-4 text-sm text-muted-foreground min-w-0 flex-wrap">
-                                <div className="flex items-center space-x-1">
-                                  <Target className="h-4 w-4" />
-                                  {story.project?.name ? (
-                                    <span
-                                      className="truncate"
-                                      title={story.project.name && story.project.name.length > 10 ? story.project.name : undefined}
-                                    >
-                                      {story.project.name && story.project.name.length > 10 ? `${story.project.name.slice(0, 10)}…` : story.project.name}
-                                    </span>
-                                  ) : (
-                                    <span className="truncate italic text-muted-foreground">Project deleted or unavailable</span>
-                                  )}
-                                </div>
-                                {story.epic && (
-                                  <div className="flex items-center space-x-1 min-w-0">
-                                    <Layers className="h-4 w-4 flex-shrink-0" />
-                                    {(() => {
-                                      const epicName = (story.epic as any).name || (story.epic as any).title || ''
-                                      if (!epicName) return null
-                                      const isLong = epicName.length > 10
-                                      const display = isLong ? `${epicName.slice(0, 10)}…` : epicName
-                                      return (
-                                        <span
-                                          className="truncate"
-                                          title={isLong ? epicName : undefined}
-                                        >
-                                          {display}
-                                        </span>
-                                      )
-                                    })()}
-                                  </div>
-                                )}
-                                {story.sprint && (
-                                  <div className="flex items-center space-x-1 min-w-0">
-                                    <Zap className="h-4 w-4 flex-shrink-0" />
-                                    <span
-                                      className="truncate"
-                                      title={story.sprint.name && story.sprint.name.length > 10 ? story.sprint.name : undefined}
-                                    >
-                                      {story.sprint.name && story.sprint.name.length > 10 ? `${story.sprint.name.slice(0, 10)}…` : story.sprint.name}
-                                    </span>
-                                  </div>
-                                )}
-                                {story.dueDate && (
-                                  <div className="flex items-center space-x-1">
-                                    <Calendar className="h-4 w-4" />
-                                    <span>Due {formatDate(story.dueDate)}</span>
-                                  </div>
-                                )}
-                                {story.storyPoints && (
-                                  <div className="flex items-center space-x-1">
-                                    <BarChart3 className="h-4 w-4" />
-                                    <span>{story.storyPoints} points</span>
-                                  </div>
-                                )}
-                                {story.estimatedHours && (
-                                  <div className="flex items-center space-x-1">
-                                    <Clock className="h-4 w-4" />
-                                    <span>{story.estimatedHours}h estimated</span>
-                                  </div>
-                                )}
+                              <div className="flex flex-shrink-0 items-center space-x-2 ml-2">
+                                <Badge className={getStatusColor(story.status)}>
+                                  {getStatusIcon(story.status)}
+                                  <span className="ml-1">{formatToTitleCase(story.status)}</span>
+                                </Badge>
+                                <Badge className={getPriorityColor(story.priority)}>
+                                  {formatToTitleCase(story.priority)}
+                                </Badge>
                               </div>
                             </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <div className="text-right">
-                              {story.assignedTo && (
-                                <div className="text-sm text-muted-foreground truncate max-w-[120px]" title={`${story.assignedTo.firstName} ${story.assignedTo.lastName}`}>
-                                  {story.assignedTo.firstName} {story.assignedTo.lastName}
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="text-sm text-muted-foreground mb-2 line-clamp-2 cursor-default">
+                                    {story.description || 'No description'}
+                                  </p>
+                                </TooltipTrigger>
+                                {(story.description && story.description.length > 0) && (
+                                  <TooltipContent>
+                                    <p className="max-w-xs break-words">{story.description}</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
+                            <div className="flex items-center space-x-4 text-sm text-muted-foreground min-w-0 flex-wrap">
+                              <div className="flex items-center space-x-1">
+                                <Target className="h-4 w-4" />
+                                {story.project?.name ? (
+                                  <span
+                                    className="truncate"
+                                    title={story.project.name && story.project.name.length > 10 ? story.project.name : undefined}
+                                  >
+                                    {story.project.name && story.project.name.length > 10 ? `${story.project.name.slice(0, 10)}…` : story.project.name}
+                                  </span>
+                                ) : (
+                                  <span className="truncate italic text-muted-foreground">Project deleted or unavailable</span>
+                                )}
+                              </div>
+                              {story.epic && (
+                                <div className="flex items-center space-x-1 min-w-0">
+                                  <Layers className="h-4 w-4 flex-shrink-0" />
+                                  {(() => {
+                                    const epicName = (story.epic as any).name || (story.epic as any).title || ''
+                                    if (!epicName) return null
+                                    const isLong = epicName.length > 10
+                                    const display = isLong ? `${epicName.slice(0, 10)}…` : epicName
+                                    return (
+                                      <span
+                                        className="truncate"
+                                        title={isLong ? epicName : undefined}
+                                      >
+                                        {display}
+                                      </span>
+                                    )
+                                  })()}
+                                </div>
+                              )}
+                              {story.sprint && (
+                                <div className="flex items-center space-x-1 min-w-0">
+                                  <Zap className="h-4 w-4 flex-shrink-0" />
+                                  <span
+                                    className="truncate"
+                                    title={story.sprint.name && story.sprint.name.length > 10 ? story.sprint.name : undefined}
+                                  >
+                                    {story.sprint.name && story.sprint.name.length > 10 ? `${story.sprint.name.slice(0, 10)}…` : story.sprint.name}
+                                  </span>
+                                </div>
+                              )}
+                              {story.dueDate && (
+                                <div className="flex items-center space-x-1">
+                                  <Calendar className="h-4 w-4" />
+                                  <span>Due {formatDate(story.dueDate)}</span>
+                                </div>
+                              )}
+                              {story.storyPoints && (
+                                <div className="flex items-center space-x-1">
+                                  <BarChart3 className="h-4 w-4" />
+                                  <span>{story.storyPoints} points</span>
+                                </div>
+                              )}
+                              {story.estimatedHours && (
+                                <div className="flex items-center space-x-1">
+                                  <Clock className="h-4 w-4" />
+                                  <span>{story.estimatedHours}h estimated</span>
                                 </div>
                               )}
                             </div>
-                            <div className="flex items-center space-x-2">
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div className="text-right">
+                            {story.assignedTo && (
+                              <div className="text-sm text-muted-foreground truncate max-w-[120px]" title={`${story.assignedTo.firstName} ${story.assignedTo.lastName}`}>
+                                {story.assignedTo.firstName} {story.assignedTo.lastName}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="sm" onClick={e => e.stopPropagation()}>
@@ -965,87 +968,87 @@ export default function StoriesPage() {
                                 )}
                               </DropdownMenuContent>
                             </DropdownMenu>
-                            </div>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </TabsContent>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
 
-              <TabsContent value="kanban" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  {kanbanStatuses.map((statusKey) => {
-                    const columnStories = filteredStories.filter((story) => story.status === statusKey)
-                    const label =
-                      statusKey === 'inprogress'
-                        ? 'In Progress'
-                        : statusKey === 'done'
+            <TabsContent value="kanban" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {kanbanStatuses.map((statusKey) => {
+                  const columnStories = filteredStories.filter((story) => story.status === statusKey)
+                  const label =
+                    statusKey === 'inprogress'
+                      ? 'In Progress'
+                      : statusKey === 'done'
                         ? 'Done'
                         : formatToTitleCase(statusKey)
 
-                    return (
-                      <div
-                        key={statusKey}
-                        className="bg-muted/40 rounded-lg border border-border flex flex-col max-h-[70vh]"
-                        onDragOver={(e) => {
-                          e.preventDefault()
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault()
-                          if (!draggedStoryId) return
-                          const story = stories.find((s) => s._id === draggedStoryId)
-                          if (!story) return
-                          if (!story.sprint?._id) {
-                            setDraggedStoryId(null)
-                            return
-                          }
-                          handleKanbanStatusChange(story, statusKey)
+                  return (
+                    <div
+                      key={statusKey}
+                      className="bg-muted/40 rounded-lg border border-border flex flex-col max-h-[70vh]"
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        if (!draggedStoryId) return
+                        const story = stories.find((s) => s._id === draggedStoryId)
+                        if (!story) return
+                        if (!story.sprint?._id) {
                           setDraggedStoryId(null)
-                        }}
-                      >
-                        <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Badge className={getStatusColor(statusKey)}>
-                              {getStatusIcon(statusKey)}
-                              <span className="ml-1 text-xs">{label}</span>
-                            </Badge>
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {columnStories.length}
-                          </span>
+                          return
+                        }
+                        handleKanbanStatusChange(story, statusKey)
+                        setDraggedStoryId(null)
+                      }}
+                    >
+                      <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge className={getStatusColor(statusKey)}>
+                            {getStatusIcon(statusKey)}
+                            <span className="ml-1 text-xs">{label}</span>
+                          </Badge>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                          {columnStories.length === 0 ? (
-                            <p className="text-xs text-muted-foreground text-center py-4">
-                              No stories
-                            </p>
-                          ) : (
-                            columnStories.map((story) => {
-                              const isCreator = story.createdBy?.toString() === currentUserId || story.createdBy === currentUserId
-                              const canDragStory = canManageAllStories || isCreator
-                              const isDraggable = Boolean(story.sprint?._id) && canDragStory
-                              const creatorDetails = resolveStoryCreator(story)
-                              const creatorName = getUserDisplayName(creatorDetails)
-                              const creatorInitials = getUserInitials(creatorDetails)
-                              const creatorTitle = creatorDetails?.email
-                                ? `${creatorName} (${creatorDetails.email})`
-                                : creatorName
-                              const assigneeName = story.assignedTo
-                                ? `${story.assignedTo.firstName ?? ''} ${story.assignedTo.lastName ?? ''}`.trim() || story.assignedTo.email || ''
-                                : ''
-                              return (
-                                <Card
-                                  key={story._id}
-                                  className={`hover:shadow-sm transition-shadow ${isDraggable ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'}`}
-                                  draggable={isDraggable}
-                                  onDragStart={() => {
-                                    if (!isDraggable) return
-                                    setDraggedStoryId(story._id)
-                                  }}
-                                  onClick={() => router.push(`/stories/${story._id}`)}
-                                >
+                        <span className="text-xs text-muted-foreground">
+                          {columnStories.length}
+                        </span>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                        {columnStories.length === 0 ? (
+                          <p className="text-xs text-muted-foreground text-center py-4">
+                            No stories
+                          </p>
+                        ) : (
+                          columnStories.map((story) => {
+                            const isCreator = story.createdBy?.toString() === currentUserId || story.createdBy === currentUserId
+                            const canDragStory = canManageAllStories || isCreator
+                            const isDraggable = Boolean(story.sprint?._id) && canDragStory
+                            const creatorDetails = resolveStoryCreator(story)
+                            const creatorName = getUserDisplayName(creatorDetails)
+                            const creatorInitials = getUserInitials(creatorDetails)
+                            const creatorTitle = creatorDetails?.email
+                              ? `${creatorName} (${creatorDetails.email})`
+                              : creatorName
+                            const assigneeName = story.assignedTo
+                              ? `${story.assignedTo.firstName ?? ''} ${story.assignedTo.lastName ?? ''}`.trim() || story.assignedTo.email || ''
+                              : ''
+                            return (
+                              <Card
+                                key={story._id}
+                                className={`hover:shadow-sm transition-shadow ${isDraggable ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'}`}
+                                draggable={isDraggable}
+                                onDragStart={() => {
+                                  if (!isDraggable) return
+                                  setDraggedStoryId(story._id)
+                                }}
+                                onClick={() => router.push(`/stories/${story._id}`)}
+                              >
                                 <CardContent className="p-3 space-y-2">
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="flex-1 min-w-0">
@@ -1109,64 +1112,64 @@ export default function StoriesPage() {
                                     </div>
                                   </div>
                                 </CardContent>
-                                </Card>
-                              )
-                            })
-                          )}
-                        </div>
+                              </Card>
+                            )
+                          })
+                        )}
                       </div>
-                    )
-                  })}
-                </div>
-              </TabsContent>
-            </Tabs>
-
-            {/* Pagination Controls */}
-            {filteredStories.length > 0 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>Items per page:</span>
-                  <Select value={pageSize.toString()} onValueChange={(value) => {
-                    setPageSize(parseInt(value))
-                    setCurrentPage(1)
-                  }}>
-                    <SelectTrigger className="w-20 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                      <SelectItem value="100">100</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <span>
-                    Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredStories.length)} of {filteredStories.length}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                    disabled={currentPage === 1 || loading}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm text-muted-foreground px-2">
-                    Page {currentPage} of {Math.ceil(filteredStories.length / pageSize) || 1}
-                  </span>
-                  <Button
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage >= Math.ceil(filteredStories.length / pageSize) || loading}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Next
-                  </Button>
-                </div>
+                    </div>
+                  )
+                })}
               </div>
-            )}
+            </TabsContent>
+          </Tabs>
+
+          {/* Pagination Controls */}
+          {totalCount > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Items per page:</span>
+                <Select value={pageSize.toString()} onValueChange={(value) => {
+                  setPageSize(parseInt(value))
+                  setCurrentPage(1)
+                }}>
+                  <SelectTrigger className="w-20 h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span>
+                  Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1 || isFetching}
+                  variant="outline"
+                  size="sm"
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground px-2">
+                  Page {currentPage} of {Math.ceil(totalCount / pageSize) || 1}
+                </span>
+                <Button
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage >= Math.ceil(totalCount / pageSize) || isFetching}
+                  variant="outline"
+                  size="sm"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <ConfirmationModal
