@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
-import { findOrgForEmail, getModelOnConnection } from '@/lib/db-connection-manager'
-import '@/models/registry'
+import { User } from '@/models/User'
 import crypto from 'crypto'
 
 export async function POST(request: Request) {
@@ -17,20 +16,10 @@ export async function POST(request: Request) {
 
     console.log('OTP verification request for email:', email)
 
-    // Search across all tenant databases
-    const orgResult = await findOrgForEmail(email.toLowerCase())
-    if (!orgResult) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
+    await connectDB()
 
-    await connectDB(orgResult.orgId)
-    const UserModel = getModelOnConnection<any>('User', orgResult.connection)
-
-    // Find user by email in the resolved org
-    const user = await UserModel.findOne({ email: email.toLowerCase() })
+    // Find user by email
+    const user = await User.findOne({ email: email.toLowerCase() })
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },

@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface ITimeEntry extends Document {
   user: mongoose.Types.ObjectId
@@ -132,5 +131,4 @@ TimeEntrySchema.pre('save', function(next) {
   next()
 })
 
-if (!mongoose.models.TimeEntry) mongoose.model<ITimeEntry>('TimeEntry', TimeEntrySchema)
-export const TimeEntry = makeOrgModel<ITimeEntry>('TimeEntry', TimeEntrySchema)
+export const TimeEntry = mongoose.models.TimeEntry || mongoose.model<ITimeEntry>('TimeEntry', TimeEntrySchema)

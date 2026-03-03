@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface IBurnRate extends Document {
   project: mongoose.Types.ObjectId
@@ -106,5 +105,4 @@ BurnRateSchema.index({ project: 1, date: 1 })
 BurnRateSchema.index({ sprint: 1, date: 1 })
 BurnRateSchema.index({ date: 1 })
 
-if (!mongoose.models.BurnRate) mongoose.model<IBurnRate>('BurnRate', BurnRateSchema)
-export const BurnRate = makeOrgModel<IBurnRate>('BurnRate', BurnRateSchema)
+export const BurnRate = mongoose.models.BurnRate || mongoose.model<IBurnRate>('BurnRate', BurnRateSchema)

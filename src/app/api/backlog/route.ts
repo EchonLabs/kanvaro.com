@@ -308,13 +308,12 @@ export async function GET(request: NextRequest) {
 
     const { user } = authResult
     const userId = user.id
-    const orgId = user.orgId
     const organizationId = user.organization
 
     // Check permissions for task visibility
     const [canViewAllTasks, hasTaskViewAll] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL, undefined, orgId),
-      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL, undefined, orgId)
+      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
+      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL)
     ])
 
     const { searchParams } = new URL(request.url)

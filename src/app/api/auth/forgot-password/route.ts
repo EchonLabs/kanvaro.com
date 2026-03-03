@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
-import { findOrgForEmail, getModelOnConnection } from '@/lib/db-connection-manager'
-import '@/models/registry'
+import { User } from '@/models/User'
 import { emailService } from '@/lib/email/EmailService'
 
 export async function POST(request: Request) {
@@ -17,22 +16,10 @@ export async function POST(request: Request) {
 
     console.log('Password reset request for email:', email)
 
-    // Search across all tenant databases
-    const orgResult = await findOrgForEmail(email.toLowerCase())
-    if (!orgResult) {
-      // Don't reveal if user exists or not for security
-      console.log('User not found in any org for password reset')
-      return NextResponse.json({
-        success: true,
-        message: 'If an account with that email exists, a password reset code has been sent.'
-      })
-    }
+    await connectDB()
 
-    await connectDB(orgResult.orgId)
-    const UserModel = getModelOnConnection<any>('User', orgResult.connection)
-
-    // Find user by email in the resolved org
-    const user = await UserModel.findOne({ email: email.toLowerCase() })
+    // Find user by email
+    const user = await User.findOne({ email: email.toLowerCase() })
     if (!user) {
       // Don't reveal if user exists or not for security
       console.log('User not found for password reset')

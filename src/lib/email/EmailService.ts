@@ -12,8 +12,6 @@ interface EmailOptions {
 export class EmailService {
   private static instance: EmailService
   private emailConfig: any = null
-  private emailConfigLoadedAt: number = 0
-  private static CONFIG_TTL_MS = 5 * 60 * 1000 // Refresh config every 5 minutes
 
   private constructor() {}
 
@@ -24,15 +22,8 @@ export class EmailService {
     return EmailService.instance
   }
 
-  /** Clear cached email config so it is re-fetched on next send. */
-  clearConfigCache(): void {
-    this.emailConfig = null
-    this.emailConfigLoadedAt = 0
-  }
-
   private async getEmailConfig() {
-    const now = Date.now()
-    if (this.emailConfig && (now - this.emailConfigLoadedAt) < EmailService.CONFIG_TTL_MS) {
+    if (this.emailConfig) {
       return this.emailConfig
     }
 
@@ -45,7 +36,6 @@ export class EmailService {
       }
 
       this.emailConfig = organization.emailConfig
-      this.emailConfigLoadedAt = Date.now()
       return this.emailConfig
     } catch (error) {
       console.error('Failed to get email configuration:', error)
@@ -102,53 +92,36 @@ export class EmailService {
     throw new Error(`Unsupported email provider: ${config.provider}`)
   }
 
-  async sendEmail(options: EmailOptions, maxRetries: number = 3): Promise<boolean> {
-    const retryableErrors = ['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ESOCKET', 'EAI_AGAIN']
+  async sendEmail(options: EmailOptions): Promise<boolean> {
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const config = await this.getEmailConfig()
+    try {
+      const config = await this.getEmailConfig()
 
-        const transporter = this.createTransporter(config)
+      const transporter = this.createTransporter(config)
 
-        const fromEmail = config.smtp?.fromEmail || config.azure?.fromEmail
-        const fromName = config.smtp?.fromName || config.azure?.fromName
+      const fromEmail = config.smtp?.fromEmail || config.azure?.fromEmail
+      const fromName = config.smtp?.fromName || config.azure?.fromName
 
-        if (!fromEmail || !fromName) {
-          throw new Error('From email and name not configured')
-        }
 
-        const mailOptions = {
-          from: `"${fromName}" <${fromEmail}>`,
-          to: options.to,
-          subject: options.subject,
-          html: options.html,
-          text: options.text,
-        }
-
-        await transporter.sendMail(mailOptions)
-        if (attempt > 1) {
-          console.log(`[EmailService] Email sent to ${options.to} on attempt ${attempt}`)
-        }
-        return true
-      } catch (error: any) {
-        const errCode = error?.code || error?.errno || ''
-        const isRetryable = retryableErrors.some(code => 
-          errCode.includes(code) || (error?.message || '').includes(code)
-        )
-
-        if (isRetryable && attempt < maxRetries) {
-          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 8000) // 1s, 2s, 4s...
-          console.warn(`[EmailService] Attempt ${attempt}/${maxRetries} failed (${errCode}), retrying in ${delay}ms...`)
-          await new Promise(resolve => setTimeout(resolve, delay))
-          continue
-        }
-
-        console.error(`[EmailService] sendEmail failed after ${attempt} attempt(s):`, error?.message || error)
-        return false
+      if (!fromEmail || !fromName) {
+        throw new Error('From email and name not configured')
       }
+
+      const mailOptions = {
+        from: `"${fromName}" <${fromEmail}>`,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+      }
+
+      const result = await transporter.sendMail(mailOptions)
+
+      return true
+    } catch (error: any) {
+      
+      return false
     }
-    return false
   }
 
   generateOTPEmail(otp: string, organizationName: string = 'Kanvaro'): string {

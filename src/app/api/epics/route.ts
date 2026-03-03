@@ -21,14 +21,11 @@ export async function GET(request: NextRequest) {
 
     const { user } = authResult
     const userId = user.id
-    const orgId = user.orgId
     const organizationId = user.organization
 
     const hasEpicViewAll = await PermissionService.hasPermission(
       userId.toString(),
-      Permission.EPIC_VIEW_ALL,
-      undefined,
-      orgId
+      Permission.EPIC_VIEW_ALL
     );
 
     const { searchParams } = new URL(request.url)

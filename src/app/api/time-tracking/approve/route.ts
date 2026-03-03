@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Only check that the logged-in user has TIME_TRACKING_APPROVE permission globally
-    const perms = await PermissionService.getUserPermissions(userId, user.orgId)
+    const perms = await PermissionService.getUserPermissions(userId)
     const canApprove = perms.globalPermissions.includes(Permission.TIME_TRACKING_APPROVE)
     if (!canApprove) {
       return NextResponse.json(

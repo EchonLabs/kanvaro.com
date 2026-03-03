@@ -17,7 +17,7 @@ export async function PUT(request: NextRequest, { params }: { params: { slug: st
     }
 
     // Check if user has permission to update documentation
-    const hasPermission = await PermissionService.hasPermission(auth.user.id, Permission.DOCUMENTATION_UPDATE, undefined, auth.user.orgId);
+    const hasPermission = await PermissionService.hasPermission(auth.user.id, Permission.DOCUMENTATION_UPDATE);
     if (!hasPermission) {
       return NextResponse.json({ error: 'Permission denied to update documentation' }, { status: 403 });
     }
@@ -79,7 +79,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { slug:
     }
 
     // Check if user has permission to delete documentation
-    const hasPermission = await PermissionService.hasPermission(auth.user.id, Permission.DOCUMENTATION_DELETE, undefined, auth.user.orgId);
+    const hasPermission = await PermissionService.hasPermission(auth.user.id, Permission.DOCUMENTATION_DELETE);
     if (!hasPermission) {
       return NextResponse.json({ error: 'Permission denied to delete documentation' }, { status: 403 });
     }

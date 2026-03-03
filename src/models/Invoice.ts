@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface IInvoice extends Document {
   invoiceNumber: string
@@ -147,5 +146,4 @@ InvoiceSchema.index({ invoiceNumber: 1 })
 InvoiceSchema.index({ organization: 1, status: 1 })
 InvoiceSchema.index({ project: 1, status: 1 })
 
-if (!mongoose.models.Invoice) mongoose.model<IInvoice>('Invoice', InvoiceSchema)
-export const Invoice = makeOrgModel<IInvoice>('Invoice', InvoiceSchema)
+export const Invoice = mongoose.models.Invoice || mongoose.model<IInvoice>('Invoice', InvoiceSchema)

@@ -26,7 +26,6 @@ export async function POST(
     const { user } = authResult
     const organizationId = user.organization
     const userId = user.id
-    const orgId = user.orgId
     const sprintId = params.id
 
     if (!sprintId) {
@@ -46,7 +45,7 @@ export async function POST(
 
     if (!sprint.organization) {
       console.warn('[Sprint Complete] Sprint missing organization, assigning current org', { sprintId })
-      sprint.organization = organizationId as any
+      sprint.organization = organizationId
       await sprint.save()
     } else if (sprint.organization.toString() !== organizationId.toString()) {
       return NextResponse.json(
@@ -66,8 +65,7 @@ export async function POST(
     const canCompleteSprint = await PermissionService.hasPermission(
       userId,
       Permission.SPRINT_COMPLETE,
-      sprintProjectId,
-      orgId
+      sprintProjectId
     )
 
     if (!canCompleteSprint) {
@@ -111,7 +109,7 @@ export async function POST(
       }
 
       if (!targetSprint.organization) {
-        targetSprint.organization = organizationId as any
+        targetSprint.organization = organizationId
         await targetSprint.save()
       } else if (targetSprint.organization.toString() !== organizationId.toString()) {
         return NextResponse.json(

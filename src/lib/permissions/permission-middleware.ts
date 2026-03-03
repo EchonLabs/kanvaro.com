@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Permission } from './permission-definitions';
 import { PermissionService } from './permission-service';
 import { authenticateUser } from '@/lib/auth-utils';
-import connectDB from '@/lib/db-config';
-import '@/models/registry';
 
 export interface PermissionContext {
   userId: string;
@@ -30,9 +28,6 @@ export function withPermission(
           );
         }
 
-        // Ensure org DB context is set for PermissionService
-        await connectDB(authResult.user.orgId);
-
         const userId = authResult.user.id;
         let projectId: string | undefined;
 
@@ -41,10 +36,8 @@ export function withPermission(
           projectId = routeContext.params[options.projectIdParam];
         }
 
-        const orgId = authResult.user.orgId;
-
         // Check permission
-        const hasPermission = await PermissionService.hasPermission(userId, permission, projectId, orgId);
+        const hasPermission = await PermissionService.hasPermission(userId, permission, projectId);
         
         if (!hasPermission) {
           return NextResponse.json(
@@ -55,7 +48,7 @@ export function withPermission(
 
         // If project-scoped permission, verify project access
         if (projectId) {
-          await PermissionService.requireProjectAccess(userId, projectId, orgId);
+          await PermissionService.requireProjectAccess(userId, projectId);
         }
 
         // Call the original handler with permission context
@@ -96,9 +89,6 @@ export function withPermissions(
           );
         }
 
-        // Ensure org DB context is set for PermissionService
-        await connectDB(authResult.user.orgId);
-
         const userId = authResult.user.id;
         let projectId: string | undefined;
 
@@ -107,15 +97,13 @@ export function withPermissions(
           projectId = routeContext.params[options.projectIdParam];
         }
 
-        const orgId = authResult.user.orgId;
-
         // Check permissions
         let hasRequiredPermissions: boolean;
         
         if (options.requireAll) {
-          hasRequiredPermissions = await PermissionService.hasAllPermissions(userId, permissions, projectId, orgId);
+          hasRequiredPermissions = await PermissionService.hasAllPermissions(userId, permissions, projectId);
         } else {
-          hasRequiredPermissions = await PermissionService.hasAnyPermission(userId, permissions, projectId, orgId);
+          hasRequiredPermissions = await PermissionService.hasAnyPermission(userId, permissions, projectId);
         }
         
         if (!hasRequiredPermissions) {
@@ -127,7 +115,7 @@ export function withPermissions(
 
         // If project-scoped permissions, verify project access
         if (projectId) {
-          await PermissionService.requireProjectAccess(userId, projectId, orgId);
+          await PermissionService.requireProjectAccess(userId, projectId);
         }
 
         // Call the original handler with permission context
@@ -167,9 +155,6 @@ export function withProjectAccess(
           );
         }
 
-        // Ensure org DB context is set for PermissionService
-        await connectDB(authResult.user.orgId);
-
         const userId = authResult.user.id;
         const projectId = routeContext?.params?.[projectIdParam];
 
@@ -180,13 +165,11 @@ export function withProjectAccess(
           );
         }
 
-        const orgId = authResult.user.orgId;
-
         // Check project access
         if (options.requireManagement) {
-          await PermissionService.requireProjectManagement(userId, projectId, orgId);
+          await PermissionService.requireProjectManagement(userId, projectId);
         } else {
-          await PermissionService.requireProjectAccess(userId, projectId, orgId);
+          await PermissionService.requireProjectAccess(userId, projectId);
         }
 
         // Call the original handler with permission context
@@ -212,11 +195,10 @@ export function withProjectAccess(
 export async function checkPermission(
   userId: string,
   permission: Permission,
-  projectId?: string,
-  orgId?: string
+  projectId?: string
 ): Promise<boolean> {
   try {
-    return await PermissionService.hasPermission(userId, permission, projectId, orgId);
+    return await PermissionService.hasPermission(userId, permission, projectId);
   } catch (error) {
     console.error('Permission check error:', error);
     return false;
@@ -228,14 +210,13 @@ export async function checkPermissions(
   userId: string,
   permissions: Permission[],
   projectId?: string,
-  requireAll: boolean = false,
-  orgId?: string
+  requireAll: boolean = false
 ): Promise<boolean> {
   try {
     if (requireAll) {
-      return await PermissionService.hasAllPermissions(userId, permissions, projectId, orgId);
+      return await PermissionService.hasAllPermissions(userId, permissions, projectId);
     } else {
-      return await PermissionService.hasAnyPermission(userId, permissions, projectId, orgId);
+      return await PermissionService.hasAnyPermission(userId, permissions, projectId);
     }
   } catch (error) {
     console.error('Permissions check error:', error);
@@ -244,9 +225,9 @@ export async function checkPermissions(
 }
 
 // Utility function to get user's accessible projects
-export async function getUserAccessibleProjects(userId: string, orgId?: string): Promise<string[]> {
+export async function getUserAccessibleProjects(userId: string): Promise<string[]> {
   try {
-    return await PermissionService.getAccessibleProjects(userId, orgId);
+    return await PermissionService.getAccessibleProjects(userId);
   } catch (error) {
     console.error('Get accessible projects error:', error);
     return [];
@@ -256,11 +237,10 @@ export async function getUserAccessibleProjects(userId: string, orgId?: string):
 // Utility function to filter projects by access
 export async function filterProjectsByAccess(
   userId: string,
-  projectIds: string[],
-  orgId?: string
+  projectIds: string[]
 ): Promise<string[]> {
   try {
-    return await PermissionService.filterProjectsByAccess(userId, projectIds, orgId);
+    return await PermissionService.filterProjectsByAccess(userId, projectIds);
   } catch (error) {
     console.error('Filter projects by access error:', error);
     return [];

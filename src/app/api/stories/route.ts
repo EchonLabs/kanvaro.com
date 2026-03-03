@@ -25,18 +25,15 @@ export async function GET(request: NextRequest) {
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
-    const orgId = user.orgId
 
-    const userPermissions = await PermissionService.getUserPermissions(userId, orgId)
+    const userPermissions = await PermissionService.getUserPermissions(userId)
     console.log('Stories API - user role:', userPermissions.userRole)
     console.log('Stories API - global permissions:', userPermissions.globalPermissions)
 
     // Check if user has permission to view all stories
     const hasStoryViewAll = await PermissionService.hasPermission(
       userId,
-      Permission.STORY_VIEW_ALL,
-      undefined,
-      orgId
+      Permission.STORY_VIEW_ALL
     );
 
     const { searchParams } = new URL(request.url)

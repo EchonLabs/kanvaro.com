@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface IProjectVersion extends Document {
   name: string
@@ -77,5 +76,4 @@ ProjectVersionSchema.index({ project: 1, isActive: 1 })
 ProjectVersionSchema.index({ project: 1, isReleased: 1 })
 ProjectVersionSchema.index({ version: 1, project: 1 }, { unique: true })
 
-if (!mongoose.models.ProjectVersion) mongoose.model<IProjectVersion>('ProjectVersion', ProjectVersionSchema)
-export const ProjectVersion = makeOrgModel<IProjectVersion>('ProjectVersion', ProjectVersionSchema)
+export const ProjectVersion = mongoose.models.ProjectVersion || mongoose.model<IProjectVersion>('ProjectVersion', ProjectVersionSchema)

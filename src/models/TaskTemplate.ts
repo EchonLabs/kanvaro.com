@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface ITaskTemplate extends Document {
   name: string
@@ -122,5 +121,4 @@ TaskTemplateSchema.index({ category: 1 })
 TaskTemplateSchema.index({ tags: 1 })
 TaskTemplateSchema.index({ usageCount: -1 })
 
-if (!mongoose.models.TaskTemplate) mongoose.model<ITaskTemplate>('TaskTemplate', TaskTemplateSchema)
-export const TaskTemplate = makeOrgModel<ITaskTemplate>('TaskTemplate', TaskTemplateSchema)
+export const TaskTemplate = mongoose.models.TaskTemplate || mongoose.model<ITaskTemplate>('TaskTemplate', TaskTemplateSchema)

@@ -47,7 +47,6 @@ export async function getTasksServer(filters: TaskFilters = {}): Promise<TasksRe
 
     const { user } = authResult
     const userId = user.id
-    const orgId = user.orgId
     const organizationId = user.organization
 
     const {
@@ -66,7 +65,7 @@ export async function getTasksServer(filters: TaskFilters = {}): Promise<TasksRe
     const sort = { createdAt: -1 as const }
 
     // Only users with PROJECT_VIEW_ALL can see all tasks; otherwise default to "My Tasks"
-    const canViewAllTasks = await PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL, undefined, orgId)
+    const canViewAllTasks = await PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL)
 
     // Build filters
     const dbFilters: any = { 

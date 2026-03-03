@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { getOrgConnection, getModelOnConnection } from '@/lib/db-connection-manager'
-import '@/models/registry'
+import connectDB from '@/lib/db-config'
+import { User } from '@/models/User'
+import '@/models/CustomRole' // Ensure CustomRole model is registered for populate
 import jwt from 'jsonwebtoken'
 import { normalizeUploadUrl } from '@/lib/file-utils'
 
@@ -36,10 +37,9 @@ export async function GET() {
         const decoded = jwt.verify(accessToken, JWT_SECRET) as any
         console.log('Access token verified for user:', decoded.userId)
         
-        // Get connection for the user's org
-        const conn = await getOrgConnection(decoded.orgId)
-        const UserModel = getModelOnConnection<any>('User', conn)
-        const user = await UserModel.findById(decoded.userId).populate('customRole', 'name')
+        // Database mode - fetch user from database
+        await connectDB()
+        const user = await User.findById(decoded.userId).populate('customRole', 'name')
         if (user && user.isActive) {
           console.log('User found in database:', user.email)
           userData = {
@@ -80,16 +80,15 @@ export async function GET() {
             const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as any
             console.log('Refresh token verified for user:', decoded.userId)
             
-            // Get connection for the user's org
-            const conn = await getOrgConnection(decoded.orgId)
-            const UserModel = getModelOnConnection<any>('User', conn)
-            const user = await UserModel.findById(decoded.userId).populate('customRole', 'name')
+            // Database mode - fetch user from database
+            await connectDB()
+            const user = await User.findById(decoded.userId).populate('customRole', 'name')
             if (user && user.isActive) {
               console.log('User found via refresh token:', user.email)
               
               // Create new access token
               const newAccessToken = jwt.sign(
-                { userId: user._id, email: user.email, role: user.role, orgId: decoded.orgId },
+                { userId: user._id, email: user.email, role: user.role },
                 JWT_SECRET,
                 { expiresIn: '15m' }
               )
@@ -153,16 +152,14 @@ export async function GET() {
         const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as any
         console.log('Only refresh token available, verifying for user:', decoded.userId)
         
-        // Get connection for the user's org
-        const conn = await getOrgConnection(decoded.orgId)
-        const UserModel = getModelOnConnection<any>('User', conn)
-        const user = await UserModel.findById(decoded.userId).populate('customRole', 'name')
+        await connectDB()
+        const user = await User.findById(decoded.userId).populate('customRole', 'name')
         if (user && user.isActive) {
           console.log('User found via refresh token only:', user.email)
           
           // Create new access token
           const newAccessToken = jwt.sign(
-            { userId: user._id, email: user.email, role: user.role, orgId: decoded.orgId },
+            { userId: user._id, email: user.email, role: user.role },
             JWT_SECRET,
             { expiresIn: '15m' }
           )

@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export const TASK_STATUS_VALUES = ['backlog', 'todo', 'in_progress', 'review', 'testing', 'done', 'cancelled'] as const
 export type TaskStatus = typeof TASK_STATUS_VALUES[number]
@@ -298,5 +297,4 @@ TaskSchema.index({ organization: 1, createdAt: -1 })
 TaskSchema.index({ project: 1, status: 1, createdAt: -1 })
 TaskSchema.index({ title: 'text', description: 'text' })
 
-if (!mongoose.models.Task) mongoose.model<ITask>('Task', TaskSchema)
-export const Task = makeOrgModel<ITask>('Task', TaskSchema)
+export const Task = mongoose.models.Task || mongoose.model<ITask>('Task', TaskSchema)

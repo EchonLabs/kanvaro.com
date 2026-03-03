@@ -152,7 +152,6 @@ export async function POST(request: NextRequest) {
 
     const userId = authResult.user.id
     const organizationId = authResult.user.organization
-    const orgId = authResult.user.orgId
 
     let body
     try {
@@ -294,7 +293,7 @@ export async function POST(request: NextRequest) {
     // }
     // Check permissions for each project
     for (const project of projects) {
-      const canCreateTask = await PermissionService.hasPermission(userId, Permission.TASK_CREATE, project._id.toString(), orgId)
+      const canCreateTask = await PermissionService.hasPermission(userId, Permission.TASK_CREATE, project._id.toString())
       if (!canCreateTask) {
         return NextResponse.json(
           { success: false, error: `Access denied to create tasks in project: ${project.name}` },

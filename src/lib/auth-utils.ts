@@ -1,6 +1,5 @@
 import connectDB from '@/lib/db-config'
-import { getOrgConnection, getModelOnConnection } from '@/lib/db-connection-manager'
-import { getOrgConfigs } from '@/lib/config'
+import { User } from '@/models/User'
 import jwt from 'jsonwebtoken'
 import { cookies } from 'next/headers'
 
@@ -12,7 +11,6 @@ export interface AuthUser {
   organization: string
   email: string
   role: string
-  orgId: string
 }
 
 export async function withAuth(request: any, handler: (user: AuthUser) => Promise<any>) {
@@ -30,98 +28,62 @@ export async function withAuth(request: any, handler: (user: AuthUser) => Promis
 
 export async function authenticateUser(): Promise<{ user: AuthUser } | { error: string; status: number }> {
   try {
+    await connectDB()
+
     const cookieStore = cookies()
     const accessToken = cookieStore.get('accessToken')?.value
     const refreshToken = cookieStore.get('refreshToken')?.value
 
+    // If no tokens, return unauthorized
     if (!accessToken && !refreshToken) {
       return { error: 'No authentication tokens', status: 401 }
     }
 
-    // Helper: given a decoded JWT payload, connect to the right org DB and find the user
-    // Returns { user, orgId } so callers know which org was resolved.
-    async function resolveUser(decoded: any): Promise<{ user: any; resolvedOrgId: string } | null> {
-      const orgId: string | undefined = decoded.orgId
-
-      if (orgId) {
-        try {
-          await connectDB(orgId)
-          const conn = await getOrgConnection(orgId)
-          const UserModel = getModelOnConnection<any>('User', conn)
-          const user = await UserModel.findById(decoded.userId)
-          if (user) {
-            console.log(`[auth] Resolved user ${decoded.userId} in org ${orgId} (db: ${conn.name})`)
-            return { user, resolvedOrgId: orgId }
-          }
-        } catch (err) {
-          console.warn('Could not find user in specified org, falling back to all orgs:', err)
-        }
-      }
-
-      // Fallback: scan all configured orgs (handles legacy tokens without orgId)
-      const orgs = getOrgConfigs()
-      for (const org of orgs) {
-        try {
-          await connectDB(org.id)
-          const conn = await getOrgConnection(org.id)
-          const UserModel = getModelOnConnection<any>('User', conn)
-          const user = await UserModel.findById(decoded.userId)
-          if (user) {
-            console.log(`[auth] Resolved user ${decoded.userId} in org ${org.id} (db: ${conn.name}) via fallback scan`)
-            return { user, resolvedOrgId: org.id }
-          }
-        } catch {
-          // skip unreachable org
-        }
-      }
-      return null
-    }
-
     let userData = null
 
+    // Try to verify access token first
     if (accessToken) {
       try {
         const decoded = jwt.verify(accessToken, JWT_SECRET) as any
-        const result = await resolveUser(decoded)
-        if (result && result.user.isActive) {
-          // Re-set the org context so downstream code uses the right DB
-          await connectDB(result.resolvedOrgId)
+        const user = await User.findById(decoded.userId)
+        if (user && user.isActive) {
           userData = {
-            id: result.user._id,
-            organization: result.user.organization,
-            email: result.user.email,
-            role: result.user.role,
-            orgId: result.resolvedOrgId,
+            id: user._id,
+            organization: user.organization,
+            email: user.email,
+            role: user.role
           }
         }
-      } catch {
-        // Try refresh token
+      } catch (error) {
+        // Access token is invalid, try refresh token
         if (refreshToken) {
           try {
             const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as any
-            const result = await resolveUser(decoded)
-            if (result && result.user.isActive) {
-              await connectDB(result.resolvedOrgId)
+            const user = await User.findById(decoded.userId)
+            if (user && user.isActive) {
+              // Create new access token
               const newAccessToken = jwt.sign(
-                { userId: result.user._id, email: result.user.email, role: result.user.role, orgId: result.resolvedOrgId },
+                { userId: user._id, email: user.email, role: user.role },
                 JWT_SECRET,
                 { expiresIn: '15m' }
               )
+
+              // Set new access token cookie
               cookieStore.set('accessToken', newAccessToken, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
                 sameSite: 'strict',
-                maxAge: 15 * 60
+                maxAge: 15 * 60 // 15 minutes
               })
+
               userData = {
-                id: result.user._id,
-                organization: result.user.organization,
-                email: result.user.email,
-                role: result.user.role,
-                orgId: result.resolvedOrgId,
+                id: user._id,
+                organization: user.organization,
+                email: user.email,
+                role: user.role
               }
             }
-          } catch {
+          } catch (refreshError) {
             return { error: 'Invalid authentication tokens', status: 401 }
           }
         } else {
@@ -129,31 +91,34 @@ export async function authenticateUser(): Promise<{ user: AuthUser } | { error: 
         }
       }
     } else if (refreshToken) {
+      // Only refresh token available
       try {
         const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as any
-        const result = await resolveUser(decoded)
-        if (result && result.user.isActive) {
-          await connectDB(result.resolvedOrgId)
+        const user = await User.findById(decoded.userId)
+        if (user && user.isActive) {
+          // Create new access token
           const newAccessToken = jwt.sign(
-            { userId: result.user._id, email: result.user.email, role: result.user.role, orgId: result.resolvedOrgId },
+            { userId: user._id, email: user.email, role: user.role },
             JWT_SECRET,
             { expiresIn: '15m' }
           )
+
+          // Set new access token cookie
           cookieStore.set('accessToken', newAccessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
-            maxAge: 15 * 60
+            maxAge: 15 * 60 // 15 minutes
           })
+
           userData = {
-            id: result.user._id,
-            organization: result.user.organization,
-            email: result.user.email,
-            role: result.user.role,
-            orgId: result.resolvedOrgId,
+            id: user._id,
+            organization: user.organization,
+            email: user.email,
+            role: user.role
           }
         }
-      } catch {
+      } catch (error) {
         return { error: 'Invalid refresh token', status: 401 }
       }
     }
@@ -168,4 +133,3 @@ export async function authenticateUser(): Promise<{ user: AuthUser } | { error: 
     return { error: 'Internal server error', status: 500 }
   }
 }
-

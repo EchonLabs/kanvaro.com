@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface IStory extends Document {
   title: string
@@ -126,7 +125,12 @@ StorySchema.index({ sprint: 1, status: 1 })
 StorySchema.index({ archived: 1 })
 StorySchema.index({ project: 1, archived: 1 })
 
-// Ensure schema is globally registered (required by the org-aware model proxy)
-if (!mongoose.models.Story) mongoose.model<IStory>('Story', StorySchema)
+// Check if model already exists to avoid re-registration
+let Story: mongoose.Model<IStory>
+try {
+  Story = mongoose.model<IStory>('Story')
+} catch {
+  Story = mongoose.model<IStory>('Story', StorySchema)
+}
 
-export const Story = makeOrgModel<IStory>('Story', StorySchema)
+export { Story }

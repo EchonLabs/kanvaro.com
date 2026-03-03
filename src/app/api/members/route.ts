@@ -23,13 +23,12 @@ export async function GET(request: NextRequest) {
 
     const { user } = authResult
     const userId = user.id
-    const orgId = user.orgId
     const organizationId = user.organization
 
     // Check if user has permission to view members
     const [canReadTeam, canReadUsers] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.TEAM_READ, undefined, orgId),
-      PermissionService.hasPermission(userId, Permission.USER_READ, undefined, orgId)
+      PermissionService.hasPermission(userId, Permission.TEAM_READ),
+      PermissionService.hasPermission(userId, Permission.USER_READ)
     ])
 
     if (!canReadTeam && !canReadUsers) {
@@ -144,15 +143,14 @@ export async function PUT(request: NextRequest) {
 
     const { user } = authResult
     const userId = user.id
-    const orgId = user.orgId
     const organizationId = user.organization
 
     const { memberId, updates } = await request.json()
 
     // Check if user has permission to update members
     const [canEditMembers, hasTeamEditPermission] = await Promise.all([
-      PermissionService.hasPermission(userId.toString(), Permission.USER_UPDATE, undefined, orgId),
-      PermissionService.hasPermission(userId.toString(), Permission.TEAM_EDIT, undefined, orgId)
+      PermissionService.hasPermission(userId.toString(), Permission.USER_UPDATE),
+      PermissionService.hasPermission(userId.toString(), Permission.TEAM_EDIT)
     ])
 
     if (!canEditMembers || !hasTeamEditPermission) {
@@ -176,7 +174,7 @@ export async function PUT(request: NextRequest) {
     }
 
     if (member.role === 'admin') {
-      const canManageAdminUsers = await PermissionService.hasPermission(userId, Permission.USER_MANAGE_ROLES, undefined, orgId)
+      const canManageAdminUsers = await PermissionService.hasPermission(userId, Permission.USER_MANAGE_ROLES)
       if (!canManageAdminUsers) {
         return NextResponse.json(
           { error: 'You do not have permission to edit administrator accounts' },

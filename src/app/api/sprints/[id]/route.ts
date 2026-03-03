@@ -26,14 +26,11 @@ export async function GET(
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
-    const orgId = user.orgId
     const sprintId = params.id
 
     const canViewSprint = await PermissionService.hasAnyPermission(
       userId.toString(),
-      [Permission.SPRINT_VIEW, Permission.SPRINT_READ],
-      undefined,
-      orgId
+      [Permission.SPRINT_VIEW, Permission.SPRINT_READ]
     )
 
     if (!canViewSprint) {
@@ -46,9 +43,7 @@ export async function GET(
     // Check if user has permission to view all sprints
     const hasSprintViewAll = await PermissionService.hasPermission(
       userId,
-      Permission.SPRINT_VIEW_ALL,
-      undefined,
-      orgId
+      Permission.SPRINT_VIEW_ALL
     );
 
     const sprint = await Sprint.findOne({ _id: sprintId })
@@ -221,7 +216,6 @@ export async function PUT(
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
-    const orgId = user.orgId
     const sprintId = params.id
 
     const updateData = await request.json()
@@ -247,14 +241,12 @@ export async function PUT(
     const hasEditPermission = await PermissionService.hasAnyPermission(
       userId,
       [Permission.SPRINT_EDIT, Permission.SPRINT_UPDATE, Permission.SPRINT_MANAGE],
-      sprintProjectId,
-      orgId
+      sprintProjectId
     )
     const hasCreatePermission = await PermissionService.hasPermission(
       userId.toString(),
       Permission.SPRINT_CREATE,
-      sprintProjectId,
-      orgId
+      sprintProjectId
     )
 
     if (!hasEditPermission || !hasCreatePermission) {
@@ -320,7 +312,6 @@ export async function DELETE(
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
-    const orgId = user.orgId
     const sprintId = params.id
 
     const sprint = await Sprint.findById(sprintId)
@@ -343,8 +334,7 @@ export async function DELETE(
     const canDeleteSprint = await PermissionService.hasPermission(
       userId.toString(),
       Permission.SPRINT_DELETE,
-      sprintProjectId,
-      orgId
+      sprintProjectId
     )
 
     if (!canDeleteSprint) {

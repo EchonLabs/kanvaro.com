@@ -23,24 +23,7 @@ export default function SetupPage() {
   const [currentStep, setCurrentStep] = useState('database')
   const [setupData, setSetupData] = useState<any>({})
   const [isLoading, setIsLoading] = useState(false)
-  const [atOrgLimit, setAtOrgLimit] = useState(false)
   const router = useRouter()
-
-  // Check org limit to inform DatabaseConfig (but don't redirect away)
-  useEffect(() => {
-    async function checkOrgLimit() {
-      try {
-        const res = await fetch('/api/setup/status')
-        if (res.ok) {
-          const data = await res.json()
-          setAtOrgLimit(!!data.atOrgLimit)
-        }
-      } catch {
-        // silently continue to setup
-      }
-    }
-    checkOrgLimit()
-  }, [])
 
   const handleNext = (stepData: any) => {
     // Extract existing data from database step if present
@@ -107,7 +90,7 @@ export default function SetupPage() {
   const renderCurrentStep = () => {
     switch (currentStep) {
       case 'database':
-        return <DatabaseConfig onNext={handleNext} initialData={setupData.database} atOrgLimit={atOrgLimit} />
+        return <DatabaseConfig onNext={handleNext} initialData={setupData.database} />
       case 'admin':
         return <AdminUserSetup onNext={handleNext} onBack={handleBack} initialData={setupData.admin} />
       case 'organization':

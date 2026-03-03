@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface ITimeTrackingSettings extends Document {
   organization: mongoose.Types.ObjectId
@@ -191,5 +190,4 @@ const TimeTrackingSettingsSchema = new Schema<ITimeTrackingSettings>({
 TimeTrackingSettingsSchema.index({ organization: 1, project: 1 }, { unique: true, sparse: true })
 TimeTrackingSettingsSchema.index({ organization: 1 })
 
-if (!mongoose.models.TimeTrackingSettings) mongoose.model<ITimeTrackingSettings>('TimeTrackingSettings', TimeTrackingSettingsSchema)
-export const TimeTrackingSettings = makeOrgModel<ITimeTrackingSettings>('TimeTrackingSettings', TimeTrackingSettingsSchema)
+export const TimeTrackingSettings = mongoose.models.TimeTrackingSettings || mongoose.model<ITimeTrackingSettings>('TimeTrackingSettings', TimeTrackingSettingsSchema)

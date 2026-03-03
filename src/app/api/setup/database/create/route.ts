@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { isAtOrgLimit, MAX_ORGANIZATIONS } from '@/lib/config'
-import { connectWithUri } from '@/lib/db-config'
-import { getModelOnConnection } from '@/lib/db-connection-manager'
-import '@/models/registry'
+import mongoose from 'mongoose'
+import { Currency } from '@/models/Currency'
+import { saveDatabaseConfig } from '@/lib/config'
+import connectDB from '@/lib/db-config'
 
 // Currency data for seeding
 const currencyData = [
@@ -58,11 +58,10 @@ const currencyData = [
   { code: 'KID', name: 'Kiribati Dollar', symbol: '$', country: 'Kiribati', isMajor: false }
 ]
 
-async function seedCurrencies(conn: any) {
+async function seedCurrencies() {
   try {
     console.log('Seeding currencies...')
-    const CurrencyModel = getModelOnConnection<any>('Currency', conn)
-    await CurrencyModel.insertMany(currencyData)
+    await Currency.insertMany(currencyData)
     console.log(`Successfully seeded ${currencyData.length} currencies`)
   } catch (error) {
     console.error('Error seeding currencies:', error)
@@ -72,72 +71,38 @@ async function seedCurrencies(conn: any) {
 
 export async function POST(request: NextRequest) {
   try {
-    // ── Org limit check ─────────────────────────────────────────────────────
-    if (isAtOrgLimit()) {
-      return NextResponse.json(
-        { error: `Organization limit reached (max ${MAX_ORGANIZATIONS}). Cannot configure a new database.` },
-        { status: 403 }
-      )
-    }
-
     const config = await request.json()
-
+    
     // For MongoDB, we don't actually "create" a database in the traditional sense
     // MongoDB creates databases automatically when you first write to them
     // What we're doing here is testing the connection and ensuring we can access the database
-
+    
     // Build MongoDB URI with authentication
+    // Always convert localhost to mongodb service name since we always run in Docker
     let host = config.host
     if (config.host === 'localhost') {
+   //   host = 'mongodb'
       console.log('Converting localhost to mongodb service name (Docker deployment)')
     }
     const port = config.port
-
+    
+    // Build URI with or without authentication
     let uri
     if (config.username && config.password) {
       uri = `mongodb://${config.username}:${config.password}@${host}:${port}/${config.database}?authSource=${config.authSource}`
     } else {
       uri = `mongodb://${host}:${port}/${config.database}`
     }
-
+    
     console.log('=== DATABASE CONNECTION DEBUG ===')
     console.log('Original config:', config)
     console.log('Host conversion - original:', config.host, 'converted:', host)
     console.log('Final URI:', uri)
     console.log('=== END DEBUG ===')
-
-    // NOTE: We do NOT save the database config here yet.
-    // It is saved during setup/complete when the org is fully registered.
-    // Here we just test the connection and optionally seed currencies.
-    console.log('Testing database connection...')
-    const conn = await connectWithUri(uri, config.database)
-    console.log('Connected via test connection')
-
-    if (conn.db) {
-      await conn.db.admin().ping()
-
-      // Create a simple test collection to "initialize" the database
-      const testCollection = conn.db.collection('_setup_test')
-      await testCollection.insertOne({ test: true, createdAt: new Date() })
-      await testCollection.deleteOne({ test: true })
-
-      // Seed currencies if not already seeded
-      const CurrencyModel = getModelOnConnection<any>('Currency', conn)
-      const existingCurrencies = await CurrencyModel.countDocuments()
-      if (existingCurrencies === 0) {
-        console.log('Seeding currencies...')
-        await seedCurrencies(conn)
-        console.log('Currencies seeded successfully')
-      } else {
-        console.log(`Currencies already exist (${existingCurrencies} found)`)
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Database is ready for use',
-      // Return the URI back so it can be used in the next setup step
-      uri,
+    
+    // Save database configuration first so connectDB can use it
+    console.log('Saving database configuration to config file...')
+    saveDatabaseConfig({
       host: config.host,
       port: config.port,
       database: config.database,
@@ -145,13 +110,55 @@ export async function POST(request: NextRequest) {
       password: config.password,
       authSource: config.authSource,
       ssl: config.ssl,
+      uri: uri
+    })
+    console.log('Database configuration saved successfully')
+    
+    // Now use the unified connection system
+    const db = await connectDB()
+    console.log('Connected using unified connection system')
+    
+    // Test basic operations to ensure database is accessible
+    if (db.connection.db) {
+      await db.connection.db.admin().ping()
+      
+      // Create a simple test collection to "initialize" the database
+      const testCollection = db.connection.db.collection('_setup_test')
+      await testCollection.insertOne({ 
+        test: true, 
+        createdAt: new Date() 
+      })
+      
+      // Clean up test document
+      await testCollection.deleteOne({ test: true })
+      
+      // Seed currencies if not already seeded
+      console.log('Checking if currencies need to be seeded...')
+      const existingCurrencies = await Currency.countDocuments()
+      if (existingCurrencies === 0) {
+        console.log('Seeding currencies...')
+        await seedCurrencies()
+        console.log('Currencies seeded successfully')
+      } else {
+        console.log(`Currencies already exist (${existingCurrencies} found)`)
+      }
+    }
+    
+    return NextResponse.json({ 
+      success: true,
+      message: 'Database is ready for use'
     })
   } catch (error) {
     console.error('Database creation failed:', error)
-
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    })
+    
+    // Provide more specific error messages
     let errorMessage = 'Database setup failed. Please check your connection settings.'
     let details = error instanceof Error ? error.message : 'Unknown error'
-
+    
     if (details.includes('EAI_AGAIN') || details.includes('getaddrinfo')) {
       errorMessage = 'Cannot resolve database hostname. Please check your host and port settings.'
     } else if (details.includes('authentication failed') || details.includes('auth')) {
@@ -159,7 +166,13 @@ export async function POST(request: NextRequest) {
     } else if (details.includes('ECONNREFUSED')) {
       errorMessage = 'Connection refused. Please check if MongoDB is running and accessible.'
     }
-
-    return NextResponse.json({ error: errorMessage, details }, { status: 400 })
+    
+    return NextResponse.json(
+      { 
+        error: errorMessage,
+        details: details
+      },
+      { status: 400 }
+    )
   }
 }
