@@ -51,11 +51,9 @@ import {
   Link as LinkIcon,
   File,
   Image,
-  ExternalLink,
-  Upload
+  ExternalLink
 } from 'lucide-react'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
-import BulkUploadModal from '@/components/tasks/BulkUploadModal'
 import { useOrganization } from '@/hooks/useOrganization'
 import EditTaskModal from '@/components/tasks/EditTaskModal'
 import { AddExpenseDialog } from '@/components/projects/AddExpenseDialog'
@@ -202,7 +200,6 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
-  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
   const [showEditTaskModal, setShowEditTaskModal] = useState(false)
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<any | null>(null)
@@ -665,16 +662,10 @@ export default function ProjectDetailPage() {
               </Button>
             )}
             {canCreateTask && (
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <Button variant="outline" size="sm" onClick={() => setShowBulkUploadModal(true)} className="w-full sm:w-auto">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Bulk Upload
-                </Button>
-                <Button size="sm" onClick={() => setShowCreateTaskModal(true)} className="w-full sm:w-auto">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Task
-                </Button>
-              </div>
+              <Button size="sm" onClick={() => setShowCreateTaskModal(true)} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Task
+              </Button>
             )}
           </div>
         </div>
@@ -2133,17 +2124,6 @@ export default function ProjectDetailPage() {
             // Refresh project data to update task counts
             fetchProject()
             // Refresh tasks list
-            fetchTasks()
-          }}
-        />
-
-        {/* Bulk Upload Modal */}
-        <BulkUploadModal
-          open={showBulkUploadModal}
-          onClose={() => setShowBulkUploadModal(false)}
-          defaultProject={project ? { id: project._id, name: project.name } : undefined}
-          onSuccess={() => {
-            fetchProject()
             fetchTasks()
           }}
         />

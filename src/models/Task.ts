@@ -118,7 +118,7 @@ const TaskSchema = new Schema<ITask>({
   },
   description: {
     type: String,
-    maxlength: 200000
+    maxlength: 10000
   },
   status: {
     type: String,

@@ -18,7 +18,6 @@ export async function GET(
   try {
     // Extract type and filename from path
     // path = ['logos', 'filename.png'] or ['avatars', 'filename.jpg']
-    // or org-scoped: ['{orgId}', '{entityType}', '{entityId}', '{filename}']
     if (params.path.length < 2) {
       return NextResponse.json(
         { error: 'Invalid path. Expected format: /api/uploads/{type}/{filename}' },
@@ -26,41 +25,21 @@ export async function GET(
       )
     }
 
-    const uploadsBase = process.env.UPLOADS_DIR || join(process.cwd(), 'uploads')
+    const [type, ...filenameParts] = params.path
+    const filename = filenameParts.join('/') // Handle nested paths if needed
 
-    // Detect org-scoped paths: first segment is a 24-hex MongoDB ObjectId
-    const isOrgScoped = /^[0-9a-f]{24}$/i.test(params.path[0])
-
-    let filePath: string
-
-    if (isOrgScoped) {
-      // /api/uploads/{orgId}/{entityType}/{entityId}/{filename}
-      // Validate entityType to prevent directory traversal
-      const entityType = params.path[1]
-      const allowedEntityTypes = ['projects', 'epics', 'sprints', 'stories', 'tasks', 'organizations']
-      if (!allowedEntityTypes.includes(entityType)) {
-        return NextResponse.json({ error: 'Invalid entity type' }, { status: 400 })
-      }
-      // Rebuild the path safely (prevent traversal)
-      const safeParts = params.path.map(p => p.replace(/\.\./g, ''))
-      filePath = join(uploadsBase, ...safeParts)
-    } else {
-      const [type, ...filenameParts] = params.path
-      const filename = filenameParts.join('/')
-
-      // Validate type (only allow known upload types)
-      const allowedTypes = ['logos', 'avatars', 'attachments', 'documents']
-      if (!allowedTypes.includes(type)) {
-        return NextResponse.json(
-          { error: 'Invalid upload type' },
-          { status: 400 }
-        )
-      }
-
-      // Get the file path using the same logic as file uploads
-      const uploadDir = getUploadDirectory(type)
-      filePath = join(uploadDir, filename)
+    // Validate type (only allow known upload types)
+    const allowedTypes = ['logos', 'avatars', 'attachments', 'documents']
+    if (!allowedTypes.includes(type)) {
+      return NextResponse.json(
+        { error: 'Invalid upload type' },
+        { status: 400 }
+      )
     }
+
+    // Get the file path using the same logic as file uploads
+    const uploadDir = getUploadDirectory(type)
+    const filePath = join(uploadDir, filename)
 
     // Check if file exists
     if (!existsSync(filePath)) {
@@ -74,7 +53,7 @@ export async function GET(
     const fileBuffer = await readFile(filePath)
 
     // Determine content type based on file extension
-    const extension = filePath.split('.').pop()?.toLowerCase()
+    const extension = filename.split('.').pop()?.toLowerCase()
     const contentTypeMap: Record<string, string> = {
       'jpg': 'image/jpeg',
       'jpeg': 'image/jpeg',
