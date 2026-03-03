@@ -25,12 +25,15 @@ export async function GET(request: NextRequest) {
 
     const { user } = authResult
     const userId = user.id
+    const orgId = user.orgId
     const organizationId = user.organization
 
     // Check permission
     const canViewAllTimers = await PermissionService.hasPermission(
       userId,
-      Permission.TIME_TRACKING_VIEW_ALL_TIMER
+      Permission.TIME_TRACKING_VIEW_ALL_TIMER,
+      undefined,
+      orgId
     )
 
     if (!canViewAllTimers) {
@@ -105,12 +108,15 @@ export async function PUT(request: NextRequest) {
 
     const { user } = authResult
     const userId = user.id
+    const orgId = user.orgId
     const organizationId = user.organization
 
     // Check permission
     const canViewAllTimers = await PermissionService.hasPermission(
       userId,
-      Permission.TIME_TRACKING_VIEW_ALL_TIMER
+      Permission.TIME_TRACKING_VIEW_ALL_TIMER,
+      undefined,
+      orgId
     )
 
     if (!canViewAllTimers) {

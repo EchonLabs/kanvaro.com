@@ -66,6 +66,8 @@ export async function GET() {
   }
 }
 
+import { emailService } from '@/lib/email/EmailService'
+
 export async function PUT(request: NextRequest) {
   try {
     const emailConfig = await request.json()
@@ -100,6 +102,9 @@ export async function PUT(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    // Clear cached email config so the new settings take effect immediately
+    emailService.clearConfigCache()
     
     return NextResponse.json({
       message: 'Email settings updated successfully',

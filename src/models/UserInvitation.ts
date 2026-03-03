@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose'
+import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface IUserInvitation extends Document {
   email: string
@@ -70,4 +71,5 @@ UserInvitationSchema.index({ email: 1, organization: 1 })
 UserInvitationSchema.index({ expiresAt: 1 })
 UserInvitationSchema.index({ isAccepted: 1 })
 
-export const UserInvitation = mongoose.models.UserInvitation || mongoose.model<IUserInvitation>('UserInvitation', UserInvitationSchema)
+if (!mongoose.models.UserInvitation) mongoose.model<IUserInvitation>('UserInvitation', UserInvitationSchema)
+export const UserInvitation = makeOrgModel<IUserInvitation>('UserInvitation', UserInvitationSchema)

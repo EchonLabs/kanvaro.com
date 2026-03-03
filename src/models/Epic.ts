@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose'
+import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface IEpic extends Document {
   title: string
@@ -107,4 +108,5 @@ EpicSchema.index({ project: 1, status: 1 })
 EpicSchema.index({ archived: 1 })
 EpicSchema.index({ project: 1, archived: 1 })
 
-export const Epic = mongoose.models.Epic || mongoose.model<IEpic>('Epic', EpicSchema)
+if (!mongoose.models.Epic) mongoose.model<IEpic>('Epic', EpicSchema)
+export const Epic = makeOrgModel<IEpic>('Epic', EpicSchema)

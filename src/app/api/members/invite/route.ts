@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
 
     const { user } = authResult
     const userId = user.id
+    const orgId = user.orgId
     const organizationId = user.organization
 
     const { email, role, firstName, lastName } = await request.json()
@@ -49,8 +50,8 @@ export async function POST(request: NextRequest) {
 
     // Check if user has permission to invite members
     const [hasTeamInvite, hasUserInvite] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.TEAM_INVITE),
-      PermissionService.hasPermission(userId, Permission.USER_INVITE)
+      PermissionService.hasPermission(userId, Permission.TEAM_INVITE, undefined, orgId),
+      PermissionService.hasPermission(userId, Permission.USER_INVITE, undefined, orgId)
     ])
 
     if (!hasTeamInvite && !hasUserInvite) {
@@ -159,39 +160,22 @@ export async function POST(request: NextRequest) {
     const invitation = new UserInvitation(invitationData)
     await invitation.save()
 
-    // Return success immediately - send email and notifications asynchronously
-    const response = NextResponse.json({
-      success: true,
-      message: 'Invitation sent successfully',
-      data: {
-        email: invitation.email,
-        role: invitation.role,
-        customRole: invitation.customRole,
-        roleDisplayName: roleDisplayName,
-        expiresAt: invitation.expiresAt
-      }
-    })
+    // Gather all data needed for the email BEFORE sending, while the
+    // org-connection context (AsyncLocalStorage) is still alive.
+    const inviterUser = await User.findById(inviterUserId).select('firstName lastName email')
+    const inviterName = inviterUser ? {
+      firstName: inviterUser.firstName || '',
+      lastName: inviterUser.lastName || '',
+      email: inviterUser.email || ''
+    } : { firstName: '', lastName: '', email: '' }
 
-    // Send email and notifications asynchronously (non-blocking)
-    // This runs in the background without blocking the response
-    ;(async () => {
-      try {
-        // Get inviter user details for email template
-        const inviterUser = await User.findById(inviterUserId).select('firstName lastName email')
-        const inviterName = inviterUser ? {
-          firstName: inviterUser.firstName || '',
-          lastName: inviterUser.lastName || '',
-          email: inviterUser.email || ''
-        } : { firstName: '', lastName: '', email: '' }
+    const organization = await Organization.findById(organizationId)
+    const organizationName = organization?.name || 'Kanvaro'
+    const organizationLogo = organization?.logo
+    const organizationDarkLogo = organization?.darkLogo
+    const logoMode = organization?.logoMode || 'both'
 
-        // Get organization details
-        const organization = await Organization.findById(organizationId)
-        const organizationName = organization?.name || 'Kanvaro'
-        const organizationLogo = organization?.logo
-        const organizationDarkLogo = organization?.darkLogo
-        const logoMode = organization?.logoMode || 'both'
-
-        // Dynamically construct the invitation URL based on environment
+    // Dynamically construct the invitation URL based on environment
         // Priority: 1. NEXT_PUBLIC_APP_URL env var, 2. Request headers (x-forwarded-*), 3. Origin/Referer headers, 4. Request host
         let baseUrl: string
         
@@ -651,25 +635,29 @@ export async function POST(request: NextRequest) {
         </html>
         `
 
-        // Send invitation email (non-blocking)
-        emailService.sendEmail({
+        // Send invitation email — properly awaited
+        const emailSent = await emailService.sendEmail({
           to: email,
           subject: `You're invited to join ${organizationName}`,
           html: emailHtml
-        }).catch((emailError) => {
-          console.error('Email sending error (non-blocking):', emailError)
-          // Log error but don't fail the invitation
         })
 
-        // Send notification to organization admins about the invitation (non-blocking)
-        User.find({ 
-          organization: organizationId, 
-          role: 'admin' 
-        }).select('_id').then((admins) => {
+        if (!emailSent) {
+          console.error('[invite] Email delivery failed for:', email)
+        } else {
+          console.log('[invite] Invitation email sent successfully to:', email)
+        }
+
+        // Send notification to organization admins about the invitation
+        try {
+          const admins = await User.find({ 
+            organization: organizationId, 
+            role: 'admin' 
+          }).select('_id')
           const adminIds = admins.map(admin => admin._id.toString())
           
           if (adminIds.length > 0) {
-            return notificationService.createBulkNotifications(adminIds, organizationId, {
+            await notificationService.createBulkNotifications(adminIds, organizationId, {
               type: 'invitation',
               title: 'New Team Member Invitation',
               message: `${inviterName.firstName} ${inviterName.lastName} invited ${firstName || email} to join as ${roleDisplayName}`,
@@ -682,17 +670,21 @@ export async function POST(request: NextRequest) {
               sendPush: false
             })
           }
-        }).catch((notificationError) => {
-          console.error('Failed to send invitation notifications (non-blocking):', notificationError)
-          // Don't fail the invitation if notification fails
-        })
-      } catch (error) {
-        console.error('Error in async invitation processing:', error)
-        // Don't fail the invitation if background processing fails
-      }
-    })()
+        } catch (notificationError) {
+          console.error('Failed to send invitation notifications:', notificationError)
+        }
 
-    return response
+    return NextResponse.json({
+      success: true,
+      message: 'Invitation sent successfully',
+      data: {
+        email: invitation.email,
+        role: invitation.role,
+        customRole: invitation.customRole,
+        roleDisplayName: roleDisplayName,
+        expiresAt: invitation.expiresAt
+      }
+    })
 
   } catch (error) {
     console.error('Invitation error:', error)

@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db-config';
 import { authenticateUser } from '@/lib/auth-utils';
 import { PermissionService } from '@/lib/permissions/permission-service';
+import '@/models/registry';
 
 
 export async function GET(req: NextRequest) {
   try {
-    await connectDB();
     const authResult = await authenticateUser();
     if ('error' in authResult) {
       return NextResponse.json(
@@ -15,8 +15,13 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Ensure the org DB context is set for the proxy models used by PermissionService
+    await connectDB(authResult.user.orgId);
+    const orgId = authResult.user.orgId;
+    console.log(`[permissions] Fetching permissions for user ${authResult.user.id} in org ${orgId}`);
+
     const userId = authResult.user.id;
-    const userPermissions = await PermissionService.getUserPermissions(userId);
+    const userPermissions = await PermissionService.getUserPermissions(userId, orgId);
     
     // Convert Map to plain object for JSON serialization
     const projectPermissions: Record<string, string[]> = {};
@@ -35,7 +40,7 @@ export async function GET(req: NextRequest) {
       projectPermissions,
       projectRoles,
       userRole: userPermissions.userRole,
-      accessibleProjects: await PermissionService.getAccessibleProjects(userId)
+      accessibleProjects: await PermissionService.getAccessibleProjects(userId, orgId)
     });
 
 

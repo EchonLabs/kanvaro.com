@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose'
+import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface ITestPlan extends Document {
   name: string
@@ -89,4 +90,5 @@ TestPlanSchema.index({ organization: 1, isActive: 1 })
 TestPlanSchema.index({ assignedTo: 1 })
 TestPlanSchema.index({ name: 'text', description: 'text' })
 
-export const TestPlan = mongoose.models.TestPlan || mongoose.model<ITestPlan>('TestPlan', TestPlanSchema)
+if (!mongoose.models.TestPlan) mongoose.model<ITestPlan>('TestPlan', TestPlanSchema)
+export const TestPlan = makeOrgModel<ITestPlan>('TestPlan', TestPlanSchema)

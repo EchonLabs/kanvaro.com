@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
+    const orgId = user.orgId
 
     const { projectId, status, orderedTaskIds } = await request.json()
 
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user can update tasks in this project
-    const canUpdateTasks = await PermissionService.hasPermission(userId, Permission.TASK_UPDATE, projectId)
+    const canUpdateTasks = await PermissionService.hasPermission(userId, Permission.TASK_UPDATE, projectId, orgId)
     if (!canUpdateTasks) {
       return NextResponse.json(
         { error: 'Insufficient permissions to reorder tasks' },

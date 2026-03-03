@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose'
+import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface IOrganization extends Document {
   name: string
@@ -211,4 +212,5 @@ const OrganizationSchema = new Schema<IOrganization>({
   strict: false // Allow saving fields not explicitly defined in schema (for flexibility)
 })
 
-export const Organization = mongoose.models.Organization || mongoose.model<IOrganization>('Organization', OrganizationSchema)
+if (!mongoose.models.Organization) mongoose.model<IOrganization>('Organization', OrganizationSchema)
+export const Organization = makeOrgModel<IOrganization>('Organization', OrganizationSchema)

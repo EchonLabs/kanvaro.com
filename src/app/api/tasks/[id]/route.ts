@@ -220,12 +220,13 @@ export async function GET(
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
+    const orgId = user.orgId
     const taskId = params.id
 
     // Check if user has permission to view all tasks
     const [hasTaskViewAll, hasProjectViewAll] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL),
-      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL)
+      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL, undefined, orgId),
+      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL, undefined, orgId)
     ]);
 
     // Build query - if user has TASK_VIEW_ALL or PROJECT_VIEW_ALL, they can view any task
@@ -301,6 +302,7 @@ export async function PUT(
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
+    const orgId = user.orgId
     const taskId = params.id
 
     const rawUpdate = await request.json()
@@ -434,8 +436,8 @@ export async function PUT(
 
     // Check if user has permission to edit all tasks
     const [hasTaskEditAll, hasProjectViewAll] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.TASK_EDIT_ALL),
-      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL)
+      PermissionService.hasPermission(userId, Permission.TASK_EDIT_ALL, undefined, orgId),
+      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL, undefined, orgId)
     ]);
 
     // Build query - if user has TASK_EDIT_ALL or PROJECT_VIEW_ALL, they can edit any task
@@ -939,12 +941,13 @@ export async function DELETE(
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
+    const orgId = user.orgId
     const taskId = params.id
 
     // Check if user has permission to delete all tasks
     const [hasTaskDeleteAll, hasProjectViewAll] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.TASK_DELETE_ALL),
-      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL)
+      PermissionService.hasPermission(userId, Permission.TASK_DELETE_ALL, undefined, orgId),
+      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL, undefined, orgId)
     ]);
 
     // Build query - if user has TASK_DELETE_ALL or PROJECT_VIEW_ALL, they can delete any task

@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose'
+import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface ICurrency extends Document {
   code: string
@@ -51,4 +52,5 @@ const CurrencySchema = new Schema<ICurrency>({
 CurrencySchema.index({ isActive: 1, isMajor: 1 })
 CurrencySchema.index({ country: 1 })
 
-export const Currency = mongoose.models.Currency || mongoose.model<ICurrency>('Currency', CurrencySchema)
+if (!mongoose.models.Currency) mongoose.model<ICurrency>('Currency', CurrencySchema)
+export const Currency = makeOrgModel<ICurrency>('Currency', CurrencySchema)

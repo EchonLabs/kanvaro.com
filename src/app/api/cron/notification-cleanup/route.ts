@@ -2,18 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Organization } from '@/models/Organization'
 import { Notification } from '@/models/Notification'
+import { getOrgConfigs } from '@/lib/config'
+import '@/models/registry'
 
 export async function GET(request: NextRequest) {
   try {
-    await connectDB()
+    let totalDeleted = 0
+    const allResults: any[] = []
+
+    // Iterate over all configured orgs
+    const orgs = getOrgConfigs()
+    for (const orgConfig of orgs) {
+      await connectDB(orgConfig.id)
+      console.log(`[cron/notification-cleanup] Processing org ${orgConfig.id} (db: ${orgConfig.database.database})`)
 
     // Get all organizations with auto cleanup enabled
     const organizations = await Organization.find({
       'settings.notifications.autoCleanup': true
     }).select('settings.notifications name')
 
-    let totalDeleted = 0
-    const results = []
+    const results: any[] = []
 
     for (const org of organizations) {
       const retentionDays = org.settings.notifications?.retentionDays || 30
@@ -36,10 +44,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    allResults.push(...results)
+
+    } // end for-each orgConfig
+
     return NextResponse.json({
       success: true,
-      message: `Notification cleanup completed. Deleted ${totalDeleted} old notifications across ${results.length} organizations`,
-      details: results
+      message: `Notification cleanup completed. Deleted ${totalDeleted} old notifications across ${allResults.length} organizations`,
+      details: allResults
     })
   } catch (error) {
     console.error('Notification cleanup error:', error)

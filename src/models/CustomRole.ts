@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose'
+import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface ICustomRole extends Document {
   name: string
@@ -70,4 +71,5 @@ CustomRoleSchema.pre('save', async function(next) {
   next()
 })
 
-export const CustomRole = mongoose.models.CustomRole || mongoose.model<ICustomRole>('CustomRole', CustomRoleSchema)
+if (!mongoose.models.CustomRole) mongoose.model<ICustomRole>('CustomRole', CustomRoleSchema)
+export const CustomRole = makeOrgModel<ICustomRole>('CustomRole', CustomRoleSchema)

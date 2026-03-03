@@ -72,6 +72,7 @@ export async function POST(
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
+    const orgId = user.orgId
     const taskId = params.id
 
     const payload = await request.json()
@@ -125,9 +126,9 @@ export async function POST(
     }
 
     const [canTaskViewAll, canProjectViewAll, canTaskUpdate] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL),
-      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
-      PermissionService.hasPermission(userId, Permission.TASK_UPDATE, taskId)
+      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL, undefined, orgId),
+      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL, undefined, orgId),
+      PermissionService.hasPermission(userId, Permission.TASK_UPDATE, taskId, orgId)
     ])
     const isAssignee = Array.isArray(task.assignedTo) && task.assignedTo.some(assignee => assignee.user?.toString() === userId.toString())
     const isCreator = task.createdBy && task.createdBy.toString() === userId
@@ -263,6 +264,7 @@ export async function PATCH(
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
+    const orgId = user.orgId
     const taskId = params.id
 
     const payload = await request.json()
@@ -290,7 +292,7 @@ export async function PATCH(
     }
 
     const isAuthor = comment.author?.toString() === userId.toString()
-    const canTaskUpdate = await PermissionService.hasPermission(userId.toString(), Permission.TASK_UPDATE, taskId)
+    const canTaskUpdate = await PermissionService.hasPermission(userId.toString(), Permission.TASK_UPDATE, taskId, orgId)
 
     // Allow author or TASK_UPDATE even if org mismatch; otherwise enforce org
     if (!isAuthor && !canTaskUpdate && task.organization && organizationId && task.organization.toString() !== organizationId.toString()) {
@@ -344,6 +346,7 @@ export async function DELETE(
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
+    const orgId = user.orgId
     const taskId = params.id
 
     const payload = await request.json()
@@ -367,7 +370,7 @@ export async function DELETE(
     }
 
     const isAuthor = comment.author?.toString() === userId.toString()
-    const canTaskUpdate = await PermissionService.hasPermission(userId.toString(), Permission.TASK_UPDATE, taskId)
+    const canTaskUpdate = await PermissionService.hasPermission(userId.toString(), Permission.TASK_UPDATE, taskId, orgId)
 
     // Allow author or TASK_UPDATE even if org mismatch; otherwise enforce org
     if (!isAuthor && !canTaskUpdate && task.organization && organizationId && task.organization.toString() !== organizationId.toString()) {

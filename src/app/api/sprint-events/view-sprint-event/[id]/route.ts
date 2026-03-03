@@ -18,6 +18,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
     const { user } = authResult
     const userId = user.id
+    const orgId = user.orgId
 
     console.log('Fetching sprint event:', { userId, eventId: params.id })
 
@@ -75,7 +76,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // Check if user has permission to view all sprint events
     const hasSprintEventViewAll = await PermissionService.hasPermission(
       userId,
-      Permission.SPRINT_EVENT_VIEW_ALL
+      Permission.SPRINT_EVENT_VIEW_ALL,
+      undefined,
+      orgId
     );
 
     console.log('User permissions:', {

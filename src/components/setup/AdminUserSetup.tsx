@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { User, Eye, EyeOff } from 'lucide-react'
+import { User, Eye, EyeOff, Info } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Progress } from '@/components/ui/Progress'
 import { PasswordStrength } from '@/components/ui/PasswordStrength'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 interface AdminUserSetupProps {
   onNext: (data: any) => void
@@ -16,6 +17,7 @@ interface AdminUserSetupProps {
 }
 
 export const AdminUserSetup = ({ onNext, onBack, initialData }: AdminUserSetupProps) => {
+  const isExistingAdmin = !!(initialData?.firstName && initialData?.email)
   const [formData, setFormData] = useState({
     firstName: initialData?.firstName || '',
     lastName: initialData?.lastName || '',
@@ -85,14 +87,28 @@ export const AdminUserSetup = ({ onNext, onBack, initialData }: AdminUserSetupPr
           <User className="h-8 w-8 text-primary" />
         </div>
         <div className="flex-1">
-          <h2 className="text-2xl font-bold text-foreground mb-2">Create Admin User</h2>
+          <h2 className="text-2xl font-bold text-foreground mb-2">
+            {isExistingAdmin ? 'Admin User Found' : 'Create Admin User'}
+          </h2>
           <p className="text-muted-foreground">
-            Set up your administrator account to manage your Kanvaro instance
+            {isExistingAdmin
+              ? 'An existing admin user was found in this database. Confirm or update the details below. You must set a new password.'
+              : 'Set up your administrator account to manage your Kanvaro instance'}
           </p>
         </div>
       </div>
 
       <div className="bg-card border rounded-lg p-8">
+        {isExistingAdmin && (
+          <Alert className="mb-6 border-blue-500 bg-blue-50 dark:bg-blue-950/20">
+            <Info className="h-4 w-4 text-blue-600" />
+            <AlertTitle className="text-blue-700 dark:text-blue-400">Existing Admin Detected</AlertTitle>
+            <AlertDescription className="text-blue-600 dark:text-blue-400">
+              Found admin <strong>{initialData.firstName} {initialData.lastName}</strong> ({initialData.email}) in the database.
+              The fields below are pre-filled. You need to set a password to continue.
+            </AlertDescription>
+          </Alert>
+        )}
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-2">

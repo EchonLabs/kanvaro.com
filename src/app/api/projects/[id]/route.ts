@@ -151,7 +151,7 @@ export async function PUT(
     const projectId = params.id
 
     // Check if user can update this project
-    const canUpdateProject = await PermissionService.hasPermission(userId, Permission.PROJECT_UPDATE, projectId)
+    const canUpdateProject = await PermissionService.hasPermission(userId, Permission.PROJECT_UPDATE, projectId, user.orgId)
     if (!canUpdateProject) {
       return NextResponse.json(
         { error: 'Insufficient permissions to update project' },
@@ -406,7 +406,7 @@ export async function DELETE(
 
     // Check if user can delete this project
  
-    const canDeleteProject = await PermissionService.hasPermission(userId, Permission.PROJECT_DELETE, projectId)
+    const canDeleteProject = await PermissionService.hasPermission(userId, Permission.PROJECT_DELETE, projectId, user.orgId)
     if (!canDeleteProject) {
       return NextResponse.json(
         { error: 'Insufficient permissions to delete project' },

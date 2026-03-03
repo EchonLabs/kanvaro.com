@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose'
+import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface IProjectTemplate extends Document {
   name: string
@@ -221,4 +222,5 @@ ProjectTemplateSchema.index({ category: 1 })
 ProjectTemplateSchema.index({ tags: 1 })
 ProjectTemplateSchema.index({ usageCount: -1 })
 
-export const ProjectTemplate = mongoose.models.ProjectTemplate || mongoose.model<IProjectTemplate>('ProjectTemplate', ProjectTemplateSchema)
+if (!mongoose.models.ProjectTemplate) mongoose.model<IProjectTemplate>('ProjectTemplate', ProjectTemplateSchema)
+export const ProjectTemplate = makeOrgModel<IProjectTemplate>('ProjectTemplate', ProjectTemplateSchema)

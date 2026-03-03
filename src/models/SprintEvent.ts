@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose'
+import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface ISprintEvent extends Document {
   sprint: mongoose.Types.ObjectId
@@ -218,4 +219,5 @@ SprintEventSchema.index({
   'remindersSent.notification1Hour': 1 
 })
 
-export const SprintEvent = mongoose.models.SprintEvent || mongoose.model<ISprintEvent>('SprintEvent', SprintEventSchema)
+if (!mongoose.models.SprintEvent) mongoose.model<ISprintEvent>('SprintEvent', SprintEventSchema)
+export const SprintEvent = makeOrgModel<ISprintEvent>('SprintEvent', SprintEventSchema)
