@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface INotification extends Document {
   user: mongoose.Types.ObjectId
@@ -76,5 +75,4 @@ NotificationSchema.index({ organization: 1, type: 1 })
 NotificationSchema.index({ 'data.entityId': 1, 'data.entityType': 1 })
 NotificationSchema.index({ createdAt: -1 })
 
-if (!mongoose.models.Notification) mongoose.model<INotification>('Notification', NotificationSchema)
-export const Notification = makeOrgModel<INotification>('Notification', NotificationSchema)
+export const Notification = mongoose.models.Notification || mongoose.model<INotification>('Notification', NotificationSchema)

@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface ITestSuite extends Document {
   name: string
@@ -73,5 +72,4 @@ TestSuiteSchema.index({ project: 1, parentSuite: 1 })
 TestSuiteSchema.index({ organization: 1, isActive: 1 })
 TestSuiteSchema.index({ name: 'text', description: 'text' })
 
-if (!mongoose.models.TestSuite) mongoose.model<ITestSuite>('TestSuite', TestSuiteSchema)
-export const TestSuite = makeOrgModel<ITestSuite>('TestSuite', TestSuiteSchema)
+export const TestSuite = mongoose.models.TestSuite || mongoose.model<ITestSuite>('TestSuite', TestSuiteSchema)

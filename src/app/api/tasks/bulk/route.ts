@@ -22,7 +22,6 @@ export async function POST(request: NextRequest) {
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
-    const orgId = user.orgId
 
     let body
     try {
@@ -76,7 +75,7 @@ export async function POST(request: NextRequest) {
     
     for (const projectId of projectIds) {
       if (projectId) {
-        const canUpdateTasks = await PermissionService.hasPermission(userId, Permission.TASK_UPDATE, projectId, orgId)
+        const canUpdateTasks = await PermissionService.hasPermission(userId, Permission.TASK_UPDATE, projectId)
         if (!canUpdateTasks) {
           return NextResponse.json(
             { success: false, error: 'Access denied to update tasks in this project' },

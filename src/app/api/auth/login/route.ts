@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import connectDB from '@/lib/db-config'
-import { hasDatabaseConfig } from '@/lib/db-config'
-import { getOrgConfigs } from '@/lib/config'
-import { getOrgConnection, getModelOnConnection } from '@/lib/db-connection-manager'
+import { connectWithStoredConfig, hasDatabaseConfig } from '@/lib/db-config'
+import { User } from '@/models/User'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
@@ -21,36 +20,60 @@ export async function POST(request: Request) {
       )
     }
 
-    const hasConfig = await hasDatabaseConfig()
-    if (!hasConfig) {
+    // Always use database authentication
+    
+    try {
+      // Check if we have stored database configuration
+      const hasStoredConfig = await hasDatabaseConfig()
+      
+      let db
+      if (hasStoredConfig) {
+        // Use stored database configuration from setup
+        db = await connectWithStoredConfig()
+      } else {
+        // Fall back to environment variable
+        const isConfigured = await hasDatabaseConfig()
+        if (!isConfigured) {
+          console.error('No database configuration found')
+          return NextResponse.json(
+            { error: 'Database not configured. Please complete the setup process first.' },
+            { status: 500 }
+          )
+        }
+        db = await connectDB()
+      }
+      
+      
+      // Ensure connection is ready
+      if (db.connection.readyState !== 1) {
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Database connection timeout'))
+          }, 10000) // 10 second timeout
+          
+          const checkConnection = () => {
+            if (db.connection.readyState === 1) {
+              clearTimeout(timeout)
+              resolve(true)
+            } else {
+              setTimeout(checkConnection, 100)
+            }
+          }
+          checkConnection()
+        })
+      }
+      
+    } catch (dbError) {
+      console.error('Database connection failed:', dbError)
       return NextResponse.json(
-        { error: 'Database not configured. Please complete the setup process first.' },
+        { error: 'Database connection failed', details: dbError instanceof Error ? dbError.message : 'Unknown error' },
         { status: 500 }
       )
     }
 
-    // ── Find which org this email belongs to ──────────────────────────────────
-    // Try each configured org's database until we find the user.
-    const orgs = getOrgConfigs()
-    let user: any = null
-    let activeOrgId: string = orgs[0]?.id ?? ''
-
-    for (const org of orgs) {
-      try {
-        await connectDB(org.id)  // sets AsyncLocalStorage for this context
-        const conn = await getOrgConnection(org.id)
-        const UserModel = getModelOnConnection<any>('User', conn)
-        const found = await UserModel.findOne({ email: email.toLowerCase() })
-        if (found) {
-          user = found
-          activeOrgId = org.id
-          break
-        }
-      } catch (err) {
-        console.warn(`Could not check org [${org.id}] during login:`, err)
-      }
-    }
-
+    // Find user by email
+    const user = await User.findOne({ email: email.toLowerCase() })
+    
     if (!user) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
@@ -58,6 +81,7 @@ export async function POST(request: Request) {
       )
     }
 
+    // Check if user is active
     if (!user.isActive) {
       return NextResponse.json(
         { error: 'Account is deactivated' },
@@ -65,7 +89,10 @@ export async function POST(request: Request) {
       )
     }
 
+
+    // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password)
+    
     if (!isPasswordValid) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
@@ -73,32 +100,33 @@ export async function POST(request: Request) {
       )
     }
 
-    // Update last login
+    // Update last login timestamp
     user.lastLogin = new Date()
     await user.save()
 
-    // ── Create JWT tokens (include orgId) ─────────────────────────────────────
+    // Create JWT tokens
     const accessToken = jwt.sign(
-      { userId: user._id, email: user.email, role: user.role, orgId: activeOrgId },
+      { userId: user._id, email: user.email, role: user.role },
       JWT_SECRET,
       { expiresIn: '15m' }
     )
 
     const refreshToken = jwt.sign(
-      { userId: user._id, email: user.email, orgId: activeOrgId },
+      { userId: user._id, email: user.email },
       JWT_REFRESH_SECRET,
       { expiresIn: '7d' }
     )
+    
 
     // Set HTTP-only cookies
     const cookieStore = cookies()
-
+    
     try {
       cookieStore.set('accessToken', accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 15 * 60,
+        maxAge: 15 * 60, // 15 minutes
         path: '/'
       })
 
@@ -106,16 +134,7 @@ export async function POST(request: Request) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60,
-        path: '/'
-      })
-
-      // Also store orgId as a non-httpOnly cookie so client-side code can read it if needed
-      cookieStore.set('orgId', activeOrgId, {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60,
+        maxAge: 7 * 24 * 60 * 60, // 7 days
         path: '/'
       })
     } catch (cookieError) {
@@ -126,6 +145,7 @@ export async function POST(request: Request) {
       )
     }
 
+    // Return user data (without password)
     const userData = {
       id: user._id,
       firstName: user.firstName,
@@ -150,8 +170,12 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error('Login error:', error)
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    })
     return NextResponse.json(
-      {
+      { 
         error: 'Login failed',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
@@ -159,4 +183,3 @@ export async function POST(request: Request) {
     )
   }
 }
-

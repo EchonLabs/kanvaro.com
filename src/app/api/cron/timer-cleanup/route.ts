@@ -8,8 +8,6 @@ import { Project } from '@/models/Project'
 import { applyRoundingRules } from '@/lib/utils'
 import { notificationService } from '@/lib/notification-service'
 import { isNotificationEnabled } from '@/lib/notification-utils'
-import { getOrgConfigs } from '@/lib/config'
-import '@/models/registry'
 
 const MINUTES_PER_HOUR = 60
 
@@ -274,6 +272,8 @@ async function stopExpiredTimer(activeTimer: IActiveTimer): Promise<{
  */
 export async function GET(request: NextRequest) {
   try {
+    await connectDB()
+
     // Optional: Add authorization header check for security
     const authHeader = request.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
@@ -285,29 +285,21 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Iterate over all configured orgs
-    const orgs = getOrgConfigs()
-    let allResults: any[] = []
-    let totalStopped = 0, totalSkipped = 0, totalErrors = 0
-    let totalChecked = 0
-
-    for (const org of orgs) {
-      await connectDB(org.id)
-      console.log(`[cron/timer-cleanup] Processing org ${org.id} (db: ${org.database.database})`)
-
     // Find all active timers (don't use .lean() as we need document methods)
     const activeTimers = await ActiveTimer.find({})
       .populate('project', 'name')
       .populate('user', 'firstName lastName')
 
     if (!activeTimers || activeTimers.length === 0) {
-      continue // No timers in this org, move to next
+      return NextResponse.json({
+        success: true,
+        message: 'No active timers found',
+        results: []
+      })
     }
 
-    totalChecked += activeTimers.length
-
     // Process each timer
-    const results: any[] = []
+    const results = []
     let stoppedCount = 0
     let skippedCount = 0
     let errorCount = 0
@@ -379,24 +371,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Accumulate per-org results into totals
-    totalStopped += stoppedCount
-    totalSkipped += skippedCount
-    totalErrors += errorCount
-    allResults = allResults.concat(results)
-
-    } // end for-each org
-
     return NextResponse.json({
       success: true,
-      message: `Timer cleanup completed. Stopped: ${totalStopped}, Skipped: ${totalSkipped}, Errors: ${totalErrors}`,
+      message: `Timer cleanup completed. Stopped: ${stoppedCount}, Skipped: ${skippedCount}, Errors: ${errorCount}`,
       summary: {
-        totalChecked,
-        stopped: totalStopped,
-        skipped: totalSkipped,
-        errors: totalErrors
+        totalChecked: activeTimers.length,
+        stopped: stoppedCount,
+        skipped: skippedCount,
+        errors: errorCount
       },
-      results: allResults
+      results
     })
   } catch (error) {
     console.error('Timer cleanup error:', error)

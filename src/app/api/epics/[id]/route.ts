@@ -24,15 +24,12 @@ export async function GET(
 
     const { user } = authResult
     const userId = user.id
-    const orgId = user.orgId
     const organizationId = user.organization
     const epicId = params.id
 
     const hasEpicViewAll = await PermissionService.hasPermission(
       userId.toString(),
-      Permission.EPIC_VIEW_ALL,
-      undefined,
-      orgId
+      Permission.EPIC_VIEW_ALL
     );
 
     const epic = await Epic.findOne({ _id: epicId })
@@ -141,7 +138,6 @@ export async function PUT(
 
     const { user } = authResult
     const userId = user.id
-    const orgId = user.orgId
     const organizationId = user.organization
     const epicId = params.id
 
@@ -164,8 +160,7 @@ export async function PUT(
     const canEditEpic = isCreator || await PermissionService.hasPermission(
       userId.toString(),
       Permission.EPIC_EDIT,
-      existingEpic.project._id?.toString(),
-      orgId
+      existingEpic.project._id?.toString()
     )
 console.log('canEditEpic',canEditEpic);
 
@@ -217,7 +212,6 @@ export async function DELETE(
 
     const { user } = authResult
     const userId = user.id
-    const orgId = user.orgId
     const organizationId = user.organization
     const epicId = params.id
 
@@ -234,8 +228,7 @@ export async function DELETE(
     const canDeleteEpic = isCreator || await PermissionService.hasPermission(
       userId.toString(),
       Permission.EPIC_DELETE,
-      epic.project.toString(),
-      orgId
+      epic.project.toString()
     )
 
     if (!canDeleteEpic) {

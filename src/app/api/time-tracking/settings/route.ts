@@ -146,7 +146,7 @@ export async function PUT(request: NextRequest) {
     const organizationId = user.organization.toString()
 console.log('userfsdfsdf',user.organization)
     // Check permissions
-    const canUpdate = await PermissionService.hasPermission(user.id, Permission.ORGANIZATION_UPDATE, undefined, user.orgId)
+    const canUpdate = await PermissionService.hasPermission(user.id, Permission.ORGANIZATION_UPDATE)
     if (!canUpdate) {
       return NextResponse.json(
         { error: 'Insufficient permissions to update time tracking settings' },

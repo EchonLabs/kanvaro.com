@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface IBudgetEntry extends Document {
   project: mongoose.Types.ObjectId
@@ -96,5 +95,4 @@ BudgetEntrySchema.index({ addedAt: 1 })
 BudgetEntrySchema.index({ category: 1 })
 BudgetEntrySchema.index({ billingReference: 1 })
 
-if (!mongoose.models.BudgetEntry) mongoose.model<IBudgetEntry>('BudgetEntry', BudgetEntrySchema)
-export const BudgetEntry = makeOrgModel<IBudgetEntry>('BudgetEntry', BudgetEntrySchema)
+export const BudgetEntry = mongoose.models.BudgetEntry || mongoose.model<IBudgetEntry>('BudgetEntry', BudgetEntrySchema)

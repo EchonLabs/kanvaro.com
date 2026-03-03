@@ -99,9 +99,9 @@ export async function GET() {
       return NextResponse.json(mockOrganization)
     }
     
-    await connectDB(authResult.user.orgId)
+    await connectDB()
     
-    // Get the organization for the user's org
+    // Get the first organization (in a real app, this would be based on user's organization)
     const organization = await Organization.findOne()
     
     if (!organization) {
@@ -176,7 +176,7 @@ export async function PUT(request: NextRequest) {
     const { user } = authResult
 
     // Check if user can update organization
-    const canUpdateOrganization = await PermissionService.hasPermission(user.id, Permission.ORGANIZATION_UPDATE, undefined, user.orgId)
+    const canUpdateOrganization = await PermissionService.hasPermission(user.id, Permission.ORGANIZATION_UPDATE)
     if (!canUpdateOrganization) {
       return NextResponse.json(
         { error: 'Insufficient permissions to update organization' },
@@ -188,7 +188,7 @@ export async function PUT(request: NextRequest) {
     const isConfigured = await hasDatabaseConfig()
     let organizationId: string = 'default'
     if (isConfigured) {
-      await connectDB(authResult.user.orgId)
+      await connectDB()
       const existingOrg = await Organization.findOne()
       if (existingOrg) {
         organizationId = existingOrg._id.toString()

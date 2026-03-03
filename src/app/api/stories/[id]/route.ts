@@ -27,15 +27,12 @@ export async function GET(
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
-    const orgId = user.orgId
     const storyId = params.id
 
     // Check if user has permission to view all stories
     const hasStoryViewAll = await PermissionService.hasPermission(
       userId,
-      Permission.STORY_VIEW_ALL,
-      undefined,
-      orgId
+      Permission.STORY_VIEW_ALL
     );
 
     // Optimize population to only fetch what's needed for the UI
@@ -123,7 +120,6 @@ export async function PUT(
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
-    const orgId = user.orgId
     const storyId = params.id
 
     const updateData = await request.json()
@@ -143,9 +139,7 @@ export async function PUT(
     const isCreator = existingStory.createdBy?._id?.toString?.() === userId.toString()
     const canEditStory = isCreator || await PermissionService.hasPermission(
       userId.toString(),
-      Permission.STORY_UPDATE,
-      undefined,
-      orgId
+      Permission.STORY_UPDATE
     )
 
     if (!canEditStory) {
@@ -222,7 +216,6 @@ export async function DELETE(
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
-    const orgId = user.orgId
     const storyId = params.id
 
     const story = await Story.findById(storyId)
@@ -237,9 +230,7 @@ export async function DELETE(
     const isCreator = story.createdBy?.toString?.() === userId.toString()
     const canDeleteStory = isCreator || await PermissionService.hasPermission(
       userId,
-      Permission.STORY_DELETE,
-      undefined,
-      orgId
+      Permission.STORY_DELETE
     )
 
     if (!canDeleteStory) {

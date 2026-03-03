@@ -115,7 +115,7 @@ export async function PUT(request: NextRequest) {
     const { user } = authResult
 
     // Check if user can update organization settings
-    const canUpdateSettings = await PermissionService.hasPermission(user.id, Permission.ORGANIZATION_UPDATE, undefined, user.orgId)
+    const canUpdateSettings = await PermissionService.hasPermission(user.id, Permission.ORGANIZATION_UPDATE)
     if (!canUpdateSettings) {
       return NextResponse.json(
         { error: 'Insufficient permissions to update landing page images' },

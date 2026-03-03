@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { Database, TestTube, Lock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
+import { useState } from 'react'
+import { Database, TestTube } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
@@ -13,10 +13,9 @@ import { useNotify } from '@/lib/notify'
 interface DatabaseConfigProps {
   onNext: (data: any) => void
   initialData?: any
-  atOrgLimit?: boolean
 }
 
-export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConfigProps) => {
+export const DatabaseConfig = ({ onNext, initialData }: DatabaseConfigProps) => {
   const [connectionType, setConnectionType] = useState<'existing' | 'create'>('existing')
   const [formData, setFormData] = useState({
     host: initialData?.host || 'localhost',
@@ -29,29 +28,11 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
   })
   const [isTesting, setIsTesting] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
-  const [existingData, _setExistingData] = useState<any>(null)
-  const existingDataRef = useRef<any>(null)
-  const setExistingData = (data: any) => {
-    existingDataRef.current = data
-    _setExistingData(data)
-  }
-  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'failed' | 'db-not-found'>('idle')
-  const [connectionError, setConnectionError] = useState('')
+  const [existingData, setExistingData] = useState(null)
   const { success: notifySuccess, error: notifyError } = useNotify()
 
-  // Reset connection status when any field changes
-  const handleFieldChange = (field: string, value: any) => {
-    setFormData({ ...formData, [field]: value })
-    if (connectionStatus !== 'idle') {
-      setConnectionStatus('idle')
-      setConnectionError('')
-    }
-  }
-
-  const handleTestConnection = async (): Promise<boolean> => {
+  const handleTestConnection = async () => {
     setIsTesting(true)
-    setConnectionStatus('idle')
-    setConnectionError('')
 
     try {
       const response = await fetch('/api/setup/database/test', {
@@ -63,22 +44,10 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
       const result = await response.json()
 
       if (response.ok) {
-        // Check if the database actually exists (has collections with data)
-        if (result.existingData && !result.existingData.databaseExists) {
-          setConnectionStatus('db-not-found')
-          setConnectionError(`Database "${formData.database}" does not exist or is empty. Please enter a valid database name.`)
-          notifyError({
-            title: 'Database Not Found',
-            message: `The database "${formData.database}" does not exist or has no data.`
-          })
-          return false
-        }
-
-        setConnectionStatus('success')
         if (result.existingData) {
           notifySuccess({
             title: 'Connection Successful',
-            message: 'Connected! Found existing data that will be pre-filled.'
+            message: 'Database connection successful! Found existing data that will be pre-filled.'
           })
         } else {
           notifySuccess({
@@ -86,26 +55,19 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
             message: 'Database connection successful!'
           })
         }
+        // Store existing data for passing to next steps
         setExistingData(result.existingData || null)
-        return true
       } else {
-        setConnectionStatus('failed')
-        const errMsg = result.error || 'Database connection failed'
-        setConnectionError(errMsg)
         notifyError({
           title: 'Connection Failed',
-          message: errMsg
+          message: result.error || 'Database connection failed'
         })
-        return false
       }
     } catch (error) {
-      setConnectionStatus('failed')
-      setConnectionError('Could not reach the server. Check if the app is running.')
       notifyError({
         title: 'Connection Failed',
-        message: 'Could not reach the server.'
+        message: 'Database connection failed'
       })
-      return false
     } finally {
       setIsTesting(false)
     }
@@ -167,7 +129,7 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
           })
           // Proceed to next step after successful creation
           setTimeout(() => {
-            onNext({ database: formData, existingData: existingDataRef.current })
+            onNext({ database: formData, existingData })
           }, 1000)
         } else {
           notifyError({
@@ -184,23 +146,8 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
         setIsCreating(false)
       }
     } else {
-      // For existing database, must verify connection AND database existence before proceeding
-      if (connectionStatus === 'db-not-found') {
-        notifyError({
-          title: 'Cannot Proceed',
-          message: `Database "${formData.database}" does not exist. Please enter a valid database name.`
-        })
-        return
-      }
-      if (connectionStatus === 'success') {
-        onNext({ database: formData, existingData: existingDataRef.current })
-      } else {
-        // Auto-test when user clicks Next without testing first
-        const ok = await handleTestConnection()
-        if (ok) {
-          setTimeout(() => onNext({ database: formData, existingData: existingDataRef.current }), 800)
-        }
-      }
+      // For existing database, proceed if test was successful
+      onNext({ database: formData, existingData })
     }
   }
 
@@ -219,16 +166,6 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
       </div>
 
       {/* Connection Type Selection */}
-      {atOrgLimit && (
-        <Alert>
-          <Lock className="h-4 w-4" />
-          <AlertTitle>Organisation Limit Reached</AlertTitle>
-          <AlertDescription>
-            This server has reached its maximum number of organisations. You can only connect to an existing database — creating a new organisation is disabled.
-          </AlertDescription>
-        </Alert>
-      )}
-
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div
           className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
@@ -248,20 +185,18 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
         </div>
 
         <div
-          className={`p-6 border-2 rounded-lg transition-all ${
-            atOrgLimit
-              ? 'border-muted opacity-40 cursor-not-allowed'
-              : connectionType === 'create'
-              ? 'border-primary bg-primary/5 cursor-pointer'
-              : 'border-muted hover:border-muted-foreground/50 cursor-pointer'
+          className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
+            connectionType === 'create'
+              ? 'border-primary bg-primary/5'
+              : 'border-muted hover:border-muted-foreground/50'
           }`}
-          onClick={() => !atOrgLimit && setConnectionType('create')}
+          onClick={() => setConnectionType('create')}
         >
           <div className="text-center">
             <Database className="h-8 w-8 text-primary mx-auto mb-2" />
             <h3 className="font-semibold">Create New Database</h3>
             <p className="text-sm text-muted-foreground mt-1">
-              {atOrgLimit ? 'Unavailable — organisation limit reached' : 'Let us create a new database for you'}
+              Let us create a new database for you
             </p>
           </div>
         </div>
@@ -275,7 +210,7 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
                 <Database className="h-4 w-4" />
                 <AlertTitle>Connect to Existing Database</AlertTitle>
                 <AlertDescription>
-                  Provide your MongoDB connection details. Username and password are optional if your database has no authentication (common on local servers).
+                  Provide your MongoDB connection details. Make sure to test the connection before proceeding.
                 </AlertDescription>
               </Alert>
 
@@ -286,12 +221,12 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
                     id="host"
                     type="text"
                     value={formData.host}
-                    onChange={(e) => handleFieldChange('host', e.target.value)}
+                    onChange={(e) => setFormData({ ...formData, host: e.target.value })}
                     placeholder="localhost"
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Use "localhost" for local development or the Docker service name for Docker
+                    Use "localhost" for Docker setup (will connect to internal mongodb service)
                   </p>
                 </div>
 
@@ -301,12 +236,12 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
                     id="port"
                     type="number"
                     value={formData.port}
-                    onChange={(e) => handleFieldChange('port', parseInt(e.target.value))}
+                    onChange={(e) => setFormData({ ...formData, port: parseInt(e.target.value) })}
                     placeholder="27017"
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Default MongoDB port is 27017
+                    Use "27017" for Docker setup (internal MongoDB port)
                   </p>
                 </div>
 
@@ -316,7 +251,7 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
                     id="database"
                     type="text"
                     value={formData.database}
-                    onChange={(e) => handleFieldChange('database', e.target.value)}
+                    onChange={(e) => setFormData({ ...formData, database: e.target.value })}
                     placeholder="kanvaro"
                     required
                   />
@@ -331,39 +266,41 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
                     id="authSource"
                     type="text"
                     value={formData.authSource}
-                    onChange={(e) => handleFieldChange('authSource', e.target.value)}
-                    placeholder="admin"
+                    onChange={(e) => setFormData({ ...formData, authSource: e.target.value })}
+                    placeholder="Enter username"
                   />
                   <p className="text-xs text-muted-foreground">
-                    The database to authenticate against (usually "admin")
+                    The database to authenticate against (usually "admin" for MongoDB)
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="username">Username (Optional)</Label>
+                  <Label htmlFor="username">Username</Label>
                   <Input
                     id="username"
                     type="text"
                     value={formData.username}
-                    onChange={(e) => handleFieldChange('username', e.target.value)}
-                    placeholder="Leave empty if no auth"
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    placeholder="Enter username"
+                    required
                   />
                   <p className="text-xs text-muted-foreground">
-                    MongoDB username — leave empty if your database has no authentication
+                    MongoDB username with access to the database
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password (Optional)</Label>
+                  <Label htmlFor="password">Password</Label>
                   <Input
                     id="password"
                     type="password"
                     value={formData.password}
-                    onChange={(e) => handleFieldChange('password', e.target.value)}
-                    placeholder="Leave empty if no auth"
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Enter password"
+                    required
                   />
                   <p className="text-xs text-muted-foreground">
-                    MongoDB password — leave empty if your database has no authentication
+                    MongoDB password for the specified username
                   </p>
                 </div>
               </div>
@@ -372,42 +309,10 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
                 <Switch
                   id="ssl"
                   checked={formData.ssl}
-                  onCheckedChange={(checked) => handleFieldChange('ssl', checked)}
+                  onCheckedChange={(checked) => setFormData({ ...formData, ssl: checked })}
                 />
                 <Label htmlFor="ssl">Enable SSL connection</Label>
               </div>
-
-              {/* Connection Status Indicator */}
-              {connectionStatus === 'success' && (
-                <Alert className="border-green-500 bg-green-50 dark:bg-green-950/20">
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <AlertTitle className="text-green-700 dark:text-green-400">Database Found &amp; Connected</AlertTitle>
-                  <AlertDescription className="text-green-600 dark:text-green-400">
-                    Successfully connected to <strong>{formData.database}</strong> on {formData.host}:{formData.port}.
-                    {existingData && (existingData as any).hasUsers && ' Existing admin user data detected — it will be pre-filled in the next steps.'}
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {connectionStatus === 'db-not-found' && (
-                <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <AlertTitle className="text-amber-700 dark:text-amber-400">Database Not Found</AlertTitle>
-                  <AlertDescription className="text-amber-600 dark:text-amber-400">
-                    The database <strong>{formData.database}</strong> does not exist or is empty on {formData.host}:{formData.port}. Please check the database name and try again.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {connectionStatus === 'failed' && (
-                <Alert variant="destructive">
-                  <XCircle className="h-4 w-4" />
-                  <AlertTitle>Connection Failed</AlertTitle>
-                  <AlertDescription>
-                    {connectionError || 'Could not connect to the database. Please check your settings.'}
-                  </AlertDescription>
-                </Alert>
-              )}
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button
@@ -418,14 +323,10 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
                 >
                   {isTesting ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
-                  ) : connectionStatus === 'success' ? (
-                    <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
-                  ) : connectionStatus === 'failed' || connectionStatus === 'db-not-found' ? (
-                    <XCircle className="h-4 w-4 mr-2 text-destructive" />
                   ) : (
                     <TestTube className="h-4 w-4 mr-2" />
                   )}
-                  {isTesting ? 'Testing...' : connectionStatus === 'success' ? 'Re-test Connection' : connectionStatus === 'failed' || connectionStatus === 'db-not-found' ? 'Retry Connection' : 'Test Connection'}
+                  Test Connection
                 </Button>
               </div>
             </>
@@ -449,12 +350,12 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
                     id="host"
                     type="text"
                     value={formData.host}
-                    onChange={(e) => handleFieldChange('host', e.target.value)}
+                    onChange={(e) => setFormData({ ...formData, host: e.target.value })}
                     placeholder="localhost"
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Use "localhost" for local development or the Docker service name for Docker
+                    Use "localhost" for Docker setup (will connect to internal mongodb service)
                   </p>
                 </div>
 
@@ -464,12 +365,12 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
                     id="port"
                     type="number"
                     value={formData.port}
-                    onChange={(e) => handleFieldChange('port', parseInt(e.target.value))}
+                    onChange={(e) => setFormData({ ...formData, port: parseInt(e.target.value) })}
                     placeholder="27017"
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Default MongoDB port is 27017
+                    Use "27017" for Docker setup (internal MongoDB port)
                   </p>
                 </div>
 
@@ -479,7 +380,7 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
                     id="database"
                     type="text"
                     value={formData.database}
-                    onChange={(e) => handleFieldChange('database', e.target.value)}
+                    onChange={(e) => setFormData({ ...formData, database: e.target.value })}
                     placeholder="kanvaro_dev"
                     required
                   />
@@ -494,8 +395,8 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
                     id="authSource"
                     type="text"
                     value={formData.authSource}
-                    onChange={(e) => handleFieldChange('authSource', e.target.value)}
-                    placeholder="admin"
+                    onChange={(e) => setFormData({ ...formData, authSource: e.target.value })}
+                    placeholder="Enter username"
                     disabled
                   />
                   <p className="text-xs text-muted-foreground">
@@ -509,11 +410,11 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
                     id="username"
                     type="text"
                     value={formData.username}
-                    onChange={(e) => handleFieldChange('username', e.target.value)}
-                    placeholder="Leave empty if no auth"
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    placeholder="Enter username (optional)"
                   />
                   <p className="text-xs text-muted-foreground">
-                    MongoDB username — leave empty if no authentication
+                    MongoDB username for authentication (leave empty for no authentication)
                   </p>
                 </div>
 
@@ -523,11 +424,11 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
                     id="password"
                     type="password"
                     value={formData.password}
-                    onChange={(e) => handleFieldChange('password', e.target.value)}
-                    placeholder="Leave empty if no auth"
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Enter password (optional)"
                   />
                   <p className="text-xs text-muted-foreground">
-                    MongoDB password — leave empty if no authentication
+                    MongoDB password for authentication (leave empty for no authentication)
                   </p>
                 </div>
               </div>
@@ -536,7 +437,7 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
                 <Switch
                   id="ssl"
                   checked={formData.ssl}
-                  onCheckedChange={(checked) => handleFieldChange('ssl', checked)}
+                  onCheckedChange={(checked) => setFormData({ ...formData, ssl: checked })}
                 />
                 <Label htmlFor="ssl">Enable SSL connection</Label>
               </div>
@@ -547,17 +448,12 @@ export const DatabaseConfig = ({ onNext, initialData, atOrgLimit }: DatabaseConf
           <div className="flex flex-col sm:flex-row justify-end gap-3">
             <Button
               type="submit"
-              disabled={isCreating || isTesting}
+              disabled={isCreating}
             >
-              {isCreating || isTesting ? (
+              {isCreating ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
-                  {connectionType === 'create' ? 'Setting up database...' : 'Verifying connection...'}
-                </>
-              ) : connectionType === 'existing' && connectionStatus === 'success' ? (
-                <>
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Next Step
+                  {connectionType === 'create' ? 'Setting up database...' : 'Testing connection...'}
                 </>
               ) : (
                 'Next Step'

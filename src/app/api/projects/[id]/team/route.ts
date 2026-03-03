@@ -26,12 +26,11 @@ export async function GET(
 
     const { user } = authResult
     const userId = user.id
-    const orgId = user.orgId
     const organizationId = user.organization
     const projectId = params.id
 
     // Check if user has budget handling permission
-    const hasBudgetPermission = await PermissionService.hasPermission(userId, Permission.BUDGET_HANDLING, undefined, orgId)
+    const hasBudgetPermission = await PermissionService.hasPermission(userId, Permission.BUDGET_HANDLING)
 
     // Find project and populate team members
     const project = await Project.findOne({
@@ -142,7 +141,6 @@ export async function PUT(
 
     const { user } = authResult
     const userId = user.id
-    const orgId = user.orgId
     const organizationId = user.organization
     const projectId = params.id
     const { memberId, hourlyRate } = await request.json()
@@ -157,7 +155,7 @@ export async function PUT(
 
     // If updating hourly rate, check budget permission
     if (hourlyRate !== undefined) {
-      const hasBudgetPermission = await PermissionService.hasPermission(userId.toString(), Permission.BUDGET_HANDLING, undefined, orgId)
+      const hasBudgetPermission = await PermissionService.hasPermission(userId.toString(), Permission.BUDGET_HANDLING)
       if (!hasBudgetPermission) {
         return NextResponse.json(
           { error: 'Insufficient permissions to manage budget/rates' },
@@ -166,7 +164,7 @@ export async function PUT(
       }
     } else {
        // If updating other things (future use), check project manage team permission
-       const canManageTeam = await PermissionService.hasPermission(userId, Permission.PROJECT_MANAGE_TEAM, projectId, orgId)
+       const canManageTeam = await PermissionService.hasPermission(userId, Permission.PROJECT_MANAGE_TEAM, projectId)
        if (!canManageTeam) {
          return NextResponse.json(
            { error: 'Insufficient permissions to manage project team' },
@@ -278,12 +276,11 @@ export async function POST(
 
     const { user } = authResult
     const userId = user.id
-    const orgId = user.orgId
     const organizationId = user.organization
     const projectId = params.id
 
     // Check if user can manage team for this project
-    const canManageTeam = await PermissionService.hasPermission(userId, Permission.PROJECT_MANAGE_TEAM, projectId, orgId)
+    const canManageTeam = await PermissionService.hasPermission(userId, Permission.PROJECT_MANAGE_TEAM, projectId)
     if (!canManageTeam) {
       return NextResponse.json(
         { error: 'Insufficient permissions to manage project team' },
@@ -489,12 +486,11 @@ export async function DELETE(
 
     const { user } = authResult
     const userId = user.id
-    const orgId = user.orgId
     const organizationId = user.organization
     const projectId = params.id
 
     // Check if user can manage team for this project
-    const canManageTeam = await PermissionService.hasPermission(userId, Permission.PROJECT_MANAGE_TEAM, projectId, orgId)
+    const canManageTeam = await PermissionService.hasPermission(userId, Permission.PROJECT_MANAGE_TEAM, projectId)
     if (!canManageTeam) {
       return NextResponse.json(
         { error: 'Insufficient permissions to manage project team' },

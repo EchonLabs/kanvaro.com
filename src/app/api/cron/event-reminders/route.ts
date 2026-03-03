@@ -5,8 +5,6 @@ import { User } from '@/models/User'
 import { Notification } from '@/models/Notification'
 import { Project } from '@/models/Project'
 import { EmailService } from '@/lib/email/EmailService'
-import { getOrgConfigs } from '@/lib/config'
-import '@/models/registry'
 
 // Helper function to send reminder email
 async function sendReminderEmail(
@@ -183,6 +181,8 @@ async function createReminderNotifications(
 // Main cron handler - should be called periodically (e.g., every 5 minutes)
 export async function GET(req: NextRequest) {
   try {
+    await connectDB()
+    
     // Check for authorization (you can add a secret key check here)
     const authHeader = req.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
@@ -199,12 +199,6 @@ export async function GET(req: NextRequest) {
       notification15Min: 0,
       errors: [] as string[]
     }
-
-    // Iterate over all configured orgs
-    const orgs = getOrgConfigs()
-    for (const orgConfig of orgs) {
-      await connectDB(orgConfig.id)
-      console.log(`[cron/event-reminders] Processing org ${orgConfig.id} (db: ${orgConfig.database.database})`)
 
     // 1. Process 1-day email reminders (events tomorrow, sent at 8 AM)
     const currentHour = now.getHours()
@@ -327,8 +321,6 @@ export async function GET(req: NextRequest) {
         results.errors.push(`Failed to send 15-min notification for event ${event._id}`)
       }
     }
-
-    } // end for-each orgConfig
 
     return NextResponse.json({
       success: true,

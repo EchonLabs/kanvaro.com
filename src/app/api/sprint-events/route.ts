@@ -227,14 +227,11 @@ export async function GET(req: NextRequest) {
 
     const { user } = authResult
     const userId = user.id
-    const orgId = user.orgId
 
     // Check if user has permission to view all sprint events
     const hasSprintEventViewAll = await PermissionService.hasPermission(
       userId,
-      Permission.SPRINT_EVENT_VIEW_ALL,
-      undefined,
-      orgId
+      Permission.SPRINT_EVENT_VIEW_ALL
     );
 
     const { searchParams } = new URL(req.url)

@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface ITestCase extends Document {
   title: string
@@ -140,6 +139,7 @@ TestCaseSchema.index({ title: 'text', description: 'text' })
 
 // In dev with HMR, ensure we don't keep stale schema versions (e.g., old fields like testSuiteId)
 // Delete existing model so we can safely recompile with the current schema shape.
-if (mongoose.models.TestCase) delete mongoose.models.TestCase
-mongoose.model<ITestCase>('TestCase', TestCaseSchema)  // Re-register globally
-export const TestCase = makeOrgModel<ITestCase>('TestCase', TestCaseSchema)
+if (mongoose.models.TestCase) {
+  delete mongoose.models.TestCase
+}
+export const TestCase = mongoose.model<ITestCase>('TestCase', TestCaseSchema)

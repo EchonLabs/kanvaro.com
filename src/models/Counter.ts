@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface ICounter extends Document {
   scope: 'project' | 'task'
@@ -21,5 +20,4 @@ const CounterSchema = new Schema<ICounter>({
 CounterSchema.index({ scope: 1, organization: 1 }, { unique: true, partialFilterExpression: { scope: 'project' } })
 CounterSchema.index({ scope: 1, project: 1 }, { unique: true, partialFilterExpression: { scope: 'task' } })
 
-if (!mongoose.models.Counter) mongoose.model<ICounter>('Counter', CounterSchema)
-export const Counter = makeOrgModel<ICounter>('Counter', CounterSchema)
+export const Counter = mongoose.models.Counter || mongoose.model<ICounter>('Counter', CounterSchema)

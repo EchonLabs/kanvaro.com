@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
-import { getOrgConnection, getModelOnConnection } from '@/lib/db-connection-manager'
-import { getOrgConfigs } from '@/lib/config'
-import '@/models/registry'
+import { User } from '@/models/User'
 import bcrypt from 'bcryptjs'
 import { emailService } from '@/lib/email/EmailService'
 
@@ -54,29 +52,15 @@ export async function POST(request: Request) {
 
     console.log('Password reset request with token:', resetToken ? 'present' : 'missing')
 
-    // Search across all tenant databases for the reset token
-    let user: any = null
-    let resolvedOrgId: string | null = null
-    const orgs = getOrgConfigs()
-    for (const org of orgs) {
-      try {
-        const conn = await getOrgConnection(org.id)
-        const UserModel = getModelOnConnection<any>('User', conn)
-        const found = await UserModel.findOne({
-          passwordResetToken: resetToken,
-          passwordResetExpiry: { $gt: new Date() }
-        })
-        if (found) {
-          user = found
-          resolvedOrgId = org.id
-          break
-        }
-      } catch {
-        // Skip unreachable orgs
-      }
-    }
+    await connectDB()
 
-    if (!user || !resolvedOrgId) {
+    // Find user by reset token
+    const user = await User.findOne({ 
+      passwordResetToken: resetToken,
+      passwordResetExpiry: { $gt: new Date() }
+    })
+
+    if (!user) {
       return NextResponse.json(
         { error: 'Invalid or expired reset token' },
         { status: 400 }

@@ -23,7 +23,6 @@ export async function GET(
 
     const { user } = authResult
     const userId = user.id
-    const orgId = user.orgId
     const organizationId = user.organization
     const { id: projectId } = params
 
@@ -43,14 +42,10 @@ export async function GET(
     // Check if user can view tasks in this project
     const canViewAllTasks = await PermissionService.hasPermission(
       userId,
-      Permission.TASK_VIEW_ALL,
-      undefined,
-      orgId
+      Permission.TASK_VIEW_ALL
     ) || await PermissionService.hasPermission(
       userId,
-      Permission.PROJECT_VIEW_ALL,
-      undefined,
-      orgId
+      Permission.PROJECT_VIEW_ALL
     )
 
     // Get tasks for the project

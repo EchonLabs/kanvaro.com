@@ -21,7 +21,7 @@ export async function GET() {
     const { user } = authResult
 
     // Check if user can read organization settings
-    const canReadSettings = await PermissionService.hasPermission(user.id, Permission.ORGANIZATION_READ, undefined, user.orgId)
+    const canReadSettings = await PermissionService.hasPermission(user.id, Permission.ORGANIZATION_READ)
     if (!canReadSettings) {
       return NextResponse.json(
         { error: 'Insufficient permissions to read organization settings' },
@@ -97,7 +97,7 @@ export async function PUT(request: NextRequest) {
     const { user } = authResult
 
     // Check if user can update organization settings
-    const canUpdateSettings = await PermissionService.hasPermission(user.id, Permission.ORGANIZATION_UPDATE, undefined, user.orgId)
+    const canUpdateSettings = await PermissionService.hasPermission(user.id, Permission.ORGANIZATION_UPDATE)
     if (!canUpdateSettings) {
       return NextResponse.json(
         { error: 'Insufficient permissions to update organization settings' },

@@ -26,7 +26,6 @@ export async function POST(
     const { user } = authResult
     const organizationId = user.organization
     const userId = user.id
-    const orgId = user.orgId
     const sprintId = params.id
 
     if (!sprintId) {
@@ -66,8 +65,7 @@ export async function POST(
     const canCompleteSprint = await PermissionService.hasPermission(
       userId,
       Permission.SPRINT_COMPLETE,
-      sprintProjectId,
-      orgId
+      sprintProjectId
     )
 
     if (!canCompleteSprint) {
