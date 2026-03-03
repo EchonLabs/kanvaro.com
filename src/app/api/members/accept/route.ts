@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
-import { User } from '@/models/User'
-import { UserInvitation } from '@/models/UserInvitation'
-import '@/models/Organization' // Ensure Organization model is registered for populate
+import { getOrgConfigs } from '@/lib/config'
+import { getOrgConnection, getModelOnConnection } from '@/lib/db-connection-manager'
 import { notificationService } from '@/lib/notification-service'
 import { emailService } from '@/lib/email/EmailService'
 import { formatToTitleCase } from '@/lib/utils'
@@ -12,16 +11,37 @@ import crypto from 'crypto'
 
 export async function POST(request: NextRequest) {
   try {
-    await connectDB()
-
     const { token, password, firstName, lastName } = await request.json()
 
-    // Find valid invitation
-    const invitation = await UserInvitation.findOne({
-      token,
-      isAccepted: false,
-      expiresAt: { $gt: new Date() }
-    }).populate('organization')
+    // ── Search ALL org databases for the invitation ───────────────────────────
+    // This is an unauthenticated route so we cannot rely on ambient org context.
+    const orgs = getOrgConfigs()
+    let invitation: any = null
+    let orgConn: any = null
+    let matchedOrgId: string = ''
+
+    for (const org of orgs) {
+      try {
+        const conn = await getOrgConnection(org.id)
+        const InvitationModel = getModelOnConnection<any>('UserInvitation', conn)
+        const found = await InvitationModel.findOne({
+          token,
+          isAccepted: false,
+          expiresAt: { $gt: new Date() }
+        }).populate('organization')
+
+        if (found) {
+          invitation = found
+          orgConn = conn
+          matchedOrgId = org.id
+          // Set ambient context so helpers (e.g. avatar generator) work correctly
+          await connectDB(org.id)
+          break
+        }
+      } catch (err) {
+        console.warn(`Could not check org [${org.id}] for invitation:`, err)
+      }
+    }
 
     if (!invitation) {
       return NextResponse.json(
@@ -30,8 +50,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Use explicit models on the matched org connection
+    const UserModel = getModelOnConnection<any>('User', orgConn)
+
     // Check if user already exists
-    const existingUser = await User.findOne({
+    const existingUser = await UserModel.findOne({
       email: invitation.email,
       organization: invitation.organization._id
     })
@@ -67,7 +90,7 @@ export async function POST(request: NextRequest) {
       userData.customRole = invitation.customRole
     }
 
-    const user = new User(userData)
+    const user = new UserModel(userData)
     const savedUser = await user.save()
 
 
@@ -197,7 +220,7 @@ export async function POST(request: NextRequest) {
 
     // Send notification to organization members about new team member
     try {
-      const organizationMembers = await User.find({ 
+      const organizationMembers = await UserModel.find({ 
         organization: invitation.organization._id,
         _id: { $ne: user._id } // Exclude the new user
       }).select('_id')

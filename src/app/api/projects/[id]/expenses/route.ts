@@ -26,7 +26,7 @@ export async function GET(
     const projectId = params.id
 
     // Check if user can access this project
-    const canAccessProject = await PermissionService.canAccessProject(user.id, projectId)
+    const canAccessProject = await PermissionService.canAccessProject(user.id, projectId, user.orgId)
     if (!canAccessProject) {
       return NextResponse.json(
         { error: 'Access denied to project' },
@@ -94,7 +94,7 @@ export async function POST(
     const projectId = params.id
 
     // Check if user can access this project
-    const canAccessProject = await PermissionService.canAccessProject(user.id, projectId)
+    const canAccessProject = await PermissionService.canAccessProject(user.id, projectId, user.orgId)
     if (!canAccessProject) {
       return NextResponse.json(
         { error: 'Access denied to project' },
@@ -232,7 +232,7 @@ export async function PUT(
     const projectId = params.id
 
     // Check if user can access this project
-    const canAccessProject = await PermissionService.canAccessProject(user.id, projectId)
+    const canAccessProject = await PermissionService.canAccessProject(user.id, projectId, user.orgId)
     if (!canAccessProject) {
       return NextResponse.json(
         { error: 'Access denied to project' },
@@ -372,7 +372,7 @@ export async function DELETE(
     const projectId = params.id
 
     // Check if user can access this project
-    const canAccessProject = await PermissionService.canAccessProject(user.id, projectId)
+    const canAccessProject = await PermissionService.canAccessProject(user.id, projectId, user.orgId)
     if (!canAccessProject) {
       return NextResponse.json(
         { error: 'Access denied to project' },

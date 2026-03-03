@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose'
+import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface IExpense extends Document {
   project: mongoose.Types.ObjectId
@@ -105,4 +106,5 @@ ExpenseSchema.index({ project: 1, paidStatus: 1 })
 ExpenseSchema.index({ project: 1, category: 1 })
 ExpenseSchema.index({ addedBy: 1 })
 
-export const Expense = mongoose.models.Expense || mongoose.model<IExpense>('Expense', ExpenseSchema)
+if (!mongoose.models.Expense) mongoose.model<IExpense>('Expense', ExpenseSchema)
+export const Expense = makeOrgModel<IExpense>('Expense', ExpenseSchema)

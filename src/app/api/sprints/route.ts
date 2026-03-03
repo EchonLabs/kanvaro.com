@@ -136,10 +136,13 @@ export async function GET(request: NextRequest) {
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
+    const orgId = user.orgId
 
     const canViewSprints = await PermissionService.hasAnyPermission(
       userId.toString(),
-      [Permission.SPRINT_VIEW, Permission.SPRINT_READ]
+      [Permission.SPRINT_VIEW, Permission.SPRINT_READ],
+      undefined,
+      orgId
     )
     
     if (!canViewSprints) {
@@ -152,7 +155,9 @@ export async function GET(request: NextRequest) {
     // Check if user has permission to view all sprints
     const hasSprintViewAll = await PermissionService.hasPermission(
       userId,
-      Permission.SPRINT_VIEW_ALL
+      Permission.SPRINT_VIEW_ALL,
+      undefined,
+      orgId
     );
 
     const { searchParams } = new URL(request.url)
@@ -392,6 +397,7 @@ export async function POST(request: NextRequest) {
     const { user } = authResult
     const userId = user.id
     const organizationId = user.organization
+    const orgId = user.orgId
 
     const {
       name,
@@ -431,7 +437,8 @@ export async function POST(request: NextRequest) {
     const canCreateSprint = await PermissionService.hasPermission(
       userId.toString(),
       Permission.SPRINT_CREATE,
-      projectDoc._id.toString()
+      projectDoc._id.toString(),
+      orgId
     )
 
     if (!canCreateSprint) {

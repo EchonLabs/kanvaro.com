@@ -167,6 +167,7 @@ export async function GET(request: NextRequest) {
     const { user } = authResult;
     const userId = user.id;
     const organizationId = user.organization;
+    const orgId = user.orgId;
     console.log('[Tasks GET] User ID:', userId, 'Organization ID:', organizationId);
 
     console.log('[Tasks GET] Parsing search parameters');
@@ -200,8 +201,8 @@ export async function GET(request: NextRequest) {
 
     console.log('[Tasks GET] Checking user permissions');
     const [canViewAllTasks, hasTaskViewAll] = await Promise.all([
-      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
-      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL)
+      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL, undefined, orgId),
+      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL, undefined, orgId)
     ]);
     console.log('[Tasks GET] User permissions - canViewAllTasks:', canViewAllTasks, 'hasTaskViewAll:', hasTaskViewAll);
 
@@ -458,6 +459,7 @@ export async function POST(request: NextRequest) {
 
     const { user } = authResult
     const userId = user.id
+    const orgId = user.orgId
 
     const payload = await request.json()
     console.log('[Task POST] Starting task creation', { userId, project: payload.project })
@@ -492,7 +494,7 @@ export async function POST(request: NextRequest) {
     // Fetch project and check permissions in parallel for better performance
     const [projectDoc, canCreateTask] = await Promise.all([
       Project.findById(project).select('projectNumber organization name teamMembers createdBy isBillableByDefault'),
-      PermissionService.hasPermission(userId, Permission.TASK_CREATE, project)
+      PermissionService.hasPermission(userId, Permission.TASK_CREATE, project, orgId)
     ])
 
     if (!projectDoc) {

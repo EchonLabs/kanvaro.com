@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import mongoose from 'mongoose'
-import { User } from '@/models/User'
-import { Organization } from '@/models/Organization'
-import { Currency } from '@/models/Currency'
 import bcrypt from 'bcryptjs'
-import { saveDatabaseConfig, markSetupCompleted } from '@/lib/config'
-import connectDB from '@/lib/db-config'
+import {
+  isAtOrgLimit,
+  addOrgConfig,
+  markOrgSetupCompleted,
+  MAX_ORGANIZATIONS,
+  OrgConfig,
+  getOrgConfigByDbName,
+  loadConfig,
+  saveConfig,
+} from '@/lib/config'
+import { connectWithUri } from '@/lib/db-config'
+import { getModelOnConnection } from '@/lib/db-connection-manager'
+import '@/models/registry'
 
 // Currency data for seeding
 const currencyData = [
@@ -154,10 +161,11 @@ const currencyData = [
   { code: 'SOL', name: 'Solana', symbol: '◎', country: 'Global', isMajor: false }
 ]
 
-async function seedCurrencies() {
+async function seedCurrencies(conn: any) {
   try {
     console.log('Seeding currencies...')
-    await Currency.insertMany(currencyData)
+    const CurrencyModel = getModelOnConnection<any>('Currency', conn)
+    await CurrencyModel.insertMany(currencyData)
     console.log(`Successfully seeded ${currencyData.length} currencies`)
   } catch (error) {
     console.error('Error seeding currencies:', error)
@@ -169,25 +177,44 @@ export async function POST(request: NextRequest) {
   try {
     const setupData = await request.json()
     console.log('Setup data received:', JSON.stringify(setupData, null, 2))
-    
-    // Validate required setup data
-    if (!setupData.database) {
-      throw new Error('Database configuration is missing')
+
+    // ── Validate required fields ────────────────────────────────────────────
+    if (!setupData.database) throw new Error('Database configuration is missing')
+    if (!setupData.organization) throw new Error('Organization configuration is missing')
+    if (!setupData.admin) throw new Error('Admin user configuration is missing')
+
+    // ── Build and validate the URI from the database step ───────────────────
+    const dbCfg = setupData.database
+    let uri = dbCfg.uri
+    if (!uri) {
+      if (dbCfg.username && dbCfg.password) {
+        uri = `mongodb://${dbCfg.username}:${dbCfg.password}@${dbCfg.host}:${dbCfg.port}/${dbCfg.database}?authSource=${dbCfg.authSource}`
+      } else {
+        uri = `mongodb://${dbCfg.host}:${dbCfg.port}/${dbCfg.database}`
+      }
     }
-    if (!setupData.organization) {
-      throw new Error('Organization configuration is missing')
+
+    // ── Check if this database is already registered in config.json ─────────
+    //    If so, we're reconnecting to an existing org — don't create a duplicate.
+    const existingOrgCfg = getOrgConfigByDbName(dbCfg.database)
+
+    // Only enforce org limit when this is a genuinely NEW database
+    if (!existingOrgCfg && isAtOrgLimit()) {
+      return NextResponse.json(
+        {
+          error: `Organization limit reached (max ${MAX_ORGANIZATIONS}). You can only reconnect to existing databases.`,
+          limitReached: true,
+        },
+        { status: 403 }
+      )
     }
-    if (!setupData.admin) {
-      throw new Error('Admin user configuration is missing')
-    }
-    
-    // Connect using unified connection system
-    await connectDB()
-    
+
+    // ── Connect to the org's database ───────────────────────────────────────
+    const conn = await connectWithUri(uri, dbCfg.database)
     console.log('Successfully connected to MongoDB')
-    
-    // Create or update organization
-    console.log('Creating/updating organization with data:', setupData.organization)
+
+    // ── Create / update Organization document ───────────────────────────────
+    const OrganizationModel = getModelOnConnection<any>('Organization', conn)
     const organizationData = {
       name: setupData.organization.name,
       domain: setupData.organization.domain,
@@ -202,33 +229,46 @@ export async function POST(request: NextRequest) {
       settings: {
         allowSelfRegistration: false,
         defaultUserRole: 'team_member',
-        projectTemplates: []
+        projectTemplates: [],
       },
       billing: {
         plan: 'free',
         maxUsers: 5,
         maxProjects: 3,
-        features: ['basic_project_management', 'time_tracking', 'basic_reporting']
+        features: ['basic_project_management', 'time_tracking', 'basic_reporting'],
       },
-      emailConfig: setupData.email ? {
-        provider: setupData.email.provider,
-        smtp: setupData.email.smtp,
-        azure: setupData.email.azure
-      } : undefined
+      emailConfig: setupData.email
+        ? { provider: setupData.email.provider, smtp: setupData.email.smtp, azure: setupData.email.azure }
+        : undefined,
     }
-    
-    console.log('Upserting organization...')
-    const organization = await Organization.findOneAndUpdate(
-      { name: setupData.organization.name }, // Find by name
-      organizationData,
-      { upsert: true, new: true, runValidators: true }
-    )
-    console.log('Organization upserted successfully:', organization._id)
-    
-    // Create or update admin user
-    console.log('Creating/updating admin user with data:', setupData.admin)
+
+    // ── IMPORTANT: When reconnecting to an existing database, find the
+    //    existing Organization by any means (not just by name) so we keep the
+    //    same _id.  All existing data (users, projects, tasks) references this
+    //    _id.  Creating a new Organization would orphan all that data.
+    let organization: any = null
+
+    // 1. Try to find an existing org in this database (any org — there should
+    //    be at most one in a single-org DB)
+    const existingOrg: any = await OrganizationModel.findOne().sort({ createdAt: 1 }).lean()
+
+    if (existingOrg) {
+      // Update the existing org in place — keeps the same _id
+      organization = await OrganizationModel.findByIdAndUpdate(
+        existingOrg._id,
+        { $set: organizationData },
+        { new: true, runValidators: true }
+      )
+      console.log('Organization updated (existing _id preserved):', organization._id)
+    } else {
+      // Brand-new database — create the org
+      organization = await OrganizationModel.create(organizationData)
+      console.log('Organization created:', organization._id)
+    }
+
+    // ── Create / update Admin User ───────────────────────────────────────────
+    const UserModel = getModelOnConnection<any>('User', conn)
     const hashedPassword = await bcrypt.hash(setupData.admin.password, 12)
-    
     const adminUserData = {
       firstName: setupData.admin.firstName,
       lastName: setupData.admin.lastName,
@@ -244,23 +284,18 @@ export async function POST(request: NextRequest) {
       preferences: {
         theme: 'system',
         sidebarCollapsed: false,
-        notifications: {
-          email: true,
-          inApp: true,
-          push: false
-        }
-      }
+        notifications: { email: true, inApp: true, push: false },
+      },
     }
-    
-    console.log('Upserting admin user...')
-    const adminUser = await User.findOneAndUpdate(
-      { email: setupData.admin.email }, // Find by email
+
+    const adminUser = await UserModel.findOneAndUpdate(
+      { email: setupData.admin.email },
       adminUserData,
       { upsert: true, new: true, runValidators: true }
     )
-    console.log('Admin user upserted successfully:', adminUser._id)
+    console.log('Admin user upserted:', adminUser._id)
 
-    // Generate and save avatar image if user doesn't have one
+    // Generate avatar (non-blocking)
     if (!adminUser.avatar) {
       try {
         const { generateAvatarImage } = await import('@/lib/avatar-generator')
@@ -271,47 +306,92 @@ export async function POST(request: NextRequest) {
         )
         adminUser.avatar = avatarUrl
         await adminUser.save()
-        console.log('Avatar generated for admin user')
       } catch (avatarError) {
-        console.error('Failed to generate avatar for admin user (non-blocking):', avatarError)
-        // Don't fail setup if avatar generation fails
+        console.error('Avatar generation failed (non-blocking):', avatarError)
       }
     }
-    
-    // Seed currencies if not already seeded
-    console.log('Checking if currencies need to be seeded...')
-    const existingCurrencies = await Currency.countDocuments()
+
+    // ── Seed currencies if needed ────────────────────────────────────────────
+    const CurrencyModel = getModelOnConnection<any>('Currency', conn)
+    const existingCurrencies = await CurrencyModel.countDocuments()
     if (existingCurrencies === 0) {
-      console.log('Seeding currencies...')
-      await seedCurrencies()
-      console.log('Currencies seeded successfully')
-    } else {
-      console.log(`Currencies already exist (${existingCurrencies} found)`)
+      await seedCurrencies(conn)
     }
-    
-    // Database configuration was already saved in the database step
-    
-    // Mark setup as completed
-    markSetupCompleted(organization._id.toString())
-    
-    console.log('Setup completed successfully!')
-    return NextResponse.json({ 
+
+    // ── Persist org config ─────────────────────────────────────────────────
+    const slug = setupData.organization.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+
+    // The config.json `id` MUST be the actual MongoDB Organization._id
+    // because login/auth embeds this id in JWTs and all data queries rely on it.
+    const actualOrgId = organization._id.toString()
+
+    if (existingOrgCfg) {
+      // ── Reconnecting to an existing DB — update the existing config entry ──
+      console.log('Reconnecting to existing org:', existingOrgCfg.id, '→ actual MongoDB _id:', actualOrgId)
+      const updatedOrgEntry: OrgConfig = {
+        ...existingOrgCfg,
+        id: actualOrgId, // Sync with the real MongoDB Organization._id
+        name: setupData.organization.name,
+        slug,
+        setupCompleted: true,
+        database: {
+          host: dbCfg.host,
+          port: dbCfg.port,
+          database: dbCfg.database,
+          username: dbCfg.username ?? '',
+          password: dbCfg.password ?? '',
+          authSource: dbCfg.authSource ?? 'admin',
+          ssl: dbCfg.ssl ?? false,
+          uri,
+        },
+      }
+      // Update in-place using the existing config entry
+      const config = loadConfig()
+      const idx = config.organizations.findIndex((o) => o.id === existingOrgCfg.id)
+      if (idx >= 0) {
+        config.organizations[idx] = updatedOrgEntry
+        saveConfig(config)
+      }
+      markOrgSetupCompleted(actualOrgId)
+      console.log('Existing org config updated with correct _id:', actualOrgId)
+    } else {
+      // ── Brand-new org — APPEND to config ──────────────────────────────────
+      const newOrgEntry: OrgConfig = {
+        id: organization._id.toString(),
+        name: setupData.organization.name,
+        slug,
+        setupCompleted: true,
+        database: {
+          host: dbCfg.host,
+          port: dbCfg.port,
+          database: dbCfg.database,
+          username: dbCfg.username ?? '',
+          password: dbCfg.password ?? '',
+          authSource: dbCfg.authSource ?? 'admin',
+          ssl: dbCfg.ssl ?? false,
+          uri,
+        },
+      }
+      addOrgConfig(newOrgEntry)
+      markOrgSetupCompleted(newOrgEntry.id)
+      console.log('New org config added:', newOrgEntry.id)
+    }
+
+    console.log('Setup completed for org:', organization._id)
+    return NextResponse.json({
       success: true,
       message: 'Setup completed successfully',
-      redirectTo: '/dashboard'
+      redirectTo: '/login?message=setup-completed',
     })
   } catch (error) {
     console.error('Setup completion failed:', error)
-    console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : undefined
-    })
-    
     return NextResponse.json(
-      { 
+      {
         error: 'Setup completion failed',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     )

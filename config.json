@@ -1,14 +1,37 @@
 {
-  "setupCompleted": true,
-  "database": {
-    "host": "mongo",
-    "port": 27017,
-    "database": "kanvaro",
-    "username": "",
-    "password": "",
-    "authSource": "admin",
-    "ssl": false,
-    "uri": "mongodb://mongo:27017/kanvaro"
-  },
-  "organizationId": "69808641a6e4382fcd5faa5a"
+  "maxOrganizations": 3,
+  "organizations": [
+    {
+      "setupCompleted": true,
+      "name": "Primary Organization",
+      "id": "698d54deb01431cb7c0697da",
+      "slug": "primary-organization",
+      "database": {
+        "host": "localhost",
+        "port": 27017,
+        "database": "kanvaro",
+        "username": "",
+        "password": "",
+        "authSource": "admin",
+        "ssl": false,
+        "uri": "mongodb://localhost:27017/kanvaro"
+      }
+    },
+    {
+      "id": "69a324b748f0caa5a9e067f7",
+      "name": "Kausn",
+      "slug": "kausn",
+      "setupCompleted": true,
+      "database": {
+        "host": "localhost",
+        "port": 27017,
+        "database": "kanvaroDB",
+        "username": "",
+        "password": "",
+        "authSource": "admin",
+        "ssl": false,
+        "uri": "mongodb://localhost:27017/kanvaroDB"
+      }
+    }
+  ]
 }

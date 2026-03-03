@@ -16,8 +16,6 @@ import { apiBaseUrl } from 'next-auth/client/_utils'
 
 export async function GET(request: NextRequest) {
   try {
-    await connectDB()
-
     const authResult = await authenticateUser()
     if ('error' in authResult) {
       return NextResponse.json(
@@ -26,17 +24,22 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Ensure DB connected for the user's org (authenticateUser already does this
+    // but we call explicitly to be safe)
+    await connectDB(authResult.user.orgId)
+
     const { user } = authResult
     const userId = user.id
+    const orgId = user.orgId
     const organizationId = user.organization
 
     // Check if user can view all projects (admin permission)
-    const canViewAllProjects = await PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL)
+    const canViewAllProjects = await PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL, undefined, orgId)
 
     console.log('Projects API - User permissions:', {
       userId,
       canViewAllProjects,
-      hasProjectRead: await PermissionService.hasPermission(userId, Permission.PROJECT_READ)
+      hasProjectRead: await PermissionService.hasPermission(userId, Permission.PROJECT_READ, undefined, orgId)
     })
     
     const { searchParams } = new URL(request.url)
@@ -163,8 +166,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    await connectDB()
-
     const authResult = await authenticateUser()
     if ('error' in authResult) {
       return NextResponse.json(
@@ -173,12 +174,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    await connectDB(authResult.user.orgId)
+
     const { user } = authResult
     const userId = user.id
+    const orgId = user.orgId
     const organizationId = user.organization
 
     // Check if user can create projects
-    const canCreateProject = await PermissionService.hasPermission(userId, Permission.PROJECT_CREATE)
+    const canCreateProject = await PermissionService.hasPermission(userId, Permission.PROJECT_CREATE, undefined, orgId)
     if (!canCreateProject) {
       return NextResponse.json(
         { error: 'Insufficient permissions to create projects' },

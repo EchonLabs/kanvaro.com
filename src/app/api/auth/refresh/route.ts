@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import connectDB from '@/lib/db-config'
+import { getOrgConnection, getModelOnConnection } from '@/lib/db-connection-manager'
 import { hasDatabaseConfig } from '@/lib/db-config'
-import { User } from '@/models/User'
+import '@/models/registry'
 import { normalizeUploadUrl } from '@/lib/file-utils'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
@@ -72,10 +72,17 @@ export async function POST() {
       })
     }
 
-    await connectDB()
+    // Connect to the org's DB (orgId embedded in refresh token by the login route)
+    if (!decoded.orgId) {
+      return NextResponse.json(
+        { error: 'Invalid token: missing orgId' },
+        { status: 401 }
+      )
+    }
 
-    // Find user
-    const user = await User.findById(decoded.userId)
+    const conn = await getOrgConnection(decoded.orgId)
+    const UserModel = getModelOnConnection<any>('User', conn)
+    const user = await UserModel.findById(decoded.userId)
     if (!user || !user.isActive) {
       return NextResponse.json(
         { error: 'User not found or inactive' },
@@ -83,9 +90,9 @@ export async function POST() {
       )
     }
 
-    // Create new access token
+    // Create new access token (preserve orgId from refresh token)
     const newAccessToken = jwt.sign(
-      { userId: user._id, email: user.email, role: user.role },
+      { userId: user._id, email: user.email, role: user.role, orgId: decoded.orgId },
       JWT_SECRET,
       { expiresIn: '15m' }
     )

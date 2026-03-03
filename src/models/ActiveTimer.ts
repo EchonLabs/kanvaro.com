@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose'
+import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface IActiveTimer extends Document {
   user: mongoose.Types.ObjectId
@@ -126,4 +127,5 @@ ActiveTimerSchema.pre('save', function(next) {
   next()
 })
 
-export const ActiveTimer = mongoose.models.ActiveTimer || mongoose.model<IActiveTimer>('ActiveTimer', ActiveTimerSchema)
+if (!mongoose.models.ActiveTimer) mongoose.model<IActiveTimer>('ActiveTimer', ActiveTimerSchema)
+export const ActiveTimer = makeOrgModel<IActiveTimer>('ActiveTimer', ActiveTimerSchema)

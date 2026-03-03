@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has permission to create documentation
-    const hasPermission = await PermissionService.hasPermission(auth.user.id, Permission.DOCUMENTATION_CREATE);
+    const hasPermission = await PermissionService.hasPermission(auth.user.id, Permission.DOCUMENTATION_CREATE, undefined, auth.user.orgId);
     if (!hasPermission) {
       return NextResponse.json({ error: 'Permission denied to create documentation' }, { status: 403 });
     }

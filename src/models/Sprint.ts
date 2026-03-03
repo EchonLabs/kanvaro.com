@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose'
+import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface ISprint extends Document {
   name: string
@@ -164,4 +165,5 @@ if (mongoose.models.Sprint) {
   }
 }
 
-export const Sprint = mongoose.models.Sprint || mongoose.model<ISprint>('Sprint', SprintSchema)
+if (!mongoose.models.Sprint) mongoose.model<ISprint>('Sprint', SprintSchema)
+export const Sprint = makeOrgModel<ISprint>('Sprint', SprintSchema)

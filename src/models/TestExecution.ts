@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose'
+import { makeOrgModel } from '@/lib/db-connection-manager'
 
 export interface ITestExecution extends Document {
   testCase: mongoose.Types.ObjectId
@@ -107,4 +108,5 @@ TestExecutionSchema.index({ executedBy: 1, executedAt: -1 })
 TestExecutionSchema.index({ status: 1, executedAt: -1 })
 TestExecutionSchema.index({ project: 1, version: 1 })
 
-export const TestExecution = mongoose.models.TestExecution || mongoose.model<ITestExecution>('TestExecution', TestExecutionSchema)
+if (!mongoose.models.TestExecution) mongoose.model<ITestExecution>('TestExecution', TestExecutionSchema)
+export const TestExecution = makeOrgModel<ITestExecution>('TestExecution', TestExecutionSchema)
