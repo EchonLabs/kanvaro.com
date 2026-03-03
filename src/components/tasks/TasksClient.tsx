@@ -35,7 +35,8 @@ import {
     Edit,
     Trash2,
     X,
-    RotateCcw
+    RotateCcw,
+    Upload
 } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -53,6 +54,7 @@ import { DateRange } from 'react-day-picker'
 import { DEFAULT_TASK_STATUS_KEYS, type TaskStatusKey } from '@/constants/taskStatuses'
 
 import CreateTaskModal from './CreateTaskModal'
+import BulkUploadModal from './BulkUploadModal'
 type KanbanBoardComponentProps = {
     projectId: string
     filters?: {
@@ -186,6 +188,7 @@ export default function TasksClient({
     const [selectedProjectDetails, setSelectedProjectDetails] = useState<any>(null)
     const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list')
     const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
+    const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
     const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
     const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
@@ -893,10 +896,20 @@ export default function TasksClient({
                     <p className="text-sm sm:text-base text-muted-foreground">Manage and track your assigned tasks</p>
                 </div>
                 {canCreateTask && (
-                    <Button onClick={() => setShowCreateTaskModal(true)} className="w-full sm:w-auto flex-shrink-0">
-                        <Plus className="h-4 w-4 mr-2" />
-                        New Task
-                    </Button>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowBulkUploadModal(true)}
+                            className="w-full sm:w-auto flex-shrink-0"
+                        >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Bulk Upload
+                        </Button>
+                        <Button onClick={() => setShowCreateTaskModal(true)} className="w-full sm:w-auto flex-shrink-0">
+                            <Plus className="h-4 w-4 mr-2" />
+                            New Task
+                        </Button>
+                    </div>
                 )}
             </div>
 
@@ -1522,6 +1535,12 @@ export default function TasksClient({
                     onTaskCreated={handleTaskCreated}
                 />
             )}
+
+            <BulkUploadModal
+                open={showBulkUploadModal}
+                onClose={() => setShowBulkUploadModal(false)}
+                onSuccess={() => fetchTasks(true)}
+            />
 
             {/* Delete Confirmation Modal */}
             <ConfirmationModal
