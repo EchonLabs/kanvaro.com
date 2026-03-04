@@ -41,9 +41,7 @@ const getIdString = (value: any): string | null => {
 }
 
 const calculateCurrentDurationMinutes = (timer: IActiveTimer, referenceDate = new Date()) => {
-  // When paused, use pausedAt as the effective end so ongoing pause time is excluded
-  const effectiveEnd = timer.pausedAt ? timer.pausedAt : referenceDate
-  const baseDuration = (effectiveEnd.getTime() - timer.startTime.getTime()) / (1000 * 60)
+  const baseDuration = (referenceDate.getTime() - timer.startTime.getTime()) / (1000 * 60)
   return Math.max(0, baseDuration - (timer.totalPausedDuration || 0))
 }
 
@@ -140,14 +138,6 @@ async function stopExpiredTimer(activeTimer: IActiveTimer): Promise<{
     }
 
     const now = new Date()
-
-    // Finalize current pause period before computing duration
-    if (activeTimer.pausedAt) {
-      const currentPauseMinutes = (now.getTime() - activeTimer.pausedAt.getTime()) / (1000 * 60)
-      activeTimer.totalPausedDuration = (activeTimer.totalPausedDuration || 0) + currentPauseMinutes
-      activeTimer.pausedAt = undefined
-    }
-
     const currentDuration = calculateCurrentDurationMinutes(activeTimer, now)
     let shouldStop = false
     let reason = 'session'
@@ -263,7 +253,7 @@ async function stopExpiredTimer(activeTimer: IActiveTimer): Promise<{
       
       if (timerStopEnabled) {
         await notificationService.createNotification(
-          userId!,
+          activeTimer.user.toString(),
           organizationId,
           {
             type: 'time_tracking' as const,
@@ -292,7 +282,7 @@ async function stopExpiredTimer(activeTimer: IActiveTimer): Promise<{
 
         if (approvalEnabled) {
           await notificationService.createNotification(
-            userId!,
+            activeTimer.user.toString(),
             organizationId,
             {
               type: 'time_tracking' as const,

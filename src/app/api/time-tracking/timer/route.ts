@@ -76,9 +76,7 @@ const getIdString = (value: any): string | null => {
 }
 
 const calculateCurrentDurationMinutes = (timer: IActiveTimer, referenceDate = new Date()) => {
-  // When paused, use pausedAt as the effective end so ongoing pause time is excluded
-  const effectiveEnd = timer.pausedAt ? timer.pausedAt : referenceDate
-  const baseDuration = (effectiveEnd.getTime() - timer.startTime.getTime()) / (1000 * 60)
+  const baseDuration = (referenceDate.getTime() - timer.startTime.getTime()) / (1000 * 60)
   return Math.max(0, baseDuration - (timer.totalPausedDuration || 0))
 }
 
@@ -165,15 +163,7 @@ async function stopTimerAndBuildResponse(
     return { status: 500, body: { error: 'Time tracking settings not found' } }
   }
 
-  const userId = getIdString(activeTimer.user)
   let endTime = options.now || new Date()
-
-  // Finalize current pause period before computing duration
-  if (activeTimer.pausedAt) {
-    const currentPauseMinutes = (endTime.getTime() - activeTimer.pausedAt.getTime()) / (1000 * 60)
-    activeTimer.totalPausedDuration = (activeTimer.totalPausedDuration || 0) + currentPauseMinutes
-    activeTimer.pausedAt = undefined
-  }
   
   const isAutoStop = options.reason === 'auto_max_session' || options.reason === 'auto_max_daily'
   let effectiveLimitMinutes: number | null = null
@@ -345,7 +335,7 @@ async function stopTimerAndBuildResponse(
         : `Timer auto-stopped for project "${projectName}" after reaching the session limit. Logged ${hoursFormatted}.`)
       : `Timer stopped for project "${projectName}". Logged ${hoursFormatted}.`
     await notificationService.createNotification(
-      userId!,
+      activeTimer.user.toString(),
       organizationId,
       buildNotificationPayload(
         autoStopTitle,
@@ -366,7 +356,7 @@ async function stopTimerAndBuildResponse(
     )
     if (overtimeEnabled) {
       await notificationService.createNotification(
-        userId!,
+        activeTimer.user.toString(),
         organizationId,
         {
           type: 'time_tracking' as const,
@@ -398,7 +388,7 @@ const projectRequiresApproval = project?.settings?.requireApproval === true;
     )
     if (approvalNeededEnabled) {
       await notificationService.createNotification(
-        userId!,
+        activeTimer.user.toString(),
         organizationId,
         {
           type: 'time_tracking' as const,
@@ -428,7 +418,7 @@ const projectRequiresApproval = project?.settings?.requireApproval === true;
     )
     if (timeSubmittedEnabled) {
       await notificationService.createNotification(
-        userId!,
+        activeTimer.user.toString(),
         organizationId,
         {
           type: 'time_tracking' as const,
@@ -717,10 +707,8 @@ export async function POST(request: NextRequest) {
 
     await activeTimer.save()
     
-    // Populate user, project and task data after saving
+    // Populate user data after saving
     await activeTimer.populate('user', 'firstName lastName')
-    await activeTimer.populate('project', 'name settings')
-    await activeTimer.populate('task', 'title')
 
     // Send timer start notification if enabled
     const shouldNotifyStart = await isNotificationEnabled(organizationId, 'onTimerStart', projectId)
@@ -773,7 +761,7 @@ export async function PUT(request: NextRequest) {
     const activeTimer = await ActiveTimer.findOne({
       user: userId,
       organization: organizationId
-    }).populate('user', 'firstName lastName').populate('project', 'name settings').populate('task', 'title')
+    }).populate('user', 'firstName lastName')
 
     if (!activeTimer) {
       return NextResponse.json({ error: 'No active timer found' }, { status: 404 })
@@ -825,8 +813,8 @@ export async function PUT(request: NextRequest) {
 
     await activeTimer.save()
 
-    // Use pausedAt-aware duration calculation
-    const currentDuration = calculateCurrentDurationMinutes(activeTimer, now)
+    const baseDuration = (now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60)
+    const currentDuration = Math.max(0, baseDuration - activeTimer.totalPausedDuration)
 
     return NextResponse.json({
       message: 'Timer updated successfully',
