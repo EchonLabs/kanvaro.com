@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '@/components/ui/Dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { toast } from 'sonner'
+import { useToast } from '@/components/ui/Toast'
 
 interface Employee {
   _id: string
@@ -67,6 +67,7 @@ export function HRManualTimeLogModal({
 }: HRManualTimeLogModalProps) {
   // State for selections
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
+  const { showToast } = useToast()
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [selectedTaskId, setSelectedTaskId] = useState('')
 
@@ -203,7 +204,7 @@ export function HRManualTimeLogModal({
       }
     } catch {
       setEmployees([])
-      toast.error('Failed to load employees')
+      showToast({ type: 'error', title: 'Failed to load employees' })
     } finally {
       setEmployeesLoading(false)
     }
@@ -241,7 +242,7 @@ export function HRManualTimeLogModal({
       }
     } catch {
       setProjects([])
-      toast.error('Failed to load projects')
+      showToast({ type: 'error', title: 'Failed to load projects' })
     } finally {
       setProjectsLoading(false)
     }
@@ -262,7 +263,7 @@ export function HRManualTimeLogModal({
       }
     } catch {
       setTasks([])
-      toast.error('Failed to load tasks')
+      showToast({ type: 'error', title: 'Failed to load tasks' })
     } finally {
       setTasksLoading(false)
     }
@@ -418,7 +419,7 @@ export function HRManualTimeLogModal({
       const data = await response.json()
 
       if (response.ok) {
-        toast.success('Manual time log created successfully')
+        showToast({ type: 'success', title: 'Manual time log created successfully' })
         onOpenChange(false)
         resetForm()
         onSuccess?.()
