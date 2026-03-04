@@ -123,9 +123,11 @@ TimeEntrySchema.virtual('totalCost').get(function() {
   return 0
 })
 
-// Pre-save middleware to calculate duration
+// Pre-save middleware to calculate duration (only when not explicitly set)
+// Timer-stopped entries set duration explicitly to exclude paused time,
+// so we must not overwrite it with wall-clock time.
 TimeEntrySchema.pre('save', function(next) {
-  if (this.endTime && this.startTime) {
+  if (this.endTime && this.startTime && (!this.duration || this.duration <= 0)) {
     this.duration = Math.round((this.endTime.getTime() - this.startTime.getTime()) / (1000 * 60))
   }
   next()
