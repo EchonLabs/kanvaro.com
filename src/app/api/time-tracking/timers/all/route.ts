@@ -6,9 +6,8 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
 
 function calculateCurrentDurationMinutes(activeTimer: any): number {
-  // When paused, use pausedAt as the effective end so ongoing pause time is excluded
-  const effectiveEnd = activeTimer.pausedAt ? new Date(activeTimer.pausedAt) : new Date()
-  const baseDuration = (effectiveEnd.getTime() - activeTimer.startTime.getTime()) / (1000 * 60)
+  const now = new Date()
+  const baseDuration = (now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60)
   return Math.max(0, baseDuration - (activeTimer.totalPausedDuration || 0))
 }
 

@@ -459,56 +459,56 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     })
   }, [reportData?.detailedEntries])
 
-  // Aggregate entries by employee + project (across all months in the date range)
   const monthlyReportData = useMemo(() => {
     if (!reportData?.detailedEntries || reportData.detailedEntries.length === 0) return []
     const entries = reportData.detailedEntries
-
-    // Group by composite key: `userId|projectId` to merge across all months
-    const grouped: Record<string, {
-      userName: string
-      userEmail: string
-      projectId: string
-      projectName: string
-      totalDuration: number
-      totalCost: number
-      entryCount: number
-    }> = {}
-
+    const byMonth: Record<string, Record<string, Record<string, { name: string; email: string; duration: number; cost: number; entries: number }>>> = {}
     for (const entry of entries) {
-      const key = `${entry.userId}|${entry.projectId}`
-      if (!grouped[key]) {
-        grouped[key] = {
-          userName: entry.userName,
-          userEmail: entry.userEmail,
-          projectId: entry.projectId,
-          projectName: entry.projectName,
-          totalDuration: 0,
-          totalCost: 0,
-          entryCount: 0,
-        }
+      const d = new Date(entry.startTime || entry.date)
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const projectKey = entry.projectId
+      const userKey = entry.userId
+      if (!byMonth[monthKey]) byMonth[monthKey] = {}
+      if (!byMonth[monthKey][projectKey]) byMonth[monthKey][projectKey] = {}
+      const proj = byMonth[monthKey][projectKey]
+      if (!proj[userKey]) {
+        proj[userKey] = { name: entry.userName, email: entry.userEmail, duration: 0, cost: 0, entries: 0 }
       }
-      grouped[key].totalDuration += entry.duration
-      grouped[key].totalCost += entry.cost
-      grouped[key].entryCount += 1
+      proj[userKey].duration += entry.duration
+      proj[userKey].cost += entry.cost
+      proj[userKey].entries += 1
     }
-
-    return Object.values(grouped).sort(
-      (a, b) => a.userName.localeCompare(b.userName) || a.projectName.localeCompare(b.projectName)
-    )
+    return Object.entries(byMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([monthKey, projects]) => {
+        const projectList = Object.entries(projects).map(([projectId, employees]) => {
+          const employeeList = Object.entries(employees).map(([userId, emp]) => ({ userId, ...emp }))
+          const totalDuration = employeeList.reduce((s, e) => s + e.duration, 0)
+          const totalCost = employeeList.reduce((s, e) => s + e.cost, 0)
+          const totalEntries = employeeList.reduce((s, e) => s + e.entries, 0)
+          const projectName = entries.find(e => e.projectId === projectId)?.projectName || projectId
+          return { projectId, projectName, totalDuration, totalCost, totalEntries, employees: employeeList }
+        })
+        const monthTotal = projectList.reduce((s, p) => s + p.totalDuration, 0)
+        return { monthKey, projects: projectList, monthTotal }
+      })
   }, [reportData?.detailedEntries])
 
   const handleMonthlyReportExport = () => {
     if (monthlyReportData.length === 0) return
     const headers = ['Row', 'Employee', 'Project', 'Total Time']
-
-    const csvRows = monthlyReportData.map((row, i) => {
-      const h = Math.floor(row.totalDuration / 60)
-      const m = Math.round(row.totalDuration % 60)
-      const hours = `${h}:${String(m).padStart(2, '0')}`
-      return [String(i + 1), row.userName, row.projectName, hours]
-    })
-
+    const rows: { empName: string; projName: string; hours: string }[] = []
+    for (const { projects } of monthlyReportData) {
+      for (const proj of projects) {
+        for (const emp of proj.employees) {
+          const h = Math.floor(emp.duration / 60)
+          const m = emp.duration % 60
+          rows.push({ empName: emp.name, projName: proj.projectName, hours: `${h}:${String(m).padStart(2, '0')}` })
+        }
+      }
+    }
+    rows.sort((a, b) => a.empName.localeCompare(b.empName) || a.projName.localeCompare(b.projName))
+    const csvRows = rows.map((r, i) => [String(i + 1), r.empName, r.projName, r.hours])
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
     const csv = [headers, ...csvRows].map(r => r.map(escape).join(',')).join('\r\n')
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
