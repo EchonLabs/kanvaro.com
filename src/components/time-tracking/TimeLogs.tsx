@@ -348,15 +348,33 @@ export function TimeLogs({
           const filtered = data.data.filter((project: any) => {
             const allow = project?.settings?.allowTimeTracking
             if (!allow) return false
-            const createdByMatch = project?.createdBy === resolvedUserId || project?.createdBy?.id === resolvedUserId
+
+            // Admins/managers with employee filter permission can see all projects
+            if (canViewEmployeeFilter) return true
+
+            // Check if user created the project (createdBy may be populated object or string)
+            const createdByMatch =
+              project?.createdBy === resolvedUserId ||
+              project?.createdBy?._id === resolvedUserId ||
+              project?.createdBy?.id === resolvedUserId
+
+            // Check if user is in teamMembers array
+            // Each entry is { memberId: { _id, firstName, ... } | string, hourlyRate }
             const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
-            const teamMatch = teamMembers.some((memberId: any) => {
-              if (typeof memberId === 'string') return memberId === resolvedUserId
-              return memberId?._id === resolvedUserId || memberId?.id === resolvedUserId
+            const teamMatch = teamMembers.some((member: any) => {
+              const mid = member?.memberId
+              if (!mid) return false
+              if (typeof mid === 'string') return mid === resolvedUserId
+              return mid?._id === resolvedUserId || mid?.id === resolvedUserId
             })
-            const members = Array.isArray(project?.members) ? project.members : []
-            const membersMatch = members.some((m: any) => (typeof m === 'string' ? m === resolvedUserId : m?.id === resolvedUserId || m?._id === resolvedUserId))
-            return createdByMatch || teamMatch || membersMatch || canViewEmployeeFilter
+
+            // Check if user is the project client (client may be populated object or string)
+            const clientMatch =
+              project?.client === resolvedUserId ||
+              project?.client?._id === resolvedUserId ||
+              project?.client?.id === resolvedUserId
+
+            return createdByMatch || teamMatch || clientMatch
           })
           setFilterProjects(filtered)
         }

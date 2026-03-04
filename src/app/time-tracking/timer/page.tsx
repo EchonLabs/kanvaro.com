@@ -398,16 +398,31 @@ const filteredTasks = tasks.filter((task) =>
           const projectAllowsTimeTracking = project?.settings?.allowTimeTracking === true
           if (!projectAllowsTimeTracking) return false
 
+          // Check if user created the project (createdBy may be populated object or string)
+          const isCreator =
+            project?.createdBy === u.id ||
+            project?.createdBy?._id === u.id ||
+            project?.createdBy?.id === u.id
+
           // Check if user is in teamMembers array as memberId
           const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
           const isUserTeamMember = teamMembers.some((member: any) => {
             if (typeof member === 'object' && member !== null) {
-              return member.memberId === u.id || member.memberId?._id === u.id || member.memberId?.id === u.id
+              const mid = member?.memberId
+              if (!mid) return false
+              if (typeof mid === 'string') return mid === u.id
+              return mid?._id === u.id || mid?.id === u.id
             }
             return false
           })
 
-          return isUserTeamMember
+          // Check if user is the project client
+          const isClient =
+            project?.client === u.id ||
+            project?.client?._id === u.id ||
+            project?.client?.id === u.id
+
+          return isCreator || isUserTeamMember || isClient
         })
 
         console.log('Time tracking - Filtered projects:', {
