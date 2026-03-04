@@ -99,16 +99,17 @@ ActiveTimerSchema.index({ startTime: 1 }) // For efficient timer expiry queries 
 
 // Virtual for current duration
 ActiveTimerSchema.virtual('currentDuration').get(function() {
-  const now = new Date()
-  const baseDuration = (now.getTime() - this.startTime.getTime()) / (1000 * 60)
+  // When paused, use pausedAt as the effective end so ongoing pause time is excluded
+  const effectiveEnd = this.pausedAt ? this.pausedAt : new Date()
+  const baseDuration = (effectiveEnd.getTime() - this.startTime.getTime()) / (1000 * 60)
   return Math.max(0, baseDuration - this.totalPausedDuration)
 })
 
 // Virtual for current cost
 ActiveTimerSchema.virtual('currentCost').get(function() {
   if (this.hourlyRate) {
-    const now = new Date()
-    const baseDuration = (now.getTime() - this.startTime.getTime()) / (1000 * 60)
+    const effectiveEnd = this.pausedAt ? this.pausedAt : new Date()
+    const baseDuration = (effectiveEnd.getTime() - this.startTime.getTime()) / (1000 * 60)
     const currentDuration = Math.max(0, baseDuration - this.totalPausedDuration)
     return (this.hourlyRate * currentDuration) / 60
   }
