@@ -123,26 +123,26 @@ export default function ViewTaskModal({
               <CardDescription>Task Details</CardDescription>
             </div>
             <div className="flex items-center space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={onEdit}
-                disabled={!canEdit}
-                title={!canEdit ? 'You need TASK_EDIT_ALL permission or be the creator to edit this task' : undefined}
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit
-              </Button>
-              <Button 
-                variant="destructive" 
-                size="sm" 
-                onClick={onDelete}
-                disabled={!canDelete}
-                title={!canDelete ? 'You need TASK_DELETE_ALL permission or be the creator to delete this task' : undefined}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
+              {canEdit && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onEdit}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+              )}
+              {canDelete && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={onDelete}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              )}
               <Button variant="ghost" size="sm" onClick={onClose}>
                 <X className="h-4 w-4" />
               </Button>
