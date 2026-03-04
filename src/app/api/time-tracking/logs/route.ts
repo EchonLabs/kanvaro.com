@@ -6,7 +6,6 @@ import { TimeTrackingSettings } from '@/models/TimeTrackingSettings'
 import { Project } from '@/models/Project'
 import { User } from '@/models/User'
 import { Organization } from '@/models/Organization'
-import mongoose from 'mongoose'
 
 export async function GET(request: NextRequest) {
   try {
@@ -121,72 +120,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Time tracking not enabled' }, { status: 403 })
     }
 
-    // Check daily hours limit before starting timer
-    if (settings.allowOvertime === false && settings.maxDailyHours) {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const tomorrow = new Date(today)
-      tomorrow.setDate(tomorrow.getDate() + 1)
-
-      const dailyResult = await TimeEntry.aggregate([
-        {
-          $match: {
-            user: new mongoose.Types.ObjectId(userId),
-            organization: new mongoose.Types.ObjectId(organizationId),
-            startTime: { $gte: today, $lt: tomorrow }
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            totalDuration: { $sum: '$duration' }
-          }
-        }
-      ])
-
-      const dailyMinutesLogged = dailyResult.length > 0 ? dailyResult[0].totalDuration : 0
-      const dailyHoursLogged = dailyMinutesLogged / 60
-
-      if (dailyHoursLogged >= settings.maxDailyHours) {
-        return NextResponse.json(
-          { error: `Daily time limit reached. You have already logged ${dailyHoursLogged.toFixed(1)} hours today (maximum: ${settings.maxDailyHours} hours). You cannot start a new timer until tomorrow.` },
-          { status: 400 }
-        )
-      }
-    }
-
     // Get user's hourly rate if not provided
     const user = await User.findById(userId)
     const finalHourlyRate = hourlyRate || user?.billingRate || settings.defaultHourlyRate
-
-    // Calculate effective max session hours considering daily limit
-    let effectiveMaxSession = settings.maxSessionHours
-    if (settings.allowOvertime === false && settings.maxDailyHours) {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const tomorrow = new Date(today)
-      tomorrow.setDate(tomorrow.getDate() + 1)
-
-      const dailyResult2 = await TimeEntry.aggregate([
-        {
-          $match: {
-            user: new mongoose.Types.ObjectId(userId),
-            organization: new mongoose.Types.ObjectId(organizationId),
-            startTime: { $gte: today, $lt: tomorrow }
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            totalDuration: { $sum: '$duration' }
-          }
-        }
-      ])
-
-      const dailyMinutesLogged2 = dailyResult2.length > 0 ? dailyResult2[0].totalDuration : 0
-      const remainingDailyHours = Math.max(0, settings.maxDailyHours - (dailyMinutesLogged2 / 60))
-      effectiveMaxSession = Math.min(settings.maxSessionHours, remainingDailyHours)
-    }
 
     // Create active timer
     const activeTimer = new ActiveTimer({
@@ -200,7 +136,7 @@ export async function POST(request: NextRequest) {
       tags: tags || [],
       isBillable: isBillable ?? true,
       hourlyRate: finalHourlyRate,
-      maxSessionHours: effectiveMaxSession
+      maxSessionHours: settings.maxSessionHours
     })
 
     await activeTimer.save()
