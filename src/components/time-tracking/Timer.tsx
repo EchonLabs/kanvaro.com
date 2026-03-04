@@ -19,6 +19,8 @@ interface TimerProps {
   isBillable?: boolean
  // requireDescription?: boolean
   allowOvertime?: boolean
+  maxDailyHours?: number
+  dailyHoursLogged?: number
   onTimerUpdate?: (timer: any) => void
   onAutoStop?: (reason: string) => void
 }
@@ -36,6 +38,7 @@ interface ActiveTimer {
   isBillable: boolean
   hourlyRate?: number
   maxSessionHours: number
+  remainingDailyMinutes?: number | null
 }
 
 export function Timer({
@@ -47,6 +50,8 @@ export function Timer({
   isBillable,
  // requireDescription = true,
   allowOvertime = true,
+  maxDailyHours,
+  dailyHoursLogged = 0,
   onTimerUpdate,
   onAutoStop
 }: TimerProps) {
@@ -123,6 +128,15 @@ export function Timer({
         const maxHours = activeTimer.maxSessionHours
         onAutoStop?.(`Timer stopped automatically. Maximum session limit of ${maxHours} ${maxHours === 1 ? 'hour' : 'hours'} reached.`)
         handleStopTimer()
+        return
+      }
+
+      // Auto-stop when reaching remaining daily hours limit
+      if (!allowOvertime && activeTimer.remainingDailyMinutes != null && activeTimer.remainingDailyMinutes > 0 && runningMinutes >= activeTimer.remainingDailyMinutes) {
+        console.log('Timer: Auto-stopping - reached daily hours limit')
+        onAutoStop?.(`Timer stopped automatically. Daily hours limit of ${maxDailyHours || 'N/A'} hours reached.`)
+        handleStopTimer()
+        return
       }
     }, 1000)
 
@@ -390,13 +404,23 @@ export function Timer({
         </Alert>
       )}
 
+      {/* Show warning when daily limit is reached */}
+      {!allowOvertime && maxDailyHours && dailyHoursLogged >= maxDailyHours && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            Daily time limit reached ({dailyHoursLogged.toFixed(1)}h / {maxDailyHours}h). You cannot start a new timer until tomorrow.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Button
         onClick={handleStartTimer}
         disabled={
           isLoading || 
           !projectId || 
           !taskId || 
-          (!description.trim())
+          (!description.trim()) ||
+          (!allowOvertime && !!maxDailyHours && dailyHoursLogged >= maxDailyHours)
         }
         className="w-full"
       >

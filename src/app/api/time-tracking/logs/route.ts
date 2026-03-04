@@ -6,6 +6,7 @@ import { TimeTrackingSettings } from '@/models/TimeTrackingSettings'
 import { Project } from '@/models/Project'
 import { User } from '@/models/User'
 import { Organization } from '@/models/Organization'
+import mongoose from 'mongoose'
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,8 +31,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Calculate current duration
+    // When paused, use pausedAt as effective end so ongoing pause time is excluded
     const now = new Date()
-    const baseDuration = Math.round((now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60))
+    const effectiveEnd = activeTimer.pausedAt ? activeTimer.pausedAt : now
+    const baseDuration = Math.round((effectiveEnd.getTime() - activeTimer.startTime.getTime()) / (1000 * 60))
     const currentDuration = Math.max(0, baseDuration - activeTimer.totalPausedDuration)
 
     return NextResponse.json({
@@ -120,9 +123,72 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Time tracking not enabled' }, { status: 403 })
     }
 
+    // Check daily hours limit before starting timer
+    if (settings.allowOvertime === false && settings.maxDailyHours) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+
+      const dailyResult = await TimeEntry.aggregate([
+        {
+          $match: {
+            user: new mongoose.Types.ObjectId(userId),
+            organization: new mongoose.Types.ObjectId(organizationId),
+            startTime: { $gte: today, $lt: tomorrow }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalDuration: { $sum: '$duration' }
+          }
+        }
+      ])
+
+      const dailyMinutesLogged = dailyResult.length > 0 ? dailyResult[0].totalDuration : 0
+      const dailyHoursLogged = dailyMinutesLogged / 60
+
+      if (dailyHoursLogged >= settings.maxDailyHours) {
+        return NextResponse.json(
+          { error: `Daily time limit reached. You have already logged ${dailyHoursLogged.toFixed(1)} hours today (maximum: ${settings.maxDailyHours} hours). You cannot start a new timer until tomorrow.` },
+          { status: 400 }
+        )
+      }
+    }
+
     // Get user's hourly rate if not provided
     const user = await User.findById(userId)
     const finalHourlyRate = hourlyRate || user?.billingRate || settings.defaultHourlyRate
+
+    // Calculate effective max session hours considering daily limit
+    let effectiveMaxSession = settings.maxSessionHours
+    if (settings.allowOvertime === false && settings.maxDailyHours) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+
+      const dailyResult2 = await TimeEntry.aggregate([
+        {
+          $match: {
+            user: new mongoose.Types.ObjectId(userId),
+            organization: new mongoose.Types.ObjectId(organizationId),
+            startTime: { $gte: today, $lt: tomorrow }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalDuration: { $sum: '$duration' }
+          }
+        }
+      ])
+
+      const dailyMinutesLogged2 = dailyResult2.length > 0 ? dailyResult2[0].totalDuration : 0
+      const remainingDailyHours = Math.max(0, settings.maxDailyHours - (dailyMinutesLogged2 / 60))
+      effectiveMaxSession = Math.min(settings.maxSessionHours, remainingDailyHours)
+    }
 
     // Create active timer
     const activeTimer = new ActiveTimer({
@@ -136,7 +202,7 @@ export async function POST(request: NextRequest) {
       tags: tags || [],
       isBillable: isBillable ?? true,
       hourlyRate: finalHourlyRate,
-      maxSessionHours: settings.maxSessionHours
+      maxSessionHours: effectiveMaxSession
     })
 
     await activeTimer.save()
@@ -169,7 +235,7 @@ export async function PUT(request: NextRequest) {
     const activeTimer = await ActiveTimer.findOne({
       user: userId,
       organization: organizationId
-    })
+    }).populate('project', 'name settings').populate('task', 'title')
 
     if (!activeTimer) {
       return NextResponse.json({ error: 'No active timer found' }, { status: 404 })
@@ -195,6 +261,12 @@ export async function PUT(request: NextRequest) {
         break
 
       case 'stop':
+        // Finalize current pause period before computing duration
+        if (activeTimer.pausedAt) {
+          const currentPauseMinutes = (now.getTime() - activeTimer.pausedAt.getTime()) / (1000 * 60)
+          activeTimer.totalPausedDuration += currentPauseMinutes
+          activeTimer.pausedAt = undefined
+        }
         // Create time entry
         const baseDuration = Math.round((now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60))
         const totalDuration = Math.max(0, baseDuration - activeTimer.totalPausedDuration)
@@ -237,9 +309,10 @@ export async function PUT(request: NextRequest) {
 
     await activeTimer.save()
 
-    // Calculate current duration
-    const baseDuration = Math.round((now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60))
-    const currentDuration = Math.max(0, baseDuration - activeTimer.totalPausedDuration)
+    // Calculate current duration (pausedAt-aware)
+    const effectiveEnd2 = activeTimer.pausedAt ? activeTimer.pausedAt : now
+    const baseDuration2 = Math.round((effectiveEnd2.getTime() - activeTimer.startTime.getTime()) / (1000 * 60))
+    const currentDuration = Math.max(0, baseDuration2 - activeTimer.totalPausedDuration)
 
     return NextResponse.json({
       message: 'Timer updated successfully',

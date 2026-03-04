@@ -1452,7 +1452,7 @@ export default function TaskDetailPage() {
               <CardContent>
                 {task.description ? (
                   <div
-                    className="prose prose-sm max-w-none text-foreground"
+                    className="prose prose-sm max-w-none text-foreground prose-img:max-w-full prose-img:h-auto prose-img:rounded-lg prose-img:shadow-sm prose-img:my-3"
                     dangerouslySetInnerHTML={{ __html: task.description }}
                   />
                 ) : (

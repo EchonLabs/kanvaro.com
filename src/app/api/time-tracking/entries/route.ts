@@ -12,6 +12,8 @@ import jwt from 'jsonwebtoken'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
 
+import mongoose from 'mongoose'
+
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
 
@@ -319,9 +321,10 @@ export async function POST(request: NextRequest) {
     requesterId = requester._id.toString()
 
     // Verify the requester can create time entries for the specified user
-    // Allow if: 1) Creating for themselves, OR 2) Has bulk_upload_all permission
+    // Allow if: 1) Creating for themselves, OR 2) Has bulk_upload_all permission, OR 3) Is HR/admin role
     const isCreatingSelf = userId === requesterId
-    const hasBulkUploadAll = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_BULK_UPLOAD_ALL)
+    const isHROrAdmin = ['admin', 'human_resource'].includes(requester.role)
+    const hasBulkUploadAll = isHROrAdmin || await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_BULK_UPLOAD_ALL)
     
     if (!isCreatingSelf && !hasBulkUploadAll) {
       return NextResponse.json({ error: 'You do not have permission to create time entries for other users' }, { status: 403 })
@@ -419,33 +422,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!settings.allowManualTimeSubmission) {
+    // HR and admin users can always add manual time logs, bypass the setting check
+    if (!settings.allowManualTimeSubmission && !isHROrAdmin) {
       return NextResponse.json({ error: 'Manual time submission not allowed' }, { status: 403 })
     }
 
-    // Validate description if required
-    // Explicitly check if requireDescription is true (handle both boolean true and undefined as false)
-    const requireDescription = settings.requireDescription === true
+    // Validate description - always required for manual time entries
     const hasDescription = description && typeof description === 'string' && description.trim().length > 0
     
-    console.log('Manual time entry - Description validation:', {
-      requireDescription,
-      hasDescription,
-      descriptionValue: description,
-      descriptionType: typeof description,
-      descriptionLength: description?.length,
-      settingsRequireDescription: settings.requireDescription,
-      settingsRequireDescriptionType: typeof settings.requireDescription
-    })
-    
-    // Only validate description if it's explicitly required
-    if (requireDescription === true && !hasDescription) {
-      console.log('Validation failed: Description is required but missing')
+    if (!hasDescription) {
       return NextResponse.json({ error: 'Description is required for time entries' }, { status: 400 })
     }
     
-    // If description is not required and empty, use empty string or default
-    const finalDescription = description || ''
+    const finalDescription = description.trim()
 
     // Validate time
     const start = new Date(startTime)
@@ -473,8 +462,9 @@ export async function POST(request: NextRequest) {
 
     const requestedDuration = duration || calculatedDuration
 
+    // Check max session hours (when overtime is NOT allowed)
     if (
-      settings.allowOvertime === true &&
+      settings.allowOvertime === false &&
       settings.maxSessionHours &&
       requestedDuration > settings.maxSessionHours * 60
     ) {
@@ -486,6 +476,54 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       )
+    }
+
+    // Check daily hours limit (when overtime is NOT allowed)
+    if (settings.allowOvertime === false && settings.maxDailyHours) {
+      // Calculate already logged hours for the day of the start time
+      const entryDay = new Date(start)
+      entryDay.setHours(0, 0, 0, 0)
+      const nextDay = new Date(entryDay)
+      nextDay.setDate(nextDay.getDate() + 1)
+
+      const dailyResult = await TimeEntry.aggregate([
+        {
+          $match: {
+            user: new mongoose.Types.ObjectId(userId),
+            organization: new mongoose.Types.ObjectId(organizationId),
+            startTime: { $gte: entryDay, $lt: nextDay }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalDuration: { $sum: '$duration' }
+          }
+        }
+      ])
+
+      const dailyMinutesLogged = dailyResult.length > 0 ? dailyResult[0].totalDuration : 0
+      const dailyHoursLogged = dailyMinutesLogged / 60
+      const requestedHours = requestedDuration / 60
+
+      if (dailyHoursLogged >= settings.maxDailyHours) {
+        return NextResponse.json(
+          {
+            error: `Daily time limit reached. You have already logged ${dailyHoursLogged.toFixed(1)} hours on this day (maximum: ${settings.maxDailyHours} hours). No more time entries can be added for this day.`
+          },
+          { status: 400 }
+        )
+      }
+
+      if (dailyHoursLogged + requestedHours > settings.maxDailyHours) {
+        const remainingHours = (settings.maxDailyHours - dailyHoursLogged).toFixed(1)
+        return NextResponse.json(
+          {
+            error: `This time entry would exceed the daily limit of ${settings.maxDailyHours} hours. You have ${remainingHours} hours remaining for this day. Please reduce the duration.`
+          },
+          { status: 400 }
+        )
+      }
     }
 
     // Apply rounding rules if enabled
