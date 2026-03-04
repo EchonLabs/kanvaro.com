@@ -12,6 +12,8 @@ import jwt from 'jsonwebtoken'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
 
+import mongoose from 'mongoose'
+
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
 
@@ -460,8 +462,9 @@ export async function POST(request: NextRequest) {
 
     const requestedDuration = duration || calculatedDuration
 
+    // Check max session hours (when overtime is NOT allowed)
     if (
-      settings.allowOvertime === true &&
+      settings.allowOvertime === false &&
       settings.maxSessionHours &&
       requestedDuration > settings.maxSessionHours * 60
     ) {
@@ -473,6 +476,54 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       )
+    }
+
+    // Check daily hours limit (when overtime is NOT allowed)
+    if (settings.allowOvertime === false && settings.maxDailyHours) {
+      // Calculate already logged hours for the day of the start time
+      const entryDay = new Date(start)
+      entryDay.setHours(0, 0, 0, 0)
+      const nextDay = new Date(entryDay)
+      nextDay.setDate(nextDay.getDate() + 1)
+
+      const dailyResult = await TimeEntry.aggregate([
+        {
+          $match: {
+            user: new mongoose.Types.ObjectId(userId),
+            organization: new mongoose.Types.ObjectId(organizationId),
+            startTime: { $gte: entryDay, $lt: nextDay }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalDuration: { $sum: '$duration' }
+          }
+        }
+      ])
+
+      const dailyMinutesLogged = dailyResult.length > 0 ? dailyResult[0].totalDuration : 0
+      const dailyHoursLogged = dailyMinutesLogged / 60
+      const requestedHours = requestedDuration / 60
+
+      if (dailyHoursLogged >= settings.maxDailyHours) {
+        return NextResponse.json(
+          {
+            error: `Daily time limit reached. You have already logged ${dailyHoursLogged.toFixed(1)} hours on this day (maximum: ${settings.maxDailyHours} hours). No more time entries can be added for this day.`
+          },
+          { status: 400 }
+        )
+      }
+
+      if (dailyHoursLogged + requestedHours > settings.maxDailyHours) {
+        const remainingHours = (settings.maxDailyHours - dailyHoursLogged).toFixed(1)
+        return NextResponse.json(
+          {
+            error: `This time entry would exceed the daily limit of ${settings.maxDailyHours} hours. You have ${remainingHours} hours remaining for this day. Please reduce the duration.`
+          },
+          { status: 400 }
+        )
+      }
     }
 
     // Apply rounding rules if enabled
