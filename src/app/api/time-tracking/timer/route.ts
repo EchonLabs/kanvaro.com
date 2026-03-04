@@ -31,9 +31,39 @@ type EffectiveTimeTrackingSettings = {
   }
 }
 
-type StopTimerReason = 'manual' | 'auto_max_session'
+type StopTimerReason = 'manual' | 'auto_max_session' | 'auto_max_daily'
 
 const MINUTES_PER_HOUR = 60
+
+/**
+ * Calculate total hours already logged today for a user (from completed TimeEntry records).
+ * Does NOT include currently running timer duration.
+ */
+async function getDailyHoursLogged(userId: string, organizationId: string): Promise<number> {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  const result = await TimeEntry.aggregate([
+    {
+      $match: {
+        user: new (require('mongoose').Types.ObjectId)(userId),
+        organization: new (require('mongoose').Types.ObjectId)(organizationId),
+        startTime: { $gte: today, $lt: tomorrow }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        totalDuration: { $sum: '$duration' }
+      }
+    }
+  ])
+
+  const totalMinutes = result.length > 0 ? result[0].totalDuration : 0
+  return totalMinutes / MINUTES_PER_HOUR
+}
 
 const getIdString = (value: any): string | null => {
   if (!value) return null
@@ -135,15 +165,39 @@ async function stopTimerAndBuildResponse(
 
   let endTime = options.now || new Date()
   
-  const isAutoStopMaxSession = options.reason === 'auto_max_session'
-  let maxSessionLimitMinutes: number | null = null
+  const isAutoStop = options.reason === 'auto_max_session' || options.reason === 'auto_max_daily'
+  let effectiveLimitMinutes: number | null = null
   
-  if (isAutoStopMaxSession && stopSettings.maxSessionHours && stopSettings.allowOvertime === false) {
-    maxSessionLimitMinutes = stopSettings.maxSessionHours * MINUTES_PER_HOUR
-    
-    const maxDurationMs = maxSessionLimitMinutes * 60 * 1000
-    const totalPausedMs = (activeTimer.totalPausedDuration || 0) * 60 * 1000
-    endTime = new Date(activeTimer.startTime.getTime() + maxDurationMs + totalPausedMs)
+  if (isAutoStop && stopSettings.allowOvertime === false) {
+    // Calculate session limit
+    const sessionLimitMinutes = stopSettings.maxSessionHours
+      ? stopSettings.maxSessionHours * MINUTES_PER_HOUR
+      : null
+
+    // Calculate daily remaining limit
+    let dailyRemainingMinutes: number | null = null
+    if (stopSettings.maxDailyHours) {
+      const userId = getIdString(activeTimer.user)
+      const orgId = getIdString(activeTimer.organization)
+      if (userId && orgId) {
+        const dailyHoursLogged = await getDailyHoursLogged(userId, orgId)
+        const remainingHours = Math.max(0, stopSettings.maxDailyHours - dailyHoursLogged)
+        dailyRemainingMinutes = remainingHours * MINUTES_PER_HOUR
+      }
+    }
+
+    // Use the stricter of the two limits
+    if (sessionLimitMinutes !== null && dailyRemainingMinutes !== null) {
+      effectiveLimitMinutes = Math.min(sessionLimitMinutes, dailyRemainingMinutes)
+    } else {
+      effectiveLimitMinutes = sessionLimitMinutes ?? dailyRemainingMinutes
+    }
+
+    if (effectiveLimitMinutes !== null) {
+      const maxDurationMs = effectiveLimitMinutes * 60 * 1000
+      const totalPausedMs = (activeTimer.totalPausedDuration || 0) * 60 * 1000
+      endTime = new Date(activeTimer.startTime.getTime() + maxDurationMs + totalPausedMs)
+    }
   }
 
   const descriptionSource = options.description ?? activeTimer.description ?? ''
@@ -159,8 +213,8 @@ async function stopTimerAndBuildResponse(
 
   let totalDuration = calculateCurrentDurationMinutes(activeTimer, endTime)
   
-  if (isAutoStopMaxSession && maxSessionLimitMinutes !== null && totalDuration > maxSessionLimitMinutes) {
-    totalDuration = maxSessionLimitMinutes
+  if (isAutoStop && effectiveLimitMinutes !== null && totalDuration > effectiveLimitMinutes) {
+    totalDuration = effectiveLimitMinutes
   }
   
   let finalDuration = totalDuration
@@ -179,8 +233,10 @@ async function stopTimerAndBuildResponse(
       status: 200,
       body: {
         message:
-          options.reason === 'auto_max_session'
-            ? 'Timer automatically stopped after reaching max session hours.'
+          isAutoStop
+            ? (options.reason === 'auto_max_daily'
+              ? 'Timer automatically stopped after reaching the daily hours limit.'
+              : 'Timer automatically stopped after reaching max session hours.')
             : 'Timer stopped. No time was logged (0 minutes).',
         timeEntry: null,
         hasTimeLogged: false,
@@ -191,7 +247,7 @@ async function stopTimerAndBuildResponse(
           approvalNeeded: false,
           timeSubmitted: false
         },
-        autoStopped: options.reason === 'auto_max_session',
+        autoStopped: isAutoStop,
         reason: options.reason ?? 'manual'
       }
     }
@@ -272,14 +328,18 @@ async function stopTimerAndBuildResponse(
   )
   
   if (timerStopEnabled && hasTimeLogged && !isZeroDurationDisplay) {
+    const autoStopTitle = isAutoStop ? 'Timer Auto-Stopped' : 'Timer Stopped'
+    const autoStopMsg = isAutoStop
+      ? (options.reason === 'auto_max_daily'
+        ? `Timer auto-stopped for project "${projectName}" after reaching the daily hours limit. Logged ${hoursFormatted}.`
+        : `Timer auto-stopped for project "${projectName}" after reaching the session limit. Logged ${hoursFormatted}.`)
+      : `Timer stopped for project "${projectName}". Logged ${hoursFormatted}.`
     await notificationService.createNotification(
       activeTimer.user.toString(),
       organizationId,
       buildNotificationPayload(
-        options.reason === 'auto_max_session' ? 'Timer Auto-Stopped' : 'Timer Stopped',
-        options.reason === 'auto_max_session'
-          ? `Timer auto-stopped for project "${projectName}" after reaching the session limit. Logged ${hoursFormatted}.`
-          : `Timer stopped for project "${projectName}". Logged ${hoursFormatted}.`,
+        autoStopTitle,
+        autoStopMsg,
         timeEntry._id.toString(),
         projectUrl
       )
@@ -383,20 +443,26 @@ const projectRequiresApproval = project?.settings?.requireApproval === true;
     status: 200,
     body: {
       message:
-        options.reason === 'auto_max_session'
-          ? 'Timer automatically stopped after reaching max session hours.'
+        isAutoStop
+          ? (options.reason === 'auto_max_daily'
+            ? 'Timer automatically stopped after reaching the daily hours limit.'
+            : 'Timer automatically stopped after reaching max session hours.')
           : 'Timer stopped successfully',
       timeEntry: timeEntry.toObject(),
       hasTimeLogged: true,
       duration: finalDuration,
       notificationsSent,
-      autoStopped: options.reason === 'auto_max_session',
+      autoStopped: isAutoStop,
       reason: options.reason ?? 'manual'
     }
   }
 }
 
-async function enforceMaxSessionLimit(
+/**
+ * Enforce both max session hours and max daily hours limits.
+ * Returns an auto-stop response if either limit is exceeded.
+ */
+async function enforceTimerLimits(
   activeTimer: IActiveTimer
 ): Promise<{ status: number; body: any } | null> {
   const organizationId = getIdString(activeTimer.organization)
@@ -404,21 +470,44 @@ async function enforceMaxSessionLimit(
 
   const projectId = getIdString(activeTimer.project)
   const stopSettings = await getEffectiveTimeTrackingSettings(organizationId, projectId)
-  if (!stopSettings || stopSettings.allowOvertime !== false || !stopSettings.maxSessionHours) {
+  if (!stopSettings || stopSettings.allowOvertime !== false) {
     return null
   }
 
   const now = new Date()
   const currentDuration = calculateCurrentDurationMinutes(activeTimer, now)
-  if (currentDuration < stopSettings.maxSessionHours * MINUTES_PER_HOUR) {
-    return null
+
+  // Check max session hours limit
+  if (stopSettings.maxSessionHours) {
+    const sessionLimitMinutes = stopSettings.maxSessionHours * MINUTES_PER_HOUR
+    if (currentDuration >= sessionLimitMinutes) {
+      return stopTimerAndBuildResponse(activeTimer, {
+        stopSettings,
+        now,
+        reason: 'auto_max_session'
+      })
+    }
   }
 
-  return stopTimerAndBuildResponse(activeTimer, {
-    stopSettings,
-    now,
-    reason: 'auto_max_session'
-  })
+  // Check max daily hours limit
+  if (stopSettings.maxDailyHours) {
+    const userId = getIdString(activeTimer.user)
+    if (userId) {
+      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
+      const currentSessionHours = currentDuration / MINUTES_PER_HOUR
+      const totalDailyHours = dailyHoursLogged + currentSessionHours
+
+      if (totalDailyHours >= stopSettings.maxDailyHours) {
+        return stopTimerAndBuildResponse(activeTimer, {
+          stopSettings,
+          now,
+          reason: 'auto_max_daily'
+        })
+      }
+    }
+  }
+
+  return null
 }
 
 export async function GET(request: NextRequest) {
@@ -442,7 +531,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ activeTimer: null })
     }
 
-    const autoStopResult = await enforceMaxSessionLimit(activeTimer)
+    const autoStopResult = await enforceTimerLimits(activeTimer)
     if (autoStopResult) {
       return NextResponse.json(
         {
@@ -455,11 +544,21 @@ export async function GET(request: NextRequest) {
 
     const currentDuration = calculateCurrentDurationMinutes(activeTimer, new Date())
 
+    // Calculate remaining daily minutes for the client
+    const effectiveSettings = await getEffectiveTimeTrackingSettings(organizationId, null)
+    let remainingDailyMinutes: number | null = null
+    if (effectiveSettings?.maxDailyHours && effectiveSettings.allowOvertime === false) {
+      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
+      const remainingHours = Math.max(0, effectiveSettings.maxDailyHours - dailyHoursLogged)
+      remainingDailyMinutes = remainingHours * MINUTES_PER_HOUR
+    }
+
     return NextResponse.json({
       activeTimer: {
         ...activeTimer.toObject(),
         currentDuration,
-        isPaused: !!activeTimer.pausedAt
+        isPaused: !!activeTimer.pausedAt,
+        remainingDailyMinutes
       }
     })
   } catch (error) {
@@ -551,6 +650,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Time tracking not enabled' }, { status: 403 })
     }
 
+    // Check daily hours limit before starting timer
+    if (settings.allowOvertime === false && settings.maxDailyHours) {
+      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
+      if (dailyHoursLogged >= settings.maxDailyHours) {
+        return NextResponse.json(
+          { error: `Daily time limit reached. You have already logged ${dailyHoursLogged.toFixed(1)} hours today (maximum: ${settings.maxDailyHours} hours). You cannot start a new timer until tomorrow.` },
+          { status: 400 }
+        )
+      }
+    }
+
     // Validate description if required
     // Explicitly check if requireDescription is true (handle both boolean true and undefined as false)
     const requireDescription = settings.requireDescription === true
@@ -572,6 +682,14 @@ export async function POST(request: NextRequest) {
 
     const startTime = new Date()
 
+    // Calculate effective max session hours considering daily limit
+    let effectiveMaxSession = settings.maxSessionHours
+    if (settings.allowOvertime === false && settings.maxDailyHours) {
+      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
+      const remainingDailyHours = Math.max(0, settings.maxDailyHours - dailyHoursLogged)
+      effectiveMaxSession = Math.min(settings.maxSessionHours, remainingDailyHours)
+    }
+
     // Create active timer
     const activeTimer = new ActiveTimer({
       user: userId,
@@ -584,7 +702,7 @@ export async function POST(request: NextRequest) {
       tags: tags || [],
       isBillable: isBillable ?? true,
       hourlyRate: finalHourlyRate,
-      maxSessionHours: settings.maxSessionHours
+      maxSessionHours: effectiveMaxSession
     })
 
     await activeTimer.save()
@@ -649,7 +767,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'No active timer found' }, { status: 404 })
     }
 
-    const autoStopResult = await enforceMaxSessionLimit(activeTimer)
+    const autoStopResult = await enforceTimerLimits(activeTimer)
     if (autoStopResult) {
       return NextResponse.json(autoStopResult.body, { status: autoStopResult.status })
     }

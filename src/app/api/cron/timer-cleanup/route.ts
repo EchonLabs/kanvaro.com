@@ -9,10 +9,13 @@ import { applyRoundingRules } from '@/lib/utils'
 import { notificationService } from '@/lib/notification-service'
 import { isNotificationEnabled } from '@/lib/notification-utils'
 
+import mongoose from 'mongoose'
+
 const MINUTES_PER_HOUR = 60
 
 interface EffectiveTimeTrackingSettings {
   maxSessionHours?: number
+  maxDailyHours?: number
   allowOvertime?: boolean
   requireApproval?: boolean
   roundingRules?: {
@@ -77,6 +80,35 @@ async function getEffectiveTimeTrackingSettings(
   return organization?.settings?.timeTracking ?? null
 }
 
+/**
+ * Calculate total hours already logged today for a user.
+ */
+async function getDailyHoursLogged(userId: string, organizationId: string): Promise<number> {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  const result = await TimeEntry.aggregate([
+    {
+      $match: {
+        user: new mongoose.Types.ObjectId(userId),
+        organization: new mongoose.Types.ObjectId(organizationId),
+        startTime: { $gte: today, $lt: tomorrow }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        totalDuration: { $sum: '$duration' }
+      }
+    }
+  ])
+
+  const totalMinutes = result.length > 0 ? result[0].totalDuration : 0
+  return totalMinutes / MINUTES_PER_HOUR
+}
+
 async function stopExpiredTimer(activeTimer: IActiveTimer): Promise<{
   success: boolean
   timerId: string
@@ -96,25 +128,66 @@ async function stopExpiredTimer(activeTimer: IActiveTimer): Promise<{
 
     // Get effective settings
     const settings = await getEffectiveTimeTrackingSettings(organizationId, projectId)
-    if (!settings || settings.allowOvertime !== false || !settings.maxSessionHours) {
+    if (!settings || settings.allowOvertime !== false) {
       return { success: false, timerId, error: 'Timer does not require enforcement' }
+    }
+
+    // Need at least one limit to enforce
+    if (!settings.maxSessionHours && !settings.maxDailyHours) {
+      return { success: false, timerId, error: 'No limits configured' }
     }
 
     const now = new Date()
     const currentDuration = calculateCurrentDurationMinutes(activeTimer, now)
+    let shouldStop = false
+    let reason = 'session'
 
-    // Check if timer has exceeded max session hours
-    if (currentDuration < settings.maxSessionHours * MINUTES_PER_HOUR) {
+    // Check max session hours
+    if (settings.maxSessionHours) {
+      if (currentDuration >= settings.maxSessionHours * MINUTES_PER_HOUR) {
+        shouldStop = true
+        reason = 'session'
+      }
+    }
+
+    // Check max daily hours
+    const userId = getIdString(activeTimer.user)
+    if (!shouldStop && settings.maxDailyHours && userId) {
+      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
+      const currentSessionHours = currentDuration / MINUTES_PER_HOUR
+      if (dailyHoursLogged + currentSessionHours >= settings.maxDailyHours) {
+        shouldStop = true
+        reason = 'daily'
+      }
+    }
+
+    if (!shouldStop) {
       return { success: false, timerId, error: 'Timer has not exceeded limit' }
     }
 
-    // Calculate the exact end time based on max session hours
-    const maxDurationMs = settings.maxSessionHours * MINUTES_PER_HOUR * 60 * 1000
+    // Calculate the effective limit (min of session limit and remaining daily hours)
+    let effectiveLimitMinutes: number | null = null
+    if (settings.maxSessionHours) {
+      effectiveLimitMinutes = settings.maxSessionHours * MINUTES_PER_HOUR
+    }
+    if (settings.maxDailyHours && userId) {
+      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
+      const dailyRemainingMinutes = Math.max(0, (settings.maxDailyHours - dailyHoursLogged)) * MINUTES_PER_HOUR
+      if (effectiveLimitMinutes !== null) {
+        effectiveLimitMinutes = Math.min(effectiveLimitMinutes, dailyRemainingMinutes)
+      } else {
+        effectiveLimitMinutes = dailyRemainingMinutes
+      }
+    }
+
+    // Calculate end time based on effective limit
+    const maxDurationMs = (effectiveLimitMinutes ?? currentDuration) * 60 * 1000
     const totalPausedMs = (activeTimer.totalPausedDuration || 0) * 60 * 1000
     const endTime = new Date(activeTimer.startTime.getTime() + maxDurationMs + totalPausedMs)
 
-    // Calculate final duration (capped at maxSessionHours)
-    let finalDuration = settings.maxSessionHours * MINUTES_PER_HOUR
+    // Calculate final duration (capped at effective limit)
+    let finalDuration = effectiveLimitMinutes ?? currentDuration
+    if (finalDuration > currentDuration) finalDuration = currentDuration
 
     // Apply rounding rules if configured
     if (settings.roundingRules?.enabled) {
@@ -323,16 +396,42 @@ export async function GET(request: NextRequest) {
         const settings = await getEffectiveTimeTrackingSettings(organizationId, projectId)
         
         // Skip timers that don't need enforcement
-        if (!settings || settings.allowOvertime !== false || !settings.maxSessionHours) {
+        if (!settings || settings.allowOvertime !== false) {
           skippedCount++
           continue
         }
 
-        // Check if timer has exceeded the limit
-        const currentDuration = calculateCurrentDurationMinutes(timer, new Date())
-        const maxDurationMinutes = settings.maxSessionHours * MINUTES_PER_HOUR
+        // Need at least one limit to enforce
+        if (!settings.maxSessionHours && !settings.maxDailyHours) {
+          skippedCount++
+          continue
+        }
 
-        if (currentDuration < maxDurationMinutes) {
+        // Check if timer has exceeded any limit
+        const currentDuration = calculateCurrentDurationMinutes(timer, new Date())
+        let exceeded = false
+
+        // Check session limit
+        if (settings.maxSessionHours) {
+          const maxDurationMinutes = settings.maxSessionHours * MINUTES_PER_HOUR
+          if (currentDuration >= maxDurationMinutes) {
+            exceeded = true
+          }
+        }
+
+        // Check daily limit
+        if (!exceeded && settings.maxDailyHours) {
+          const timerId = getIdString(timer.user)
+          if (timerId) {
+            const dailyHoursLogged = await getDailyHoursLogged(timerId, organizationId)
+            const currentSessionHours = currentDuration / MINUTES_PER_HOUR
+            if (dailyHoursLogged + currentSessionHours >= settings.maxDailyHours) {
+              exceeded = true
+            }
+          }
+        }
+
+        if (!exceeded) {
           skippedCount++
           continue
         }
