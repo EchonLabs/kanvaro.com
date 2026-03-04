@@ -736,7 +736,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 
     // Tasks (assigned tasks only)
     Permission.TASK_READ,
-    Permission.TASK_UPDATE,
     Permission.TASK_CHANGE_STATUS,
     Permission.TASK_MANAGE_COMMENTS,
 
@@ -1095,7 +1094,6 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.PROJECT_READ,
     Permission.TASK_CREATE,
     Permission.TASK_READ,
-    Permission.TASK_UPDATE,
     Permission.TASK_CHANGE_STATUS,
     Permission.TASK_MANAGE_COMMENTS,
     Permission.TEAM_READ,

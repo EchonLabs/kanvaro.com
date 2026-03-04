@@ -573,9 +573,6 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      {task.description || 'No description'}
-                    </p>
                     <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                       {task.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && (
                         <div className="flex items-center space-x-1">

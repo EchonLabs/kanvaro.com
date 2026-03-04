@@ -871,23 +871,6 @@ export default function LandingPage() {
             </div>
             <div className="flex flex-col gap-4 sm:flex-row sm:justify-center lg:justify-start">
               <Button
-                onClick={() => router.push('/setup')}
-                disabled={ctaLoading}
-                className="h-14 rounded-full bg-[#0d9488] dark:bg-[#7bffde] px-10 text-base font-semibold text-white dark:text-slate-900 shadow-[0_20px_45px_rgba(13,148,136,0.35)] dark:shadow-[0_20px_45px_rgba(123,255,222,0.35)] transition hover:-translate-y-1 hover:bg-[#0f766e] dark:hover:bg-[#62f5cf] disabled:opacity-70"
-              >
-                {ctaLoading ? (
-                  <>
-                    Loading...
-                    <ArrowRight className="ml-2 h-5 w-5 animate-pulse" />
-                  </>
-                ) : (
-                  <>
-                    Get Started
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </>
-                )}
-              </Button>
-              <Button
                 variant="outline"
                 onClick={() => {
                   setCurrentVideo('dashboard')

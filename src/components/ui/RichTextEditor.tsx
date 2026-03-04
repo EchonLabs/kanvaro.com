@@ -148,8 +148,25 @@ export function RichTextEditor({
       currentNode = currentNode.parentNode
     }
 
-    // If we found a list, convert it
+    // If we found a list, toggle off if same type/style, or convert it
     if (listElement) {
+      const isSameType = listElement.nodeName === 'UL'
+      const isSameStyle = listElement.style.listStyleType === listType
+
+      // Toggle off: remove list formatting if clicking the same style
+      if (isSameType && isSameStyle) {
+        const listItems = Array.from(listElement.querySelectorAll('li'))
+        const fragment = document.createDocumentFragment()
+        listItems.forEach(li => {
+          const div = document.createElement('div')
+          div.innerHTML = li.innerHTML
+          fragment.appendChild(div)
+        })
+        listElement.parentNode?.replaceChild(fragment, listElement)
+        handleInput()
+        return
+      }
+
       const listItems = Array.from(listElement.querySelectorAll('li'))
       const newList = document.createElement('ul')
       newList.style.listStyleType = listType
@@ -231,8 +248,25 @@ export function RichTextEditor({
       currentNode = currentNode.parentNode
     }
 
-    // If we found a list, convert it
+    // If we found a list, toggle off if same type/style, or convert it
     if (listElement) {
+      const isSameType = listElement.nodeName === 'OL'
+      const isSameStyle = listElement.style.listStyleType === listType
+
+      // Toggle off: remove list formatting if clicking the same style
+      if (isSameType && isSameStyle) {
+        const listItems = Array.from(listElement.querySelectorAll('li'))
+        const fragment = document.createDocumentFragment()
+        listItems.forEach(li => {
+          const div = document.createElement('div')
+          div.innerHTML = li.innerHTML
+          fragment.appendChild(div)
+        })
+        listElement.parentNode?.replaceChild(fragment, listElement)
+        handleInput()
+        return
+      }
+
       const listItems = Array.from(listElement.querySelectorAll('li'))
       const newList = document.createElement('ol')
       newList.style.listStyleType = listType
