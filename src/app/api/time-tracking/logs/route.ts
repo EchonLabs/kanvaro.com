@@ -31,8 +31,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Calculate current duration
+    // When paused, use pausedAt as effective end so ongoing pause time is excluded
     const now = new Date()
-    const baseDuration = Math.round((now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60))
+    const effectiveEnd = activeTimer.pausedAt ? activeTimer.pausedAt : now
+    const baseDuration = Math.round((effectiveEnd.getTime() - activeTimer.startTime.getTime()) / (1000 * 60))
     const currentDuration = Math.max(0, baseDuration - activeTimer.totalPausedDuration)
 
     return NextResponse.json({
@@ -233,7 +235,7 @@ export async function PUT(request: NextRequest) {
     const activeTimer = await ActiveTimer.findOne({
       user: userId,
       organization: organizationId
-    })
+    }).populate('project', 'name settings').populate('task', 'title')
 
     if (!activeTimer) {
       return NextResponse.json({ error: 'No active timer found' }, { status: 404 })
@@ -259,6 +261,12 @@ export async function PUT(request: NextRequest) {
         break
 
       case 'stop':
+        // Finalize current pause period before computing duration
+        if (activeTimer.pausedAt) {
+          const currentPauseMinutes = (now.getTime() - activeTimer.pausedAt.getTime()) / (1000 * 60)
+          activeTimer.totalPausedDuration += currentPauseMinutes
+          activeTimer.pausedAt = undefined
+        }
         // Create time entry
         const baseDuration = Math.round((now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60))
         const totalDuration = Math.max(0, baseDuration - activeTimer.totalPausedDuration)
@@ -301,9 +309,10 @@ export async function PUT(request: NextRequest) {
 
     await activeTimer.save()
 
-    // Calculate current duration
-    const baseDuration = Math.round((now.getTime() - activeTimer.startTime.getTime()) / (1000 * 60))
-    const currentDuration = Math.max(0, baseDuration - activeTimer.totalPausedDuration)
+    // Calculate current duration (pausedAt-aware)
+    const effectiveEnd2 = activeTimer.pausedAt ? activeTimer.pausedAt : now
+    const baseDuration2 = Math.round((effectiveEnd2.getTime() - activeTimer.startTime.getTime()) / (1000 * 60))
+    const currentDuration = Math.max(0, baseDuration2 - activeTimer.totalPausedDuration)
 
     return NextResponse.json({
       message: 'Timer updated successfully',
