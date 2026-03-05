@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { promises as fs } from 'fs'
-import path from 'path'
-import { randomUUID } from 'crypto'
 import connectDB from '@/lib/db-config'
 import mongoose from 'mongoose'
 import { Task, TASK_STATUS_VALUES, TaskStatus } from '@/models/Task'
@@ -14,12 +11,8 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 
 const TASK_STATUS_SET = new Set<TaskStatus>(TASK_STATUS_VALUES)
 
-const MAX_DESC_LENGTH = 195000
-const UPLOADS_DIR = process.env.UPLOADS_DIR || path.resolve('./uploads')
+const MAX_DESC_LENGTH = 195_000
 
-/**
- * Truncate only. Base64 images are handled by extractAndSaveBase64Images below.
- */
 function sanitizeDescription(raw: string): string {
   if (!raw) return ''
   if (raw.length > MAX_DESC_LENGTH) {
@@ -29,84 +22,12 @@ function sanitizeDescription(raw: string): string {
 }
 
 
-async function extractAndSaveBase64Images(
-  description: string,
-  orgId: string,
-  taskId: string
-): Promise<string> {
-  if (!description.includes('data:image')) return description
-
-  // Universal regex: find ALL data:image URIs regardless of surrounding HTML.
-  // Base64 alphabet: A-Z a-z 0-9 + / = and optional whitespace.
-  const dataUriRegex = /data:image\/([^;]+);base64,([A-Za-z0-9+/=\s]+)/g
-  const hits: Array<{ full: string; mime: string; b64: string; index: number }> = []
-  let m: RegExpExecArray | null
-  while ((m = dataUriRegex.exec(description)) !== null) {
-    hits.push({ full: m[0], mime: m[1], b64: m[2], index: m.index })
-  }
-  if (hits.length === 0) return description
-
-  const destDir = path.join(UPLOADS_DIR, orgId, 'tasks', taskId)
-  await fs.mkdir(destDir, { recursive: true })
-
-  let result = description
-  // Process in reverse so index offsets don't shift
-  for (let i = hits.length - 1; i >= 0; i--) {
-    const hit = hits[i]
-    const ext = hit.mime === 'jpeg' ? 'jpg' : hit.mime.replace(/[^a-z0-9]/g, '').slice(0, 10)
-    const filename = `img-${randomUUID()}.${ext}`
-    const fp = path.join(destDir, filename)
-    try {
-      const cleanB64 = hit.b64.replace(/\s/g, '')
-      if (cleanB64.length === 0) continue
-      await fs.writeFile(fp, Buffer.from(cleanB64, 'base64'))
-      const url = `/api/uploads/${orgId}/tasks/${taskId}/${filename}`
-      result = result.substring(0, hit.index) + url + result.substring(hit.index + hit.full.length)
-    } catch (err) {
-      console.error(`[bulk-create] Failed to save base64 image for task ${taskId}:`, err)
-    }
-  }
-
-  // Repair any broken <img> tags left over from the replacement.
-  // After replacement the description may look like:
-  //   <img src="/api/uploads/...    (no closing " or >)
-  //   <img src="data:image/...      (if save failed, still raw URI)
-  // We normalise all <img ...> that contain /api/uploads/ to well-formed HTML.
-  result = result.replace(
-    /<img\s+src=["']?((\/api\/uploads\/[^"'\s>]+))["']?\s*\/?>/gi,
-    '<img src="$1" />'
-  )
-  // Fix unclosed <img src="..." at end of string or followed by non-tag chars
-  result = result.replace(
-    /<img\s+src=["']?((\/api\/uploads\/[^"'\s>]+))["']?$/gi,
-    '<img src="$1" />'
-  )
-  // If description ends with an unclosed <img src="URL without proper closing
-  if (/<img\s+src=["']?\/api\/uploads\/[^>]*$/.test(result)) {
-    result = result.replace(
-      /(<img\s+src=["']?)(\/api\/uploads\/[^"'\s>]+)(.*)$/i,
-      '$1$2" />'
-    )
-  }
-
-  return result
-}
-
 type IncomingSubtask = {
   _id?: string
   title?: unknown
   description?: unknown
   status?: unknown
   isCompleted?: unknown
-}
-
-type IncomingAttachment = {
-  name?: unknown
-  url?: unknown
-  size?: unknown
-  type?: unknown
-  uploadedBy?: unknown
-  uploadedAt?: unknown
 }
 
 function sanitizeLabels(input: any): string[] {
@@ -175,50 +96,6 @@ function sanitizeSubtasks(input: any): Array<{
     })
 }
 
-function sanitizeAttachments(input: any, defaultUserId: string) {
-  if (!Array.isArray(input)) {
-    return []
-  }
-
-  return input
-    .map((item: IncomingAttachment) => {
-      if (typeof item?.name !== 'string' || typeof item?.url !== 'string') {
-        return null
-      }
-
-      const sizeValue = typeof item.size === 'number'
-        ? item.size
-        : typeof item.size === 'string'
-          ? Number(item.size)
-          : undefined
-
-      if (typeof sizeValue !== 'number' || Number.isNaN(sizeValue)) {
-        return null
-      }
-
-      const typeValue = typeof item.type === 'string' ? item.type : 'application/octet-stream'
-      const uploadedByValue =
-        typeof item.uploadedBy === 'string' && item.uploadedBy.trim().length > 0
-          ? item.uploadedBy.trim()
-          : defaultUserId
-
-      const uploadedAtValue =
-        typeof item.uploadedAt === 'string'
-          ? new Date(item.uploadedAt)
-          : new Date()
-
-      return {
-        name: item.name,
-        url: item.url,
-        size: sizeValue,
-        type: typeValue,
-        uploadedBy: uploadedByValue,
-        uploadedAt: uploadedAtValue
-      }
-    })
-    .filter((attachment): attachment is NonNullable<typeof attachment> => attachment !== null)
-}
-
 export async function POST(request: NextRequest) {
   try {
     await connectDB()
@@ -282,7 +159,6 @@ export async function POST(request: NextRequest) {
         estimatedHours,
         labels,
         subtasks,
-        attachments,
         isBillable
       } = item
 
@@ -332,7 +208,6 @@ export async function POST(request: NextRequest) {
         estimatedHours: typeof estimatedHours === 'number' ? estimatedHours : (typeof estimatedHours === 'string' && estimatedHours.trim() !== '' ? Number(estimatedHours) : undefined),
         labels: sanitizeLabels(labels),
         subtasks: sanitizeSubtasks(subtasks),
-        attachments: sanitizeAttachments(attachments, userId),
         isBillable: typeof isBillable === 'boolean' ? isBillable : undefined
       })
       projectIds.add(project.trim())
@@ -452,15 +327,11 @@ export async function POST(request: NextRequest) {
       }
 
       const taskId = new mongoose.Types.ObjectId()
-      const taskOrgId = (organizationId || projectInfo.organization || '').toString()
-      const processedDescription = taskOrgId
-        ? await extractAndSaveBase64Images(taskData.description || '', taskOrgId, taskId.toString())
-        : taskData.description || ''
 
       const task = new Task({
         _id: taskId,
         title: taskData.title,
-        description: sanitizeDescription(processedDescription),
+        description: taskData.description || '',
         status: taskData.status,
         priority: taskData.priority,
         type: taskData.type,
@@ -478,7 +349,6 @@ export async function POST(request: NextRequest) {
         estimatedHours: taskData.estimatedHours,
         labels: taskData.labels,
         subtasks: taskData.subtasks,
-        attachments: taskData.attachments,
         position: nextPosition,
         isBillable: taskData.isBillable ?? projectInfo.isBillableByDefault ?? true
       })
