@@ -124,6 +124,7 @@ export interface InvalidRow {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('[csv-upload] POST handler hit, url:', request.url)
   try {
     await connectDB()
 

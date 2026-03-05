@@ -422,13 +422,38 @@ export default function BulkUploadModal({ open, onClose, onSuccess, defaultProje
 
     setValidating(true)
     try {
-      const res = await fetch('/api/tasks/csv-upload', {
+      const csvUploadUrl = '/api/tasks/csv-upload'
+      console.log('[BulkUpload] ── csv-upload START ──')
+      console.log('[BulkUpload] Origin:', window.location.origin)
+      console.log('[BulkUpload] Full URL:', window.location.origin + csvUploadUrl)
+      console.log('[BulkUpload] Row count:', mappedRows.length)
+      console.log('[BulkUpload] Payload preview:', JSON.stringify({ rows: mappedRows }).slice(0, 500))
+      const res = await fetch(csvUploadUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows: mappedRows }),
       })
-      const data = await res.json()
-      if (!res.ok || !data.success) {
+      console.log('[BulkUpload] csv-upload response status:', res.status, res.statusText)
+      console.log('[BulkUpload] csv-upload response headers content-type:', res.headers.get('content-type'))
+      console.log('[BulkUpload] csv-upload response headers server:', res.headers.get('server'))
+      const responseText = await res.text()
+      console.log('[BulkUpload] csv-upload raw response body:', responseText.slice(0, 1000))
+      if (!res.ok) {
+        console.error('[BulkUpload] csv-upload HTTP error:', res.status, res.statusText, '| Body:', responseText.slice(0, 500))
+        notifyError({ title: `Validation Error (${res.status})`, message: `Server returned ${res.status} ${res.statusText}. Check console for details.` })
+        return
+      }
+      let data: any
+      try {
+        data = JSON.parse(responseText)
+      } catch (parseErr) {
+        console.error('[BulkUpload] csv-upload JSON parse error:', parseErr, '| Raw:', responseText.slice(0, 500))
+        notifyError({ title: 'Parse Error', message: 'Server returned non-JSON response. Check console.' })
+        return
+      }
+      console.log('[BulkUpload] csv-upload parsed data:', JSON.stringify(data).slice(0, 500))
+      if (!data.success) {
+        console.error('[BulkUpload] csv-upload API error:', data.error)
         notifyError({ title: 'Validation Error', message: data.error ?? 'Validation failed' })
         return
       }
@@ -436,7 +461,8 @@ export default function BulkUploadModal({ open, onClose, onSuccess, defaultProje
       setInvalidRows(data.data.invalidRows)
       setStep(2)
     } catch (err) {
-      notifyError({ title: 'Network Error', message: 'Failed to connect to server.' })
+      console.error('[BulkUpload] csv-upload network/fetch error:', err)
+      notifyError({ title: 'Network Error', message: String(err) })
     } finally {
       setValidating(false)
     }
@@ -472,13 +498,39 @@ export default function BulkUploadModal({ open, onClose, onSuccess, defaultProje
 
     setSubmitting(true)
     try {
-      const res = await fetch('/api/tasks/bulk-create', {
+      const bulkCreateUrl = '/api/tasks/bulk-create'
+      console.log('[BulkUpload] ── bulk-create START ──')
+      console.log('[BulkUpload] Origin:', window.location.origin)
+      console.log('[BulkUpload] Full URL:', window.location.origin + bulkCreateUrl)
+      console.log('[BulkUpload] Task count:', payload.length)
+      console.log('[BulkUpload] Payload size (bytes):', JSON.stringify(payload).length)
+      console.log('[BulkUpload] Payload preview:', JSON.stringify(payload).slice(0, 500))
+      const res = await fetch(bulkCreateUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      const data = await res.json()
-      if (!res.ok || !data.success) {
+      console.log('[BulkUpload] bulk-create response status:', res.status, res.statusText)
+      console.log('[BulkUpload] bulk-create response headers content-type:', res.headers.get('content-type'))
+      console.log('[BulkUpload] bulk-create response headers server:', res.headers.get('server'))
+      const responseText = await res.text()
+      console.log('[BulkUpload] bulk-create raw response body:', responseText.slice(0, 1000))
+      if (!res.ok) {
+        console.error('[BulkUpload] bulk-create HTTP error:', res.status, res.statusText, '| Body:', responseText.slice(0, 500))
+        notifyError({ title: `Submit Failed (${res.status})`, message: `Server returned ${res.status} ${res.statusText}. Check console for details.` })
+        return
+      }
+      let data: any
+      try {
+        data = JSON.parse(responseText)
+      } catch (parseErr) {
+        console.error('[BulkUpload] bulk-create JSON parse error:', parseErr, '| Raw:', responseText.slice(0, 500))
+        notifyError({ title: 'Parse Error', message: 'Server returned non-JSON response. Check console.' })
+        return
+      }
+      console.log('[BulkUpload] bulk-create parsed data:', JSON.stringify(data).slice(0, 500))
+      if (!data.success) {
+        console.error('[BulkUpload] bulk-create API error:', data.error)
         notifyError({ title: 'Submit Failed', message: data.error ?? 'Failed to create tasks' })
         return
       }
@@ -490,7 +542,8 @@ export default function BulkUploadModal({ open, onClose, onSuccess, defaultProje
       onSuccess?.()
       router.refresh()
     } catch (err) {
-      notifyError({ title: 'Network Error', message: 'Failed to connect to server.' })
+      console.error('[BulkUpload] bulk-create network/fetch error:', err)
+      notifyError({ title: 'Network Error', message: String(err) })
     } finally {
       setSubmitting(false)
     }
