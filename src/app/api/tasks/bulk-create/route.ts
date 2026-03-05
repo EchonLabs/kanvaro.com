@@ -402,33 +402,21 @@ export async function POST(request: NextRequest) {
     const createdTasks = []
     const projectCounters = new Map()
 
-    console.log('[bulk-create] Starting task creation loop, tasksToCreate:', tasksToCreate.length)
-    for (let taskIdx = 0; taskIdx < tasksToCreate.length; taskIdx++) {
-      const taskData = tasksToCreate[taskIdx]
-      console.log(`[bulk-create] Processing task ${taskIdx + 1}/${tasksToCreate.length}: ${taskData.title}`)
-      
+    for (const taskData of tasksToCreate) {
       const projectInfo = projectTeamMap.get(taskData.project)
       if (!projectInfo) {
-        console.log(`[bulk-create] Skipping task (no projectInfo for project ${taskData.project})`)
         continue // Should not happen
       }
 
       // Get or create counter for this project
       let counter = projectCounters.get(taskData.project)
       if (!counter) {
-        try {
-          console.log(`[bulk-create] Fetching/creating counter for project ${taskData.project}`)
-          counter = await Counter.findOneAndUpdate(
-            { scope: 'task', project: taskData.project },
-            { $inc: { seq: 1 }, $setOnInsert: { updatedAt: new Date() } },
-            { new: true, upsert: true }
-          )
-          console.log(`[bulk-create] Counter acquired: seq=${counter.seq}`)
-          projectCounters.set(taskData.project, counter)
-        } catch (counterErr) {
-          console.error(`[bulk-create] Failed to fetch/create counter for project ${taskData.project}:`, counterErr)
-          throw counterErr
-        }
+        counter = await Counter.findOneAndUpdate(
+          { scope: 'task', project: taskData.project },
+          { $inc: { seq: 1 }, $setOnInsert: { updatedAt: new Date() } },
+          { new: true, upsert: true }
+        )
+        projectCounters.set(taskData.project, counter)
       } else {
         counter.seq += 1
         await counter.save()
@@ -502,45 +490,23 @@ export async function POST(request: NextRequest) {
         isBillable: taskData.isBillable ?? projectInfo.isBillableByDefault ?? true
       })
 
-      try {
-        console.log(`[bulk-create] Saving task ${taskIdx + 1}/${tasksToCreate.length}: ${task.displayId}`)
-        await task.save()
-        console.log(`[bulk-create] Task saved successfully: ${task.displayId}`)
-        createdTasks.push(task)
-      } catch (saveErr) {
-        console.error(`[bulk-create] Failed to save task ${task.displayId}:`, saveErr)
-        throw saveErr
-      }
+      await task.save()
+      createdTasks.push(task)
     }
 
-    console.log(`[bulk-create] All ${createdTasks.length} tasks created successfully`)
-    
     // Invalidate cache for affected projects and organizations
     const affectedOrganizations = new Set<string>()
     for (const projectId of projectIdsArray) {
-      try {
-        console.log(`[bulk-create] Invalidating cache for project ${projectId}`)
-        await invalidateCache(`tasks:*project:${projectId}*`)
-      } catch (cacheErr) {
-        console.error(`[bulk-create] Failed to invalidate cache for project ${projectId}:`, cacheErr)
-        // Don't throw - cache failure shouldn't block response
-      }
+      await invalidateCache(`tasks:*project:${projectId}*`)
       const projectInfo = projectTeamMap.get(projectId)
       if (projectInfo?.organization) {
         affectedOrganizations.add(projectInfo.organization)
       }
     }
     for (const orgId of Array.from(affectedOrganizations)) {
-      try {
-        console.log(`[bulk-create] Invalidating cache for org ${orgId}`)
-        await invalidateCache(`tasks:*org:${orgId}*`)
-      } catch (cacheErr) {
-        console.error(`[bulk-create] Failed to invalidate cache for org ${orgId}:`, cacheErr)
-        // Don't throw - cache failure shouldn't block response
-      }
+      await invalidateCache(`tasks:*org:${orgId}*`)
     }
 
-    console.log('[bulk-create] Sending success response with', createdTasks.length, 'tasks')
     return NextResponse.json({
       success: true,
       data: createdTasks,
