@@ -34,7 +34,13 @@ async function extractAndSaveBase64Images(
   orgId: string,
   taskId: string
 ): Promise<string> {
-  if (!description.includes('data:image')) return description
+  console.log(`[bulk-create][extractImages] Called for task=${taskId}, orgId=${orgId}, descLength=${description.length}`)
+  console.log(`[bulk-create][extractImages] Description preview:`, description.slice(0, 200))
+
+  if (!description.includes('data:image')) {
+    console.log(`[bulk-create][extractImages] No data:image found in description, skipping`)
+    return description
+  }
 
   // Universal regex: find ALL data:image URIs regardless of surrounding HTML.
   // Base64 alphabet: A-Z a-z 0-9 + / = and optional whitespace.
@@ -44,10 +50,18 @@ async function extractAndSaveBase64Images(
   while ((m = dataUriRegex.exec(description)) !== null) {
     hits.push({ full: m[0], mime: m[1], b64: m[2], index: m.index })
   }
+  console.log(`[bulk-create][extractImages] Found ${hits.length} base64 image(s) in description`)
   if (hits.length === 0) return description
 
   const destDir = path.join(UPLOADS_DIR, orgId, 'tasks', taskId)
-  await fs.mkdir(destDir, { recursive: true })
+  console.log(`[bulk-create][extractImages] Creating dest dir: ${destDir}`)
+  try {
+    await fs.mkdir(destDir, { recursive: true })
+    console.log(`[bulk-create][extractImages] Dest dir created/exists: ${destDir}`)
+  } catch (mkdirErr) {
+    console.error(`[bulk-create][extractImages] Failed to create dest dir: ${destDir}`, mkdirErr)
+    return description
+  }
 
   let result = description
   // Process in reverse so index offsets don't shift
@@ -56,22 +70,23 @@ async function extractAndSaveBase64Images(
     const ext = hit.mime === 'jpeg' ? 'jpg' : hit.mime.replace(/[^a-z0-9]/g, '').slice(0, 10)
     const filename = `img-${randomUUID()}.${ext}`
     const fp = path.join(destDir, filename)
+    console.log(`[bulk-create][extractImages] Processing image ${hits.length - i}/${hits.length}: mime=${hit.mime}, ext=${ext}, b64Length=${hit.b64.length}, file=${fp}`)
     try {
       const cleanB64 = hit.b64.replace(/\s/g, '')
-      if (cleanB64.length === 0) continue
+      if (cleanB64.length === 0) {
+        console.log(`[bulk-create][extractImages] Skipping empty base64 for image ${hits.length - i}`)
+        continue
+      }
       await fs.writeFile(fp, Buffer.from(cleanB64, 'base64'))
       const url = `/api/uploads/${orgId}/tasks/${taskId}/${filename}`
+      console.log(`[bulk-create][extractImages] Saved image to ${fp}, URL: ${url}`)
       result = result.substring(0, hit.index) + url + result.substring(hit.index + hit.full.length)
     } catch (err) {
-      console.error(`[bulk-create] Failed to save base64 image for task ${taskId}:`, err)
+      console.error(`[bulk-create][extractImages] Failed to save base64 image for task ${taskId}, image ${hits.length - i}:`, err)
     }
   }
 
-  // Repair any broken <img> tags left over from the replacement.
-  // After replacement the description may look like:
-  //   <img src="/api/uploads/...    (no closing " or >)
-  //   <img src="data:image/...      (if save failed, still raw URI)
-  // We normalise all <img ...> that contain /api/uploads/ to well-formed HTML.
+  console.log(`[bulk-create][extractImages] Fixing <img> tags in result (resultLength=${result.length})`)
   result = result.replace(
     /<img\s+src=["']?((\/api\/uploads\/[^"'\s>]+))["']?\s*\/?>/gi,
     '<img src="$1" />'
@@ -89,6 +104,7 @@ async function extractAndSaveBase64Images(
     )
   }
 
+  console.log(`[bulk-create][extractImages] Done. Result preview:`, result.slice(0, 200))
   return result
 }
 
@@ -220,6 +236,7 @@ function sanitizeAttachments(input: any, defaultUserId: string) {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('[bulk-create] POST handler hit, url:', request.url)
   try {
     await connectDB()
 
@@ -245,6 +262,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    console.log('[bulk-create] Parsed body, isArray:', Array.isArray(body), 'length:', Array.isArray(body) ? body.length : 'N/A')
 
     if (!Array.isArray(body) || body.length === 0) {
       return NextResponse.json(
@@ -338,9 +357,7 @@ export async function POST(request: NextRequest) {
       projectIds.add(project.trim())
     }
 
-    // Check projects exist.
-    // When organizationId is available we include it in the query so cross-org
-    // access is rejected at the DB level (no need for a second JS-side filter).
+  
     const projectIdsArray = Array.from(projectIds)
     const projectQuery = organizationId
       ? { _id: { $in: projectIdsArray }, organization: organizationId }
@@ -354,17 +371,7 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       )
     }
-// Skip permission checks for no-auth mode
-    // for (const project of projects) {
-    //   const canCreateTask = await PermissionService.hasPermission(userId, Permission.TASK_CREATE, project._id.toString())
-    //   if (!canCreateTask) {
-    //     return NextResponse.json(
-    //       { success: false, error: `Access denied to create tasks in project: ${project.name}` },
-    //       { status: 403 }
-    //     )
-    //   }
-    // }
-    // Check permissions for each project
+
     for (const project of projects) {
       const canCreateTask = await PermissionService.hasPermission(userId, Permission.TASK_CREATE, project._id.toString())
       if (!canCreateTask) {
@@ -506,7 +513,7 @@ export async function POST(request: NextRequest) {
       message: `Bulk task creation completed successfully. Created ${createdTasks.length} tasks.`
     })
   } catch (error) {
-    console.error('Error performing bulk task creation:', error)
+    console.error('[bulk-create] Error performing bulk task creation:', error)
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Failed to create tasks' },
       { status: 500 }
