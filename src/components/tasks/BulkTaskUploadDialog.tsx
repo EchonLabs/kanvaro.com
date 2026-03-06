@@ -507,7 +507,7 @@ export default function BulkTaskUploadDialog({
                                 <SelectItem value="none">
                                   <span className="text-muted-foreground">— Select column —</span>
                                 </SelectItem>
-                                {csvData.headers.map((header) => (
+                                {csvData.headers.filter(h => h.trim().length > 0).map((header) => (
                                   <SelectItem key={header} value={header}>
                                     {header}
                                   </SelectItem>
@@ -530,15 +530,7 @@ export default function BulkTaskUploadDialog({
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
-                    Please map all required columns:{' '}
-                    {Object.entries(SYSTEM_COLUMNS)
-                      .filter(([key, col]) => {
-                        if (!col.required) return false
-                        if (key === 'project' && projectId) return false
-                        return !Object.values(mapping).includes(key as SystemColumnKey)
-                      })
-                      .map(([, col]) => col.label)
-                      .join(', ')}
+                    Please map all required columns
                   </AlertDescription>
                 </Alert>
               )}
