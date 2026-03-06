@@ -109,6 +109,8 @@ export default function SprintsPage() {
   const searchParams = useSearchParams()
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [loading, setLoading] = useState(true)
+  const [isFetching, setIsFetching] = useState(false)
+  const isFirstFetch = useRef(false)
   const [error, setError] = useState('')
   const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -191,12 +193,19 @@ export default function SprintsPage() {
     }, 3000)
   }, [])
 
-  const fetchSprints = useCallback(async () => {
+  const fetchSprints = useCallback(async (page = currentPage) => {
     try {
-      setLoading(true)
+      if (!isFirstFetch.current) {
+        setLoading(true)
+      } else {
+        setIsFetching(true)
+      }
       const params = new URLSearchParams()
-      params.set('page', currentPage.toString())
+      params.set('page', page.toString())
       params.set('limit', pageSize.toString())
+      if (searchQuery.trim()) params.set('search', searchQuery.trim())
+      if (statusFilter !== 'all') params.set('status', statusFilter)
+      if (projectFilter !== 'all') params.set('project', projectFilter)
 
       const response = await fetch(`/api/sprints?${params.toString()}`)
       const data = await response.json()
@@ -210,9 +219,14 @@ export default function SprintsPage() {
     } catch (err) {
       setError('Failed to fetch sprints')
     } finally {
-      setLoading(false)
+      if (!isFirstFetch.current) {
+        setLoading(false)
+        isFirstFetch.current = true
+      } else {
+        setIsFetching(false)
+      }
     }
-  }, [currentPage, pageSize])
+  }, [currentPage, pageSize, searchQuery, statusFilter, projectFilter])
 
   const checkAuth = useCallback(async () => {
     try {
@@ -220,7 +234,7 @@ export default function SprintsPage() {
 
       if (response.ok) {
         setAuthError('')
-        await fetchSprints()
+        await fetchSprints(currentPage)
       } else if (response.status === 401) {
         const refreshResponse = await fetch('/api/auth/refresh', {
           method: 'POST'
@@ -228,7 +242,7 @@ export default function SprintsPage() {
 
         if (refreshResponse.ok) {
           setAuthError('')
-          await fetchSprints()
+          await fetchSprints(currentPage)
         } else {
           setAuthError('Session expired')
           setTimeout(() => {
@@ -245,7 +259,7 @@ export default function SprintsPage() {
         routerRef.current.push('/login')
       }, 2000)
     }
-  }, [fetchSprints])
+  }, [fetchSprints, currentPage])
 
   useEffect(() => {
     if (!initialLoadDone.current) {
@@ -273,9 +287,16 @@ export default function SprintsPage() {
   // Fetch when pagination changes (after initial load)
   useEffect(() => {
     if (initialLoadDone.current) {
-      fetchSprints()
+      fetchSprints(currentPage)
     }
-  }, [currentPage, pageSize])
+  }, [currentPage, pageSize]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-fetch from page 1 whenever search/filters change
+  useEffect(() => {
+    if (!initialLoadDone.current) return
+    setCurrentPage(1)
+    fetchSprints(1)
+  }, [searchQuery, statusFilter, projectFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDeleteClick = (sprintId: string) => {
     if (!canDeleteSprint) {
@@ -730,15 +751,15 @@ export default function SprintsPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'planning': 
+      case 'planning':
         return (<Calendar className="h-4 w-4" />)
-      case 'active': 
+      case 'active':
         return (<Play className="h-4 w-4" />)
-      case 'completed': 
+      case 'completed':
         return (<CheckCircle className="h-4 w-4" />)
-      case 'cancelled': 
+      case 'cancelled':
         return (<XCircle className="h-4 w-4" />)
-      default: 
+      default:
         return (<Calendar className="h-4 w-4" />)
     }
   }
@@ -774,18 +795,8 @@ export default function SprintsPage() {
     return projectOptions.filter((project) => project.name.toLowerCase().includes(query))
   }, [projectOptions, projectFilterQuery])
 
-  const filteredSprints = sprints.filter(sprint => {
-    const matchesSearch = !searchQuery ||
-      sprint.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sprint.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sprint.project.name.toLowerCase().includes(searchQuery.toLowerCase())
-
-    const matchesStatus = statusFilter === 'all' || sprint.status === statusFilter
-
-    const matchesProject = projectFilter === 'all' || sprint.project._id === projectFilter
-
-    return matchesSearch && matchesStatus && matchesProject
-  })
+  // Server handles all filtering — sprints returned are already filtered
+  const filteredSprints = sprints
 
   if (loading) {
     return (
@@ -912,8 +923,9 @@ export default function SprintsPage() {
           </div>
           {/* Sprint count and reset filters */}
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              {filteredSprints.length} sprint{filteredSprints.length !== 1 ? 's' : ''} found
+            <p className="text-sm text-muted-foreground flex items-center gap-2">
+              {isFetching && <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}
+              {totalCount} sprint{totalCount !== 1 ? 's' : ''} found
             </p>
             {hasActiveFilters && (
               <TooltipProvider>
@@ -941,106 +953,106 @@ export default function SprintsPage() {
 
         {/* Sprints View */}
         <div>
-            <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'grid' | 'list')}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="grid">Grid View</TabsTrigger>
-                <TabsTrigger value="list">List View</TabsTrigger>
-              </TabsList>
+          <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'grid' | 'list')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="grid">Grid View</TabsTrigger>
+              <TabsTrigger value="list">List View</TabsTrigger>
+            </TabsList>
 
-              <TabsContent value="grid" className="space-y-4">
-                <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredSprints.map((sprint) => {
-                    const totalTasks = sprint?.progress?.totalTasks ?? (Array.isArray(sprint?.tasks) ? sprint.tasks.length : 0)
-                    const hasTasks = (totalTasks ?? 0) > 0
-                    const completionPercentage = Math.min(
-                      100,
-                      Math.max(0, sprint?.progress?.completionPercentage ?? 0)
-                    )
-                    const storyPointsPercentage = (() => {
-                      if (typeof sprint?.progress?.storyPointsCompletionPercentage === 'number') {
-                        return Math.min(
-                          100,
-                          Math.max(0, sprint.progress.storyPointsCompletionPercentage)
-                        )
-                      }
-                      const completed = sprint?.progress?.storyPointsCompleted ?? 0
-                      const total = sprint?.progress?.totalStoryPoints ?? 0
-                      if (!total) return 0
-                      return Math.min(100, Math.max(0, Math.round((completed / total) * 100)))
-                    })()
-                    const storyPointsCompleted = sprint?.progress?.storyPointsCompleted ?? 0
-                    const totalStoryPoints = sprint?.progress?.totalStoryPoints ?? 0
+            <TabsContent value="grid" className="space-y-4">
+              <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                {filteredSprints.map((sprint) => {
+                  const totalTasks = sprint?.progress?.totalTasks ?? (Array.isArray(sprint?.tasks) ? sprint.tasks.length : 0)
+                  const hasTasks = (totalTasks ?? 0) > 0
+                  const completionPercentage = Math.min(
+                    100,
+                    Math.max(0, sprint?.progress?.completionPercentage ?? 0)
+                  )
+                  const storyPointsPercentage = (() => {
+                    if (typeof sprint?.progress?.storyPointsCompletionPercentage === 'number') {
+                      return Math.min(
+                        100,
+                        Math.max(0, sprint.progress.storyPointsCompletionPercentage)
+                      )
+                    }
+                    const completed = sprint?.progress?.storyPointsCompleted ?? 0
+                    const total = sprint?.progress?.totalStoryPoints ?? 0
+                    if (!total) return 0
+                    return Math.min(100, Math.max(0, Math.round((completed / total) * 100)))
+                  })()
+                  const storyPointsCompleted = sprint?.progress?.storyPointsCompleted ?? 0
+                  const totalStoryPoints = sprint?.progress?.totalStoryPoints ?? 0
 
-                    return (
-                      <Card
-                        key={sprint._id}
-                        className={`hover:shadow-md transition-shadow overflow-x-hidden ${canViewSprint ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
-                        onClick={() => {
-                          if (!canViewSprint) return
-                          router.push(`/sprints/${sprint._id}`)
-                        }}
-                      >
-                        <CardHeader className="p-3 sm:p-6">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="space-y-1 flex-1 min-w-0">
-                              <CardTitle className="text-base sm:text-lg truncate" title={sprint.name}>
-                                {sprint.name}
-                              </CardTitle>
-                              <CardDescription className="line-clamp-2 text-xs sm:text-sm" title={sprint.description || 'No description'}>
-                                {sprint.description || 'No description'}
-                              </CardDescription>
-                            </div>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                                <DropdownMenuItem
-                                  disabled={!canViewSprint}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    if (!canViewSprint) return
-                                    router.push(`/sprints/${sprint._id}`)
-                                  }}
-                                >
-                                  <Zap className="h-4 w-4 mr-2" />
-                                  View Sprint
-                                </DropdownMenuItem>
-                                {/* <DropdownMenuItem onClick={(e) => {
+                  return (
+                    <Card
+                      key={sprint._id}
+                      className={`hover:shadow-md transition-shadow overflow-x-hidden ${canViewSprint ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                      onClick={() => {
+                        if (!canViewSprint) return
+                        router.push(`/sprints/${sprint._id}`)
+                      }}
+                    >
+                      <CardHeader className="p-3 sm:p-6">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-1 flex-1 min-w-0">
+                            <CardTitle className="text-base sm:text-lg truncate" title={sprint.name}>
+                              {sprint.name}
+                            </CardTitle>
+                            <CardDescription className="line-clamp-2 text-xs sm:text-sm" title={sprint.description || 'No description'}>
+                              {sprint.description || 'No description'}
+                            </CardDescription>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                              <DropdownMenuItem
+                                disabled={!canViewSprint}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (!canViewSprint) return
+                                  router.push(`/sprints/${sprint._id}`)
+                                }}
+                              >
+                                <Zap className="h-4 w-4 mr-2" />
+                                View Sprint
+                              </DropdownMenuItem>
+                              {/* <DropdownMenuItem onClick={(e) => {
                                 e.stopPropagation()
                                 router.push(`/sprints/${sprint._id}?tab=settings`)
                               }}>
                                 <Settings className="h-4 w-4 mr-2" />
                                 Settings
                               </DropdownMenuItem> */}
-                                {canEditSprint && (
+                              {canEditSprint && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    router.push(`/sprints/${sprint._id}/edit`)
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit Sprint
+                                </DropdownMenuItem>
+                              )}
+                              {canDeleteSprint && (
+                                <>
+                                  <DropdownMenuSeparator />
                                   <DropdownMenuItem
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      router.push(`/sprints/${sprint._id}/edit`)
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit Sprint
-                                  </DropdownMenuItem>
-                                )}
-                                {canDeleteSprint && (
-                                  <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleDeleteClick(sprint._id)
+                                      handleDeleteClick(sprint._id)
 
-                                      }}
-                                      className="text-destructive focus:text-destructive"
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Delete Sprint
-                                    </DropdownMenuItem>
-                                 </>
+                                    }}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete Sprint
+                                  </DropdownMenuItem>
+                                </>
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -1393,6 +1405,53 @@ export default function SprintsPage() {
               </div>
             </TabsContent>
           </Tabs>
+
+          {/* Pagination Controls */}
+          {totalCount > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Items per page:</span>
+                <Select value={pageSize.toString()} onValueChange={(value) => {
+                  setPageSize(parseInt(value))
+                  setCurrentPage(1)
+                }}>
+                  <SelectTrigger className="w-20 h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span>
+                  Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1 || isFetching}
+                  variant="outline"
+                  size="sm"
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground px-2">
+                  Page {currentPage} of {Math.ceil(totalCount / pageSize) || 1}
+                </span>
+                <Button
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage >= Math.ceil(totalCount / pageSize) || isFetching}
+                  variant="outline"
+                  size="sm"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         <ResponsiveDialog

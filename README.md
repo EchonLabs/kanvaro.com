@@ -2,7 +2,7 @@
 
 ## Overview
 
-Kanvaro is a comprehensive, open-source project management web application designed for SMEs, tech startups, freelancers, and modern teams. Built with cutting-edge technologies, Kanvaro provides a self-hosted solution that gives teams complete control over their project management data and workflows.
+Kanvaro is a comprehensive, open-source project management web application designed for SMEs, tech startups, freelancers, and modern teams. Built with cutting-edge technologies, Kanvaro provides a self-hosted solution that gives teams complete control over their project management data.
 
 ## Key Features
 
@@ -63,11 +63,13 @@ docker-compose up -d
 - **Health Check**: `http://localhost:3000/api/health`
 
 **Service Ports:**
+
 - **Application**: `http://localhost:3000`
 - **MongoDB**: `localhost:27018`
 - **Redis**: `localhost:6380`
 
 **Demo Credentials:**
+
 - Email: `admin@kanvaro.com`
 - Password: `admin123`
 
@@ -134,6 +136,7 @@ The setup wizard guides you through:
 ## Features
 
 ### Core Project Management
+
 - Project creation and management
 - Task management with Scrum and Kanban
 - Team collaboration and user management
@@ -143,6 +146,7 @@ The setup wizard guides you through:
 - File management and document sharing
 
 ### Technical Architecture
+
 - **Micro Frontend**: Modular frontend architecture
 - **Redis Caching**: Session management and data caching
 - **Background Jobs**: Queue-based job processing
@@ -153,23 +157,27 @@ The setup wizard guides you through:
 ## API Endpoints
 
 ### Setup Wizard
+
 - `GET /api/setup/status` - Check setup completion status
 - `POST /api/setup/database/test` - Test database connection
 - `POST /api/setup/email/test` - Test email configuration
 - `POST /api/setup/complete` - Complete setup process
 
 ### Authentication
+
 - `GET /api/auth/me` - Get current user
 - `POST /api/auth/logout` - Logout user
 
 ## Docker Configuration
 
 ### Development
+
 ```bash
 docker-compose -f docker-compose.dev.yml up -d
 ```
 
 ### Production
+
 ```bash
 docker-compose up -d
 ```
@@ -177,11 +185,13 @@ docker-compose up -d
 ## Environment Variables
 
 ### Required
+
 - `MONGODB_URI` - MongoDB connection string
 - `JWT_SECRET` - JWT secret key
 - `REFRESH_TOKEN_SECRET` - Refresh token secret
 
 ### Optional
+
 - `REDIS_URL` - Redis connection string
 - `SMTP_HOST` - SMTP server host
 - `SMTP_USER` - SMTP username
@@ -202,6 +212,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Support
 
 For support and questions:
+
 - Create an issue on GitHub
 - Check the documentation in the `docs/` folder
 - Join our community discussions

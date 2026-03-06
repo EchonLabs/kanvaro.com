@@ -199,8 +199,8 @@ export function GlobalSearch({ className, placeholder = "Search projects, tasks,
   }
 
   const renderResult = (result: SearchResult, index: number) => {
-    const Icon = typeIcons[result.type]
-    const typeColor = typeColors[result.type]
+    const Icon = typeIcons[result.type as keyof typeof typeIcons] || Search
+    const typeColor = typeColors[result.type as keyof typeof typeColors] || 'bg-gray-100 text-gray-800'
     const isSelected = index === selectedIndex
 
     return (

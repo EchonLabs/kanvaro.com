@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -19,8 +19,22 @@ import {
   ArrowRight,
   Plus,
   Clock3,
-  CheckCircle2
+  CheckCircle2,
+  FolderOpen,
+  Pause,
+  Square
 } from 'lucide-react'
+
+interface ActiveTimer {
+  _id: string
+  project: { _id: string; name: string }
+  task?: { _id: string; title: string }
+  description: string
+  startTime: string
+  currentDuration: number
+  isPaused: boolean
+  isBillable: boolean
+}
 
 export default function TimeTrackingPage() {
   const [user, setUser] = useState<any>(null)
@@ -28,26 +42,48 @@ export default function TimeTrackingPage() {
   const [authError, setAuthError] = useState('')
   const [stats, setStats] = useState<any>(null)
   const [statsLoading, setStatsLoading] = useState(true)
+  const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null)
+  const [displayTime, setDisplayTime] = useState('00:00:00')
+  const baseMinutesRef = useRef<number>(0)
+  const tickStartMsRef = useRef<number | null>(null)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const router = useRouter()
+
+  const loadActiveTimer = async (currentUser: any) => {
+    if (!currentUser?.id || !currentUser?.organization) return
+    try {
+      const response = await fetch(
+        `/api/time-tracking/timer?userId=${currentUser.id}&organizationId=${currentUser.organization}`
+      )
+      if (response.ok) {
+        const data = await response.json()
+        setActiveTimer(data.activeTimer ?? null)
+      }
+    } catch (err) {
+      console.error('Failed to load active timer:', err)
+    }
+  }
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const response = await fetch('/api/auth/me')
-        
+
         if (response.ok) {
           const userData = await response.json()
           setUser(userData)
           setAuthError('')
+          await loadActiveTimer(userData)
         } else if (response.status === 401) {
           const refreshResponse = await fetch('/api/auth/refresh', {
             method: 'POST'
           })
-          
+
           if (refreshResponse.ok) {
             const refreshData = await refreshResponse.json()
             setUser(refreshData.user)
             setAuthError('')
+            await loadActiveTimer(refreshData.user)
           } else {
             setAuthError('Session expired')
             setTimeout(() => {
@@ -78,7 +114,7 @@ export default function TimeTrackingPage() {
       try {
         setStatsLoading(true)
         const response = await fetch('/api/time-tracking/stats')
-        
+
         if (response.ok) {
           const statsData = await response.json()
           setStats(statsData)
@@ -92,6 +128,38 @@ export default function TimeTrackingPage() {
 
     fetchStats()
   }, [user])
+
+  // Ticking display for active timer
+  useEffect(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+    if (!activeTimer) {
+      setDisplayTime('00:00:00')
+      baseMinutesRef.current = 0
+      tickStartMsRef.current = null
+      return
+    }
+    baseMinutesRef.current = activeTimer.currentDuration || 0
+    const fmt = (m: number) => {
+      const h = Math.floor(m / 60)
+      const mn = Math.floor(m % 60)
+      const s = Math.floor((m % 1) * 60)
+      return `${String(h).padStart(2, '0')}:${String(mn).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    }
+    setDisplayTime(fmt(baseMinutesRef.current))
+    if (!activeTimer.isPaused) {
+      tickStartMsRef.current = Date.now()
+      intervalRef.current = setInterval(() => {
+        const elapsed = (Date.now() - (tickStartMsRef.current as number)) / 60000
+        setDisplayTime(fmt(Math.max(0, baseMinutesRef.current + elapsed)))
+      }, 1000)
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [activeTimer])
 
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60)
@@ -220,19 +288,69 @@ export default function TimeTrackingPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8">
-                  <div className="p-4 bg-muted rounded-lg inline-block mb-4">
-                    <Clock3 className="h-12 w-12 text-muted-foreground" />
+                {activeTimer ? (
+                  <div className="space-y-4">
+                    <div className="text-center py-2">
+                      <div className="text-4xl font-mono font-bold text-primary mb-1">
+                        {displayTime}
+                      </div>
+                      <Badge variant={activeTimer.isPaused ? 'secondary' : 'default'} className="text-xs">
+                        {activeTimer.isPaused ? 'Paused' : 'Running'}
+                      </Badge>
+                    </div>
+                    <div className="border-t pt-4 space-y-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <FolderOpen className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="font-semibold">Project:</span>
+                        <span className="text-muted-foreground truncate">{activeTimer.project?.name}</span>
+                      </div>
+                      {activeTimer.task && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Target className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <span className="font-semibold">Task:</span>
+                          <span className="text-muted-foreground truncate">{activeTimer.task.title}</span>
+                        </div>
+                      )}
+                      {activeTimer.description && (
+                        <div className="flex items-start gap-2 text-sm">
+                          <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                          <span className="font-semibold">Memo:</span>
+                          <span className="text-muted-foreground line-clamp-2">{activeTimer.description}</span>
+                        </div>
+                      )}
+                      {activeTimer.isBillable && (
+                        <Badge variant="outline" className="text-xs">Billable</Badge>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const pid = activeTimer.project?._id ? `projectId=${encodeURIComponent(activeTimer.project._id)}` : ''
+                        const tid = activeTimer.task?._id ? `taskId=${encodeURIComponent(activeTimer.task._id)}` : ''
+                        const qs = [pid, tid].filter(Boolean).join('&')
+                        router.push(qs ? `/time-tracking/timer?${qs}` : '/time-tracking/timer')
+                      }}
+                      className="w-full"
+                    >
+                      <Clock className="h-4 w-4 mr-2" />
+                      Manage Timer
+                    </Button>
                   </div>
-                  <h3 className="text-lg font-medium mb-2">No Active Timer</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Start tracking time for your tasks
-                  </p>
-                  <Button onClick={() => router.push('/time-tracking/timer')} className="w-full">
-                    <Play className="h-4 w-4 mr-2" />
-                    Start Timer
-                  </Button>
-                </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="p-4 bg-muted rounded-lg inline-block mb-4">
+                      <Clock3 className="h-12 w-12 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-lg font-medium mb-2">No Active Timer</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Start tracking time for your tasks
+                    </p>
+                    <Button onClick={() => router.push('/time-tracking/timer')} className="w-full">
+                      <Play className="h-4 w-4 mr-2" />
+                      Start Timer
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

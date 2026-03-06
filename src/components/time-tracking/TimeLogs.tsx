@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useMemo } from 'react'
 import { usePathname } from 'next/navigation'
-import { Clock, Edit, Trash2, Check, X, Filter, Download, Plus, AlertTriangle, FolderOpen, Target, Loader2, Upload, FileText, User, Search, MoreHorizontal, DollarSign, RotateCcw } from 'lucide-react'
+import { Clock, Edit, Trash2, Check, X, Filter, Download, Plus, AlertTriangle, FolderOpen, Target, Loader2, Upload, FileText, User, UserPlus, Search, MoreHorizontal, DollarSign, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -20,9 +20,10 @@ import { useFeaturePermissions, usePermissions } from '@/lib/permissions/permiss
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { toast } from 'sonner'
+import { useToast } from '@/components/ui/Toast'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { detectClientTimezone } from '@/lib/timezone'
+import { HRManualTimeLogModal } from '@/components/time-tracking/HRManualTimeLogModal'
 
 interface TimeLogsProps {
   userId: string
@@ -92,6 +93,7 @@ export function TimeLogs({
   showManualLogButtons = false
 }: TimeLogsProps) {
   const { formatDateTimeSafe, preferences } = useDateTime()
+  const { showToast } = useToast()
   const pathname = usePathname()
 
   // Debug timezone and DateTimeProvider
@@ -218,6 +220,7 @@ export function TimeLogs({
   const [startTimeError, setStartTimeError] = useState('')
   const [endDateError, setEndDateError] = useState('')
   const [endTimeError, setEndTimeError] = useState('')
+  const [showHRManualLogModal, setShowHRManualLogModal] = useState(false)
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
   const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null)
   const [bulkUploadProgress, setBulkUploadProgress] = useState<{ total: number; processed: number; successful: number; failed: number } | null>(null)
@@ -345,15 +348,33 @@ export function TimeLogs({
           const filtered = data.data.filter((project: any) => {
             const allow = project?.settings?.allowTimeTracking
             if (!allow) return false
-            const createdByMatch = project?.createdBy === resolvedUserId || project?.createdBy?.id === resolvedUserId
+
+            // Admins/managers with employee filter permission can see all projects
+            if (canViewEmployeeFilter) return true
+
+            // Check if user created the project (createdBy may be populated object or string)
+            const createdByMatch =
+              project?.createdBy === resolvedUserId ||
+              project?.createdBy?._id === resolvedUserId ||
+              project?.createdBy?.id === resolvedUserId
+
+            // Check if user is in teamMembers array
+            // Each entry is { memberId: { _id, firstName, ... } | string, hourlyRate }
             const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
-            const teamMatch = teamMembers.some((memberId: any) => {
-              if (typeof memberId === 'string') return memberId === resolvedUserId
-              return memberId?._id === resolvedUserId || memberId?.id === resolvedUserId
+            const teamMatch = teamMembers.some((member: any) => {
+              const mid = member?.memberId
+              if (!mid) return false
+              if (typeof mid === 'string') return mid === resolvedUserId
+              return mid?._id === resolvedUserId || mid?.id === resolvedUserId
             })
-            const members = Array.isArray(project?.members) ? project.members : []
-            const membersMatch = members.some((m: any) => (typeof m === 'string' ? m === resolvedUserId : m?.id === resolvedUserId || m?._id === resolvedUserId))
-            return createdByMatch || teamMatch || membersMatch || canViewEmployeeFilter
+
+            // Check if user is the project client (client may be populated object or string)
+            const clientMatch =
+              project?.client === resolvedUserId ||
+              project?.client?._id === resolvedUserId ||
+              project?.client?.id === resolvedUserId
+
+            return createdByMatch || teamMatch || clientMatch
           })
           setFilterProjects(filtered)
         }
@@ -1346,7 +1367,7 @@ export function TimeLogs({
     } catch (error) {
       setTasks([])
       if (!tasksLoading) {
-        toast.error('Could not load tasks. Some features may be limited.')
+        showToast({ type: 'error', title: 'Could not load tasks. Some features may be limited.' })
       }
     } finally {
       setTasksLoading(false)
@@ -1426,14 +1447,14 @@ export function TimeLogs({
       if (response.ok) {
         loadTimeEntries()
         onTimeEntryUpdate?.()
-        toast.success('Time entry deleted successfully')
+        showToast({ type: 'success', title: 'Time entry deleted successfully' })
       } else {
         const data = await response.json().catch(() => ({}))
-        toast.error((data as any).error || 'Failed to delete time entry')
+        showToast({ type: 'error', title: (data as any).error || 'Failed to delete time entry' })
       }
     } catch (error) {
       console.error('Error deleting time entry:', error)
-      toast.error('Failed to delete time entry')
+      showToast({ type: 'error', title: 'Failed to delete time entry' })
     } finally {
       setShowDeleteDialog(false)
       setEntryToDelete(null)
@@ -1945,7 +1966,7 @@ export function TimeLogs({
         // Handle success and errors with toast notifications
         if (results.successful > 0) {
           // Show success toast
-          toast.success(`Successfully uploaded ${results.successful} time ${results.successful === 1 ? 'entry' : 'entries'}.`)
+          showToast({ type: 'success', title: `Successfully uploaded ${results.successful} time ${results.successful === 1 ? 'entry' : 'entries'}.` })
 
           // Refresh the time entries table
           setTimeout(async () => {
@@ -2015,14 +2036,14 @@ export function TimeLogs({
 
         if (results.failed > 0) {
           // Show error toast for failed entries
-          toast.error(`Failed to upload ${results.failed} time ${results.failed === 1 ? 'entry' : 'entries'}. Check the errors below.`)
+          showToast({ type: 'error', title: `Failed to upload ${results.failed} time ${results.failed === 1 ? 'entry' : 'entries'}. Check the errors below.` })
         }
       } else {
-        toast.error(result.error || 'Bulk upload failed')
+        showToast({ type: 'error', title: result.error || 'Bulk upload failed' })
       }
     } catch (error) {
       console.error('Bulk upload error:', error)
-      toast.error('Failed to upload file. Please try again.')
+      showToast({ type: 'error', title: 'Failed to upload file. Please try again.' })
     } finally {
       setUploadingBulk(false)
     }
@@ -2050,6 +2071,18 @@ export function TimeLogs({
               {/* <Clock className="h-5 w-5" />
             Time Logs */}
             </CardTitle>
+            {/* HR Manual Time Log Button - visible only to HR role */}
+            {currentUserRole === 'human_resource' && (
+              <Button
+                onClick={() => setShowHRManualLogModal(true)}
+                size="sm"
+                variant="outline"
+                className="h-8 sm:h-8 px-3 text-xs justify-start w-full sm:w-auto border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-950"
+              >
+                <UserPlus className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                <span className="whitespace-nowrap">Add Manual Time Log</span>
+              </Button>
+            )}
             {showManualLogButtons && pathname === '/time-tracking/timer' && canAddManualTimeLog && (
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 {/* <Button
@@ -3581,6 +3614,17 @@ export function TimeLogs({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* HR Manual Time Log Modal */}
+      <HRManualTimeLogModal
+        open={showHRManualLogModal}
+        onOpenChange={setShowHRManualLogModal}
+        organizationId={resolvedOrgId}
+        onSuccess={() => {
+          loadTimeEntries()
+          onTimeEntryUpdate?.()
+        }}
+      />
 
       {/* Bulk Upload Modal */}
       <Dialog open={showBulkUploadModal} onOpenChange={setShowBulkUploadModal}>

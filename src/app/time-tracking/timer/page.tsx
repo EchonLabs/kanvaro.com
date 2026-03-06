@@ -207,14 +207,32 @@ const filteredTasks = tasks.filter((task) =>
         return
       }
     }
+
+    // Check daily hours limit
+    if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxDailyHours) {
+      const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
+      const durationHours = durationMinutes / 60
+
+      if (dailyHoursLogged >= timeTrackingSettings.maxDailyHours) {
+        setSessionHoursError(`⚠️ Daily limit reached: You have already logged ${dailyHoursLogged.toFixed(1)} hours today (max: ${timeTrackingSettings.maxDailyHours} hours). No more time can be logged.`)
+        return
+      }
+      if (dailyHoursLogged + durationHours > timeTrackingSettings.maxDailyHours) {
+        const remaining = (timeTrackingSettings.maxDailyHours - dailyHoursLogged).toFixed(1)
+        setSessionHoursError(`⚠️ Would exceed daily limit: This entry (${durationHours.toFixed(2)}h) + already logged (${dailyHoursLogged.toFixed(1)}h) exceeds the ${timeTrackingSettings.maxDailyHours}h daily limit. Only ${remaining}h remaining.`)
+        return
+      }
+    }
   }, [
     manualLogData.startDate,
     manualLogData.startTime,
     manualLogData.endDate,
     manualLogData.endTime,
     timeTrackingSettings?.maxSessionHours,
+    timeTrackingSettings?.maxDailyHours,
     timeTrackingSettings?.allowFutureTime,
-    timeTrackingSettings?.allowOvertime
+    timeTrackingSettings?.allowOvertime,
+    dailyHoursLogged
   ])
 
   // Validate session hours when relevant fields change
@@ -398,16 +416,31 @@ const filteredTasks = tasks.filter((task) =>
           const projectAllowsTimeTracking = project?.settings?.allowTimeTracking === true
           if (!projectAllowsTimeTracking) return false
 
+          // Check if user created the project (createdBy may be populated object or string)
+          const isCreator =
+            project?.createdBy === u.id ||
+            project?.createdBy?._id === u.id ||
+            project?.createdBy?.id === u.id
+
           // Check if user is in teamMembers array as memberId
           const teamMembers = Array.isArray(project?.teamMembers) ? project.teamMembers : []
           const isUserTeamMember = teamMembers.some((member: any) => {
             if (typeof member === 'object' && member !== null) {
-              return member.memberId === u.id || member.memberId?._id === u.id || member.memberId?.id === u.id
+              const mid = member?.memberId
+              if (!mid) return false
+              if (typeof mid === 'string') return mid === u.id
+              return mid?._id === u.id || mid?.id === u.id
             }
             return false
           })
 
-          return isUserTeamMember
+          // Check if user is the project client
+          const isClient =
+            project?.client === u.id ||
+            project?.client?._id === u.id ||
+            project?.client?.id === u.id
+
+          return isCreator || isUserTeamMember || isClient
         })
 
         console.log('Time tracking - Filtered projects:', {
@@ -614,6 +647,19 @@ const filteredTasks = tasks.filter((task) =>
       const maxHours = timeTrackingSettings.maxSessionHours
       setError(`⚠️ Session duration exceeded: The logged time (${durationHours.toFixed(2)} hours) exceeds the maximum allowed session duration of ${maxHours} ${maxHours === 1 ? 'hour' : 'hours'}. Please break this into multiple sessions or contact your administrator if you need to log longer sessions.`)
       return
+    }
+
+    // Check daily hours limit
+    if (timeTrackingSettings?.allowOvertime === false && timeTrackingSettings?.maxDailyHours) {
+      if (dailyHoursLogged >= timeTrackingSettings.maxDailyHours) {
+        setError(`⚠️ Daily time limit reached: You have already logged ${dailyHoursLogged.toFixed(1)} hours today (maximum: ${timeTrackingSettings.maxDailyHours} hours). No more time entries can be added for today.`)
+        return
+      }
+      if (dailyHoursLogged + durationHours > timeTrackingSettings.maxDailyHours) {
+        const remainingHours = (timeTrackingSettings.maxDailyHours - dailyHoursLogged).toFixed(1)
+        setError(`⚠️ Daily time limit would be exceeded: This entry (${durationHours.toFixed(2)} hours) plus already logged time (${dailyHoursLogged.toFixed(1)} hours) exceeds the daily limit of ${timeTrackingSettings.maxDailyHours} hours. You have ${remainingHours} hours remaining today.`)
+        return
+      }
     }
 
     setSubmittingManualLog(true)
@@ -1181,6 +1227,8 @@ const filteredTasks = tasks.filter((task) =>
                           isBillable={isBillable}
                           //  requireDescription={timeTrackingSettings?.requireDescription === true}
                           allowOvertime={timeTrackingSettings?.allowOvertime ?? false}
+                          maxDailyHours={timeTrackingSettings?.maxDailyHours}
+                          dailyHoursLogged={dailyHoursLogged}
                           onTimerUpdate={(timer) => {
                             if (!timer) {
                               resetTimerForm()

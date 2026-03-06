@@ -66,6 +66,13 @@ function LoginForm() {
         // Login successful, now load permissions before redirecting
         setIsLoading(false)
         setIsLoadingPermissions(true)
+
+        // Respect returnTo param set by middleware when the user tried to access a protected route
+        const returnTo = searchParams.get('returnTo')
+        const redirectTarget =
+          returnTo && returnTo.startsWith('/') && !returnTo.startsWith('/login')
+            ? decodeURIComponent(returnTo)
+            : '/dashboard'
         
         try {
 
@@ -76,19 +83,19 @@ function LoginForm() {
           })
           
           if (permissionsResponse.ok) {
-            console.log('Permissions loaded successfully, redirecting to dashboard')
+            console.log('Permissions loaded successfully, redirecting to', redirectTarget)
 
-            // Permissions will be cached by the permission context, redirect to dashboard
-            router.push('/dashboard')
+            // Permissions will be cached by the permission context, redirect to target
+            router.push(redirectTarget)
           } else {
             console.error('Failed to load permissions:', permissionsResponse.status)
-            // Even if permissions fail, redirect to dashboard (it will handle loading there)
-            router.push('/dashboard')
+            // Even if permissions fail, redirect (it will handle loading there)
+            router.push(redirectTarget)
           }
         } catch (permError) {
           console.error('Error loading permissions:', permError)
-          // Even if permissions fail, redirect to dashboard (it will handle loading there)
-          router.push('/dashboard')
+          // Even if permissions fail, redirect (it will handle loading there)
+          router.push(redirectTarget)
         } finally {
           setIsLoadingPermissions(false)
         }

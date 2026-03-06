@@ -1,3 +1,17 @@
+## [1.30.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.3...v1.30.4) (2026-03-05)
+
+
+### Bug Fixes
+
+* correct grammatical error in README.md for consistency ([52acc97](https://github.com/EchonLabs/kanvaro.com/commit/52acc97338c23cc5e9dc10183553195316adff56))
+
+## [1.30.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.2...v1.30.3) (2026-03-04)
+
+
+### Bug Fixes
+
+* correct minor grammatical errors and improve formatting in README.md ([2a8570e](https://github.com/EchonLabs/kanvaro.com/commit/2a8570e663af5fa878c8aea47c5c1a94ea341fac))
+
 # [1.6.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.5.0...v1.6.0) (2025-11-25)
 
 

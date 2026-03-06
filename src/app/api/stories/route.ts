@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
+    const search = searchParams.get('search') || ''
     const projectId = searchParams.get('projectId')
     const epicId = searchParams.get('epicId')
     const status = searchParams.get('status')
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest) {
 
       filters.project = { $in: accessibleProjectIds }
     }
-    
+
     if (projectId) {
       if (!hasStoryViewAll) {
         const canAccessProject = accessibleProjectIds.some((id) => id.toString() === projectId)
@@ -92,21 +93,29 @@ export async function GET(request: NextRequest) {
       }
       filters.project = projectId
     }
-    
+
     if (epicId) {
       filters.epic = epicId
     }
-    
+
     if (status) {
       filters.status = status
     }
-    
+
     if (priority) {
       filters.priority = priority
     }
-    
+
     if (sprintId) {
       filters.sprint = sprintId
+    }
+
+    // Full-text search across title and description
+    if (search) {
+      filters.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ]
     }
 
     // Ensure Sprint model is registered
@@ -119,7 +128,7 @@ export async function GET(request: NextRequest) {
     }
 
     const PAGE_SIZE = Math.min(limit, 100)
-    
+
     const stories = await Story.find(filters)
       .populate('project', 'name')
       .populate('epic', 'title')
@@ -246,7 +255,7 @@ export async function POST(request: NextRequest) {
       if (dueDate && epicDoc.dueDate) {
         const storyDueDate = new Date(dueDate)
         const epicDueDate = new Date(epicDoc.dueDate)
-        
+
         // Reset time to compare only dates
         storyDueDate.setHours(0, 0, 0, 0)
         epicDueDate.setHours(0, 0, 0, 0)

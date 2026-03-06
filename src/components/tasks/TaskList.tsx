@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useNotify } from '@/lib/notify'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionGate } from '@/lib/permissions/permission-components'
 import { 
   Search, 
   Filter, 
@@ -78,6 +79,8 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   const { formatDate } = useDateTime()
   const { success: notifySuccess, error: notifyError } = useNotify()
   const { hasPermission } = usePermissions()
+  const canEditTask = hasPermission(Permission.TASK_UPDATE, projectId)
+  const canDeleteTask = hasPermission(Permission.TASK_DELETE, projectId)
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -208,10 +211,10 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   }
 
   const filteredTasks = tasks.filter(task => {
-    const matchesSearch = !searchQuery || 
+    const matchesSearch = !searchQuery ||
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.description.toLowerCase().includes(searchQuery.toLowerCase())
-    
+
     const matchesStatus = statusFilter === 'all' || task.status === statusFilter
     const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
     const matchesType = typeFilter === 'all' || task.type === typeFilter
@@ -225,8 +228,8 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
     const previousStatus = previousTask?.status
 
     // Optimistic update - update UI immediately
-    setTasks(prevTasks => 
-      prevTasks.map(task => 
+    setTasks(prevTasks =>
+      prevTasks.map(task =>
         task._id === taskId ? { ...task, status: newStatus as any } : task
       )
     )
@@ -241,7 +244,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
       })
 
       const contentType = response.headers.get('content-type') || ''
-      
+
       if (!response.ok) {
         // Check if response is JSON or HTML
         if (contentType.includes('application/json')) {
@@ -262,19 +265,19 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
       }
 
       const data = await response.json()
-      
+
       if (data.success && data.data) {
         // Update with server response to ensure consistency
-        setTasks(prevTasks => 
-          prevTasks.map(task => 
+        setTasks(prevTasks =>
+          prevTasks.map(task =>
             task._id === taskId ? { ...task, ...data.data, status: newStatus as any } : task
           )
         )
         notifySuccess({ title: 'Success', message: 'Task updated successfully' })
       } else if (data.success) {
         // If success but no data, just update status
-        setTasks(prevTasks => 
-          prevTasks.map(task => 
+        setTasks(prevTasks =>
+          prevTasks.map(task =>
             task._id === taskId ? { ...task, status: newStatus as any } : task
           )
         )
@@ -282,8 +285,8 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
       } else {
         // Revert on error
         if (previousStatus) {
-          setTasks(prevTasks => 
-            prevTasks.map(task => 
+          setTasks(prevTasks =>
+            prevTasks.map(task =>
               task._id === taskId ? { ...task, status: previousStatus } : task
             )
           )
@@ -294,14 +297,14 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
       console.error('Failed to update task status:', error)
       // Revert on error
       if (previousStatus) {
-        setTasks(prevTasks => 
-          prevTasks.map(task => 
+        setTasks(prevTasks =>
+          prevTasks.map(task =>
             task._id === taskId ? { ...task, status: previousStatus } : task
           )
         )
       }
-      const errorMessage = error instanceof Error 
-        ? error.message 
+      const errorMessage = error instanceof Error
+        ? error.message
         : 'Failed to update task status. The API endpoint may not be available in this environment.'
       notifyError({ title: 'Error', message: errorMessage })
     }
@@ -332,7 +335,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
       })
 
       const data = await response.json()
-      
+
       if (data.success) {
         setTasks(tasks.filter(task => task._id !== selectedTask._id))
         setShowDeleteModal(false)
@@ -404,14 +407,14 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
             <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    {availableStatuses.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {formatToTitleCase(status)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              {availableStatuses.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {formatToTitleCase(status)}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
           <Select value={priorityFilter} onValueChange={setPriorityFilter}>
             <SelectTrigger className="w-full sm:w-40">
@@ -450,47 +453,37 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
             <CardContent className="p-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex-1 min-w-0 w-full">
-                    <div className="flex items-center justify-between mb-2">
-                      <TooltipProvider delayDuration={150}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <h4 className="font-medium text-foreground text-sm sm:text-base truncate flex-1 min-w-0 mr-2">
-                              {task.title}
-                            </h4>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" align="start" className="max-w-xs break-words">
+                  <div className="flex items-center justify-between mb-2">
+                    <TooltipProvider delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <h4 className="font-medium text-foreground text-sm sm:text-base truncate flex-1 min-w-0 mr-2">
                             {task.title}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <Badge className={getStatusColor(task.status) + ' flex-shrink-0'}>
-                          {getStatusIcon(task.status)}
-                          <span className="ml-1">{formatToTitleCase(task.status)}</span>
-                        </Badge>
-                        <Badge className={getPriorityColor(task.priority) + ' flex-shrink-0'}>
-                          {formatToTitleCase(task.priority)}
-                        </Badge>
-                        <Badge className={getTypeColor(task.type) + ' flex-shrink-0'}>
-                          {formatToTitleCase(task.type)}
-                        </Badge>
-                      </div>
+                          </h4>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="start" className="max-w-xs break-words">
+                          {task.title}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Badge className={getStatusColor(task.status) + ' flex-shrink-0'}>
+                        {getStatusIcon(task.status)}
+                        <span className="ml-1">{formatToTitleCase(task.status)}</span>
+                      </Badge>
+                      <Badge className={getPriorityColor(task.priority) + ' flex-shrink-0'}>
+                        {formatToTitleCase(task.priority)}
+                      </Badge>
+                      <Badge className={getTypeColor(task.type) + ' flex-shrink-0'}>
+                        {formatToTitleCase(task.type)}
+                      </Badge>
                     </div>
-                  <div className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">
-                    {task.description ? (
-                      <div
-                        className="prose prose-xs max-w-none"
-                        dangerouslySetInnerHTML={{ __html: task.description }}
-                      />
-                    ) : (
-                      'No description'
-                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                     {task.assignedTo && task.assignedTo.length > 0 ? (
                       <div className="flex items-center space-x-1 flex-wrap gap-1">
                         <User className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                          <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1">
                           {task.assignedTo.map((assignee, idx) => {
                             // Try to get user data from populated user field first, then from denormalized fields
                             const firstName = assignee?.user?.firstName || assignee?.firstName || '';
@@ -509,7 +502,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                               </Badge>
                             );
                           })}
-                          </div>
+                        </div>
                       </div>
                     ) : null}
                     {task.dueDate && (
@@ -542,8 +535,8 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                   )}
                 </div>
                 <div className="flex items-center space-x-2 flex-shrink-0 w-full sm:w-auto" onClick={(e) => e.stopPropagation()}>
-                  <Select 
-                    value={task.status} 
+                  <Select
+                    value={task.status}
                     onValueChange={(value) => handleStatusChange(task._id, value)}
                   >
                     <SelectTrigger className="w-full sm:w-32">
@@ -566,19 +559,25 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleEditTask(task)}>
-                        Edit Task
-                      </DropdownMenuItem>
+                      <PermissionGate permission={Permission.TASK_UPDATE} projectId={projectId}>
+                        <DropdownMenuItem onClick={() => handleEditTask(task)}>
+                          Edit Task
+                        </DropdownMenuItem>
+                      </PermissionGate>
                       <DropdownMenuItem onClick={() => handleViewTask(task)}>
                         View Details
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={() => handleDeleteTask(task)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        Delete Task
-                      </DropdownMenuItem>
+                      <PermissionGate permission={Permission.TASK_DELETE} projectId={projectId}>
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteTask(task)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            Delete Task
+                          </DropdownMenuItem>
+                        </>
+                      </PermissionGate>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -592,7 +591,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         <div className="text-center py-8">
           <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">No tasks found</p>
-          {hasPermission(Permission.TASK_CREATE) && (
+          {hasPermission(Permission.TASK_CREATE, projectId) && (
             <Button onClick={handleCreateTaskClick} className="mt-4">
               <Plus className="h-4 w-4 mr-2" />
               Create First Task
@@ -628,6 +627,8 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
               setSelectedTask(null)
             }}
             task={selectedTask}
+            canEdit={canEditTask}
+            canDelete={canDeleteTask}
             onEdit={() => {
               setShowViewModal(false)
               setShowEditModal(true)
