@@ -692,11 +692,12 @@ export default function StoryDetailPage() {
                                   {task.title}
                                 </h4>
                               </div>
-                              {task.description && (
-                                <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mb-2">
-                                  {task.description}
-                                </p>
-                              )}
+                              {/* {task.description && (
+                                <div
+                                  className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mb-2"
+                                  dangerouslySetInnerHTML={{ __html: task.description }}
+                                />
+                              )} */}
                               <div className="flex flex-wrap items-center gap-2">
                                 <Badge className={`${getStatusColor(task.status)} text-xs`}>
                                   {getStatusIcon(task.status)}

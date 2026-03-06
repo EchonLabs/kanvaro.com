@@ -189,7 +189,24 @@ export async function POST(
     notifyUserIds.delete(userId) // do not notify self
 
     if (notifyUserIds.size > 0) {
-      const url = `/tasks/${taskId}`
+      // Build absolute URL for email notifications
+      let baseUrl = ''
+      if (process.env.NEXT_PUBLIC_APP_URL) {
+        baseUrl = process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
+      } else {
+        const origin = request.headers.get('origin')
+        const referer = request.headers.get('referer')
+        const host = request.headers.get('host')
+        const proto = request.headers.get('x-forwarded-proto') || 'https'
+        if (origin) {
+          baseUrl = origin
+        } else if (referer) {
+          try { baseUrl = new URL(referer).origin } catch {}
+        } else if (host) {
+          baseUrl = `${proto}://${host}`
+        }
+      }
+      const url = `${baseUrl}/tasks/${taskId}`
       // Fire-and-forget notification to reduce request latency
       void (async () => {
         try {
