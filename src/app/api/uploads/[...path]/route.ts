@@ -49,7 +49,7 @@ export async function GET(
       const filename = filenameParts.join('/')
 
       // Validate type (only allow known upload types)
-      const allowedTypes = ['logos', 'avatars', 'attachments', 'documents']
+      const allowedTypes = ['logos', 'avatars', 'attachments', 'documents', 'task']
       if (!allowedTypes.includes(type)) {
         return NextResponse.json(
           { error: 'Invalid upload type' },
@@ -95,7 +95,7 @@ export async function GET(
     // Convert Buffer to Uint8Array for proper TypeScript compatibility
     // This ensures the buffer is compatible with NextResponse's BodyInit type
     const uint8Array = new Uint8Array(fileBuffer)
-    
+
     return new NextResponse(uint8Array, {
       headers: {
         'Content-Type': contentType,
