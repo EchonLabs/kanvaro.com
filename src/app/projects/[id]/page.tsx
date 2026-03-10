@@ -1588,6 +1588,17 @@ export default function ProjectDetailPage() {
               <BacklogView
                 projectId={projectId}
                 onCreateTask={() => setShowCreateTaskModal(true)}
+                onEditTask={(task) => {
+                  setSelectedTask(task)
+                  setShowEditTaskModal(true)
+                }}
+                onDeleteTask={(taskId) => {
+                  const task = tasks.find(t => t._id === taskId)
+                  if (task) {
+                    setSelectedTask(task)
+                    setShowDeleteConfirmModal(true)
+                  }
+                }}
               />
             </TabsContent>
 

@@ -38,7 +38,7 @@ export async function GET(
 
     // Check if UPLOADS_DIR is set (files stored outside public)
     const baseUploadDir = process.env.UPLOADS_DIR || process.env.UPLOAD_DIR || process.env.UPLOAD_PATH
-    
+
     if (baseUploadDir) {
       // Files are stored outside public directory, serve them directly
       const uploadDir = getUploadDirectory(type)
@@ -77,7 +77,7 @@ export async function GET(
       // Convert Buffer to Uint8Array for proper TypeScript compatibility
       // This ensures the buffer is compatible with NextResponse's BodyInit type
       const uint8Array = new Uint8Array(fileBuffer)
-      
+
       // Return file with appropriate headers
       return new NextResponse(uint8Array, {
         headers: {
