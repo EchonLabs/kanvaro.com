@@ -9,6 +9,7 @@ import { invalidateCache } from '@/lib/redis'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { fixImagePathsInDescription } from '@/lib/image-path-utils'
 
 /**
  * POST /api/tasks/bulk-csv
@@ -198,7 +199,7 @@ async function handleCreate(
 
     tasksToCreate.push({
       title: title.trim(),
-      description: typeof description === 'string' ? description.trim() : '',
+      description: typeof description === 'string' ? fixImagePathsInDescription(description.trim()) : '',
       status: typeof status === 'string' && status.trim().length > 0 ? status.trim() : 'backlog',
       priority: typeof priority === 'string' && ['low', 'medium', 'high', 'critical'].includes(priority) ? priority : 'medium',
       type: typeof type === 'string' && ['bug', 'feature', 'improvement', 'task', 'subtask'].includes(type) ? type : 'task',

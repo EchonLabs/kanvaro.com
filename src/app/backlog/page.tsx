@@ -496,8 +496,6 @@ export default function BacklogPage() {
           }
         }
 
-        setProjectOptions(Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name)))
-
         // Fetch unique project team members for assignedTo filter
         const teamMembersMap = new Map<string, UserSummary>()
         try {
@@ -505,7 +503,15 @@ export default function BacklogPage() {
           if (projectsResponse.ok) {
             const projectsData = await projectsResponse.json()
             if (projectsData.success && Array.isArray(projectsData.data)) {
+              // Extract all projects from the API response (not just from filtered backlog items)
+              const allProjectsMap = new Map<string, ProjectSummary>()
               projectsData.data.forEach((project: any) => {
+                if (project._id && project.name) {
+                  allProjectsMap.set(project._id, {
+                    _id: project._id,
+                    name: project.name
+                  })
+                }
                 if (Array.isArray(project.teamMembers)) {
                   project.teamMembers.forEach((member: any) => {
                     const memberId = member.memberId?._id || member.memberId
@@ -524,6 +530,8 @@ export default function BacklogPage() {
                   })
                 }
               })
+              // Use all projects from the API instead of just those in the current backlog results
+              setProjectOptions(Array.from(allProjectsMap.values()).sort((a, b) => a.name.localeCompare(b.name)))
             }
           }
         } catch (error) {
@@ -1432,6 +1440,47 @@ export default function BacklogPage() {
     return items
   }, [backlogItems, selectedSprintId, sprints])
 
+  const selectAll = () => {
+    const newTaskIds: string[] = [...selectedTaskIds]
+    const newStoryIds: string[] = [...selectedStoryIds]
+
+    // displayedItems is already the current page only (from API pagination)
+    displayedItems.forEach((item) => {
+      if ((item.type === 'task' || item.type === 'story') && !item.sprint) {
+        if (item.type === 'task' && !newTaskIds.includes(item._id)) {
+          newTaskIds.push(item._id)
+        } else if (item.type === 'story' && !newStoryIds.includes(item._id)) {
+          newStoryIds.push(item._id)
+        }
+      }
+    })
+
+    setSelectedTaskIds(newTaskIds)
+    setSelectedStoryIds(newStoryIds)
+  }
+
+  const deselectAll = () => {
+    setSelectedTaskIds([])
+    setSelectedStoryIds([])
+  }
+
+  // Check if all selectable items on the current page are selected
+  const allSelectableItemsSelected = useMemo(() => {
+    // displayedItems is already the current page only (from API pagination)
+    const selectableItems = displayedItems.filter(
+      (item) => (item.type === 'task' || item.type === 'story') && !item.sprint
+    )
+    if (selectableItems.length === 0) return false
+
+    const selectableTasks = selectableItems.filter((item) => item.type === 'task')
+    const selectableStories = selectableItems.filter((item) => item.type === 'story')
+
+    const allTasksSelected = selectableTasks.every((task) => selectedTaskIds.includes(task._id))
+    const allStoriesSelected = selectableStories.every((story) => selectedStoryIds.includes(story._id))
+
+    return allTasksSelected && allStoriesSelected
+  }, [displayedItems, selectedTaskIds, selectedStoryIds])
+
   const totalPages = Math.max(1, Math.ceil((totalCount || 0) / pageSize) || 1)
   const pageStartIndex = totalCount === 0 ? 0 : ((currentPage - 1) * pageSize) + 1
   const pageEndIndex = totalCount === 0 ? 0 : Math.min(currentPage * pageSize, totalCount)
@@ -1790,6 +1839,14 @@ export default function BacklogPage() {
                     <Kanban className="h-4 w-4 mr-2" />
                   )}
                   {assigningSprint ? 'Processing...' : 'Add Selected to Sprint'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={allSelectableItemsSelected ? deselectAll : selectAll}
+                  className="w-full sm:w-auto"
+                >
+                  {allSelectableItemsSelected ? 'Deselect All' : 'Select All'}
                 </Button>
                 <Button
                   variant="ghost"

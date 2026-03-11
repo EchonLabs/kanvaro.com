@@ -8,10 +8,6 @@ export interface CSVParseResult {
   rows: string[][]
 }
 
-/**
- * Parse CSV text into headers and rows.
- * Handles quoted fields, commas inside quotes, and newlines in quotes.
- */
 export function parseCSV(text: string): CSVParseResult {
   const rows: string[][] = []
   let current = ''
@@ -61,19 +57,46 @@ export function parseCSV(text: string): CSVParseResult {
     return { headers: [], rows: [] }
   }
 
+  // Find the maximum number of non-empty columns
+  const headers = rows[0]
+  const maxColumns = Math.max(
+    headers.length,
+    ...rows.slice(1).map(r => r.length)
+  )
+
+  // Find the rightmost non-empty column across all rows
+  let lastNonEmptyColumn = 0
+  for (let i = 0; i < maxColumns; i++) {
+    for (let j = 0; j < rows.length; j++) {
+      if (rows[j][i] && rows[j][i].trim().length > 0) {
+        lastNonEmptyColumn = i
+      }
+    }
+  }
+
+  // Trim all rows to remove trailing empty columns
+  const trimmedHeaders = headers.slice(0, lastNonEmptyColumn + 1)
+  const trimmedRows = rows.slice(1).map(r => r.slice(0, lastNonEmptyColumn + 1))
+
+  // Replace any empty headers with a placeholder name
+  const safeHeaders = trimmedHeaders.map((h, i) =>
+    h.trim().length > 0 ? h : `Column_${i + 1}`
+  )
+
   return {
-    headers: rows[0],
-    rows: rows.slice(1)
+    headers: safeHeaders,
+    rows: trimmedRows
   }
 }
 
 /** Known system columns with their canonical names */
 export const SYSTEM_COLUMNS = {
   title: { label: 'Task Title', required: true, aliases: ['task title', 'task name', 'title', 'name', 'task', 'summary', 'subject'] },
-  project: { label: 'Project', required: true, aliases: ['project', 'project name', 'project id'] },
-  dueDate: { label: 'Due Date', required: true, aliases: ['due date', 'due', 'deadline', 'target date', 'end date'] },
+  project: { label: 'Project', required: true, aliases: ['project', 'project name'] },
+  dueDate: { label: 'Due Date', required: true, aliases: ['due date', 'due', 'deadline', 'target date', 'end date', 'task due date'] },
   assignee: { label: 'Assignee', required: true, aliases: ['assignee', 'assigned to', 'assigned', 'owner', 'responsible', 'assignee email', 'assignee name'] },
-  description: { label: 'Description', required: false, aliases: ['description', 'details', 'desc', 'body', 'content', 'notes'] },
+  description: { label: 'Description', required: false, aliases: ['description', 'details', 'desc', 'body', 'content', 'notes', 'task description'] },
+  status: { label: 'Status', required: false, aliases: ['status', 'task status', 'state', 'workflow status'] },
   priority: { label: 'Priority', required: false, aliases: ['priority', 'prio', 'urgency', 'importance'] },
   type: { label: 'Type', required: false, aliases: ['type', 'task type', 'category', 'kind', 'issue type'] },
   estimatedHours: { label: 'Estimated Hours', required: false, aliases: ['estimated hours', 'hours', 'estimate', 'est hours', 'time estimate', 'estimation'] },
@@ -130,6 +153,7 @@ export interface ValidatedRow {
     assigneeName?: string
     assigneeEmail?: string
     description?: string
+    status?: string
     priority?: string
     type?: string
     estimatedHours?: number
@@ -192,10 +216,49 @@ function parseBool(value: string): boolean | null {
 
 const VALID_PRIORITIES = ['low', 'medium', 'high', 'critical']
 const VALID_TYPES = ['bug', 'feature', 'improvement', 'task', 'subtask']
+const VALID_STATUSES = ['backlog', 'todo', 'in_progress', 'review', 'testing', 'done', 'cancelled']
 
-/**
- * Validate parsed CSV rows against the column mapping and resolved data.
- */
+const STATUS_ALIASES: Record<string, string> = {
+  'backlog': 'backlog',
+  'to do': 'todo', 'to-do': 'todo', 'todo': 'todo', 'new': 'todo', 'open': 'todo',
+  'in progress': 'in_progress', 'in-progress': 'in_progress', 'in_progress': 'in_progress',
+  'inprogress': 'in_progress', 'wip': 'in_progress', 'doing': 'in_progress', 'active': 'in_progress',
+  'review': 'review', 'in review': 'review', 'in-review': 'review', 'code review': 'review', 'peer review': 'review',
+  'testing': 'testing', 'qa': 'testing', 'test': 'testing', 'in testing': 'testing', 'in-testing': 'testing',
+  'done': 'done', 'complete': 'done', 'completed': 'done', 'closed': 'done', 'resolved': 'done', 'finished': 'done',
+  'cancelled': 'cancelled', 'canceled': 'cancelled', 'dropped': 'cancelled', 'archived': 'cancelled',
+}
+
+function normalizeStatus(value: string): string | null {
+  const normalized = value.toLowerCase().trim()
+  return STATUS_ALIASES[normalized] || (VALID_STATUSES.includes(normalized) ? normalized : null)
+}
+
+export function detectBase64Image(value: string): { isBase64: boolean; type?: string; sizeKB: number } {
+  if (!value) return { isBase64: false, sizeKB: 0 }
+
+  // Match standalone base64 data URI
+  const standaloneMatch = value.match(/^data:image\/(\w+);base64,(.+)$/)
+  if (standaloneMatch) {
+    const imageType = standaloneMatch[1]
+    const base64Data = standaloneMatch[2]
+    const sizeKB = Math.ceil((base64Data.length * 0.75) / 1024)
+    return { isBase64: true, type: imageType, sizeKB }
+  }
+
+  // Match base64 images embedded in HTML (e.g. <img src="data:image/png;base64,...">)
+  const htmlMatch = value.match(/src=["']data:image\/(\w+);base64,([^"']+)["']/)
+  if (htmlMatch) {
+    const imageType = htmlMatch[1]
+    const base64Data = htmlMatch[2]
+    const sizeKB = Math.ceil((base64Data.length * 0.75) / 1024)
+    return { isBase64: true, type: imageType, sizeKB }
+  }
+
+  return { isBase64: false, sizeKB: 0 }
+}
+
+
 export function validateRows(
   rows: string[][],
   headers: string[],
@@ -281,6 +344,27 @@ export function validateRows(
     // Optional fields
     if (data.description) {
       resolved.description = data.description.trim()
+
+      // Detect and validate base64 images
+      const base64Info = detectBase64Image(resolved.description)
+      if (base64Info.isBase64) {
+        const MAX_BASE64_SIZE_KB = 5 * 1024 // 5MB
+        if (base64Info.sizeKB > MAX_BASE64_SIZE_KB) {
+          errors.push(
+            `Base64 image in description is too large (${base64Info.sizeKB}KB > ${MAX_BASE64_SIZE_KB}KB max). ` +
+            `Consider using the separate file upload feature for large images.`
+          )
+        }
+      }
+    }
+
+    if (data.status) {
+      const s = normalizeStatus(data.status)
+      if (s) {
+        resolved.status = s
+      } else {
+        errors.push(`Invalid status: "${data.status}". Must be: ${VALID_STATUSES.join(', ')}`)
+      }
     }
 
     if (data.priority) {
@@ -355,7 +439,7 @@ export function toBulkCreatePayload(
         title: r.resolved.title,
         project: r.resolved.project,
         dueDate: r.resolved.dueDate,
-        status: 'backlog'
+        status: r.resolved.status || 'backlog'
       }
 
       if (r.resolved.assignee) {
@@ -382,11 +466,8 @@ export function toBulkCreatePayload(
     })
 }
 
-/**
- * Generate a CSV template string with required and optional columns.
- */
 export function generateCSVTemplate(): string {
   const headers = ['Task Title', 'Project', 'Due Date', 'Assignee', 'Description', 'Priority', 'Type', 'Estimated Hours', 'Billable', 'Labels']
-  const sampleRow = ['Design Login Page', 'My Project', '2026-03-10', 'john@company.com', 'Create the login page design', 'high', 'task', '8', 'yes', 'ui,design']
+  const sampleRow = ['Design Login Page', 'My Project', '2026-03-10', 'john@company.com', 'Create the login page design with mockup image', 'high', 'task', '8', 'yes', '"ui,design"']
   return [headers.join(','), sampleRow.join(',')].join('\n')
 }
