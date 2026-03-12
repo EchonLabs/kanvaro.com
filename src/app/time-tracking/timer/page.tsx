@@ -50,6 +50,8 @@ interface Task {
   status: string
   priority: string
   isBillable?: boolean
+  taskNumber?: string | number
+  displayId?: string
   assignedTo?: {
     _id: string
     firstName: string
@@ -606,8 +608,10 @@ export default function TimerPage() {
       clearTimeout(taskSearchTimerRef.current)
     }
     taskSearchTimerRef.current = setTimeout(() => {
-      // console.log('Searching tasks with query:', taskSearch)
-      fetchTasks(selectedProject, taskSearch || undefined, 1)
+      // Fetch all tasks without search filter - do filtering client-side instead
+      // This avoids server-side search issues with special characters like dots
+      console.log('Fetching tasks for project:', selectedProject)
+      fetchTasks(selectedProject, undefined, 1)
     }, 80)
     return () => {
       if (taskSearchTimerRef.current) clearTimeout(taskSearchTimerRef.current)
@@ -1138,7 +1142,7 @@ export default function TimerPage() {
                     <Select
                       value={selectedProject}
                       onValueChange={handleProjectChange}
-                      disabled={!timeTrackingSettings?.allowTimeTracking}
+                      disabled={!timeTrackingSettings?.allowTimeTracking || liveActiveTimer !== null}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a project" />
@@ -1181,7 +1185,7 @@ export default function TimerPage() {
                     <Select
                       value={selectedTask}
                       onValueChange={handleTaskChange}
-                      disabled={!timeTrackingSettings?.allowTimeTracking || !selectedProject || tasksLoading || (!tasksLoading && (!Array.isArray(tasks) || tasks.length === 0))}
+                      disabled={!timeTrackingSettings?.allowTimeTracking || !selectedProject || tasksLoading || (!tasksLoading && (!Array.isArray(tasks) || tasks.length === 0)) || liveActiveTimer !== null}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder={
@@ -1223,7 +1227,30 @@ export default function TimerPage() {
                                 {tasks.filter((task) => {
                                   // Client-side filtering by search term
                                   if (!taskSearch || taskSearch.trim() === '') return true
-                                  return task.title.toLowerCase().includes(taskSearch.toLowerCase())
+                                  const searchLower = taskSearch.toLowerCase().trim()
+                                  
+                                  // Compare with title
+                                  if (task.title && task.title.toLowerCase().includes(searchLower)) {
+                                    return true
+                                  }
+                                  
+                                  // Compare with displayId (convert to string, handling dots)
+                                  if (task.displayId !== undefined && task.displayId !== null && task.displayId !== '') {
+                                    const displayIdStr = String(task.displayId).toLowerCase()
+                                    if (displayIdStr.includes(searchLower)) {
+                                      return true
+                                    }
+                                  }
+                                  
+                                  // Compare with taskNumber (convert to string, handling dots)
+                                  if (task.taskNumber !== undefined && task.taskNumber !== null && task.taskNumber !== '') {
+                                    const taskNumStr = String(task.taskNumber).toLowerCase()
+                                    if (taskNumStr.includes(searchLower)) {
+                                      return true
+                                    }
+                                  }
+                                  
+                                  return false
                                 }).map((task) => {
                                   const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
                                   return (
@@ -1232,15 +1259,18 @@ export default function TimerPage() {
                                       value={task._id}
                                       disabled={isBillableDisabled}
                                       className="w-full"
-                                      title={task.title}
+                                      title={`${task.displayId || task.taskNumber || 'N/A'} - ${task.title}`}
                                     >
-                                      <div className="flex items-center space-x-2 min-w-0 w-full">
+                                      <div className="flex items-center space-x-2 w-full">
                                         <Target className="h-4 w-4 flex-shrink-0" />
-                                        <div className="flex-1 min-w-0 overflow-hidden">
-                                          <div className="font-medium truncate flex items-center gap-2 min-w-0">
-                                            <span className="truncate max-w-[200px] inline-block">{task.title}</span>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-medium flex items-center gap-2 w-full">
+                                            <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                                              {task.displayId || task.taskNumber || 'N/A'}
+                                            </span>
+                                            <span className="truncate">{task.title}</span>
                                           </div>
-                                          <div className="text-xs text-muted-foreground truncate">
+                                          <div className="text-xs text-muted-foreground">
                                             {task.status} • {task.priority}
                                             {isBillableDisabled && ' • Billable time not allowed'}
                                           </div>
@@ -1294,7 +1324,7 @@ export default function TimerPage() {
                     }
                     rows={2}
                     required={true}
-                    disabled={!timeTrackingSettings?.allowTimeTracking || !selectedProject || !selectedTask}
+                    disabled={!timeTrackingSettings?.allowTimeTracking || !selectedProject || !selectedTask || liveActiveTimer !== null}
                     className="w-full"
                   />
                   {timeTrackingSettings && (
