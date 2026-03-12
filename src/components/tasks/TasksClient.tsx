@@ -48,6 +48,7 @@ import { Permission, PermissionGate } from '@/lib/permissions'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { usePermissions } from '@/lib/permissions/permission-context'
+import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { format } from 'date-fns'
 import { DateRange } from 'react-day-picker'
@@ -1348,6 +1349,28 @@ export default function TasksClient({
                                                                                         {task?.project?.name && task.project.name.length > 10 ? `${task.project.name.slice(0, 10)}…` : task?.project?.name}
                                                                                     </span>
                                                                                 </div>
+                                                                                {task?.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && (
+                                                                                    <div className="flex items-center flex-shrink-0">
+                                                                                        {(task.assignedTo as any[]).map((assignee: any, idx: number, arr: any[]) => {
+                                                                                            const userData = assignee.user || assignee;
+                                                                                            const displayName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Unknown User';
+                                                                                            return (
+                                                                                                <div key={userData._id || idx} title={displayName} style={{ marginLeft: idx === 0 ? 0 : -6, zIndex: arr.length - idx }}>
+                                                                                                    <GravatarAvatar
+                                                                                                        user={{
+                                                                                                            avatar: userData.avatar,
+                                                                                                            firstName: userData.firstName,
+                                                                                                            lastName: userData.lastName,
+                                                                                                            email: userData.email
+                                                                                                        }}
+                                                                                                        size={24}
+                                                                                                        className="border-2 border-background"
+                                                                                                    />
+                                                                                                </div>
+                                                                                            );
+                                                                                        })}
+                                                                                    </div>
+                                                                                )}
                                                                                 {task?.dueDate && (
                                                                                     <div className="flex items-center space-x-1 flex-shrink-0">
                                                                                         <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
@@ -1369,15 +1392,6 @@ export default function TasksClient({
                                                                             </div>
                                                                         </div>
                                                                         <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-2">
-                                                                            {task?.assignedTo && Array.isArray(task.assignedTo) && task.assignedTo.length > 0 && (
-                                                                                <div className="text-xs sm:text-sm text-muted-foreground truncate">
-                                                                                    {(() => {
-                                                                                        const firstAssignee = task.assignedTo[0];
-                                                                                        const userData = firstAssignee.user || firstAssignee;
-                                                                                        return `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Unknown User';
-                                                                                    })()}
-                                                                                </div>
-                                                                            )}
                                                                             <DropdownMenu>
                                                                                 <DropdownMenuTrigger asChild>
                                                                                     <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>

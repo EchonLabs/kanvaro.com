@@ -35,6 +35,7 @@ import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import EditTaskModal from './EditTaskModal'
 import ViewTaskModal from './ViewTaskModal'
 import CreateTaskModal from './CreateTaskModal'
+import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 
 interface Task {
   _id: string
@@ -496,28 +497,29 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                   </div>
                   <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                     {task.assignedTo && task.assignedTo.length > 0 ? (
-                      <div className="flex items-center space-x-1 flex-wrap gap-1">
-                        <User className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                        <div className="flex flex-wrap gap-1">
-                          {task.assignedTo.map((assignee, idx) => {
-                            // Try to get user data from populated user field first, then from denormalized fields
-                            const firstName = assignee?.user?.firstName || assignee?.firstName || '';
-                            const lastName = assignee?.user?.lastName || assignee?.lastName || '';
-                            const email = assignee?.user?.email || assignee?.email || '';
-                            const displayName = `${firstName} ${lastName}`.trim();
+                      <div className="flex items-center -space-x-1.5">
+                        {task.assignedTo.slice(0, 3).map((assignee, idx) => {
+                          const firstName = assignee?.user?.firstName || assignee?.firstName || '';
+                          const lastName = assignee?.user?.lastName || assignee?.lastName || '';
+                          const email = assignee?.user?.email || assignee?.email || '';
+                          const avatar = (assignee?.user as any)?.avatar || (assignee as any)?.avatar;
+                          const displayName = `${firstName} ${lastName}`.trim();
 
-                            return (
-                              <Badge
-                                key={assignee?.user?._id || assignee?._id || idx}
-                                variant="secondary"
-                                className="text-xs px-2 py-0.5"
-                                title={`${displayName} (${email})`}
-                              >
-                                {displayName || 'Unknown User'}
-                              </Badge>
-                            );
-                          })}
-                        </div>
+                          return (
+                            <div key={assignee?.user?._id || assignee?._id || idx} title={`${displayName} (${email})`}>
+                              <GravatarAvatar
+                                user={{ avatar, firstName, lastName, email }}
+                                size={24}
+                                className="border-2 border-background"
+                              />
+                            </div>
+                          );
+                        })}
+                        {task.assignedTo.length > 3 && (
+                          <div className="flex items-center justify-center h-6 w-6 rounded-full bg-muted border-2 border-background text-[10px] font-medium text-muted-foreground">
+                            +{task.assignedTo.length - 3}
+                          </div>
+                        )}
                       </div>
                     ) : null}
                     {task.dueDate && (

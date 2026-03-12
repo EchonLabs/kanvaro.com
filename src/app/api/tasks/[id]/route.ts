@@ -11,6 +11,7 @@ import { notificationService } from '@/lib/notification-service'
 import { invalidateCache } from '@/lib/redis'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { logTaskFieldChanges } from '@/lib/task-activity-logger'
 
 const TASK_STATUS_SET = new Set<TaskStatus>(TASK_STATUS_VALUES)
 
@@ -244,8 +245,9 @@ export async function GET(
     const task = await Task.findOne(taskQuery)
       .populate([
         { path: 'project', select: '_id name' },
-        { path: 'assignedTo.user', select: '_id firstName lastName email' },
+        { path: 'assignedTo.user', select: '_id firstName lastName email avatar' },
         { path: 'createdBy', select: 'firstName lastName email' },
+        { path: 'assignedBy', select: 'firstName lastName email' },
         { path: 'comments.author', select: 'firstName lastName email' },
         { path: 'comments.linkedIssues', select: 'displayId title', options: { strictPopulate: false } },
         {
@@ -576,8 +578,9 @@ export async function PUT(
     )
       .populate([
         { path: 'project', select: '_id name' },
-        { path: 'assignedTo.user', select: '_id firstName lastName email' },
+        { path: 'assignedTo.user', select: '_id firstName lastName email avatar' },
         { path: 'createdBy', select: 'firstName lastName email' },
+        { path: 'assignedBy', select: 'firstName lastName email' },
         {
           path: 'story',
           select: 'title status epic',
@@ -617,6 +620,15 @@ export async function PUT(
       message: 'Task updated successfully',
       data: task
     }
+
+    // Log field-level activity changes (non-blocking)
+    logTaskFieldChanges(
+      taskId,
+      organizationId,
+      userId,
+      currentTask,
+      updateData
+    ).catch(err => console.error('Failed to log task update activities:', err))
 
     // Run async operations in background without blocking response
     const taskIdStr = String(task._id || taskId)
