@@ -102,6 +102,11 @@ export const SYSTEM_COLUMNS = {
   estimatedHours: { label: 'Estimated Hours', required: false, aliases: ['estimated hours', 'hours', 'estimate', 'est hours', 'time estimate', 'estimation'] },
   isBillable: { label: 'Billable', required: false, aliases: ['billable', 'is billable', 'billing'] },
   labels: { label: 'Labels', required: false, aliases: ['labels', 'tags', 'label', 'tag', 'categories'] },
+  createdAt: { label: 'Task Created At', required: false, aliases: ['task created at', 'created at', 'created date', 'creation date', 'date created'] },
+  assignedBy: { label: 'Assigned By', required: false, aliases: ['assigned by', 'assigner', 'reporter'] },
+  attachments: { label: 'Attachment Files', required: false, aliases: ['attachment files', 'attachments', 'files', 'attachment', 'file', 'images'] },
+  subtasks: { label: 'Sub Tasks', required: false, aliases: ['sub tasks', 'subtasks', 'sub-tasks', 'checklist', 'sub task', 'subtask'] },
+  comments: { label: 'Comments', required: false, aliases: ['comments', 'comment', 'remarks', 'discussion'] },
 } as const
 
 export type SystemColumnKey = keyof typeof SYSTEM_COLUMNS
@@ -143,15 +148,18 @@ export interface ValidatedRow {
   rowIndex: number
   data: Record<string, string>
   errors: string[]
+  warnings: string[]
   isValid: boolean
   resolved: {
     title: string
     project?: string      // resolved project ID
     projectName?: string
     dueDate?: string
-    assignee?: string      // resolved user ID
+    assignee?: string      // resolved first user ID
     assigneeName?: string
     assigneeEmail?: string
+    assignees?: Array<{ _id: string; firstName: string; lastName: string; email: string; hourlyRate?: number }>
+    assigneeWarnings?: string[]
     description?: string
     status?: string
     priority?: string
@@ -159,6 +167,12 @@ export interface ValidatedRow {
     estimatedHours?: number
     isBillable?: boolean
     labels?: string[]
+    createdAt?: string
+    assignedBy?: string
+    assignedByName?: string
+    attachmentFiles?: Array<{ name: string; url: string }>
+    subtaskItems?: Array<{ title: string }>
+    commentItems?: Array<{ content: string }>
   }
 }
 
@@ -166,6 +180,7 @@ export interface ValidationSummary {
   totalRows: number
   validRows: number
   invalidRows: number
+  duplicateRows: number
   rows: ValidatedRow[]
 }
 
@@ -274,6 +289,7 @@ export function validateRows(
     const row = rows[i]
     const data: Record<string, string> = {}
     const errors: string[] = []
+    const warnings: string[] = []
     const resolved: ValidatedRow['resolved'] = { title: '' }
 
     // Build data record from mapping
@@ -325,19 +341,38 @@ export function validateRows(
       }
     }
 
-    // Validate assignee (required)
+    // Validate assignee (required, supports multiple comma/pipe-separated values)
     const assigneeValue = data.assignee?.trim()
     if (!assigneeValue) {
       errors.push('Assignee is required')
     } else {
-      const key = assigneeValue.toLowerCase()
-      const usr = userMap[key]
-      if (usr) {
-        resolved.assignee = usr._id
-        resolved.assigneeName = `${usr.firstName} ${usr.lastName}`
-        resolved.assigneeEmail = usr.email
+      const assigneeIdentifiers = assigneeValue.split(/[|,]/).map(a => a.trim()).filter(Boolean)
+      const foundAssignees: Array<{ _id: string; firstName: string; lastName: string; email: string; hourlyRate?: number }> = []
+      const notFound: string[] = []
+
+      for (const identifier of assigneeIdentifiers) {
+        const key = identifier.toLowerCase()
+        const usr = userMap[key]
+        if (usr) {
+          if (!foundAssignees.some(a => a._id === usr._id)) {
+            foundAssignees.push(usr)
+          }
+        } else {
+          notFound.push(identifier)
+        }
+      }
+
+      if (foundAssignees.length > 0) {
+        resolved.assignee = foundAssignees[0]._id
+        resolved.assigneeName = foundAssignees.map(u => `${u.firstName} ${u.lastName}`).join(', ')
+        resolved.assigneeEmail = foundAssignees[0].email
+        resolved.assignees = foundAssignees
+        if (notFound.length > 0) {
+          warnings.push(...notFound.map(n => `User "${n}" not found in system, skipped`))
+          resolved.assigneeWarnings = notFound.map(n => `User "${n}" not found`)
+        }
       } else {
-        errors.push(`Assignee "${assigneeValue}" not found`)
+        errors.push(`No matching users found for assignee: "${assigneeValue}"`)
       }
     }
 
@@ -407,20 +442,86 @@ export function validateRows(
       resolved.labels = data.labels.split(/[,;|]/).map(l => l.trim()).filter(Boolean)
     }
 
+    // Optional: Task Created At
+    if (data.createdAt) {
+      const parsed = parseDate(data.createdAt)
+      if (parsed) {
+        resolved.createdAt = parsed
+      } else {
+        errors.push(`Invalid created-at date format: "${data.createdAt}"`)
+      }
+    }
+
+    // Optional: Assigned By
+    if (data.assignedBy) {
+      const key = data.assignedBy.trim().toLowerCase()
+      const usr = userMap[key]
+      if (usr) {
+        resolved.assignedBy = usr._id
+        resolved.assignedByName = `${usr.firstName} ${usr.lastName}`
+      } else {
+        warnings.push(`Assigned-by user "${data.assignedBy}" not found, skipped`)
+      }
+    }
+
+    // Optional: Attachment Files (pipe-separated URLs/paths)
+    if (data.attachments) {
+      const files = data.attachments.split(/[|]/).map(f => f.trim()).filter(Boolean)
+      if (files.length > 0) {
+        resolved.attachmentFiles = files.map(f => {
+          const name = f.split('/').pop() || f
+          return { name, url: f }
+        })
+      }
+    }
+
+    // Optional: Sub Tasks (pipe-separated titles)
+    if (data.subtasks) {
+      const items = data.subtasks.split(/[|]/).map(s => s.trim()).filter(Boolean)
+      if (items.length > 0) {
+        resolved.subtaskItems = items.map(title => ({ title }))
+      }
+    }
+
+    // Optional: Comments (pipe-separated comment texts)
+    if (data.comments) {
+      const items = data.comments.split(/[|]/).map(c => c.trim()).filter(Boolean)
+      if (items.length > 0) {
+        resolved.commentItems = items.map(content => ({ content }))
+      }
+    }
+
     validatedRows.push({
       rowIndex: i + 1,
       data,
       errors,
+      warnings,
       isValid: errors.length === 0,
       resolved
     })
   }
 
+  // Detect intra-CSV duplicates: rows with same title + project → mark as invalid
+  const seen = new Map<string, number>()
+  for (const row of validatedRows) {
+    if (!row.resolved.title || !row.resolved.project) continue
+    const key = `${row.resolved.title.toLowerCase().trim()}::${row.resolved.project}`
+    const firstRow = seen.get(key)
+    if (firstRow !== undefined) {
+      row.errors.push(`Duplicate of row ${firstRow} in CSV (same title & project)`)
+      row.isValid = false
+    } else {
+      seen.set(key, row.rowIndex)
+    }
+  }
+
   const validCount = validatedRows.filter(r => r.isValid).length
+  const duplicateCount = validatedRows.filter(r => r.errors.some(e => e.includes('Duplicate'))).length
   return {
     totalRows: validatedRows.length,
     validRows: validCount,
     invalidRows: validatedRows.length - validCount,
+    duplicateRows: duplicateCount,
     rows: validatedRows
   }
 }
@@ -442,7 +543,15 @@ export function toBulkCreatePayload(
         status: r.resolved.status || 'backlog'
       }
 
-      if (r.resolved.assignee) {
+      if (r.resolved.assignees && r.resolved.assignees.length > 0) {
+        task.assignedTo = r.resolved.assignees.map(u => ({
+          user: u._id,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          email: u.email,
+          hourlyRate: u.hourlyRate
+        }))
+      } else if (r.resolved.assignee) {
         const u = Object.values(userMap).find(u => u._id === r.resolved.assignee)
         if (u) {
           task.assignedTo = [{
@@ -461,13 +570,54 @@ export function toBulkCreatePayload(
       if (r.resolved.estimatedHours !== undefined) task.estimatedHours = r.resolved.estimatedHours
       if (r.resolved.isBillable !== undefined) task.isBillable = r.resolved.isBillable
       if (r.resolved.labels && r.resolved.labels.length > 0) task.labels = r.resolved.labels
+      if (r.resolved.createdAt) task.createdAt = r.resolved.createdAt
+      if (r.resolved.assignedBy) task.assignedBy = r.resolved.assignedBy
+      if (r.resolved.attachmentFiles && r.resolved.attachmentFiles.length > 0) task.attachments = r.resolved.attachmentFiles
+      if (r.resolved.subtaskItems && r.resolved.subtaskItems.length > 0) task.subtasks = r.resolved.subtaskItems
+      if (r.resolved.commentItems && r.resolved.commentItems.length > 0) task.comments = r.resolved.commentItems
 
       return task
     })
 }
+export function exportRowsAsCSV(
+  rows: ValidatedRow[],
+  headers: string[],
+  mapping: ColumnMapping,
+  includeErrorColumn = false
+): string {
+  function escapeCSV(value: string): string {
+    if (!value) return ''
+    if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+      return `"${value.replace(/"/g, '""')}"`
+    }
+    return value
+  }
+
+  const outputHeaders = [...headers]
+  if (includeErrorColumn) outputHeaders.push('Errors')
+
+  const csvRows = [outputHeaders.map(escapeCSV).join(',')]
+
+  for (const row of rows) {
+    // Reconstruct the original row values from row.data using mapping
+    const cells = headers.map(header => {
+      const sysCol = mapping[header]
+      if (sysCol && sysCol !== 'skip' && row.data[sysCol] !== undefined) {
+        return escapeCSV(row.data[sysCol])
+      }
+      return ''
+    })
+    if (includeErrorColumn) {
+      cells.push(escapeCSV(row.errors.join('; ')))
+    }
+    csvRows.push(cells.join(','))
+  }
+
+  return csvRows.join('\n')
+}
 
 export function generateCSVTemplate(): string {
-  const headers = ['Task Title', 'Project', 'Due Date', 'Assignee', 'Description', 'Priority', 'Type', 'Estimated Hours', 'Billable', 'Labels']
-  const sampleRow = ['Design Login Page', 'My Project', '2026-03-10', 'john@company.com', 'Create the login page design with mockup image', 'high', 'task', '8', 'yes', '"ui,design"']
+  const headers = ['Task Title', 'Project', 'Due Date', 'Assignee', 'Description', 'Priority', 'Type', 'Estimated Hours', 'Billable', 'Labels', 'Task Created At', 'Assigned By', 'Attachment Files', 'Sub Tasks', 'Comments']
+  const sampleRow = ['Design Login Page', 'My Project', '2026-03-10', '"john@company.com, jane@company.com"', 'Create the login page design', 'high', 'task', '8', 'yes', '"ui,design"', '2026-03-01', 'manager@company.com', '/uploads/mockup.png|/uploads/spec.pdf', 'Create wireframe|Review with team', 'Initial task created|Needs design review']
   return [headers.join(','), sampleRow.join(',')].join('\n')
 }

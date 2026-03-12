@@ -36,6 +36,7 @@ export interface ITask extends Document {
   }>
   // assignees?: mongoose.Types.ObjectId[] // Removed in favor of assignedTo array
   createdBy: mongoose.Types.ObjectId
+  assignedBy?: mongoose.Types.ObjectId
   storyPoints?: number
   dueDate?: Date
   estimatedHours?: number
@@ -186,6 +187,10 @@ const TaskSchema = new Schema<ITask>({
     type: Schema.Types.ObjectId,
     ref: 'User',
     required: true
+  },
+  assignedBy: {
+    type: Schema.Types.ObjectId,
+    ref: 'User'
   },
   storyPoints: {
     type: Number,
