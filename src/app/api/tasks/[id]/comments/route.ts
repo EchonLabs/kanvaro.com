@@ -8,6 +8,7 @@ import { notificationService } from '@/lib/notification-service'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import mongoose from 'mongoose'
+import { logTaskActivity } from '@/lib/task-activity-logger'
 
 const isValidObjectId = (val: unknown) =>
   typeof val === 'string' && mongoose.Types.ObjectId.isValid(val)
@@ -189,7 +190,24 @@ export async function POST(
     notifyUserIds.delete(userId) // do not notify self
 
     if (notifyUserIds.size > 0) {
-      const url = `/tasks/${taskId}`
+      // Build absolute URL for email notifications
+      let baseUrl = ''
+      if (process.env.NEXT_PUBLIC_APP_URL) {
+        baseUrl = process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
+      } else {
+        const origin = request.headers.get('origin')
+        const referer = request.headers.get('referer')
+        const host = request.headers.get('host')
+        const proto = request.headers.get('x-forwarded-proto') || 'https'
+        if (origin) {
+          baseUrl = origin
+        } else if (referer) {
+          try { baseUrl = new URL(referer).origin } catch {}
+        } else if (host) {
+          baseUrl = `${proto}://${host}`
+        }
+      }
+      const url = `${baseUrl}/tasks/${taskId}`
       // Fire-and-forget notification to reduce request latency
       void (async () => {
         try {
@@ -215,6 +233,15 @@ export async function POST(
         }
       })()
     }
+
+    // Log comment activity (non-blocking)
+    logTaskActivity({
+      taskId,
+      organizationId,
+      userId,
+      action: 'comment_added',
+      newValue: content.length > 100 ? content.substring(0, 100) + '...' : content
+    }).catch(err => console.error('Failed to log comment activity:', err))
 
     return NextResponse.json({
       success: true,
@@ -312,6 +339,15 @@ export async function PATCH(
       return NextResponse.json({ error: 'Failed to update comment' }, { status: 500 })
     }
 
+    // Log comment update activity (non-blocking)
+    logTaskActivity({
+      taskId,
+      organizationId,
+      userId,
+      action: 'comment_updated',
+      newValue: content.length > 100 ? content.substring(0, 100) + '...' : content
+    }).catch(err => console.error('Failed to log comment update activity:', err))
+
     return NextResponse.json({
       success: true,
       data: {
@@ -382,6 +418,14 @@ export async function DELETE(
     if (result.modifiedCount === 0) {
       return NextResponse.json({ error: 'Failed to delete comment' }, { status: 500 })
     }
+
+    // Log comment deletion activity (non-blocking)
+    logTaskActivity({
+      taskId,
+      organizationId,
+      userId,
+      action: 'comment_deleted'
+    }).catch(err => console.error('Failed to log comment delete activity:', err))
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -13,9 +13,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { 
-  ArrowLeft, 
-  Clock, 
+import {
+  ArrowLeft,
+  Clock,
   Target,
   FolderOpen,
   Loader2,
@@ -50,6 +50,8 @@ interface Task {
   status: string
   priority: string
   isBillable?: boolean
+  taskNumber?: string | number
+  displayId?: string
   assignedTo?: {
     _id: string
     firstName: string
@@ -80,7 +82,7 @@ interface TimeTrackingSettings {
   maxWeeklyHours: number
   maxSessionHours: number
   allowOvertime: boolean
-//  requireDescription: boolean
+  //  requireDescription: boolean
   requireCategory: boolean
   allowFutureTime: boolean
   allowPastTime: boolean
@@ -138,6 +140,11 @@ export default function TimerPage() {
   const autoStopNotifiedRef = useRef(false)
   const [projectSearch, setProjectSearch] = useState('')
   const [taskSearch, setTaskSearch] = useState('')
+  const [taskPage, setTaskPage] = useState(1)
+  const [hasMoreTasks, setHasMoreTasks] = useState(false)
+  const [loadingMoreTasks, setLoadingMoreTasks] = useState(false)
+  const taskSearchTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)
 
 
 
@@ -148,12 +155,8 @@ export default function TimerPage() {
   }
 
   const filteredProjects = projects.filter((project) =>
-  project.name.toLowerCase().includes(projectSearch.toLowerCase())
-)
-
-const filteredTasks = tasks.filter((task) =>
-  task.title.toLowerCase().includes(taskSearch.toLowerCase())
-)
+    project.name.toLowerCase().includes(projectSearch.toLowerCase())
+  )
 
 
   // Validate maxSessionHours and future time when dates/times change
@@ -255,20 +258,20 @@ const filteredTasks = tasks.filter((task) =>
 
   const fetchDailyHoursLogged = useCallback(async () => {
     if (!user?.id || !user?.organization) return
-    
+
     try {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const tomorrow = new Date(today)
       tomorrow.setDate(tomorrow.getDate() + 1)
-      
+
       const params = new URLSearchParams({
         userId: user.id,
         organizationId: user.organization,
         startDate: today.toISOString(),
         endDate: tomorrow.toISOString()
       })
-      
+
       const response = await fetch(`/api/time-tracking/entries?${params.toString()}`)
       if (response.ok) {
         const data = await response.json()
@@ -285,11 +288,11 @@ const filteredTasks = tasks.filter((task) =>
     const checkAuth = async () => {
       try {
         const response = await fetch('/api/auth/me')
-        
+
         if (response.ok) {
           const userData = await response.json()
-       
-          
+
+
           setUser(userData)
           setAuthError('')
           await fetchProjects(userData)
@@ -299,11 +302,11 @@ const filteredTasks = tasks.filter((task) =>
           const refreshResponse = await fetch('/api/auth/refresh', {
             method: 'POST'
           })
-          
+
           if (refreshResponse.ok) {
             const refreshData = await refreshResponse.json()
-         
-            
+
+
             setUser(refreshData.user)
             setAuthError('')
             await fetchProjects(refreshData.user)
@@ -375,18 +378,18 @@ const filteredTasks = tasks.filter((task) =>
     }
     if (selectedTask) return
     if (!selectedProject) return
-    
+
     let tid = searchParams?.get('taskId') || ''
     const tnameRaw = searchParams?.get('taskName') || ''
     const tname = tnameRaw && tnameRaw !== 'undefined' && tnameRaw !== 'null' ? tnameRaw : ''
     if (tid === 'undefined' || tid === 'null') tid = ''
-    
+
     let taskIdToSelect = tid || ''
     if (!taskIdToSelect && tname) {
       const match = tasks.find(t => t.title.toLowerCase() === tname.toLowerCase())
       if (match) taskIdToSelect = match._id
     }
-    
+
     if (taskIdToSelect && tasks.some(t => t._id === taskIdToSelect)) {
       handleTaskChange(taskIdToSelect)
     }
@@ -407,7 +410,7 @@ const filteredTasks = tasks.filter((task) =>
       const data = await response.json()
       if (data.success && Array.isArray(data.data)) {
         const effectiveUser = currentUser ?? user     // Filter projects by strict requirements:
-    // 1. project.settings.allowTimeTracking === true (explicitly enabled)     // 2. project.teamMembers contains logged user as memberId
+        // 1. project.settings.allowTimeTracking === true (explicitly enabled)     // 2. project.teamMembers contains logged user as memberId
         const filtered = data.data.filter((project: any) => {
           const u = effectiveUser
           if (!u) return false
@@ -465,27 +468,41 @@ const filteredTasks = tasks.filter((task) =>
     }
   }
 
-  const fetchTasks = useCallback(async (projectId: string) => {
+  const fetchTasks = useCallback(async (projectId: string, search?: string, page: number = 1) => {
     if (!projectId || !user) {
       setTasks([])
       setTasksLoading(false)
       return
     }
 
-    setTasksLoading(true)
-    
+    if (page === 1) {
+      setTasksLoading(true)
+    } else {
+      setLoadingMoreTasks(true)
+    }
+
     try {
-      // Fetch tasks for the selected project where user is assigned
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout (reduced since query is optimized)
-      
-      const response = await fetch(`/api/tasks?project=${projectId}&assignedTo=${user.id}&limit=50&minimal=true`, {
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+      const params = new URLSearchParams({
+        project: projectId,
+        assignedTo: user.id,
+        limit: '10',
+        page: String(page),
+        minimal: 'true'
+      })
+      if (search && search.trim()) {
+        params.set('search', search.trim())
+      }
+
+      const response = await fetch(`/api/tasks?${params.toString()}`, {
         cache: 'no-store',
         signal: controller.signal
       })
-      
+
       clearTimeout(timeoutId)
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -493,24 +510,21 @@ const filteredTasks = tasks.filter((task) =>
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
-        // Double-check filtering: ensure task.project matches selectedProject AND user is in assignedTo
         const validTasks = data.data.filter((task: any) => {
-          // Check project match
           const projectMatch = task?.project === projectId ||
-                              task?.project?._id === projectId ||
-                              task?.project?.id === projectId
+            task?.project?._id === projectId ||
+            task?.project?.id === projectId
 
           if (!projectMatch) return false
 
-          // Check user assignment - look for user in assignedTo array
           const assignedTo = Array.isArray(task?.assignedTo) ? task.assignedTo : []
           const userAssigned = assignedTo.some((assignment: any) => {
             if (typeof assignment === 'object' && assignment !== null) {
               return assignment.user === user.id ||
-                     assignment.user?._id === user.id ||
-                     assignment.user?.id === user.id ||
-                     assignment._id === user.id ||
-                     assignment.id === user.id
+                assignment.user?._id === user.id ||
+                assignment.user?.id === user.id ||
+                assignment._id === user.id ||
+                assignment.id === user.id
             }
             return false
           })
@@ -518,17 +532,18 @@ const filteredTasks = tasks.filter((task) =>
           return userAssigned
         })
 
-        console.log('Filtered tasks for project:', {
-          projectId,
-          userId: user.id,
-          totalTasks: data.data.length,
-          validTasks: validTasks.length,
-          tasks: validTasks.map((t: any) => ({ _id: t._id, title: t.title, assignedTo: t.assignedTo }))
-        })
+        const totalPages = data.pagination?.totalPages || 1
+        setHasMoreTasks(page < totalPages)
+        setTaskPage(page)
 
-        setTasks(validTasks)
+        if (page === 1) {
+          setTasks(validTasks)
+        } else {
+          setTasks(prev => [...prev, ...validTasks])
+        }
       } else {
-        setTasks([])
+        if (page === 1) setTasks([])
+        setHasMoreTasks(false)
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
@@ -536,18 +551,79 @@ const filteredTasks = tasks.filter((task) =>
       } else {
         console.error('Failed to fetch tasks:', err)
       }
-      setTasks([])
+      if (page === 1) setTasks([])
     } finally {
       setTasksLoading(false)
+      setLoadingMoreTasks(false)
     }
   }, [user?.id])
+
+  // IntersectionObserver callback for infinite scroll
+  const handleLoadMoreIntersect = useCallback((entries: IntersectionObserverEntry[]) => {
+    const entry = entries[0]
+    if (entry?.isIntersecting && hasMoreTasks && !loadingMoreTasks && !tasksLoading) {
+      console.log('Sentinel visible - loading more tasks')
+      fetchTasks(selectedProject, taskSearch || undefined, taskPage + 1)
+    }
+  }, [selectedProject, hasMoreTasks, loadingMoreTasks, tasksLoading, taskSearch, taskPage, fetchTasks])
+
+  // Set up IntersectionObserver on sentinel ref
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current
+    if (!sentinel) return
+    
+    // Get the scrollable parent (SelectContent)
+    let scrollableParent = sentinel.parentElement
+    while (scrollableParent) {
+      const overflow = window.getComputedStyle(scrollableParent).overflowY
+      if (overflow === 'auto' || overflow === 'scroll') {
+        break
+      }
+      scrollableParent = scrollableParent.parentElement
+    }
+
+    const observerOptions: IntersectionObserverInit = {
+      root: scrollableParent || null,
+      threshold: [0, 0.1, 0.5, 1],
+      rootMargin: '50px'
+    }
+    
+    const observer = new IntersectionObserver(handleLoadMoreIntersect, observerOptions)
+    observer.observe(sentinel)
+    
+    return () => {
+      observer.disconnect()
+    }
+  }, [handleLoadMoreIntersect])
+
+  const loadMoreTasks = useCallback(() => {
+    if (!selectedProject || loadingMoreTasks || !hasMoreTasks) return
+    fetchTasks(selectedProject, taskSearch || undefined, taskPage + 1)
+  }, [selectedProject, loadingMoreTasks, hasMoreTasks, taskPage, taskSearch, fetchTasks])
+
+  // Debounced server-side search for tasks
+  useEffect(() => {
+    if (!selectedProject) return
+    if (taskSearchTimerRef.current) {
+      clearTimeout(taskSearchTimerRef.current)
+    }
+    taskSearchTimerRef.current = setTimeout(() => {
+      // Fetch all tasks without search filter - do filtering client-side instead
+      // This avoids server-side search issues with special characters like dots
+      console.log('Fetching tasks for project:', selectedProject)
+      fetchTasks(selectedProject, undefined, 1)
+    }, 80)
+    return () => {
+      if (taskSearchTimerRef.current) clearTimeout(taskSearchTimerRef.current)
+    }
+  }, [taskSearch, selectedProject, fetchTasks])
 
   const handleTaskChange = (taskId: string) => {
     setSelectedTask(taskId === 'none' ? '' : taskId)
     const task = tasks.find(t => t._id === taskId)
     if (task) {
       setDescription(task.title)
-      
+
       // Check if task is billable and allowBillableTime is false
       if (task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime) {
         showToast({
@@ -572,7 +648,7 @@ const filteredTasks = tasks.filter((task) =>
     }
 
     // Only validate description if it's explicitly required
-    if ( !manualLogData.description.trim()) {
+    if (!manualLogData.description.trim()) {
       setError('⚠️ Memo required: Please enter a Memo for this time entry.')
       return
     }
@@ -600,7 +676,7 @@ const filteredTasks = tasks.filter((task) =>
       setError('⚠️ Invalid date/time: The selected dates or times are invalid. Please check your entries and try again.')
       return
     }
-    
+
     if (start >= end) {
       setError('⚠️ Invalid time range: The end date/time must be after the start date/time. Please adjust your entries.')
       return
@@ -626,12 +702,12 @@ const filteredTasks = tasks.filter((task) =>
     if (timeTrackingSettings?.allowPastTime !== undefined) {
       const daysDiff = Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
       const pastLimitDays = timeTrackingSettings.pastTimeLimitDays || 30
-      
+
       if (!timeTrackingSettings.allowPastTime && daysDiff > 0) {
         setError(`⚠️ Past time not allowed: Your organization does not allow logging time for past dates. You can only log time for today or future dates.`)
         return
       }
-      
+
       if (timeTrackingSettings.allowPastTime && daysDiff > pastLimitDays) {
         const startDateStr = start.toLocaleDateString()
         setError(`⚠️ Past time limit exceeded: You can only log time up to ${pastLimitDays} days in the past. The selected start date (${startDateStr}) is more than ${pastLimitDays} days ago. Please select a more recent date.`)
@@ -710,7 +786,7 @@ const filteredTasks = tasks.filter((task) =>
       } else {
         // Parse and improve error messages from API
         let errorMessage = data.error || 'An unexpected error occurred while logging time.'
-        
+
         // Improve common error messages
         if (errorMessage.includes('Future time logging not allowed')) {
           errorMessage = '⚠️ Future time logging is not allowed. Please select a date/time that is today or in the past based on your organization settings.'
@@ -785,24 +861,24 @@ const filteredTasks = tasks.filter((task) =>
           fetchDailyHoursLogged()
         } else if (data?.activeTimer) {
           // Normal active timer
-        setActiveTimerSnapshot(data.activeTimer)
-        setLiveActiveTimer(data.activeTimer)
+          setActiveTimerSnapshot(data.activeTimer)
+          setLiveActiveTimer(data.activeTimer)
 
-        const projectId = data.activeTimer.project?._id || null
-        const taskId = data.activeTimer.task?._id || null
-        const timerDescription = data.activeTimer.description || ''
+          const projectId = data.activeTimer.project?._id || null
+          const taskId = data.activeTimer.task?._id || null
+          const timerDescription = data.activeTimer.description || ''
 
-        if (projectId) {
-          setPendingActiveProject(projectId)
-        }
-        if (taskId) {
-          setPendingActiveTask(taskId)
-        }
-        if (timerDescription) {
-          setPendingActiveDescription(timerDescription)
-        }
-        setInitializedFromActive(false)
-      } else {
+          if (projectId) {
+            setPendingActiveProject(projectId)
+          }
+          if (taskId) {
+            setPendingActiveTask(taskId)
+          }
+          if (timerDescription) {
+            setPendingActiveDescription(timerDescription)
+          }
+          setInitializedFromActive(false)
+        } else {
           // No active timer
           setActiveTimerSnapshot(null)
           setLiveActiveTimer(null)
@@ -838,8 +914,8 @@ const filteredTasks = tasks.filter((task) =>
 
   // Debug Timer component rendering
   useEffect(() => {
-  
-    
+
+
     if (selectedProject && user) {
     }
   }, [selectedProject, user])
@@ -1063,26 +1139,26 @@ const filteredTasks = tasks.filter((task) =>
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="project">Project *</Label>
-                    <Select 
-                      value={selectedProject} 
+                    <Select
+                      value={selectedProject}
                       onValueChange={handleProjectChange}
-                      disabled={!timeTrackingSettings?.allowTimeTracking}
+                      disabled={!timeTrackingSettings?.allowTimeTracking || liveActiveTimer !== null}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a project" />
                       </SelectTrigger>
-                     <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
-                     <div className="p-2 sticky top-0 bg-background z-10">                      <Input
-                            placeholder="Type project name..."
-                            value={projectSearch}
-                            onChange={(e) => {
-                              e.stopPropagation()
-                              setProjectSearch(e.target.value)
-                            }}
-                            onKeyDown={(e) => e.stopPropagation()}
-                            onClick={(e) => e.stopPropagation()}
-                            className="h-8"
-                          />
+                      <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
+                        <div className="p-2 sticky top-0 bg-background z-10">                      <Input
+                          placeholder="Type project name..."
+                          value={projectSearch}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            setProjectSearch(e.target.value)
+                          }}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-8"
+                        />
                         </div>
 
                         {Array.isArray(filteredProjects) && filteredProjects.length > 0 ? (
@@ -1109,7 +1185,7 @@ const filteredTasks = tasks.filter((task) =>
                     <Select
                       value={selectedTask}
                       onValueChange={handleTaskChange}
-                      disabled={!timeTrackingSettings?.allowTimeTracking || !selectedProject || tasksLoading || (!tasksLoading && (!Array.isArray(tasks) || tasks.length === 0))}
+                      disabled={!timeTrackingSettings?.allowTimeTracking || !selectedProject || tasksLoading || (!tasksLoading && (!Array.isArray(tasks) || tasks.length === 0)) || liveActiveTimer !== null}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder={
@@ -1123,11 +1199,11 @@ const filteredTasks = tasks.filter((task) =>
                       {tasksLoading && (
                         <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                       )}
-                      <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
+                      <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)] max-h-[300px]">
                         {!tasksLoading && (
                           <div className="p-2 sticky top-0 bg-background z-10">
                             <Input
-                              placeholder="Type task name..."
+                              placeholder="Search tasks..."
                               value={taskSearch}
                               onChange={(e) => {
                                 e.stopPropagation()
@@ -1135,9 +1211,10 @@ const filteredTasks = tasks.filter((task) =>
                               }}
                               onKeyDown={(e) => e.stopPropagation()}
                               onClick={(e) => e.stopPropagation()}
+                              autoFocus
                               className="h-8"
                             />
-                          </div> )}
+                          </div>)}
 
                         {tasksLoading ? (
                           <div className="flex items-center justify-center p-4">
@@ -1145,28 +1222,74 @@ const filteredTasks = tasks.filter((task) =>
                             <span className="text-sm text-muted-foreground">Loading tasks...</span>
                           </div>
                         ) : (
-                          Array.isArray(filteredTasks) && filteredTasks.length > 0 ? (
-                            filteredTasks.map((task) => {
-                              const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
-                              return (
-                                <SelectItem
-                                  key={task._id}
-                                  value={task._id}
-                                  disabled={isBillableDisabled}>
-                                  <div className="flex items-center space-x-2 min-w-0 w-full">
-                                    <Target className="h-4 w-4 flex-shrink-0" />
-                                    <div className="flex-1 min-w-0 overflow-hidden">
-                                      <div className="font-medium truncate flex items-center gap-2 min-w-0">
-                                        <span className="truncate">{task.title}</span>
+                          Array.isArray(tasks) && tasks.length > 0 ? (
+                            <div className="flex flex-col">
+                                {tasks.filter((task) => {
+                                  // Client-side filtering by search term
+                                  if (!taskSearch || taskSearch.trim() === '') return true
+                                  const searchLower = taskSearch.toLowerCase().trim()
+                                  
+                                  // Compare with title
+                                  if (task.title && task.title.toLowerCase().includes(searchLower)) {
+                                    return true
+                                  }
+                                  
+                                  // Compare with displayId (convert to string, handling dots)
+                                  if (task.displayId !== undefined && task.displayId !== null && task.displayId !== '') {
+                                    const displayIdStr = String(task.displayId).toLowerCase()
+                                    if (displayIdStr.includes(searchLower)) {
+                                      return true
+                                    }
+                                  }
+                                  
+                                  // Compare with taskNumber (convert to string, handling dots)
+                                  if (task.taskNumber !== undefined && task.taskNumber !== null && task.taskNumber !== '') {
+                                    const taskNumStr = String(task.taskNumber).toLowerCase()
+                                    if (taskNumStr.includes(searchLower)) {
+                                      return true
+                                    }
+                                  }
+                                  
+                                  return false
+                                }).map((task) => {
+                                  const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
+                                  return (
+                                    <SelectItem
+                                      key={task._id}
+                                      value={task._id}
+                                      disabled={isBillableDisabled}
+                                      className="w-full"
+                                      title={`${task.displayId || task.taskNumber || 'N/A'} - ${task.title}`}
+                                    >
+                                      <div className="flex items-center space-x-2 w-full">
+                                        <Target className="h-4 w-4 flex-shrink-0" />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-medium flex items-center gap-2 w-full">
+                                            <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                                              {task.displayId || task.taskNumber || 'N/A'}
+                                            </span>
+                                            <span className="truncate">{task.title}</span>
+                                          </div>
+                                          <div className="text-xs text-muted-foreground">
+                                            {task.status} • {task.priority}
+                                            {isBillableDisabled && ' • Billable time not allowed'}
+                                          </div>
+                                        </div>
                                       </div>
-                                      <div className="text-xs sm:text-sm text-muted-foreground truncate">
-                                        {task.status} • {task.priority}
-                                        {isBillableDisabled && ' • Billable time not allowed'}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </SelectItem>)
-                            })
+                                    </SelectItem>
+                                  )
+                                })}
+                              {hasMoreTasks && (
+                                <div
+                                  ref={loadMoreSentinelRef}
+                                  className="p-3 text-center min-h-10 flex items-center justify-center"
+                                >
+                                  <span className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Loading more...
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           ) : (
                             <div className="p-3 text-sm text-muted-foreground text-center">
                               No tasks found
@@ -1201,7 +1324,7 @@ const filteredTasks = tasks.filter((task) =>
                     }
                     rows={2}
                     required={true}
-                    disabled={!timeTrackingSettings?.allowTimeTracking || !selectedProject || !selectedTask}
+                    disabled={!timeTrackingSettings?.allowTimeTracking || !selectedProject || !selectedTask || liveActiveTimer !== null}
                     className="w-full"
                   />
                   {timeTrackingSettings && (
@@ -1338,39 +1461,79 @@ const filteredTasks = tasks.filter((task) =>
                           <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                         )}
                         <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
+                          {!tasksLoading && (
+                            <div className="p-2 sticky top-0 bg-background z-10">
+                              <Input
+                                placeholder="Search tasks..."
+                                value={taskSearch}
+                                onChange={(e) => {
+                                  e.stopPropagation()
+                                  setTaskSearch(e.target.value)
+                                }}
+                                onKeyDown={(e) => e.stopPropagation()}
+                                onClick={(e) => e.stopPropagation()}
+                                className="h-8"
+                              />
+                            </div>)}
                           {tasksLoading ? (
                             <div className="flex items-center justify-center p-4">
                               <Loader2 className="h-4 w-4 animate-spin mr-2" />
                               <span className="text-sm text-muted-foreground">Loading tasks...</span>
                             </div>
                           ) : (
-                            Array.isArray(tasks) && tasks.map((task) => {
-                              const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
-                              return (
-                                <SelectItem 
-                                  key={task._id} 
-                                  value={task._id}
-                                  disabled={isBillableDisabled}
-                                >
-                                  <div className="flex items-center space-x-2 min-w-0 w-full">
-                                    <Target className="h-4 w-4 flex-shrink-0" />
-                                    <div className="flex-1 min-w-0 overflow-hidden">
-                                      <div className="font-medium truncate flex items-center gap-2 min-w-0">
-                                        <span className="truncate">{task.title}</span>
-                                        {task.isBillable && (
-                                          <DollarSign className="h-3 w-3 text-green-600 flex-shrink-0" />
-                                        )}
-                                      </div>
-                                      {isBillableDisabled && (
-                                        <div className="text-xs text-muted-foreground">
-                                          Billable time not allowed
+                            Array.isArray(tasks) && tasks.length > 0 ? (
+                              <TooltipProvider delayDuration={300}>
+                                {tasks.map((task) => {
+                                  const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
+                                  return (
+                                    <Tooltip key={task._id}>
+                                      <TooltipTrigger asChild>
+                                        <div>
+                                          <SelectItem 
+                                            value={task._id}
+                                            disabled={isBillableDisabled}
+                                          >
+                                            <div className="flex items-center space-x-2 min-w-0 w-full">
+                                              <Target className="h-4 w-4 flex-shrink-0" />
+                                              <div className="flex-1 min-w-0 overflow-hidden">
+                                                <div className="font-medium truncate flex items-center gap-2 min-w-0">
+                                                  <span className="truncate max-w-[200px] inline-block">{task.title}</span>
+                                                  {task.isBillable && (
+                                                    <DollarSign className="h-3 w-3 text-green-600 flex-shrink-0" />
+                                                  )}
+                                                </div>
+                                                {isBillableDisabled && (
+                                                  <div className="text-xs text-muted-foreground">
+                                                    Billable time not allowed
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </SelectItem>
                                         </div>
-                                      )}
-                                    </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="left" className="max-w-[300px]">
+                                        <p className="break-words">{task.title}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )
+                                })}
+                                {hasMoreTasks && (
+                                  <div
+                                    ref={loadMoreSentinelRef}
+                                    className="p-2 text-center"
+                                  >
+                                    <span className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                                      <Loader2 className="h-3 w-3 animate-spin" /> Loading more...
+                                    </span>
                                   </div>
-                                </SelectItem>
-                              )
-                            })
+                                )}
+                              </TooltipProvider>
+                            ) : (
+                              <div className="p-3 text-sm text-muted-foreground text-center">
+                                No tasks found
+                              </div>
+                            )
                           )}
                         </SelectContent>
                       </Select>

@@ -43,6 +43,7 @@ import { useNotify } from '@/lib/notify'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { extractUserId } from '@/lib/auth/user-utils'
+import TaskActivityLog from '@/components/tasks/TaskActivityLog'
 
 interface Task {
   _id: string
@@ -69,6 +70,11 @@ interface Task {
     hourlyRate?: number
   }>]
   createdBy: {
+    firstName: string
+    lastName: string
+    email: string
+  }
+  assignedBy?: {
     firstName: string
     lastName: string
     email: string
@@ -2000,16 +2006,31 @@ export default function TaskDetailPage() {
               <CardHeader>
                 <CardTitle>Created By</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center space-x-2">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">
-                    {task.createdBy.firstName} {task.createdBy.lastName}
-                  </span>
+              <CardContent className="space-y-3">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Creator</p>
+                  <div className="flex items-center space-x-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">
+                      {task.createdBy.firstName} {task.createdBy.lastName}
+                    </span>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatDate(task.createdAt)}
-                </p>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Created At</p>
+                  <p className="text-sm">
+                    {formatDate(task.createdAt)}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TaskActivityLog taskId={task._id} />
               </CardContent>
             </Card>
           </div>

@@ -1588,6 +1588,17 @@ export default function ProjectDetailPage() {
               <BacklogView
                 projectId={projectId}
                 onCreateTask={() => setShowCreateTaskModal(true)}
+                onEditTask={(task) => {
+                  setSelectedTask(task)
+                  setShowEditTaskModal(true)
+                }}
+                onDeleteTask={(taskId) => {
+                  const task = tasks.find(t => t._id === taskId)
+                  if (task) {
+                    setSelectedTask(task)
+                    setShowDeleteConfirmModal(true)
+                  }
+                }}
               />
             </TabsContent>
 
@@ -1792,7 +1803,7 @@ export default function ProjectDetailPage() {
                         <Switch
                           id="allow-billable-time"
                           checked={settingsForm.allowBillableTime && (globalTimeTrackingSettings?.allowBillableTime ?? true)}
-                          disabled={!globalTimeTrackingSettings?.allowBillableTime}
+                          disabled={!globalTimeTrackingSettings?.allowBillableTime || !canUpdateProject}
                           onCheckedChange={(checked) =>
                             setSettingsForm((prev) => ({
                               ...prev,
@@ -1816,7 +1827,7 @@ export default function ProjectDetailPage() {
                         <Switch
                           id="allow-time-tracking"
                           checked={settingsForm.allowTimeTracking && (globalTimeTrackingSettings?.allowTimeTracking ?? true)}
-                          disabled={!globalTimeTrackingSettings?.allowTimeTracking}
+                          disabled={!globalTimeTrackingSettings?.allowTimeTracking || !canUpdateProject}
                           onCheckedChange={(checked) =>
                             setSettingsForm((prev) => ({
                               ...prev,
@@ -1844,7 +1855,7 @@ export default function ProjectDetailPage() {
                             <Switch
                               id="allow-manual-time-submission"
                               checked={settingsForm.allowManualTimeSubmission && (globalTimeTrackingSettings?.allowManualTimeSubmission ?? true)}
-                              disabled={!globalTimeTrackingSettings?.allowManualTimeSubmission}
+                              disabled={!globalTimeTrackingSettings?.allowManualTimeSubmission || !canUpdateProject}
                               onCheckedChange={(checked) =>
                                 setSettingsForm((prev) => ({
                                   ...prev,
@@ -1864,6 +1875,7 @@ export default function ProjectDetailPage() {
                         <Switch
                           id="allow-expense-tracking"
                           checked={settingsForm.allowExpenseTracking}
+                          disabled={!canUpdateProject}
                           onCheckedChange={(checked) =>
                             setSettingsForm((prev) => ({
                               ...prev,
@@ -1891,7 +1903,7 @@ export default function ProjectDetailPage() {
                             const isChecked = globalTimeTrackingSettings?.requireApproval === false ? false : settingsForm.requireApproval
                             return isChecked
                           })()}
-                          disabled={globalTimeTrackingSettings?.requireApproval === false}
+                          disabled={globalTimeTrackingSettings?.requireApproval === false || !canUpdateProject}
                           onCheckedChange={(checked) => {
                             setSettingsForm((prev) => ({
                               ...prev,
@@ -1904,7 +1916,7 @@ export default function ProjectDetailPage() {
                     </CardContent>
                     <CardFooter className="justify-end">
                       <Button onClick={handleSaveSettings}
-                        disabled={savingSettings || !trackingSettingsChanged}
+                        disabled={savingSettings || !trackingSettingsChanged || !canUpdateProject}
                       >
                         {savingSettings ? (
                           <>

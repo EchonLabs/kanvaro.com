@@ -67,6 +67,8 @@ interface Task {
 interface BacklogViewProps {
   projectId: string
   onCreateTask: () => void
+  onEditTask?: (task: Task) => void
+  onDeleteTask?: (taskId: string) => void
 }
 
 interface Story {
@@ -80,7 +82,7 @@ interface Story {
   }
 }
 
-export default function BacklogView({ projectId, onCreateTask }: BacklogViewProps) {
+export default function BacklogView({ projectId, onCreateTask, onEditTask, onDeleteTask }: BacklogViewProps) {
   const router = useRouter()
   const { formatDate } = useDateTime()
   const { hasPermission } = usePermissions()
@@ -95,11 +97,20 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
   const [typeFilter, setTypeFilter] = useState('all')
   const [sortBy, setSortBy] = useState('priority')
   const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
+  // Permission checks for backlog actions
+  const canEditTasks = hasPermission(Permission.TASK_EDIT_ALL)
+  const canDeleteTasks = hasPermission(Permission.TASK_DELETE_ALL)
+  const canChangeTaskStatus = hasPermission(Permission.TASK_CHANGE_STATUS)
+  const canManageProject = hasPermission(Permission.PROJECT_UPDATE)
+  const canManageBacklogItems = canEditTasks || canDeleteTasks
 
   useEffect(() => {
     fetchTasks()
     fetchStories()
-  }, [projectId, debouncedSearchQuery, priorityFilter, typeFilter])
+  }, [projectId, debouncedSearchQuery, priorityFilter, typeFilter, currentPage, pageSize])
 
   // Debounce search query to avoid excessive API calls
   useEffect(() => {
@@ -126,6 +137,8 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
       if (debouncedSearchQuery) params.set('search', debouncedSearchQuery)
       if (priorityFilter !== 'all') params.set('priority', priorityFilter)
       if (typeFilter !== 'all') params.set('type', typeFilter)
+      params.set('page', currentPage.toString())
+      params.set('limit', pageSize.toString())
 
       const url = `/api/tasks?${params.toString()}`
       const response = await fetch(url)
@@ -198,7 +211,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
     }
   }
 
-  // Sort tasks client-side (filtering is now done server-side)
+  // Sort tasks client-side (filtering is done server-side)
   const filteredAndSortedTasks = tasks
     .sort((a, b) => {
       switch (sortBy) {
@@ -218,7 +231,32 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
       }
     })
 
+  // Tasks are already paginated from the server, no need for client-side slicing
+  const paginatedTasks = filteredAndSortedTasks
+
+  // Determine if we're on the last page (API returns fewer items than requested)
+  const isLastPage = tasks.length < pageSize
+  const totalPages = isLastPage && currentPage === 1 ? 1 : currentPage + (isLastPage ? 0 : 1)
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [debouncedSearchQuery, priorityFilter, typeFilter, sortBy])
+
   const handleStatusChange = async (taskId: string, newStatus: string) => {
+    // Check permission for status change
+    if (!canChangeTaskStatus) {
+      setError('You do not have permission to change task status')
+      return
+    }
+
+    // Prevent Team Members (users without PROJECT_UPDATE) from changing backlog task status
+    const task = tasks.find(t => t._id === taskId)
+    if (task?.status === 'backlog' && !canManageProject) {
+      setError('Cannot change the status of a backlog task')
+      return
+    }
+
     // Store previous state for potential revert
     const previousTask = tasks.find(t => t._id === taskId)
     const previousStatus = previousTask?.status
@@ -528,7 +566,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
 
       {/* backlog Items */}
       <div className="space-y-8">
-        {filteredAndSortedTasks.map((task, index) => (
+        {paginatedTasks.map((task, index) => (
           <Card
             key={task._id}
             className="hover:shadow-md transition-shadow cursor-pointer"
@@ -538,7 +576,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4 flex-1">
                   <div className="text-sm font-medium text-muted-foreground w-8">
-                    #{index + 1}
+                    #{(currentPage - 1) * pageSize + index + 1}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-2">
@@ -614,8 +652,9 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
                   <Select
                     value={task.status}
                     onValueChange={(value) => handleStatusChange(task._id, value)}
+                    disabled={!canChangeTaskStatus || (task.status === 'backlog' && !canManageProject)}
                   >
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-32" disabled={!canChangeTaskStatus || (task.status === 'backlog' && !canManageProject)}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -628,28 +667,36 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>
-                        Edit Task
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        View Details
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => handleDeleteTask(task._id)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        Delete Task
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {canManageBacklogItems && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {canEditTasks && (
+                          <DropdownMenuItem onClick={() => onEditTask?.(task)}>
+                            Edit Task
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => router.push(`/tasks/${task._id}`)}>
+                          View Details
+                        </DropdownMenuItem>
+                        {canDeleteTasks && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => onDeleteTask?.(task._id)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              Delete Task
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -657,7 +704,7 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
         ))}
       </div>
 
-      {filteredAndSortedTasks.length === 0 && !loading && (
+      {paginatedTasks.length === 0 && !loading && (
         <div className="text-center py-8">
           <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">No backlog items found</p>
@@ -667,6 +714,51 @@ export default function BacklogView({ projectId, onCreateTask }: BacklogViewProp
               Create First Task
             </Button>
           )}
+        </div>
+      )}
+
+      {paginatedTasks.length > 0 && (
+        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Items per page:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(parseInt(e.target.value))
+                setCurrentPage(1)
+              }}
+              className="px-2 py-1 border rounded text-sm bg-background"
+            >
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+            </select>
+            <span>
+              Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, (currentPage - 1) * pageSize + paginatedTasks.length)} of ~{!isLastPage ? 'many' : (currentPage - 1) * pageSize + paginatedTasks.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              variant="outline"
+              size="sm"
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground px-2">
+              Page {currentPage} of {totalPages || 1}
+            </span>
+            <Button
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={currentPage >= totalPages}
+              variant="outline"
+              size="sm"
+            >
+              Next
+            </Button>
+          </div>
         </div>
       )}
     </div>

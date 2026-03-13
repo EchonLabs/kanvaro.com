@@ -9,6 +9,23 @@ import { invalidateCache } from '@/lib/redis'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { fixImagePathsInDescription } from '@/lib/image-path-utils'
+
+/** Detect MIME type from file extension */
+function getFileTypeFromPath(filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase() || ''
+  const mimeTypes: Record<string, string> = {
+    'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png', 'gif': 'image/gif',
+    'webp': 'image/webp', 'svg': 'image/svg+xml',
+    'pdf': 'application/pdf', 'doc': 'application/msword',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'xls': 'application/vnd.ms-excel',
+    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'txt': 'text/plain', 'csv': 'text/csv',
+    'zip': 'application/zip',
+  }
+  return mimeTypes[ext] || 'application/octet-stream'
+}
 
 /**
  * POST /api/tasks/bulk-csv
@@ -38,11 +55,13 @@ export async function POST(request: NextRequest) {
 
     if (action === 'resolve') {
       return handleResolve(body, organizationId)
+    } else if (action === 'check-duplicates') {
+      return handleCheckDuplicates(body, organizationId)
     } else if (action === 'create') {
       return handleCreate(body, userId, organizationId)
     } else {
       return NextResponse.json(
-        { success: false, error: 'Invalid action. Use "resolve" or "create".' },
+        { success: false, error: 'Invalid action. Use "resolve", "check-duplicates", or "create".' },
         { status: 400 }
       )
     }
@@ -144,6 +163,64 @@ async function handleResolve(
 }
 
 // ─────────────────────────────────────────────
+// Action: check-duplicates — find existing tasks matching CSV rows
+// ─────────────────────────────────────────────
+async function handleCheckDuplicates(
+  body: any,
+  organizationId: string
+) {
+  const { tasks } = body as {
+    tasks: Array<{ title: string; projectId: string; rowIndex: number }>
+  }
+
+  if (!Array.isArray(tasks) || tasks.length === 0) {
+    return NextResponse.json(
+      { success: false, error: '"tasks" must be a non-empty array' },
+      { status: 400 }
+    )
+  }
+
+  // Group by project for efficient querying
+  const byProject = new Map<string, Array<{ title: string; rowIndex: number }>>()
+  for (const t of tasks) {
+    if (!t.title || !t.projectId) continue
+    const list = byProject.get(t.projectId) || []
+    list.push({ title: t.title.trim(), rowIndex: t.rowIndex })
+    byProject.set(t.projectId, list)
+  }
+
+  // For each project, find existing tasks with matching titles
+  const duplicates: Record<number, string> = {} // rowIndex → existing task displayId
+
+  for (const [projectId, rows] of Array.from(byProject.entries())) {
+    const titles = rows.map(r => r.title)
+    const existingTasks = await Task.find({
+      project: projectId,
+      organization: organizationId,
+      title: { $in: titles.map(t => new RegExp(`^${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')) }
+    }).select('title displayId').lean() as unknown as Array<{ title: string; displayId?: string }>
+
+    if (existingTasks.length > 0) {
+      const existingMap = new Map<string, string>()
+      for (const et of existingTasks) {
+        existingMap.set(et.title.toLowerCase(), et.displayId || et.title)
+      }
+      for (const row of rows) {
+        const match = existingMap.get(row.title.toLowerCase())
+        if (match) {
+          duplicates[row.rowIndex] = match
+        }
+      }
+    }
+  }
+
+  return NextResponse.json({
+    success: true,
+    data: { duplicates }
+  })
+}
+
+// ─────────────────────────────────────────────
 // Action: create — bulk-create tasks from validated CSV payload
 // ─────────────────────────────────────────────
 async function handleCreate(
@@ -180,7 +257,7 @@ async function handleCreate(
       )
     }
 
-    const { title, description, status, priority, type, project, assignedTo, dueDate, estimatedHours, labels, isBillable } = item
+    const { title, description, status, priority, type, project, assignedTo, dueDate, estimatedHours, labels, isBillable, createdAt: taskCreatedAt, assignedBy, attachments: taskAttachments, subtasks: taskSubtasks, comments: taskComments } = item
 
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return NextResponse.json(
@@ -198,7 +275,7 @@ async function handleCreate(
 
     tasksToCreate.push({
       title: title.trim(),
-      description: typeof description === 'string' ? description.trim() : '',
+      description: typeof description === 'string' ? fixImagePathsInDescription(description.trim()) : '',
       status: typeof status === 'string' && status.trim().length > 0 ? status.trim() : 'backlog',
       priority: typeof priority === 'string' && ['low', 'medium', 'high', 'critical'].includes(priority) ? priority : 'medium',
       type: typeof type === 'string' && ['bug', 'feature', 'improvement', 'task', 'subtask'].includes(type) ? type : 'task',
@@ -207,7 +284,12 @@ async function handleCreate(
       dueDate: dueDate ? new Date(dueDate) : undefined,
       estimatedHours: typeof estimatedHours === 'number' ? estimatedHours : undefined,
       labels: Array.isArray(labels) ? labels.filter((l: unknown) => typeof l === 'string') : [],
-      isBillable: typeof isBillable === 'boolean' ? isBillable : undefined
+      isBillable: typeof isBillable === 'boolean' ? isBillable : undefined,
+      createdAt: taskCreatedAt ? new Date(taskCreatedAt) : undefined,
+      assignedBy: typeof assignedBy === 'string' && assignedBy.match(/^[0-9a-fA-F]{24}$/) ? assignedBy : undefined,
+      attachments: Array.isArray(taskAttachments) ? taskAttachments : [],
+      subtasks: Array.isArray(taskSubtasks) ? taskSubtasks : [],
+      comments: Array.isArray(taskComments) ? taskComments : [],
     })
     projectIds.add(project.trim())
   }
@@ -289,15 +371,49 @@ async function handleCreate(
       taskNumber: counter.seq,
       displayId: `${projectInfo.projectNumber}.${counter.seq}`,
       assignedTo: taskData.assignedTo,
-      createdBy: userId,
+      createdBy: taskData.assignedBy || userId,
       dueDate: taskData.dueDate,
       estimatedHours: taskData.estimatedHours,
       labels: taskData.labels,
       position: nextPosition,
-      isBillable: taskData.isBillable ?? projectInfo.isBillableByDefault ?? true
+      isBillable: taskData.isBillable ?? projectInfo.isBillableByDefault ?? true,
+      ...(taskData.assignedBy && { assignedBy: taskData.assignedBy }),
+      ...(taskData.attachments.length > 0 && {
+        attachments: taskData.attachments.map((a: any) => ({
+          name: a.name || 'attachment',
+          url: a.url,
+          size: 0,
+          type: getFileTypeFromPath(a.url || a.name || ''),
+          uploadedBy: userId,
+          uploadedAt: new Date()
+        }))
+      }),
+      ...(taskData.subtasks.length > 0 && {
+        subtasks: taskData.subtasks
+          .filter((s: any) => typeof s.title === 'string' && s.title.trim().length > 0)
+          .map((s: any) => ({
+            title: s.title.trim().slice(0, 200),
+            status: 'backlog',
+            isCompleted: false
+          }))
+      }),
+      ...(taskData.comments.length > 0 && {
+        comments: taskData.comments
+          .filter((c: any) => typeof c.content === 'string' && c.content.trim().length > 0)
+          .map((c: any) => ({
+            content: c.content.trim(),
+            author: userId,
+            createdAt: new Date()
+          }))
+      }),
     })
 
-    await task.save()
+    // Override createdAt if provided from CSV
+    if (taskData.createdAt) {
+      task.createdAt = taskData.createdAt
+    }
+
+    await task.save({ timestamps: !taskData.createdAt })
     createdTasks.push(task)
   }
 

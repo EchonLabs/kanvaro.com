@@ -35,6 +35,7 @@ import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import EditTaskModal from './EditTaskModal'
 import ViewTaskModal from './ViewTaskModal'
 import CreateTaskModal from './CreateTaskModal'
+import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 
 interface Task {
   _id: string
@@ -81,6 +82,8 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   const { hasPermission } = usePermissions()
   const canEditTask = hasPermission(Permission.TASK_UPDATE, projectId)
   const canDeleteTask = hasPermission(Permission.TASK_DELETE, projectId)
+  const canChangeTaskStatus = hasPermission(Permission.TASK_CHANGE_STATUS, projectId)
+  const canManageProject = hasPermission(Permission.PROJECT_UPDATE, projectId)
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -94,6 +97,8 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [availableStatuses, setAvailableStatuses] = useState<string[]>(['todo', 'in_progress', 'review', 'testing', 'done', 'cancelled', 'backlog'])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const fetchProjectStatuses = async (projId: string) => {
     if (projId === 'all') {
@@ -141,13 +146,21 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   useEffect(() => {
     fetchTasks()
     fetchProjectStatuses(projectId)
-  }, [projectId])
+  }, [projectId, currentPage, pageSize])
 
   const fetchTasks = async () => {
     try {
       setLoading(true)
       // Handle "all" case by not passing project parameter
-      const url = projectId === 'all' ? '/api/tasks' : `/api/tasks?project=${projectId}`
+      const params = new URLSearchParams()
+      params.set('page', currentPage.toString())
+      params.set('limit', pageSize.toString())
+      if (projectId !== 'all') params.set('project', projectId)
+      if (searchQuery) params.set('search', searchQuery)
+      if (statusFilter !== 'all') params.set('status', statusFilter)
+      if (priorityFilter !== 'all') params.set('priority', priorityFilter)
+      if (typeFilter !== 'all') params.set('type', typeFilter)
+      const url = `/api/tasks?${params.toString()}`
       const response = await fetch(url)
       const data = await response.json()
 
@@ -210,19 +223,37 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
     }
   }
 
-  const filteredTasks = tasks.filter(task => {
-    const matchesSearch = !searchQuery ||
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.description.toLowerCase().includes(searchQuery.toLowerCase())
+  // Tasks are already paginated and filtered from the server
+  const paginatedTasks = tasks
 
-    const matchesStatus = statusFilter === 'all' || task.status === statusFilter
-    const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
-    const matchesType = typeFilter === 'all' || task.type === typeFilter
+  // Determine if we're on the last page (API returns fewer items than requested)
+  const isLastPage = tasks.length < pageSize
+  const totalPages = isLastPage && currentPage === 1 ? 1 : currentPage + (isLastPage ? 0 : 1)
 
-    return matchesSearch && matchesStatus && matchesPriority && matchesType
-  })
+  // Refetch when pagination or filters change
+  useEffect(() => {
+    fetchTasks()
+  }, [currentPage, pageSize, searchQuery, statusFilter, priorityFilter, typeFilter])
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, statusFilter, priorityFilter, typeFilter])
 
   const handleStatusChange = async (taskId: string, newStatus: string) => {
+    // Check permission for status change
+    if (!canChangeTaskStatus) {
+      notifyError({ title: 'Error', message: 'You do not have permission to change task status' })
+      return
+    }
+
+    // Prevent Team Members (users without PROJECT_UPDATE) from changing backlog task status
+    const task = tasks.find(t => t._id === taskId)
+    if (task?.status === 'backlog' && !canManageProject) {
+      notifyError({ title: 'Error', message: 'Cannot change the status of a backlog task' })
+      return
+    }
+
     // Store previous state for potential revert
     const previousTask = tasks.find(t => t._id === taskId)
     const previousStatus = previousTask?.status
@@ -383,7 +414,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         <div className="flex-1 min-w-0">
           <h3 className="text-xl sm:text-2xl font-semibold text-foreground">Project Tasks</h3>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} found
+            {paginatedTasks.length} task{paginatedTasks.length !== 1 ? 's' : ''} {!isLastPage ? '(showing current page)' : ''}
           </p>
         </div>
         {/* <Button onClick={handleCreateTaskClick} className="w-full sm:w-auto">
@@ -444,7 +475,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
       </div>
 
       <div className="space-y-8 mt-12">
-        {filteredTasks.map((task) => (
+        {paginatedTasks.map((task) => (
           <Card
             key={task._id}
             className="hover:shadow-md transition-shadow cursor-pointer "
@@ -481,28 +512,29 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                   </div>
                   <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                     {task.assignedTo && task.assignedTo.length > 0 ? (
-                      <div className="flex items-center space-x-1 flex-wrap gap-1">
-                        <User className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                        <div className="flex flex-wrap gap-1">
-                          {task.assignedTo.map((assignee, idx) => {
-                            // Try to get user data from populated user field first, then from denormalized fields
-                            const firstName = assignee?.user?.firstName || assignee?.firstName || '';
-                            const lastName = assignee?.user?.lastName || assignee?.lastName || '';
-                            const email = assignee?.user?.email || assignee?.email || '';
-                            const displayName = `${firstName} ${lastName}`.trim();
+                      <div className="flex items-center -space-x-1.5">
+                        {task.assignedTo.slice(0, 3).map((assignee, idx) => {
+                          const firstName = assignee?.user?.firstName || assignee?.firstName || '';
+                          const lastName = assignee?.user?.lastName || assignee?.lastName || '';
+                          const email = assignee?.user?.email || assignee?.email || '';
+                          const avatar = (assignee?.user as any)?.avatar || (assignee as any)?.avatar;
+                          const displayName = `${firstName} ${lastName}`.trim();
 
-                            return (
-                              <Badge
-                                key={assignee?.user?._id || assignee?._id || idx}
-                                variant="secondary"
-                                className="text-xs px-2 py-0.5"
-                                title={`${displayName} (${email})`}
-                              >
-                                {displayName || 'Unknown User'}
-                              </Badge>
-                            );
-                          })}
-                        </div>
+                          return (
+                            <div key={assignee?.user?._id || assignee?._id || idx} title={`${displayName} (${email})`}>
+                              <GravatarAvatar
+                                user={{ avatar, firstName, lastName, email }}
+                                size={24}
+                                className="border-2 border-background"
+                              />
+                            </div>
+                          );
+                        })}
+                        {task.assignedTo.length > 3 && (
+                          <div className="flex items-center justify-center h-6 w-6 rounded-full bg-muted border-2 border-background text-[10px] font-medium text-muted-foreground">
+                            +{task.assignedTo.length - 3}
+                          </div>
+                        )}
                       </div>
                     ) : null}
                     {task.dueDate && (
@@ -538,8 +570,9 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                   <Select
                     value={task.status}
                     onValueChange={(value) => handleStatusChange(task._id, value)}
+                    disabled={!canChangeTaskStatus || (task.status === 'backlog' && !canManageProject)}
                   >
-                    <SelectTrigger className="w-full sm:w-32">
+                    <SelectTrigger className="w-full sm:w-32" disabled={!canChangeTaskStatus || (task.status === 'backlog' && !canManageProject)}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -587,7 +620,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         ))}
       </div>
 
-      {filteredTasks.length === 0 && !loading && (
+      {paginatedTasks.length === 0 && !loading && (
         <div className="text-center py-8">
           <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">No tasks found</p>
@@ -597,6 +630,51 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
               Create First Task
             </Button>
           )}
+        </div>
+      )}
+
+      {paginatedTasks.length > 0 && (
+        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Items per page:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(parseInt(e.target.value))
+                setCurrentPage(1)
+              }}
+              className="px-2 py-1 border rounded text-sm bg-background"
+            >
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+            </select>
+            <span>
+              Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, (currentPage - 1) * pageSize + paginatedTasks.length)} of ~{!isLastPage ? 'many' : (currentPage - 1) * pageSize + paginatedTasks.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              variant="outline"
+              size="sm"
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground px-2">
+              Page {currentPage} of {totalPages || 1}
+            </span>
+            <Button
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={currentPage >= totalPages}
+              variant="outline"
+              size="sm"
+            >
+              Next
+            </Button>
+          </div>
         </div>
       )}
 
