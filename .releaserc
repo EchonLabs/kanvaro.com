@@ -2,7 +2,17 @@
   "branches": ["main"],
   "repositoryUrl": "https://github.com/EchonLabs/kanvaro.com.git",
   "plugins": [
-    "@semantic-release/commit-analyzer",
+    [
+      "@semantic-release/commit-analyzer",
+      {
+        "preset": "conventionalcommits",
+        "releaseRules": [
+          { "type": "hotfix", "release": "patch" },
+          { "type": "bugfix", "release": "patch" },
+          { "type": "feature", "release": "minor" }
+        ]
+      }
+    ],
     "@semantic-release/release-notes-generator",
     [
       "@semantic-release/changelog",
