@@ -882,7 +882,7 @@ export default function EditTaskPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-4xl mx-auto space-y-4">
+      <div className="w-full max-w-3xl mx-auto space-y-4">
         <Button variant="ghost" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
@@ -891,7 +891,7 @@ export default function EditTaskPage() {
           <CardHeader>
             <CardTitle>Edit Task</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-6 overflow-x-hidden">
             <div className="grid gap-4 min-w-0">
             <div>
                   <label className="text-sm font-medium flex items-center gap-2">
@@ -995,7 +995,7 @@ export default function EditTaskPage() {
                 </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
+                <div className="min-w-0">
                   <label className="text-sm font-medium">Status</label>
                   <Select value={task.status} onValueChange={(v) => setTask((prev) => prev ? ({ ...prev, status: v as TaskStatus }) : prev)} disabled={!taskHasSprint}>
                     <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
@@ -1006,7 +1006,7 @@ export default function EditTaskPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className="text-sm font-medium">Priority</label>
                   <Select value={task.priority} onValueChange={(v) => setTask((prev) => prev ? ({ ...prev, priority: v as TaskPriority }) : prev)}>
                     <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
@@ -1018,7 +1018,7 @@ export default function EditTaskPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className="text-sm font-medium">Type</label>
                   <Select value={task.type} onValueChange={(v) => setTask((prev) => prev ? ({ ...prev, type: v as TaskType }) : prev)}>
                     <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
@@ -1147,7 +1147,7 @@ export default function EditTaskPage() {
 
               {task.project && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
+                  <div className="min-w-0">
                     <label className="text-sm font-medium">User Story</label>
                     <Select 
                       value={task.story || ''} 
@@ -1205,7 +1205,7 @@ export default function EditTaskPage() {
                     </Select>
                   </div>
 
-                  <div>
+                  <div className="min-w-0">
                     <label className="text-sm font-medium">Epic</label>
                     <Select 
                       value={task.epic || ''} 
@@ -1280,7 +1280,7 @@ export default function EditTaskPage() {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div className="min-w-0">
                   <label className="text-sm font-medium flex items-center gap-2">
                     <Clock className="h-4 w-4" />
                     Estimated Hours
@@ -1316,7 +1316,7 @@ export default function EditTaskPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div className="min-w-0">
                   <label className="text-sm font-medium flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     Due Date
@@ -1329,7 +1329,7 @@ export default function EditTaskPage() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between min-w-0">
                   <div>
                     <label className="text-sm font-medium text-foreground">Billable</label>
                     <p className="text-xs text-muted-foreground">Override project default for this task.</p>
@@ -1341,7 +1341,7 @@ export default function EditTaskPage() {
                   />
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <label className="text-sm font-medium">Labels</label>
                   <Input
                     value={labelsInput}
