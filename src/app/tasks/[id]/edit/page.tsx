@@ -882,17 +882,17 @@ export default function EditTaskPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-3xl mx-auto space-y-4">
+      <div className="max-w-3xl mx-auto space-y-4 overflow-hidden">
         <Button variant="ghost" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
 
-        <Card>
+        <Card className="overflow-hidden">
           <CardHeader>
             <CardTitle>Edit Task</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid gap-4">
+            <div className="grid gap-4 min-w-0">
             <div>
                   <label className="text-sm font-medium flex items-center gap-2">
                     <Target className="h-4 w-4" />

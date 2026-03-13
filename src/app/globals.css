@@ -199,6 +199,13 @@
   z-index: 1;
 }
 
+/* Rich Text Editor image constraints */
+.rich-text-editor img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
 /* Rich Text Editor List Styles */
 .rich-text-editor ul {
   padding-left: 1.5rem;
