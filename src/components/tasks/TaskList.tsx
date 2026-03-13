@@ -82,6 +82,8 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   const { hasPermission } = usePermissions()
   const canEditTask = hasPermission(Permission.TASK_UPDATE, projectId)
   const canDeleteTask = hasPermission(Permission.TASK_DELETE, projectId)
+  const canChangeTaskStatus = hasPermission(Permission.TASK_CHANGE_STATUS, projectId)
+  const canManageProject = hasPermission(Permission.PROJECT_UPDATE, projectId)
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -239,6 +241,19 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   }, [searchQuery, statusFilter, priorityFilter, typeFilter])
 
   const handleStatusChange = async (taskId: string, newStatus: string) => {
+    // Check permission for status change
+    if (!canChangeTaskStatus) {
+      notifyError({ title: 'Error', message: 'You do not have permission to change task status' })
+      return
+    }
+
+    // Prevent Team Members (users without PROJECT_UPDATE) from changing backlog task status
+    const task = tasks.find(t => t._id === taskId)
+    if (task?.status === 'backlog' && !canManageProject) {
+      notifyError({ title: 'Error', message: 'Cannot change the status of a backlog task' })
+      return
+    }
+
     // Store previous state for potential revert
     const previousTask = tasks.find(t => t._id === taskId)
     const previousStatus = previousTask?.status
@@ -555,8 +570,9 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                   <Select
                     value={task.status}
                     onValueChange={(value) => handleStatusChange(task._id, value)}
+                    disabled={!canChangeTaskStatus || (task.status === 'backlog' && !canManageProject)}
                   >
-                    <SelectTrigger className="w-full sm:w-32">
+                    <SelectTrigger className="w-full sm:w-32" disabled={!canChangeTaskStatus || (task.status === 'backlog' && !canManageProject)}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
