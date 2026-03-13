@@ -195,6 +195,7 @@ export default function KanbanBoard({ projectId, filters, onProjectChange, onCre
       setLoading(true)
 
       const params = new URLSearchParams()
+      params.set('limit', '1000')
 
       if (filters?.search) params.set('search', filters.search)
       if (filters?.status && filters.status !== 'all') params.set('status', filters.status)
