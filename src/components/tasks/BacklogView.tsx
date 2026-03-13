@@ -103,6 +103,8 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
   // Permission checks for backlog actions
   const canEditTasks = hasPermission(Permission.TASK_EDIT_ALL)
   const canDeleteTasks = hasPermission(Permission.TASK_DELETE_ALL)
+  const canChangeTaskStatus = hasPermission(Permission.TASK_CHANGE_STATUS)
+  const canManageProject = hasPermission(Permission.PROJECT_UPDATE)
   const canManageBacklogItems = canEditTasks || canDeleteTasks
 
   useEffect(() => {
@@ -242,6 +244,19 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
   }, [debouncedSearchQuery, priorityFilter, typeFilter, sortBy])
 
   const handleStatusChange = async (taskId: string, newStatus: string) => {
+    // Check permission for status change
+    if (!canChangeTaskStatus) {
+      setError('You do not have permission to change task status')
+      return
+    }
+
+    // Prevent Team Members (users without PROJECT_UPDATE) from changing backlog task status
+    const task = tasks.find(t => t._id === taskId)
+    if (task?.status === 'backlog' && !canManageProject) {
+      setError('Cannot change the status of a backlog task')
+      return
+    }
+
     // Store previous state for potential revert
     const previousTask = tasks.find(t => t._id === taskId)
     const previousStatus = previousTask?.status
@@ -637,8 +652,9 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
                   <Select
                     value={task.status}
                     onValueChange={(value) => handleStatusChange(task._id, value)}
+                    disabled={!canChangeTaskStatus || (task.status === 'backlog' && !canManageProject)}
                   >
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-32" disabled={!canChangeTaskStatus || (task.status === 'backlog' && !canManageProject)}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
