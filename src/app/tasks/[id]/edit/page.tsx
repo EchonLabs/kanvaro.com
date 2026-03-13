@@ -891,7 +891,7 @@ export default function EditTaskPage() {
           <CardHeader>
             <CardTitle>Edit Task</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6 overflow-x-hidden">
+          <CardContent className="space-y-6">
             <div className="grid gap-4 min-w-0">
             <div>
                   <label className="text-sm font-medium flex items-center gap-2">
@@ -994,7 +994,7 @@ export default function EditTaskPage() {
                   Maximum 10,000 characters.
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="min-w-0">
                   <label className="text-sm font-medium">Status</label>
                   <Select value={task.status} onValueChange={(v) => setTask((prev) => prev ? ({ ...prev, status: v as TaskStatus }) : prev)} disabled={!taskHasSprint}>
@@ -1146,7 +1146,7 @@ export default function EditTaskPage() {
               </div>
 
               {task.project && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <div className="min-w-0">
                     <label className="text-sm font-medium">User Story</label>
                     <Select 
@@ -1279,7 +1279,7 @@ export default function EditTaskPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="min-w-0">
                   <label className="text-sm font-medium flex items-center gap-2">
                     <Clock className="h-4 w-4" />
@@ -1315,7 +1315,7 @@ export default function EditTaskPage() {
                 </div> */}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="min-w-0">
                   <label className="text-sm font-medium flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
@@ -1424,7 +1424,7 @@ export default function EditTaskPage() {
                     </Button>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-2">
+                  <div className="grid gap-3 lg:grid-cols-2">
                     <div>
                       <label className="text-sm font-medium">Title *</label>
                       <Input
