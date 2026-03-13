@@ -741,7 +741,7 @@ export function RichTextEditor({
         onKeyUp={updateActiveStates}
         onPaste={handlePaste}
         className={cn(
-          'rich-text-editor min-h-[120px] p-3 focus:outline-none prose prose-sm max-w-none',
+          'rich-text-editor min-h-[120px] p-3 focus:outline-none prose prose-sm max-w-none overflow-x-hidden',
           'prose-headings:font-semibold prose-headings:text-foreground',
           'prose-p:text-foreground prose-p:leading-relaxed',
           'prose-strong:font-semibold prose-strong:text-foreground',
