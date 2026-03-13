@@ -49,7 +49,9 @@ export function RichTextEditor({
   showCharCount = false
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
+  const savedRangeRef = useRef<Range | null>(null)
   const [isActive, setIsActive] = useState<Record<string, boolean>>({})
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
 
   const execCommand = useCallback((command: string, value: string = '') => {
     if (disabled) return
@@ -75,6 +77,28 @@ export function RichTextEditor({
     handleInput()
   }, [disabled])  // eslint-disable-line react-hooks/exhaustive-deps
 
+  const saveSelection = useCallback(() => {
+    const selection = window.getSelection()
+    if (selection && selection.rangeCount > 0 && editorRef.current) {
+      const range = selection.getRangeAt(0)
+      if (editorRef.current.contains(range.commonAncestorContainer)) {
+        savedRangeRef.current = range.cloneRange()
+      }
+    }
+  }, [])
+
+  const restoreSelection = useCallback(() => {
+    const range = savedRangeRef.current
+    if (range && editorRef.current) {
+      editorRef.current.focus()
+      const selection = window.getSelection()
+      if (selection) {
+        selection.removeAllRanges()
+        selection.addRange(range)
+      }
+    }
+  }, [])
+
   const updateActiveStates = useCallback(() => {
     if (!editorRef.current) return
 
@@ -85,8 +109,9 @@ export function RichTextEditor({
       newStates[command] = document.queryCommandState(command)
     })
 
+    saveSelection()
     setIsActive(newStates)
-  }, [])
+  }, [saveSelection])
 
   const stripHtml = useCallback((html: string): string => {
     const tmp = document.createElement('div')
@@ -128,6 +153,9 @@ export function RichTextEditor({
 
   const insertUnorderedList = useCallback((listType: string = 'disc') => {
     if (disabled || !editorRef.current) return
+
+    // Restore saved selection first (dropdown click may have cleared it)
+    restoreSelection()
 
     const selection = window.getSelection()
     if (!selection || selection.rangeCount === 0) return
@@ -187,28 +215,51 @@ export function RichTextEditor({
     const container = document.createElement('div')
     container.appendChild(range.cloneContents())
 
-    // Extract lines properly (div, p, br, li)
+    // Extract lines properly - handles div, p, br, li, and mixed inline content
     let lines: string[] = []
+    let currentLine = ''
+
+    const flushLine = () => {
+      const trimmed = currentLine.trim()
+      if (trimmed) lines.push(trimmed)
+      currentLine = ''
+    }
 
     const extractText = (node: Node) => {
       if (node.nodeName === 'LI') {
-        const text = (node as HTMLElement).innerText.trim()
+        flushLine()
+        const text = (node as HTMLElement).innerHTML
         if (text) lines.push(text)
       } else if (node.nodeName === 'DIV' || node.nodeName === 'P') {
-        const text = (node as HTMLElement).innerText.trim()
-        if (text) lines.push(text)
+        flushLine()
+        const el = node as HTMLElement
+        // Check if the block element itself contains BR-separated content
+        if (el.querySelector('br')) {
+          el.childNodes.forEach(child => extractText(child))
+        } else {
+          const text = el.innerText.trim()
+          if (text) lines.push(text)
+        }
+        flushLine()
       } else if (node.nodeName === 'BR') {
-        // ignore empty lines
+        flushLine()
       } else if (node.nodeName === 'UL' || node.nodeName === 'OL') {
-        // Extract list items
+        flushLine()
         node.childNodes.forEach(child => extractText(child))
       } else {
-        const text = node.textContent?.trim()
-        if (text) lines.push(text)
+        // Inline text node or inline element
+        const text = node.textContent || ''
+        currentLine += text
       }
     }
 
     container.childNodes.forEach(node => extractText(node))
+    flushLine()
+
+    // Fallback: if we got a single line that contains newlines, split it
+    if (lines.length === 1 && lines[0].includes('\n')) {
+      lines = lines[0].split('\n').map(l => l.trim()).filter(l => l)
+    }
 
     if (lines.length > 0) {
       const listItems = lines
@@ -224,10 +275,13 @@ export function RichTextEditor({
     }
 
     handleInput()
-  }, [disabled, handleInput])
+  }, [disabled, handleInput, restoreSelection])
 
   const insertOrderedList = useCallback((listType: string = 'decimal') => {
     if (disabled || !editorRef.current) return
+
+    // Restore saved selection first (dropdown click may have cleared it)
+    restoreSelection()
 
     const selection = window.getSelection()
     if (!selection || selection.rangeCount === 0) return
@@ -287,28 +341,49 @@ export function RichTextEditor({
     const container = document.createElement('div')
     container.appendChild(range.cloneContents())
 
-    // Extract lines properly (div, p, br, li)
+    // Extract lines properly - handles div, p, br, li, and mixed inline content
     let lines: string[] = []
+    let currentLine = ''
+
+    const flushLine = () => {
+      const trimmed = currentLine.trim()
+      if (trimmed) lines.push(trimmed)
+      currentLine = ''
+    }
 
     const extractText = (node: Node) => {
       if (node.nodeName === 'LI') {
-        const text = (node as HTMLElement).innerText.trim()
+        flushLine()
+        const text = (node as HTMLElement).innerHTML
         if (text) lines.push(text)
       } else if (node.nodeName === 'DIV' || node.nodeName === 'P') {
-        const text = (node as HTMLElement).innerText.trim()
-        if (text) lines.push(text)
+        flushLine()
+        const el = node as HTMLElement
+        if (el.querySelector('br')) {
+          el.childNodes.forEach(child => extractText(child))
+        } else {
+          const text = el.innerText.trim()
+          if (text) lines.push(text)
+        }
+        flushLine()
       } else if (node.nodeName === 'BR') {
-        // ignore
+        flushLine()
       } else if (node.nodeName === 'UL' || node.nodeName === 'OL') {
-        // Extract list items
+        flushLine()
         node.childNodes.forEach(child => extractText(child))
       } else {
-        const text = node.textContent?.trim()
-        if (text) lines.push(text)
+        const text = node.textContent || ''
+        currentLine += text
       }
     }
 
     container.childNodes.forEach(node => extractText(node))
+    flushLine()
+
+    // Fallback: if we got a single line that contains newlines, split it
+    if (lines.length === 1 && lines[0].includes('\n')) {
+      lines = lines[0].split('\n').map(l => l.trim()).filter(l => l)
+    }
 
     if (lines.length > 0) {
       const listItems = lines
@@ -324,6 +399,57 @@ export function RichTextEditor({
     }
 
     handleInput()
+  }, [disabled, handleInput, restoreSelection])
+
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+    if (disabled || !editorRef.current) return
+
+    const clipboardData = e.clipboardData
+    if (!clipboardData) return
+
+    // Check if clipboard has image files
+    const items = Array.from(clipboardData.items)
+    const imageItem = items.find(item => item.type.startsWith('image/'))
+
+    if (imageItem) {
+      e.preventDefault()
+      const file = imageItem.getAsFile()
+      if (!file) return
+
+      // Validate file size (25MB max)
+      if (file.size > 25 * 1024 * 1024) {
+        return
+      }
+
+      setIsUploadingImage(true)
+
+      try {
+        const formData = new FormData()
+        formData.append('attachment', file)
+
+        const response = await fetch('/api/uploads/attachments', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          if (result.success && result.data?.url) {
+            const imgHTML = `<img src="${result.data.url}" alt="${result.data.name || 'Pasted image'}" style="max-width: 100%; height: auto;" />`
+            editorRef.current?.focus()
+            document.execCommand('insertHTML', false, imgHTML)
+            handleInput()
+          }
+        } else {
+          const errorData = await response.json().catch(() => ({}))
+          console.error('Upload failed:', errorData.error || response.statusText)
+        }
+      } catch (error) {
+        console.error('Failed to upload pasted image:', error)
+      } finally {
+        setIsUploadingImage(false)
+      }
+    }
   }, [disabled, handleInput])
 
   const fontSizes = [
@@ -400,9 +526,9 @@ export function RichTextEditor({
   }, [value])
 
   return (
-    <div className={cn('border rounded-md', className)}>
+    <div className={cn('border rounded-md overflow-hidden', className)}>
       {/* Toolbar */}
-      <div className="flex items-center gap-1 p-2 border-b bg-muted/50">
+      <div className="flex flex-wrap items-center gap-1 p-2 border-b bg-muted/50">
         <Button
           type="button"
           variant="ghost"
@@ -598,6 +724,13 @@ export function RichTextEditor({
         </DropdownMenu>
       </div>
 
+      {/* Upload indicator */}
+      {isUploadingImage && (
+        <div className="px-3 py-1 text-xs text-muted-foreground bg-muted/30 border-b">
+          Uploading image...
+        </div>
+      )}
+
       {/* Editor */}
       <div
         ref={editorRef}
@@ -606,8 +739,9 @@ export function RichTextEditor({
         onKeyDown={handleKeyDown}
         onMouseUp={updateActiveStates}
         onKeyUp={updateActiveStates}
+        onPaste={handlePaste}
         className={cn(
-          'rich-text-editor min-h-[120px] p-3 focus:outline-none prose prose-sm max-w-none',
+          'rich-text-editor min-h-[120px] p-3 focus:outline-none prose prose-sm max-w-none overflow-x-hidden',
           'prose-headings:font-semibold prose-headings:text-foreground',
           'prose-p:text-foreground prose-p:leading-relaxed',
           'prose-strong:font-semibold prose-strong:text-foreground',

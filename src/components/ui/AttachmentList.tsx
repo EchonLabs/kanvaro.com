@@ -100,73 +100,112 @@ export function AttachmentList({
 
   return (
     <div className={cn('space-y-2', className)}>
-      {attachments.map((attachment, index) => (
-        <Card key={index} className="p-3">
-          <CardContent className="p-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3 flex-1 min-w-0">
-                <div className="flex-shrink-0">
-                  {getFileIcon(attachment.type)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">
-                    {attachment.name}
-                  </p>
-                  <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                    <span>{formatFileSize(attachment.size)}</span>
-                    <span>•</span>
-                    <span className="flex items-center">
-                      <Calendar className="h-3 w-3 mr-1" />
-                      {formatDistanceToNow(new Date(attachment.uploadedAt), { addSuffix: true })}
-                    </span>
-                    <span>•</span>
-                    <span className="flex items-center">
-                      <User className="h-3 w-3 mr-1" />
-                      {attachment.uploadedBy}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-1">
-                {isImage(attachment.type) && (
+      {/* Image attachments - show as thumbnail grid */}
+      {attachments.some(a => isImage(a.type)) && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {attachments.filter(a => isImage(a.type)).map((attachment, idx) => {
+            const originalIndex = attachments.indexOf(attachment)
+            return (
+              <div key={`img-${idx}`} className="relative group rounded-lg border overflow-hidden bg-muted/30">
+                <img
+                  src={attachment.url}
+                  alt={attachment.name}
+                  className="w-full h-32 object-cover cursor-pointer transition-opacity group-hover:opacity-80"
+                  onClick={() => setPreviewUrl(attachment.url)}
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => handlePreview(attachment)}
-                    className="h-8 w-8 p-0"
+                    onClick={() => setPreviewUrl(attachment.url)}
+                    className="h-8 w-8 p-0 text-white hover:text-white hover:bg-white/20"
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
-                )}
-                
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDownload(attachment)}
-                  className="h-8 w-8 p-0"
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
-                
-                {canDelete && onDelete && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => onDelete(index)}
-                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                    onClick={() => handleDownload(attachment)}
+                    className="h-8 w-8 p-0 text-white hover:text-white hover:bg-white/20"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Download className="h-4 w-4" />
                   </Button>
-                )}
+                  {canDelete && onDelete && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onDelete(originalIndex)}
+                      className="h-8 w-8 p-0 text-red-300 hover:text-red-300 hover:bg-white/20"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <div className="px-2 py-1">
+                  <p className="text-[11px] text-muted-foreground truncate">{attachment.name}</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+            )
+          })}
+        </div>
+      )}
+
+      {/* Non-image attachments - show as file list (name only) */}
+      {attachments.filter(a => !isImage(a.type)).map((attachment, idx) => {
+        const originalIndex = attachments.indexOf(attachment)
+        return (
+          <Card key={`file-${idx}`} className="p-3">
+            <CardContent className="p-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3 flex-1 min-w-0">
+                  <div className="flex-shrink-0">
+                    {getFileIcon(attachment.type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {attachment.name}
+                    </p>
+                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                      {attachment.size > 0 && (
+                        <>
+                          <span>{formatFileSize(attachment.size)}</span>
+                          <span>•</span>
+                        </>
+                      )}
+                      <span className="flex items-center">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        {formatDistanceToNow(new Date(attachment.uploadedAt), { addSuffix: true })}
+                      </span>
+                      <span>•</span>
+                      <span className="flex items-center">
+                        <User className="h-3 w-3 mr-1" />
+                        {attachment.uploadedBy}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-1">
+                  {canDelete && onDelete && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onDelete(originalIndex)}
+                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })}
 
       {/* Image Preview Modal */}
       {previewUrl && (

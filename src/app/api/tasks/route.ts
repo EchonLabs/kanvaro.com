@@ -12,6 +12,7 @@ import { notificationService } from '@/lib/notification-service'
 import { cache, invalidateCache } from '@/lib/redis'
 import crypto from 'crypto'
 import { Counter } from '@/models/Counter'
+import { logTaskActivity } from '@/lib/task-activity-logger'
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -363,7 +364,7 @@ export async function GET(request: NextRequest) {
     // Use minimal population for story detail view to improve performance
     const populatePaths = minimal ? [] : [
       { path: 'project', select: '_id name' },
-      { path: 'assignedTo.user', select: '_id firstName lastName email' },
+      { path: 'assignedTo.user', select: '_id firstName lastName email avatar' },
       { path: 'createdBy', select: 'firstName lastName email' },
       { path: 'movedFromSprint', select: '_id name' }
     ];
@@ -647,6 +648,15 @@ export async function POST(request: NextRequest) {
       message: 'Task created successfully',
       data: populatedTask
     }
+
+    // Log task creation activity (non-blocking)
+    logTaskActivity({
+      taskId: String(task._id),
+      organizationId: String(user.organization),
+      userId,
+      action: 'created',
+      newValue: task.status
+    }).catch(err => console.error('Failed to log task creation activity:', err))
 
     // Invalidate tasks cache for this organization (non-blocking)
     invalidateCache(`tasks:*:org:${user.organization}:*`).catch(err => {

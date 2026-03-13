@@ -35,6 +35,7 @@ import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import EditTaskModal from './EditTaskModal'
 import ViewTaskModal from './ViewTaskModal'
 import CreateTaskModal from './CreateTaskModal'
+import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 
 interface Task {
   _id: string
@@ -81,6 +82,8 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   const { hasPermission } = usePermissions()
   const canEditTask = hasPermission(Permission.TASK_UPDATE, projectId)
   const canDeleteTask = hasPermission(Permission.TASK_DELETE, projectId)
+  const canChangeTaskStatus = hasPermission(Permission.TASK_CHANGE_STATUS, projectId)
+  const canManageProject = hasPermission(Permission.PROJECT_UPDATE, projectId)
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -238,6 +241,19 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   }, [searchQuery, statusFilter, priorityFilter, typeFilter])
 
   const handleStatusChange = async (taskId: string, newStatus: string) => {
+    // Check permission for status change
+    if (!canChangeTaskStatus) {
+      notifyError({ title: 'Error', message: 'You do not have permission to change task status' })
+      return
+    }
+
+    // Prevent Team Members (users without PROJECT_UPDATE) from changing backlog task status
+    const task = tasks.find(t => t._id === taskId)
+    if (task?.status === 'backlog' && !canManageProject) {
+      notifyError({ title: 'Error', message: 'Cannot change the status of a backlog task' })
+      return
+    }
+
     // Store previous state for potential revert
     const previousTask = tasks.find(t => t._id === taskId)
     const previousStatus = previousTask?.status
@@ -496,28 +512,29 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                   </div>
                   <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                     {task.assignedTo && task.assignedTo.length > 0 ? (
-                      <div className="flex items-center space-x-1 flex-wrap gap-1">
-                        <User className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                        <div className="flex flex-wrap gap-1">
-                          {task.assignedTo.map((assignee, idx) => {
-                            // Try to get user data from populated user field first, then from denormalized fields
-                            const firstName = assignee?.user?.firstName || assignee?.firstName || '';
-                            const lastName = assignee?.user?.lastName || assignee?.lastName || '';
-                            const email = assignee?.user?.email || assignee?.email || '';
-                            const displayName = `${firstName} ${lastName}`.trim();
+                      <div className="flex items-center -space-x-1.5">
+                        {task.assignedTo.slice(0, 3).map((assignee, idx) => {
+                          const firstName = assignee?.user?.firstName || assignee?.firstName || '';
+                          const lastName = assignee?.user?.lastName || assignee?.lastName || '';
+                          const email = assignee?.user?.email || assignee?.email || '';
+                          const avatar = (assignee?.user as any)?.avatar || (assignee as any)?.avatar;
+                          const displayName = `${firstName} ${lastName}`.trim();
 
-                            return (
-                              <Badge
-                                key={assignee?.user?._id || assignee?._id || idx}
-                                variant="secondary"
-                                className="text-xs px-2 py-0.5"
-                                title={`${displayName} (${email})`}
-                              >
-                                {displayName || 'Unknown User'}
-                              </Badge>
-                            );
-                          })}
-                        </div>
+                          return (
+                            <div key={assignee?.user?._id || assignee?._id || idx} title={`${displayName} (${email})`}>
+                              <GravatarAvatar
+                                user={{ avatar, firstName, lastName, email }}
+                                size={24}
+                                className="border-2 border-background"
+                              />
+                            </div>
+                          );
+                        })}
+                        {task.assignedTo.length > 3 && (
+                          <div className="flex items-center justify-center h-6 w-6 rounded-full bg-muted border-2 border-background text-[10px] font-medium text-muted-foreground">
+                            +{task.assignedTo.length - 3}
+                          </div>
+                        )}
                       </div>
                     ) : null}
                     {task.dueDate && (
@@ -553,8 +570,9 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                   <Select
                     value={task.status}
                     onValueChange={(value) => handleStatusChange(task._id, value)}
+                    disabled={!canChangeTaskStatus || (task.status === 'backlog' && !canManageProject)}
                   >
-                    <SelectTrigger className="w-full sm:w-32">
+                    <SelectTrigger className="w-full sm:w-32" disabled={!canChangeTaskStatus || (task.status === 'backlog' && !canManageProject)}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

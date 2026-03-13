@@ -1,3 +1,10 @@
+## [1.30.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.4...v1.30.5) (2026-03-13)
+
+
+### Bug Fixes
+
+* fixing unable to version up issue ([840d4b7](https://github.com/EchonLabs/kanvaro.com/commit/840d4b7a05119f81eb4f6b1cf5b442c64a7ddf56))
+
 ## [1.30.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.3...v1.30.4) (2026-03-05)
 
 

@@ -35,7 +35,7 @@
   html,
   body {
     overflow-x: hidden;
-    max-width: 100vw;
+    width: 100%;
     position: relative;
   }
   
@@ -197,6 +197,13 @@
   width: calc(100% - 48px);
   height: 2px;
   z-index: 1;
+}
+
+/* Rich Text Editor image constraints */
+.rich-text-editor img {
+  max-width: 100%;
+  height: auto;
+  display: block;
 }
 
 /* Rich Text Editor List Styles */
