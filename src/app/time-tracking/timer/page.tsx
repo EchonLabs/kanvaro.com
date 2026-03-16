@@ -158,6 +158,10 @@ export default function TimerPage() {
     project.name.toLowerCase().includes(projectSearch.toLowerCase())
   )
 
+  // Only show the loading state in the task select for the initial load,
+  // not for every background refetch while the user is typing.
+  const showInitialTasksLoading = tasksLoading && (!Array.isArray(tasks) || tasks.length === 0)
+
 
   // Validate maxSessionHours and future time when dates/times change
   const validateSessionHours = useCallback(() => {
@@ -476,14 +480,14 @@ export default function TimerPage() {
     }
 
     if (page === 1) {
-      setTasksLoading(true)
+      if (!search) setTasksLoading(true)
     } else {
       setLoadingMoreTasks(true)
     }
 
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000)
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
 
       const params = new URLSearchParams({
         project: projectId,
@@ -542,7 +546,7 @@ export default function TimerPage() {
           setTasks(prev => [...prev, ...validTasks])
         }
       } else {
-        if (page === 1) setTasks([])
+        if (page === 1 && !search) setTasks([])
         setHasMoreTasks(false)
       }
     } catch (err) {
@@ -551,10 +555,14 @@ export default function TimerPage() {
       } else {
         console.error('Failed to fetch tasks:', err)
       }
-      if (page === 1) setTasks([])
+      // On search errors, keep existing tasks so the UI doesn't jump
+      if (page === 1 && !search) setTasks([])
     } finally {
-      setTasksLoading(false)
-      setLoadingMoreTasks(false)
+      if (page === 1) {
+        if (!search) setTasksLoading(false)
+      } else {
+        setLoadingMoreTasks(false)
+      }
     }
   }, [user?.id])
 
@@ -608,15 +616,44 @@ export default function TimerPage() {
       clearTimeout(taskSearchTimerRef.current)
     }
     taskSearchTimerRef.current = setTimeout(() => {
-      // Fetch all tasks without search filter - do filtering client-side instead
-      // This avoids server-side search issues with special characters like dots
-      console.log('Fetching tasks for project:', selectedProject)
-      fetchTasks(selectedProject, undefined, 1)
+      const searchTerm = taskSearch.trim().toLowerCase()
+
+      // If there's no search term, just refresh the first page normally
+      if (!searchTerm) {
+        console.log('Fetching tasks for project (no search):', selectedProject)
+        fetchTasks(selectedProject, undefined, 1)
+        return
+      }
+
+      // First, try to satisfy the search from already-loaded tasks
+      const hasLocalMatch = Array.isArray(tasks) && tasks.some((task) => {
+        const titleMatch = task.title && task.title.toLowerCase().includes(searchTerm)
+
+        let displayIdMatch = false
+        if (task.displayId !== undefined && task.displayId !== null && task.displayId !== '') {
+          const displayIdStr = String(task.displayId).toLowerCase()
+          displayIdMatch = displayIdStr.includes(searchTerm)
+        }
+
+        let taskNumberMatch = false
+        if (task.taskNumber !== undefined && task.taskNumber !== null && task.taskNumber !== '') {
+          const taskNumStr = String(task.taskNumber).toLowerCase()
+          taskNumberMatch = taskNumStr.includes(searchTerm)
+        }
+
+        return titleMatch || displayIdMatch || taskNumberMatch
+      })
+
+      if (!hasLocalMatch) {
+        // No local match — ask the server (MongoDB) using the search term
+        console.log('No local task match, fetching from server with search:', taskSearch)
+        fetchTasks(selectedProject, taskSearch, 1)
+      }
     }, 80)
     return () => {
       if (taskSearchTimerRef.current) clearTimeout(taskSearchTimerRef.current)
     }
-  }, [taskSearch, selectedProject, fetchTasks])
+  }, [taskSearch, selectedProject, fetchTasks, tasks])
 
   const handleTaskChange = (taskId: string) => {
     setSelectedTask(taskId === 'none' ? '' : taskId)
@@ -1185,22 +1222,28 @@ export default function TimerPage() {
                     <Select
                       value={selectedTask}
                       onValueChange={handleTaskChange}
-                      disabled={!timeTrackingSettings?.allowTimeTracking || !selectedProject || tasksLoading || (!tasksLoading && (!Array.isArray(tasks) || tasks.length === 0)) || liveActiveTimer !== null}
+                      disabled={
+                        !timeTrackingSettings?.allowTimeTracking ||
+                        !selectedProject ||
+                        showInitialTasksLoading ||
+                        (!tasksLoading && (!Array.isArray(tasks) || tasks.length === 0)) ||
+                        liveActiveTimer !== null
+                      }
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder={
-                          tasksLoading
+                          showInitialTasksLoading
                             ? 'Loading tasks...'
                             : selectedProject
                               ? (Array.isArray(tasks) && tasks.length > 0 ? 'Select a task' : 'No tasks available')
                               : 'Select a project first'
                         } />
                       </SelectTrigger>
-                      {tasksLoading && (
+                      {showInitialTasksLoading && (
                         <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                       )}
                       <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)] max-h-[300px]">
-                        {!tasksLoading && (
+                        {!showInitialTasksLoading && (
                           <div className="p-2 sticky top-0 bg-background z-10">
                             <Input
                               placeholder="Search tasks..."
@@ -1216,7 +1259,7 @@ export default function TimerPage() {
                             />
                           </div>)}
 
-                        {tasksLoading ? (
+                        {showInitialTasksLoading ? (
                           <div className="flex items-center justify-center p-4">
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
                             <span className="text-sm text-muted-foreground">Loading tasks...</span>
@@ -1302,7 +1345,7 @@ export default function TimerPage() {
                         No tasks available in this project. Please create or assign a task to start tracking.
                       </p>
                     )}
-                    {tasksLoading && (
+                    {showInitialTasksLoading && (
                       <p className="text-xs text-muted-foreground flex items-center gap-2">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         Loading tasks...
@@ -1483,7 +1526,7 @@ export default function TimerPage() {
                           ) : (
                             Array.isArray(tasks) && tasks.length > 0 ? (
                               <TooltipProvider delayDuration={300}>
-                                {tasks.map((task) => {
+                                {tasks.filter(task => task._id !== selectedTask).map((task) => {
                                   const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
                                   return (
                                     <Tooltip key={task._id}>
