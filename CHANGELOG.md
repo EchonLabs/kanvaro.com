@@ -1,3 +1,10 @@
+## [1.30.8](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.7...v1.30.8) (2026-03-18)
+
+
+### Bug Fixes
+
+* improve infinite scroll handling and task search debounce ([77cec7d](https://github.com/EchonLabs/kanvaro.com/commit/77cec7d50bb290cc7c49265ca235bb780fc9629f))
+
 ## [1.30.7](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.6...v1.30.7) (2026-03-16)
 
 
