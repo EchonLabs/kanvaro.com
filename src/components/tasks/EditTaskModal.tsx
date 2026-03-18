@@ -625,7 +625,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
                 <div className="mt-1">
                   <RichTextEditor
                     value={formData.description}
-                    onChange={(value) => setFormData({...formData, description: value})}
+                    onChange={(value) => setFormData(prev => ({...prev, description: value}))}
                     placeholder="Enter task description with rich formatting..."
                     disabled={loading}
                     maxLength={10000}

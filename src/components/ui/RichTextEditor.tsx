@@ -53,30 +53,6 @@ export function RichTextEditor({
   const [isActive, setIsActive] = useState<Record<string, boolean>>({})
   const [isUploadingImage, setIsUploadingImage] = useState(false)
 
-  const execCommand = useCallback((command: string, value: string = '') => {
-    if (disabled) return
-
-    // Save the current selection
-    const selection = window.getSelection()
-    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
-
-    editorRef.current?.focus()
-    document.execCommand(command, false, value)
-
-    // Restore selection if it existed
-    if (range && selection) {
-      try {
-        selection.removeAllRanges()
-        selection.addRange(range)
-      } catch (e) {
-        // Selection restoration failed, ignore
-      }
-    }
-
-    updateActiveStates()
-    handleInput()
-  }, [disabled])  // eslint-disable-line react-hooks/exhaustive-deps
-
   const saveSelection = useCallback(() => {
     const selection = window.getSelection()
     if (selection && selection.rangeCount > 0 && editorRef.current) {
@@ -143,6 +119,30 @@ export function RichTextEditor({
       updateActiveStates()
     }
   }, [onChange, updateActiveStates, maxLength, stripHtml])
+
+  const execCommand = useCallback((command: string, value: string = '') => {
+    if (disabled) return
+
+    // Save the current selection
+    const selection = window.getSelection()
+    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
+
+    editorRef.current?.focus()
+    document.execCommand(command, false, value)
+
+    // Restore selection if it existed
+    if (range && selection) {
+      try {
+        selection.removeAllRanges()
+        selection.addRange(range)
+      } catch (e) {
+        // Selection restoration failed, ignore
+      }
+    }
+
+    updateActiveStates()
+    handleInput()
+  }, [disabled, handleInput, updateActiveStates])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Tab') {
@@ -741,6 +741,7 @@ export function RichTextEditor({
         onKeyUp={updateActiveStates}
         onPaste={handlePaste}
         className={cn(
+
           'rich-text-editor min-h-[120px] p-3 focus:outline-none prose prose-sm max-w-none overflow-x-hidden',
           'prose-headings:font-semibold prose-headings:text-foreground',
           'prose-p:text-foreground prose-p:leading-relaxed',
