@@ -1,3 +1,10 @@
+## [1.30.9](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.8...v1.30.9) (2026-03-23)
+
+
+### Bug Fixes
+
+* enhance task search functionality and improve UI in TimeLogs and HRManualTimeLogModal ([3bd5bd6](https://github.com/EchonLabs/kanvaro.com/commit/3bd5bd68cecf0140a63a24c26e80204a177f2e21))
+
 ## [1.30.8](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.7...v1.30.8) (2026-03-18)
 
 
