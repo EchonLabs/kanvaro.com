@@ -770,9 +770,33 @@ export default function CreateSprintPage() {
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                           Assigned members ({formData.teamMembers.length})
                         </p>
-                        {formData.teamMembers.length > 4 && (
-                          <span className="text-[10px] text-muted-foreground">Scroll to view all</span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {activeUsers.length > 0 && formData.project && (
+                            formData.teamMembers.length < activeUsers.length ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const allIds = activeUsers.map(u => u._id)
+                                  setFormData(prev => ({ ...prev, teamMembers: allIds }))
+                                }}
+                                className="text-xs text-primary hover:text-primary/80 font-medium"
+                              >
+                                Select All
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ ...prev, teamMembers: [] }))}
+                                className="text-xs text-primary hover:text-primary/80 font-medium"
+                              >
+                                Deselect All
+                              </button>
+                            )
+                          )}
+                          {formData.teamMembers.length > 4 && (
+                            <span className="text-[10px] text-muted-foreground">Scroll to view all</span>
+                          )}
+                        </div>
                       </div>
                       {formData.teamMembers.length === 0 ? (
                         <p className="text-xs text-muted-foreground italic">No members assigned yet.</p>

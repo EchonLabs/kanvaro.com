@@ -131,6 +131,7 @@ export function TimeLogs({
   const [employeeSearch, setEmployeeSearch] = useState('')
   const [statusSearch, setStatusSearch] = useState('')
   const [modalProjectSearch, setModalProjectSearch] = useState('')
+  const [modalTaskSearch, setModalTaskSearch] = useState('')
 
   // Filtered lists based on search queries
   const filteredProjects = useMemo(() => {
@@ -208,6 +209,15 @@ export function TimeLogs({
       project.name?.toLowerCase().includes(searchLower)
     )
   }, [projects, modalProjectSearch])
+
+  const filteredModalTasks = useMemo(() => {
+    if (!modalTaskSearch.trim()) return tasks
+    const searchLower = modalTaskSearch.toLowerCase()
+    return tasks.filter(task =>
+      task.title?.toLowerCase().includes(searchLower) ||
+      task.displayId?.toLowerCase().includes(searchLower)
+    )
+  }, [tasks, modalTaskSearch])
   const [manualLogData, setManualLogData] = useState({
     startDate: '',
     startTime: '',
@@ -3317,6 +3327,7 @@ export function TimeLogs({
                     setSelectedProjectForLog(value)
                     setSelectedTaskForLog('')
                     setTasks([])
+                    setModalTaskSearch('')
                     loadTasksForProject(value)
                   }}
                   disabled={true}
@@ -3391,29 +3402,73 @@ export function TimeLogs({
                   {tasksLoading && (
                     <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                   )}
-                  <SelectContent className="max-h-[200px]">
-                    {tasksLoading ? (
-                      <div className="flex items-center justify-center p-4">
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        <span className="text-sm text-muted-foreground">Loading tasks...</span>
+                  <SelectContent className="max-h-[250px]">
+                    <div className="sticky top-0 z-10 p-2 border-b bg-popover">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search tasks..."
+                          value={modalTaskSearch}
+                          onChange={(e) => setModalTaskSearch(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="h-8 pl-7 pr-7 text-xs"
+                        />
+                        {modalTaskSearch && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setModalTaskSearch('')
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground hover:text-foreground transition-colors"
+                            aria-label="Clear search"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
-                    ) : (
-                      tasks.map((task) => (
-                        <SelectItem key={task._id} value={task._id}>
-                          <div className="flex items-center space-x-2">
-                            <Target className="h-4 w-4 flex-shrink-0" />
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="truncate">{task.title}</span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{task.title}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </SelectItem>
-                      ))
-                    )}
+                    </div>
+                    <div className="max-h-[200px] overflow-y-auto">
+                      {tasksLoading ? (
+                        <div className="flex items-center justify-center p-4">
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <span className="text-sm text-muted-foreground">Loading tasks...</span>
+                        </div>
+                      ) : filteredModalTasks.length === 0 ? (
+                        <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                          No tasks found
+                        </div>
+                      ) : (
+                        filteredModalTasks.map((task) => (
+                          <SelectItem key={task._id} value={task._id} onMouseDown={(e) => e.preventDefault()}>
+                            <div className="flex items-center space-x-2 min-w-0 w-full">
+                              <Target className="h-4 w-4 flex-shrink-0" />
+                              <div className="flex-1 min-w-0 overflow-hidden">
+                                <div className="font-bold truncate flex items-center gap-2 min-w-0">
+                                  {task.displayId && (
+                                    <span className="font-bold text-primary flex-shrink-0">{task.displayId}</span>
+                                  )}
+                                  <span className="text-xs font-normal text-muted-foreground flex-shrink-0">
+                                    {task.status} • {task.priority}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-muted-foreground min-w-0 overflow-hidden">
+                                  <Tooltip delayDuration={200}>
+                                    <TooltipTrigger asChild>
+                                      <span className="truncate block">{task.title}</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left" className="max-w-sm">
+                                      <p className="font-medium truncate block" >{task.title}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
                   </SelectContent>
                 </Select>
               </div>

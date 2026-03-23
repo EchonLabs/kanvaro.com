@@ -145,6 +145,7 @@ export default function TimerPage() {
   const [loadingMoreTasks, setLoadingMoreTasks] = useState(false)
   const taskSearchTimerRef = useRef<NodeJS.Timeout | null>(null)
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)
+  const isLoadingMoreRef = useRef(false)
 
 
 
@@ -514,6 +515,7 @@ export default function TimerPage() {
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
+        console.log('DEBUG: fetched tasks for search', search, data.data);
         const validTasks = data.data.filter((task: any) => {
           const projectMatch = task?.project === projectId ||
             task?.project?._id === projectId ||
@@ -569,36 +571,28 @@ export default function TimerPage() {
   // IntersectionObserver callback for infinite scroll
   const handleLoadMoreIntersect = useCallback((entries: IntersectionObserverEntry[]) => {
     const entry = entries[0]
-    if (entry?.isIntersecting && hasMoreTasks && !loadingMoreTasks && !tasksLoading) {
-      console.log('Sentinel visible - loading more tasks')
-      fetchTasks(selectedProject, taskSearch || undefined, taskPage + 1)
+    if (entry?.isIntersecting && hasMoreTasks && !isLoadingMoreRef.current && !tasksLoading) {
+      isLoadingMoreRef.current = true
+      fetchTasks(selectedProject, taskSearch || undefined, taskPage + 1).finally(() => {
+        isLoadingMoreRef.current = false
+      })
     }
-  }, [selectedProject, hasMoreTasks, loadingMoreTasks, tasksLoading, taskSearch, taskPage, fetchTasks])
+  }, [selectedProject, hasMoreTasks, tasksLoading, taskSearch, taskPage, fetchTasks])
 
   // Set up IntersectionObserver on sentinel ref
   useEffect(() => {
     const sentinel = loadMoreSentinelRef.current
     if (!sentinel) return
-    
-    // Get the scrollable parent (SelectContent)
-    let scrollableParent = sentinel.parentElement
-    while (scrollableParent) {
-      const overflow = window.getComputedStyle(scrollableParent).overflowY
-      if (overflow === 'auto' || overflow === 'scroll') {
-        break
-      }
-      scrollableParent = scrollableParent.parentElement
-    }
 
     const observerOptions: IntersectionObserverInit = {
-      root: scrollableParent || null,
-      threshold: [0, 0.1, 0.5, 1],
-      rootMargin: '50px'
+      root: null,
+      threshold: 0.1,
+      rootMargin: '0px'
     }
-    
+
     const observer = new IntersectionObserver(handleLoadMoreIntersect, observerOptions)
     observer.observe(sentinel)
-    
+
     return () => {
       observer.disconnect()
     }
@@ -612,48 +606,20 @@ export default function TimerPage() {
   // Debounced server-side search for tasks
   useEffect(() => {
     if (!selectedProject) return
+
+    const searchTerm = taskSearch.trim()
+    if (!searchTerm) return
+
     if (taskSearchTimerRef.current) {
       clearTimeout(taskSearchTimerRef.current)
     }
     taskSearchTimerRef.current = setTimeout(() => {
-      const searchTerm = taskSearch.trim().toLowerCase()
-
-      // If there's no search term, just refresh the first page normally
-      if (!searchTerm) {
-        console.log('Fetching tasks for project (no search):', selectedProject)
-        fetchTasks(selectedProject, undefined, 1)
-        return
-      }
-
-      // First, try to satisfy the search from already-loaded tasks
-      const hasLocalMatch = Array.isArray(tasks) && tasks.some((task) => {
-        const titleMatch = task.title && task.title.toLowerCase().includes(searchTerm)
-
-        let displayIdMatch = false
-        if (task.displayId !== undefined && task.displayId !== null && task.displayId !== '') {
-          const displayIdStr = String(task.displayId).toLowerCase()
-          displayIdMatch = displayIdStr.includes(searchTerm)
-        }
-
-        let taskNumberMatch = false
-        if (task.taskNumber !== undefined && task.taskNumber !== null && task.taskNumber !== '') {
-          const taskNumStr = String(task.taskNumber).toLowerCase()
-          taskNumberMatch = taskNumStr.includes(searchTerm)
-        }
-
-        return titleMatch || displayIdMatch || taskNumberMatch
-      })
-
-      if (!hasLocalMatch) {
-        // No local match — ask the server (MongoDB) using the search term
-        console.log('No local task match, fetching from server with search:', taskSearch)
-        fetchTasks(selectedProject, taskSearch, 1)
-      }
-    }, 80)
+      fetchTasks(selectedProject, searchTerm, 1)
+    }, 300)
     return () => {
       if (taskSearchTimerRef.current) clearTimeout(taskSearchTimerRef.current)
     }
-  }, [taskSearch, selectedProject, fetchTasks, tasks])
+  }, [taskSearch, selectedProject, fetchTasks])
 
   const handleTaskChange = (taskId: string) => {
     setSelectedTask(taskId === 'none' ? '' : taskId)
@@ -1226,7 +1192,7 @@ export default function TimerPage() {
                         !timeTrackingSettings?.allowTimeTracking ||
                         !selectedProject ||
                         showInitialTasksLoading ||
-                        (!tasksLoading && (!Array.isArray(tasks) || tasks.length === 0)) ||
+                        (!tasksLoading && !loadingMoreTasks && (!Array.isArray(tasks) || tasks.length === 0)) ||
                         liveActiveTimer !== null
                       }
                     >
@@ -1267,61 +1233,67 @@ export default function TimerPage() {
                         ) : (
                           Array.isArray(tasks) && tasks.length > 0 ? (
                             <div className="flex flex-col">
-                                {tasks.filter((task) => {
-                                  // Client-side filtering by search term
-                                  if (!taskSearch || taskSearch.trim() === '') return true
-                                  const searchLower = taskSearch.toLowerCase().trim()
-                                  
-                                  // Compare with title
-                                  if (task.title && task.title.toLowerCase().includes(searchLower)) {
+                              {tasks.filter((task) => {
+                                // Client-side filtering by search term
+
+                                // If search is empty or only dots, show all
+                                if (!taskSearch || taskSearch.trim() === '' || /^\.+$/.test(taskSearch.trim())) return true
+                                const searchLower = taskSearch.toLowerCase().trim()
+                                // Normalize: strip trailing dots for number-like search
+                                const searchNormalized = searchLower.replace(/\.+$/, '')
+
+                                // Compare with title
+                                if (task.title && task.title.toLowerCase().includes(searchLower)) {
+                                  return true
+                                }
+
+                                // Compare with displayId (convert to string, handling dots)
+                                if (task.displayId !== undefined && task.displayId !== null && task.displayId !== '') {
+                                  const displayIdStr = String(task.displayId).toLowerCase()
+                                  // Match both the original search and normalized version
+                                  if (displayIdStr.includes(searchLower) || (searchNormalized && displayIdStr.includes(searchNormalized))) {
                                     return true
                                   }
-                                  
-                                  // Compare with displayId (convert to string, handling dots)
-                                  if (task.displayId !== undefined && task.displayId !== null && task.displayId !== '') {
-                                    const displayIdStr = String(task.displayId).toLowerCase()
-                                    if (displayIdStr.includes(searchLower)) {
-                                      return true
-                                    }
+                                }
+
+                                // Compare with taskNumber (convert to string, handling dots)
+                                if (task.taskNumber !== undefined && task.taskNumber !== null && task.taskNumber !== '') {
+                                  const taskNumStr = String(task.taskNumber).toLowerCase()
+                                  // Match both the original search and normalized version
+                                  if (taskNumStr.includes(searchLower) || (searchNormalized !== searchLower && taskNumStr.includes(searchNormalized))) {
+                                    return true
                                   }
-                                  
-                                  // Compare with taskNumber (convert to string, handling dots)
-                                  if (task.taskNumber !== undefined && task.taskNumber !== null && task.taskNumber !== '') {
-                                    const taskNumStr = String(task.taskNumber).toLowerCase()
-                                    if (taskNumStr.includes(searchLower)) {
-                                      return true
-                                    }
-                                  }
-                                  
-                                  return false
-                                }).map((task) => {
-                                  const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
-                                  return (
-                                    <SelectItem
-                                      key={task._id}
-                                      value={task._id}
-                                      disabled={isBillableDisabled}
-                                      className="w-full"
-                                      title={`${task.displayId || task.taskNumber || 'N/A'} - ${task.title}`}
-                                    >
-                                      <div className="flex items-center space-x-2 w-full">
-                                        <Target className="h-4 w-4 flex-shrink-0" />
-                                        <div className="flex-1 min-w-0">
-                                          <div className="font-medium flex items-center gap-2 w-full">
-                                            <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
-                                              {task.displayId || task.taskNumber || 'N/A'}
-                                            </span>
-                                            <span className="truncate">{task.title}</span>
-                                          </div>
-                                          <div className="text-xs text-muted-foreground">
-                                            {task.status} • {task.priority}
-                                            {isBillableDisabled && ' • Billable time not allowed'}
-                                          </div>
+                                }
+
+                                return false
+                              }).map((task) => {
+                                const isBillableDisabled = !!(task.isBillable && timeTrackingSettings && !timeTrackingSettings.allowBillableTime)
+                                return (
+                                  <SelectItem
+                                    key={task._id}
+                                    value={task._id}
+                                    disabled={isBillableDisabled}
+                                    className="w-full"
+                                    title={`${task.displayId || task.taskNumber || 'N/A'} - ${task.title}`}
+                                  >
+                                    <div className="flex items-center space-x-2 w-full">
+                                      <Target className="h-4 w-4 flex-shrink-0" />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-medium flex items-center gap-2 w-full">
+                                          <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                                            {task.displayId || task.taskNumber || 'N/A'}
+                                          </span>
+                                          <span className="truncate">{task.title}</span>
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                          {task.status} • {task.priority}
+                                          {isBillableDisabled && ' • Billable time not allowed'}
                                         </div>
                                       </div>
-                                    </SelectItem>
-                                  )
-                                })}
+                                    </div>
+                                  </SelectItem>
+                                )
+                              })}
                               {hasMoreTasks && (
                                 <div
                                   ref={loadMoreSentinelRef}

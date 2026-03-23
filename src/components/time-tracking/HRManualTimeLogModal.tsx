@@ -468,7 +468,7 @@ export function HRManualTimeLogModal({
                 } />
               </SelectTrigger>
               <SelectContent className="max-h-[250px]">
-                <div className="p-2 border-b">
+                <div className="sticky top-0 z-10 p-2 border-b bg-popover">
                   <div className="relative">
                     <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -558,7 +558,7 @@ export function HRManualTimeLogModal({
                   } />
                 </SelectTrigger>
                 <SelectContent className="max-h-[250px]">
-                  <div className="p-2 border-b">
+                  <div className="sticky top-0 z-10 p-2 border-b bg-popover">
                     <div className="relative">
                       <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
                       <Input
@@ -631,7 +631,7 @@ export function HRManualTimeLogModal({
                   } />
                 </SelectTrigger>
                 <SelectContent className="max-h-[250px]">
-                  <div className="p-2 border-b">
+                  <div className="sticky top-0 z-10 p-2 border-b bg-popover">
                     <div className="relative">
                       <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
                       <Input
@@ -673,18 +673,18 @@ export function HRManualTimeLogModal({
                           <div className="flex items-center space-x-2 min-w-0 w-full">
                             <Target className="h-4 w-4 flex-shrink-0" />
                             <div className="flex-1 min-w-0 overflow-hidden">
-                              <div className="font-medium truncate flex items-center gap-2 min-w-0">
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="truncate">{task.title}</span>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>{task.title}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </div>
                               <div className="text-xs text-muted-foreground truncate">
                                 {task.displayId && `${task.displayId} • `}{task.status} • {task.priority}
+                              </div>
+                              <div className="font-medium min-w-0 overflow-hidden">
+                                <Tooltip delayDuration={200}>
+                                  <TooltipTrigger asChild>
+                                    <span className="truncate block">{task.title}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="left" className="max-w-sm">
+                                    <p className="font-medium">{task.title}</p>
+                                  </TooltipContent>
+                                </Tooltip>
                               </div>
                             </div>
                           </div>

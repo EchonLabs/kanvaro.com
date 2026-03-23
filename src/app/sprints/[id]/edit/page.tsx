@@ -878,9 +878,33 @@ export default function EditSprintPage() {
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Assigned members ({teamMembers.length})
                     </p>
-                    {teamMembers.length > 4 && (
-                      <span className="text-[10px] text-muted-foreground">Scroll to view all</span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {activeAvailableMembers.length > 0 && (
+                        teamMembers.length < activeAvailableMembers.length ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allIds = activeAvailableMembers.map(m => m._id)
+                              setTeamMembers(allIds)
+                            }}
+                            className="text-xs text-primary hover:text-primary/80 font-medium"
+                          >
+                            Select All
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setTeamMembers([])}
+                            className="text-xs text-primary hover:text-primary/80 font-medium"
+                          >
+                            Deselect All
+                          </button>
+                        )
+                      )}
+                      {teamMembers.length > 4 && (
+                        <span className="text-[10px] text-muted-foreground">Scroll to view all</span>
+                      )}
+                    </div>
                   </div>
                   {teamMembers.length === 0 ? (
                     <p className="text-xs text-muted-foreground italic">No members assigned yet.</p>
