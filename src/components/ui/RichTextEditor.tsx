@@ -435,7 +435,7 @@ export function RichTextEditor({
         if (response.ok) {
           const result = await response.json()
           if (result.success && result.data?.url) {
-            const imgHTML = `<img src="${result.data.url}" alt="${result.data.name || 'Pasted image'}" style="max-width: 100%; height: auto;" />`
+            const imgHTML = `<img src="${result.data.url}" alt="${result.data.name || 'Pasted image'}" style="max-width: 100%; max-height: 300px; height: auto; object-fit: contain; display: block;" />`
             editorRef.current?.focus()
             document.execCommand('insertHTML', false, imgHTML)
             handleInput()
@@ -742,7 +742,8 @@ export function RichTextEditor({
         onPaste={handlePaste}
         className={cn(
 
-          'rich-text-editor min-h-[120px] p-3 focus:outline-none prose prose-sm max-w-none overflow-x-hidden',
+          'rich-text-editor min-h-[120px] max-h-[400px] p-3 focus:outline-none prose prose-sm max-w-none overflow-x-hidden overflow-y-auto',
+          '[&_img]:max-w-full [&_img]:max-h-[300px] [&_img]:h-auto [&_img]:object-contain [&_img]:block',
           'prose-headings:font-semibold prose-headings:text-foreground',
           'prose-p:text-foreground prose-p:leading-relaxed',
           'prose-strong:font-semibold prose-strong:text-foreground',

@@ -8,12 +8,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/Badge'
-import { 
-  X, 
-  Plus, 
-  Calendar, 
-  User, 
-  Target, 
+import {
+  X,
+  Plus,
+  Calendar,
+  User,
+  Target,
   Clock,
   Loader2,
   Trash2,
@@ -561,7 +561,7 @@ export default function CreateTaskModal({
 
       // Read response body only once - you can't read it twice!
       const data = await response.json().catch(() => ({ error: 'Failed to parse response' }))
-      
+
       if (!response.ok || !data.success) {
         const message = data.error || 'Failed to create task. Please try again.'
         setError(message)
@@ -659,7 +659,7 @@ export default function CreateTaskModal({
                   onValueChange={(v) => {
                     setSelectedProjectId(v)
                     setAssignedTo([])
-      setAssigneeHourlyRates({})
+                    setAssigneeHourlyRates({})
                     setAssigneeQuery('')
                     setProjectMembers([])
                     setFormData(prev => ({
@@ -722,7 +722,7 @@ export default function CreateTaskModal({
                 <label className="text-sm font-medium text-foreground">Task Title *</label>
                 <Input
                   value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="Enter task title"
                   className="mt-1"
                   required
@@ -731,10 +731,10 @@ export default function CreateTaskModal({
 
               <div className="md:col-span-2">
                 <label className="text-sm font-medium text-foreground">Description</label>
-                <div className="mt-1">
+                <div className="mt-1 overflow-hidden rounded-md">
                   <RichTextEditor
                     value={formData.description}
-                    onChange={(value) => setFormData(prev => ({...prev, description: value}))}
+                    onChange={(value) => setFormData(prev => ({ ...prev, description: value }))}
                     placeholder="Enter task description with rich formatting..."
                     maxLength={10000}
                     showCharCount={true}
@@ -816,12 +816,12 @@ export default function CreateTaskModal({
                 <>
                   <div>
                     <label className="text-sm font-medium text-foreground">User Story</label>
-                    <Select 
-                      value={formData.story} 
+                    <Select
+                      value={formData.story}
                       onValueChange={(value) => {
                         const selectedStory = stories.find(s => s._id === value)
-                        setFormData({ 
-                          ...formData, 
+                        setFormData({
+                          ...formData,
                           story: value,
                           epic: selectedStory?.epic?._id || ''
                         })
@@ -848,16 +848,16 @@ export default function CreateTaskModal({
                               </div>
                             ) : (() => {
                               const q = storyQuery.toLowerCase().trim()
-                              const filtered = stories.filter(s => 
+                              const filtered = stories.filter(s =>
                                 !q || s.title.toLowerCase().includes(q)
                               )
-                              
+
                               if (filtered.length === 0) {
                                 return (
                                   <div className="px-2 py-1 text-sm text-muted-foreground">No matching stories</div>
                                 )
                               }
-                              
+
                               return filtered.map((story) => (
                                 <SelectItem key={story._id} value={story._id}>
                                   <span className="truncate block">{story.title}</span>
@@ -872,8 +872,8 @@ export default function CreateTaskModal({
 
                   <div>
                     <label className="text-sm font-medium text-foreground">Epic</label>
-                    <Select 
-                      value={formData.epic} 
+                    <Select
+                      value={formData.epic}
                       onValueChange={(value) => setFormData({ ...formData, epic: value })}
                       disabled={loadingEpics}
                       onOpenChange={(open) => { if (open) setEpicQuery('') }}
@@ -899,7 +899,7 @@ export default function CreateTaskModal({
                             ) : (() => {
                               const q = epicQuery.toLowerCase().trim()
                               let availableEpics: Epic[] = []
-                              
+
                               if (!formData.story) {
                                 // No story selected, show all epics
                                 availableEpics = epics
@@ -917,17 +917,17 @@ export default function CreateTaskModal({
                                   availableEpics = epics
                                 }
                               }
-                              
-                              const filtered = availableEpics.filter(e => 
+
+                              const filtered = availableEpics.filter(e =>
                                 !q || e.title.toLowerCase().includes(q)
                               )
-                              
+
                               if (filtered.length === 0) {
                                 return (
                                   <div className="px-2 py-1 text-sm text-muted-foreground">No matching epics</div>
                                 )
                               }
-                              
+
                               return filtered.map((epic) => (
                                 <SelectItem key={epic._id} value={epic._id}>
                                   <span className="truncate block">{epic.title}</span>
@@ -1137,7 +1137,7 @@ export default function CreateTaskModal({
                   type="number"
                   step="0.5"
                   value={formData.estimatedHours}
-                  onChange={(e) => setFormData({...formData, estimatedHours: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, estimatedHours: e.target.value })}
                   placeholder="e.g., 8"
                   className="mt-1"
                 />
@@ -1148,7 +1148,7 @@ export default function CreateTaskModal({
                 <Input
                   type="date"
                   value={formData.dueDate}
-                  onChange={(e) => setFormData({...formData, dueDate: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                   min={new Date().toISOString().split('T')[0]}
                   className="mt-1"
                   required
@@ -1186,8 +1186,8 @@ export default function CreateTaskModal({
                   {formData.labels.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {formData.labels.map((label, index) => (
-                        <div 
-                          key={index} 
+                        <div
+                          key={index}
                           className="inline-flex items-center gap-1.5 bg-muted px-3 py-1.5 rounded-md text-sm"
                         >
                           <span>{label}</span>
@@ -1231,7 +1231,7 @@ export default function CreateTaskModal({
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                  
+
                   <div>
                     <label className="text-sm font-medium text-foreground">Title *</label>
                     <Input

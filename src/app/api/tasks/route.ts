@@ -236,18 +236,32 @@ export async function GET(request: NextRequest) {
     if (search) {
       try {
         const trimmedSearch = search.trim()
+        // Normalize search by removing trailing dots for number matching
+        const normalizedSearch = trimmedSearch.replace(/\.+$/, '')
         const escapedSearch = escapeRegex(trimmedSearch)
+        const escapedNormalized = escapeRegex(normalizedSearch)
         const fuzzyRegex = new RegExp(escapedSearch, 'i')
-        const displayIdRegex = new RegExp(`^${escapedSearch}$`, 'i')
+        const fuzzyRegexNormalized = new RegExp(escapedNormalized, 'i')
+        
         const orFilters: any[] = [
           { title: fuzzyRegex },
           { description: fuzzyRegex },
-          { displayId: trimmedSearch.includes('.') ? displayIdRegex : fuzzyRegex }
+          // For displayId, use fuzzy matching that handles dots properly
+          // Match both with and without trailing dots
+          { displayId: { $regex: `${escapedSearch}|${escapedNormalized}`, $options: 'i' } }
         ]
 
+        // Try parsing as number - both original and normalized
         const numericValue = Number(trimmedSearch)
-        if (!Number.isNaN(numericValue)) {
+        const numericValueNormalized = Number(normalizedSearch)
+        
+        if (!Number.isNaN(numericValue) && numericValue !== 0) {
           orFilters.push({ taskNumber: numericValue })
+        }
+        
+        // If normalized differs from original, also try the normalized number
+        if (!Number.isNaN(numericValueNormalized) && numericValueNormalized !== numericValue && numericValueNormalized !== 0) {
+          orFilters.push({ taskNumber: numericValueNormalized })
         }
 
         filters.$and = filters.$and || []

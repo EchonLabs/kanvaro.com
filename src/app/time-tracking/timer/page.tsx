@@ -515,6 +515,7 @@ export default function TimerPage() {
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
+        console.log('DEBUG: fetched tasks for search', search, data.data);
         const validTasks = data.data.filter((task: any) => {
           const projectMatch = task?.project === projectId ||
             task?.project?._id === projectId ||
@@ -1234,8 +1235,12 @@ export default function TimerPage() {
                             <div className="flex flex-col">
                               {tasks.filter((task) => {
                                 // Client-side filtering by search term
-                                if (!taskSearch || taskSearch.trim() === '') return true
+
+                                // If search is empty or only dots, show all
+                                if (!taskSearch || taskSearch.trim() === '' || /^\.+$/.test(taskSearch.trim())) return true
                                 const searchLower = taskSearch.toLowerCase().trim()
+                                // Normalize: strip trailing dots for number-like search
+                                const searchNormalized = searchLower.replace(/\.+$/, '')
 
                                 // Compare with title
                                 if (task.title && task.title.toLowerCase().includes(searchLower)) {
@@ -1245,7 +1250,8 @@ export default function TimerPage() {
                                 // Compare with displayId (convert to string, handling dots)
                                 if (task.displayId !== undefined && task.displayId !== null && task.displayId !== '') {
                                   const displayIdStr = String(task.displayId).toLowerCase()
-                                  if (displayIdStr.includes(searchLower)) {
+                                  // Match both the original search and normalized version
+                                  if (displayIdStr.includes(searchLower) || (searchNormalized && displayIdStr.includes(searchNormalized))) {
                                     return true
                                   }
                                 }
@@ -1253,7 +1259,8 @@ export default function TimerPage() {
                                 // Compare with taskNumber (convert to string, handling dots)
                                 if (task.taskNumber !== undefined && task.taskNumber !== null && task.taskNumber !== '') {
                                   const taskNumStr = String(task.taskNumber).toLowerCase()
-                                  if (taskNumStr.includes(searchLower)) {
+                                  // Match both the original search and normalized version
+                                  if (taskNumStr.includes(searchLower) || (searchNormalized !== searchLower && taskNumStr.includes(searchNormalized))) {
                                     return true
                                   }
                                 }
