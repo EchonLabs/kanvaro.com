@@ -156,6 +156,18 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     totalPages: 0
   })
 
+  // Temporary state for date inputs to provide instant UI feedback
+  const [tempStartDate, setTempStartDate] = useState(filters.startDate)
+  const [tempEndDate, setTempEndDate] = useState(filters.endDate)
+
+  // Handle date input blur to sync with filters (only when user finishes interacting)
+  const handleDateBlur = (dateType: 'start' | 'end') => {
+    setFilters(prev => ({
+      ...prev,
+      [dateType === 'start' ? 'startDate' : 'endDate']: dateType === 'start' ? tempStartDate : tempEndDate
+    }))
+  }
+
   // Check if any filters are active (not default values)
   const hasActiveFilters = useMemo(() => {
     return filters.startDate !== '' ||
@@ -168,9 +180,13 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
 
   // Reset all filters to default values
   const resetFilters = () => {
+    const newStartDate = ''
+    const newEndDate = ''
+    setTempStartDate(newStartDate)
+    setTempEndDate(newEndDate)
     setFilters({
-      startDate: '',
-      endDate: '',
+      startDate: newStartDate,
+      endDate: newEndDate,
       reportType: 'detailed',
       projectId: projectId || 'all',
       assignedTo: userId || 'all',
@@ -238,6 +254,12 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   useEffect(() => {
     loadReport()
   }, [loadReport])
+
+  // Sync temporary dates when filters change from external sources (e.g., reset button)
+  useEffect(() => {
+    setTempStartDate(filters.startDate)
+    setTempEndDate(filters.endDate)
+  }, [filters.startDate, filters.endDate])
 
   // Reset pagination to page 1 when filters change
   useEffect(() => {
@@ -500,12 +522,12 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
 
   const handleMonthlyReportExport = () => {
     if (monthlyReportData.length === 0) return
-    const headers = ['Row', 'Employee', 'Project', 'Total Time']
+    const headers = ['Row', 'Employee', 'Project', 'Total Hours (HH:MM)']
 
     const csvRows = monthlyReportData.map((row, i) => {
       const h = Math.floor(row.totalDuration / 60)
       const m = Math.round(row.totalDuration % 60)
-      const hours = `${h}:${String(m).padStart(2, '0')}`
+      const hours = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
       return [String(i + 1), row.userName, row.projectName, hours]
     })
 
@@ -668,8 +690,9 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
               <Input
                 id="startDate"
                 type="date"
-                value={filters.startDate}
-                onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                value={tempStartDate}
+                onChange={(e) => setTempStartDate(e.target.value)}
+                onBlur={() => handleDateBlur('start')}
               />
             </div>
             <div>
@@ -677,8 +700,9 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
               <Input
                 id="endDate"
                 type="date"
-                value={filters.endDate}
-                onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                value={tempEndDate}
+                onChange={(e) => setTempEndDate(e.target.value)}
+                onBlur={() => handleDateBlur('end')}
               />
             </div>
             <div>
@@ -817,21 +841,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                setFilters({
-                  startDate: '',
-                  endDate: '',
-                  reportType: 'detailed',
-                  projectId: 'all',
-                  taskId: 'all',
-                  assignedTo: 'all',
-                  assignedBy: 'all'
-                })
-                setProjectFilterQuery('')
-                setTaskFilterQuery('')
-                setAssignedToFilterQuery('')
-                setAssignedByFilterQuery('')
-              }}
+              onClick={resetFilters}
               title="Clear all filters"
             >
               <RotateCcw className="h-4 w-4" />

@@ -12,7 +12,8 @@ import {
   AlignCenter,
   AlignRight,
   Type,
-  ChevronDown
+  ChevronDown,
+  Trash2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -37,6 +38,7 @@ interface RichTextEditorProps {
   disabled?: boolean
   maxLength?: number
   showCharCount?: boolean
+  onImageClick?: (image: HTMLImageElement | null) => void
 }
 
 export function RichTextEditor({
@@ -46,12 +48,15 @@ export function RichTextEditor({
   className,
   disabled = false,
   maxLength,
-  showCharCount = false
+  showCharCount = false,
+  onImageClick
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const savedRangeRef = useRef<Range | null>(null)
   const [isActive, setIsActive] = useState<Record<string, boolean>>({})
   const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<HTMLImageElement | null>(null)
+  const [toolbarPos, setToolbarPos] = useState({ top: 0, left: 0, visible: false })
 
   const saveSelection = useCallback(() => {
     const selection = window.getSelection()
@@ -150,6 +155,37 @@ export function RichTextEditor({
       execCommand('insertHTML', '&nbsp;&nbsp;&nbsp;&nbsp;')
     }
   }, [execCommand])
+
+  const handleImageClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+    if (target.tagName === 'IMG') {
+      const img = target as HTMLImageElement
+      setSelectedImage(img)
+      // Add visual feedback
+      if (selectedImage && selectedImage !== img) {
+        selectedImage.style.border = 'none'
+        selectedImage.style.outline = 'none'
+      }
+      img.style.border = '2px solid rgb(59, 130, 246)'
+      img.style.outline = '2px solid rgb(191, 219, 254)'
+      img.style.outlineOffset = '2px'
+      
+      // Position toolbar below image
+      const rect = img.getBoundingClientRect()
+      const editorRect = editorRef.current?.getBoundingClientRect()
+      if (editorRect) {
+        setToolbarPos({
+          top: rect.bottom - editorRect.top + 5,
+          left: rect.left - editorRect.left,
+          visible: true
+        })
+      }
+      
+      onImageClick?.(img)
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  }, [selectedImage, onImageClick])
 
   const insertUnorderedList = useCallback((listType: string = 'disc') => {
     if (disabled || !editorRef.current) return
@@ -526,7 +562,7 @@ export function RichTextEditor({
   }, [value])
 
   return (
-    <div className={cn('border rounded-md overflow-hidden', className)}>
+    <div className={cn('border rounded-md overflow-visible relative', className)}>
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-1 p-2 border-b bg-muted/50">
         <Button
@@ -731,19 +767,146 @@ export function RichTextEditor({
         </div>
       )}
 
+      {/* Image Toolbar - Below Image */}
+      {toolbarPos.visible && selectedImage && (
+        <div
+          className="absolute bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center gap-1 p-2 z-50"
+          style={{
+            top: `${toolbarPos.top}px`,
+            left: `${toolbarPos.left}px`,
+            pointerEvents: 'auto',
+            flexWrap: 'wrap',
+            maxWidth: '200px'
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {/* Size Presets */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 px-2 text-xs font-medium"
+            onClick={() => {
+              selectedImage.style.width = '100%'
+              selectedImage.style.maxWidth = 'none'
+              handleInput()
+            }}
+            title="100% width"
+          >
+            100%
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 px-2 text-xs font-medium"
+            onClick={() => {
+              selectedImage.style.width = '50%'
+              selectedImage.style.maxWidth = 'none'
+              handleInput()
+            }}
+            title="50% width"
+          >
+            50%
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 px-2 text-xs font-medium"
+            onClick={() => {
+              selectedImage.style.width = '25%'
+              selectedImage.style.maxWidth = 'none'
+              handleInput()
+            }}
+            title="25% width"
+          >
+            25%
+          </Button>
+
+          <div className="h-5 border-l border-gray-300 mx-0.5" />
+
+          {/* Alignment Buttons */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 flex items-center justify-center"
+            onClick={() => {
+              selectedImage.style.display = 'block'
+              selectedImage.style.marginLeft = '0'
+              selectedImage.style.marginRight = 'auto'
+              handleInput()
+            }}
+            title="Align left"
+          >
+            <AlignLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 flex items-center justify-center"
+            onClick={() => {
+              selectedImage.style.display = 'block'
+              selectedImage.style.margin = '0 auto'
+              handleInput()
+            }}
+            title="Align center"
+          >
+            <AlignCenter className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 flex items-center justify-center"
+            onClick={() => {
+              selectedImage.style.display = 'block'
+              selectedImage.style.marginLeft = 'auto'
+              selectedImage.style.marginRight = '0'
+              handleInput()
+            }}
+            title="Align right"
+          >
+            <AlignRight className="h-4 w-4" />
+          </Button>
+
+          <div className="h-5 border-l border-gray-300 mx-0.5" />
+
+          {/* Delete Button */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 flex items-center justify-center hover:bg-red-100 hover:border-red-300"
+            onClick={() => {
+              selectedImage.remove()
+              setSelectedImage(null)
+              setToolbarPos({ ...toolbarPos, visible: false })
+              handleInput()
+            }}
+            title="Delete image"
+          >
+            <Trash2 className="h-4 w-4 text-red-600" />
+          </Button>
+        </div>
+      )}
+
       {/* Editor */}
       <div
         ref={editorRef}
         contentEditable={!disabled}
         onInput={handleInput}
         onKeyDown={handleKeyDown}
+        onClick={handleImageClick}
         onMouseUp={updateActiveStates}
         onKeyUp={updateActiveStates}
         onPaste={handlePaste}
         className={cn(
 
           'rich-text-editor min-h-[120px] max-h-[400px] p-3 focus:outline-none prose prose-sm max-w-none overflow-x-hidden overflow-y-auto',
-          '[&_img]:max-w-full [&_img]:max-h-[300px] [&_img]:h-auto [&_img]:object-contain [&_img]:block',
+          '[&_img]:max-w-full [&_img]:max-h-[300px] [&_img]:h-auto [&_img]:object-contain [&_img]:block [&_img]:cursor-pointer',
           'prose-headings:font-semibold prose-headings:text-foreground',
           'prose-p:text-foreground prose-p:leading-relaxed',
           'prose-strong:font-semibold prose-strong:text-foreground',

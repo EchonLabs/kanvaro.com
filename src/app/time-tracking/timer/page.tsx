@@ -253,6 +253,10 @@ export default function TimerPage() {
     setSelectedTask('')
     setSelectedProject('')
     setTasks([])
+    setTaskSearch('')
+    setProjectSearch('')
+    setTaskPage(1)
+    setHasMoreTasks(false)
     setActiveTimerSnapshot(null)
     setPendingActiveProject(null)
     setPendingActiveTask(null)
@@ -782,6 +786,10 @@ export default function TimerPage() {
         setSelectedProject('')
         setSelectedTask('')
         setTasks([])
+        setTaskSearch('')
+        setProjectSearch('')
+        setTaskPage(1)
+        setHasMoreTasks(false)
         setError('')
         setSessionHoursError('')
         setTimeLogsRefreshKey(prev => prev + 1)
@@ -908,6 +916,9 @@ export default function TimerPage() {
     setSelectedProject(projectId)
     setSelectedTask('')
     setTasks([])
+    setTaskSearch('')
+    setTaskPage(1)
+    setHasMoreTasks(false)
     setError('')
     if (projectId && user) {
       fetchTasks(projectId)
@@ -1192,7 +1203,6 @@ export default function TimerPage() {
                         !timeTrackingSettings?.allowTimeTracking ||
                         !selectedProject ||
                         showInitialTasksLoading ||
-                        (!tasksLoading && !loadingMoreTasks && (!Array.isArray(tasks) || tasks.length === 0)) ||
                         liveActiveTimer !== null
                       }
                     >
@@ -1236,18 +1246,18 @@ export default function TimerPage() {
                               {tasks.filter((task) => {
                                 // Client-side filtering by search term
 
-                                // If search is empty or only dots, show all
-                                if (!taskSearch || taskSearch.trim() === '' || /^\.+$/.test(taskSearch.trim())) return true
-                                const searchLower = taskSearch.toLowerCase().trim()
+                               // If search is empty or only dots, show all
+                               if (!taskSearch || taskSearch.trim() === '' || /^\.+$/.test(taskSearch.trim())) return true
+                               const searchLower = taskSearch.toLowerCase().trim()
                                 // Normalize: strip trailing dots for number-like search
                                 const searchNormalized = searchLower.replace(/\.+$/, '')
 
-                                // Compare with title
+                               // Compare with title
                                 if (task.title && task.title.toLowerCase().includes(searchLower)) {
                                   return true
                                 }
 
-                                // Compare with displayId (convert to string, handling dots)
+                               // Compare with displayId (convert to string, handling dots)
                                 if (task.displayId !== undefined && task.displayId !== null && task.displayId !== '') {
                                   const displayIdStr = String(task.displayId).toLowerCase()
                                   // Match both the original search and normalized version
@@ -1289,7 +1299,7 @@ export default function TimerPage() {
                                           {task.status} • {task.priority}
                                           {isBillableDisabled && ' • Billable time not allowed'}
                                         </div>
-                                      </div>
+                                     </div>
                                     </div>
                                   </SelectItem>
                                 )
