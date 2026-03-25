@@ -682,8 +682,8 @@ export default function StoriesPage() {
               className="pl-10 w-full"
             />
           </div>
-          {/* Filter options - compact grid layout */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+          {/* Filter options - responsive grid layout 3-4 filters per line */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Status" />
@@ -724,9 +724,6 @@ export default function StoriesPage() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
             <Select value={projectFilter} onValueChange={setProjectFilter}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Project" />
