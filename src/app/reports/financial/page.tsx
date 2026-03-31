@@ -22,6 +22,7 @@ import { BudgetAnalysisReport } from '@/components/reports/BudgetAnalysisReport'
 import { ExpenseReport } from '@/components/reports/ExpenseReport'
 import { RevenueReport } from '@/components/reports/RevenueReport'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
+import { validateAndCorrectDateRange } from '@/lib/dateRangeValidation'
 
 interface FinancialReportData {
   overview: {
@@ -158,13 +159,23 @@ export default function FinancialReportsPage() {
   }
 
   const handleDateRangeChange = (key: 'from' | 'to', date: Date | undefined) => {
-    setFilters(prev => ({
-      ...prev,
-      dateRange: {
-        ...prev.dateRange,
-        [key]: date
+    setFilters(prev => {
+      const updated = {
+        ...prev,
+        dateRange: {
+          ...prev.dateRange,
+          [key]: date
+        }
       }
-    }))
+      
+      // Validate and auto-correct the date range
+      if (updated.dateRange.from && updated.dateRange.to) {
+        const corrected = validateAndCorrectDateRange(updated.dateRange.from, updated.dateRange.to)
+        updated.dateRange = corrected as { from: Date | undefined; to: Date | undefined }
+      }
+      
+      return updated
+    })
   }
 
   const clearFilters = () => {

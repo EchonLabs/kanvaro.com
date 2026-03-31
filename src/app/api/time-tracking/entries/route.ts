@@ -20,7 +20,7 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secre
 export async function GET(request: NextRequest) {
   try {
     await connectDB()
-    
+
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
     const organizationId = searchParams.get('organizationId')
@@ -56,12 +56,12 @@ export async function GET(request: NextRequest) {
         const decoded: any = jwt.verify(accessToken, JWT_SECRET)
         viewer = await User.findById(decoded.userId)
       }
-    } catch {}
+    } catch { }
     if (!viewer && refreshToken) {
       try {
         const decoded: any = jwt.verify(refreshToken, JWT_REFRESH_SECRET)
         viewer = await User.findById(decoded.userId)
-      } catch {}
+      } catch { }
     }
     if (!viewer || !viewer.isActive) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
           ]
         }).select('_id')
         const ids = assignedUsers.map((u: any) => u._id.toString())
-        
+
         // If no assigned users, return empty results immediately
         if (ids.length === 0) {
           return NextResponse.json({
@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
             }
           })
         }
-        
+
         query.user = { $in: ids }
       } else {
         // Only own logs
@@ -200,32 +200,32 @@ export async function GET(request: NextRequest) {
       .skip(skip)
       .limit(limit)
       .lean()
-    
+
     // Normalize the response - ensure project and task are properly formatted
     // Handle cases where project/task might be deleted (populate returns null)
     const normalizedEntries = timeEntries.map((entry: any) => {
       // Check if project exists (populate returns null if document deleted)
       const project = entry.project && typeof entry.project === 'object' && entry.project.name
         ? {
-            _id: entry.project._id || entry.project,
-            name: entry.project.name,
-            settings: entry.project.settings || {}
-          }
+          _id: entry.project._id || entry.project,
+          name: entry.project.name,
+          settings: entry.project.settings || {}
+        }
         : null
-      
+
       // Check if task exists (populate returns null if document deleted)
       // Only set task if task field exists in original entry (not null)
       const task = entry.task && typeof entry.task === 'object' && entry.task.title
         ? { _id: entry.task._id || entry.task, title: entry.task.title }
         : entry.task !== null && entry.task !== undefined
-        ? { _id: entry.task._id || entry.task, title: null } // Task reference exists but document deleted
-        : null
-      
+          ? { _id: entry.task._id || entry.task, title: null } // Task reference exists but document deleted
+          : null
+
       // Populate user minimal fields for display
       const user = entry.user && typeof entry.user === 'object' && (entry.user.firstName !== undefined || entry.user.lastName !== undefined)
         ? { _id: entry.user._id || entry.user, firstName: entry.user.firstName || '', lastName: entry.user.lastName || '' }
         : { _id: (entry.user && entry.user._id) || entry.user, firstName: '', lastName: '' }
-      
+
       return {
         ...entry,
         user,
@@ -237,8 +237,26 @@ export async function GET(request: NextRequest) {
     const total = await TimeEntry.countDocuments(query)
 
     // Calculate totals
+    // Note: Mongoose .find() auto-casts string IDs to ObjectId, but .aggregate() does NOT.
+    // We must cast string IDs to ObjectId for the aggregate pipeline to match correctly.
+    const aggregateQuery: any = { ...query }
+    if (typeof aggregateQuery.user === 'string') {
+      aggregateQuery.user = new mongoose.Types.ObjectId(aggregateQuery.user)
+    } else if (aggregateQuery.user?.$in) {
+      aggregateQuery.user = { $in: aggregateQuery.user.$in.map((id: string) => new mongoose.Types.ObjectId(id)) }
+    }
+    if (typeof aggregateQuery.organization === 'string') {
+      aggregateQuery.organization = new mongoose.Types.ObjectId(aggregateQuery.organization)
+    }
+    if (typeof aggregateQuery.project === 'string') {
+      aggregateQuery.project = new mongoose.Types.ObjectId(aggregateQuery.project)
+    }
+    if (typeof aggregateQuery.task === 'string') {
+      aggregateQuery.task = new mongoose.Types.ObjectId(aggregateQuery.task)
+    }
+
     const totalDuration = await TimeEntry.aggregate([
-      { $match: query },
+      { $match: aggregateQuery },
       { $group: { _id: null, total: { $sum: '$duration' } } }
     ])
 
@@ -270,7 +288,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     await connectDB()
-    
+
     const body = await request.json()
     const {
       userId,
@@ -308,12 +326,12 @@ export async function POST(request: NextRequest) {
         const decoded: any = jwt.verify(accessToken, JWT_SECRET)
         requester = await User.findById(decoded.userId)
       }
-    } catch {}
+    } catch { }
     if (!requester && refreshToken) {
       try {
         const decoded: any = jwt.verify(refreshToken, JWT_REFRESH_SECRET)
         requester = await User.findById(decoded.userId)
-      } catch {}
+      } catch { }
     }
     if (!requester || !requester.isActive) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -325,7 +343,7 @@ export async function POST(request: NextRequest) {
     const isCreatingSelf = userId === requesterId
     const isHROrAdmin = ['admin', 'human_resource'].includes(requester.role)
     const hasBulkUploadAll = isHROrAdmin || await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_BULK_UPLOAD_ALL)
-    
+
     if (!isCreatingSelf && !hasBulkUploadAll) {
       return NextResponse.json({ error: 'You do not have permission to create time entries for other users' }, { status: 403 })
     }
@@ -339,7 +357,7 @@ export async function POST(request: NextRequest) {
     // If taskId is provided, verify task assignment for users without bulk_upload_all permission
     if (taskId && !hasBulkUploadAll) {
       const task = await Task.findById(taskId)
-      
+
       if (!task) {
         return NextResponse.json({ error: 'Task not found' }, { status: 404 })
       }
@@ -360,14 +378,14 @@ export async function POST(request: NextRequest) {
       organization: organizationId,
       project: projectId
     })
-    
+
     if (!settings) {
       settings = await TimeTrackingSettings.findOne({
         organization: organizationId,
         project: null
       })
     }
-   
+
 
     // If no TimeTrackingSettings exist, create default ones based on organization settings
     if (!settings) {
@@ -375,9 +393,9 @@ export async function POST(request: NextRequest) {
         console.error('Organization model is undefined')
         return NextResponse.json({ error: 'Internal server error: Organization model not loaded' }, { status: 500 })
       }
-      
+
       const organization = await Organization.findById(organizationId)
-      
+
       if (!organization || !organization.settings?.timeTracking?.allowTimeTracking) {
         return NextResponse.json({ error: 'Time tracking not enabled' }, { status: 403 })
       }
@@ -429,11 +447,11 @@ export async function POST(request: NextRequest) {
 
     // Validate description - always required for manual time entries
     const hasDescription = description && typeof description === 'string' && description.trim().length > 0
-    
+
     if (!hasDescription) {
       return NextResponse.json({ error: 'Description is required for time entries' }, { status: 400 })
     }
-    
+
     const finalDescription = description.trim()
 
     // Validate time
@@ -470,9 +488,8 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         {
-          error: `Session duration exceeds the maximum of ${settings.maxSessionHours} ${
-            settings.maxSessionHours === 1 ? 'hour' : 'hours'
-          }.`
+          error: `Session duration exceeds the maximum of ${settings.maxSessionHours} ${settings.maxSessionHours === 1 ? 'hour' : 'hours'
+            }.`
         },
         { status: 400 }
       )

@@ -453,7 +453,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_CREATE,
     Permission.TIME_TRACKING_READ,
     Permission.TIME_TRACKING_UPDATE,
-    Permission.TIME_TRACKING_DELETE,
+    // Permission.TIME_TRACKING_DELETE,
     Permission.TIME_TRACKING_APPROVE,
     Permission.TIME_TRACKING_EXPORT,
     Permission.TIME_TRACKING_VIEW_ASSIGNED,
@@ -567,7 +567,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.USER_CREATE,
     Permission.USER_READ,
     Permission.USER_UPDATE,
-    Permission.USER_DELETE,
+    // Permission.USER_DELETE,
     Permission.USER_INVITE,
     Permission.USER_ACTIVATE,
     Permission.USER_DEACTIVATE,
@@ -727,6 +727,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   [Role.TEAM_MEMBER]: [
     // User management (own profile only)
     Permission.USER_READ,
+    Permission.USER_UPDATE,
 
     // Organization (read only)
     Permission.ORGANIZATION_READ,
@@ -893,6 +894,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   [Role.QA_ENGINEER]: [
     // User management (read only)
     Permission.USER_READ,
+    Permission.USER_UPDATE,
+
 
     // Organization (read only)
     Permission.ORGANIZATION_READ,

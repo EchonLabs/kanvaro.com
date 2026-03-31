@@ -234,7 +234,7 @@ export async function GET(
       _id: taskId,
       organization: organizationId
     };
-    
+
     if (!hasTaskViewAll && !hasProjectViewAll) {
       taskQuery.$or = [
         { 'assignedTo.user': userId },
@@ -445,7 +445,7 @@ export async function PUT(
       _id: taskId,
       organization: organizationId
     };
-    
+
     if (!hasTaskEditAll && !hasProjectViewAll) {
       taskQuery.$or = [
         { 'assignedTo.user': userId },
@@ -461,7 +461,7 @@ export async function PUT(
         { status: 404 }
       )
     }
-    
+
     console.log('[Task PUT] Current task loaded', {
       taskId,
       currentStatus: currentTask.status,
@@ -489,6 +489,7 @@ export async function PUT(
       }
 
       // Generate new task number for the new project
+      // Counter will be rolled back if update fails later
       const taskCounter = await Counter.findOneAndUpdate(
         { scope: 'task', project: newProject._id },
         { $inc: { seq: 1 }, $setOnInsert: { updatedAt: new Date() } },
@@ -500,6 +501,8 @@ export async function PUT(
 
       updateData.taskNumber = newTaskNumber
       updateData.displayId = newDisplayId
+      // Store project ref for potential counter rollback if update fails
+      updateData._counterRollbackProject = newProject._id
 
       console.log('[Task PUT] Generated new identifiers for project change', {
         newTaskNumber,
@@ -532,7 +535,7 @@ export async function PUT(
       const subtasksToUpdate = Object.prototype.hasOwnProperty.call(updateData, 'subtasks')
         ? sanitizeSubtasks(updateData.subtasks)
         : (currentTask.subtasks && Array.isArray(currentTask.subtasks) ? currentTask.subtasks : [])
-      
+
       if (subtasksToUpdate.length > 0) {
         const updatedSubtasks = subtasksToUpdate.map((subtask: any) => ({
           _id: subtask._id,
@@ -548,7 +551,7 @@ export async function PUT(
     // Check for concurrent modifications
     if (updateData.expectedVersion && currentTask.updatedAt.getTime() !== new Date(updateData.expectedVersion).getTime()) {
       return NextResponse.json(
-        { 
+        {
           error: 'Task was modified by another user. Please refresh and try again.',
           conflict: true,
           currentVersion: currentTask.updatedAt.toISOString()
@@ -563,13 +566,17 @@ export async function PUT(
       _id: taskId,
       organization: organizationId
     };
-    
+
     if (!hasTaskEditAll && !hasProjectViewAll) {
       updateQuery.$or = [
         { 'assignedTo.user': userId },
         { createdBy: userId }
       ];
     }
+
+    // Extract and remove internal rollback tracking field before saving
+    const counterRollbackProject = updateData._counterRollbackProject
+    delete updateData._counterRollbackProject
 
     const taskResult = await Task.findOneAndUpdate(
       updateQuery,
@@ -596,6 +603,16 @@ export async function PUT(
       .lean()
 
     if (!taskResult) {
+      // If update failed and we incremented a counter for a project change, roll it back
+      if (counterRollbackProject) {
+        const { Counter } = await import('@/models/Counter')
+        await Counter.findOneAndUpdate(
+          { scope: 'task', project: counterRollbackProject },
+          { $inc: { seq: -1 } }
+        ).catch(rollbackErr => {
+          console.error('[Task PUT] Failed to rollback counter:', rollbackErr)
+        })
+      }
       return NextResponse.json(
         { error: 'Task not found or unauthorized' },
         { status: 404 }
@@ -635,26 +652,26 @@ export async function PUT(
     const taskProjectId = (typeof task.project === 'object' && task.project !== null && '_id' in task.project)
       ? task.project._id
       : task.project
-    
+
     setImmediate(async () => {
       try {
         // Synchronize sprint tasks array if sprint changed
         if (Object.prototype.hasOwnProperty.call(updateData, 'sprint')) {
           // Normalize newSprintId - null/undefined/empty means moving to backlog
-          const newSprintId = (updateData.sprint === null || updateData.sprint === undefined || updateData.sprint === '') 
-            ? null 
+          const newSprintId = (updateData.sprint === null || updateData.sprint === undefined || updateData.sprint === '')
+            ? null
             : updateData.sprint
           const oldSprintId = currentTask.sprint
 
           const updates: Promise<unknown>[] = []
 
           // Get old sprint ID as string for comparison
-          const oldSprintIdStr = oldSprintId 
+          const oldSprintIdStr = oldSprintId
             ? (typeof oldSprintId === 'object' && oldSprintId !== null && '_id' in oldSprintId
-                ? String(oldSprintId._id)
-                : String(oldSprintId))
+              ? String(oldSprintId._id)
+              : String(oldSprintId))
             : null
-          
+
           // Get new sprint ID as string for comparison
           const newSprintIdStr = newSprintId ? String(newSprintId) : null
 
@@ -725,29 +742,29 @@ export async function PUT(
 
         // Send notifications for important changes (non-blocking)
         const notificationPromises: Promise<unknown>[] = []
-        
+
         // Notify if task was assigned to someone new
         const currentAssignedToIds = Array.isArray(currentTask.assignedTo)
           ? currentTask.assignedTo.map((item: any) => {
-              if (typeof item === 'object' && item.user) {
-                return typeof item.user === 'object' ? item.user._id?.toString() : item.user.toString()
-              }
-              return item.toString()
-            })
+            if (typeof item === 'object' && item.user) {
+              return typeof item.user === 'object' ? item.user._id?.toString() : item.user.toString()
+            }
+            return item.toString()
+          })
           : currentTask.assignedTo ? [currentTask.assignedTo.toString()] : []
         const newAssignedToIds = Array.isArray(updateData.assignedTo)
           ? updateData.assignedTo.map((item: any) => {
-              if (typeof item === 'object' && item.user) {
-                return typeof item.user === 'object' ? item.user._id?.toString() : item.user.toString()
-              }
-              return item.toString()
-            })
+            if (typeof item === 'object' && item.user) {
+              return typeof item.user === 'object' ? item.user._id?.toString() : item.user.toString()
+            }
+            return item.toString()
+          })
           : []
 
         const assignedUsersChanged = JSON.stringify(currentAssignedToIds.sort()) !== JSON.stringify(newAssignedToIds.sort())
 
-              let baseUrl: string
-        
+        let baseUrl: string
+
         // First, check if NEXT_PUBLIC_APP_URL is explicitly set (recommended for all environments)
         if (process.env.NEXT_PUBLIC_APP_URL) {
           baseUrl = process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '') // Remove trailing slash
@@ -757,16 +774,16 @@ export async function PUT(
           // When behind a proxy/load balancer, check x-forwarded-* headers first
           const forwardedHost = request.headers.get('x-forwarded-host')
           const forwardedProto = request.headers.get('x-forwarded-proto')
-          
+
           // Get the host from various sources, prioritizing origin/referer headers for external URLs
           const originHeader = request.headers.get('origin')
           const refererHeader = request.headers.get('referer')
           const hostHeader = request.headers.get('host')
-          
+
           // Extract host from origin or referer (these usually have the correct external domain)
           let extractedHost: string | null = null
           let extractedProtocol: string | null = null
-          
+
           if (originHeader) {
             try {
               const originUrl = new URL(originHeader)
@@ -776,7 +793,7 @@ export async function PUT(
               // Invalid origin, continue
             }
           }
-          
+
           if (!extractedHost && refererHeader) {
             try {
               const refererUrl = new URL(refererHeader)
@@ -786,7 +803,7 @@ export async function PUT(
               // Invalid referer, continue
             }
           }
-          
+
           // Determine protocol
           let protocol: string
           if (extractedProtocol) {
@@ -798,7 +815,7 @@ export async function PUT(
           } else {
             protocol = 'https' // Default to https for production domains
           }
-          
+
           // Determine host - prefer extracted host from origin/referer, then forwarded host, then host header
           let host: string
           if (extractedHost && !extractedHost.includes('localhost') && !extractedHost.includes('127.0.0.1')) {
@@ -812,13 +829,13 @@ export async function PUT(
             host = 'localhost:3000' // Fallback
             protocol = 'http'
           }
-          
+
           // Clean up host (remove any protocol prefix, remove trailing slash, remove port if default)
           host = host.replace(/^https?:\/\//, '').replace(/\/$/, '')
           // Remove default ports
           host = host.replace(/^(.+):80$/, '$1')
           host = host.replace(/^(.+):443$/, '$1')
-          
+
           baseUrl = `${protocol}://${host}`
           console.log('baseUrl from fallback logic:', baseUrl)
         }
@@ -883,7 +900,7 @@ export async function PUT(
           ? currentTask.assignedTo.map((id: any) => id.toString())
           : currentTask.assignedTo ? [currentTask.assignedTo.toString()] : []
 
-          
+
         currentAssignees.forEach((assigneeId: string) => {
           if (assigneeId !== userId) {
             console.log('Using baseUrl for update notification:', baseUrl)
@@ -964,7 +981,7 @@ export async function DELETE(
       _id: taskId,
       organization: organizationId
     };
-    
+
     if (!hasTaskDeleteAll && !hasProjectViewAll) {
       deleteQuery.createdBy = userId;
     }

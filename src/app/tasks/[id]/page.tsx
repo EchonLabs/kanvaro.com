@@ -1411,11 +1411,14 @@ export default function TaskDetailPage() {
               </Button>
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
                 <h1
-                  className="text-2xl font-semibold leading-snug text-foreground flex items-start gap-2 min-w-0 flex-wrap max-w-[70ch] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden break-words overflow-wrap-anywhere"
+                  className="text-2xl font-semibold leading-snug text-foreground flex items-center gap-3 min-w-0 flex-wrap"
                   title={`${task.title} ${task.displayId}`}
                 >
                   <span className="flex-shrink-0">{getTypeIcon(task.type)}</span>
-                  <span className="break-words overflow-wrap-anywhere">{task.title} {task.displayId}</span>
+                  <span className="break-words overflow-wrap-anywhere">{task.title}</span>
+                  <span className="inline-block px-3 py-2 bg-slate-800 dark:bg-slate-700 rounded-full text-sm font-mono font-bold text-white flex-shrink-0">
+                    {task.displayId}
+                  </span>
                 </h1>
                 <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap ml-auto justify-end">
                   <Button
@@ -1458,7 +1461,7 @@ export default function TaskDetailPage() {
               <CardContent>
                 {task.description ? (
                   <div
-                    className="prose prose-sm max-w-none text-foreground prose-img:max-w-full prose-img:h-auto prose-img:rounded-lg prose-img:shadow-sm prose-img:my-3"
+                    className="task-description max-w-none"
                     dangerouslySetInnerHTML={{ __html: task.description }}
                   />
                 ) : (

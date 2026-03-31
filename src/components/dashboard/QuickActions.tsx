@@ -69,62 +69,44 @@ export function QuickActions() {
     : quickActions.filter(action => hasAnyPermission(action.permissions))
 
   return (
-    <Card className="overflow-x-hidden">
-      <CardHeader className="p-4 sm:p-6">
-        <CardTitle className="text-base sm:text-lg truncate">Quick Actions</CardTitle>
-      </CardHeader>
-      <CardContent className="p-4 sm:p-6 pt-0">
-        <div className="grid grid-cols-1 gap-2 sm:gap-3">
-          {loading && (
-            <>
-              {[0,1,2,3,4].map((i) => (
-                <div key={i} className="h-12 sm:h-14 w-full animate-pulse rounded-md bg-muted/40" />
-              ))}
-            </>
-          )}
-          {!loading && availableActions.map((action, index) => {
-            const Icon = action.icon
-            
-            return (
-              <Link
-                key={index}
-                href={action.href}
-                prefetch={true}
-              >
-                <Button
-                  variant="ghost"
-                  className="h-auto p-3 sm:p-4 justify-start hover:bg-gray-50 dark:hover:bg-gray-800 w-full"
-                >
-                <div className={`p-1.5 sm:p-2 rounded-lg ${action.color} mr-2 sm:mr-3 flex-shrink-0`}>
-                  <Icon className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
-                </div>
-                <div className="text-left min-w-0 flex-1">
-                  <div className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white truncate">
-                    {action.title}
-                  </div>
-                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">
-                    {action.description}
-                  </div>
-                </div>
-                </Button>
-              </Link>
-            )
-          })}
-        </div>
-        
-        <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t">
-          <Link href="/projects" prefetch={true}>
-            <Button 
-              variant="outline" 
-              className="w-full text-xs sm:text-sm"
+    <div className="space-y-2">
+      <h2 className="text-sm font-semibold text-foreground">Quick Actions</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
+        {loading && (
+          <>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-24 sm:h-28 w-full animate-pulse rounded-lg bg-muted/40" />
+            ))}
+          </>
+        )}
+        {!loading && availableActions.map((action, index) => {
+          const Icon = action.icon
+
+          return (
+            <Link
+              key={index}
+              href={action.href}
+              prefetch={true}
             >
-              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-              View All Projects
-              <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-2" />
-            </Button>
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
+              <Card className="h-full hover:shadow-md transition-all duration-200 hover:scale-105 cursor-pointer border border-border">
+                <CardContent className="p-2.5 sm:p-3 h-full flex flex-col items-center justify-center text-center gap-2">
+                  <div className={`p-1.5 sm:p-2 rounded-md ${action.color}`}>
+                    <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                  </div>
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="text-xs sm:text-sm font-semibold text-foreground truncate">
+                      {action.title}
+                    </div>
+                    <div className="text-xs text-muted-foreground line-clamp-2">
+                      {action.description}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          )
+        })}
+      </div>
+    </div>
   )
 }

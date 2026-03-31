@@ -53,6 +53,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { format } from 'date-fns'
 import { DateRange } from 'react-day-picker'
 import { DEFAULT_TASK_STATUS_KEYS, type TaskStatusKey } from '@/constants/taskStatuses'
+import { validateAndCorrectDateRange } from '@/lib/dateRangeValidation'
 
 import CreateTaskModal from './CreateTaskModal'
 // Removed bulk upload import
@@ -223,6 +224,18 @@ export default function TasksClient({
       // Trigger a fresh fetch with reset filters
       fetchTasks(true)
     }
+
+    // Handle date range changes with validation and auto-correction
+    const handleDateRangeChange = useCallback((range: DateRange | undefined) => {
+      if (!range) {
+        setDateRangeFilter(undefined)
+        return
+      }
+      
+      // Validate and auto-correct the date range
+      const correctedRange = validateAndCorrectDateRange(range.from, range.to)
+      setDateRangeFilter(correctedRange as DateRange | undefined)
+    }, [])
 
     const startDateBoundary = useMemo(() => {
         if (!dateRangeFilter?.from) return null
@@ -1151,7 +1164,7 @@ export default function TasksClient({
                                                 mode="range"
                                                 defaultMonth={dateRangeFilter?.from}
                                                 selected={dateRangeFilter}
-                                                onSelect={setDateRangeFilter}
+                                                onSelect={handleDateRangeChange}
                                                 numberOfMonths={2}
                                             />
                                         </PopoverContent>

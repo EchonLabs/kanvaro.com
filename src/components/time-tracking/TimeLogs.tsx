@@ -24,6 +24,7 @@ import { useToast } from '@/components/ui/Toast'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { detectClientTimezone } from '@/lib/timezone'
 import { HRManualTimeLogModal } from '@/components/time-tracking/HRManualTimeLogModal'
+import { validateAndCorrectDateRangeStrings } from '@/lib/dateRangeValidation'
 
 interface TimeLogsProps {
   userId: string
@@ -1218,6 +1219,16 @@ export function TimeLogs({
         }
       }
 
+      // Validate and auto-correct date range when start or end date changes
+      if (key === 'startDate' || key === 'endDate') {
+        const corrected = validateAndCorrectDateRangeStrings(
+          key === 'startDate' ? newFilters.startDate : prev.startDate,
+          key === 'endDate' ? newFilters.endDate : prev.endDate
+        )
+        newFilters.startDate = corrected.startDate
+        newFilters.endDate = corrected.endDate
+      }
+
       return newFilters
     })
     setPagination(prev => ({ ...prev, page: 1 }))
@@ -2081,8 +2092,8 @@ export function TimeLogs({
               {/* <Clock className="h-5 w-5" />
             Time Logs */}
             </CardTitle>
-            {/* HR Manual Time Log Button - visible only to HR role */}
-            {currentUserRole === 'human_resource' && (
+            {/* HR Manual Time Log Button - visible only to HR role and only in Timer tab */}
+            {currentUserRole === 'human_resource' && !showManualLogButtons && pathname === '/time-tracking/timer' && (
               <Button
                 onClick={() => setShowHRManualLogModal(true)}
                 size="sm"
