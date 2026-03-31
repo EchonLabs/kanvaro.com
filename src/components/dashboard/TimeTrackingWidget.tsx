@@ -219,8 +219,10 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
   const handleTimerUpdate = (timer: ActiveTimer | null) => {
     setActiveTimer(timer)
     if (!timer) {
-      // Timer was stopped, refresh stats
-      loadTimeStats()
+      // Timer was stopped, wait a moment for backend to save the entry, then refresh stats
+      setTimeout(() => {
+        loadTimeStats()
+      }, 500)
     }
   }
 
@@ -250,30 +252,25 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Active Timer Widget - Conditionally Visible */}
       {activeTimer && (
         <Card className="overflow-x-hidden border-primary/20">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-              <Clock className="h-5 w-5 text-primary flex-shrink-0" />
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Clock className="h-4 w-4 text-primary flex-shrink-0" />
               <span className="truncate">Active Timer</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-center py-2">
-              <div className="text-4xl font-mono font-bold text-primary break-words mb-2">
+          <CardContent className="space-y-2">
+            <div className="text-center py-1">
+              <div className="text-2xl sm:text-3xl font-mono font-bold text-primary break-words mb-1">
                 {displayTime}
               </div>
-              {/* {activeTimer.hourlyRate != null && activeTimer.hourlyRate > 0  && (
-                <div className="text-sm font-medium text-green-600 dark:text-green-400">
-                  <span className="break-words">{formatCurrency((activeTimer.hourlyRate * activeTimer.currentDuration) / 60)}</span>
-                </div>
-              )} */}
             </div>
 
-            <div className="border-t pt-4 space-y-2.5">
-              <div className="text-sm break-words">
+            <div className="border-t pt-2 space-y-1.5">
+              <div className="text-xs break-words">
                 <span className="font-semibold text-foreground">Project:</span>{' '}
                 {activeTimer.project?.name ? (
                   <span
@@ -289,18 +286,18 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
                 )}
               </div>
               {activeTimer.task && (
-                <div className="text-sm break-words">
+                <div className="text-xs break-words">
                   <span className="font-semibold text-foreground">Task:</span>{' '}
                   <span className="truncate">{activeTimer.task.title}</span>
                 </div>
               )}
               {activeTimer.description && (
-                <div className="text-sm">
+                <div className="text-xs">
                   <span className="font-semibold text-foreground">Memo:</span>{' '}
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span>
+                        <span className="line-clamp-1">
                           {activeTimer.description}
                         </span>
                       </TooltipTrigger>
@@ -311,10 +308,10 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
                   </TooltipProvider>
                 </div>
               )}
-              <div className="flex flex-wrap items-center gap-2 pt-1">
+              <div className="flex flex-wrap items-center gap-1 pt-1">
                 <Badge
                   variant={activeTimer.isPaused ? 'secondary' : 'default'}
-                  className={`text-xs flex-shrink-0 ${activeTimer.isPaused ? 'hover:!bg-secondary dark:hover:!bg-secondary' : 'hover:!bg-primary dark:hover:!bg-primary'}`}
+                  className={`text-xs flex-shrink-0 hover:!bg-secondary dark:hover:!bg-secondary ${activeTimer.isPaused ? '' : 'hover:!bg-primary dark:hover:!bg-primary'}`}
                 >
                   {activeTimer.isPaused ? 'Paused' : 'Running'}
                 </Badge>
@@ -324,22 +321,22 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-1.5 pt-1">
               <Button
                 size="sm"
                 variant="outline"
                 disabled={isLoading}
                 onClick={() => updateTimerAction(activeTimer.isPaused ? 'resume' : 'pause')}
-                className="w-full text-xs sm:text-sm whitespace-nowrap"
+                className="w-full text-xs whitespace-nowrap px-2 py-1 h-auto"
               >
                 {activeTimer.isPaused ? (
                   <>
-                    <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                    <Play className="h-3 w-3 mr-1" />
                     Resume
                   </>
                 ) : (
                   <>
-                    <Pause className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                    <Pause className="h-3 w-3 mr-1" />
                     Pause
                   </>
                 )}
@@ -349,9 +346,9 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
                 variant="destructive"
                 disabled={isLoading}
                 onClick={() => setShowStopConfirm(true)}
-                className="w-full text-xs sm:text-sm whitespace-nowrap"
+                className="w-full text-xs whitespace-nowrap px-2 py-1 h-auto"
               >
-                <Square className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                <Square className="h-3 w-3 mr-1" />
                 Stop
               </Button>
               <Button
@@ -365,10 +362,10 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
                   const qs = [pid, pname, tid, tname].filter(Boolean).join('&')
                   router.push(qs ? `/time-tracking/timer?${qs}` : '/time-tracking/timer')
                 }}
-                className="w-full text-xs sm:text-sm whitespace-nowrap"
+                className="w-full text-xs whitespace-nowrap px-2 py-1 h-auto"
               >
-                <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                Manage<span className="hidden sm:inline"> Timer</span>
+                <Clock className="h-3 w-3 mr-1" />
+                Info
               </Button>
             </div>
           </CardContent>
@@ -413,81 +410,81 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
 
       {/* Time Tracking Widget - Always Visible */}
       <Card className="overflow-x-hidden">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-            <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <span className="truncate">Time Tracking</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-2">
           {error && (
             <Alert variant="destructive">
-              <AlertDescription className="text-xs sm:text-sm break-words">{error}</AlertDescription>
+              <AlertDescription className="text-xs break-words">{error}</AlertDescription>
             </Alert>
           )}
 
           {timeStats && (
-            <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
+            <div className="grid grid-cols-3 gap-2 text-center">
               <div>
-                <div className="text-lg sm:text-2xl font-bold text-primary break-words">
+                <div className="text-base sm:text-lg font-bold text-primary break-words">
                   {formatDuration(timeStats.todayDuration)}
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">Today</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Today</div>
               </div>
               <div>
-                <div className="text-lg sm:text-2xl font-bold text-blue-600 break-words">
+                <div className="text-base sm:text-lg font-bold text-blue-600 break-words">
                   {formatDuration(timeStats.weekDuration)}
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">This Week</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Week</div>
               </div>
               <div>
-                <div className="text-lg sm:text-2xl font-bold text-green-600 break-words">
+                <div className="text-base sm:text-lg font-bold text-green-600 break-words">
                   {formatDuration(timeStats.monthDuration)}
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">This Month</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Month</div>
               </div>
             </div>
           )}
 
           {timeStats && (timeStats.todayCost > 0 || timeStats.weekCost > 0 || timeStats.monthCost > 0) && (
-            <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
+            <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t">
               <div>
-                <div className="text-sm sm:text-lg font-semibold text-green-600 break-words">
+                <div className="text-xs sm:text-sm font-semibold text-green-600 break-words">
                   {formatCurrency(timeStats.todayCost)}
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">Today</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Today</div>
               </div>
               <div>
-                <div className="text-sm sm:text-lg font-semibold text-green-600 break-words">
+                <div className="text-xs sm:text-sm font-semibold text-green-600 break-words">
                   {formatCurrency(timeStats.weekCost)}
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">This Week</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Week</div>
               </div>
               <div>
-                <div className="text-sm sm:text-lg font-semibold text-green-600 break-words">
+                <div className="text-xs sm:text-sm font-semibold text-green-600 break-words">
                   {formatCurrency(timeStats.monthCost)}
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">This Month</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Month</div>
               </div>
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col gap-1.5 pt-1">
             <Button
               size="sm"
               onClick={() => router.push('/time-tracking')}
-              className="flex-1 text-xs sm:text-sm"
+              className="w-full text-xs py-1 h-auto"
             >
-              <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+              <Play className="h-3 w-3 mr-1.5" />
               Time Tracking Details
             </Button>
             <Button
               size="sm"
               variant="outline"
               onClick={() => router.push('/time-tracking/logs')}
-              className="flex-1 sm:flex-initial text-xs sm:text-sm"
+              className="w-full text-xs py-1 h-auto"
             >
-              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+              <TrendingUp className="h-3 w-3 mr-1.5" />
               View Logs
             </Button>
           </div>
