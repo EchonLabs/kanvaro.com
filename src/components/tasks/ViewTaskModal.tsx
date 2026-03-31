@@ -232,7 +232,7 @@ export default function ViewTaskModal({
               <label className="text-sm font-medium text-muted-foreground">Description</label>
               <div className="mt-1 p-3 bg-muted rounded-lg">
                 <div
-                  className="prose prose-sm max-w-none text-sm prose-img:max-w-[300px] prose-img:h-auto prose-img:rounded"
+                  className="task-description text-sm max-w-none"
                   dangerouslySetInnerHTML={{ __html: task.description }}
                 />
               </div>

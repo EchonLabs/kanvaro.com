@@ -48,6 +48,7 @@ import { useNotify } from '@/lib/notify'
 import { usePermissions } from '@/lib/permissions/permission-hooks'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionGate } from '@/lib/permissions/permission-components'
+import { validateAndCorrectDateRange, validateAndCorrectDateRangeStrings } from '@/lib/dateRangeValidation'
 import { extractUserId } from '@/lib/auth/user-utils'
 
 interface UserSummary {
@@ -626,11 +627,30 @@ export default function BacklogPage() {
   }
 
   const handleCreatedDateChange = (type: 'from' | 'to', date: Date | undefined) => {
-    setCreatedDateRange((prev) => ({
-      ...prev,
-      [type]: date
-    }))
+    setCreatedDateRange((prev) => {
+      const updated = {
+        ...prev,
+        [type]: date
+      }
+      // Validate and auto-correct the date range for created date
+      if (updated.from && updated.to) {
+        const corrected = validateAndCorrectDateRange(updated.from, updated.to)
+        return { from: corrected.from, to: corrected.to }
+      }
+      return updated
+    })
   }
+
+  const handleDueDateRangeChange = useCallback((range: DateRange | undefined) => {
+    if (!range) {
+      setDateRangeFilter(undefined)
+      return
+    }
+    
+    // Validate and auto-correct the date range
+    const correctedRange = validateAndCorrectDateRange(range.from, range.to)
+    setDateRangeFilter(correctedRange as DateRange | undefined)
+  }, [])
 
   const resetSprintModalState = () => {
     clearSprintSelection()

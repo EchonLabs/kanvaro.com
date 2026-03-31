@@ -15,6 +15,7 @@ import { applyRoundingRules } from '@/lib/utils'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Permission, Role, ROLE_PERMISSIONS } from '@/lib/permissions/permission-definitions'
+import { validateAndCorrectDateRangeStrings } from '@/lib/dateRangeValidation'
 
 interface TimeReportsProps {
   userId?: string
@@ -162,9 +163,19 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
 
   // Handle date input blur to sync with filters (only when user finishes interacting)
   const handleDateBlur = (dateType: 'start' | 'end') => {
+    // Validate and auto-correct the date range
+    const corrected = validateAndCorrectDateRangeStrings(
+      dateType === 'start' ? tempStartDate : filters.startDate,
+      dateType === 'end' ? tempEndDate : filters.endDate
+    )
+    
+    setTempStartDate(corrected.startDate)
+    setTempEndDate(corrected.endDate)
+    
     setFilters(prev => ({
       ...prev,
-      [dateType === 'start' ? 'startDate' : 'endDate']: dateType === 'start' ? tempStartDate : tempEndDate
+      startDate: corrected.startDate,
+      endDate: corrected.endDate
     }))
   }
 

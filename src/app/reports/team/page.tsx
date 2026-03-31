@@ -21,6 +21,7 @@ import { TeamOverviewReport } from '@/components/reports/TeamOverviewReport'
 import { TeamPerformanceReport } from '@/components/reports/TeamPerformanceReport'
 import { TeamProductivityReport } from '@/components/reports/TeamProductivityReport'
 import { TeamWorkloadReport } from '@/components/reports/TeamWorkloadReport'
+import { validateAndCorrectDateRange } from '@/lib/dateRangeValidation'
 
 interface TeamMember {
   _id: string
@@ -177,13 +178,23 @@ export default function TeamReportsPage() {
   }
 
   const handleDateRangeChange = (key: 'from' | 'to', date: Date | undefined) => {
-    setFilters(prev => ({
-      ...prev,
-      dateRange: {
-        ...prev.dateRange,
-        [key]: date
+    setFilters(prev => {
+      const updated = {
+        ...prev,
+        dateRange: {
+          ...prev.dateRange,
+          [key]: date
+        }
       }
-    }))
+      
+      // Validate and auto-correct the date range
+      if (updated.dateRange.from && updated.dateRange.to) {
+        const corrected = validateAndCorrectDateRange(updated.dateRange.from, updated.dateRange.to)
+        updated.dateRange = corrected as { from: Date | undefined; to: Date | undefined }
+      }
+      
+      return updated
+    })
   }
 
   const clearFilters = () => {

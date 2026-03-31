@@ -162,12 +162,7 @@ export default function TimeTrackingPage() {
   }, [activeTimer])
 
   const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
-    if (hours > 0) {
-      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
-    }
-    return `${mins}m`
+    return minutes.toFixed(2)
   }
 
   const formatDate = (dateString: string) => {

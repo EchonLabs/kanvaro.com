@@ -199,6 +199,38 @@
   z-index: 1;
 }
 
+/* Rich Text Editor text color */
+.rich-text-editor {
+  color: hsl(var(--foreground)) !important;
+}
+
+.rich-text-editor * {
+  color: hsl(var(--foreground)) !important;
+  background-color: transparent !important;
+}
+
+.rich-text-editor p,
+.rich-text-editor div,
+.rich-text-editor span,
+.rich-text-editor h1,
+.rich-text-editor h2,
+.rich-text-editor h3,
+.rich-text-editor h4,
+.rich-text-editor h5,
+.rich-text-editor h6,
+.rich-text-editor li,
+.rich-text-editor strong,
+.rich-text-editor em {
+  color: hsl(var(--foreground)) !important;
+  background-color: transparent !important;
+}
+
+/* Keep links blue */
+.rich-text-editor a {
+  color: rgb(59, 130, 246) !important;
+  background-color: transparent !important;
+}
+
 /* Rich Text Editor image constraints */
 .rich-text-editor img {
   max-width: 100% !important;
@@ -206,6 +238,48 @@
   height: auto;
   display: block;
   box-sizing: border-box;
+  background-color: transparent !important;
+}
+
+/* Task description display - Override prose styles for proper theme colors */
+.task-description {
+  color: hsl(var(--foreground)) !important;
+}
+
+.task-description * {
+  color: hsl(var(--foreground)) !important;
+  background-color: transparent !important;
+}
+
+.task-description p,
+.task-description div,
+.task-description span,
+.task-description h1,
+.task-description h2,
+.task-description h3,
+.task-description h4,
+.task-description h5,
+.task-description h6,
+.task-description li,
+.task-description strong,
+.task-description em,
+.task-description ul,
+.task-description ol {
+  color: hsl(var(--foreground)) !important;
+  background-color: transparent !important;
+}
+
+.task-description a {
+  color: rgb(59, 130, 246) !important;
+  background-color: transparent !important;
+}
+
+.task-description img {
+  max-width: 100% !important;
+  height: auto !important;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background-color: transparent !important;
 }
 
 /* Rich Text Editor List Styles */

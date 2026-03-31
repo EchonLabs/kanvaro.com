@@ -75,6 +75,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { DateRange } from 'react-day-picker'
 import { format } from 'date-fns'
 import { useNotify } from '@/lib/notify'
+import { validateAndCorrectDateRange } from '@/lib/dateRangeValidation'
 
 interface Task {
   _id: string
@@ -332,6 +333,18 @@ export default function KanbanPage() {
     setAssignedByFilterQuery('')
     setTaskNumberFilterQuery('')
   }
+
+  // Handle date range changes with validation and auto-correction
+  const handleDateRangeChange = useCallback((range: DateRange | undefined) => {
+    if (!range) {
+      setDateRangeFilter(undefined)
+      return
+    }
+    
+    // Validate and auto-correct the date range
+    const correctedRange = validateAndCorrectDateRange(range.from, range.to)
+    setDateRangeFilter(correctedRange as DateRange | undefined)
+  }, [])
 
   // Use the task state management hook
   const {
@@ -1332,7 +1345,7 @@ export default function KanbanPage() {
                       mode="range"
                       defaultMonth={dateRangeFilter?.from}
                       selected={dateRangeFilter}
-                      onSelect={setDateRangeFilter}
+                      onSelect={handleDateRangeChange}
                       numberOfMonths={2}
                     />
                     <div className="p-3 border-t">

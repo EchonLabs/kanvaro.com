@@ -413,16 +413,25 @@ async function handleCreate(
       task.createdAt = taskData.createdAt
     }
 
-    await task.save({ timestamps: !taskData.createdAt })
+    try {
+      await task.save({ timestamps: !taskData.createdAt })
+    } catch (saveError) {
+      // Roll back the counter to prevent number gaps
+      counter.seq -= 1
+      await counter.save().catch((rollbackErr: any) => {
+        console.error('[bulk-csv] Failed to rollback counter after save error:', rollbackErr)
+      })
+      throw saveError
+    }
     createdTasks.push(task)
   }
 
   // Invalidate caches (non-blocking)
   for (const pid of projectIdsArray) {
-    invalidateCache(`tasks:*project:${pid}*`).catch(() => {})
+    invalidateCache(`tasks:*project:${pid}*`).catch(() => { })
   }
   if (organizationId) {
-    invalidateCache(`tasks:*org:${organizationId}*`).catch(() => {})
+    invalidateCache(`tasks:*org:${organizationId}*`).catch(() => { })
   }
 
   return NextResponse.json({

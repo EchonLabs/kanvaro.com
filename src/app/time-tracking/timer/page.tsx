@@ -1749,8 +1749,8 @@ export default function TimerPage() {
           <TimeLogs
             userId={user.id}
             organizationId={user.organization}
-            projectId={selectedProject || undefined}
-            taskId={selectedTask || undefined}
+            projectId={undefined}
+            taskId={undefined}
             refreshKey={timeLogsRefreshKey}
             liveActiveTimer={liveActiveTimer}
             showSelectionAndApproval={false}
