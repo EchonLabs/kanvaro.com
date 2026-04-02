@@ -594,7 +594,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <TooltipProvider>
-        <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col m-4 sm:m-6">
+        <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col m-4 sm:m-6 overflow-hidden">
           <CardHeader className="flex-shrink-0">
             <div className="flex items-center justify-between">
               <div>
@@ -608,7 +608,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto">
             <form onSubmit={handleSubmit} className="space-y-6" id="edit-task-form">
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2 min-w-0 overflow-hidden">
                 <div className="md:col-span-2">
                   <label className="text-sm font-medium text-foreground">Task Title *</label>
                   <Input
@@ -622,7 +622,7 @@ export default function EditTaskModal({ isOpen, onClose, task, onTaskUpdated }: 
 
                 <div className="md:col-span-2">
                   <label className="text-sm font-medium text-foreground">Description</label>
-                  <div className="mt-1 overflow-hidden rounded-md">
+                  <div className="mt-1 overflow-hidden rounded-md min-w-0">
                     <RichTextEditor
                       value={formData.description}
                       onChange={(value) => setFormData(prev => ({ ...prev, description: value }))}

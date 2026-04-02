@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 
 interface TimerProps {
@@ -60,6 +61,7 @@ export function Timer({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [displayTime, setDisplayTime] = useState('00:00:00')
+  const [showStopConfirmation, setShowStopConfirmation] = useState(false)
   // Local ticking baseline when running
   const baseMinutesRef = useRef<number>(0)
   const tickStartMsRef = useRef<number | null>(null)
@@ -270,6 +272,7 @@ export function Timer({
   const handleStopTimer = async () => {
     setIsLoading(true)
     setError('')
+    setShowStopConfirmation(false)
 
     try {
       const response = await fetch('/api/time-tracking/timer', {
@@ -300,6 +303,10 @@ export function Timer({
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleConfirmStop = () => {
+    handleStopTimer()
   }
 
   const handleUpdateTimer = async () => {
@@ -386,10 +393,21 @@ export function Timer({
                 Pause
               </Button>
             )}
-            <Button onClick={handleStopTimer} disabled={isLoading} variant="destructive">
+            <Button onClick={() => setShowStopConfirmation(true)} disabled={isLoading} variant="destructive">
               <Square className="h-4 w-4 mr-2" />
               Stop
             </Button>
+            <ConfirmationModal
+              isOpen={showStopConfirmation}
+              onClose={() => setShowStopConfirmation(false)}
+              onConfirm={handleConfirmStop}
+              title="Stop Timer?"
+              description={`Are you sure you want to stop the timer? You have logged ${displayTime} so far.`}
+              confirmText="Stop"
+              cancelText="Cancel"
+              variant="destructive"
+              isLoading={isLoading}
+            />
           </div>
         </CardContent>
       </Card>

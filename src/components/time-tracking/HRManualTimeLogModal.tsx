@@ -681,7 +681,7 @@ export function HRManualTimeLogModal({
                                   <TooltipTrigger asChild>
                                     <span className="truncate block">{task.title}</span>
                                   </TooltipTrigger>
-                                  <TooltipContent side="left" className="max-w-sm">
+                                  <TooltipContent side="top" className="max-w-sm">
                                     <p className="font-medium">{task.title}</p>
                                   </TooltipContent>
                                 </Tooltip>

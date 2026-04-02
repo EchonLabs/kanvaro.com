@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   try {
     await connectDB()
     const authResult = await authenticateUser()
-    
+
     if ('error' in authResult) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
@@ -64,11 +64,14 @@ export async function GET(req: NextRequest) {
       .skip(skip)
       .limit(limit)
 
+    // Filter out test cases with deleted/null test suites to prevent client-side errors
+    const validTestCases = testCases.filter((tc: any) => tc.testSuite != null)
+
     const total = await TestCase.countDocuments(query)
 
     return NextResponse.json({
       success: true,
-      data: testCases,
+      data: validTestCases,
       pagination: {
         page,
         limit,
@@ -89,7 +92,7 @@ export async function POST(req: NextRequest) {
   try {
     await connectDB()
     const authResult = await authenticateUser()
-    
+
     if ('error' in authResult) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }

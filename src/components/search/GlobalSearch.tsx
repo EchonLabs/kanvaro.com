@@ -237,12 +237,6 @@ export function GlobalSearch({ className, placeholder = "Search projects, tasks,
             )}
           </div>
           
-          {result.description && (
-            <p className="text-sm text-muted-foreground truncate mt-1">
-              {result.description}
-            </p>
-          )}
-          
           {result.metadata.assignee && (
             <div className="flex items-center space-x-2 mt-1">
               <span className="text-xs text-muted-foreground">

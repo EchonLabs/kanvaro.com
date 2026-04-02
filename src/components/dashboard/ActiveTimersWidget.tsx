@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Clock, Square, User, FolderOpen, Loader2, RefreshCw, Search } from 'lucide-react'
+import { Clock, Square, User, FolderOpen, Loader2, RefreshCw, Search, AlertTriangle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/Dialog'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { useToast } from '@/components/ui/Toast'
@@ -71,6 +72,7 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
   const [projectSearch, setProjectSearch] = useState<string>('')
   const [isLoading, setIsLoading] = useState(false)
   const [isStopping, setIsStopping] = useState<string | null>(null)
+  const [stopConfirmTimerId, setStopConfirmTimerId] = useState<string | null>(null)
   const [displayTimes, setDisplayTimes] = useState<Record<string, string>>({})
   const timerBaselinesRef = useRef<Record<string, TimerBaseline>>({})
 
@@ -223,8 +225,14 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
     }
   }, [canViewAllTimers, permissionsLoading, selectedEmployeeId, selectedProjectId, organizationId, syncTimerBaselines])
 
-  // Stop a timer
+  // Show confirmation before stopping a timer
+  const requestStopTimer = (timerId: string) => {
+    setStopConfirmTimerId(timerId)
+  }
+
+  // Actually stop the timer after confirmation
   const handleStopTimer = async (timerId: string) => {
+    setStopConfirmTimerId(null)
     setIsStopping(timerId)
     try {
       const response = await fetch('/api/time-tracking/timers/all', {
@@ -263,6 +271,9 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
       setIsStopping(null)
     }
   }
+
+  // Get the timer being confirmed for stop
+  const timerToStop = stopConfirmTimerId ? timers.find(t => t._id === stopConfirmTimerId) : null
 
   // Initial load - only if user has permission
   useEffect(() => {
@@ -480,7 +491,7 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => handleStopTimer(timer._id)}
+                        onClick={() => requestStopTimer(timer._id)}
                         disabled={isStopping === timer._id}
                         className="h-7 px-2 text-xs"
                       >
@@ -501,6 +512,39 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
           </div>
         )}
       </CardContent>
+
+      {/* Stop Timer Confirmation Dialog */}
+      <Dialog open={!!stopConfirmTimerId} onOpenChange={(open) => !open && setStopConfirmTimerId(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Stop Timer
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to stop this timer?
+              {timerToStop && (
+                <span className="block mt-2 text-foreground font-medium">
+                  {timerToStop.user.firstName} {timerToStop.user.lastName} — {timerToStop.project.name}
+                  {timerToStop.task && ` • ${timerToStop.task.title}`}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStopConfirmTimerId(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => stopConfirmTimerId && handleStopTimer(stopConfirmTimerId)}
+            >
+              <Square className="h-4 w-4 mr-2" />
+              Stop Timer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

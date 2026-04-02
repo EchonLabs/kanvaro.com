@@ -14,15 +14,23 @@ interface TestSuite {
   project: string
 }
 
+interface Project {
+  _id: string
+  name: string
+}
+
 interface TestSuiteFormProps {
   testSuite?: TestSuite
   projectId: string
+  projectName?: string
   onSave: (testSuite: TestSuite) => void
   onCancel: () => void
   loading?: boolean
+  showProjectSelector?: boolean
+  onProjectChange?: (projectId: string) => void
 }
 
-export function TestSuiteForm({ testSuite, projectId, onSave, onCancel, loading = false }: TestSuiteFormProps) {
+export function TestSuiteForm({ testSuite, projectId, projectName, onSave, onCancel, loading = false, showProjectSelector = false, onProjectChange }: TestSuiteFormProps) {
   const [formData, setFormData] = useState<TestSuite>({
     name: '',
     description: '',
@@ -31,15 +39,65 @@ export function TestSuiteForm({ testSuite, projectId, onSave, onCancel, loading 
     ...testSuite
   })
   const [parentSuites, setParentSuites] = useState<TestSuite[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
+  // Use testSuite.project if editing, otherwise use projectId
+  const [currentProjectId, setCurrentProjectId] = useState(testSuite?.project || projectId)
+  const [selectedProjectName, setSelectedProjectName] = useState(projectName || '')
 
   useEffect(() => {
-    fetchParentSuites()
-  }, [projectId, testSuite?._id])
+    if (showProjectSelector || currentProjectId) {
+      // Fetch projects if:
+      // 1. showProjectSelector is true (user needs to pick a project), OR
+      // 2. currentProjectId is set but we don't have the name yet (editing existing suite)
+      if (projects.length === 0) {
+        fetchProjects()
+      }
+    }
+  }, [showProjectSelector, currentProjectId, projects.length])
 
-  const fetchParentSuites = async () => {
+  useEffect(() => {
+    setCurrentProjectId(testSuite?.project || projectId)
+    setSelectedProjectName(projectName || '')
+    setFormData(prev => ({
+      ...prev,
+      project: testSuite?.project || projectId,
+      ...testSuite
+    }))
+  }, [projectId, projectName, testSuite])
+
+  useEffect(() => {
+    if (currentProjectId && projects.length > 0) {
+      const selected = projects.find(p => p._id === currentProjectId)
+      if (selected) {
+        setSelectedProjectName(selected.name)
+      }
+    }
+  }, [currentProjectId, projects])
+
+  useEffect(() => {
+    if (currentProjectId) {
+      fetchParentSuites(currentProjectId)
+    } else {
+      setParentSuites([])
+    }
+  }, [currentProjectId, testSuite?._id])
+
+  const fetchProjects = async () => {
     try {
-      const response = await fetch(`/api/test-suites?projectId=${projectId}`)
+      const response = await fetch('/api/projects')
+      const data = await response.json()
+      if (data.success) {
+        setProjects(data.data)
+      }
+    } catch (error) {
+      console.error('Error fetching projects:', error)
+    }
+  }
+
+  const fetchParentSuites = async (projId: string) => {
+    try {
+      const response = await fetch(`/api/test-suites?projectId=${projId}`)
       const data = await response.json()
       if (data.success) {
         // Filter out the current suite to prevent self-parenting
@@ -51,9 +109,23 @@ export function TestSuiteForm({ testSuite, projectId, onSave, onCancel, loading 
     }
   }
 
+  const handleProjectChange = (newProjectId: string) => {
+    setCurrentProjectId(newProjectId)
+    // Find and display the selected project name
+    const selected = projects.find(p => p._id === newProjectId)
+    if (selected) {
+      setSelectedProjectName(selected.name)
+    }
+    setFormData(prev => ({ ...prev, project: newProjectId, parentSuite: '' }))
+    onProjectChange?.(newProjectId)
+  }
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
+    if (showProjectSelector && !currentProjectId) {
+      newErrors.project = 'Project is required'
+    }
     if (!formData.name.trim()) {
       newErrors.name = 'Name is required'
     }
@@ -75,6 +147,32 @@ export function TestSuiteForm({ testSuite, projectId, onSave, onCancel, loading 
   return (
     <div className="w-full">
       <form onSubmit={handleSubmit} className="space-y-6" id="test-suite-form">
+        {showProjectSelector && (
+          <div className="space-y-2">
+            <Label htmlFor="project">Project *</Label>
+            <Select
+              value={currentProjectId || 'none'}
+              onValueChange={(value) => handleProjectChange(value === 'none' ? '' : value)}
+            >
+              <SelectTrigger className={errors.project ? 'border-red-500' : ''}>
+                {selectedProjectName ? (
+                  <span className="text-sm font-medium">{selectedProjectName}</span>
+                ) : (
+                  <SelectValue placeholder="Select a project" />
+                )}
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((project) => (
+                  <SelectItem key={project._id} value={project._id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.project && <p className="text-sm text-red-600">{errors.project}</p>}
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="name">Name *</Label>
           <Input
@@ -102,8 +200,8 @@ export function TestSuiteForm({ testSuite, projectId, onSave, onCancel, loading 
 
         <div className="space-y-2">
           <Label htmlFor="parentSuite">Parent Suite (Optional)</Label>
-          <Select 
-            value={formData.parentSuite || 'none'} 
+          <Select
+            value={formData.parentSuite || 'none'}
             onValueChange={(value) => setFormData(prev => ({ ...prev, parentSuite: value === 'none' ? undefined : value }))}
           >
             <SelectTrigger>

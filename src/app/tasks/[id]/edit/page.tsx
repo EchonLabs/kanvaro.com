@@ -103,7 +103,7 @@ const mapTaskFormState = (data: any): TaskFormState => ({
   story: data?.story?._id ?? data?.story ?? undefined,
   epic: data?.epic?._id ?? data?.epic ?? undefined,
   isBillable: typeof data?.isBillable === 'boolean' ? data.isBillable : undefined,
- // storyPoints: typeof data?.storyPoints === 'number' ? data.storyPoints : undefined
+  // storyPoints: typeof data?.storyPoints === 'number' ? data.storyPoints : undefined
 })
 
 const mapSubtasksFromResponse = (input: any): Subtask[] => {
@@ -173,8 +173,8 @@ const mapAttachmentsFromResponse = (input: any): AttachmentDraft[] => {
       const uploadedByName =
         typeof uploadedBy === 'object' && uploadedBy !== null
           ? `${uploadedBy.firstName || ''} ${uploadedBy.lastName || ''}`.trim() ||
-            uploadedBy.email ||
-            'Unknown'
+          uploadedBy.email ||
+          'Unknown'
           : undefined
 
       return {
@@ -352,7 +352,7 @@ export default function EditTaskPage() {
       { label: 'Tasks', href: '/tasks' },
       { label: 'Edit Task' }
     ])
-    
+
     try {
       setLoading(true)
       const res = await fetch(`/api/tasks/${taskId}`)
@@ -391,7 +391,7 @@ export default function EditTaskPage() {
         setProjectFilterQuery('')
         setAssignedToFilterQuery('')
         fetchProjects()
-        
+
         // Fetch team members for the project if one is set
         // On initial load: fetch team members and preserve existing assignee if valid
         if (normalizedTask.project) {
@@ -457,7 +457,7 @@ export default function EditTaskPage() {
     try {
       const response = await fetch('/api/projects?limit=1000&page=1')
       const data = await response.json()
-      
+
       if (data.success && Array.isArray(data.data)) {
         setProjects(data.data.map((p: any) => ({ _id: p._id, name: p.name })))
       } else {
@@ -736,7 +736,7 @@ export default function EditTaskPage() {
           uploadedBy: attachment.uploadedById || currentUser?.id || ''
         }))
         .filter((attachment) => attachment.uploadedBy)
-      
+
       // Parse labels from comma-separated string
       const labels = labelsInput
         ? labelsInput.split(',').map(label => label.trim()).filter(label => label.length > 0)
@@ -763,7 +763,7 @@ export default function EditTaskPage() {
           labels: labels,
           estimatedHours: task.estimatedHours || undefined,
           isBillable: task.isBillable,
-        //  storyPoints: task.storyPoints || undefined,
+          //  storyPoints: task.storyPoints || undefined,
           story: task.story || undefined,
           epic: task.epic || undefined,
           subtasks: preparedSubtasks,
@@ -828,13 +828,13 @@ export default function EditTaskPage() {
     const taskChanged = JSON.stringify(task) !== JSON.stringify(originalTask)
     const subtasksChanged = JSON.stringify(comparableCurrentSubtasks) !== JSON.stringify(comparableOriginalSubtasks)
     const attachmentsChanged = JSON.stringify(comparableCurrentAttachments) !== JSON.stringify(comparableOriginalAttachments)
-    
+
     // Check labels separately since they're stored in a separate state
     const originalLabelsStr = Array.isArray(originalTask.labels) ? originalTask.labels.join(', ') : (originalTask.labels || '')
     const labelsChanged = labelsInput.trim() !== originalLabelsStr.trim()
-    
+
     const assigneesChanged = JSON.stringify(assignedTo) !== JSON.stringify(originalAssignedTo)
-    
+
     return taskChanged || subtasksChanged || labelsChanged || attachmentsChanged || assigneesChanged
   }, [
     task,
@@ -882,7 +882,7 @@ export default function EditTaskPage() {
 
   return (
     <MainLayout>
-      <div className="w-full max-w-3xl mx-auto space-y-4">
+      <div className="w-full max-w-5xl mx-auto space-y-4">
         <Button variant="ghost" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
@@ -893,84 +893,84 @@ export default function EditTaskPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-4 min-w-0">
-            <div>
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    <Target className="h-4 w-4" />
-                    Project *
-                  </label>
-                  <Select 
-                    value={task.project || ''} 
-                    onValueChange={(v) => {
-                      const newProjectId = v || undefined
-                      const currentAssigneeId = task?.assignedTo
-                      
-                      // Update project but DON'T clear assignee yet - will be validated when team members load
-                      setTask((prev) => prev ? ({ ...prev, project: newProjectId, story: undefined, epic: undefined }) : prev)
-                      setProjectFilterQuery('')
-                      setAssignedToFilterQuery('')
-                      
-                      // Fetch team members for new project and preserve assignee if they're in the new team
-                      if (newProjectId) {
-                        // Pass current assignee ID to preserve it if valid in new project
-                        fetchProjectTeamMembers(newProjectId, currentAssigneeId)
-                        fetchStories(newProjectId)
-                        fetchEpics(newProjectId)
-                      } else {
-                        setUsers([])
-                        updateAssignees(() => [])
-                        setStories([])
-                        setEpics([])
-                      }
-                    }}
-                    disabled={loadingProjects}
-                    required
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder={loadingProjects ? "Loading projects..." : "Select project"} />
-                    </SelectTrigger>
-                    <SelectContent className="z-[10050] p-0">
-                      <div 
-                        className="p-2"
+              <div>
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Project *
+                </label>
+                <Select
+                  value={task.project || ''}
+                  onValueChange={(v) => {
+                    const newProjectId = v || undefined
+                    const currentAssigneeId = task?.assignedTo
+
+                    // Update project but DON'T clear assignee yet - will be validated when team members load
+                    setTask((prev) => prev ? ({ ...prev, project: newProjectId, story: undefined, epic: undefined }) : prev)
+                    setProjectFilterQuery('')
+                    setAssignedToFilterQuery('')
+
+                    // Fetch team members for new project and preserve assignee if they're in the new team
+                    if (newProjectId) {
+                      // Pass current assignee ID to preserve it if valid in new project
+                      fetchProjectTeamMembers(newProjectId, currentAssigneeId)
+                      fetchStories(newProjectId)
+                      fetchEpics(newProjectId)
+                    } else {
+                      setUsers([])
+                      updateAssignees(() => [])
+                      setStories([])
+                      setEpics([])
+                    }
+                  }}
+                  disabled={loadingProjects}
+                  required
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder={loadingProjects ? "Loading projects..." : "Select project"} />
+                  </SelectTrigger>
+                  <SelectContent className="z-[10050] p-0">
+                    <div
+                      className="p-2"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      <Input
+                        value={projectFilterQuery}
+                        onChange={(e) => setProjectFilterQuery(e.target.value)}
+                        placeholder="Search projects"
+                        className="mb-2"
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
                         onPointerDown={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                      >
-                        <Input
-                          value={projectFilterQuery}
-                          onChange={(e) => setProjectFilterQuery(e.target.value)}
-                          placeholder="Search projects"
-                          className="mb-2"
-                          autoFocus
-                          onClick={(e) => e.stopPropagation()}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => {
-                            e.stopPropagation()
-                            // Prevent Select from handling keyboard navigation when typing
-                            if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
-                              e.preventDefault()
-                            }
-                          }}
-                          onFocus={(e) => e.stopPropagation()}
-                        />
-                        <div className="max-h-56 overflow-y-auto">
-                          {loadingProjects ? (
-                            <div className="px-2 py-1 text-xs text-muted-foreground flex items-center space-x-2">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span>Loading projects...</span>
-                            </div>
-                          ) : filteredProjectOptions.length === 0 ? (
-                            <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
-                          ) : (
-                            filteredProjectOptions.map((project) => (
-                              <SelectItem key={project._id} value={project._id}>
-                                {project.name}
-                              </SelectItem>
-                            ))
-                          )}
-                        </div>
+                        onKeyDown={(e) => {
+                          e.stopPropagation()
+                          // Prevent Select from handling keyboard navigation when typing
+                          if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+                            e.preventDefault()
+                          }
+                        }}
+                        onFocus={(e) => e.stopPropagation()}
+                      />
+                      <div className="max-h-56 overflow-y-auto">
+                        {loadingProjects ? (
+                          <div className="px-2 py-1 text-xs text-muted-foreground flex items-center space-x-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Loading projects...</span>
+                          </div>
+                        ) : filteredProjectOptions.length === 0 ? (
+                          <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                        ) : (
+                          filteredProjectOptions.map((project) => (
+                            <SelectItem key={project._id} value={project._id}>
+                              {project.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </div>
-                    </SelectContent>
-                  </Select>
-                </div>
+                    </div>
+                  </SelectContent>
+                </Select>
+              </div>
               <div>
                 <label className="text-sm font-medium">Title</label>
                 <Input
@@ -981,7 +981,7 @@ export default function EditTaskPage() {
               </div>
               <div>
                 <label className="text-sm font-medium">Description</label>
-                <div className="mt-1">
+                <div className="mt-1 min-w-0 overflow-hidden">
                   <RichTextEditor
                     value={task.description}
                     onChange={(value) => setTask((prev) => prev ? ({ ...prev, description: value }) : prev)}
@@ -1033,95 +1033,95 @@ export default function EditTaskPage() {
               </div>
 
               <div>
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Assigned To *
-                  </label>
-                  <div className="space-y-2 mt-1">
-                    <Select
-                      value=""
-                      onValueChange={(value) => {
-                        if (!assignedTo.some(assignee => assignee._id === value)) {
-                          const selectedUser = users.find(u => u._id === value)
-                          if (selectedUser) {
-                            console.log('Selected user:', selectedUser)
-                            updateAssignees(prev => [...prev, {
-                              _id: selectedUser._id,
-                              firstName: selectedUser.firstName,
-                              lastName: selectedUser.lastName,
-                              email: selectedUser.email,
-                              hourlyRate: assigneeHourlyRates[selectedUser._id] || ''
-                            }])
-                          }
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Assigned To *
+                </label>
+                <div className="space-y-2 mt-1">
+                  <Select
+                    value=""
+                    onValueChange={(value) => {
+                      if (!assignedTo.some(assignee => assignee._id === value)) {
+                        const selectedUser = users.find(u => u._id === value)
+                        if (selectedUser) {
+                          console.log('Selected user:', selectedUser)
+                          updateAssignees(prev => [...prev, {
+                            _id: selectedUser._id,
+                            firstName: selectedUser.firstName,
+                            lastName: selectedUser.lastName,
+                            email: selectedUser.email,
+                            hourlyRate: assigneeHourlyRates[selectedUser._id] || ''
+                          }])
                         }
-                      }}
-                      disabled={loadingUsers || !task.project}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={
-                          loadingUsers
-                            ? 'Loading team members...'
-                            : !task.project
-                              ? 'Select project first'
-                              : users.length === 0
-                                ? 'No team members available'
-                                : 'Select team members'
-                        } />
-                      </SelectTrigger>
-                      <SelectContent className="z-[10050] p-0">
-                        <div className="p-2">
-                          <Input
-                            value={assignedToFilterQuery}
-                            onChange={(e) => setAssignedToFilterQuery(e.target.value)}
-                            placeholder="Search team members"
-                            className="mb-2"
-                          />
-                          <div className="max-h-56 overflow-y-auto">
-                            {loadingUsers ? (
-                              <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                <span>Loading members...</span>
-                              </div>
-                            ) : users.length === 0 ? (
+                      }
+                    }}
+                    disabled={loadingUsers || !task.project}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={
+                        loadingUsers
+                          ? 'Loading team members...'
+                          : !task.project
+                            ? 'Select project first'
+                            : users.length === 0
+                              ? 'No team members available'
+                              : 'Select team members'
+                      } />
+                    </SelectTrigger>
+                    <SelectContent className="z-[10050] p-0">
+                      <div className="p-2">
+                        <Input
+                          value={assignedToFilterQuery}
+                          onChange={(e) => setAssignedToFilterQuery(e.target.value)}
+                          placeholder="Search team members"
+                          className="mb-2"
+                        />
+                        <div className="max-h-56 overflow-y-auto">
+                          {loadingUsers ? (
+                            <div className="flex items-center space-x-2 text-sm text-muted-foreground p-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Loading members...</span>
+                            </div>
+                          ) : users.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">
+                              No team members found for this project
+                            </div>
+                          ) : (
+                            filteredAssignedToOptions.length === 0 ? (
                               <div className="px-2 py-1 text-xs text-muted-foreground">
-                                No team members found for this project
+                                No matching team members
                               </div>
                             ) : (
-                              filteredAssignedToOptions.length === 0 ? (
-                                <div className="px-2 py-1 text-xs text-muted-foreground">
-                                  No matching team members
-                                </div>
-                              ) : (
-                                filteredAssignedToOptions.map((member: User) => {
-                                  const isSelected = assignedTo.some(assignee => assignee._id === member._id)
-                                  return (
-                                    <SelectItem
-                                      key={member._id}
-                                      value={member._id}
-                                      disabled={isSelected}
-                                      className={isSelected ? 'opacity-50 cursor-not-allowed' : ''}
-                                    >
-                                      <div className="flex items-center justify-between w-full">
-                                        <span>{member.firstName} {member.lastName}</span>
-                                        {member.email && (
-                                          <span className="text-xs text-muted-foreground ml-2 truncate max-w-[180px]">
-                                            {member.email}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </SelectItem>
-                                  )
-                                })
-                              )
-                            )}
-                          </div>
+                              filteredAssignedToOptions.map((member: User) => {
+                                const isSelected = assignedTo.some(assignee => assignee._id === member._id)
+                                return (
+                                  <SelectItem
+                                    key={member._id}
+                                    value={member._id}
+                                    disabled={isSelected}
+                                    className={isSelected ? 'opacity-50 cursor-not-allowed' : ''}
+                                  >
+                                    <div className="flex items-center justify-between w-full">
+                                      <span>{member.firstName} {member.lastName}</span>
+                                      {member.email && (
+                                        <span className="text-xs text-muted-foreground ml-2 truncate max-w-[180px]">
+                                          {member.email}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                )
+                              })
+                            )
+                          )}
                         </div>
-                      </SelectContent>
-                    </Select>
-                    {assignedTo.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {assignedTo.map((assignee) => {
-                          return (
+                      </div>
+                    </SelectContent>
+                  </Select>
+                  {assignedTo.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {assignedTo.map((assignee) => {
+                        return (
                           <span
                             key={assignee._id}
                             className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded"
@@ -1138,23 +1138,23 @@ export default function EditTaskPage() {
                               <X className="h-3 w-3" />
                             </button>
                           </span>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {task.project && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <div className="min-w-0">
                     <label className="text-sm font-medium">User Story</label>
-                    <Select 
-                      value={task.story || ''} 
+                    <Select
+                      value={task.story || ''}
                       onValueChange={(value) => {
                         const selectedStory = stories.find(s => s._id === value)
-                        setTask((prev) => prev ? ({ 
-                          ...prev, 
+                        setTask((prev) => prev ? ({
+                          ...prev,
                           story: value,
                           epic: selectedStory?.epic?._id || undefined
                         }) : prev)
@@ -1181,16 +1181,16 @@ export default function EditTaskPage() {
                               </div>
                             ) : (() => {
                               const q = storyQuery.toLowerCase().trim()
-                              const filtered = stories.filter(s => 
+                              const filtered = stories.filter(s =>
                                 !q || s.title.toLowerCase().includes(q)
                               )
-                              
+
                               if (filtered.length === 0) {
                                 return (
                                   <div className="px-2 py-1 text-sm text-muted-foreground">No matching stories</div>
                                 )
                               }
-                              
+
                               return filtered.map((story) => (
                                 <SelectItem key={story._id} value={story._id}>
                                   <div className="truncate max-w-xs" title={story.title}>
@@ -1207,8 +1207,8 @@ export default function EditTaskPage() {
 
                   <div className="min-w-0">
                     <label className="text-sm font-medium">Epic</label>
-                    <Select 
-                      value={task.epic || ''} 
+                    <Select
+                      value={task.epic || ''}
                       onValueChange={(value) => setTask((prev) => prev ? ({ ...prev, epic: value || undefined }) : prev)}
                       disabled={loadingEpics}
                       onOpenChange={(open) => { if (open) setEpicQuery('') }}
@@ -1234,7 +1234,7 @@ export default function EditTaskPage() {
                             ) : (() => {
                               const q = epicQuery.toLowerCase().trim()
                               let availableEpics: Epic[] = []
-                              
+
                               if (!task.story) {
                                 // No story selected, show all epics
                                 availableEpics = epics
@@ -1252,17 +1252,17 @@ export default function EditTaskPage() {
                                   availableEpics = epics
                                 }
                               }
-                              
-                              const filtered = availableEpics.filter(e => 
+
+                              const filtered = availableEpics.filter(e =>
                                 !q || e.title.toLowerCase().includes(q)
                               )
-                              
+
                               if (filtered.length === 0) {
                                 return (
                                   <div className="px-2 py-1 text-sm text-muted-foreground">No matching epics</div>
                                 )
                               }
-                              
+
                               return filtered.map((epic) => (
                                 <SelectItem key={epic._id} value={epic._id}>
                                   <div className="truncate max-w-xs" title={epic.title}>
@@ -1279,7 +1279,7 @@ export default function EditTaskPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="min-w-0">
                   <label className="text-sm font-medium flex items-center gap-2">
                     <Clock className="h-4 w-4" />
@@ -1289,9 +1289,9 @@ export default function EditTaskPage() {
                     type="number"
                     step="0.5"
                     value={task.estimatedHours || ''}
-                    onChange={(e) => setTask((prev) => prev ? ({ 
-                      ...prev, 
-                      estimatedHours: e.target.value ? parseFloat(e.target.value) : undefined 
+                    onChange={(e) => setTask((prev) => prev ? ({
+                      ...prev,
+                      estimatedHours: e.target.value ? parseFloat(e.target.value) : undefined
                     }) : prev)}
                     placeholder="e.g., 8"
                     className="mt-1"
@@ -1299,23 +1299,6 @@ export default function EditTaskPage() {
                   />
                 </div>
 
-                {/* <div>
-                  <label className="text-sm font-medium">Story Points</label>
-                  <Input
-                    type="number"
-                    value={task.storyPoints || ''}
-                    onChange={(e) => setTask((prev) => prev ? ({ 
-                      ...prev, 
-                      storyPoints: e.target.value ? parseInt(e.target.value) : undefined 
-                    }) : prev)}
-                    placeholder="e.g., 5"
-                    className="mt-1"
-                    min="0"
-                  />
-                </div> */}
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="min-w-0">
                   <label className="text-sm font-medium flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
@@ -1340,17 +1323,17 @@ export default function EditTaskPage() {
                     onChange={(e) => setTask((prev) => prev ? ({ ...prev, isBillable: e.target.checked }) : prev)}
                   />
                 </div>
+              </div>
 
-                <div className="min-w-0">
-                  <label className="text-sm font-medium">Labels</label>
-                  <Input
-                    value={labelsInput}
-                    onChange={(e) => setLabelsInput(e.target.value)}
-                    placeholder="e.g., frontend, urgent, design"
-                    className="mt-1"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Separate multiple labels with commas</p>
-                </div>
+              <div className="min-w-0">
+                <label className="text-sm font-medium">Labels</label>
+                <Input
+                  value={labelsInput}
+                  onChange={(e) => setLabelsInput(e.target.value)}
+                  placeholder="e.g., frontend, urgent, design"
+                  className="mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Separate multiple labels with commas</p>
               </div>
 
               <div className="space-y-4 border-t pt-4">

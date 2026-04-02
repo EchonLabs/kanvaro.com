@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef, useCallback, useState } from 'react'
+import React, { useRef, useCallback, useState, useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
 import {
   Bold,
@@ -12,7 +12,8 @@ import {
   AlignCenter,
   AlignRight,
   Type,
-  ChevronDown
+  ChevronDown,
+  Trash2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -37,6 +38,7 @@ interface RichTextEditorProps {
   disabled?: boolean
   maxLength?: number
   showCharCount?: boolean
+  onImageClick?: (image: HTMLImageElement | null) => void
 }
 
 export function RichTextEditor({
@@ -46,12 +48,64 @@ export function RichTextEditor({
   className,
   disabled = false,
   maxLength,
-  showCharCount = false
+  showCharCount = false,
+  onImageClick
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const savedRangeRef = useRef<Range | null>(null)
   const [isActive, setIsActive] = useState<Record<string, boolean>>({})
   const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<HTMLImageElement | null>(null)
+  const [toolbarPos, setToolbarPos] = useState({ top: 0, left: 0, visible: false })
+  const imageToolbarRef = useRef<HTMLDivElement>(null)
+
+  // Dismiss image toolbar when clicking outside
+  const dismissImageToolbar = useCallback(() => {
+    if (selectedImage) {
+      selectedImage.style.border = 'none'
+      selectedImage.style.outline = 'none'
+    }
+    setSelectedImage(null)
+    setToolbarPos(prev => ({ ...prev, visible: false }))
+  }, [selectedImage])
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!toolbarPos.visible) return
+      const target = e.target as HTMLElement
+      // If clicking on the toolbar itself, do nothing
+      if (imageToolbarRef.current?.contains(target)) return
+      // If clicking on the currently selected image, do nothing
+      if (selectedImage && target === selectedImage) return
+      // Otherwise dismiss
+      dismissImageToolbar()
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [toolbarPos.visible, selectedImage, dismissImageToolbar])
+
+  // Update toolbar position when image moves or window resizes
+  useEffect(() => {
+    if (!toolbarPos.visible || !selectedImage) return
+
+    const updateToolbarPos = () => {
+      const rect = selectedImage.getBoundingClientRect()
+      setToolbarPos({
+        top: rect.bottom + 5,
+        left: rect.left,
+        visible: true
+      })
+    }
+
+    window.addEventListener('scroll', updateToolbarPos, true)
+    window.addEventListener('resize', updateToolbarPos)
+
+    return () => {
+      window.removeEventListener('scroll', updateToolbarPos, true)
+      window.removeEventListener('resize', updateToolbarPos)
+    }
+  }, [toolbarPos.visible, selectedImage])
 
   const saveSelection = useCallback(() => {
     const selection = window.getSelection()
@@ -150,6 +204,34 @@ export function RichTextEditor({
       execCommand('insertHTML', '&nbsp;&nbsp;&nbsp;&nbsp;')
     }
   }, [execCommand])
+
+  const handleImageClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+    if (target.tagName === 'IMG') {
+      const img = target as HTMLImageElement
+      setSelectedImage(img)
+      // Add visual feedback
+      if (selectedImage && selectedImage !== img) {
+        selectedImage.style.border = 'none'
+        selectedImage.style.outline = 'none'
+      }
+      img.style.border = '2px solid rgb(59, 130, 246)'
+      img.style.outline = '2px solid rgb(191, 219, 254)'
+      img.style.outlineOffset = '2px'
+
+      // Position toolbar below image using window coordinates for fixed positioning
+      const rect = img.getBoundingClientRect()
+      setToolbarPos({
+        top: rect.bottom + 5,
+        left: rect.left,
+        visible: true
+      })
+
+      onImageClick?.(img)
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  }, [selectedImage, onImageClick])
 
   const insertUnorderedList = useCallback((listType: string = 'disc') => {
     if (disabled || !editorRef.current) return
@@ -449,6 +531,62 @@ export function RichTextEditor({
       } finally {
         setIsUploadingImage(false)
       }
+    } else {
+      // Handle text paste - clean up color styles to ensure proper theme colors
+      e.preventDefault()
+      
+      // Get HTML and plain text from clipboard
+      const html = clipboardData.getData('text/html')
+      const plainText = clipboardData.getData('text/plain')
+      
+      let pasteContent = html || plainText
+      
+      if (html) {
+        // Parse and clean the HTML to remove color-related styles
+        const tempDiv = document.createElement('div')
+        tempDiv.innerHTML = html
+        
+        // Remove all color-related inline styles and attributes
+        const walk = (node: Node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const el = node as HTMLElement
+            
+            // Remove color-related attributes
+            el.removeAttribute('color')
+            el.removeAttribute('bgcolor')
+            
+            // Clean style attribute - remove color, background-color, etc.
+            if (el.style.color) el.style.color = ''
+            if (el.style.backgroundColor) el.style.backgroundColor = ''
+            if (el.style.background) el.style.background = ''
+            
+            // Handle style attribute string manipulation for other color properties
+            let style = el.getAttribute('style') || ''
+            style = style
+              .replace(/color\s*:\s*[^;]*;?/gi, '')
+              .replace(/background-color\s*:\s*[^;]*;?/gi, '')
+              .replace(/background\s*:\s*[^;]*;?/gi, '')
+              .replace(/;\s*;/g, ';') // Clean up double semicolons
+              .trim()
+            
+            if (style) {
+              el.setAttribute('style', style)
+            } else {
+              el.removeAttribute('style')
+            }
+            
+            // Recursively clean child nodes
+            Array.from(el.childNodes).forEach(walk)
+          }
+        }
+        
+        walk(tempDiv)
+        pasteContent = tempDiv.innerHTML
+      }
+      
+      // Insert the cleaned content
+      document.execCommand('insertHTML', false, pasteContent)
+      handleInput()
     }
   }, [disabled, handleInput])
 
@@ -518,6 +656,43 @@ export function RichTextEditor({
     execCommand('formatBlock', 'h3')
   }, [execCommand, disabled])
 
+  // Helper function to set image size with proper CSS override
+  const setImageSize = useCallback((img: HTMLImageElement, width: string) => {
+    // Use setAttribute to set inline styles with !important to override Tailwind's !max-w-full
+    const currentStyle = img.getAttribute('style') || ''
+    // Remove any existing width and max-width styles
+    const cleanedStyle = currentStyle
+      .replace(/width\s*:\s*[^;]*!important/i, '')
+      .replace(/width\s*:\s*[^;]*/i, '')
+      .replace(/max-width\s*:\s*[^;]*!important/i, '')
+      .replace(/max-width\s*:\s*[^;]*/i, '')
+      .trim()
+    
+    const newStyle = `${cleanedStyle}; width: ${width} !important; max-width: none !important`
+    img.setAttribute('style', newStyle)
+    handleInput()
+  }, [handleInput])
+
+  const setImageAlignment = useCallback((img: HTMLImageElement, alignment: 'left' | 'center' | 'right') => {
+    img.style.display = 'block'
+    
+    switch (alignment) {
+      case 'left':
+        img.style.marginLeft = '0'
+        img.style.marginRight = 'auto'
+        break
+      case 'center':
+        img.style.margin = '0 auto'
+        break
+      case 'right':
+        img.style.marginLeft = 'auto'
+        img.style.marginRight = '0'
+        break
+    }
+    
+    handleInput()
+  }, [handleInput])
+
   // Initialize content when value changes
   React.useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== value) {
@@ -526,7 +701,7 @@ export function RichTextEditor({
   }, [value])
 
   return (
-    <div className={cn('border rounded-md overflow-hidden', className)}>
+    <div className={cn('border rounded-md overflow-visible relative', className)}>
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-1 p-2 border-b bg-muted/50">
         <Button
@@ -731,31 +906,149 @@ export function RichTextEditor({
         </div>
       )}
 
+      {/* Image Toolbar - Below Image */}
+      {toolbarPos.visible && selectedImage && (
+        <div
+          ref={imageToolbarRef}
+          className="fixed bg-white dark:bg-slate-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg flex items-center justify-center gap-1 p-2 z-[60]"
+          style={{
+            top: `${toolbarPos.top}px`,
+            left: `${toolbarPos.left}px`,
+            pointerEvents: 'auto',
+            flexWrap: 'wrap',
+            maxWidth: '250px'
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {/* Size Presets */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 px-2 text-xs font-medium"
+            onClick={() => {
+              if (selectedImage) setImageSize(selectedImage, '100%')
+            }}
+            title="Set image to 100% width"
+          >
+            100%
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 px-2 text-xs font-medium"
+            onClick={() => {
+              if (selectedImage) setImageSize(selectedImage, '50%')
+            }}
+            title="Set image to 50% width"
+          >
+            50%
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 px-2 text-xs font-medium"
+            onClick={() => {
+              if (selectedImage) setImageSize(selectedImage, '25%')
+            }}
+            title="Set image to 25% width"
+          >
+            25%
+          </Button>
+
+          <div className="h-5 border-l border-gray-300 dark:border-gray-600 mx-0.5" />
+
+          {/* Alignment Buttons */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 flex items-center justify-center"
+            onClick={() => {
+              if (selectedImage) setImageAlignment(selectedImage, 'left')
+            }}
+            title="Align image left"
+          >
+            <AlignLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 flex items-center justify-center"
+            onClick={() => {
+              if (selectedImage) setImageAlignment(selectedImage, 'center')
+            }}
+            title="Align image center"
+          >
+            <AlignCenter className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 flex items-center justify-center"
+            onClick={() => {
+              if (selectedImage) setImageAlignment(selectedImage, 'right')
+            }}
+            title="Align image right"
+          >
+            <AlignRight className="h-4 w-4" />
+          </Button>
+
+          <div className="h-5 border-l border-gray-300 dark:border-gray-600 mx-0.5" />
+
+          {/* Delete Button */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900 hover:border-red-300 dark:hover:border-red-600"
+            onClick={() => {
+              if (selectedImage) {
+                selectedImage.remove()
+                setSelectedImage(null)
+                setToolbarPos({ ...toolbarPos, visible: false })
+                handleInput()
+              }
+            }}
+            title="Delete image"
+          >
+            <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+          </Button>
+        </div>
+      )}
+
       {/* Editor */}
       <div
         ref={editorRef}
         contentEditable={!disabled}
         onInput={handleInput}
         onKeyDown={handleKeyDown}
+        onClick={handleImageClick}
         onMouseUp={updateActiveStates}
         onKeyUp={updateActiveStates}
         onPaste={handlePaste}
         className={cn(
 
-          'rich-text-editor min-h-[120px] max-h-[400px] p-3 focus:outline-none prose prose-sm max-w-none overflow-x-hidden overflow-y-auto',
-          '[&_img]:max-w-full [&_img]:max-h-[300px] [&_img]:h-auto [&_img]:object-contain [&_img]:block',
-          'prose-headings:font-semibold prose-headings:text-foreground',
-          'prose-p:text-foreground prose-p:leading-relaxed',
-          'prose-strong:font-semibold prose-strong:text-foreground',
-          'prose-em:text-foreground',
-          'prose-ul:text-foreground prose-ol:text-foreground',
-          'prose-li:text-foreground',
-          'prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline',
+          'rich-text-editor w-full min-h-[120px] max-h-[400px] p-3 focus:outline-none overflow-x-hidden overflow-y-auto text-foreground',
+          '[&_img]:!max-w-full [&_img]:!max-h-[300px] [&_img]:!h-auto [&_img]:!object-contain [&_img]:block [&_img]:cursor-pointer',
+          '[&_h1]:text-foreground [&_h2]:text-foreground [&_h3]:text-foreground [&_h4]:text-foreground [&_h5]:text-foreground [&_h6]:text-foreground',
+          '[&_p]:text-foreground [&_p]:leading-relaxed',
+          '[&_strong]:text-foreground [&_strong]:font-semibold',
+          '[&_em]:text-foreground',
+          '[&_ul]:text-foreground [&_ol]:text-foreground',
+          '[&_li]:text-foreground',
+          '[&_a]:text-blue-600 [&_a]:no-underline [&_a:hover]:underline',
           disabled && 'opacity-50 cursor-not-allowed'
         )}
         style={{
           whiteSpace: 'pre-wrap',
-          wordWrap: 'break-word'
+          wordWrap: 'break-word',
+          wordBreak: 'break-word',
+          overflowWrap: 'break-word'
         }}
         data-placeholder={placeholder}
       />

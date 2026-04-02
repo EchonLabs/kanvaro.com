@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -86,7 +86,10 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   const canManageProject = hasPermission(Permission.PROJECT_UPDATE, projectId)
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
+  const [isFetching, setIsFetching] = useState(false)
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -99,6 +102,8 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   const [availableStatuses, setAvailableStatuses] = useState<string[]>(['todo', 'in_progress', 'review', 'testing', 'done', 'cancelled', 'backlog'])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const fetchProjectStatuses = async (projId: string) => {
     if (projId === 'all') {
@@ -143,20 +148,47 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
     }
   }
 
+  // Debounce search query - waits 500ms after user stops typing
   useEffect(() => {
-    fetchTasks()
+    debounceTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+    }, 500)
+
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+      }
+    }
+  }, [searchQuery])
+
+  // Fetch statuses when project changes
+  useEffect(() => {
     fetchProjectStatuses(projectId)
-  }, [projectId, currentPage, pageSize])
+  }, [projectId])
+
+  // Maintain focus on search input when results update
+  useEffect(() => {
+    if (!loading && !isFetching && searchQuery && document.activeElement !== searchInputRef.current) {
+      searchInputRef.current?.focus()
+    }
+  }, [isFetching, searchQuery, loading])
 
   const fetchTasks = async () => {
     try {
-      setLoading(true)
+      // Only show full loading on initial load
+      if (isInitialLoad) {
+        setLoading(true)
+      } else {
+        // For subsequent searches/filters, just indicate fetching without full UI reset
+        setIsFetching(true)
+      }
+      
       // Handle "all" case by not passing project parameter
       const params = new URLSearchParams()
       params.set('page', currentPage.toString())
       params.set('limit', pageSize.toString())
       if (projectId !== 'all') params.set('project', projectId)
-      if (searchQuery) params.set('search', searchQuery)
+      if (debouncedSearchQuery) params.set('search', debouncedSearchQuery)
       if (statusFilter !== 'all') params.set('status', statusFilter)
       if (priorityFilter !== 'all') params.set('priority', priorityFilter)
       if (typeFilter !== 'all') params.set('type', typeFilter)
@@ -172,7 +204,12 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
     } catch (err) {
       notifyError({ title: 'Error', message: 'Failed to fetch tasks' })
     } finally {
-      setLoading(false)
+      if (isInitialLoad) {
+        setLoading(false)
+        setIsInitialLoad(false)
+      } else {
+        setIsFetching(false)
+      }
     }
   }
 
@@ -233,12 +270,12 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   // Refetch when pagination or filters change
   useEffect(() => {
     fetchTasks()
-  }, [currentPage, pageSize, searchQuery, statusFilter, priorityFilter, typeFilter])
+  }, [currentPage, pageSize, debouncedSearchQuery, statusFilter, priorityFilter, typeFilter])
 
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery, statusFilter, priorityFilter, typeFilter])
+  }, [debouncedSearchQuery, statusFilter, priorityFilter, typeFilter])
 
   const handleStatusChange = async (taskId: string, newStatus: string) => {
     // Check permission for status change
@@ -427,6 +464,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
+            ref={searchInputRef}
             placeholder="Search tasks..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}

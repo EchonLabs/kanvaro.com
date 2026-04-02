@@ -632,11 +632,7 @@ export default function CreateTaskModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]" onClick={(e) => {
-      if (e.target === e.currentTarget) {
-        onClose()
-      }
-    }}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
       <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col bg-background m-4 sm:m-6" onClick={(e) => e.stopPropagation()}>
         <CardHeader className="flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -741,7 +737,7 @@ export default function CreateTaskModal({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Maximum 10,000 characters.
+                  Maximum 10,000 characters. Click images to resize and delete.
                 </p>
               </div>
 

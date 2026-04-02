@@ -89,7 +89,7 @@ export function StatsCards({ stats, changes, isLoading }: StatsCardsProps) {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mt-4">
         {[1, 2, 3, 4].map((i) => (
           <Card key={i}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
@@ -109,7 +109,7 @@ export function StatsCards({ stats, changes, isLoading }: StatsCardsProps) {
 
   if (!stats || !changes) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mt-4">
         <Card>
           <CardContent className="p-4 sm:p-6 text-center">
             <p className="text-xs sm:text-sm text-muted-foreground">No data available</p>

@@ -253,6 +253,10 @@ export default function TimerPage() {
     setSelectedTask('')
     setSelectedProject('')
     setTasks([])
+    setTaskSearch('')
+    setProjectSearch('')
+    setTaskPage(1)
+    setHasMoreTasks(false)
     setActiveTimerSnapshot(null)
     setPendingActiveProject(null)
     setPendingActiveTask(null)
@@ -608,11 +612,17 @@ export default function TimerPage() {
     if (!selectedProject) return
 
     const searchTerm = taskSearch.trim()
-    if (!searchTerm) return
 
     if (taskSearchTimerRef.current) {
       clearTimeout(taskSearchTimerRef.current)
     }
+
+    // When search is cleared, reload the initial task list immediately
+    if (!searchTerm) {
+      fetchTasks(selectedProject, undefined, 1)
+      return
+    }
+
     taskSearchTimerRef.current = setTimeout(() => {
       fetchTasks(selectedProject, searchTerm, 1)
     }, 300)
@@ -782,6 +792,10 @@ export default function TimerPage() {
         setSelectedProject('')
         setSelectedTask('')
         setTasks([])
+        setTaskSearch('')
+        setProjectSearch('')
+        setTaskPage(1)
+        setHasMoreTasks(false)
         setError('')
         setSessionHoursError('')
         setTimeLogsRefreshKey(prev => prev + 1)
@@ -908,6 +922,9 @@ export default function TimerPage() {
     setSelectedProject(projectId)
     setSelectedTask('')
     setTasks([])
+    setTaskSearch('')
+    setTaskPage(1)
+    setHasMoreTasks(false)
     setError('')
     if (projectId && user) {
       fetchTasks(projectId)
@@ -1192,7 +1209,6 @@ export default function TimerPage() {
                         !timeTrackingSettings?.allowTimeTracking ||
                         !selectedProject ||
                         showInitialTasksLoading ||
-                        (!tasksLoading && !loadingMoreTasks && (!Array.isArray(tasks) || tasks.length === 0)) ||
                         liveActiveTimer !== null
                       }
                     >
@@ -1733,8 +1749,8 @@ export default function TimerPage() {
           <TimeLogs
             userId={user.id}
             organizationId={user.organization}
-            projectId={selectedProject || undefined}
-            taskId={selectedTask || undefined}
+            projectId={undefined}
+            taskId={undefined}
             refreshKey={timeLogsRefreshKey}
             liveActiveTimer={liveActiveTimer}
             showSelectionAndApproval={false}

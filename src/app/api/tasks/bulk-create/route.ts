@@ -182,16 +182,25 @@ export async function POST(request: NextRequest) {
         isBillable: taskData.isBillable ?? projectInfo.isBillableByDefault ?? true
       })
 
-      await task.save()
+      try {
+        await task.save()
+      } catch (saveError) {
+        // Roll back the counter to prevent number gaps
+        counter.seq -= 1
+        await counter.save().catch((rollbackErr: any) => {
+          console.error('[bulk-create] Failed to rollback counter after save error:', rollbackErr)
+        })
+        throw saveError
+      }
       createdTasks.push(task)
     }
 
     // Invalidate caches (non-blocking)
     for (const projectId of projectIdsArray) {
-      invalidateCache(`tasks:*project:${projectId}*`).catch(() => {})
+      invalidateCache(`tasks:*project:${projectId}*`).catch(() => { })
     }
     if (organizationId) {
-      invalidateCache(`tasks:*org:${organizationId}*`).catch(() => {})
+      invalidateCache(`tasks:*org:${organizationId}*`).catch(() => { })
     }
 
     return NextResponse.json({

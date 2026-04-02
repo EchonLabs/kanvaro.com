@@ -4,14 +4,15 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { 
-  ChevronRight, 
-  ChevronDown, 
-  Folder, 
-  FolderOpen, 
-  Plus, 
-  Edit, 
+import {
+  ChevronRight,
+  ChevronDown,
+  Folder,
+  FolderOpen,
+  Plus,
+  Edit,
   Trash2,
+  Eye,
   MoreHorizontal
 } from 'lucide-react'
 import {
@@ -36,16 +37,16 @@ interface TestSuite {
 
 interface TestSuiteTreeProps {
   projectId: string
-  onSuiteSelect?: (suite: TestSuite) => void
+  onSuiteView?: (suite: TestSuite) => void
   onSuiteCreate?: (parentSuiteId?: string) => void
   onSuiteEdit?: (suite: TestSuite) => void
-  onSuiteDelete?: (suiteId: string) => void
+  onSuiteDelete?: (suiteId: string, suiteName: string) => void
   selectedSuiteId?: string
 }
 
 export default function TestSuiteTree({
   projectId,
-  onSuiteSelect,
+  onSuiteView,
   onSuiteCreate,
   onSuiteEdit,
   onSuiteDelete,
@@ -110,8 +111,11 @@ export default function TestSuiteTree({
   }
 
   const handleSuiteClick = (suite: TestSuite) => {
-    
-    onSuiteSelect?.(suite)
+    // Row click removed - use View button instead
+  }
+
+  const handleViewSuite = (suite: TestSuite) => {
+    onSuiteView?.(suite)
   }
 
   const handleCreateSuite = (parentSuiteId?: string) => {
@@ -122,8 +126,8 @@ export default function TestSuiteTree({
     onSuiteEdit?.(suite)
   }
 
-  const handleDeleteSuite = (suiteId: string) => {
-    onSuiteDelete?.(suiteId)
+  const handleDeleteSuite = (suiteId: string, suiteName: string) => {
+    onSuiteDelete?.(suiteId, suiteName)
   }
 
   const renderSuite = (suite: TestSuite, level = 0) => {
@@ -135,11 +139,10 @@ export default function TestSuiteTree({
       <div key={suite._id} className="select-none">
         <div
           className={`
-            flex items-center gap-2 p-2 rounded-md cursor-pointer hover:bg-muted/50
+            flex items-center gap-2 p-2 rounded-md
             ${isSelected ? 'bg-primary/10 border border-primary/20' : ''}
           `}
           style={{ paddingLeft: `${level * 20 + 8}px` }}
-          onClick={() => handleSuiteClick(suite)}
         >
           {hasChildren ? (
             <Button
@@ -187,16 +190,24 @@ export default function TestSuiteTree({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleCreateSuite(suite._id)}>
-                <Plus className="h-3 w-3 mr-2" />
-                Add Child Suite
-              </DropdownMenuItem>
+              {onSuiteCreate && (
+                <DropdownMenuItem onClick={() => handleCreateSuite(suite._id)}>
+                  <Plus className="h-3 w-3 mr-2" />
+                  Add Child Suite
+                </DropdownMenuItem>
+              )}
+              {onSuiteView && (
+                <DropdownMenuItem onClick={() => handleViewSuite(suite)}>
+                  <Eye className="h-3 w-3 mr-2" />
+                  View Details
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => handleEditSuite(suite)}>
                 <Edit className="h-3 w-3 mr-2" />
                 Edit Suite
               </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => handleDeleteSuite(suite._id)}
+              <DropdownMenuItem
+                onClick={() => handleDeleteSuite(suite._id, suite.name)}
                 className="text-destructive"
               >
                 <Trash2 className="h-3 w-3 mr-2" />
@@ -240,28 +251,32 @@ export default function TestSuiteTree({
     <Card>
       <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <CardTitle className="text-xl sm:text-2xl">Test Suites</CardTitle>
-        <Button
-          size="sm"
-          onClick={() => handleCreateSuite()}
-          className="w-full sm:w-auto"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Suite
-        </Button>
+        {onSuiteCreate && (
+          <Button
+            size="sm"
+            onClick={() => handleCreateSuite()}
+            className="w-full sm:w-auto"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Suite
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         {suites.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Folder className="h-8 w-8 mx-auto mb-2" />
             <p>No test suites found</p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-2"
-              onClick={() => handleCreateSuite()}
-            >
-              Create First Suite
-            </Button>
+            {onSuiteCreate && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => handleCreateSuite()}
+              >
+                Create First Suite
+              </Button>
+            )}
           </div>
         ) : (
           <div className="space-y-1">

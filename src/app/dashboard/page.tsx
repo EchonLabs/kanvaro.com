@@ -247,8 +247,9 @@ export default function DashboardPage() {
   return (
     <MainLayout>
       <PageContent>
-        <div className="space-y-8 sm:space-y-10 overflow-x-hidden">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
+          {/* Welcome Section with Refresh Button */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
             <div className="flex-1 min-w-0 w-full sm:w-auto">
               <DashboardHeader user={user} />
             </div>
@@ -257,29 +258,34 @@ export default function DashboardPage() {
               size="sm"
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="w-full sm:w-auto flex-shrink-0"
+              className="w-full sm:w-auto flex-shrink-0 text-xs"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
           </div>
 
           {dataError && (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 sm:p-4">
-              <p className="text-destructive text-xs sm:text-sm break-words">{dataError}</p>
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-2 sm:p-3">
+              <p className="text-destructive text-xs break-words">{dataError}</p>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleRefresh}
-                className="mt-2 w-full sm:w-auto"
+                className="mt-1.5 w-full sm:w-auto text-xs"
               >
                 Try Again
               </Button>
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-            <div className="lg:col-span-2 flex flex-col gap-6 sm:gap-8">
+          {/* Quick Actions - Full Width at Top */}
+          <div className="w-full">
+            <QuickActions />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mt-10">
+            <div className="lg:col-span-2 flex flex-col gap-4 sm:gap-6 mt-10">
               <StatsCards
                 stats={dashboardData?.stats}
                 changes={dashboardData?.changes}
@@ -301,25 +307,7 @@ export default function DashboardPage() {
               />
             </div>
 
-            <div className="flex flex-col gap-6 sm:gap-8">
-              {/* Quick Actions */}
-              <div className="grid grid-cols-1 gap-6">
-                <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/time-tracking/timer')}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                        <Play className="h-6 w-6 text-green-600" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-foreground">Start Timer</h3>
-                        <p className="text-sm text-muted-foreground">Begin tracking time for a task</p>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
+            <div className="flex flex-col gap-3 sm:gap-4 mt-10">
               {user.id && user.organization  && (
                 <TimeTrackingWidget
                   userId={user.id}
@@ -330,7 +318,6 @@ export default function DashboardPage() {
               {user.organization && (
                 <ActiveTimersWidget organizationId={user.organization} />
               )}
-              <QuickActions />
             </div>
           </div>
         </div>

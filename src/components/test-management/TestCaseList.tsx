@@ -7,12 +7,12 @@ import { Badge } from '@/components/ui/Badge'
 import { formatToTitleCase } from '@/lib/utils'
 import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { 
-  Search, 
-  Filter, 
-  Plus, 
-  Edit, 
-  Trash2, 
+import {
+  Search,
+  Filter,
+  Plus,
+  Edit,
+  Trash2,
   Play,
   CheckCircle,
   XCircle,
@@ -54,7 +54,7 @@ interface TestCase {
     lastName: string
   }
   isActive: boolean
-  preconditions:string
+  preconditions: string
   createdAt: string
   updatedAt: string
 }
@@ -133,7 +133,7 @@ export default function TestCaseList({
   }
 
   const handleEditTestCase = (testCase: TestCase) => {
-    
+
     onTestCaseEdit?.(testCase)
   }
 
@@ -146,8 +146,8 @@ export default function TestCaseList({
   }
 
   const handleSelectCase = (testCaseId: string) => {
-    setSelectedCases(prev => 
-      prev.includes(testCaseId) 
+    setSelectedCases(prev =>
+      prev.includes(testCaseId)
         ? prev.filter(id => id !== testCaseId)
         : [...prev, testCaseId]
     )
@@ -227,7 +227,7 @@ export default function TestCaseList({
             Add Test Case
           </Button>
         </div>
-        
+
         <div className="flex flex-col gap-2 sm:gap-4 mt-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -239,7 +239,7 @@ export default function TestCaseList({
               className="pl-10 w-full"
             />
           </div>
-          
+
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
             <Select value={priorityFilter || ALL_PRIORITY} onValueChange={(v) => setPriorityFilter(v === ALL_PRIORITY ? '' : v)}>
               <SelectTrigger className="w-full sm:w-32">
@@ -335,9 +335,8 @@ export default function TestCaseList({
                 {testCases.map((testCase) => (
                   <TableRow
                     key={testCase._id}
-                    className={`cursor-pointer hover:bg-muted/50 ${
-                      selectedTestCaseId === testCase._id ? 'bg-primary/10' : ''
-                    }`}
+                    className={`cursor-pointer hover:bg-muted/50 ${selectedTestCaseId === testCase._id ? 'bg-primary/10' : ''
+                      }`}
                     onClick={() => handleTestCaseClick(testCase)}
                   >
                     <TableCell>
@@ -359,7 +358,7 @@ export default function TestCaseList({
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {testCase.testSuite.name}
+                        {testCase.testSuite?.name || 'Unknown Suite'}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -406,7 +405,7 @@ export default function TestCaseList({
                             <Edit className="h-3 w-3 mr-2" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             onClick={() => handleDeleteTestCase(testCase._id)}
                             className="text-destructive"
                           >

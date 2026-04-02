@@ -1,3 +1,10 @@
+## [1.30.10](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.9...v1.30.10) (2026-03-25)
+
+
+### Bug Fixes
+
+* improve task management UI and enhance date filtering in TimeReports ([40d14c3](https://github.com/EchonLabs/kanvaro.com/commit/40d14c3560482a48a23179c7f61a00f91d5c4752))
+
 ## [1.30.9](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.8...v1.30.9) (2026-03-23)
 
 

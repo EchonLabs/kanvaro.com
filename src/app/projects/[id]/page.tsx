@@ -72,6 +72,7 @@ import TestCaseList from '@/components/test-management/TestCaseList'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { TestSuiteForm } from '@/components/test-management/TestSuiteForm'
 import { TestCaseForm } from '@/components/test-management/TestCaseForm'
+import { TestSuiteDetailDialog } from '@/components/test-management/TestSuiteDetailDialog'
 import { ProjectTeamTab } from '@/components/projects/ProjectTeamTab'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { Permission } from '@/lib/permissions'
@@ -239,6 +240,9 @@ export default function ProjectDetailPage() {
   const [editingTestCase, setEditingTestCase] = useState<any | null>(null)
   const [createCaseSuiteId, setCreateCaseSuiteId] = useState<string | undefined>(undefined)
   const [testCasesRefreshCounter, setTestCasesRefreshCounter] = useState(0)
+  const [suiteDetailDialogOpen, setSuiteDetailDialogOpen] = useState(false)
+  const [detailSuiteId, setDetailSuiteId] = useState<string | null>(null)
+  const [suiteDetailRefreshKey, setSuiteDetailRefreshKey] = useState(0)
   const [settingsForm, setSettingsForm] = useState({
     allowTimeTracking: false,
     allowManualTimeSubmission: false,
@@ -1610,7 +1614,10 @@ export default function ProjectDetailPage() {
                       <TestSuiteTree
                         key={`${projectId}-${suitesRefreshCounter}`}
                         projectId={projectId}
-                        onSuiteSelect={(suite) => console.log('Selected suite:', suite)}
+                        onSuiteView={(suite) => {
+                          setDetailSuiteId(suite._id)
+                          setSuiteDetailDialogOpen(true)
+                        }}
                         onSuiteCreate={(parentSuiteId) => {
                           setEditingSuite(null)
                           setParentSuiteIdForCreate(parentSuiteId)
@@ -2071,6 +2078,10 @@ export default function ProjectDetailPage() {
                     setEditingSuite(null)
                     setParentSuiteIdForCreate(undefined)
                     setSuitesRefreshCounter(c => c + 1)
+                    if (detailSuiteId) {
+                      setSuiteDetailRefreshKey(k => k + 1)
+                      setSuiteDetailDialogOpen(true)
+                    }
                   } else {
                     const data = await res.json().catch(() => ({}))
                     console.error('Failed to save test suite', data)
@@ -2085,6 +2096,9 @@ export default function ProjectDetailPage() {
                 setSuiteDialogOpen(false)
                 setEditingSuite(null)
                 setParentSuiteIdForCreate(undefined)
+                if (detailSuiteId) {
+                  setSuiteDetailDialogOpen(true)
+                }
               }}
               loading={suiteSaving}
             />
@@ -2116,6 +2130,10 @@ export default function ProjectDetailPage() {
                     setEditingTestCase(null)
                     setCreateCaseSuiteId(undefined)
                     setTestCasesRefreshCounter(c => c + 1)
+                    if (detailSuiteId) {
+                      setSuiteDetailRefreshKey(k => k + 1)
+                      setSuiteDetailDialogOpen(true)
+                    }
                   } else {
                     const data = await res.json().catch(() => ({}))
                     console.error('Failed to save test case', data)
@@ -2130,10 +2148,52 @@ export default function ProjectDetailPage() {
                 setTestCaseDialogOpen(false)
                 setEditingTestCase(null)
                 setCreateCaseSuiteId(undefined)
+                if (detailSuiteId) {
+                  setSuiteDetailDialogOpen(true)
+                }
               }}
               loading={testCaseSaving}
             />
           </ResponsiveDialog>
+
+          <TestSuiteDetailDialog
+            suiteId={detailSuiteId}
+            open={suiteDetailDialogOpen}
+            onOpenChange={setSuiteDetailDialogOpen}
+            refreshKey={suiteDetailRefreshKey}
+            onEdit={(suite) => {
+              setSuiteDetailDialogOpen(false)
+              setEditingSuite({
+                _id: suite._id,
+                name: suite.name,
+                description: suite.description,
+                parentSuite: suite.parentSuite?._id,
+                project: projectId,
+              })
+              setParentSuiteIdForCreate(undefined)
+              setSuiteDialogOpen(true)
+            }}
+            onDelete={(suiteId) => {
+              setSuiteDetailDialogOpen(false)
+              // Refresh suites tree
+              setSuitesRefreshCounter(c => c + 1)
+            }}
+            onCreateChild={(parentSuiteId) => {
+              setSuiteDetailDialogOpen(false)
+              setEditingSuite(null)
+              setParentSuiteIdForCreate(parentSuiteId)
+              setSuiteDialogOpen(true)
+            }}
+            onCreateTestCase={(suiteId) => {
+              setSuiteDetailDialogOpen(false)
+              setEditingTestCase(null)
+              setCreateCaseSuiteId(suiteId)
+              setTestCaseDialogOpen(true)
+            }}
+            onChildSuiteClick={(childSuiteId) => {
+              setDetailSuiteId(childSuiteId)
+            }}
+          />
 
           {/* Bulk Task Upload Dialog */}
           <BulkTaskUploadDialog

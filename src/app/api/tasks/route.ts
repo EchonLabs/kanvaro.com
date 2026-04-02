@@ -242,7 +242,7 @@ export async function GET(request: NextRequest) {
         const escapedNormalized = escapeRegex(normalizedSearch)
         const fuzzyRegex = new RegExp(escapedSearch, 'i')
         const fuzzyRegexNormalized = new RegExp(escapedNormalized, 'i')
-        
+
         const orFilters: any[] = [
           { title: fuzzyRegex },
           { description: fuzzyRegex },
@@ -254,11 +254,11 @@ export async function GET(request: NextRequest) {
         // Try parsing as number - both original and normalized
         const numericValue = Number(trimmedSearch)
         const numericValueNormalized = Number(normalizedSearch)
-        
+
         if (!Number.isNaN(numericValue) && numericValue !== 0) {
           orFilters.push({ taskNumber: numericValue })
         }
-        
+
         // If normalized differs from original, also try the normalized number
         if (!Number.isNaN(numericValueNormalized) && numericValueNormalized !== numericValue && numericValueNormalized !== 0) {
           orFilters.push({ taskNumber: numericValueNormalized })
@@ -518,7 +518,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify user has access to this project (quick check before permission check)
-    const isProjectMember = projectDoc.teamMembers?.some((member: any) => 
+    const isProjectMember = projectDoc.teamMembers?.some((member: any) =>
       member.toString() === userId || (typeof member === 'object' && member._id?.toString() === userId)
     ) || projectDoc.createdBy?.toString() === userId
 
@@ -535,28 +535,19 @@ export async function POST(request: NextRequest) {
     const taskStatus: string = typeof status === 'string' && status.trim().length > 0
       ? status.trim()
       : 'backlog'
-    
-    // Run position query and counter update in parallel for better performance
-    const [maxPosition, taskCounter] = await Promise.all([
-      Task.findOne(
-        { project, status: taskStatus },
-        { position: 1 }
-      ).sort({ position: -1 }).lean(),
-      Counter.findOneAndUpdate(
-        { scope: 'task', project: projectDoc._id },
-        { $inc: { seq: 1 }, $setOnInsert: { updatedAt: new Date() } },
-        { new: true, upsert: true }
-      )
-    ])
-    
+
+    // Get the next position for this project/status combination
+    const maxPosition = await Task.findOne(
+      { project, status: taskStatus },
+      { position: 1 }
+    ).sort({ position: -1 }).lean()
+
     // TypeScript type narrowing: findOne returns a single document or null
     // Access position property safely after verifying it exists
     const maxPositionValue = maxPosition && typeof maxPosition === 'object' && !Array.isArray(maxPosition) && 'position' in maxPosition
       ? (maxPosition as any).position
       : undefined
     const nextPosition = typeof maxPositionValue === 'number' ? maxPositionValue + 1 : 0
-    const taskNumber = taskCounter.seq
-    const displayId = `${projectDoc.projectNumber}.${taskNumber}`
 
     // Create task
     const normalizedStory = typeof story === 'string' && story.trim() !== '' ? story.trim() : undefined
@@ -579,45 +570,66 @@ export async function POST(request: NextRequest) {
       normalizedAssignedTo = [{ user: assignedTo.trim() }]
     }
 
-    const task = new Task({
-      title,
-      description,
-      status: taskStatus,
-      priority: priority || 'medium',
-      type: type || 'task',
-      organization: user.organization,
-      project,
-      taskNumber,
-      displayId,
-      story: normalizedStory,
-      epic: normalizedEpic,
-      parentTask: normalizedParentTask,
-      assignedTo: normalizedAssignedTo.map(item => ({
-        user: item.user,
-        firstName: item.firstName,
-        lastName: item.lastName,
-        email: item.email,
-        hourlyRate: item.hourlyRate
-      })),
-      createdBy: userId,
-      storyPoints: typeof storyPoints === 'number'
-        ? storyPoints
-        : (typeof storyPoints === 'string' && storyPoints.trim() !== '' ? Number(storyPoints) : undefined),
-      dueDate: dueDate ? new Date(dueDate) : undefined,
-      estimatedHours: typeof estimatedHours === 'number'
-        ? estimatedHours
-        : (typeof estimatedHours === 'string' && estimatedHours.trim() !== '' ? Number(estimatedHours) : undefined),
-      labels: sanitizeLabels(labels),
-      subtasks: sanitizeSubtasks(subtasks),
-      attachments: sanitizeAttachments(attachments, userId),
-      position: nextPosition,
-      isBillable: typeof isBillable === 'boolean'
-        ? isBillable
-        : (projectDoc as any)?.isBillableByDefault ?? true
-    })
+    // Increment counter to get next task number
+    // If task save fails later, we'll decrement it back to prevent gaps
+    const taskCounter = await Counter.findOneAndUpdate(
+      { scope: 'task', project: projectDoc._id },
+      { $inc: { seq: 1 }, $setOnInsert: { updatedAt: new Date() } },
+      { new: true, upsert: true }
+    )
+    const taskNumber = taskCounter.seq
+    const displayId = `${projectDoc.projectNumber}.${taskNumber}`
 
-    // Save task and prepare response data in parallel where possible
-    const savePromise = task.save()
+    let task: any
+    try {
+      task = new Task({
+        title,
+        description,
+        status: taskStatus,
+        priority: priority || 'medium',
+        type: type || 'task',
+        organization: user.organization,
+        project,
+        taskNumber,
+        displayId,
+        story: normalizedStory,
+        epic: normalizedEpic,
+        parentTask: normalizedParentTask,
+        assignedTo: normalizedAssignedTo.map(item => ({
+          user: item.user,
+          firstName: item.firstName,
+          lastName: item.lastName,
+          email: item.email,
+          hourlyRate: item.hourlyRate
+        })),
+        createdBy: userId,
+        storyPoints: typeof storyPoints === 'number'
+          ? storyPoints
+          : (typeof storyPoints === 'string' && storyPoints.trim() !== '' ? Number(storyPoints) : undefined),
+        dueDate: dueDate ? new Date(dueDate) : undefined,
+        estimatedHours: typeof estimatedHours === 'number'
+          ? estimatedHours
+          : (typeof estimatedHours === 'string' && estimatedHours.trim() !== '' ? Number(estimatedHours) : undefined),
+        labels: sanitizeLabels(labels),
+        subtasks: sanitizeSubtasks(subtasks),
+        attachments: sanitizeAttachments(attachments, userId),
+        position: nextPosition,
+        isBillable: typeof isBillable === 'boolean'
+          ? isBillable
+          : (projectDoc as any)?.isBillableByDefault ?? true
+      })
+
+      await task.save()
+    } catch (saveError) {
+      // Task save failed — roll back the counter to prevent number gaps
+      await Counter.findOneAndUpdate(
+        { scope: 'task', project: projectDoc._id },
+        { $inc: { seq: -1 } }
+      ).catch(rollbackErr => {
+        console.error('[Task POST] Failed to rollback counter after save error:', rollbackErr)
+      })
+      throw saveError
+    }
 
     // Build minimal populate paths for faster response
     // Only populate essential fields that are likely to be used immediately
@@ -646,9 +658,6 @@ export async function POST(request: NextRequest) {
     if (task.attachments && Array.isArray(task.attachments) && task.attachments.length > 0) {
       populatePaths.push({ path: 'attachments.uploadedBy', select: 'firstName lastName email' })
     }
-
-    // Wait for save to complete, then populate
-    await savePromise
 
     // Use lean() for faster queries - returns plain JS objects instead of Mongoose documents
     const populatedTask = await Task.findById(task._id)
@@ -688,16 +697,16 @@ export async function POST(request: NextRequest) {
       // When behind a proxy/load balancer, check x-forwarded-* headers first
       const forwardedHost = request.headers.get('x-forwarded-host')
       const forwardedProto = request.headers.get('x-forwarded-proto')
-      
+
       // Get the host from various sources, prioritizing origin/referer headers for external URLs
       const originHeader = request.headers.get('origin')
       const refererHeader = request.headers.get('referer')
       const hostHeader = request.headers.get('host')
-      
+
       // Extract host from origin or referer (these usually have the correct external domain)
       let extractedHost: string | null = null
       let extractedProtocol: string | null = null
-      
+
       if (originHeader) {
         try {
           const originUrl = new URL(originHeader)
@@ -707,7 +716,7 @@ export async function POST(request: NextRequest) {
           // Invalid origin, continue
         }
       }
-      
+
       if (!extractedHost && refererHeader) {
         try {
           const refererUrl = new URL(refererHeader)
@@ -717,7 +726,7 @@ export async function POST(request: NextRequest) {
           // Invalid referer, continue
         }
       }
-      
+
       // Determine protocol
       let protocol: string
       if (extractedProtocol) {
@@ -729,7 +738,7 @@ export async function POST(request: NextRequest) {
       } else {
         protocol = 'https' // Default to https for production domains
       }
-      
+
       // Determine host - prefer extracted host from origin/referer, then forwarded host, then host header
       let host: string
       if (extractedHost && !extractedHost.includes('localhost') && !extractedHost.includes('127.0.0.1')) {
@@ -743,13 +752,13 @@ export async function POST(request: NextRequest) {
         host = 'localhost:3000' // Fallback
         protocol = 'http'
       }
-      
+
       // Clean up host (remove any protocol prefix, remove trailing slash, remove port if default)
       host = host.replace(/^https?:\/\//, '').replace(/\/$/, '')
       // Remove default ports
       host = host.replace(/^(.+):80$/, '$1')
       host = host.replace(/^(.+):443$/, '$1')
-      
+
       baseUrl = `${protocol}://${host}`
       console.log('baseUrl from fallback logic:', baseUrl)
     }
@@ -758,17 +767,17 @@ export async function POST(request: NextRequest) {
     if (normalizedAssignedTo && normalizedAssignedTo.length > 0) {
       const assigneesToNotify = normalizedAssignedTo.filter(id => id.user !== userId)
       assigneesToNotify.forEach(assigneeId => {
-      notificationService.notifyTaskUpdate(
-        task._id.toString(),
-        'assigned',
+        notificationService.notifyTaskUpdate(
+          task._id.toString(),
+          'assigned',
           assigneeId.user.toString(),
-        user.organization,
-        title,
-        projectDoc?.name,
-        baseUrl
-      ).catch(notificationError => {
-        console.error('Failed to send task assignment notification:', notificationError)
-        // Don't fail the task creation if notification fails
+          user.organization,
+          title,
+          projectDoc?.name,
+          baseUrl
+        ).catch(notificationError => {
+          console.error('Failed to send task assignment notification:', notificationError)
+          // Don't fail the task creation if notification fails
         })
       })
     }
