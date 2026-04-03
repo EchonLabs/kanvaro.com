@@ -404,12 +404,11 @@ export async function DELETE(
     const organizationId = user.organization
     const projectId = params.id
 
-    // Check if user can delete this project
- 
-    const canDeleteProject = await PermissionService.hasPermission(userId, Permission.PROJECT_DELETE, projectId)
+    // Check if user can delete this project - only Admin users
+    const canDeleteProject = await PermissionService.hasPermission(userId, Permission.PROJECT_DELETE)
     if (!canDeleteProject) {
       return NextResponse.json(
-        { error: 'Insufficient permissions to delete project' },
+        { error: 'Insufficient permissions to delete project. Only Admins can delete projects.' },
         { status: 403 }
       )
     }

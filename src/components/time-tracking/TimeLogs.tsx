@@ -3413,7 +3413,7 @@ export function TimeLogs({
                   {tasksLoading && (
                     <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                   )}
-                  <SelectContent className="max-h-[250px]">
+                  <SelectContent className="max-h-[250px] w-[var(--radix-select-trigger-width)]">
                     <div className="sticky top-0 z-10 p-2 border-b bg-popover">
                       <div className="relative">
                         <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -3453,9 +3453,9 @@ export function TimeLogs({
                       ) : (
                         filteredModalTasks.map((task) => (
                           <SelectItem key={task._id} value={task._id} onMouseDown={(e) => e.preventDefault()}>
-                            <div className="flex items-center space-x-2 min-w-0 w-full">
+                            <div className="flex items-center space-x-2 min-w-0" style={{ maxWidth: '300px' }}>
                               <Target className="h-4 w-4 flex-shrink-0" />
-                              <div className="flex-1 min-w-0 overflow-hidden">
+                              <div className="flex-1 min-w-0">
                                 <div className="font-bold truncate flex items-center gap-2 min-w-0">
                                   {task.displayId && (
                                     <span className="font-bold text-primary flex-shrink-0">{task.displayId}</span>
@@ -3464,12 +3464,14 @@ export function TimeLogs({
                                     {task.status} • {task.priority}
                                   </span>
                                 </div>
-                                <div className="text-xs text-muted-foreground min-w-0 overflow-hidden">
+                                <div className="text-xs text-muted-foreground min-w-0">
                                   <Tooltip delayDuration={200}>
                                     <TooltipTrigger asChild>
-                                      <span className="truncate block">{task.title}</span>
+                                      <span className="truncate block overflow-hidden">{task.title}</span>
                                     </TooltipTrigger>
-                                    <TooltipContent side="left" className="max-w-sm">
+<TooltipContent 
+  side="bottom" 
+  className="max-w-sm whitespace-normal break-words">
                                       <p className="font-medium truncate block" >{task.title}</p>
                                     </TooltipContent>
                                   </Tooltip>

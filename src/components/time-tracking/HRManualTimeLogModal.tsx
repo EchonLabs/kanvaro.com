@@ -630,7 +630,7 @@ export function HRManualTimeLogModal({
                           : 'No tasks available'
                   } />
                 </SelectTrigger>
-                <SelectContent className="max-h-[250px]">
+                <SelectContent className="max-h-[250px] w-[var(--radix-select-trigger-width)]">
                   <div className="sticky top-0 z-10 p-2 border-b bg-popover">
                     <div className="relative">
                       <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -657,7 +657,7 @@ export function HRManualTimeLogModal({
                       )}
                     </div>
                   </div>
-                  <div className="max-h-[200px] overflow-y-auto">
+                  <div className="overflow-hidden">
                     {tasksLoading ? (
                       <div className="flex items-center justify-center p-4">
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -670,16 +670,16 @@ export function HRManualTimeLogModal({
                     ) : (
                       filteredTasks.map((task) => (
                         <SelectItem key={task._id} value={task._id} onMouseDown={(e) => e.preventDefault()}>
-                          <div className="flex items-center space-x-2 min-w-0 w-full">
+                          <div className="flex items-center space-x-2 min-w-0" style={{ maxWidth: '400px'}}>
                             <Target className="h-4 w-4 flex-shrink-0" />
-                            <div className="flex-1 min-w-0 overflow-hidden">
+                            <div className="flex-1 min-w-0">
                               <div className="text-xs text-muted-foreground truncate">
                                 {task.displayId && `${task.displayId} • `}{task.status} • {task.priority}
                               </div>
-                              <div className="font-medium min-w-0 overflow-hidden">
+                              <div className="font-medium min-w-0">
                                 <Tooltip delayDuration={200}>
                                   <TooltipTrigger asChild>
-                                    <span className="truncate block">{task.title}</span>
+                                    <span className="truncate block overflow-hidden">{task.title}</span>
                                   </TooltipTrigger>
                                   <TooltipContent side="top" className="max-w-sm">
                                     <p className="font-medium">{task.title}</p>
