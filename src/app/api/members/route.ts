@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { User } from '@/models/User'
-import { Project } from '@/models/Project'
 import { UserInvitation } from '@/models/UserInvitation'
 import '@/models/CustomRole' // Ensure CustomRole model is registered for populate
 import { authenticateUser } from '@/lib/auth-utils'
@@ -48,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     // Build filters
     const filters: any = { organization: organizationId }
-
+    
     if (search) {
       filters.$or = [
         { firstName: { $regex: search, $options: 'i' } },
@@ -60,7 +59,7 @@ export async function GET(request: NextRequest) {
         { "humanResourcePartner.lastName": { $regex: search, $options: 'i' } }
       ]
     }
-
+    
     if (role) {
       // Check if the role is a system role or custom role
       const systemRoles = Object.values(Role)
@@ -72,7 +71,7 @@ export async function GET(request: NextRequest) {
         filters.customRole = role
       }
     }
-
+    
     if (status === 'active') {
       filters.isActive = true
     } else if (status === 'inactive') {
@@ -188,15 +187,6 @@ export async function PUT(request: NextRequest) {
     Object.assign(member, updates)
     await member.save()
 
-    // If hourlyRate was updated, propagate to all projects where this user is a team member
-    if (updates.hourlyRate !== undefined) {
-      await Project.updateMany(
-        { organization: organizationId, 'teamMembers.memberId': memberId },
-        { $set: { 'teamMembers.$[elem].hourlyRate': Number(updates.hourlyRate) } },
-        { arrayFilters: [{ 'elem.memberId': memberId }] }
-      )
-    }
-
     return NextResponse.json({
       success: true,
       message: 'Member updated successfully',
@@ -304,7 +294,7 @@ export async function DELETE(request: NextRequest) {
       organization: organizationId
     })
 
-
+   
 
     if (!member) {
       return NextResponse.json(

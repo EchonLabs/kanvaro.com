@@ -483,19 +483,19 @@ export default function ProjectsPage() {
                                   Edit Project
                                 </DropdownMenuItem>
                               </PermissionGate>
-                              <>
+                              <PermissionGate permission={Permission.PROJECT_DELETE} projectId={project._id}>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation()
+                                    handleDeleteClick(project._id)
                                   }}
-                                  disabled={true}
                                   className="text-destructive focus:text-destructive"
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   Delete Project
                                 </DropdownMenuItem>
-                              </>
+                              </PermissionGate>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -686,19 +686,19 @@ export default function ProjectsPage() {
                                     Edit Project
                                   </DropdownMenuItem>
                                 </PermissionGate>
-                                <>\n                                  <DropdownMenuSeparator />
+                                <PermissionGate permission={Permission.PROJECT_DELETE} projectId={project._id}>
+                                  <DropdownMenuSeparator />
                                   <DropdownMenuItem
                                     onClick={(e) => {
                                       e.stopPropagation()
+                                      handleDeleteClick(project._id)
                                     }}
-                                    disabled={true}
-                                    title="You do not have permission to delete projects"
                                     className="text-destructive focus:text-destructive"
                                   >
                                     <Trash2 className="h-4 w-4 mr-2" />
                                     Delete Project
                                   </DropdownMenuItem>
-                                </>
+                                </PermissionGate>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>

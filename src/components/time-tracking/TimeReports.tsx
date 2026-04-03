@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { BarChart3, PieChart, TrendingUp, Download, Calendar, Users, DollarSign, Clock, X, RotateCcw, FileText, Briefcase } from 'lucide-react'
+import { BarChart3, PieChart, TrendingUp, Download, Calendar, Users, DollarSign, Clock, X, RotateCcw, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -11,7 +11,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useOrganization } from '@/hooks/useOrganization'
-import { usePermissions } from '@/lib/permissions/permission-context'
 import { applyRoundingRules } from '@/lib/utils'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
@@ -107,8 +106,6 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   const { organization } = useOrganization()
   const { formatCurrency } = useOrgCurrency()
   const { formatDate, formatTime, formatDuration: formatDurationUtil } = useDateTime()
-  const { permissions } = usePermissions()
-  const isAdmin = permissions?.userRole === 'admin' || permissions?.userRole === 'super_admin'
 
   // Function to determine hourly rate source explanation
   const getHourlyRateSource = (entry: any) => {
@@ -171,10 +168,10 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       dateType === 'start' ? tempStartDate : filters.startDate,
       dateType === 'end' ? tempEndDate : filters.endDate
     )
-
+    
     setTempStartDate(corrected.startDate)
     setTempEndDate(corrected.endDate)
-
+    
     setFilters(prev => ({
       ...prev,
       startDate: corrected.startDate,
@@ -559,32 +556,6 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     document.body.removeChild(a)
   }
 
-  const handleBudgetReportExport = async () => {
-    try {
-      const params = new URLSearchParams({ organizationId })
-      if (filters.startDate) params.append('startDate', filters.startDate)
-      if (filters.endDate) params.append('endDate', filters.endDate)
-
-      const response = await fetch(`/api/time-tracking/reports/budget?${params}`)
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        const dateRange = filters.startDate && filters.endDate ? `_${filters.startDate}_to_${filters.endDate}` : ''
-        a.download = `Budget_Report${dateRange}.csv`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-      } else {
-        setError('Failed to generate budget report')
-      }
-    } catch (err) {
-      setError('Failed to generate budget report')
-    }
-  }
-
   const handleExport = async () => {
     try {
       if (reportData?.detailedEntries && reportData.detailedEntries.length > 0) {
@@ -890,12 +861,6 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
               <FileText className="h-4 w-4 mr-2" />
               Monthly Report
             </Button>
-            {isAdmin && (
-              <Button variant="outline" onClick={handleBudgetReportExport}>
-                <Briefcase className="h-4 w-4 mr-2" />
-                Budget Report
-              </Button>
-            )}
             <Button onClick={handleExport}>
               <Download className="h-4 w-4 mr-2" />
               Export CSV

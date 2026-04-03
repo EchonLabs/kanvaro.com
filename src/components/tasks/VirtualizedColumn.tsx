@@ -152,7 +152,6 @@ export default function VirtualizedColumn({
                       getTypeColor={getTypeColor}
                       onEdit={task => onEditTask?.(task as unknown as PopulatedTask)}
                       onDelete={task => onDeleteTask?.(task)}
-                      canDelete={hasPermission(Permission.TASK_DELETE_ALL)}
                       isDraggable={canDragTask ? canDragTask(task) : true}
                     />
                   </div>

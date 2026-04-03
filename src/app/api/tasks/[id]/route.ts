@@ -971,20 +971,20 @@ export async function DELETE(
     const taskId = params.id
 
     // Check if user has permission to delete all tasks
-    const hasTaskDeleteAll = await PermissionService.hasPermission(userId, Permission.TASK_DELETE_ALL);
+    const [hasTaskDeleteAll, hasProjectViewAll] = await Promise.all([
+      PermissionService.hasPermission(userId, Permission.TASK_DELETE_ALL),
+      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL)
+    ]);
 
-    // Only users with TASK_DELETE_ALL (Admin) can delete tasks
-    if (!hasTaskDeleteAll) {
-      return NextResponse.json(
-        { error: 'You do not have permission to delete tasks' },
-        { status: 403 }
-      );
-    }
-
+    // Build query - if user has TASK_DELETE_ALL or PROJECT_VIEW_ALL, they can delete any task
     const deleteQuery: any = {
       _id: taskId,
       organization: organizationId
     };
+
+    if (!hasTaskDeleteAll && !hasProjectViewAll) {
+      deleteQuery.createdBy = userId;
+    }
 
     const task = await Task.findOneAndDelete(deleteQuery)
 

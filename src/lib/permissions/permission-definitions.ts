@@ -310,7 +310,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.REPORTING_EXPORT,
     Permission.REPORTING_SHARE,
     Permission.TIME_LOG_REPORT_ACCESS,
-   Permission.REPORTING_VIEW,
 
     // Settings
     Permission.SETTINGS_VIEW,
@@ -454,7 +453,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TIME_TRACKING_CREATE,
     Permission.TIME_TRACKING_READ,
     Permission.TIME_TRACKING_UPDATE,
-    Permission.TIME_TRACKING_DELETE,
+    // Permission.TIME_TRACKING_DELETE,
     Permission.TIME_TRACKING_APPROVE,
     Permission.TIME_TRACKING_EXPORT,
     Permission.TIME_TRACKING_VIEW_ASSIGNED,

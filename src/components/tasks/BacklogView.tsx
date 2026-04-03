@@ -683,16 +683,17 @@ export default function BacklogView({ projectId, onCreateTask, onEditTask, onDel
                         <DropdownMenuItem onClick={() => router.push(`/tasks/${task._id}`)}>
                           View Details
                         </DropdownMenuItem>
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => onDeleteTask?.(task._id)}
-                            disabled={!canDeleteTasks}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            Delete Task
-                          </DropdownMenuItem>
-                        </>
+                        {canDeleteTasks && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => onDeleteTask?.(task._id)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              Delete Task
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}

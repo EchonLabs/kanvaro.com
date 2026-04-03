@@ -2260,8 +2260,8 @@ export default function BacklogPage() {
                               </DropdownMenuItem>
                             )}
 
-                            {/* Delete - only for Admin */}
-                            {false && ((item.type === 'task' && canDeleteTask(item)) ||
+                            {/* Delete */}
+                            {((item.type === 'task' && canDeleteTask(item)) ||
                               (item.type === 'story' && canDeleteStory(item)) ||
                               (item.type === 'epic' && canDeleteEpic(item))) && (
                                 <DropdownMenuItem

@@ -683,19 +683,17 @@ export default function SprintEventsPage() {
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit Event
                               </DropdownMenuItem>
-                              {false && <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleDeleteClick(event)
-                                  }}
-                                  className="text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </>}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDeleteClick(event)
+                                }}
+                                className="text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
                             </>
                           ) : null}
                         </DropdownMenuContent>

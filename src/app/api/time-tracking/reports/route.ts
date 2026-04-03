@@ -441,7 +441,7 @@ async function getDetailedEntriesReport(query: any, format: string) {
     .populate('user', 'firstName lastName email hourlyRate')
     .populate({
       path: 'project',
-      select: 'name budget memberRates teamMembers'
+      select: 'name budget memberRates'
     })
     .populate('task', 'title displayId')
     .populate('approvedBy', 'firstName lastName email')
@@ -466,40 +466,29 @@ async function getDetailedEntriesReport(query: any, format: string) {
     let rateSource = 'organization' // Default fallback
     const userId = entry.user?._id || entry.user
 
-    // 1. Check teamMembers specific rate (primary storage)
-    const teamMember = entry.project?.teamMembers?.find(
-      (tm: any) => (tm.memberId || tm)?.toString() === userId?.toString()
+    // 1. Check if employee has project-specific hourly rate
+    const projectMemberRate = entry.project?.memberRates?.find(
+      (rate: any) => rate.user?.toString() === userId?.toString()
     )
 
-    if (teamMember?.hourlyRate !== undefined && teamMember?.hourlyRate !== null) {
-      effectiveHourlyRate = teamMember.hourlyRate
+    if (projectMemberRate && projectMemberRate.hourlyRate !== undefined && projectMemberRate.hourlyRate !== null) {
+      effectiveHourlyRate = projectMemberRate.hourlyRate
       rateSource = 'project-member'
     }
-    // 2. Check memberRates specific rate (legacy)
+    // 2. Check project default hourly rate
+    else if (entry.project?.budget?.defaultHourlyRate !== undefined && entry.project?.budget?.defaultHourlyRate !== null) {
+      effectiveHourlyRate = entry.project.budget.defaultHourlyRate
+      rateSource = 'project'
+    }
+    // 3. Check user's default hourly rate
+    else if (entry.user?.hourlyRate !== undefined && entry.user?.hourlyRate !== null) {
+      effectiveHourlyRate = entry.user.hourlyRate
+      rateSource = 'user'
+    }
+    // 4. Fallback to organization default rate
     else {
-      const projectMemberRate = entry.project?.memberRates?.find(
-        (rate: any) => rate.user?.toString() === userId?.toString()
-      )
-
-      if (projectMemberRate && projectMemberRate.hourlyRate !== undefined && projectMemberRate.hourlyRate !== null) {
-        effectiveHourlyRate = projectMemberRate.hourlyRate
-        rateSource = 'project-member'
-      }
-      // 3. Check project default hourly rate
-      else if (entry.project?.budget?.defaultHourlyRate !== undefined && entry.project?.budget?.defaultHourlyRate !== null) {
-        effectiveHourlyRate = entry.project.budget.defaultHourlyRate
-        rateSource = 'project'
-      }
-      // 4. Check user's default hourly rate
-      else if (entry.user?.hourlyRate !== undefined && entry.user?.hourlyRate !== null) {
-        effectiveHourlyRate = entry.user.hourlyRate
-        rateSource = 'user'
-      }
-      // 5. Fallback to organization default rate
-      else {
-        effectiveHourlyRate = orgDefaultRate
-        rateSource = 'organization'
-      }
+      effectiveHourlyRate = orgDefaultRate
+      rateSource = 'organization'
     }
 
     const hourlyRate = effectiveHourlyRate
