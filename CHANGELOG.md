@@ -1,3 +1,5 @@
+## [1.30.11](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.10...v1.30.11) (2026-03-31)
+
 ## [1.30.10](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.9...v1.30.10) (2026-03-25)
 
 

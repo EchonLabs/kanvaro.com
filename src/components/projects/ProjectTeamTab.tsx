@@ -84,6 +84,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
   const [projectBudget, setProjectBudget] = useState<{ defaultHourlyRate?: number } | null>(null)
   const [editingRate, setEditingRate] = useState<string | null>(null)
   const [tempRate, setTempRate] = useState<string>('')
+  const [newMemberHourlyRate, setNewMemberHourlyRate] = useState<string>('')
 
   const pageRef = useRef<HTMLDivElement | null>(null)
   const addMemberSectionRef = useRef<HTMLDivElement | null>(null)
@@ -131,8 +132,6 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
       const data = await response.json()
 
       if (data.success) {
-        console.log('Team data received:', data.data)
-        console.log('Team members:', data.data.teamMembers)
         setTeamMembers(data.data.teamMembers || [])
         setProjectRoles(data.data.projectRoles || [])
         setAvailableMembers(data.data.availableMembers || [])
@@ -167,7 +166,8 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
         },
         body: JSON.stringify({
           memberId: selectedMemberId,
-          role: autoProjectRole
+          role: autoProjectRole,
+          hourlyRate: newMemberHourlyRate !== '' ? Number(newMemberHourlyRate) : undefined
         })
       })
 
@@ -177,6 +177,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
         setSuccess('Team member added successfully')
         setShowAddMember(false)
         setSelectedMemberId('')
+        setNewMemberHourlyRate('')
         fetchTeamData()
         onUpdate()
         setTimeout(() => setSuccess(''), 3000)
@@ -702,6 +703,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                     setShowAddMember(false)
                     setSelectedMemberId('')
                     setMemberSearchQuery('')
+                    setNewMemberHourlyRate('')
                     setError('')
                   }}
                 >
@@ -800,6 +802,30 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                     </div>
                   </div>
 
+                  {/* Hourly Rate Input */}
+                  {canManageBudget && (
+                    <div className="space-y-2">
+                      <label htmlFor="newMemberRate" className="text-sm font-medium">
+                        Hourly Rate ({project?.budget?.currency || 'USD'})
+                      </label>
+                      <Input
+                        id="newMemberRate"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder={selectedMember.hourlyRate ? selectedMember.hourlyRate.toString() : "0.00"}
+                        value={newMemberHourlyRate}
+                        onChange={(e) => setNewMemberHourlyRate(e.target.value)}
+                        className="w-full"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {selectedMember.hourlyRate
+                          ? `User's default rate: ${selectedMember.hourlyRate}/hr`
+                          : 'No default rate set for this user. Leave empty to use project default.'}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Project Role Preview */}
                   {/* <div className="space-y-2 p-4 border rounded-lg bg-muted/30">
                     <label className="text-sm font-medium">Project Role (Auto-assigned)</label>
@@ -822,6 +848,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                     setShowAddMember(false)
                     setSelectedMemberId('')
                     setMemberSearchQuery('')
+                    setNewMemberHourlyRate('')
                     setError('')
                   }}
                 >
