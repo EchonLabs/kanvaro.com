@@ -1429,21 +1429,21 @@ export default function TasksClient({
                                                                                         <Edit className="h-4 w-4 mr-2" />
                                                                                         Edit Task
                                                                                     </DropdownMenuItem>
-                                                                                    {canDeleteTask(task) && (
-                                                                                        <>
-                                                                                            <DropdownMenuSeparator />
-                                                                                            <DropdownMenuItem
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation()
-                                                                                                    handleDeleteClick(task)
-                                                                                                }}
-                                                                                                className="text-destructive focus:text-destructive"
-                                                                                            >
-                                                                                                <Trash2 className="h-4 w-4 mr-2" />
-                                                                                                Delete Task
-                                                                                            </DropdownMenuItem>
-                                                                                        </>
-                                                                                    )}
+                                                                                    <>
+                                                                                        <DropdownMenuSeparator />
+                                                                                        <DropdownMenuItem
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation()
+                                                                                                if (!canDeleteTask(task)) return
+                                                                                                handleDeleteClick(task)
+                                                                                            }}
+                                                                                            disabled={!canDeleteTask(task)}
+                                                                                            className="text-destructive focus:text-destructive"
+                                                                                        >
+                                                                                            <Trash2 className="h-4 w-4 mr-2" />
+                                                                                            Delete Task
+                                                                                        </DropdownMenuItem>
+                                                                                    </>
                                                                                 </DropdownMenuContent>
                                                                             </DropdownMenu>
                                                                         </div>

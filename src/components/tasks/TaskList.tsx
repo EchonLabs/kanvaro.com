@@ -81,7 +81,7 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   const { success: notifySuccess, error: notifyError } = useNotify()
   const { hasPermission } = usePermissions()
   const canEditTask = hasPermission(Permission.TASK_UPDATE, projectId)
-  const canDeleteTask = hasPermission(Permission.TASK_DELETE, projectId)
+  const canDeleteTask = hasPermission(Permission.TASK_DELETE_ALL)
   const canChangeTaskStatus = hasPermission(Permission.TASK_CHANGE_STATUS, projectId)
   const canManageProject = hasPermission(Permission.PROJECT_UPDATE, projectId)
   const [tasks, setTasks] = useState<Task[]>([])
@@ -638,17 +638,16 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
                       <DropdownMenuItem onClick={() => handleViewTask(task)}>
                         View Details
                       </DropdownMenuItem>
-                      <PermissionGate permission={Permission.TASK_DELETE} projectId={projectId}>
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteTask(task)}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            Delete Task
-                          </DropdownMenuItem>
-                        </>
-                      </PermissionGate>
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteTask(task)}
+                          disabled={!canDeleteTask}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          Delete Task
+                        </DropdownMenuItem>
+                      </>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

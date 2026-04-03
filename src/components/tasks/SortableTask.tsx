@@ -225,7 +225,6 @@ export default function SortableTask({
                           onDelete(task._id.toString())
                         }}
                         disabled={!canDelete}
-                        title={!canDelete ? 'You need TASK_DELETE_ALL permission or be the creator to delete this task' : undefined}
                         className="text-destructive focus:text-destructive"
                       >
                         Delete Task

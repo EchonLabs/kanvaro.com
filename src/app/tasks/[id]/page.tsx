@@ -1379,7 +1379,7 @@ export default function TaskDetailPage() {
   }
 
   const editAllowed = hasPermission(Permission.TASK_EDIT_ALL) || isCreator(task)
-  const deleteAllowed = hasPermission(Permission.TASK_DELETE_ALL) || isCreator(task)
+  const deleteAllowed = hasPermission(Permission.TASK_DELETE_ALL)
 
   const attachmentListItems = (task.attachments || []).map(attachment => ({
     name: attachment.name,

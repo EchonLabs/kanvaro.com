@@ -1093,12 +1093,13 @@ export default function TimerPage() {
         )}
 
         {/* Daily Hours Info */}
-        {timeTrackingSettings && dailyHoursLogged > 0 && (
+        
+        {/* {timeTrackingSettings && dailyHoursLogged > 0 && (
           <Alert variant={dailyHoursLogged >= timeTrackingSettings.maxDailyHours ? 'destructive' : 'default'}>
             <Info className="h-4 w-4" />
-            <AlertDescription>
-              You have logged <strong>{dailyHoursLogged.toFixed(1)} hours</strong> today.
-              {dailyHoursLogged >= timeTrackingSettings.maxDailyHours && (
+            <AlertDescription> */}
+              {/* You have logged <strong>{dailyHoursLogged.toFixed(1)} hours</strong> today. */}
+              {/* {dailyHoursLogged >= timeTrackingSettings.maxDailyHours && (
                 <span className="ml-2">
                   You have exceeded your daily limit of {timeTrackingSettings.maxDailyHours} hours.
                 </span>
@@ -1110,7 +1111,7 @@ export default function TimerPage() {
               )}
             </AlertDescription>
           </Alert>
-        )}
+        )} */}
 
         {/* Time Tracking Disabled Message */}
         {timeTrackingSettings && !timeTrackingSettings.allowTimeTracking && (

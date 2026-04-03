@@ -38,7 +38,7 @@ export async function GET(
       organization: organizationId,
       is_deleted: { $ne: true }
     })
-      .populate('teamMembers.memberId', 'firstName lastName email avatar role')
+      .populate('teamMembers.memberId', 'firstName lastName email avatar role hourlyRate')
       .populate('createdBy', 'firstName lastName email avatar')
       .populate('client', 'firstName lastName email avatar')
       .populate('projectRoles.user', 'firstName lastName email avatar')
@@ -68,20 +68,47 @@ export async function GET(
       }
     }
 
+    // Auto-sync: persist user default rates to project for members missing a project-specific rate
+    if (Array.isArray(project.teamMembers)) {
+      let needsSave = false
+      for (const tm of project.teamMembers as any[]) {
+        if (tm.hourlyRate === undefined || tm.hourlyRate === null) {
+          const populatedUser = tm.memberId
+          const userRate = populatedUser?.hourlyRate
+          if (userRate !== undefined && userRate !== null) {
+            tm.hourlyRate = Number(userRate)
+            needsSave = true
+          }
+        }
+      }
+      if (needsSave) {
+        project.markModified('teamMembers')
+        await project.save()
+      }
+    }
+
     // Enhance team members with rate info if user has permission
     const enhanceMemberWithRate = (member: any) => {
       // Handle both old ObjectId format and new object format
       const memberId = member.memberId || member._id || member
-      const memberHourlyRate = member.hourlyRate
+      // member.hourlyRate here is the PROJECT-SPECIFIC rate from teamMembers schema
+      const projectMemberHourlyRate = member.hourlyRate
 
-      const normalizedMember = normalizeUserAvatar(typeof member === 'object' && member.memberId ? member.memberId : member)
+      // Convert populated Mongoose document to plain object for proper spreading
+      const populatedUser = typeof member === 'object' && member.memberId ? member.memberId : member
+      const plainUser = populatedUser?.toObject ? populatedUser.toObject() : (populatedUser?._doc || populatedUser)
+      const normalizedMember = normalizeUserAvatar(plainUser)
+
       if (!hasBudgetPermission) {
         const { hourlyRate, ...memberWithoutRate } = normalizedMember
         return memberWithoutRate
       }
 
-      // Use hourly rate from teamMembers if available, otherwise fall back to memberRates
-      let projectRate = memberHourlyRate
+      // Get the user's default hourly rate from their profile
+      const userDefaultHourlyRate = normalizedMember?.hourlyRate
+
+      // Use project-specific rate from teamMembers if available, otherwise fall back to memberRates
+      let projectRate = projectMemberHourlyRate
       if (projectRate === undefined) {
         const projectRateEntry = project.memberRates?.find(
           (r: any) => r.user.toString() === memberId.toString()
@@ -89,10 +116,13 @@ export async function GET(
         projectRate = projectRateEntry ? projectRateEntry.hourlyRate : undefined
       }
 
+      // Fall back to user's default rate if no project-specific rate
+      const effectiveProjectRate = projectRate ?? userDefaultHourlyRate
+
       return {
         ...normalizedMember,
-        projectHourlyRate: projectRate,
-        // user.hourlyRate is already in member object
+        hourlyRate: userDefaultHourlyRate,
+        projectHourlyRate: effectiveProjectRate,
       }
     }
 
@@ -108,7 +138,10 @@ export async function GET(
         })),
         createdBy: normalizeUserAvatar(project.createdBy),
         client: normalizeUserAvatar(project.client),
-        availableMembers: organizationMembers.map(normalizeUserAvatar),
+        availableMembers: organizationMembers.map((member: any) => ({
+          ...normalizeUserAvatar(member),
+          hourlyRate: member.hourlyRate
+        })),
         // Include project budget info if user has permission
         budget: hasBudgetPermission ? project.budget : undefined
       }
@@ -163,14 +196,14 @@ export async function PUT(
         )
       }
     } else {
-       // If updating other things (future use), check project manage team permission
-       const canManageTeam = await PermissionService.hasPermission(userId, Permission.PROJECT_MANAGE_TEAM, projectId)
-       if (!canManageTeam) {
-         return NextResponse.json(
-           { error: 'Insufficient permissions to manage project team' },
-           { status: 403 }
-         )
-       }
+      // If updating other things (future use), check project manage team permission
+      const canManageTeam = await PermissionService.hasPermission(userId, Permission.PROJECT_MANAGE_TEAM, projectId)
+      if (!canManageTeam) {
+        return NextResponse.json(
+          { error: 'Insufficient permissions to manage project team' },
+          { status: 403 }
+        )
+      }
     }
 
     // Find project
@@ -217,7 +250,7 @@ export async function PUT(
           teamMember.hourlyRate = hourlyRate
           // Mark the teamMembers array as modified
           project.markModified('teamMembers')
-        } 
+        }
       }
 
       const existingRateIndex = project.memberRates.findIndex(
@@ -227,10 +260,10 @@ export async function PUT(
       if (existingRateIndex > -1) {
         // Update existing rate
         if (hourlyRate === null || hourlyRate === '') {
-           // Remove if setting to null/empty (reset to default)
-           project.memberRates.splice(existingRateIndex, 1)
+          // Remove if setting to null/empty (reset to default)
+          project.memberRates.splice(existingRateIndex, 1)
         } else {
-           project.memberRates[existingRateIndex].hourlyRate = Number(hourlyRate)
+          project.memberRates[existingRateIndex].hourlyRate = Number(hourlyRate)
         }
       } else if (hourlyRate !== null && hourlyRate !== '') {
         // Add new rate
@@ -288,13 +321,24 @@ export async function POST(
       )
     }
 
-    const { memberId, role } = await request.json()
+    const { memberId, role, hourlyRate } = await request.json()
 
     if (!memberId) {
       return NextResponse.json(
         { error: 'Member ID is required' },
         { status: 400 }
       )
+    }
+
+    // If setting hourly rate, check budget handling permission
+    if (hourlyRate !== undefined && hourlyRate !== null) {
+      const hasBudgetPermission = await PermissionService.hasPermission(userId.toString(), Permission.BUDGET_HANDLING)
+      if (!hasBudgetPermission) {
+        return NextResponse.json(
+          { error: 'Insufficient permissions to manage budget/rates' },
+          { status: 403 }
+        )
+      }
     }
 
     // Find project
@@ -337,11 +381,22 @@ export async function POST(
       )
     }
 
+    // Determine the rate to use: explicit rate > user's default rate > undefined
+    const effectiveRate = (hourlyRate !== undefined && hourlyRate !== null)
+      ? Number(hourlyRate)
+      : (member.hourlyRate ? Number(member.hourlyRate) : undefined)
+
     // Add member to team
     if (Array.isArray(project.teamMembers)) {
-      project.teamMembers.push({ memberId, hourlyRate: undefined })
+      project.teamMembers.push({
+        memberId,
+        hourlyRate: effectiveRate
+      })
     } else {
-      project.teamMembers = [{ memberId, hourlyRate: undefined }]
+      project.teamMembers = [{
+        memberId,
+        hourlyRate: effectiveRate
+      }]
     }
 
     // Add project role if specified
@@ -350,7 +405,7 @@ export async function POST(
       project.projectRoles = project.projectRoles.filter(
         (r: any) => r.user.toString() !== memberId
       )
-      
+
       // Add new role
       project.projectRoles.push({
         user: memberId,
@@ -361,80 +416,80 @@ export async function POST(
     }
 
     await project.save()
-      let baseUrl: string
-        
-        // First, check if NEXT_PUBLIC_APP_URL is explicitly set (recommended for all environments)
-        if (process.env.NEXT_PUBLIC_APP_URL) {
-          baseUrl = process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '') // Remove trailing slash
-        } else {
-          // Fall back to detecting from request headers
-          // When behind a proxy/load balancer, check x-forwarded-* headers first
-          const forwardedHost = request.headers.get('x-forwarded-host')
-          const forwardedProto = request.headers.get('x-forwarded-proto')
-          
-          // Get the host from various sources, prioritizing origin/referer headers for external URLs
-          const originHeader = request.headers.get('origin')
-          const refererHeader = request.headers.get('referer')
-          const hostHeader = request.headers.get('host')
-          
-          // Extract host from origin or referer (these usually have the correct external domain)
-          let extractedHost: string | null = null
-          let extractedProtocol: string | null = null
-          
-          if (originHeader) {
-            try {
-              const originUrl = new URL(originHeader)
-              extractedHost = originUrl.host
-              extractedProtocol = originUrl.protocol.replace(':', '')
-            } catch (e) {
-              // Invalid origin, continue
-            }
-          }
-          
-          if (!extractedHost && refererHeader) {
-            try {
-              const refererUrl = new URL(refererHeader)
-              extractedHost = refererUrl.host
-              extractedProtocol = refererUrl.protocol.replace(':', '')
-            } catch (e) {
-              // Invalid referer, continue
-            }
-          }
-          
-          // Determine protocol
-          let protocol: string
-          if (extractedProtocol) {
-            protocol = extractedProtocol
-          } else if (forwardedProto) {
-            protocol = forwardedProto.split(',')[0].trim() // Use first proto if multiple
-          } else if (hostHeader?.includes('localhost') || hostHeader?.includes('127.0.0.1')) {
-            protocol = 'http'
-          } else {
-            protocol = 'https' // Default to https for production domains
-          }
-          
-          // Determine host - prefer extracted host from origin/referer, then forwarded host, then host header
-          let host: string
-          if (extractedHost && !extractedHost.includes('localhost') && !extractedHost.includes('127.0.0.1')) {
-            // Use extracted host if it's a valid external domain
-            host = extractedHost
-          } else if (forwardedHost) {
-            host = forwardedHost.split(',')[0].trim() // Use first host if multiple
-          } else if (hostHeader) {
-            host = hostHeader.replace(/^https?:\/\//, '') // Remove protocol if present
-          } else {
-            host = 'localhost:3000' // Fallback
-            protocol = 'http'
-          }
-          
-          // Clean up host (remove any protocol prefix, remove trailing slash, remove port if default)
-          host = host.replace(/^https?:\/\//, '').replace(/\/$/, '')
-          // Remove default ports
-          host = host.replace(/^(.+):80$/, '$1')
-          host = host.replace(/^(.+):443$/, '$1')
-          
-          baseUrl = `${protocol}://${host}`
+    let baseUrl: string
+
+    // First, check if NEXT_PUBLIC_APP_URL is explicitly set (recommended for all environments)
+    if (process.env.NEXT_PUBLIC_APP_URL) {
+      baseUrl = process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '') // Remove trailing slash
+    } else {
+      // Fall back to detecting from request headers
+      // When behind a proxy/load balancer, check x-forwarded-* headers first
+      const forwardedHost = request.headers.get('x-forwarded-host')
+      const forwardedProto = request.headers.get('x-forwarded-proto')
+
+      // Get the host from various sources, prioritizing origin/referer headers for external URLs
+      const originHeader = request.headers.get('origin')
+      const refererHeader = request.headers.get('referer')
+      const hostHeader = request.headers.get('host')
+
+      // Extract host from origin or referer (these usually have the correct external domain)
+      let extractedHost: string | null = null
+      let extractedProtocol: string | null = null
+
+      if (originHeader) {
+        try {
+          const originUrl = new URL(originHeader)
+          extractedHost = originUrl.host
+          extractedProtocol = originUrl.protocol.replace(':', '')
+        } catch (e) {
+          // Invalid origin, continue
         }
+      }
+
+      if (!extractedHost && refererHeader) {
+        try {
+          const refererUrl = new URL(refererHeader)
+          extractedHost = refererUrl.host
+          extractedProtocol = refererUrl.protocol.replace(':', '')
+        } catch (e) {
+          // Invalid referer, continue
+        }
+      }
+
+      // Determine protocol
+      let protocol: string
+      if (extractedProtocol) {
+        protocol = extractedProtocol
+      } else if (forwardedProto) {
+        protocol = forwardedProto.split(',')[0].trim() // Use first proto if multiple
+      } else if (hostHeader?.includes('localhost') || hostHeader?.includes('127.0.0.1')) {
+        protocol = 'http'
+      } else {
+        protocol = 'https' // Default to https for production domains
+      }
+
+      // Determine host - prefer extracted host from origin/referer, then forwarded host, then host header
+      let host: string
+      if (extractedHost && !extractedHost.includes('localhost') && !extractedHost.includes('127.0.0.1')) {
+        // Use extracted host if it's a valid external domain
+        host = extractedHost
+      } else if (forwardedHost) {
+        host = forwardedHost.split(',')[0].trim() // Use first host if multiple
+      } else if (hostHeader) {
+        host = hostHeader.replace(/^https?:\/\//, '') // Remove protocol if present
+      } else {
+        host = 'localhost:3000' // Fallback
+        protocol = 'http'
+      }
+
+      // Clean up host (remove any protocol prefix, remove trailing slash, remove port if default)
+      host = host.replace(/^https?:\/\//, '').replace(/\/$/, '')
+      // Remove default ports
+      host = host.replace(/^(.+):80$/, '$1')
+      host = host.replace(/^(.+):443$/, '$1')
+
+      baseUrl = `${protocol}://${host}`
+    }
 
     // Send notification to the added member
     await notificationService.notifyProjectTeamMemberAdded(
