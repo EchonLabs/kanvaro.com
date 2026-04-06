@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
+import '@/models/registry'
 import { BudgetEntry } from '@/models/BudgetEntry'
 import { Project } from '@/models/Project'
-import { TimeEntry } from '@/models/TimeEntry'
+import { Expense } from '@/models/Expense'
+import { ProjectIncome } from '@/models/ProjectIncome'
 import { authenticateUser } from '@/lib/auth-utils'
 import { hasPermission } from '@/lib/permissions/permission-utils'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { Types } from 'mongoose'
 
 export async function GET(req: NextRequest) {
   try {
@@ -22,6 +25,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
+    const organizationId = authResult.user.organization
+
     const { searchParams } = new URL(req.url)
     const search = searchParams.get('search')
     const category = searchParams.get('category')
@@ -31,8 +36,35 @@ export async function GET(req: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'date'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
 
-    // Build query for budget entries
-    let budgetQuery: any = {}
+    const hasDateRange = Boolean(startDate && endDate)
+    const start = hasDateRange ? new Date(startDate as string) : null
+    const end = hasDateRange ? new Date(endDate as string) : null
+
+    if (hasDateRange && (Number.isNaN(start!.getTime()) || Number.isNaN(end!.getTime()))) {
+      return NextResponse.json({ error: 'Invalid date range' }, { status: 400 })
+    }
+
+    // Build scoped project set (organization + optional project filter)
+    const projectQuery: any = {
+      organization: organizationId,
+      is_deleted: { $ne: true }
+    }
+
+    if (project && project !== 'all') {
+      if (!Types.ObjectId.isValid(project)) {
+        return NextResponse.json({ error: 'Invalid project filter' }, { status: 400 })
+      }
+      projectQuery._id = new Types.ObjectId(project)
+    }
+
+    const projects = await Project.find(projectQuery)
+      .select('name budget')
+      .lean()
+
+    const projectIds = projects.map(p => p._id)
+
+    // Build query for budget entries (scoped to the allowed projects)
+    let budgetQuery: any = { project: { $in: projectIds } }
     
     if (search) {
       budgetQuery.$or = [
@@ -45,14 +77,10 @@ export async function GET(req: NextRequest) {
       budgetQuery.category = category
     }
     
-    if (project && project !== 'all') {
-      budgetQuery.project = project
-    }
-    
-    if (startDate && endDate) {
+    if (hasDateRange) {
       budgetQuery.addedAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
+        $gte: start,
+        $lte: end
       }
     }
 
@@ -62,67 +90,130 @@ export async function GET(req: NextRequest) {
       .populate('addedBy', 'firstName lastName')
       .sort({ [sortBy]: sortOrder === 'asc' ? 1 : -1 })
 
-    // Get all projects for context
-    const projects = await Project.find({})
-      .select('name budget')
-      .lean()
+    // Expense + Income sources (real values)
+    const expenseMatch: any = { project: { $in: projectIds } }
+    if (category && category !== 'all') {
+      expenseMatch.category = category
+    }
+    if (hasDateRange) {
+      expenseMatch.expenseDate = { $gte: start, $lte: end }
+    }
 
-    // Calculate overview metrics
-    const totalBudget = budgetEntries.reduce((sum, entry) => sum + entry.amount, 0)
-    const totalSpent = projects.reduce((sum, project) => sum + (project.budget?.spent || 0), 0)
-    const totalRevenue = projects.reduce((sum, project) => sum + (project.budget?.revenue || 0), 0)
+    const incomeMatch: any = { organization: organizationId, project: { $in: projectIds } }
+    if (hasDateRange) {
+      incomeMatch.createdAt = { $gte: start, $lte: end }
+    }
+
+    const [spentAgg, revenueAgg] = await Promise.all([
+      Expense.aggregate([
+        { $match: expenseMatch },
+        { $group: { _id: null, total: { $sum: '$fullAmount' } } }
+      ]),
+      ProjectIncome.aggregate([
+        { $match: incomeMatch },
+        { $group: { _id: null, total: { $sum: '$utilizableBudget' } } }
+      ])
+    ])
+
+    const totalSpent = spentAgg?.[0]?.total || 0
+    const totalRevenue = revenueAgg?.[0]?.total || 0
+
+    // Total budget: prefer BudgetEntry sum if present, otherwise fall back to project-level budget.total
+    const budgetFromEntries = budgetEntries.reduce((sum, entry) => sum + (entry.amount || 0), 0)
+    const budgetFromProjects = projects.reduce((sum, p: any) => sum + (p.budget?.total || 0), 0)
+    const totalBudget = budgetFromEntries > 0 ? budgetFromEntries : budgetFromProjects
+
     const netProfit = totalRevenue - totalSpent
     const budgetUtilization = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0
 
     // Calculate budget breakdown by category
-    const categoryBreakdown = budgetEntries.reduce((acc, entry) => {
-      if (!acc[entry.category]) {
-        acc[entry.category] = {
-          category: entry.category,
+    const categoryBreakdown: Record<string, any> = {}
+
+    // Budget side: prefer BudgetEntry categories; fallback to project.budget.categories if no entries
+    if (budgetEntries.length > 0) {
+      for (const entry of budgetEntries) {
+        if (!categoryBreakdown[entry.category]) {
+          categoryBreakdown[entry.category] = {
+            category: entry.category,
+            budgeted: 0,
+            spent: 0,
+            remaining: 0,
+            utilizationRate: 0
+          }
+        }
+        categoryBreakdown[entry.category].budgeted += entry.amount
+      }
+    } else {
+      const seedCategories = ['materials', 'overhead', 'external', 'other']
+      for (const cat of seedCategories) {
+        categoryBreakdown[cat] = {
+          category: cat,
           budgeted: 0,
           spent: 0,
           remaining: 0,
           utilizationRate: 0
         }
       }
-      acc[entry.category].budgeted += entry.amount
-      return acc
-    }, {} as Record<string, any>)
+      for (const p of projects as any[]) {
+        categoryBreakdown.materials.budgeted += p.budget?.categories?.materials || 0
+        categoryBreakdown.overhead.budgeted += p.budget?.categories?.overhead || 0
+        categoryBreakdown.external.budgeted += p.budget?.categories?.external || 0
+      }
+    }
 
-    // Calculate spent amounts by category (simplified - would need more complex logic in real app)
+    // Spent side: real expenses grouped by category
+    const spentByCategoryAgg = await Expense.aggregate([
+      { $match: expenseMatch },
+      { $group: { _id: '$category', total: { $sum: '$fullAmount' } } }
+    ])
+
+    const spentByCategory = new Map<string, number>(
+      spentByCategoryAgg.map((row: any) => [row._id, row.total])
+    )
+
     Object.keys(categoryBreakdown).forEach(category => {
-      const categorySpent = budgetEntries
-        .filter(entry => entry.category === category)
-        .reduce((sum, entry) => sum + (entry.amount * 0.7), 0) // Simplified calculation
+      const categorySpent = spentByCategory.get(category) || 0
       categoryBreakdown[category].spent = categorySpent
       categoryBreakdown[category].remaining = categoryBreakdown[category].budgeted - categorySpent
-      categoryBreakdown[category].utilizationRate = categoryBreakdown[category].budgeted > 0 
-        ? (categorySpent / categoryBreakdown[category].budgeted) * 100 
+      categoryBreakdown[category].utilizationRate = categoryBreakdown[category].budgeted > 0
+        ? (categorySpent / categoryBreakdown[category].budgeted) * 100
         : 0
     })
 
     // Generate monthly trends (last 12 months)
-    const monthlyTrends = generateMonthlyTrends(budgetEntries, projects)
+    const monthlyTrends = await generateMonthlyTrends({
+      budgetQuery,
+      expenseMatch,
+      incomeMatch
+    })
 
-    // Get top expenses
-    const topExpenses = budgetEntries
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 10)
-      .map(entry => ({
-        description: entry.description,
-        amount: entry.amount,
-        category: entry.category,
-        project: entry.project?.name || 'Unknown',
-        date: entry.addedAt.toISOString().split('T')[0]
-      }))
+    // Get top expenses (real expenses)
+    const topExpenseDocs = await Expense.find(expenseMatch)
+      .populate('project', 'name')
+      .sort({ fullAmount: -1 })
+      .limit(10)
 
-    // Calculate revenue sources (simplified)
-    const revenueSources = [
-      { source: 'Project Revenue', amount: totalRevenue * 0.8, percentage: 80 },
-      { source: 'Consulting', amount: totalRevenue * 0.15, percentage: 15 },
-      { source: 'Other', amount: totalRevenue * 0.05, percentage: 5 }
-    ]
+    const topExpenses = topExpenseDocs.map((e: any) => ({
+      description: e.name,
+      amount: e.fullAmount,
+      category: e.category,
+      project: e.project?.name || 'Unknown',
+      date: new Date(e.expenseDate).toISOString().split('T')[0]
+    }))
+
+    // Revenue sources (real income grouped by category)
+    const incomeByCategoryAgg = await ProjectIncome.aggregate([
+      { $match: incomeMatch },
+      { $group: { _id: '$category', total: { $sum: '$utilizableBudget' } } },
+      { $sort: { total: -1 } }
+    ])
+
+    const revenueSources = incomeByCategoryAgg.map((row: any) => ({
+      source: row._id,
+      amount: row.total,
+      percentage: totalRevenue > 0 ? Math.round((row.total / totalRevenue) * 100) : 0
+    }))
 
     return NextResponse.json({
       overview: {
@@ -144,34 +235,80 @@ export async function GET(req: NextRequest) {
   }
 }
 
-function generateMonthlyTrends(budgetEntries: any[], projects: any[]) {
-  const months = []
+async function generateMonthlyTrends(args: {
+  budgetQuery: any
+  expenseMatch: any
+  incomeMatch: any
+}) {
   const now = new Date()
-  
+  const months: Array<{ key: string; start: Date; end: Date; label: string }> = []
+
   for (let i = 11; i >= 0; i--) {
-    const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-    
-    // Calculate budget and spent for this month
-    const monthBudget = budgetEntries
-      .filter(entry => {
-        const entryDate = new Date(entry.addedAt)
-        return entryDate.getMonth() === date.getMonth() && entryDate.getFullYear() === date.getFullYear()
-      })
-      .reduce((sum, entry) => sum + entry.amount, 0)
-    
-    const monthSpent = monthBudget * 0.7 // Simplified calculation
-    const monthRevenue = monthBudget * 1.2 // Simplified calculation
-    const monthProfit = monthRevenue - monthSpent
-    
-    months.push({
-      month: monthName,
-      budget: monthBudget,
-      spent: monthSpent,
-      revenue: monthRevenue,
-      profit: monthProfit
-    })
+    const start = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999)
+    const key = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`
+    const label = start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+    months.push({ key, start, end, label })
   }
-  
-  return months
+
+  const budgetAgg = await BudgetEntry.aggregate([
+    { $match: { ...args.budgetQuery } },
+    {
+      $group: {
+        _id: { y: { $year: '$addedAt' }, m: { $month: '$addedAt' } },
+        total: { $sum: '$amount' }
+      }
+    }
+  ])
+
+  const expenseAgg = await Expense.aggregate([
+    { $match: { ...args.expenseMatch } },
+    {
+      $group: {
+        _id: { y: { $year: '$expenseDate' }, m: { $month: '$expenseDate' } },
+        total: { $sum: '$fullAmount' }
+      }
+    }
+  ])
+
+  const incomeAgg = await ProjectIncome.aggregate([
+    { $match: { ...args.incomeMatch } },
+    {
+      $group: {
+        _id: { y: { $year: '$createdAt' }, m: { $month: '$createdAt' } },
+        total: { $sum: '$utilizableBudget' }
+      }
+    }
+  ])
+
+  const budgetMap = new Map<string, number>()
+  for (const row of budgetAgg as any[]) {
+    const key = `${row._id.y}-${String(row._id.m).padStart(2, '0')}`
+    budgetMap.set(key, row.total)
+  }
+
+  const expenseMap = new Map<string, number>()
+  for (const row of expenseAgg as any[]) {
+    const key = `${row._id.y}-${String(row._id.m).padStart(2, '0')}`
+    expenseMap.set(key, row.total)
+  }
+
+  const incomeMap = new Map<string, number>()
+  for (const row of incomeAgg as any[]) {
+    const key = `${row._id.y}-${String(row._id.m).padStart(2, '0')}`
+    incomeMap.set(key, row.total)
+  }
+
+  return months.map(m => {
+    const budget = budgetMap.get(m.key) || 0
+    const spent = expenseMap.get(m.key) || 0
+    const revenue = incomeMap.get(m.key) || 0
+    return {
+      month: m.label,
+      budget,
+      spent,
+      revenue,
+      profit: revenue - spent
+    }
+  })
 }

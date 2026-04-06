@@ -1,10 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Button } from '@/components/ui/Button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/Command'
+import { Check, ChevronsUpDown } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface TestSuite {
   _id?: string
@@ -41,9 +46,23 @@ export function TestSuiteForm({ testSuite, projectId, projectName, onSave, onCan
   const [parentSuites, setParentSuites] = useState<TestSuite[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
-  // Use testSuite.project if editing, otherwise use projectId
+  const nameInputRef = useRef<HTMLInputElement | null>(null)
   const [currentProjectId, setCurrentProjectId] = useState(testSuite?.project || projectId)
   const [selectedProjectName, setSelectedProjectName] = useState(projectName || '')
+  const [parentSuiteSearch, setParentSuiteSearch] = useState('')
+  const [parentSuiteOpen, setParentSuiteOpen] = useState(false)
+  
+  // Get the display name of the selected parent suite
+  const getSelectedParentSuiteName = () => {
+    if (!formData.parentSuite) return 'No parent suite'
+    const selected = parentSuites.find(s => s._id === formData.parentSuite)
+    return selected?.name || formData.parentSuite
+  }
+
+  // Filter parent suites based on search
+  const filteredParentSuites = parentSuites.filter(suite =>
+    suite.name.toLowerCase().includes(parentSuiteSearch.toLowerCase())
+  )
 
   useEffect(() => {
     if (showProjectSelector || currentProjectId) {
@@ -65,6 +84,27 @@ export function TestSuiteForm({ testSuite, projectId, projectName, onSave, onCan
       ...testSuite
     }))
   }, [projectId, projectName, testSuite])
+
+  useEffect(() => {
+    // When the dialog opens, Radix focus management may auto-focus the first input
+    // and select its content. Clear any initial selection after mount.
+    const el = nameInputRef.current
+    if (!el) return
+
+    const collapseSelection = () => {
+      try {
+        const pos = (el.value ?? '').length
+        el.setSelectionRange(pos, pos)
+      } catch {
+        // ignore (e.g. element not focusable yet)
+      }
+    }
+
+    // Run a few times to reliably override browser/Radix timing.
+    queueMicrotask(collapseSelection)
+    requestAnimationFrame(collapseSelection)
+    setTimeout(collapseSelection, 0)
+  }, [])
 
   useEffect(() => {
     if (currentProjectId && projects.length > 0) {
@@ -177,10 +217,24 @@ export function TestSuiteForm({ testSuite, projectId, projectName, onSave, onCan
           <Label htmlFor="name">Name *</Label>
           <Input
             id="name"
+            type="text"
+            ref={nameInputRef}
             value={formData.name}
             onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+            onFocus={(e) => {
+              // Prevent auto-select on focus (keep caret collapsed)
+              const el = e.currentTarget
+              const pos = (el.value ?? '').length
+              requestAnimationFrame(() => {
+                try {
+                  el.setSelectionRange(pos, pos)
+                } catch {
+                  // ignore
+                }
+              })
+            }}
             placeholder="Test suite name"
-            className={errors.name ? 'border-red-500' : ''}
+            className={cn(errors.name ? 'border-red-500' : '')}
           />
           {errors.name && <p className="text-sm text-red-600">{errors.name}</p>}
         </div>
@@ -200,22 +254,70 @@ export function TestSuiteForm({ testSuite, projectId, projectName, onSave, onCan
 
         <div className="space-y-2">
           <Label htmlFor="parentSuite">Parent Suite (Optional)</Label>
-          <Select
-            value={formData.parentSuite || 'none'}
-            onValueChange={(value) => setFormData(prev => ({ ...prev, parentSuite: value === 'none' ? undefined : value }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select parent suite (optional)" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No parent suite</SelectItem>
-              {parentSuites.map((suite) => (
-                <SelectItem key={suite._id} value={suite._id!}>
-                  {suite.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={parentSuiteOpen} onOpenChange={setParentSuiteOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={parentSuiteOpen}
+                className="w-full justify-between"
+              >
+                <span className="truncate text-sm">
+                  {getSelectedParentSuiteName()}
+                </span>
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0" align="start">
+              <Command shouldFilter={false}>
+                <CommandInput 
+                  placeholder="Search parent suites..."
+                  value={parentSuiteSearch}
+                  onValueChange={setParentSuiteSearch}
+                />
+                <CommandEmpty>No parent suite found.</CommandEmpty>
+                <CommandList>
+                  <CommandGroup>
+                    <CommandItem
+                      value="none"
+                      onSelect={() => {
+                        setFormData(prev => ({ ...prev, parentSuite: '' }))
+                        setParentSuiteSearch('')
+                        setParentSuiteOpen(false)
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          'mr-2 h-4 w-4',
+                          !formData.parentSuite ? 'opacity-100' : 'opacity-0'
+                        )}
+                      />
+                      No parent suite
+                    </CommandItem>
+                    {filteredParentSuites.map((suite) => (
+                      <CommandItem
+                        key={suite._id}
+                        value={suite._id!}
+                        onSelect={() => {
+                          setFormData(prev => ({ ...prev, parentSuite: suite._id }))
+                          setParentSuiteSearch('')
+                          setParentSuiteOpen(false)
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            'mr-2 h-4 w-4',
+                            formData.parentSuite === suite._id ? 'opacity-100' : 'opacity-0'
+                          )}
+                        />
+                        {suite.name}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
           <p className="text-xs text-muted-foreground">
             Select a parent suite to create a hierarchical structure
           </p>

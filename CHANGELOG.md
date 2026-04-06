@@ -1,3 +1,10 @@
+## [1.30.12](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.11...v1.30.12) (2026-04-06)
+
+
+### Bug Fixes
+
+* test module and budget module issue ([0bac662](https://github.com/EchonLabs/kanvaro.com/commit/0bac6628e5e3fe5cd07445938d22b1fc70753746))
+
 ## [1.30.11](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.10...v1.30.11) (2026-03-31)
 
 ## [1.30.10](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.9...v1.30.10) (2026-03-25)
