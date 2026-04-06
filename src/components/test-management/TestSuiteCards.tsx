@@ -45,10 +45,30 @@ export default function TestSuiteCards({
   const [suites, setSuites] = useState<TestSuite[]>([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [loadingUserRole, setLoadingUserRole] = useState(true)
 
   useEffect(() => {
     fetchTestSuites()
+    fetchUserRole()
   }, [projectId])
+
+  const fetchUserRole = async () => {
+    try {
+      setLoadingUserRole(true)
+      const response = await fetch('/api/auth/me')
+      const data = await response.json()
+      if (response.ok && data.role) {
+        setUserRole(data.role)
+      }
+    } catch (error) {
+      console.error('Error fetching user role:', error)
+    } finally {
+      setLoadingUserRole(false)
+    }
+  }
+
+  const isAdmin = userRole && ['admin', 'super_admin', 'superadmin'].includes(userRole.toLowerCase())
 
   const fetchTestSuites = async () => {
     try {
@@ -156,13 +176,19 @@ export default function TestSuiteCards({
                         Edit
                       </DropdownMenuItem>
                     )}
-                    {onSuiteDelete && (
+                    {onSuiteDelete && isAdmin && (
                       <DropdownMenuItem
                         onClick={() => onSuiteDelete(suite._id, suite.name)}
                         className="text-destructive"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete
+                      </DropdownMenuItem>
+                    )}
+                    {onSuiteDelete && !isAdmin && (
+                      <DropdownMenuItem disabled className="text-muted-foreground">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete (Admin only)
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>

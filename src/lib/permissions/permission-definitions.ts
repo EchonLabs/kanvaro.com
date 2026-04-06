@@ -601,6 +601,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TASK_MANAGE_COMMENTS,
     Permission.TASK_MANAGE_ATTACHMENTS,
     Permission.TASK_VIEW_ALL,
+    Permission.TASK_EDIT_ALL,
+
 
     // Team
     Permission.TEAM_READ,
@@ -701,7 +703,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEST_SUITE_CREATE,
     Permission.TEST_SUITE_READ,
     Permission.TEST_SUITE_UPDATE,
-    Permission.TEST_SUITE_DELETE,
+    // Permission.TEST_SUITE_DELETE,
     Permission.TEST_CASE_CREATE,
     Permission.TEST_CASE_READ,
     Permission.TEST_CASE_UPDATE,
@@ -954,7 +956,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TEST_SUITE_CREATE,
     Permission.TEST_SUITE_READ,
     Permission.TEST_SUITE_UPDATE,
-    Permission.TEST_SUITE_DELETE,
+    // Permission.TEST_SUITE_DELETE,
     Permission.TEST_CASE_CREATE,
     Permission.TEST_CASE_READ,
     Permission.TEST_CASE_UPDATE,
@@ -1169,7 +1171,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     Permission.TEST_SUITE_CREATE,
     Permission.TEST_SUITE_READ,
     Permission.TEST_SUITE_UPDATE,
-    Permission.TEST_SUITE_DELETE,
+    // Permission.TEST_SUITE_DELETE,
     Permission.TEST_CASE_CREATE,
     Permission.TEST_CASE_READ,
     Permission.TEST_CASE_UPDATE,

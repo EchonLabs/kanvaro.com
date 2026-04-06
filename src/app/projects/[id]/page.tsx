@@ -59,6 +59,7 @@ import BulkTaskUploadDialog from '@/components/tasks/BulkTaskUploadDialog'
 import { useOrganization } from '@/hooks/useOrganization'
 import EditTaskModal from '@/components/tasks/EditTaskModal'
 import { AddExpenseDialog } from '@/components/projects/AddExpenseDialog'
+import { AddIncomeDialog } from '@/components/projects/AddIncomeDialog'
 import ViewTaskModal from '@/components/tasks/ViewTaskModal'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
@@ -194,7 +195,8 @@ export default function ProjectDetailPage() {
   const orgCurrency = organization?.currency || 'USD'
   const { formatCurrency } = useOrgCurrency()
   const { formatDate } = useDateTime()
-  const { hasPermission } = usePermissions()
+  const { hasPermission, permissions } = usePermissions()
+  const isAdmin = typeof permissions?.userRole === 'string' && ['admin', 'super_admin', 'superadmin'].includes(permissions.userRole.toLowerCase())
   const canUpdateProject = hasPermission(Permission.PROJECT_UPDATE)
   const canCreateTask = hasPermission(Permission.TASK_CREATE)
   const canManageTests = hasPermission(Permission.TEST_MANAGE)
@@ -206,6 +208,7 @@ export default function ProjectDetailPage() {
   const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false)
   const [showEditTaskModal, setShowEditTaskModal] = useState(false)
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
+  const [showAddIncomeDialog, setShowAddIncomeDialog] = useState(false)
   const [selectedTask, setSelectedTask] = useState<any | null>(null)
   const [tasks, setTasks] = useState<any[]>([])
   const [suiteDialogOpen, setSuiteDialogOpen] = useState(false)
@@ -213,6 +216,8 @@ export default function ProjectDetailPage() {
   const [expenses, setExpenses] = useState<any[]>([])
   const [showAddExpenseDialog, setShowAddExpenseDialog] = useState(false)
   const [expensesLoading, setExpensesLoading] = useState(false)
+  const [incomes, setIncomes] = useState<any[]>([])
+  const [incomesLoading, setIncomesLoading] = useState(false)
   const [editingSuite, setEditingSuite] = useState<any | null>(null)
   const [editingExpense, setEditingExpense] = useState<any | null>(null)
   const [showDeleteExpenseConfirmModal, setShowDeleteExpenseConfirmModal] = useState(false)
@@ -346,6 +351,27 @@ export default function ProjectDetailPage() {
     }
   }
 
+  const fetchIncomes = async () => {
+    if (!projectId || !isAdmin) return
+
+    try {
+      setIncomesLoading(true)
+      const response = await fetch(`/api/projects/${projectId}/income`)
+      const data = await response.json()
+
+      if (data?.success) {
+        setIncomes(Array.isArray(data.data) ? data.data : [])
+      } else {
+        setIncomes([])
+      }
+    } catch (error) {
+      console.error('Error fetching incomes:', error)
+      setIncomes([])
+    } finally {
+      setIncomesLoading(false)
+    }
+  }
+
   const handleExpenseAdded = () => {
     fetchExpenses()
     setShowAddExpenseDialog(false)
@@ -390,6 +416,12 @@ export default function ProjectDetailPage() {
       fetchExpenses()
     }
   }, [project])
+
+  useEffect(() => {
+    if (activeTab === 'budget' && isAdmin) {
+      fetchIncomes()
+    }
+  }, [activeTab, isAdmin, projectId])
 
   useEffect(() => {
     if (project) {
@@ -1361,6 +1393,117 @@ export default function ProjectDetailPage() {
                 </Card>
               )}
 
+              {/* Income Section (Admin Only) */}
+              {isAdmin && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Income</CardTitle>
+                      <Button onClick={() => setShowAddIncomeDialog(true)} size="sm">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Income
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {incomesLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : incomes.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <DollarSign className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <p>No income added yet</p>
+                        <p className="text-sm mt-1">Click "Add Income" to get started</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {incomes.map((income: any) => {
+                          const attachments = Array.isArray(income.attachments) ? income.attachments : []
+                          const subCategoryLabel = income.subCategory === 'amc'
+                            ? 'AMC (Annual Maintenance Cost)'
+                            : income.subCategory === 'cr'
+                              ? 'CR'
+                              : undefined
+
+                          return (
+                            <Card key={income._id} className="hover:shadow-md transition-shadow">
+                              <CardContent className="p-4 space-y-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <h4 className="font-semibold text-sm truncate" title={income.invoiceNumber}>
+                                      {income.invoiceNumber}
+                                    </h4>
+                                    <div className="mt-1 flex flex-wrap gap-2">
+                                      <Badge variant="secondary" className="capitalize">
+                                        {formatToTitleCase(income.category || 'other')}
+                                      </Badge>
+                                      {subCategoryLabel && (
+                                        <Badge variant="outline">{subCategoryLabel}</Badge>
+                                      )}
+                                      <Badge variant="outline">
+                                        {formatCurrency(Number(income.utilizableBudget || 0), orgCurrency)}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {income.description && (
+                                  <p className="text-xs text-muted-foreground line-clamp-3" title={income.description}>
+                                    {income.description}
+                                  </p>
+                                )}
+
+                                <div className="grid grid-cols-1 gap-1 text-xs text-muted-foreground">
+                                  {income.approvedDate && (
+                                    <div className="flex items-center justify-between">
+                                      <span>Approved Date:</span>
+                                      <span className="text-foreground">{formatDate(income.approvedDate)}</span>
+                                    </div>
+                                  )}
+                                  {income.actualStartDate && (
+                                    <div className="flex items-center justify-between">
+                                      <span>Actual Start Date:</span>
+                                      <span className="text-foreground">{formatDate(income.actualStartDate)}</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {attachments.length > 0 && (
+                                  <div className="pt-2 border-t">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                                        <Paperclip className="h-4 w-4" />
+                                        Attachments
+                                      </span>
+                                      <Badge variant="secondary" className="text-xs">{attachments.length}</Badge>
+                                    </div>
+                                    <div className={`space-y-1 ${attachments.length > 3 ? 'max-h-32 overflow-y-auto pr-1' : ''}`}>
+                                      {attachments.map((att: any, index: number) => (
+                                        <a
+                                          key={`${att.url}-${index}`}
+                                          href={att.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-xs text-primary hover:underline block truncate"
+                                          title={att.name}
+                                        >
+                                          {att.name}
+                                        </a>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Expenses Section */}
               {project.settings?.allowExpenseTracking && (
                 <Card>
@@ -2303,6 +2446,16 @@ export default function ProjectDetailPage() {
               showExpenseSuccess('Expense added successfully')
               fetchExpenses()
               fetchProject() // Refresh project to update budget
+            }}
+          />
+
+          <AddIncomeDialog
+            open={showAddIncomeDialog}
+            onClose={() => setShowAddIncomeDialog(false)}
+            projectId={projectId}
+            onSuccess={() => {
+              notifySuccess({ title: 'Income Added', message: 'Income has been added successfully' })
+              fetchIncomes()
             }}
           />
 
