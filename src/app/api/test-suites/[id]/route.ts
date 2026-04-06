@@ -150,22 +150,16 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: 'Test suite not found' }, { status: 404 })
     }
 
-    // Check if user has access to the project (compare as strings)
-    const project = await Project.findById(testSuite.project)
+    // Get user role (from global or auth result)
+    const userRole = (authResult as any)?.user?.role ?? (authResult as any)?.role
     const userIdStr = authResult.user.id?.toString?.() || String(authResult.user.id)
-    const createdByStr = project?.createdBy?.toString?.()
-    const teamHasUser = Array.isArray(project?.teamMembers)
-      ? project!.teamMembers.some((m: any) => m?.toString?.() === userIdStr)
-      : false
-    const roleHasUser = Array.isArray(project?.projectRoles)
-      ? project!.projectRoles.some(
-          (role: any) => role?.user?.toString?.() === userIdStr && ['project_manager', 'project_qa_lead', 'project_tester'].includes(role.role)
-        )
-      : false
-    const hasAccess = !!project && (createdByStr === userIdStr || teamHasUser || roleHasUser)
+    
+    // Check if user is an admin - admins can delete any test suite
+    const isAdmin = typeof userRole === 'string' && ['admin', 'super_admin', 'superadmin'].includes(userRole.toLowerCase())
 
-    if (!hasAccess) {
-      return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 })
+    if (!isAdmin) {
+      // Non-admin users cannot delete test suites based on current requirements
+      return NextResponse.json({ success: false, error: 'Access denied. Only admins can delete test suites' }, { status: 403 })
     }
 
     // Check if test suite has child suites
