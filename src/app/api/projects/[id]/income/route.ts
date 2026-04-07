@@ -4,11 +4,8 @@ import '@/models/registry'
 import { Project } from '@/models/Project'
 import { ProjectIncome } from '@/models/ProjectIncome'
 import { authenticateUser } from '@/lib/auth-utils'
-
-function isAdminRole(role: unknown) {
-  if (typeof role !== 'string') return false
-  return ['admin', 'super_admin', 'superadmin'].includes(role.toLowerCase())
-}
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionService } from '@/lib/permissions/permission-service'
 
 export async function GET(
   request: NextRequest,
@@ -23,9 +20,7 @@ export async function GET(
     }
 
     const { user } = authResult
-    if (!isAdminRole(user.role)) {
-      return NextResponse.json({ error: 'Access denied. Admin only.' }, { status: 403 })
-    }
+    const userId = user.id
 
     const project = await Project.findById(params.id).select('organization')
     if (!project) {
@@ -34,6 +29,16 @@ export async function GET(
 
     if (project.organization?.toString() !== user.organization?.toString()) {
       return NextResponse.json({ error: 'Access denied to project' }, { status: 403 })
+    }
+
+    const hasProjectAccess = await PermissionService.canAccessProject(userId, params.id)
+    if (!hasProjectAccess) {
+      return NextResponse.json({ error: 'Insufficient access to project' }, { status: 403 })
+    }
+
+    const canViewIncome = await PermissionService.hasPermission(userId, Permission.FINANCIAL_VIEW_INCOME, params.id)
+    if (!canViewIncome) {
+      return NextResponse.json({ error: 'Insufficient permissions to view income' }, { status: 403 })
     }
 
     const incomes = await ProjectIncome.find({ project: params.id })
@@ -59,9 +64,7 @@ export async function POST(
     }
 
     const { user } = authResult
-    if (!isAdminRole(user.role)) {
-      return NextResponse.json({ error: 'Access denied. Admin only.' }, { status: 403 })
-    }
+    const userId = user.id
 
     const project = await Project.findById(params.id).select('organization')
     if (!project) {
@@ -70,6 +73,16 @@ export async function POST(
 
     if (project.organization?.toString() !== user.organization?.toString()) {
       return NextResponse.json({ error: 'Access denied to project' }, { status: 403 })
+    }
+
+    const hasProjectAccess = await PermissionService.canAccessProject(userId, params.id)
+    if (!hasProjectAccess) {
+      return NextResponse.json({ error: 'Insufficient access to project' }, { status: 403 })
+    }
+
+    const canCreateIncome = await PermissionService.hasPermission(userId, Permission.FINANCIAL_CREATE_INCOME, params.id)
+    if (!canCreateIncome) {
+      return NextResponse.json({ error: 'Insufficient permissions to add income' }, { status: 403 })
     }
 
     const body = await request.json()

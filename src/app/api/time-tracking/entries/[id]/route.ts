@@ -2,6 +2,40 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { TimeEntry } from '@/models/TimeEntry'
 import { TimeTrackingSettings } from '@/models/TimeTrackingSettings'
+import { cookies } from 'next/headers'
+import jwt from 'jsonwebtoken'
+import { User } from '@/models/User'
+import { Permission } from '@/lib/permissions/permission-definitions'
+import { PermissionService } from '@/lib/permissions/permission-service'
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
+
+async function getAuthenticatedUserId(): Promise<string | null> {
+  const cookieStore = cookies()
+  const accessToken = cookieStore.get('accessToken')?.value
+  const refreshToken = cookieStore.get('refreshToken')?.value
+
+  if (!accessToken && !refreshToken) return null
+
+  let user: any = null
+  try {
+    if (accessToken) {
+      const decoded: any = jwt.verify(accessToken, JWT_SECRET)
+      user = await User.findById(decoded.userId)
+    }
+  } catch { }
+
+  if (!user && refreshToken) {
+    try {
+      const decoded: any = jwt.verify(refreshToken, JWT_REFRESH_SECRET)
+      user = await User.findById(decoded.userId)
+    } catch { }
+  }
+
+  if (!user || !user.isActive) return null
+  return user._id.toString()
+}
 
 export async function GET(
   request: NextRequest,
@@ -33,6 +67,11 @@ export async function PUT(
 ) {
   try {
     await connectDB()
+
+    const requesterId = await getAuthenticatedUserId()
+    if (!requesterId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     
     const body = await request.json()
     const { description, startTime, endTime, duration, isBillable, hourlyRate, category, tags, notes } = body
@@ -41,6 +80,38 @@ export async function PUT(
 
     if (!timeEntry) {
       return NextResponse.json({ error: 'Time entry not found' }, { status: 404 })
+    }
+
+    // Authorization: owners can update their own entry (subject to time-based rules);
+    // non-owners can update only if they have update permission AND are allowed to view that user's logs.
+    const ownerId = timeEntry.user?.toString()
+    const isOwner = ownerId === requesterId
+
+    if (!isOwner) {
+      const canUpdate = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_UPDATE)
+      if (!canUpdate) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+
+      const hasViewAll = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_VIEW_ALL)
+      const hasViewAssigned = await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_VIEW_ASSIGNED)
+
+      if (!hasViewAll) {
+        if (!hasViewAssigned) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+
+        const target = await User.findById(ownerId).select('organization projectManager humanResourcePartner')
+        const sameOrg = target && target.organization && target.organization.toString() === timeEntry.organization?.toString()
+        const isAssigned = target && (
+          (target.projectManager && target.projectManager.toString() === requesterId) ||
+          (target.humanResourcePartner && target.humanResourcePartner.toString() === requesterId)
+        )
+
+        if (!sameOrg || !isAssigned) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+      }
     }
 
     // Check if time entry is already approved
@@ -116,11 +187,22 @@ export async function DELETE(
 ) {
   try {
     await connectDB()
+
+    const requesterId = await getAuthenticatedUserId()
+    if (!requesterId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     
     const timeEntry = await TimeEntry.findById(params.id)
 
     if (!timeEntry) {
       return NextResponse.json({ error: 'Time entry not found' }, { status: 404 })
+    }
+
+    // Requirement: all users (including PM/HR/Admin) can delete ONLY their own time logs.
+    const ownerId = timeEntry.user?.toString()
+    if (ownerId !== requesterId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Check if time entry is already approved

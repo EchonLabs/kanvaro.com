@@ -57,7 +57,8 @@ export default function VirtualizedColumn({
   canDragTask
 }: VirtualizedColumnProps) {
   const parentRef = useRef<HTMLDivElement | null>(null)
-  const { hasPermission } = usePermissions()
+  const { hasPermission, permissions } = usePermissions()
+  const isAdmin = typeof permissions?.userRole === 'string' && ['admin', 'super_admin', 'superadmin'].includes(permissions.userRole.toLowerCase())
   
   // Add droppable functionality for empty columns
   const { setNodeRef, isOver } = useDroppable({
@@ -152,7 +153,7 @@ export default function VirtualizedColumn({
                       getTypeColor={getTypeColor}
                       onEdit={task => onEditTask?.(task as unknown as PopulatedTask)}
                       onDelete={task => onDeleteTask?.(task)}
-                      canDelete={hasPermission(Permission.TASK_DELETE_ALL)}
+                      canDelete={isAdmin}
                       isDraggable={canDragTask ? canDragTask(task) : true}
                     />
                   </div>

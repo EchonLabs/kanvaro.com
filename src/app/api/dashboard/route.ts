@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
     const organizationId = user.organization
     const privilegedRoles = new Set(['admin', 'human_resource', 'project_manager'])
     const canViewAll = privilegedRoles.has(user.role)
-    const canViewOrganizationWideTime = privilegedRoles.has(user.role)
+    // Requirement: dashboard time tracking summary should always show ONLY the viewer's own totals
+    // (even if the viewer can otherwise view organization-wide time logs).
 
     // Get date ranges
     const now = new Date()
@@ -154,7 +155,7 @@ export async function GET(request: NextRequest) {
       startOfWeek,
       startOfMonth,
       now,
-      canViewOrganizationWideTime ? {} : { userId }
+      { userId }
     )
 
     // Calculate project progress
@@ -192,7 +193,7 @@ export async function GET(request: NextRequest) {
       organizationId,
       startOfLastMonth,
       endOfLastMonth,
-      canViewOrganizationWideTime ? {} : { userId }
+      { userId }
     )
     const changes = {
       activeProjects: activeProjects - lastMonthStats.activeProjects,

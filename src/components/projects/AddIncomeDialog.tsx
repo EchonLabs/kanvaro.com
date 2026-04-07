@@ -227,7 +227,10 @@ export function AddIncomeDialog({ open, onClose, projectId, onSuccess }: AddInco
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form
+          onSubmit={handleSubmit}
+          className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pb-4 sm:pb-6 space-y-6"
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="invoiceNumber">Invoice Number <span className="text-destructive">*</span></Label>

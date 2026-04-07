@@ -195,11 +195,13 @@ export default function ProjectDetailPage() {
   const orgCurrency = organization?.currency || 'USD'
   const { formatCurrency } = useOrgCurrency()
   const { formatDate } = useDateTime()
-  const { hasPermission, permissions } = usePermissions()
+  const { hasPermission, permissions, loading: permissionsLoading } = usePermissions()
   const isAdmin = typeof permissions?.userRole === 'string' && ['admin', 'super_admin', 'superadmin'].includes(permissions.userRole.toLowerCase())
   const canUpdateProject = hasPermission(Permission.PROJECT_UPDATE)
   const canCreateTask = hasPermission(Permission.TASK_CREATE)
   const canManageTests = hasPermission(Permission.TEST_MANAGE)
+  const canViewIncome = !permissionsLoading && hasPermission(Permission.FINANCIAL_VIEW_INCOME, projectId)
+  const canCreateIncome = !permissionsLoading && hasPermission(Permission.FINANCIAL_CREATE_INCOME, projectId)
 
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
@@ -352,7 +354,7 @@ export default function ProjectDetailPage() {
   }
 
   const fetchIncomes = async () => {
-    if (!projectId || !isAdmin) return
+    if (!projectId || !canViewIncome) return
 
     try {
       setIncomesLoading(true)
@@ -418,10 +420,10 @@ export default function ProjectDetailPage() {
   }, [project])
 
   useEffect(() => {
-    if (activeTab === 'budget' && isAdmin) {
+    if (activeTab === 'budget' && canViewIncome) {
       fetchIncomes()
     }
-  }, [activeTab, isAdmin, projectId])
+  }, [activeTab, canViewIncome, projectId])
 
   useEffect(() => {
     if (project) {
@@ -1393,16 +1395,18 @@ export default function ProjectDetailPage() {
                 </Card>
               )}
 
-              {/* Income Section (Admin Only) */}
-              {isAdmin && (
+              {/* Income Section */}
+              {canViewIncome && (
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Income</CardTitle>
-                      <Button onClick={() => setShowAddIncomeDialog(true)} size="sm">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Income
-                      </Button>
+                      {canCreateIncome && (
+                        <Button onClick={() => setShowAddIncomeDialog(true)} size="sm">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Income
+                        </Button>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -1414,7 +1418,9 @@ export default function ProjectDetailPage() {
                       <div className="text-center py-8 text-muted-foreground">
                         <DollarSign className="h-12 w-12 mx-auto mb-2 opacity-50" />
                         <p>No income added yet</p>
-                        <p className="text-sm mt-1">Click "Add Income" to get started</p>
+                        {canCreateIncome && (
+                          <p className="text-sm mt-1">Click "Add Income" to get started</p>
+                        )}
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

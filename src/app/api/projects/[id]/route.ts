@@ -404,9 +404,9 @@ export async function DELETE(
     const organizationId = user.organization
     const projectId = params.id
 
-    // Check if user can delete this project - only Admin users
-    const canDeleteProject = await PermissionService.hasPermission(userId, Permission.PROJECT_DELETE)
-    if (!canDeleteProject) {
+    const roleStr = typeof user.role === 'string' ? user.role : ''
+    const isAdmin = ['admin', 'super_admin', 'superadmin'].includes(roleStr.toLowerCase())
+    if (!isAdmin) {
       return NextResponse.json(
         { error: 'Insufficient permissions to delete project. Only Admins can delete projects.' },
         { status: 403 }

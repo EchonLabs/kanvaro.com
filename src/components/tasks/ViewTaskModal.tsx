@@ -28,9 +28,10 @@ interface ViewTaskModalProps {
   onClose: () => void
   task: any
   onEdit: () => void
-  onDelete: () => void
+  onDelete?: () => void
   canEdit?: boolean
   canDelete?: boolean
+  hideDeleteWhenDisabled?: boolean
 }
 
 export default function ViewTaskModal({ 
@@ -40,7 +41,8 @@ export default function ViewTaskModal({
   onEdit, 
   onDelete,
   canEdit = true,
-  canDelete = true
+  canDelete = true,
+  hideDeleteWhenDisabled = false
 }: ViewTaskModalProps) {
   if (!isOpen || !task) return null
 
@@ -132,15 +134,17 @@ export default function ViewTaskModal({
                 <Edit className="h-4 w-4 mr-2" />
                 Edit
               </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={onDelete}
-                disabled={!canDelete}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
+              {onDelete && (!hideDeleteWhenDisabled || canDelete) && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={onDelete}
+                  disabled={!canDelete}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              )}
               <Button variant="ghost" size="sm" onClick={onClose}>
                 <X className="h-4 w-4" />
               </Button>

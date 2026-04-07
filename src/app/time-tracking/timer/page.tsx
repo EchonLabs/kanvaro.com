@@ -1206,6 +1206,11 @@ export default function TimerPage() {
                     <Select
                       value={selectedTask}
                       onValueChange={handleTaskChange}
+                      onOpenChange={(open) => {
+                        if (!open) {
+                          setTaskSearch('')
+                        }
+                      }}
                       disabled={
                         !timeTrackingSettings?.allowTimeTracking ||
                         !selectedProject ||
