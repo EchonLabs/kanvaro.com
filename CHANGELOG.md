@@ -1,3 +1,10 @@
+## [1.30.13](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.12...v1.30.13) (2026-04-07)
+
+
+### Bug Fixes
+
+* implement permission checks for income viewing and creation, restrict project and task deletions to admins, and ensure time tracking summaries reflect only the viewer's logs ([04c46d6](https://github.com/EchonLabs/kanvaro.com/commit/04c46d6dc20d6ce20fc3536dbe865e5dfca0cbb8))
+
 ## [1.30.12](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.11...v1.30.12) (2026-04-06)
 
 
