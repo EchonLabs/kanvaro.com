@@ -91,6 +91,7 @@ export default function ProjectsPage() {
   const { success: notifySuccess, error: notifyError } = useNotify()
   const { formatDate } = useDateTime()
   const orgCurrency = organization?.currency || 'USD'
+  const isAdmin = typeof user?.role === 'string' && ['admin', 'super_admin', 'superadmin'].includes(user.role.toLowerCase())
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [searching, setSearching] = useState(false)
@@ -488,8 +489,11 @@ export default function ProjectsPage() {
                                 <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation()
+                                    if (!isAdmin) return
+                                    handleDeleteClick(project._id)
                                   }}
-                                  disabled={true}
+                                  disabled={!isAdmin}
+                                  title={!isAdmin ? 'Only admins can delete projects' : undefined}
                                   className="text-destructive focus:text-destructive"
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
@@ -690,9 +694,11 @@ export default function ProjectsPage() {
                                   <DropdownMenuItem
                                     onClick={(e) => {
                                       e.stopPropagation()
+                                      if (!isAdmin) return
+                                      handleDeleteClick(project._id)
                                     }}
-                                    disabled={true}
-                                    title="You do not have permission to delete projects"
+                                      disabled={!isAdmin}
+                                      title={!isAdmin ? 'Only admins can delete projects' : undefined}
                                     className="text-destructive focus:text-destructive"
                                   >
                                     <Trash2 className="h-4 w-4 mr-2" />

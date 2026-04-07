@@ -236,10 +236,17 @@ export async function GET(request: NextRequest) {
 
     const total = await TimeEntry.countDocuments(query)
 
-    // Calculate totals
+    // Calculate totals (self-only)
+    // Requirement: even if the viewer can see other users' logs, the summary total should reflect ONLY the viewer's own logs.
+    // We still respect the same non-user filters (date/project/task/status/billable/approval) when calculating these totals.
+    const totalsQuery: any = {
+      ...query,
+      user: viewerId
+    }
+
     // Note: Mongoose .find() auto-casts string IDs to ObjectId, but .aggregate() does NOT.
     // We must cast string IDs to ObjectId for the aggregate pipeline to match correctly.
-    const aggregateQuery: any = { ...query }
+    const aggregateQuery: any = { ...totalsQuery }
     if (typeof aggregateQuery.user === 'string') {
       aggregateQuery.user = new mongoose.Types.ObjectId(aggregateQuery.user)
     } else if (aggregateQuery.user?.$in) {
@@ -260,11 +267,9 @@ export async function GET(request: NextRequest) {
       { $group: { _id: null, total: { $sum: '$duration' } } }
     ])
 
-    // Calculate total cost using a simpler approach
-    const billableEntries = await TimeEntry.find({ ...query, isBillable: true })
-    const totalCost = billableEntries.reduce((sum, entry) => {
-      return sum + (entry.duration * entry.hourlyRate / 60)
-    }, 0)
+    // Calculate total cost using a simpler approach (self-only)
+    const billableEntries = await TimeEntry.find({ ...totalsQuery, isBillable: true })
+    const totalCost = billableEntries.reduce((sum, entry) => sum + ((entry.duration || 0) * (entry.hourlyRate || 0) / 60), 0)
 
     return NextResponse.json({
       timeEntries: normalizedEntries,

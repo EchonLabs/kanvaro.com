@@ -154,7 +154,9 @@ export default function TasksClient({
 }: TasksClientProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const { hasPermission } = usePermissions()
+    const { hasPermission, permissions } = usePermissions()
+
+    const isAdmin = typeof permissions?.userRole === 'string' && ['admin', 'super_admin', 'superadmin'].includes(permissions.userRole.toLowerCase())
     const { formatDate } = useDateTime()
     const canViewAllTasks = hasPermission(Permission.PROJECT_VIEW_ALL) || hasPermission(Permission.TASK_VIEW_ALL)
     const canCreateTask = hasPermission(Permission.TASK_CREATE)
@@ -265,8 +267,8 @@ export default function TasksClient({
     )
 
     const canDeleteTask = useCallback(
-        (task: Task) => hasPermission(Permission.TASK_DELETE_ALL),
-        [hasPermission]
+        (task: Task) => isAdmin,
+        [isAdmin]
     )
 
     // Fetch current user for creator checks

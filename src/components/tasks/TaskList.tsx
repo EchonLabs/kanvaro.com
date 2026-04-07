@@ -79,9 +79,10 @@ export default function TaskList({ projectId, onCreateTask }: TaskListProps) {
   const router = useRouter()
   const { formatDate } = useDateTime()
   const { success: notifySuccess, error: notifyError } = useNotify()
-  const { hasPermission } = usePermissions()
+  const { hasPermission, permissions } = usePermissions()
+  const isAdmin = typeof permissions?.userRole === 'string' && ['admin', 'super_admin', 'superadmin'].includes(permissions.userRole.toLowerCase())
   const canEditTask = hasPermission(Permission.TASK_UPDATE, projectId)
-  const canDeleteTask = hasPermission(Permission.TASK_DELETE_ALL)
+  const canDeleteTask = isAdmin
   const canChangeTaskStatus = hasPermission(Permission.TASK_CHANGE_STATUS, projectId)
   const canManageProject = hasPermission(Permission.PROJECT_UPDATE, projectId)
   const [tasks, setTasks] = useState<Task[]>([])

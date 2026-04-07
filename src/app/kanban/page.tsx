@@ -277,6 +277,7 @@ export default function KanbanPage() {
   const { formatDate } = useDateTime()
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState('')
+  const [userRole, setUserRole] = useState<string | null>(null)
   const { success: notifySuccess, error: notifyError } = useNotify()
   const permissions = usePermissions()
   const canCreateTask = permissions?.hasPermission(Permission.TASK_CREATE) || false
@@ -307,6 +308,8 @@ export default function KanbanPage() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [pendingUpdates, setPendingUpdates] = useState<Set<string>>(new Set())
   const hasFetchedProjects = useRef(false)
+
+  const isAdmin = userRole === 'admin'
 
   // Check if any filters are active
   const hasActiveFilters = projectFilter !== 'all' ||
@@ -557,6 +560,12 @@ export default function KanbanPage() {
       const response = await fetch('/api/auth/me')
       
       if (response.ok) {
+        try {
+          const me = await response.json()
+          setUserRole(me?.role ?? null)
+        } catch {
+          setUserRole(null)
+        }
         setAuthError('')
         await Promise.all([fetchTasks(), fetchProjects()])
         // Start real-time synchronization after successful auth
@@ -567,24 +576,38 @@ export default function KanbanPage() {
         })
         
         if (refreshResponse.ok) {
+          try {
+            const meResponse = await fetch('/api/auth/me')
+            if (meResponse.ok) {
+              const me = await meResponse.json()
+              setUserRole(me?.role ?? null)
+            } else {
+              setUserRole(null)
+            }
+          } catch {
+            setUserRole(null)
+          }
           setAuthError('')
           await Promise.all([fetchTasks(), fetchProjects()])
           // Start real-time synchronization after successful refresh
           startPolling()
         } else {
           setAuthError('Session expired')
+          setUserRole(null)
           stopPolling()
           setTimeout(() => {
             router.push('/login')
           }, 2000)
         }
       } else {
+        setUserRole(null)
         stopPolling()
         router.push('/login')
       }
     } catch (error) {
       console.error('Auth check failed:', error)
       setAuthError('Authentication failed')
+      setUserRole(null)
       stopPolling()
       setTimeout(() => {
         router.push('/login')
@@ -1417,7 +1440,7 @@ export default function KanbanPage() {
                       tasks={columnTasks}
                       onCreateTask={handleCreateTask}
                       onEditTask={handleEditTask}
-                      onDeleteTask={handleDeleteTask}
+                      onDeleteTask={isAdmin ? handleDeleteTask : undefined}
                       pendingUpdates={pendingUpdates}
                       canCreateTask={canCreateTask}
                       canDragTask={(task) => {
@@ -1438,7 +1461,7 @@ export default function KanbanPage() {
                     getPriorityColor={getPriorityColor}
                     getTypeColor={getTypeColor}
                     onEdit={handleEditTask}
-                    onDelete={handleDeleteTask}
+                    onDelete={isAdmin ? handleDeleteTask : undefined}
                   />
                 ) : null}
               </DragOverlay>
@@ -1493,10 +1516,16 @@ export default function KanbanPage() {
             setShowViewTaskModal(false)
             setShowEditTaskModal(true)
           }}
-          onDelete={() => {
-            setShowViewTaskModal(false)
-            handleDeleteTask(selectedTask._id)
-          }}
+          canDelete={isAdmin}
+          hideDeleteWhenDisabled
+          onDelete={
+            isAdmin
+              ? () => {
+                  setShowViewTaskModal(false)
+                  handleDeleteTask(selectedTask._id)
+                }
+              : undefined
+          }
         />
       )}
 

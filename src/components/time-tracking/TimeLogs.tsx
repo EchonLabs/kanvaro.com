@@ -103,6 +103,7 @@ export function TimeLogs({
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [selfTotals, setSelfTotals] = useState<{ totalDuration: number; totalCost: number }>({ totalDuration: 0, totalCost: 0 })
   const [resolvedUserId, setResolvedUserId] = useState<string>(userId || '')
   const [resolvedOrgId, setResolvedOrgId] = useState<string>(organizationId || '')
   const [authResolving, setAuthResolving] = useState<boolean>(!userId || !organizationId)
@@ -1132,6 +1133,12 @@ export function TimeLogs({
         const entries = data.data || data.timeEntries || []
         setTimeEntries(Array.isArray(entries) ? entries : [])
         setPagination(data.pagination)
+
+        const totals = data.totals || {}
+        setSelfTotals({
+          totalDuration: typeof totals.totalDuration === 'number' ? totals.totalDuration : 0,
+          totalCost: typeof totals.totalCost === 'number' ? totals.totalCost : 0
+        })
       } else {
         setError(data.error || 'Failed to load time entries')
       }
@@ -1456,6 +1463,11 @@ export function TimeLogs({
     setEntryToDelete(entry)
     setShowDeleteDialog(true)
   }
+
+  const isEntryOwnedByViewer = useCallback((entry: TimeEntry) => {
+    const entryUserId = entry?.user?._id
+    return !!resolvedUserId && !!entryUserId && entryUserId === resolvedUserId
+  }, [resolvedUserId])
 
   const handleConfirmDelete = async () => {
     if (!entryToDelete) return
@@ -2551,7 +2563,9 @@ export function TimeLogs({
                     <div className="text-right">
                       <div className="text-2xl font-bold text-primary">
                         {(() => {
-                          const totalMinutes = displayedEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0)
+                          // Self-only totals (per requirement): even if the list shows other users, the summary should reflect the viewer's own time.
+                          // Include the active timer display duration (if present) so the widget stays consistent with the current session.
+                          const totalMinutes = (selfTotals.totalDuration || 0) + (activeTimerDisplay ? (activeTimerDisplay.duration || 0) : 0)
                           const hours = Math.floor(totalMinutes / 60)
                           const minutes = Math.floor(totalMinutes % 60)
                           return `${hours}h ${minutes}m`
@@ -2740,30 +2754,40 @@ export function TimeLogs({
                         </div>
                       )}
                       {/* Mobile Edit and Delete Actions */}
-                      <div className="flex gap-2 pt-2 border-t border-border">
-                        {canUpdateTime && canEditTimeEntry(entry) && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1 h-8 text-xs"
-                            onClick={() => handleEdit(entry)}
-                          >
-                            <Edit className="h-3 w-3 mr-1" />
-                            Edit
-                          </Button>
-                        )}
-                        {canDeleteTime && canEditTimeEntry(entry) && (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            className="flex-1 h-8 text-xs"
-                            onClick={() => handleDeleteClick(entry)}
-                          >
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            Delete
-                          </Button>
-                        )}
-                      </div>
+                      {(() => {
+                        const canShowEditAction = !entry.__isActive && canUpdateTime && canEditTimeEntry(entry)
+                        const canShowDeleteAction = !entry.__isActive && canDeleteTime && canEditTimeEntry(entry) && isEntryOwnedByViewer(entry)
+                        const hasAnyActions = canShowEditAction || canShowDeleteAction
+
+                        if (!hasAnyActions) return null
+
+                        return (
+                          <div className="flex gap-2 pt-2 border-t border-border">
+                            {canShowEditAction && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 h-8 text-xs"
+                                onClick={() => handleEdit(entry)}
+                              >
+                                <Edit className="h-3 w-3 mr-1" />
+                                Edit
+                              </Button>
+                            )}
+                            {canShowDeleteAction && (
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className="flex-1 h-8 text-xs"
+                                onClick={() => handleDeleteClick(entry)}
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                Delete
+                              </Button>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </div>
 
                     {/* Desktop Table View */}
@@ -2899,7 +2923,11 @@ export function TimeLogs({
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 p-0"
-                              disabled={!canEditTimeEntry(entry)}
+                              disabled={(() => {
+                                const canShowEditAction = !entry.__isActive && canUpdateTime && canEditTimeEntry(entry)
+                                const canShowDeleteAction = !entry.__isActive && canDeleteTime && canEditTimeEntry(entry) && isEntryOwnedByViewer(entry)
+                                return !(canShowEditAction || canShowDeleteAction)
+                              })()}
                             >
                               <MoreHorizontal className="h-4 w-4" />
                               <span className="sr-only">Open menu</span>
@@ -2907,7 +2935,7 @@ export function TimeLogs({
                           </DropdownMenu.Trigger>
                           <DropdownMenu.Portal>
                             <DropdownMenu.Content className="min-w-[120px] bg-popover dark:bg-popover rounded-md p-1 shadow-lg border border-border dark:border-border z-50">
-                              {canUpdateTime && canEditTimeEntry(entry) && (
+                              {!entry.__isActive && canUpdateTime && canEditTimeEntry(entry) && (
                                 <DropdownMenu.Item
                                   className="flex items-center px-2 py-1.5 text-sm rounded hover:bg-accent dark:hover:bg-accent hover:text-accent-foreground dark:hover:text-accent-foreground cursor-pointer outline-none text-foreground dark:text-foreground"
                                   onSelect={() => handleEdit(entry)}
@@ -2916,7 +2944,7 @@ export function TimeLogs({
                                   <span>Edit</span>
                                 </DropdownMenu.Item>
                               )}
-                              {canDeleteTime && canEditTimeEntry(entry) && (
+                              {!entry.__isActive && canDeleteTime && canEditTimeEntry(entry) && isEntryOwnedByViewer(entry) && (
                                 <DropdownMenu.Item
                                   className="flex items-center px-2 py-1.5 text-sm rounded text-destructive dark:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 cursor-pointer outline-none"
                                   onSelect={() => handleDeleteClick(entry)}
