@@ -73,6 +73,8 @@ import TestCaseList from '@/components/test-management/TestCaseList'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { TestSuiteForm } from '@/components/test-management/TestSuiteForm'
 import { TestCaseForm } from '@/components/test-management/TestCaseForm'
+import { TestExecutionForm } from '@/components/test-management/TestExecutionForm'
+import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmDialog'
 import { TestSuiteDetailDialog } from '@/components/test-management/TestSuiteDetailDialog'
 import { ProjectTeamTab } from '@/components/projects/ProjectTeamTab'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
@@ -247,6 +249,12 @@ export default function ProjectDetailPage() {
   const [editingTestCase, setEditingTestCase] = useState<any | null>(null)
   const [createCaseSuiteId, setCreateCaseSuiteId] = useState<string | undefined>(undefined)
   const [testCasesRefreshCounter, setTestCasesRefreshCounter] = useState(0)
+  const [testCaseDeleteDialogOpen, setTestCaseDeleteDialogOpen] = useState(false)
+  const [testCaseDeleteItem, setTestCaseDeleteItem] = useState<{ id: string; name: string } | null>(null)
+  const [testCaseDeleting, setTestCaseDeleting] = useState(false)
+  const [testExecutionDialogOpen, setTestExecutionDialogOpen] = useState(false)
+  const [executionTestCase, setExecutionTestCase] = useState<any | null>(null)
+  const [testExecutionSaving, setTestExecutionSaving] = useState(false)
   const [suiteDetailDialogOpen, setSuiteDetailDialogOpen] = useState(false)
   const [detailSuiteId, setDetailSuiteId] = useState<string | null>(null)
   const [suiteDetailRefreshKey, setSuiteDetailRefreshKey] = useState(0)
@@ -284,6 +292,68 @@ export default function ProjectDetailPage() {
 
   // Use the notification hook
   const { success: notifySuccess, error: notifyError } = useNotify()
+
+  const handleConfirmDeleteTestCase = async () => {
+    if (!testCaseDeleteItem?.id) return
+
+    setTestCaseDeleting(true)
+    try {
+      const res = await fetch(`/api/test-cases/${testCaseDeleteItem.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        notifySuccess({ title: 'Test Case deleted successfully.' })
+        setTestCaseDeleteDialogOpen(false)
+        setTestCaseDeleteItem(null)
+        setTestCasesRefreshCounter(c => c + 1)
+      } else {
+        const data = await res.json().catch(() => ({}))
+        console.error('Failed to delete test case', data)
+        notifyError({ title: 'Failed to delete test case.' })
+      }
+    } catch (e) {
+      console.error('Error deleting test case:', e)
+      notifyError({ title: 'Failed to delete test case.' })
+    } finally {
+      setTestCaseDeleting(false)
+    }
+  }
+
+  const handleSaveTestExecution = async (executionData: any) => {
+    setTestExecutionSaving(true)
+    try {
+      const payload = {
+        testCaseId: executionData.testCase,
+        testPlanId: executionData.testPlan || undefined,
+        status: executionData.status,
+        actualResult: executionData.actualResult,
+        comments: executionData.comments,
+        executionTime: executionData.executionTime,
+        environment: executionData.environment,
+        version: executionData.version,
+        attachments: executionData.attachments || []
+      }
+
+      const res = await fetch('/api/test-executions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      if (res.ok) {
+        notifySuccess({ title: 'Test Execution recorded successfully.' })
+        setTestExecutionDialogOpen(false)
+        setExecutionTestCase(null)
+      } else {
+        const data = await res.json().catch(() => ({}))
+        console.error('Failed to create test execution', data)
+        notifyError({ title: 'Failed to record test execution.' })
+      }
+    } catch (e) {
+      console.error('Error creating test execution:', e)
+      notifyError({ title: 'Failed to record test execution.' })
+    } finally {
+      setTestExecutionSaving(false)
+    }
+  }
 
   const totalExpenses = useMemo(
     () => expenses.reduce((sum, exp) => sum + (exp.fullAmount || 0), 0),
@@ -1764,8 +1834,7 @@ export default function ProjectDetailPage() {
                         key={`${projectId}-${suitesRefreshCounter}`}
                         projectId={projectId}
                         onSuiteView={(suite) => {
-                          setDetailSuiteId(suite._id)
-                          setSuiteDetailDialogOpen(true)
+                          router.push(`/test-management/suites?projectId=${encodeURIComponent(projectId)}&suiteId=${encodeURIComponent(suite._id)}`)
                         }}
                         onSuiteCreate={(parentSuiteId) => {
                           setEditingSuite(null)
@@ -1777,7 +1846,25 @@ export default function ProjectDetailPage() {
                           setParentSuiteIdForCreate(undefined)
                           setSuiteDialogOpen(true)
                         }}
-                        onSuiteDelete={(suiteId) => console.log('Delete suite:', suiteId)}
+                        onSuiteDelete={async (suiteId) => {
+                          try {
+                            const res = await fetch(`/api/test-suites/${suiteId}`, { method: 'DELETE' })
+                            if (res.ok) {
+                              notifySuccess({ title: 'Test Suite deleted successfully.' })
+                              setSuitesRefreshCounter((c) => c + 1)
+                              // If currently viewing details for this suite, close it.
+                              if (detailSuiteId === suiteId) {
+                                setSuiteDetailDialogOpen(false)
+                                setDetailSuiteId(null)
+                              }
+                            } else {
+                              const data = await res.json().catch(() => ({}))
+                              console.error('Failed to delete test suite', data)
+                            }
+                          } catch (e) {
+                            console.error('Error deleting test suite:', e)
+                          }
+                        }}
                       />
                     </div>
                     <div className="lg:col-span-2">
@@ -1790,9 +1877,43 @@ export default function ProjectDetailPage() {
                           setCreateCaseSuiteId(testSuiteId)
                           setTestCaseDialogOpen(true)
                         }}
-                        onTestCaseEdit={(testCase) => console.log('Edit test case:', testCase)}
-                        onTestCaseDelete={(testCaseId) => console.log('Delete test case:', testCaseId)}
-                        onTestCaseExecute={(testCase) => console.log('Execute test case:', testCase)}
+                        onTestCaseEdit={(testCase) => {
+                          setEditingTestCase({
+                            _id: testCase._id,
+                            title: testCase.title,
+                            description: testCase.description,
+                            preconditions: (testCase as any)?.preconditions || '',
+                            steps: (testCase as any)?.steps || [{ step: '', expectedResult: '' }],
+                            expectedResult: (testCase as any)?.expectedResult || '',
+                            testData: (testCase as any)?.testData || '',
+                            priority: testCase.priority,
+                            category: testCase.category,
+                            automationStatus: testCase.automationStatus,
+                            estimatedExecutionTime: testCase.estimatedExecutionTime,
+                            testSuite: testCase.testSuite?._id,
+                            tags: testCase.tags || [],
+                            requirements: (testCase as any)?.requirements || ''
+                          })
+                          setCreateCaseSuiteId(undefined)
+                          setTestCaseDialogOpen(true)
+                        }}
+                        onTestCaseDelete={(testCaseId, testCaseTitle) => {
+                          setTestCaseDeleteItem({
+                            id: testCaseId,
+                            name: testCaseTitle || 'this test case'
+                          })
+                          setTestCaseDeleteDialogOpen(true)
+                        }}
+                        onTestCaseExecute={(testCase) => {
+                          setExecutionTestCase({
+                            _id: testCase._id,
+                            title: testCase.title,
+                            priority: testCase.priority,
+                            category: testCase.category,
+                            estimatedExecutionTime: testCase.estimatedExecutionTime
+                          })
+                          setTestExecutionDialogOpen(true)
+                        }}
                       />
                     </div>
                   </div>
@@ -2181,6 +2302,7 @@ export default function ProjectDetailPage() {
             open={suiteDialogOpen}
             onOpenChange={setSuiteDialogOpen}
             title={editingSuite ? 'Edit Test Suite' : 'Create Test Suite'}
+            dismissible={false}
             footer={
               <>
                 <Button
@@ -2223,6 +2345,7 @@ export default function ProjectDetailPage() {
                     })
                   })
                   if (res.ok) {
+                    notifySuccess({ title: isEdit ? 'Test Suite updated successfully.' : 'Test Suite created successfully.' })
                     setSuiteDialogOpen(false)
                     setEditingSuite(null)
                     setParentSuiteIdForCreate(undefined)
@@ -2257,6 +2380,7 @@ export default function ProjectDetailPage() {
             open={testCaseDialogOpen}
             onOpenChange={setTestCaseDialogOpen}
             title={editingTestCase ? 'Edit Test Case' : 'Create Test Case'}
+            dismissible={false}
           >
             <TestCaseForm
               testCase={editingTestCase || (createCaseSuiteId ? { testSuite: createCaseSuiteId } as any : undefined)}
@@ -2265,12 +2389,15 @@ export default function ProjectDetailPage() {
                 setTestCaseSaving(true)
                 try {
                   const isEdit = !!editingTestCase?._id
-                  const res = await fetch('/api/test-cases', {
-                    method: isEdit ? 'PUT' : 'POST',
+                  const url = isEdit ? `/api/test-cases/${editingTestCase._id}` : '/api/test-cases'
+                  const method = isEdit ? 'PUT' : 'POST'
+                  const res = await fetch(url, {
+                    method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                      ...(isEdit ? { testCaseId: editingTestCase._id } : {}),
                       ...testCaseData,
+                      // API expects testSuiteId for create, and uses it for updates too
+                      testSuiteId: testCaseData.testSuite,
                       projectId,
                     })
                   })
@@ -2304,6 +2431,37 @@ export default function ProjectDetailPage() {
               loading={testCaseSaving}
             />
           </ResponsiveDialog>
+
+          <ResponsiveDialog
+            open={testExecutionDialogOpen}
+            onOpenChange={setTestExecutionDialogOpen}
+            title="Execute Test Case"
+            dismissible={false}
+          >
+            <TestExecutionForm
+              projectId={projectId}
+              testCase={executionTestCase || undefined}
+              onSave={handleSaveTestExecution}
+              onCancel={() => {
+                setTestExecutionDialogOpen(false)
+                setExecutionTestCase(null)
+              }}
+              loading={testExecutionSaving}
+            />
+          </ResponsiveDialog>
+
+          <DeleteConfirmDialog
+            isOpen={testCaseDeleteDialogOpen}
+            onClose={() => {
+              setTestCaseDeleteDialogOpen(false)
+              setTestCaseDeleteItem(null)
+            }}
+            onConfirm={handleConfirmDeleteTestCase}
+            title="Delete Test Case"
+            itemName={testCaseDeleteItem?.name || 'this test case'}
+            itemType="Test Case"
+            loading={testCaseDeleting}
+          />
 
           <TestSuiteDetailDialog
             suiteId={detailSuiteId}

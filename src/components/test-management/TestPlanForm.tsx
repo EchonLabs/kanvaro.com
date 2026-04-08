@@ -13,6 +13,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { CalendarIcon, X, Plus } from 'lucide-react'
 import { format } from 'date-fns'
+import { formatToTitleCase } from '@/lib/utils'
 
 interface TestPlan {
   _id?: string
@@ -288,10 +289,10 @@ export function TestPlanForm({ testPlan, projectId, onSave, onCancel, loading = 
                           <span className="font-medium">{testCase.title}</span>
                           <div className="flex items-center space-x-2">
                             <Badge variant="outline" className="text-xs">
-                              {testCase.priority}
+                              {formatToTitleCase(testCase.priority)}
                             </Badge>
                             <Badge variant="secondary" className="text-xs">
-                              {testCase.category}
+                              {formatToTitleCase(testCase.category)}
                             </Badge>
                           </div>
                         </div>

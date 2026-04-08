@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
@@ -41,6 +41,7 @@ interface TestCaseFormProps {
 }
 
 export function TestCaseForm({ testCase, projectId, onSave, onCancel, loading = false }: TestCaseFormProps) {
+  const titleFocusAdjustedRef = useRef(false)
   const [formData, setFormData] = useState<TestCase>({
     title: '',
     description: '',
@@ -161,6 +162,21 @@ export function TestCaseForm({ testCase, projectId, onSave, onCancel, loading = 
                 id="title"
                 value={formData.title}
                 onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                onFocus={(e) => {
+                  // Some browsers/radix focus management can highlight the initial value.
+                  // Only on first focus, collapse selection to the end.
+                  if (titleFocusAdjustedRef.current) return
+                  titleFocusAdjustedRef.current = true
+                  const el = e.currentTarget
+                  queueMicrotask(() => {
+                    try {
+                      const end = el.value.length
+                      el.setSelectionRange(end, end)
+                    } catch {
+                      // ignore
+                    }
+                  })
+                }}
                 placeholder="Test case title"
                 className={errors.title ? 'border-red-500' : ''}
               />

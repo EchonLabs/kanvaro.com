@@ -299,7 +299,7 @@ export function CreateRoleModal({ isOpen, onClose, onRoleCreated }: CreateRoleMo
     if (!group) return
 
     const allSelected = group.permissions.every(p => formData.permissions.includes(p.permission))
-    
+
     if (allSelected) {
       // Deselect all in this category
       setFormData(prev => ({
@@ -318,9 +318,9 @@ export function CreateRoleModal({ isOpen, onClose, onRoleCreated }: CreateRoleMo
   }
 
   // Check if form is valid - all required fields must be filled
-  const isFormValid = !!formData.name.trim() && 
-                      !!formData.description.trim() && 
-                      formData.permissions.length > 0
+  const isFormValid = !!formData.name.trim() &&
+    !!formData.description.trim() &&
+    formData.permissions.length > 0
 
   const hasBlockingError = !!error
 

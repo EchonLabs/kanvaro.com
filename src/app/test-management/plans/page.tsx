@@ -295,6 +295,7 @@ export default function TestPlansPage() {
           open={testPlanDialogOpen}
           onOpenChange={setTestPlanDialogOpen}
           title={selectedTestPlan ? 'Edit Test Plan' : 'Create Test Plan'}
+          dismissible={false}
         >
           <TestPlanForm
             testPlan={selectedTestPlan || undefined}

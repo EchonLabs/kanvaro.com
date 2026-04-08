@@ -233,6 +233,7 @@ export default function TestExecutionViewPage() {
           open={editOpen}
           onOpenChange={setEditOpen}
           title="Edit Test Execution"
+          dismissible={false}
         >
           <TestExecutionForm
             testExecution={mappedForForm}

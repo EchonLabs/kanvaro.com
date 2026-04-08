@@ -82,10 +82,18 @@ export function TestExecutionForm({
 
   const fetchTestCases = async () => {
     try {
-      const response = await fetch(`/api/test-cases?projectId=${projectId}`)
+      // Pull a bigger page so the selected test case is very likely present.
+      // The API defaults to paginated responses.
+      const response = await fetch(`/api/test-cases?projectId=${projectId}&page=1&limit=500`)
       const data = await response.json()
       if (data.success) {
-        setTestCases(data.data)
+        const items: TestCase[] = Array.isArray(data.data) ? data.data : []
+        // If the form is launched for a specific test case, ensure it exists in the list
+        // so the Select can render the label even if it wasn't returned in the first page.
+        const withSelected = testCase && !items.some(tc => tc._id === testCase._id)
+          ? [testCase, ...items]
+          : items
+        setTestCases(withSelected)
       }
     } catch (error) {
       console.error('Error fetching test cases:', error)

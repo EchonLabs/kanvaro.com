@@ -35,6 +35,7 @@ import TestCaseList from '@/components/test-management/TestCaseList'
 import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmDialog'
 import { TestSuiteDetailDialog } from '@/components/test-management/TestSuiteDetailDialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useNotify } from '@/lib/notify'
 
 interface TestSummary {
   totalTestCases: number
@@ -55,12 +56,14 @@ interface Project {
 
 export default function TestManagementPage() {
   const { setItems } = useBreadcrumb()
+  const { success: notifySuccess } = useNotify()
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [testPlanDialogOpen, setTestPlanDialogOpen] = useState(false)
   const [testExecutionDialogOpen, setTestExecutionDialogOpen] = useState(false)
+  const [executionTestCase, setExecutionTestCase] = useState<any | null>(null)
   const [saving, setSaving] = useState(false)
   const [suiteDialogOpen, setSuiteDialogOpen] = useState(false)
   const [suiteSaving, setSuiteSaving] = useState(false)
@@ -192,6 +195,7 @@ export default function TestManagementPage() {
     try {
       const res = await fetch(`/api/test-suites/${suiteId}`, { method: 'DELETE' })
       if (res.ok) {
+        notifySuccess({ title: 'Test Suite deleted successfully.' })
         setSuitesRefreshCounter(c => c + 1)
         // Clear details panel if the deleted suite was selected
         if (selectedSuiteId === suiteId) {
@@ -594,11 +598,20 @@ export default function TestManagementPage() {
                     setCreateCaseSuiteId(undefined)
                     setTestCaseDialogOpen(true)
                   }}
-                  onTestCaseDelete={(testCaseId) => {
-                    setDeleteItem({ id: testCaseId, name: '' })
+                  onTestCaseDelete={(testCaseId, testCaseTitle) => {
+                    setDeleteItem({ id: testCaseId, name: testCaseTitle || '' })
                     setDeleteDialogOpen(true)
                   }}
-                  onTestCaseExecute={(testCase) => console.log('Execute test case:', testCase)}
+                  onTestCaseExecute={(testCase) => {
+                    setExecutionTestCase({
+                      _id: testCase._id,
+                      title: testCase.title,
+                      priority: testCase.priority,
+                      category: testCase.category,
+                      estimatedExecutionTime: testCase.estimatedExecutionTime
+                    })
+                    setTestExecutionDialogOpen(true)
+                  }}
                 />
               </TabsContent>
 
@@ -695,6 +708,7 @@ export default function TestManagementPage() {
             open={testPlanDialogOpen}
             onOpenChange={setTestPlanDialogOpen}
             title="Create Test Plan"
+            dismissible={false}
           >
             <TestPlanForm
               projectId={selectedProject}
@@ -708,11 +722,16 @@ export default function TestManagementPage() {
             open={testExecutionDialogOpen}
             onOpenChange={setTestExecutionDialogOpen}
             title="Execute Test Case"
+            dismissible={false}
           >
             <TestExecutionForm
               projectId={selectedProject}
+              testCase={executionTestCase || undefined}
               onSave={handleSaveTestExecution}
-              onCancel={() => setTestExecutionDialogOpen(false)}
+              onCancel={() => {
+                setTestExecutionDialogOpen(false)
+                setExecutionTestCase(null)
+              }}
               loading={saving}
             />
           </ResponsiveDialog>
@@ -721,6 +740,7 @@ export default function TestManagementPage() {
             open={suiteDialogOpen}
             onOpenChange={setSuiteDialogOpen}
             title={editingSuite ? 'Edit Test Suite' : 'Create Test Suite'}
+            dismissible={false}
           >
             <TestSuiteForm
               testSuite={editingSuite || (parentSuiteIdForCreate ? { name: '', description: '', parentSuite: parentSuiteIdForCreate, project: selectedProject } as any : undefined)}
@@ -743,6 +763,7 @@ export default function TestManagementPage() {
                     })
                   })
                   if (res.ok) {
+                    notifySuccess({ title: isEdit ? 'Test Suite updated successfully.' : 'Test Suite created successfully.' })
                     setSuiteDialogOpen(false)
                     setEditingSuite(null)
                     setParentSuiteIdForCreate(undefined)
@@ -779,6 +800,7 @@ export default function TestManagementPage() {
             open={testCaseDialogOpen}
             onOpenChange={setTestCaseDialogOpen}
             title={editingTestCase ? 'Edit Test Case' : 'Create Test Case'}
+            dismissible={false}
           >
             <TestCaseForm
               testCase={editingTestCase || (createCaseSuiteId ? { testSuite: createCaseSuiteId } as any : undefined)}

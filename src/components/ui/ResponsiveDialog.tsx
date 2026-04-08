@@ -12,6 +12,8 @@ interface ResponsiveDialogProps {
   children: ReactNode
   footer?: ReactNode
   className?: string
+  /** When false, dialog can only be closed via explicit close controls (close icon/buttons). */
+  dismissible?: boolean
 }
 
 export function ResponsiveDialog({ 
@@ -21,7 +23,8 @@ export function ResponsiveDialog({
   description,
   children, 
   footer,
-  className 
+  className,
+  dismissible = true
 }: ResponsiveDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -30,6 +33,8 @@ export function ResponsiveDialog({
           'max-w-lg sm:max-w-2xl lg:max-w-4xl',
           className
         )}
+        onInteractOutside={dismissible ? undefined : (e) => e.preventDefault()}
+        onEscapeKeyDown={dismissible ? undefined : (e) => e.preventDefault()}
       >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

@@ -5,9 +5,11 @@ import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import TestCaseList from '@/components/test-management/TestCaseList'
 import { TestCaseForm } from '@/components/test-management/TestCaseForm'
+import { TestExecutionForm } from '@/components/test-management/TestExecutionForm'
 import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmDialog'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, AlertCircle } from 'lucide-react'
 import { Permission } from '@/lib/permissions'
@@ -64,12 +66,15 @@ export default function TestCasesPage() {
   const { setItems } = useBreadcrumb()
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('')
-  const [testCases, setTestCases] = useState<TestCase[]>([])
+  const [projectQuery, setProjectQuery] = useState('')
   const [testCaseDialogOpen, setTestCaseDialogOpen] = useState(false)
+  const [testExecutionDialogOpen, setTestExecutionDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [selectedTestCase, setSelectedTestCase] = useState<FormTestCase | null>(null)
+  const [executionTestCase, setExecutionTestCase] = useState<any | null>(null)
   const [deleteItem, setDeleteItem] = useState<{ id: string; name: string } | null>(null)
   const [saving, setSaving] = useState(false)
+  const [executionSaving, setExecutionSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [refreshCounter, setRefreshCounter] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -94,9 +99,6 @@ export default function TestCasesPage() {
 
       if (data.success) {
         setProjects(data.data)
-        if (data.data.length > 0) {
-          setSelectedProject(data.data[0]._id)
-        }
       }
     } catch (error) {
       console.error('Error fetching projects:', error)
@@ -135,12 +137,55 @@ export default function TestCasesPage() {
     setTestCaseDialogOpen(true)
   }
 
-  const handleDeleteTestCase = (testCaseId: string) => {
-    // Find the test case to get its name
-    const testCase = testCases.find(tc => tc._id === testCaseId)
-    const testCaseName = testCase?.title || 'Unknown Test Case'
-    setDeleteItem({ id: testCaseId, name: testCaseName })
+  const handleDeleteTestCase = (testCaseId: string, testCaseTitle?: string) => {
+    setDeleteItem({ id: testCaseId, name: testCaseTitle || 'Unknown Test Case' })
     setDeleteDialogOpen(true)
+  }
+
+  const handleExecuteTestCase = (testCase: TestCase) => {
+    setExecutionTestCase({
+      _id: testCase._id,
+      title: testCase.title,
+      priority: testCase.priority,
+      category: testCase.category,
+      estimatedExecutionTime: testCase.estimatedExecutionTime
+    })
+    setTestExecutionDialogOpen(true)
+  }
+
+  const handleSaveTestExecution = async (executionData: any) => {
+    setExecutionSaving(true)
+    try {
+      const payload = {
+        testCaseId: executionData.testCase,
+        testPlanId: executionData.testPlan || undefined,
+        status: executionData.status,
+        actualResult: executionData.actualResult,
+        comments: executionData.comments,
+        executionTime: executionData.executionTime,
+        environment: executionData.environment,
+        version: executionData.version,
+        attachments: executionData.attachments || []
+      }
+
+      const response = await fetch('/api/test-executions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      if (response.ok) {
+        setTestExecutionDialogOpen(false)
+        setExecutionTestCase(null)
+      } else {
+        const data = await response.json().catch(() => ({}))
+        console.error('Failed to create test execution', data)
+      }
+    } catch (error) {
+      console.error('Error creating test execution:', error)
+    } finally {
+      setExecutionSaving(false)
+    }
   }
 
   const handleSaveTestCase = async (testCaseData: FormTestCase) => {
@@ -200,6 +245,10 @@ export default function TestCasesPage() {
     }
   }
 
+  const filteredProjects = projects.filter(project =>
+    !projectQuery.trim() || project.name.toLowerCase().includes(projectQuery.toLowerCase())
+  )
+
   return (
     <MainLayout>
       <PermissionGate permission={Permission.TEST_MANAGE}>
@@ -218,21 +267,44 @@ export default function TestCasesPage() {
           </div>
 
         {/* Project Selection */}
-        <div className="flex items-center gap-4">
+        <div className="space-y-1">
           <div className="flex items-center gap-2">
             <label htmlFor="project-select" className="text-sm font-medium">
               Project:
             </label>
-            <Select value={selectedProject} onValueChange={setSelectedProject}>
+            <Select
+              value={selectedProject}
+              onValueChange={setSelectedProject}
+              onOpenChange={(open) => {
+                if (open) setProjectQuery('')
+              }}
+            >
               <SelectTrigger id="project-select" className="w-64">
                 <SelectValue placeholder="Select a project" />
               </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project._id} value={project._id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
+              <SelectContent className="p-0">
+                <div className="p-2">
+                  <Input
+                    value={projectQuery}
+                    onChange={(e) => setProjectQuery(e.target.value)}
+                    placeholder="Search projects"
+                    className="mb-2"
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <div className="max-h-56 overflow-y-auto">
+                    {filteredProjects.length === 0 ? (
+                      <div className="px-2 py-2 text-sm text-muted-foreground">No matching projects</div>
+                    ) : (
+                      filteredProjects.map((project) => (
+                        <SelectItem key={project._id} value={project._id}>
+                          {project.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </div>
+                </div>
               </SelectContent>
             </Select>
           </div>
@@ -248,9 +320,11 @@ export default function TestCasesPage() {
           <TestCaseList 
             projectId={selectedProject}
             key={`${selectedProject}-${refreshCounter}`}
+            showAddButton={false}
             onTestCaseCreate={handleCreateTestCase}
             onTestCaseEdit={handleEditTestCase}
             onTestCaseDelete={handleDeleteTestCase}
+            onTestCaseExecute={handleExecuteTestCase}
           />
         </div>
 
@@ -259,6 +333,7 @@ export default function TestCasesPage() {
           open={testCaseDialogOpen}
           onOpenChange={setTestCaseDialogOpen}
           title={selectedTestCase ? 'Edit Test Case' : 'Create Test Case'}
+          dismissible={false}
         >
           <TestCaseForm
             testCase={selectedTestCase || undefined}
@@ -269,6 +344,24 @@ export default function TestCasesPage() {
               setSelectedTestCase(null)
             }}
             loading={saving}
+          />
+        </ResponsiveDialog>
+
+        <ResponsiveDialog
+          open={testExecutionDialogOpen}
+          onOpenChange={setTestExecutionDialogOpen}
+          title="Execute Test Case"
+          dismissible={false}
+        >
+          <TestExecutionForm
+            projectId={selectedProject}
+            testCase={executionTestCase || undefined}
+            onSave={handleSaveTestExecution}
+            onCancel={() => {
+              setTestExecutionDialogOpen(false)
+              setExecutionTestCase(null)
+            }}
+            loading={executionSaving}
           />
         </ResponsiveDialog>
 

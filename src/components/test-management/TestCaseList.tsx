@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Search,
-  Filter,
   Plus,
   Edit,
   Trash2,
@@ -18,7 +17,10 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
-  MoreHorizontal
+  RotateCcw,
+  MoreHorizontal,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -65,9 +67,10 @@ interface TestCaseListProps {
   onTestCaseSelect?: (testCase: TestCase) => void
   onTestCaseCreate?: (testSuiteId?: string) => void
   onTestCaseEdit?: (testCase: TestCase) => void
-  onTestCaseDelete?: (testCaseId: string) => void
+  onTestCaseDelete?: (testCaseId: string, testCaseTitle?: string) => void
   onTestCaseExecute?: (testCase: TestCase) => void
   selectedTestCaseId?: string
+  showAddButton?: boolean
 }
 
 export default function TestCaseList({
@@ -78,40 +81,74 @@ export default function TestCaseList({
   onTestCaseEdit,
   onTestCaseDelete,
   onTestCaseExecute,
-  selectedTestCaseId
+  selectedTestCaseId,
+  showAddButton = true
 }: TestCaseListProps) {
+  const ITEMS_PER_PAGE = 20
+
   const [testCases, setTestCases] = useState<TestCase[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [automationFilter, setAutomationFilter] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
   const ALL_PRIORITY = '__ALL_PRIORITY__'
   const ALL_CATEGORIES = '__ALL_CATEGORIES__'
   const ALL_STATUS = '__ALL_STATUS__'
   const [selectedCases, setSelectedCases] = useState<string[]>([])
 
   useEffect(() => {
-    fetchTestCases()
-  }, [projectId, testSuiteId])
+    const timeout = setTimeout(() => {
+      setAppliedSearchTerm(searchTerm)
+    }, 300)
 
-  const fetchTestCases = async () => {
+    return () => clearTimeout(timeout)
+  }, [searchTerm])
+
+  useEffect(() => {
+    setCurrentPage(1)
+    setSelectedCases([])
+    fetchTestCases(1)
+  }, [projectId, testSuiteId, appliedSearchTerm, priorityFilter, categoryFilter, automationFilter])
+
+  const fetchTestCases = async (page = currentPage) => {
+    if (!projectId) {
+      setTestCases([])
+      setSelectedCases([])
+      setTotalPages(1)
+      setTotalItems(0)
+      setLoading(false)
+      return
+    }
     try {
       setLoading(true)
       const params = new URLSearchParams({
         projectId,
         ...(testSuiteId && { testSuiteId }),
-        ...(searchTerm && { search: searchTerm }),
+        ...(appliedSearchTerm && { search: appliedSearchTerm }),
         ...(priorityFilter && { priority: priorityFilter }),
         ...(categoryFilter && { category: categoryFilter }),
-        ...(automationFilter && { automationStatus: automationFilter })
+        ...(automationFilter && { automationStatus: automationFilter }),
+        page: String(page),
+        limit: String(ITEMS_PER_PAGE)
       })
 
       const response = await fetch(`/api/test-cases?${params}`)
       const data = await response.json()
 
       if (data.success) {
-        setTestCases(data.data)
+        const items: TestCase[] = Array.isArray(data.data) ? data.data : []
+        setTestCases(items)
+        setSelectedCases([])
+
+        const pagesFromApi = Number(data.pagination?.pages)
+        const totalFromApi = Number(data.pagination?.total)
+        setTotalPages(Number.isFinite(pagesFromApi) && pagesFromApi > 0 ? pagesFromApi : 1)
+        setTotalItems(Number.isFinite(totalFromApi) && totalFromApi >= 0 ? totalFromApi : items.length)
       }
     } catch (error) {
       console.error('Error fetching test cases:', error)
@@ -120,8 +157,26 @@ export default function TestCaseList({
     }
   }
 
-  const handleSearch = () => {
-    fetchTestCases()
+  const handleResetFilters = () => {
+    setSearchTerm('')
+    setAppliedSearchTerm('')
+    setPriorityFilter('')
+    setCategoryFilter('')
+    setAutomationFilter('')
+  }
+
+  const handlePreviousPage = () => {
+    if (currentPage <= 1) return
+    const nextPage = currentPage - 1
+    setCurrentPage(nextPage)
+    fetchTestCases(nextPage)
+  }
+
+  const handleNextPage = () => {
+    if (currentPage >= totalPages) return
+    const nextPage = currentPage + 1
+    setCurrentPage(nextPage)
+    fetchTestCases(nextPage)
   }
 
   const handleTestCaseClick = (testCase: TestCase) => {
@@ -138,7 +193,8 @@ export default function TestCaseList({
   }
 
   const handleDeleteTestCase = (testCaseId: string) => {
-    onTestCaseDelete?.(testCaseId)
+    const testCase = testCases.find(tc => tc._id === testCaseId)
+    onTestCaseDelete?.(testCaseId, testCase?.title)
   }
 
   const handleExecuteTestCase = (testCase: TestCase) => {
@@ -193,6 +249,10 @@ export default function TestCaseList({
     }
   }
 
+  const hasActiveFilters = Boolean(
+    searchTerm.trim() || priorityFilter || categoryFilter || automationFilter
+  )
+
   if (loading) {
     return (
       <Card>
@@ -222,10 +282,12 @@ export default function TestCaseList({
       <CardHeader>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <CardTitle className="text-xl sm:text-2xl">Test Cases</CardTitle>
-          <Button onClick={handleCreateTestCase} className="w-full sm:w-auto">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Test Case
-          </Button>
+          {showAddButton && (
+            <Button onClick={handleCreateTestCase} className="w-full sm:w-auto">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Test Case
+            </Button>
+          )}
         </div>
 
         <div className="flex flex-col gap-2 sm:gap-4 mt-4">
@@ -235,7 +297,6 @@ export default function TestCaseList({
               placeholder="Search test cases..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
               className="pl-10 w-full"
             />
           </div>
@@ -283,9 +344,16 @@ export default function TestCaseList({
               </SelectContent>
             </Select>
 
-            <Button variant="outline" onClick={handleSearch} className="w-full sm:w-auto">
-              <Filter className="h-4 w-4 mr-2" />
-              Filter
+            <Button
+              variant="outline"
+              onClick={handleResetFilters}
+              size="sm"
+              className="w-full sm:w-auto"
+              disabled={!hasActiveFilters}
+              title="Clear all filters"
+              aria-label="Clear all filters"
+            >
+              <RotateCcw className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -363,12 +431,12 @@ export default function TestCaseList({
                     </TableCell>
                     <TableCell>
                       <Badge className={getPriorityColor(testCase.priority)}>
-                        {testCase.priority}
+                        {formatToTitleCase(testCase.priority)}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge className={getCategoryColor(testCase.category)}>
-                        {testCase.category}
+                        {formatToTitleCase(testCase.category)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -397,16 +465,16 @@ export default function TestCaseList({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleExecuteTestCase(testCase)}>
+                          <DropdownMenuItem onSelect={() => handleExecuteTestCase(testCase)}>
                             <Play className="h-3 w-3 mr-2" />
                             Execute
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditTestCase(testCase)}>
+                          <DropdownMenuItem onSelect={() => handleEditTestCase(testCase)}>
                             <Edit className="h-3 w-3 mr-2" />
                             Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => handleDeleteTestCase(testCase._id)}
+                            onSelect={() => handleDeleteTestCase(testCase._id)}
                             className="text-destructive"
                           >
                             <Trash2 className="h-3 w-3 mr-2" />
@@ -419,6 +487,32 @@ export default function TestCaseList({
                 ))}
               </TableBody>
             </Table>
+
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages} ({totalItems} test cases)
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePreviousPage}
+                  disabled={currentPage === 1 || totalPages <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages || totalPages <= 1}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </CardContent>

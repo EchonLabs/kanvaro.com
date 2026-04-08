@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -31,6 +31,8 @@ interface TestSuiteCardsProps {
   onSuiteCreate?: (parentSuiteId?: string) => void
   onSuiteEdit?: (suite: TestSuite) => void
   onSuiteDelete?: (suiteId: string, suiteName: string) => void
+  /** If set, the list will navigate to and highlight this suite (no modal). */
+  highlightSuiteId?: string
 }
 
 const ITEMS_PER_PAGE = 6
@@ -41,12 +43,14 @@ export default function TestSuiteCards({
   onSuiteCreate,
   onSuiteEdit,
   onSuiteDelete,
+  highlightSuiteId,
 }: TestSuiteCardsProps) {
   const [suites, setSuites] = useState<TestSuite[]>([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [loadingUserRole, setLoadingUserRole] = useState(true)
+  const lastHandledHighlightRef = useRef<string | null>(null)
 
   useEffect(() => {
     fetchTestSuites()
@@ -87,6 +91,24 @@ export default function TestSuiteCards({
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (!highlightSuiteId) return
+    if (lastHandledHighlightRef.current === highlightSuiteId) return
+    if (!suites || suites.length === 0) return
+
+    const idx = suites.findIndex((s) => s._id === highlightSuiteId)
+    if (idx < 0) return
+
+    const page = Math.floor(idx / ITEMS_PER_PAGE) + 1
+    setCurrentPage(page)
+    lastHandledHighlightRef.current = highlightSuiteId
+
+    setTimeout(() => {
+      const el = document.getElementById(`suite-${highlightSuiteId}`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 0)
+  }, [highlightSuiteId, suites])
 
   const totalPages = Math.ceil(suites.length / ITEMS_PER_PAGE)
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
@@ -150,7 +172,15 @@ export default function TestSuiteCards({
       {/* Grid of Suite Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {currentSuites.map((suite) => (
-          <Card key={suite._id} className="flex flex-col hover:shadow-lg transition-shadow overflow-hidden">
+          <Card
+            key={suite._id}
+            id={`suite-${suite._id}`}
+            className={`flex flex-col hover:shadow-lg transition-shadow overflow-hidden ${
+              highlightSuiteId && suite._id === highlightSuiteId
+                ? 'ring-2 ring-primary/30 border-primary/40'
+                : ''
+            }`}
+          >
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-2">
                 <CardTitle className="text-base font-semibold truncate flex-1">

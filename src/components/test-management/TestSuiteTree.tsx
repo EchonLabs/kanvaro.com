@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge'
 import {
   ChevronRight,
   ChevronDown,
+  ChevronLeft,
   Folder,
   FolderOpen,
   Plus,
@@ -52,11 +53,15 @@ export default function TestSuiteTree({
   onSuiteDelete,
   selectedSuiteId
 }: TestSuiteTreeProps) {
+  const ROOT_SUITES_PER_PAGE = 8
+
   const [suites, setSuites] = useState<TestSuite[]>([])
   const [expandedSuites, setExpandedSuites] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
+    setCurrentPage(1)
     fetchTestSuites()
   }, [projectId])
 
@@ -111,7 +116,7 @@ export default function TestSuiteTree({
   }
 
   const handleSuiteClick = (suite: TestSuite) => {
-    // Row click removed - use View button instead
+    onSuiteView?.(suite)
   }
 
   const handleViewSuite = (suite: TestSuite) => {
@@ -130,6 +135,23 @@ export default function TestSuiteTree({
     onSuiteDelete?.(suiteId, suiteName)
   }
 
+  const totalPages = Math.ceil(suites.length / ROOT_SUITES_PER_PAGE)
+  const startIndex = (currentPage - 1) * ROOT_SUITES_PER_PAGE
+  const endIndex = startIndex + ROOT_SUITES_PER_PAGE
+  const currentSuites = suites.slice(startIndex, endIndex)
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1)
+    }
+  }
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1)
+    }
+  }
+
   const renderSuite = (suite: TestSuite, level = 0) => {
     const isExpanded = expandedSuites.has(suite._id)
     const hasChildren = suite.children && suite.children.length > 0
@@ -143,6 +165,7 @@ export default function TestSuiteTree({
             ${isSelected ? 'bg-primary/10 border border-primary/20' : ''}
           `}
           style={{ paddingLeft: `${level * 20 + 8}px` }}
+          onClick={() => handleSuiteClick(suite)}
         >
           {hasChildren ? (
             <Button
@@ -280,7 +303,33 @@ export default function TestSuiteTree({
           </div>
         ) : (
           <div className="space-y-1">
-            {suites.map(suite => renderSuite(suite))}
+            {currentSuites.map(suite => renderSuite(suite))}
+
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages} ({suites.length} root suites)
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePreviousPage}
+                  disabled={currentPage === 1 || totalPages <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages || totalPages <= 1}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </CardContent>

@@ -14,6 +14,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const projectId = searchParams.get('projectId')
     const parentSuiteId = searchParams.get('parentSuiteId')
+    const hasPagination = searchParams.has('page') || searchParams.has('limit')
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '50')
 
     let query: any = { organization: authResult.user.organization }
 
@@ -28,14 +31,35 @@ export async function GET(req: NextRequest) {
       query.parentSuite = { $exists: false }
     }
 
-    const testSuites = await TestSuite.find(query)
+    const findQuery = TestSuite.find(query)
       .populate('createdBy', 'firstName lastName email')
       .populate('parentSuite', 'name')
       .sort({ order: 1, createdAt: 1 })
 
+    let testSuites
+    let pagination: { page: number; limit: number; total: number; pages: number } | undefined
+
+    if (hasPagination) {
+      const safePage = Number.isFinite(page) && page > 0 ? page : 1
+      const safeLimit = Number.isFinite(limit) && limit > 0 ? limit : 50
+      const skip = (safePage - 1) * safeLimit
+
+      const total = await TestSuite.countDocuments(query)
+      testSuites = await findQuery.skip(skip).limit(safeLimit)
+      pagination = {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        pages: Math.ceil(total / safeLimit)
+      }
+    } else {
+      testSuites = await findQuery
+    }
+
     return NextResponse.json({
       success: true,
-      data: testSuites
+      data: testSuites,
+      ...(pagination ? { pagination } : {})
     })
   } catch (error) {
     console.error('Error fetching test suites:', error)

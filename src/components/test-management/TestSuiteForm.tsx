@@ -6,9 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/Button'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/Command'
-import { Check, ChevronsUpDown } from 'lucide-react'
+import { ChevronsUpDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface TestSuite {
@@ -49,19 +47,15 @@ export function TestSuiteForm({ testSuite, projectId, projectName, onSave, onCan
   const nameInputRef = useRef<HTMLInputElement | null>(null)
   const [currentProjectId, setCurrentProjectId] = useState(testSuite?.project || projectId)
   const [selectedProjectName, setSelectedProjectName] = useState(projectName || '')
-  const [parentSuiteSearch, setParentSuiteSearch] = useState('')
-  const [parentSuiteOpen, setParentSuiteOpen] = useState(false)
+  const [projectQuery, setProjectQuery] = useState('')
+  const [parentSuiteQuery, setParentSuiteQuery] = useState('')
   
-  // Get the display name of the selected parent suite
-  const getSelectedParentSuiteName = () => {
-    if (!formData.parentSuite) return 'No parent suite'
-    const selected = parentSuites.find(s => s._id === formData.parentSuite)
-    return selected?.name || formData.parentSuite
-  }
-
-  // Filter parent suites based on search
   const filteredParentSuites = parentSuites.filter(suite =>
-    suite.name.toLowerCase().includes(parentSuiteSearch.toLowerCase())
+    suite.name.toLowerCase().includes(parentSuiteQuery.toLowerCase())
+  )
+
+  const filteredProjects = projects.filter(project =>
+    project.name.toLowerCase().includes(projectQuery.toLowerCase())
   )
 
   useEffect(() => {
@@ -193,6 +187,9 @@ export function TestSuiteForm({ testSuite, projectId, projectName, onSave, onCan
             <Select
               value={currentProjectId || 'none'}
               onValueChange={(value) => handleProjectChange(value === 'none' ? '' : value)}
+              onOpenChange={(open) => {
+                if (open) setProjectQuery('')
+              }}
             >
               <SelectTrigger className={errors.project ? 'border-red-500' : ''}>
                 {selectedProjectName ? (
@@ -201,12 +198,27 @@ export function TestSuiteForm({ testSuite, projectId, projectName, onSave, onCan
                   <SelectValue placeholder="Select a project" />
                 )}
               </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project._id} value={project._id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
+              <SelectContent className="p-0">
+                <div className="p-2">
+                  <Input
+                    value={projectQuery}
+                    onChange={(e) => setProjectQuery(e.target.value)}
+                    placeholder="Search projects..."
+                    className="mb-2"
+                    onKeyDown={(e) => e.stopPropagation()}
+                  />
+                  <div className="max-h-56 overflow-y-auto">
+                    {filteredProjects.length === 0 ? (
+                      <div className="px-2 py-2 text-sm text-muted-foreground">No projects found.</div>
+                    ) : (
+                      filteredProjects.map((project) => (
+                        <SelectItem key={project._id} value={project._id}>
+                          {project.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </div>
+                </div>
               </SelectContent>
             </Select>
             {errors.project && <p className="text-sm text-red-600">{errors.project}</p>}
@@ -254,70 +266,42 @@ export function TestSuiteForm({ testSuite, projectId, projectName, onSave, onCan
 
         <div className="space-y-2">
           <Label htmlFor="parentSuite">Parent Suite (Optional)</Label>
-          <Popover open={parentSuiteOpen} onOpenChange={setParentSuiteOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={parentSuiteOpen}
-                className="w-full justify-between"
-              >
-                <span className="truncate text-sm">
-                  {getSelectedParentSuiteName()}
-                </span>
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-full p-0" align="start">
-              <Command shouldFilter={false}>
-                <CommandInput 
+          <Select
+            value={formData.parentSuite ? String(formData.parentSuite) : 'none'}
+            onValueChange={(value) => {
+              setFormData(prev => ({ ...prev, parentSuite: value === 'none' ? '' : value }))
+            }}
+            onOpenChange={(open) => {
+              if (open) setParentSuiteQuery('')
+            }}
+          >
+            <SelectTrigger className="w-full justify-between">
+              <SelectValue placeholder="No parent suite" />
+            </SelectTrigger>
+            <SelectContent className="p-0">
+              <div className="p-2">
+                <Input
+                  value={parentSuiteQuery}
+                  onChange={(e) => setParentSuiteQuery(e.target.value)}
                   placeholder="Search parent suites..."
-                  value={parentSuiteSearch}
-                  onValueChange={setParentSuiteSearch}
+                  className="mb-2"
+                  onKeyDown={(e) => e.stopPropagation()}
                 />
-                <CommandEmpty>No parent suite found.</CommandEmpty>
-                <CommandList>
-                  <CommandGroup>
-                    <CommandItem
-                      value="none"
-                      onSelect={() => {
-                        setFormData(prev => ({ ...prev, parentSuite: '' }))
-                        setParentSuiteSearch('')
-                        setParentSuiteOpen(false)
-                      }}
-                    >
-                      <Check
-                        className={cn(
-                          'mr-2 h-4 w-4',
-                          !formData.parentSuite ? 'opacity-100' : 'opacity-0'
-                        )}
-                      />
-                      No parent suite
-                    </CommandItem>
-                    {filteredParentSuites.map((suite) => (
-                      <CommandItem
-                        key={suite._id}
-                        value={suite._id!}
-                        onSelect={() => {
-                          setFormData(prev => ({ ...prev, parentSuite: suite._id }))
-                          setParentSuiteSearch('')
-                          setParentSuiteOpen(false)
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            'mr-2 h-4 w-4',
-                            formData.parentSuite === suite._id ? 'opacity-100' : 'opacity-0'
-                          )}
-                        />
+                <div className="max-h-56 overflow-y-auto">
+                  <SelectItem value="none">No parent suite</SelectItem>
+                  {filteredParentSuites.length === 0 ? (
+                    <div className="px-2 py-2 text-sm text-muted-foreground">No parent suite found.</div>
+                  ) : (
+                    filteredParentSuites.map((suite) => (
+                      <SelectItem key={String(suite._id)} value={String(suite._id)}>
                         {suite.name}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+                      </SelectItem>
+                    ))
+                  )}
+                </div>
+              </div>
+            </SelectContent>
+          </Select>
           <p className="text-xs text-muted-foreground">
             Select a parent suite to create a hierarchical structure
           </p>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import TestSuiteCards from '@/components/test-management/TestSuiteCards'
@@ -12,6 +13,7 @@ import { Button } from '@/components/ui/Button'
 import { Plus } from 'lucide-react'
 import { Permission } from '@/lib/permissions'
 import { PermissionGate } from '@/lib/permissions/permission-components'
+import { useNotify } from '@/lib/notify'
 
 interface TestSuite {
   _id?: string
@@ -23,7 +25,10 @@ interface TestSuite {
 
 export default function TestSuitesPage() {
   const { setItems } = useBreadcrumb()
+  const searchParams = useSearchParams()
+  const { success: notifySuccess } = useNotify()
   const [selectedProject, setSelectedProject] = useState<string>('')
+  const [highlightSuiteId, setHighlightSuiteId] = useState<string | null>(null)
   const [testSuiteDialogOpen, setTestSuiteDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [selectedTestSuite, setSelectedTestSuite] = useState<TestSuite | null>(null)
@@ -42,6 +47,18 @@ export default function TestSuitesPage() {
       { label: 'Test Suites' }
     ])
   }, [setItems])
+
+  useEffect(() => {
+    const suiteId = searchParams.get('suiteId')
+    const projectId = searchParams.get('projectId')
+
+    if (projectId && projectId !== selectedProject) {
+      setSelectedProject(projectId)
+    }
+
+    setHighlightSuiteId(suiteId)
+    // Intentionally respond to URL changes (e.g., navigation from Project → Testing)
+  }, [searchParams, selectedProject])
 
   const handleCreateTestSuite = () => {
     setSelectedTestSuite(null)
@@ -76,6 +93,7 @@ export default function TestSuitesPage() {
       })
 
       if (response.ok) {
+        notifySuccess({ title: isEdit ? 'Test Suite updated successfully.' : 'Test Suite created successfully.' })
         setTestSuiteDialogOpen(false)
         setSelectedTestSuite(null)
         setRefreshCounter(c => c + 1)
@@ -104,6 +122,7 @@ export default function TestSuitesPage() {
       })
 
       if (response.ok) {
+        notifySuccess({ title: 'Test Suite deleted successfully.' })
         setDeleteDialogOpen(false)
         setDeleteItem(null)
         setRefreshCounter(c => c + 1)
@@ -138,6 +157,7 @@ export default function TestSuitesPage() {
             <TestSuiteCards
               key={`suites-${selectedProject}-${refreshCounter}`}
               projectId={selectedProject}
+              highlightSuiteId={highlightSuiteId || undefined}
               onSuiteView={(suite) => {
                 setDetailSuiteId(suite._id)
                 setSuiteDetailDialogOpen(true)
@@ -156,6 +176,7 @@ export default function TestSuitesPage() {
             open={testSuiteDialogOpen}
             onOpenChange={setTestSuiteDialogOpen}
             title={selectedTestSuite ? 'Edit Test Suite' : 'Create Test Suite'}
+            dismissible={false}
             footer={
               <>
                 <Button

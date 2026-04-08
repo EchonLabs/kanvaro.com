@@ -292,6 +292,7 @@ export default function TestExecutionsPage() {
           open={testExecutionDialogOpen}
           onOpenChange={setTestExecutionDialogOpen}
           title={selectedTestExecution ? 'Edit Test Execution' : 'Execute Test Case'}
+          dismissible={false}
         >
           <TestExecutionForm
             testExecution={selectedTestExecution || undefined}
