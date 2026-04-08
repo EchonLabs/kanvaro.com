@@ -1,3 +1,10 @@
+## [1.30.14](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.13...v1.30.14) (2026-04-08)
+
+
+### Bug Fixes
+
+* Test management ([b05ba9a](https://github.com/EchonLabs/kanvaro.com/commit/b05ba9ae0af1b1b01344e041e2389830dfb6ede4))
+
 ## [1.30.13](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.12...v1.30.13) (2026-04-07)
 
 
