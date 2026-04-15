@@ -238,7 +238,21 @@ async function stopTimerAndBuildResponse(
   const hasTimeLogged = finalDuration > 0
 
   if (!hasTimeLogged) {
-    await ActiveTimer.findByIdAndDelete(activeTimer._id)
+    // Atomically claim the timer — only the first caller succeeds
+    const deletedTimer = await ActiveTimer.findOneAndDelete({ _id: activeTimer._id })
+    if (!deletedTimer) {
+      // Another process already stopped this timer — bail out
+      return {
+        status: 200,
+        body: {
+          message: 'Timer already stopped by another process',
+          timeEntry: null,
+          hasTimeLogged: false,
+          duration: 0,
+          alreadyStopped: true
+        }
+      }
+    }
     return {
       status: 200,
       body: {
@@ -293,8 +307,22 @@ async function stopTimerAndBuildResponse(
     isApproved: !requiresProjectApproval
   })
 
+  // Atomically claim the timer — only the first caller succeeds
+  const deletedTimer = await ActiveTimer.findOneAndDelete({ _id: activeTimer._id })
+  if (!deletedTimer) {
+    // Another process already stopped this timer — bail out without creating duplicate
+    return {
+      status: 200,
+      body: {
+        message: 'Timer already stopped by another process',
+        timeEntry: null,
+        hasTimeLogged: false,
+        duration: 0,
+        alreadyStopped: true
+      }
+    }
+  }
   await timeEntry.save()
-  await ActiveTimer.findByIdAndDelete(activeTimer._id)
 
   const hoursLogged = finalDuration / MINUTES_PER_HOUR
   const isOvertime =
@@ -779,10 +807,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'No active timer found' }, { status: 404 })
     }
 
-    const autoStopResult = await enforceTimerLimits(activeTimer)
-    if (autoStopResult) {
-      return NextResponse.json(autoStopResult.body, { status: autoStopResult.status })
-    }
+    // NOTE: enforceTimerLimits() removed from PUT handler to prevent race condition.
+    // When a user sends a 'stop' action, the stop logic itself handles limit capping.
+    // The GET handler and cron job still enforce limits independently.
 
     const now = new Date()
 

@@ -238,10 +238,13 @@ async function stopExpiredTimer(activeTimer: IActiveTimer): Promise<{
       isApproved: !(requiresApproval || requiresProjectApproval)
     })
 
+    // Atomically claim the timer — only the first caller succeeds
+    const deletedTimer = await ActiveTimer.findOneAndDelete({ _id: activeTimer._id })
+    if (!deletedTimer) {
+      // Another process (user stop, GET auto-stop) already handled this timer
+      return { success: false, timerId, error: 'Timer already stopped by another process' }
+    }
     await timeEntry.save()
-
-    // Delete the active timer
-    await ActiveTimer.findByIdAndDelete(activeTimer._id)
 
     // Format duration for notifications
     const hours = Math.floor(finalDuration / 60)

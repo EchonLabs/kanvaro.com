@@ -66,6 +66,8 @@ export function Timer({
   const baseMinutesRef = useRef<number>(0)
   const tickStartMsRef = useRef<number | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  // Guard to prevent multiple concurrent stop requests
+  const stoppingRef = useRef(false)
 
   // Track active timer state
   useEffect(() => {
@@ -127,6 +129,8 @@ export function Timer({
       // Auto-stop when reaching max session hours (when overtime is NOT allowed)
       if (!allowOvertime && activeTimer.maxSessionHours && runningMinutes >= activeTimer.maxSessionHours * 60) {
         console.log('Timer: Auto-stopping - reached max session hours')
+        // Clear interval immediately to prevent double-fire from daily limit check
+        if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
         const maxHours = activeTimer.maxSessionHours
         onAutoStop?.(`Timer stopped automatically. Maximum session limit of ${maxHours} ${maxHours === 1 ? 'hour' : 'hours'} reached.`)
         handleStopTimer()
@@ -136,6 +140,8 @@ export function Timer({
       // Auto-stop when reaching remaining daily hours limit
       if (!allowOvertime && activeTimer.remainingDailyMinutes != null && activeTimer.remainingDailyMinutes > 0 && runningMinutes >= activeTimer.remainingDailyMinutes) {
         console.log('Timer: Auto-stopping - reached daily hours limit')
+        // Clear interval immediately to prevent repeat fire
+        if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
         onAutoStop?.(`Timer stopped automatically. Daily hours limit of ${maxDailyHours || 'N/A'} hours reached.`)
         handleStopTimer()
         return
@@ -270,6 +276,9 @@ export function Timer({
   }
 
   const handleStopTimer = async () => {
+    // Prevent multiple concurrent stop requests (from auto-stop + manual click)
+    if (stoppingRef.current) return
+    stoppingRef.current = true
     setIsLoading(true)
     setError('')
     setShowStopConfirmation(false)
@@ -302,6 +311,7 @@ export function Timer({
       setError('Failed to stop timer')
     } finally {
       setIsLoading(false)
+      stoppingRef.current = false
     }
   }
 

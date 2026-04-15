@@ -184,6 +184,85 @@ export interface ValidationSummary {
   rows: ValidatedRow[]
 }
 
+function cleanupListItem(value: string): string {
+  let s = value.replace(/\r\n?/g, '\n').trim()
+  if (!s) return ''
+
+  // Strip common bullet/numbering prefixes
+  s = s
+    .replace(/^[\u2022\-*]+\s+/, '')
+    .replace(/^\d+\s*[\).:-]\s+/, '')
+    .trim()
+
+  // Remove leading/trailing separator punctuation introduced by splitting
+  s = s.replace(/^[,;]+\s*/, '').replace(/\s*[,;]+$/, '').trim()
+
+  return s
+}
+
+/**
+ * Split a single "Sub Tasks" cell into individual subtask titles.
+ *
+ * Supports:
+ * - explicit separators: newlines, "|", ";", repeated commas ",,"
+ * - sentence boundaries: ".", "!", "?" (including cases like "., Next sentence")
+ */
+export function splitSubtaskTitles(raw: string): string[] {
+  const input = typeof raw === 'string' ? raw : ''
+  if (!input || input.trim().length === 0) return []
+
+  // Normalize line breaks and treat obvious list separators as newlines.
+  const normalized = input
+    .replace(/\r\n?/g, '\n')
+    .replace(/\|/g, '\n')
+    .replace(/;/g, '\n')
+    .replace(/,{2,}/g, '\n')
+
+  const items: string[] = []
+  let current = ''
+
+  const commit = () => {
+    const cleaned = cleanupListItem(current)
+    if (cleaned) items.push(cleaned)
+    current = ''
+  }
+
+  const isSentenceEnd = (ch: string) => ch === '.' || ch === '!' || ch === '?'
+
+  for (let i = 0; i < normalized.length; i++) {
+    const ch = normalized[i]
+
+    if (ch === '\n') {
+      commit()
+      continue
+    }
+
+    current += ch
+
+    if (!isSentenceEnd(ch)) continue
+
+    // If this is likely a decimal (e.g. 2.0), don't split.
+    const prev = normalized[i - 1]
+    let j = i + 1
+
+    // Skip commas/whitespace after punctuation: handles patterns like "., Next".
+    while (j < normalized.length && /[\s,]/.test(normalized[j])) j++
+
+    const next = normalized[j]
+    if (!next) continue
+    if (prev && /\d/.test(prev) && /\d/.test(next)) continue
+
+    // Only split when the next meaningful token looks like a new sentence/list item.
+    if (/[A-Z0-9\u2022\-*]/.test(next)) {
+      commit()
+      i = j - 1
+    }
+  }
+
+  commit()
+  return items
+}
+
 /**
  * Parse a date string in common formats. Returns ISO string or null.
  */
@@ -477,7 +556,7 @@ export function validateRows(
 
     // Optional: Sub Tasks (pipe-separated titles)
     if (data.subtasks) {
-      const items = data.subtasks.split(/[|]/).map(s => s.trim()).filter(Boolean)
+      const items = splitSubtaskTitles(data.subtasks)
       if (items.length > 0) {
         resolved.subtaskItems = items.map(title => ({ title }))
       }
