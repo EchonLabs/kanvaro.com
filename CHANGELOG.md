@@ -1,3 +1,15 @@
+# [1.31.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.14...v1.31.0) (2026-04-16)
+
+
+### Bug Fixes
+
+* implement duplicate time entry cleanup script and deduplication safety net in TimeEntry model ([254bde2](https://github.com/EchonLabs/kanvaro.com/commit/254bde24db7833fe2186001fd490137cf1f62f5f))
+
+
+### Features
+
+* enhance TestPlanForm with rich text editor and test suite management ([c39d037](https://github.com/EchonLabs/kanvaro.com/commit/c39d037be6e3a02a768baed6c5ba54a17a2beda4))
+
 ## [1.30.14](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.13...v1.30.14) (2026-04-08)
 
 
