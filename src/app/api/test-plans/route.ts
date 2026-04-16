@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const projectId = searchParams.get('projectId')
+    const testCaseId = searchParams.get('testCaseId')
     const status = searchParams.get('status')
     const search = searchParams.get('search')
     const page = parseInt(searchParams.get('page') || '1')
@@ -25,6 +26,10 @@ export async function GET(req: NextRequest) {
 
     if (projectId) {
       query.project = projectId
+    }
+
+    if (testCaseId) {
+      query.testCases = testCaseId
     }
 
     if (status) {

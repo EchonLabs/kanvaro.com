@@ -1,18 +1,19 @@
+
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { TestPlanForm } from '@/components/test-management/TestPlanForm'
 import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmDialog'
-import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Plus, Calendar, Users, CheckSquare, Edit, Trash2 } from 'lucide-react'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Permission } from '@/lib/permissions'
 import { PermissionGate } from '@/lib/permissions/permission-components'
+import { useNotify } from '@/lib/notify'
 
 interface TestPlan {
   _id?: string
@@ -30,12 +31,11 @@ interface TestPlan {
 
 export default function TestPlansPage() {
   const { setItems } = useBreadcrumb()
+  const router = useRouter()
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const [selectedProject, setSelectedProject] = useState<string>('')
-  const [testPlanDialogOpen, setTestPlanDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [selectedTestPlan, setSelectedTestPlan] = useState<TestPlan | null>(null)
   const [deleteItem, setDeleteItem] = useState<{ id: string; name: string } | null>(null)
-  const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [testPlans, setTestPlans] = useState<TestPlan[]>([])
   const [plansLoading, setPlansLoading] = useState(false)
@@ -110,18 +110,22 @@ export default function TestPlansPage() {
   }
 
   const handleCreateTestPlan = async () => {
-    console.log('inside create project')
-    if (!selectedProject) {
+    let effectiveProjectId = selectedProject
+    if (!effectiveProjectId) {
       const first = await getFirstProjectId()
-      if (first) setSelectedProject(first)
+      if (first) {
+        setSelectedProject(first)
+        effectiveProjectId = first
+      }
     }
-    setSelectedTestPlan(null)
-    setTestPlanDialogOpen(true)
+
+    const qs = effectiveProjectId ? `?projectId=${effectiveProjectId}` : ''
+    router.push(`/test-management/plans/new${qs}`)
   }
 
   const handleEditTestPlan = (testPlan: TestPlan) => {
-    setSelectedTestPlan(testPlan)
-    setTestPlanDialogOpen(true)
+    if (!testPlan._id) return
+    router.push(`/test-management/plans/${testPlan._id}/edit`)
   }
 
   const handleDeleteTestPlan = (testPlanId: string, testPlanName: string) => {
@@ -129,69 +133,30 @@ export default function TestPlansPage() {
     setDeleteDialogOpen(true)
   }
 
-  const handleSaveTestPlan = async (testPlanData: any) => {
-    console.log('testPlanData', testPlanData)
-    setSaving(true)
-    try {
-      let effectiveProjectId = selectedProject || testPlanData.project
-      if (!effectiveProjectId) {
-        const first = await getFirstProjectId()
-        if (first) {
-          setSelectedProject(first)
-          effectiveProjectId = first
-        }
-      }
-      if (!effectiveProjectId) {
-        console.error('Cannot save test plan: projectId is missing')
-        setSaving(false)
-        return
-      }
-      const url = selectedTestPlan?._id 
-        ? `/api/test-plans/${selectedTestPlan._id}` 
-        : '/api/test-plans'
-      
-      const method = selectedTestPlan?._id ? 'PUT' : 'POST'
-      
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...testPlanData,
-          projectId: effectiveProjectId
-        })
-      })
-
-      if (response.ok) {
-        setTestPlanDialogOpen(false)
-        setSelectedTestPlan(null)
-        setRefreshCounter(c => c + 1)
-      } else {
-        console.error('Failed to save test plan')
-      }
-    } catch (error) {
-      console.error('Error saving test plan:', error)
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const handleConfirmDelete = async () => {
     if (!deleteItem) return
-    
+
     setDeleting(true)
     try {
       const response = await fetch(`/api/test-plans/${deleteItem.id}`, {
         method: 'DELETE'
       })
 
-      if (response.ok) {
+      const data = await response.json().catch(() => ({}))
+
+      if (response.ok && (data as any)?.success !== false) {
+        notifySuccess({ title: 'Test plan deleted.' })
         setDeleteDialogOpen(false)
         setDeleteItem(null)
         setRefreshCounter(c => c + 1)
       } else {
-        console.error('Failed to delete test plan')
+        notifyError({
+          title: 'Failed to delete test plan.',
+          message: (data as any)?.error || 'Please try again.'
+        })
       }
     } catch (error) {
+      notifyError({ title: 'Failed to delete test plan.', message: 'Please try again.' })
       console.error('Error deleting test plan:', error)
     } finally {
       setDeleting(false)
@@ -289,25 +254,6 @@ export default function TestPlansPage() {
             </Card>
           ))}
         </div>
-
-        {/* Dialogs */}
-        <ResponsiveDialog
-          open={testPlanDialogOpen}
-          onOpenChange={setTestPlanDialogOpen}
-          title={selectedTestPlan ? 'Edit Test Plan' : 'Create Test Plan'}
-          dismissible={false}
-        >
-          <TestPlanForm
-            testPlan={selectedTestPlan || undefined}
-            projectId={selectedProject}
-            onSave={handleSaveTestPlan}
-            onCancel={() => {
-              setTestPlanDialogOpen(false)
-              setSelectedTestPlan(null)
-            }}
-            loading={saving}
-          />
-        </ResponsiveDialog>
 
         <DeleteConfirmDialog
           isOpen={deleteDialogOpen}

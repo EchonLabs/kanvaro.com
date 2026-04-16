@@ -4,16 +4,17 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/Badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
-import { CalendarIcon, X, Plus } from 'lucide-react'
+import { CalendarIcon, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { formatToTitleCase } from '@/lib/utils'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
+import { validateAndCorrectDateRange, isValidDateRange } from '@/lib/dateRangeValidation'
 
 interface TestPlan {
   _id?: string
@@ -34,6 +35,7 @@ interface TestCase {
   title: string
   priority: string
   category: string
+  testSuite?: { _id?: string; name?: string } | string
 }
 
 interface User {
@@ -41,6 +43,13 @@ interface User {
   firstName: string
   lastName: string
   email: string
+  role?: string
+  customRole?: { _id?: string; name?: string } | string | null
+}
+
+interface TestSuite {
+  _id: string
+  name: string
 }
 
 interface TestPlanFormProps {
@@ -66,18 +75,46 @@ export function TestPlanForm({ testPlan, projectId, onSave, onCancel, loading = 
     ...testPlan
   })
   const [testCases, setTestCases] = useState<TestCase[]>([])
-  const [users, setUsers] = useState<User[]>([])
+  const [qaUsers, setQaUsers] = useState<User[]>([])
+  const [testSuites, setTestSuites] = useState<TestSuite[]>([])
   const [newTag, setNewTag] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [testCaseSearch, setTestCaseSearch] = useState('')
+  const [testCasePriority, setTestCasePriority] = useState<string>('all')
+  const [testCaseCategory, setTestCaseCategory] = useState<string>('all')
+  const [expandedSuites, setExpandedSuites] = useState<Set<string>>(new Set())
 
   useEffect(() => {
+    // Reset project-scoped lists immediately to avoid showing stale data while refetching.
+    setTestCases([])
+    setQaUsers([])
+    setTestSuites([])
+
+    if (!projectId) return
+
     fetchTestCases()
-    fetchUsers()
+    fetchProjectQAs()
+    fetchTestSuites()
   }, [projectId])
+
+  useEffect(() => {
+    setFormData((prev) => {
+      const next: TestPlan = { ...prev, project: projectId }
+
+      // When creating a new plan, switching projects should clear project-scoped selections.
+      if (!testPlan?._id) {
+        next.assignedTo = undefined
+        next.testCases = []
+      }
+
+      return next
+    })
+  }, [projectId, testPlan?._id])
 
   const fetchTestCases = async () => {
     try {
-      const response = await fetch(`/api/test-cases?projectId=${projectId}`)
+      // Use a high limit so selection UI can search/filter client-side.
+      const response = await fetch(`/api/test-cases?projectId=${projectId}&page=1&limit=10000`)
       const data = await response.json()
       if (data.success) {
         setTestCases(data.data)
@@ -87,16 +124,72 @@ export function TestPlanForm({ testPlan, projectId, onSave, onCancel, loading = 
     }
   }
 
-  const fetchUsers = async () => {
+  const fetchProjectQAs = async () => {
     try {
-      const response = await fetch('/api/users')
+      const response = await fetch(`/api/projects/${projectId}/team`)
       const data = await response.json()
-      if (data.success) {
-        setUsers(data.data)
+      if (!data?.success) return
+
+      const teamMembers: User[] = Array.isArray(data?.data?.teamMembers) ? data.data.teamMembers : []
+      const projectRoles: any[] = Array.isArray(data?.data?.projectRoles) ? data.data.projectRoles : []
+
+      const isQAUser = (u: any): boolean => {
+        const globalRole = String(u?.role || '').toLowerCase()
+        if (['qa_engineer', 'tester'].includes(globalRole)) return true
+
+        const cr = u?.customRole
+        const crName = (cr && typeof cr === 'object') ? String(cr.name || '') : ''
+        if (!crName) return false
+
+        // Prefer explicit QA naming, but allow broader matching
+        if (/\bqa\b/i.test(crName)) return true
+        if (/quality\s*assurance/i.test(crName)) return true
+        if (/qa/i.test(crName)) return true
+
+        return false
+      }
+
+      const qaProjectRoleUsers: User[] = projectRoles
+        .filter((pr: any) => pr?.user && (['project_qa_lead', 'project_tester'].includes(pr.role) || isQAUser(pr.user)))
+        .map((pr: any) => pr.user)
+
+      const qaTeamMembers: User[] = teamMembers.filter(isQAUser)
+
+      const byId = new Map<string, User>()
+      ;[...qaProjectRoleUsers, ...qaTeamMembers].forEach((u) => {
+        if (u?._id) byId.set(u._id, u)
+      })
+
+      setQaUsers(Array.from(byId.values()).sort((a, b) => {
+        const an = `${a.firstName ?? ''} ${a.lastName ?? ''}`.trim()
+        const bn = `${b.firstName ?? ''} ${b.lastName ?? ''}`.trim()
+        return an.localeCompare(bn)
+      }))
+    } catch (error) {
+      console.error('Error fetching project QAs:', error)
+    }
+  }
+
+  const fetchTestSuites = async () => {
+    try {
+      const response = await fetch(`/api/test-suites?projectId=${projectId}`)
+      const data = await response.json()
+      if (data?.success && Array.isArray(data.data)) {
+        setTestSuites(data.data.map((s: any) => ({ _id: s._id, name: s.name })))
       }
     } catch (error) {
-      console.error('Error fetching users:', error)
+      console.error('Error fetching test suites:', error)
     }
+  }
+
+  const stripHtmlToText = (html: string) => {
+    return (html || '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
   }
 
   const validateForm = () => {
@@ -105,11 +198,15 @@ export function TestPlanForm({ testPlan, projectId, onSave, onCancel, loading = 
     if (!formData.name.trim()) {
       newErrors.name = 'Name is required'
     }
-    if (!formData.description.trim()) {
+    if (!stripHtmlToText(formData.description).trim()) {
       newErrors.description = 'Description is required'
     }
     if (!formData.version.trim()) {
       newErrors.version = 'Version is required'
+    }
+
+    if (!isValidDateRange(formData.startDate, formData.endDate)) {
+      newErrors.dateRange = 'End date cannot be earlier than start date'
     }
 
     setErrors(newErrors)
@@ -132,6 +229,88 @@ export function TestPlanForm({ testPlan, projectId, onSave, onCancel, loading = 
     }))
   }
 
+  const toggleSuiteExpanded = (suiteId: string) => {
+    setExpandedSuites(prev => {
+      const next = new Set(prev)
+      if (next.has(suiteId)) next.delete(suiteId)
+      else next.add(suiteId)
+      return next
+    })
+  }
+
+  const toggleSelectAllInSuite = (suiteId: string, suiteTestCases: TestCase[]) => {
+    const suiteIds = suiteTestCases.map(tc => tc._id)
+    const allSelected = suiteIds.every(id => formData.testCases.includes(id))
+    setFormData(prev => ({
+      ...prev,
+      testCases: allSelected
+        ? prev.testCases.filter(id => !suiteIds.includes(id))
+        : Array.from(new Set([...prev.testCases, ...suiteIds]))
+    }))
+  }
+
+  const handleStartDateSelect = (date: Date | undefined) => {
+    setFormData(prev => {
+      const corrected = validateAndCorrectDateRange(date, prev.endDate)
+      return { ...prev, startDate: corrected.from, endDate: corrected.to }
+    })
+    setErrors(prev => {
+      const { dateRange, ...rest } = prev
+      return rest
+    })
+  }
+
+  const handleEndDateSelect = (date: Date | undefined) => {
+    setFormData(prev => {
+      const corrected = validateAndCorrectDateRange(prev.startDate, date)
+      return { ...prev, startDate: corrected.from, endDate: corrected.to }
+    })
+    setErrors(prev => {
+      const { dateRange, ...rest } = prev
+      return rest
+    })
+  }
+
+  const getTestSuiteId = (tc: TestCase): string => {
+    const suite = tc.testSuite as any
+    if (!suite) return 'unspecified'
+    if (typeof suite === 'string') return suite
+    if (suite?._id) return String(suite._id)
+    return 'unspecified'
+  }
+
+  const getTestSuiteName = (suiteId: string): string => {
+    if (suiteId === 'unspecified') return 'Unassigned Suite'
+    const fromSuites = testSuites.find(s => s._id === suiteId)?.name
+    if (fromSuites) return fromSuites
+    // Fallback: infer from populated testSuite on any case
+    const anyCase = testCases.find(tc => getTestSuiteId(tc) === suiteId)
+    const suite = (anyCase?.testSuite as any)
+    if (suite && typeof suite !== 'string' && suite?.name) return suite.name
+    return 'Test Suite'
+  }
+
+  const filteredTestCases = testCases.filter(tc => {
+    const query = testCaseSearch.trim().toLowerCase()
+    if (query && !tc.title.toLowerCase().includes(query)) return false
+    if (testCasePriority !== 'all' && tc.priority !== testCasePriority) return false
+    if (testCaseCategory !== 'all' && tc.category !== testCaseCategory) return false
+    return true
+  })
+
+  const testCaseSuites = (() => {
+    const suiteIds = Array.from(new Set(filteredTestCases.map(getTestSuiteId)))
+    suiteIds.sort((a, b) => getTestSuiteName(a).localeCompare(getTestSuiteName(b)))
+    return suiteIds
+  })()
+
+  const testCaseSuitesKey = testCaseSuites.join('|')
+
+  useEffect(() => {
+    // Keep suites expanded by default when list changes (new project, filters, etc.)
+    setExpandedSuites(new Set(testCaseSuites))
+  }, [testCaseSuitesKey])
+
   const addTag = () => {
     if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
       setFormData(prev => ({
@@ -150,7 +329,7 @@ export function TestPlanForm({ testPlan, projectId, onSave, onCancel, loading = 
   }
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>
           {testPlan?._id ? 'Edit Test Plan' : 'Create Test Plan'}
@@ -187,13 +366,11 @@ export function TestPlanForm({ testPlan, projectId, onSave, onCancel, loading = 
 
           <div className="space-y-2">
             <Label htmlFor="description">Description *</Label>
-            <Textarea
-              id="description"
+            <RichTextEditor
               value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              onChange={(value) => setFormData(prev => ({ ...prev, description: value }))}
               placeholder="Describe the purpose and scope of this test plan"
-              rows={3}
-              className={errors.description ? 'border-red-500' : ''}
+              className={errors.description ? 'border border-red-500 rounded-md' : undefined}
             />
             {errors.description && <p className="text-sm text-red-600">{errors.description}</p>}
           </div>
@@ -211,7 +388,7 @@ export function TestPlanForm({ testPlan, projectId, onSave, onCancel, loading = 
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {users.map((user) => (
+                  {qaUsers.map((user) => (
                     <SelectItem key={user._id} value={user._id}>
                       {user.firstName} {user.lastName}
                     </SelectItem>
@@ -236,7 +413,7 @@ export function TestPlanForm({ testPlan, projectId, onSave, onCancel, loading = 
                   <Calendar
                     mode="single"
                     selected={formData.startDate}
-                    onSelect={(date) => setFormData(prev => ({ ...prev, startDate: date }))}
+                    onSelect={handleStartDateSelect}
                     initialFocus
                   />
                 </PopoverContent>
@@ -259,7 +436,8 @@ export function TestPlanForm({ testPlan, projectId, onSave, onCancel, loading = 
                   <Calendar
                     mode="single"
                     selected={formData.endDate}
-                    onSelect={(date) => setFormData(prev => ({ ...prev, endDate: date }))}
+                    onSelect={handleEndDateSelect}
+                    disabled={formData.startDate ? { before: formData.startDate } : undefined}
                     initialFocus
                   />
                 </PopoverContent>
@@ -267,38 +445,134 @@ export function TestPlanForm({ testPlan, projectId, onSave, onCancel, loading = 
             </div>
           </div>
 
+          {errors.dateRange && <p className="text-sm text-red-600">{errors.dateRange}</p>}
+
           {/* Test Cases Selection */}
           <div className="space-y-4">
             <Label>Test Cases</Label>
-            <div className="border rounded-lg p-4 max-h-60 overflow-y-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-2">
+                <Label className="text-xs text-muted-foreground">Search</Label>
+                <Input
+                  value={testCaseSearch}
+                  onChange={(e) => setTestCaseSearch(e.target.value)}
+                  placeholder="Search test cases"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Priority</Label>
+                <Select value={testCasePriority} onValueChange={setTestCasePriority}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="sm:col-span-3">
+                <Label className="text-xs text-muted-foreground">Category</Label>
+                <Select value={testCaseCategory} onValueChange={setTestCaseCategory}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="functional">Functional</SelectItem>
+                    <SelectItem value="regression">Regression</SelectItem>
+                    <SelectItem value="integration">Integration</SelectItem>
+                    <SelectItem value="performance">Performance</SelectItem>
+                    <SelectItem value="security">Security</SelectItem>
+                    <SelectItem value="usability">Usability</SelectItem>
+                    <SelectItem value="compatibility">Compatibility</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="border rounded-lg p-4 max-h-[420px] overflow-y-auto space-y-3">
               {testCases.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   No test cases available for this project
                 </p>
+              ) : filteredTestCases.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No matching test cases
+                </p>
               ) : (
-                <div className="space-y-2">
-                  {testCases.map((testCase) => (
-                    <div key={testCase._id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={testCase._id}
-                        checked={formData.testCases.includes(testCase._id)}
-                        onCheckedChange={() => toggleTestCase(testCase._id)}
-                      />
-                      <Label htmlFor={testCase._id} className="flex-1 cursor-pointer">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{testCase.title}</span>
+                <div className="space-y-3">
+                  {testCaseSuites.map((suiteId) => {
+                    const suiteName = getTestSuiteName(suiteId)
+                    const suiteTestCases = filteredTestCases.filter(tc => getTestSuiteId(tc) === suiteId)
+                    if (suiteTestCases.length === 0) return null
+
+                    const selectedCount = suiteTestCases.filter(tc => formData.testCases.includes(tc._id)).length
+                    const allSelected = selectedCount === suiteTestCases.length
+                    const isExpanded = expandedSuites.has(suiteId)
+
+                    return (
+                      <div key={suiteId} className="border rounded-lg">
+                        <div
+                          className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50"
+                          onClick={() => toggleSuiteExpanded(suiteId)}
+                        >
                           <div className="flex items-center space-x-2">
-                            <Badge variant="outline" className="text-xs">
-                              {formatToTitleCase(testCase.priority)}
-                            </Badge>
-                            <Badge variant="secondary" className="text-xs">
-                              {formatToTitleCase(testCase.category)}
-                            </Badge>
+                            <span className="font-medium">{suiteName}</span>
+                            <span className="text-sm text-muted-foreground">
+                              ({selectedCount}/{suiteTestCases.length})
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleSelectAllInSuite(suiteId, suiteTestCases)
+                              }}
+                            >
+                              {allSelected ? 'Deselect All' : 'Select All'}
+                            </Button>
+                            <span className="text-muted-foreground">
+                              {isExpanded ? '▼' : '▶'}
+                            </span>
                           </div>
                         </div>
-                      </Label>
-                    </div>
-                  ))}
+
+                        {isExpanded && (
+                          <div className="border-t p-3 space-y-2">
+                            {suiteTestCases.map((testCase) => (
+                              <div key={testCase._id} className="flex items-start space-x-3">
+                                <Checkbox
+                                  id={testCase._id}
+                                  checked={formData.testCases.includes(testCase._id)}
+                                  onCheckedChange={() => toggleTestCase(testCase._id)}
+                                />
+                                <div className="flex-1">
+                                  <Label htmlFor={testCase._id} className="text-sm font-medium cursor-pointer">
+                                    {testCase.title}
+                                  </Label>
+                                  <div className="flex items-center space-x-2 mt-1">
+                                    <Badge variant="outline" className="text-xs">
+                                      {formatToTitleCase(testCase.priority)}
+                                    </Badge>
+                                    <Badge variant="secondary" className="text-xs">
+                                      {formatToTitleCase(testCase.category)}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -329,7 +603,7 @@ export function TestPlanForm({ testPlan, projectId, onSave, onCancel, loading = 
                 value={newTag}
                 onChange={(e) => setNewTag(e.target.value)}
                 placeholder="Add a tag"
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
               />
               <Button type="button" variant="outline" onClick={addTag}>
                 Add

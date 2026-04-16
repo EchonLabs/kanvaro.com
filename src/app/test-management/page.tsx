@@ -11,11 +11,9 @@ import { formatToTitleCase } from '@/lib/utils'
 import { Permission } from '@/lib/permissions'
 import { PermissionGate } from '@/lib/permissions/permission-components'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
-import { TestPlanForm } from '@/components/test-management/TestPlanForm'
-import { TestExecutionForm } from '@/components/test-management/TestExecutionForm'
 import { TestSuiteForm } from '@/components/test-management/TestSuiteForm'
-import { TestCaseForm } from '@/components/test-management/TestCaseForm'
 import {
   TestTube,
   Play,
@@ -55,16 +53,13 @@ interface Project {
 }
 
 export default function TestManagementPage() {
+  const router = useRouter()
   const { setItems } = useBreadcrumb()
   const { success: notifySuccess } = useNotify()
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
-  const [testPlanDialogOpen, setTestPlanDialogOpen] = useState(false)
-  const [testExecutionDialogOpen, setTestExecutionDialogOpen] = useState(false)
-  const [executionTestCase, setExecutionTestCase] = useState<any | null>(null)
-  const [saving, setSaving] = useState(false)
   const [suiteDialogOpen, setSuiteDialogOpen] = useState(false)
   const [suiteSaving, setSuiteSaving] = useState(false)
   const [editingSuite, setEditingSuite] = useState<any | null>(null)
@@ -76,16 +71,12 @@ export default function TestManagementPage() {
   const [suiteDetailDialogOpen, setSuiteDetailDialogOpen] = useState(false)
   const [detailSuiteId, setDetailSuiteId] = useState<string | null>(null)
   const [suiteDetailRefreshKey, setSuiteDetailRefreshKey] = useState(0)
-  const [testCaseDialogOpen, setTestCaseDialogOpen] = useState(false)
-  const [testCaseSaving, setTestCaseSaving] = useState(false)
-  const [editingTestCase, setEditingTestCase] = useState<any | null>(null)
-  const [createCaseSuiteId, setCreateCaseSuiteId] = useState<string | undefined>(undefined)
   const [testCasesRefreshCounter, setTestCasesRefreshCounter] = useState(0)
-  const router = useRouter()
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteItem, setDeleteItem] = useState<{ id: string; name: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [executions, setExecutions] = useState<any[]>([])
+  const [executionsTotal, setExecutionsTotal] = useState(0)
   const [executionsLoading, setExecutionsLoading] = useState(false)
   const [executionsRefreshCounter, setExecutionsRefreshCounter] = useState(0)
   const [suiteCount, setSuiteCount] = useState(0)
@@ -102,7 +93,8 @@ export default function TestManagementPage() {
   useEffect(() => {
     // Set breadcrumb
     setItems([
-      { label: 'Test Management' }
+      { label: 'Test Management', href: '/test-management' },
+      { label: 'Dashboard' }
     ])
   }, [setItems])
 
@@ -117,10 +109,8 @@ export default function TestManagementPage() {
       const data = await response.json()
 
       if (data.success) {
-        setProjects(data.data)
-        if (data.data.length > 0) {
-          setSelectedProject(data.data[0]._id)
-        }
+        setProjects(Array.isArray(data.data) ? data.data : [])
+        // Do not auto-select a project on load (dashboard starts empty until user selects)
       }
     } catch (error) {
       console.error('Error fetching projects:', error)
@@ -129,25 +119,35 @@ export default function TestManagementPage() {
     }
   }
 
-  // Fetch test executions for selected project
+  // Fetch test executions for selected project (dashboard shows latest 20)
   useEffect(() => {
     const fetchExecutions = async () => {
       if (!selectedProject) {
         setExecutions([])
+        setExecutionsTotal(0)
         return
       }
       try {
         setExecutionsLoading(true)
-        const res = await fetch(`/api/test-executions?projectId=${selectedProject}`)
-        const data = await res.json()
+        setExecutions([])
+        setExecutionsTotal(0)
+        const limit = 20
+        const res = await fetch(
+          `/api/test-executions?projectId=${encodeURIComponent(selectedProject)}&page=1&limit=${limit}`
+        )
+        const data = await res.json().catch(() => ({}))
         if (res.ok && data?.success && Array.isArray(data.data)) {
           setExecutions(data.data)
+          const totalFromApi = Number(data?.pagination?.total)
+          setExecutionsTotal(Number.isFinite(totalFromApi) ? totalFromApi : data.data.length)
         } else {
           setExecutions([])
+          setExecutionsTotal(0)
         }
       } catch (e) {
         console.error('Error fetching test executions:', e)
         setExecutions([])
+        setExecutionsTotal(0)
       } finally {
         setExecutionsLoading(false)
       }
@@ -164,21 +164,28 @@ export default function TestManagementPage() {
         return
       }
       try {
+        setSuiteCount(0)
+        setCaseCount(0)
+        // Use pagination totals to avoid fetching entire datasets
         const [suitesRes, casesRes] = await Promise.all([
-          fetch(`/api/test-suites?projectId=${selectedProject}`),
-          fetch(`/api/test-cases?projectId=${selectedProject}`)
+          fetch(`/api/test-suites?projectId=${encodeURIComponent(selectedProject)}&page=1&limit=1`),
+          fetch(`/api/test-cases?projectId=${encodeURIComponent(selectedProject)}&page=1&limit=1`)
         ])
-        // If APIs return total via headers or body, prefer that. Otherwise, fallback to arrays length if provided
-        const [suitesData, casesData] = await Promise.all([suitesRes.json(), casesRes.json()])
+        const [suitesData, casesData] = await Promise.all([
+          suitesRes.json().catch(() => ({})),
+          casesRes.json().catch(() => ({}))
+        ])
+
         if (suitesRes.ok && suitesData?.success) {
-          const totalSuites = Array.isArray(suitesData.data) ? suitesData.data.length : (suitesData.total ?? 0)
-          setSuiteCount(totalSuites)
+          const totalSuites = Number(suitesData?.pagination?.total)
+          setSuiteCount(Number.isFinite(totalSuites) ? totalSuites : (Array.isArray(suitesData.data) ? suitesData.data.length : 0))
         } else {
           setSuiteCount(0)
         }
+
         if (casesRes.ok && casesData?.success) {
-          const totalCases = Array.isArray(casesData.data) ? casesData.data.length : (casesData.total ?? 0)
-          setCaseCount(totalCases)
+          const totalCases = Number(casesData?.pagination?.total)
+          setCaseCount(Number.isFinite(totalCases) ? totalCases : (Array.isArray(casesData.data) ? casesData.data.length : 0))
         } else {
           setCaseCount(0)
         }
@@ -262,77 +269,21 @@ export default function TestManagementPage() {
     })
   }
 
-  const executionsCount = executions.length
+  const displayedExecutionsCount = executions.length
   const passRate = (() => {
-    if (executionsCount === 0) return 0
+    if (displayedExecutionsCount === 0) return 0
     const passed = executions.filter(e => e.status === 'passed').length
-    return Math.round((passed / executionsCount) * 100)
+    return Math.round((passed / displayedExecutionsCount) * 100)
   })()
 
   const handleCreateTestPlan = () => {
-    setTestPlanDialogOpen(true)
-  }
-
-  const handleSaveTestPlan = async (testPlanData: any) => {
-    setSaving(true)
-    try {
-      const response = await fetch('/api/test-plans', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...testPlanData,
-          projectId: selectedProject
-        })
-      })
-
-      if (response.ok) {
-        setTestPlanDialogOpen(false)
-        // Refresh data or show success message
-      } else {
-        console.error('Failed to create test plan')
-      }
-    } catch (error) {
-      console.error('Error creating test plan:', error)
-    } finally {
-      setSaving(false)
-    }
+    const qs = selectedProject ? `?projectId=${encodeURIComponent(selectedProject)}` : ''
+    router.push(`/test-management/plans/new${qs}`)
   }
 
   const handleStartTestExecution = () => {
-    setTestExecutionDialogOpen(true)
-  }
-
-  const handleSaveTestExecution = async (executionData: any) => {
-    setSaving(true)
-    try {
-      const payload = {
-        testCaseId: executionData.testCase,
-        testPlanId: executionData.testPlan || undefined,
-        status: executionData.status,
-        actualResult: executionData.actualResult,
-        comments: executionData.comments,
-        executionTime: executionData.executionTime,
-        environment: executionData.environment,
-        version: executionData.version,
-        attachments: executionData.attachments || []
-      }
-      const response = await fetch('/api/test-executions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-
-      if (response.ok) {
-        setTestExecutionDialogOpen(false)
-        // Refresh data or show success message
-      } else {
-        console.error('Failed to create test execution')
-      }
-    } catch (error) {
-      console.error('Error creating test execution:', error)
-    } finally {
-      setSaving(false)
-    }
+    if (!selectedProject) return
+    router.push(`/test-management/executions/new?projectId=${encodeURIComponent(selectedProject)}`)
   }
 
   if (loading) {
@@ -341,8 +292,8 @@ export default function TestManagementPage() {
         <div className="space-y-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">Test Management</h1>
-              <p className="text-muted-foreground">Manage test suites, cases, and executions</p>
+              <h1 className="text-3xl font-bold">Dashboard</h1>
+              <p className="text-muted-foreground">Select a project to manage test suites, cases, and executions</p>
             </div>
           </div>
 
@@ -369,15 +320,15 @@ export default function TestManagementPage() {
         <div className="space-y-8">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Test Management</h1>
-              <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage test suites, cases, and executions</p>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">Dashboard</h1>
+              <p className="text-sm sm:text-base text-muted-foreground mt-1">Select a project to manage test suites, cases, and executions</p>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
               <Button variant="outline" onClick={() => router.push('/test-management/reports')} className="w-full sm:w-auto">
                 <BarChart3 className="h-4 w-4 mr-2" />
                 Reports
               </Button>
-              <Button onClick={handleCreateTestPlan} className="w-full sm:w-auto">
+              <Button onClick={handleCreateTestPlan} className="w-full sm:w-auto" disabled={!selectedProject}>
                 <TestTube className="h-4 w-4 mr-2" />
                 New Test Plan
               </Button>
@@ -399,7 +350,41 @@ export default function TestManagementPage() {
               </CardContent>
             </Card>
           ) : (
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                <span className="text-sm font-medium">Project:</span>
+                <Select
+                  value={selectedProject || undefined}
+                  onValueChange={(value) => {
+                    setSelectedProject(value)
+                    setActiveTab('overview')
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-96">
+                    <SelectValue placeholder="Select a project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((p) => (
+                      <SelectItem key={p._id} value={p._id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {!selectedProject ? (
+                <Card>
+                  <CardContent className="p-6 sm:p-8 text-center">
+                    <TestTube className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-base sm:text-lg font-semibold mb-2">Select a Project</h3>
+                    <p className="text-sm sm:text-base text-muted-foreground">
+                      Choose a project to view test suites, cases, and executions.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
               <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 overflow-x-auto mb-4">
                 <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
                 <TabsTrigger value="suites" className="text-xs sm:text-sm">Test Suites</TabsTrigger>
@@ -437,7 +422,7 @@ export default function TestManagementPage() {
                         <Play className="h-4 w-4 text-purple-600" />
                         <span className="text-sm font-medium">Executions</span>
                       </div>
-                      <div className="text-2xl font-bold mt-2">{executionsCount}</div>
+                      <div className="text-2xl font-bold mt-2">{executionsTotal}</div>
                       <p className="text-xs text-muted-foreground">Total runs</p>
                     </CardContent>
                   </Card>
@@ -574,43 +559,24 @@ export default function TestManagementPage() {
                   key={`${selectedProject}-${testCasesRefreshCounter}-${selectedSuiteId ?? 'all'}`}
                   onTestCaseSelect={(testCase) => console.log('Selected test case:', testCase)}
                   onTestCaseCreate={(testSuiteId) => {
-                    setEditingTestCase(null)
-                    setCreateCaseSuiteId(testSuiteId)
-                    setTestCaseDialogOpen(true)
+                    const qp = new URLSearchParams({ projectId: selectedProject })
+                    if (testSuiteId) qp.set('testSuiteId', testSuiteId)
+                    router.push(`/test-management/cases/new?${qp.toString()}`)
                   }}
                   onTestCaseEdit={(testCase) => {
-                    setEditingTestCase({
-                      _id: testCase._id,
-                      title: testCase.title,
-                      description: testCase.description,
-                      preconditions: testCase?.preconditions || '',
-                      steps: (testCase as any)?.steps || [{ step: '', expectedResult: '' }],
-                      expectedResult: (testCase as any)?.expectedResult || '',
-                      testData: (testCase as any)?.testData || '',
-                      priority: testCase.priority,
-                      category: testCase.category,
-                      automationStatus: testCase.automationStatus,
-                      estimatedExecutionTime: testCase.estimatedExecutionTime,
-                      testSuite: testCase.testSuite?._id,
-                      tags: testCase.tags || [],
-                      requirements: (testCase as any)?.requirements || ''
-                    })
-                    setCreateCaseSuiteId(undefined)
-                    setTestCaseDialogOpen(true)
+                    router.push(
+                      `/test-management/cases/${encodeURIComponent(testCase._id)}/edit?projectId=${encodeURIComponent(selectedProject)}`
+                    )
                   }}
                   onTestCaseDelete={(testCaseId, testCaseTitle) => {
                     setDeleteItem({ id: testCaseId, name: testCaseTitle || '' })
                     setDeleteDialogOpen(true)
                   }}
                   onTestCaseExecute={(testCase) => {
-                    setExecutionTestCase({
-                      _id: testCase._id,
-                      title: testCase.title,
-                      priority: testCase.priority,
-                      category: testCase.category,
-                      estimatedExecutionTime: testCase.estimatedExecutionTime
-                    })
-                    setTestExecutionDialogOpen(true)
+                    if (!selectedProject) return
+                    router.push(
+                      `/test-management/executions/new?projectId=${encodeURIComponent(selectedProject)}&testCaseId=${encodeURIComponent(testCase._id)}`
+                    )
                   }}
                 />
               </TabsContent>
@@ -620,7 +586,11 @@ export default function TestManagementPage() {
                   <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <CardTitle className="text-xl sm:text-2xl">Test Executions</CardTitle>
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                      <Button variant="outline" onClick={() => router.push('/test-management/executions')} className="w-full sm:w-auto">
+                      <Button
+                        variant="outline"
+                        onClick={() => router.push(`/test-management/executions?projectId=${encodeURIComponent(selectedProject)}`)}
+                        className="w-full sm:w-auto"
+                      >
                         View All
                       </Button>
                       <Button onClick={handleStartTestExecution} className="w-full sm:w-auto">
@@ -673,23 +643,14 @@ export default function TestManagementPage() {
                                 <TableCell className="text-xs sm:text-sm whitespace-nowrap">{formatDate(execution.executedAt)}</TableCell>
                                 <TableCell className="text-xs sm:text-sm">{execution.version || '—'}</TableCell>
                                 <TableCell>
-                                  <Button variant="ghost" size="sm" onClick={() => {
-                                    // open edit dialog with selected execution
-                                    // shape it to TestExecutionForm inputs
-                                    const mapped = {
-                                      _id: execution._id,
-                                      testCase: execution?.testCase?._id || execution.testCase,
-                                      testPlan: execution?.testPlan?._id || execution.testPlan,
-                                      status: execution.status,
-                                      actualResult: execution.actualResult,
-                                      comments: execution.comments,
-                                      executionTime: execution.executionTime,
-                                      environment: execution.environment,
-                                      version: execution.version,
-                                      attachments: execution.attachments || []
-                                    }
-                                      ; (setTestExecutionDialogOpen(true), (setTimeout(() => { }, 0)))
-                                  }} className="text-xs sm:text-sm">Edit</Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => router.push(`/test-management/executions/${encodeURIComponent(execution._id)}`)}
+                                    className="text-xs sm:text-sm"
+                                  >
+                                    View
+                                  </Button>
                                 </TableCell>
                               </TableRow>
                             ))
@@ -700,42 +661,12 @@ export default function TestManagementPage() {
                   </CardContent>
                 </Card>
               </TabsContent>
-            </Tabs>
+                </Tabs>
+              )}
+            </div>
           )}
 
           {/* Dialogs */}
-          <ResponsiveDialog
-            open={testPlanDialogOpen}
-            onOpenChange={setTestPlanDialogOpen}
-            title="Create Test Plan"
-            dismissible={false}
-          >
-            <TestPlanForm
-              projectId={selectedProject}
-              onSave={handleSaveTestPlan}
-              onCancel={() => setTestPlanDialogOpen(false)}
-              loading={saving}
-            />
-          </ResponsiveDialog>
-
-          <ResponsiveDialog
-            open={testExecutionDialogOpen}
-            onOpenChange={setTestExecutionDialogOpen}
-            title="Execute Test Case"
-            dismissible={false}
-          >
-            <TestExecutionForm
-              projectId={selectedProject}
-              testCase={executionTestCase || undefined}
-              onSave={handleSaveTestExecution}
-              onCancel={() => {
-                setTestExecutionDialogOpen(false)
-                setExecutionTestCase(null)
-              }}
-              loading={saving}
-            />
-          </ResponsiveDialog>
-
           <ResponsiveDialog
             open={suiteDialogOpen}
             onOpenChange={setSuiteDialogOpen}
@@ -796,64 +727,6 @@ export default function TestManagementPage() {
             />
           </ResponsiveDialog>
 
-          <ResponsiveDialog
-            open={testCaseDialogOpen}
-            onOpenChange={setTestCaseDialogOpen}
-            title={editingTestCase ? 'Edit Test Case' : 'Create Test Case'}
-            dismissible={false}
-          >
-            <TestCaseForm
-              testCase={editingTestCase || (createCaseSuiteId ? { testSuite: createCaseSuiteId } as any : undefined)}
-              projectId={selectedProject}
-              onSave={async (testCaseData: any) => {
-                setTestCaseSaving(true)
-                try {
-                  const isEdit = !!editingTestCase?._id
-                  const url = isEdit ? `/api/test-cases/${editingTestCase._id}` : '/api/test-cases'
-                  const method = isEdit ? 'PUT' : 'POST'
-                  const res = await fetch(url, {
-                    method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      ...testCaseData,
-                      // API expects testSuiteId, include it always to be explicit
-                      testSuiteId: testCaseData.testSuite,
-                      projectId: selectedProject,
-                    })
-                  })
-                  if (res.ok) {
-                    setTestCaseDialogOpen(false)
-                    setEditingTestCase(null)
-                    setCreateCaseSuiteId(undefined)
-                    setTestCasesRefreshCounter(c => c + 1)
-                    // Reopen detail dialog if it was open before
-                    if (detailSuiteId) {
-                      setSuiteDetailRefreshKey(k => k + 1)
-                      setSuiteDetailDialogOpen(true)
-                    }
-                  } else {
-                    const data = await res.json().catch(() => ({}))
-                    console.error('Failed to save test case', data)
-                  }
-                } catch (e) {
-                  console.error('Error saving test case:', e)
-                } finally {
-                  setTestCaseSaving(false)
-                }
-              }}
-              onCancel={() => {
-                setTestCaseDialogOpen(false)
-                setEditingTestCase(null)
-                setCreateCaseSuiteId(undefined)
-                // Reopen detail dialog if it was open before
-                if (detailSuiteId) {
-                  setSuiteDetailDialogOpen(true)
-                }
-              }}
-              loading={testCaseSaving}
-            />
-          </ResponsiveDialog>
-
           <TestSuiteDetailDialog
             suiteId={detailSuiteId}
             open={suiteDetailDialogOpen}
@@ -883,9 +756,9 @@ export default function TestManagementPage() {
             }}
             onCreateTestCase={(suiteId) => {
               setSuiteDetailDialogOpen(false)
-              setEditingTestCase(null)
-              setCreateCaseSuiteId(suiteId)
-              setTestCaseDialogOpen(true)
+              const qp = new URLSearchParams({ projectId: selectedProject })
+              if (suiteId) qp.set('testSuiteId', suiteId)
+              router.push(`/test-management/cases/new?${qp.toString()}`)
             }}
             onChildSuiteClick={(childSuiteId) => {
               setDetailSuiteId(childSuiteId)

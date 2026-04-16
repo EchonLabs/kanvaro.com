@@ -6,8 +6,6 @@ import { TimeTrackingSettings } from '@/models/TimeTrackingSettings'
 import { Organization } from '@/models/Organization'
 import { Project } from '@/models/Project'
 import { applyRoundingRules } from '@/lib/utils'
-import { notificationService } from '@/lib/notification-service'
-import { isNotificationEnabled } from '@/lib/notification-utils'
 
 import mongoose from 'mongoose'
 
@@ -245,76 +243,6 @@ async function stopExpiredTimer(activeTimer: IActiveTimer): Promise<{
       return { success: false, timerId, error: 'Timer already stopped by another process' }
     }
     await timeEntry.save()
-
-    // Format duration for notifications
-    const hours = Math.floor(finalDuration / 60)
-    const minutes = Math.round(finalDuration % 60)
-    const hoursFormatted = `${hours}h ${minutes}m`
-    const hasTimeLogged = finalDuration > 0
-    const isZeroDurationDisplay = hoursFormatted === '0h 0m'
-
-    // Send notifications (only if time was logged)
-    if (hasTimeLogged && !isZeroDurationDisplay) {
-      const projectUrl = `/projects/${projectId}`
-
-      // Timer Stop notification
-      const timerStopEnabled = await isNotificationEnabled(
-        organizationId,
-        'onTimerStop',
-        projectId
-      )
-      
-      if (timerStopEnabled) {
-        await notificationService.createNotification(
-          userId!,
-          organizationId,
-          {
-            type: 'time_tracking' as const,
-            title: 'Timer Auto-Stopped',
-            message: `Timer auto-stopped for project "${projectName}" after reaching the session limit. Logged ${hoursFormatted}.`,
-            data: {
-              entityType: 'time_entry' as const,
-              entityId: timeEntry._id.toString(),
-              action: 'created' as const,
-              priority: 'medium' as const,
-              url: projectUrl
-            },
-            sendEmail: false,
-            sendPush: false
-          }
-        )
-      }
-
-      // Approval notification (if approval is required)
-      if (requiresApproval || requiresProjectApproval) {
-        const approvalEnabled = await isNotificationEnabled(
-          organizationId,
-          'onApprovalNeeded',
-          projectId
-        )
-
-        if (approvalEnabled) {
-          await notificationService.createNotification(
-            userId!,
-            organizationId,
-            {
-              type: 'time_tracking' as const,
-              title: 'Time Entry Requires Approval',
-              message: `Your time entry for "${projectName}" (${hoursFormatted}) requires approval.`,
-              data: {
-                entityType: 'time_entry' as const,
-                entityId: timeEntry._id.toString(),
-                action: 'updated' as const,
-                priority: 'medium' as const,
-                url: projectUrl
-              },
-              sendEmail: false,
-              sendPush: false
-            }
-          )
-        }
-      }
-    }
 
     return {
       success: true,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/Badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { X, Plus, Trash2 } from 'lucide-react'
 
 interface TestCase {
@@ -59,8 +60,29 @@ export function TestCaseForm({ testCase, projectId, onSave, onCancel, loading = 
     ...testCase
   })
   const [testSuites, setTestSuites] = useState<TestSuite[]>([])
+  const [suiteQuery, setSuiteQuery] = useState('')
   const [newTag, setNewTag] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [estimatedTimeText, setEstimatedTimeText] = useState(() => String((testCase?.estimatedExecutionTime ?? 5) as number))
+
+  useEffect(() => {
+    setEstimatedTimeText(String((testCase?.estimatedExecutionTime ?? 5) as number))
+  }, [testCase?._id])
+
+  const filteredTestSuites = useMemo(() => {
+    const q = suiteQuery.trim().toLowerCase()
+    if (!q) return testSuites
+    return testSuites.filter(s => s.name.toLowerCase().includes(q))
+  }, [testSuites, suiteQuery])
+
+  const stripHtml = (html: string): string => {
+    // Best-effort plain-text extraction for validation.
+    return (html || '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
 
   useEffect(() => {
     fetchTestSuites()
@@ -84,13 +106,13 @@ export function TestCaseForm({ testCase, projectId, onSave, onCancel, loading = 
     if (!formData.title.trim()) {
       newErrors.title = 'Title is required'
     }
-    if (!formData.description.trim()) {
+    if (!stripHtml(formData.description)) {
       newErrors.description = 'Description is required'
     }
     if (!formData.testSuite) {
       newErrors.testSuite = 'Test suite is required'
     }
-    if (formData.steps.some(step => !step.step.trim() || !step.expectedResult.trim())) {
+    if (formData.steps.some(step => !stripHtml(step.step) || !stripHtml(step.expectedResult))) {
       newErrors.steps = 'All test steps must have both step and expected result'
     }
 
@@ -146,7 +168,7 @@ export function TestCaseForm({ testCase, projectId, onSave, onCancel, loading = 
   }
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>
           {testCase?._id ? 'Edit Test Case' : 'Create Test Case'}
@@ -188,16 +210,36 @@ export function TestCaseForm({ testCase, projectId, onSave, onCancel, loading = 
               <Select 
                 value={formData.testSuite} 
                 onValueChange={(value) => setFormData(prev => ({ ...prev, testSuite: value }))}
+                onOpenChange={(open) => {
+                  if (open) setSuiteQuery('')
+                }}
               >
                 <SelectTrigger className={errors.testSuite ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Select test suite" />
                 </SelectTrigger>
-                <SelectContent>
-                  {testSuites.map((suite) => (
-                    <SelectItem key={suite._id} value={suite._id}>
-                      {suite.name}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="p-0">
+                  <div className="p-2">
+                    <Input
+                      value={suiteQuery}
+                      onChange={(e) => setSuiteQuery(e.target.value)}
+                      placeholder="Search test suites"
+                      className="mb-2"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <div className="max-h-56 overflow-y-auto">
+                      {filteredTestSuites.length === 0 ? (
+                        <div className="px-2 py-2 text-sm text-muted-foreground">No matching test suites</div>
+                      ) : (
+                        filteredTestSuites.map((suite) => (
+                          <SelectItem key={suite._id} value={suite._id}>
+                            {suite.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </SelectContent>
               </Select>
               {errors.testSuite && <p className="text-sm text-red-600">{errors.testSuite}</p>}
@@ -206,25 +248,21 @@ export function TestCaseForm({ testCase, projectId, onSave, onCancel, loading = 
 
           <div className="space-y-2">
             <Label htmlFor="description">Description *</Label>
-            <Textarea
-              id="description"
+            <RichTextEditor
               value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              onChange={(value) => setFormData(prev => ({ ...prev, description: value }))}
               placeholder="Describe what this test case validates"
-              rows={3}
-              className={errors.description ? 'border-red-500' : ''}
+              className={errors.description ? 'border border-red-500 rounded-md' : undefined}
             />
             {errors.description && <p className="text-sm text-red-600">{errors.description}</p>}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="preconditions">Preconditions</Label>
-            <Textarea
-              id="preconditions"
+            <RichTextEditor
               value={formData.preconditions}
-              onChange={(e) => setFormData(prev => ({ ...prev, preconditions: e.target.value }))}
+              onChange={(value) => setFormData(prev => ({ ...prev, preconditions: value }))}
               placeholder="Any prerequisites or setup required"
-              rows={2}
             />
           </div>
 
@@ -257,20 +295,18 @@ export function TestCaseForm({ testCase, projectId, onSave, onCancel, loading = 
                 
                 <div className="space-y-2">
                   <Label htmlFor={`step-${index}`}>Action</Label>
-                  <Input
-                    id={`step-${index}`}
+                  <RichTextEditor
                     value={step.step}
-                    onChange={(e) => updateStep(index, 'step', e.target.value)}
+                    onChange={(value) => updateStep(index, 'step', value)}
                     placeholder="Describe the action to perform"
                   />
                 </div>
                 
                 <div className="space-y-2">
                   <Label htmlFor={`expected-${index}`}>Expected Result</Label>
-                  <Input
-                    id={`expected-${index}`}
+                  <RichTextEditor
                     value={step.expectedResult}
-                    onChange={(e) => updateStep(index, 'expectedResult', e.target.value)}
+                    onChange={(value) => updateStep(index, 'expectedResult', value)}
                     placeholder="Describe the expected outcome"
                   />
                 </div>
@@ -282,12 +318,10 @@ export function TestCaseForm({ testCase, projectId, onSave, onCancel, loading = 
 
           <div className="space-y-2">
             <Label htmlFor="expectedResult">Overall Expected Result</Label>
-            <Textarea
-              id="expectedResult"
+            <RichTextEditor
               value={formData.expectedResult}
-              onChange={(e) => setFormData(prev => ({ ...prev, expectedResult: e.target.value }))}
+              onChange={(value) => setFormData(prev => ({ ...prev, expectedResult: value }))}
               placeholder="Overall expected result of the test case"
-              rows={2}
             />
           </div>
 
@@ -323,7 +357,7 @@ export function TestCaseForm({ testCase, projectId, onSave, onCancel, loading = 
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
+              <Label htmlFor="category">Testing Types</Label>
               <Select 
                 value={formData.category} 
                 onValueChange={(value: any) => setFormData(prev => ({ ...prev, category: value }))}
@@ -344,7 +378,7 @@ export function TestCaseForm({ testCase, projectId, onSave, onCancel, loading = 
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="automationStatus">Automation Status</Label>
+              <Label htmlFor="automationStatus">Testing Approaches</Label>
               <Select 
                 value={formData.automationStatus} 
                 onValueChange={(value: any) => setFormData(prev => ({ ...prev, automationStatus: value }))}
@@ -367,8 +401,21 @@ export function TestCaseForm({ testCase, projectId, onSave, onCancel, loading = 
                 id="estimatedExecutionTime"
                 type="number"
                 min="1"
-                value={formData.estimatedExecutionTime}
-                onChange={(e) => setFormData(prev => ({ ...prev, estimatedExecutionTime: parseInt(e.target.value) || 1 }))}
+                value={estimatedTimeText}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setEstimatedTimeText(next)
+                  const parsed = parseInt(next, 10)
+                  if (Number.isFinite(parsed)) {
+                    setFormData(prev => ({ ...prev, estimatedExecutionTime: parsed }))
+                  }
+                }}
+                onBlur={() => {
+                  const parsed = parseInt(estimatedTimeText, 10)
+                  const normalized = Number.isFinite(parsed) && parsed > 0 ? parsed : 1
+                  setEstimatedTimeText(String(normalized))
+                  setFormData(prev => ({ ...prev, estimatedExecutionTime: normalized }))
+                }}
               />
             </div>
           </div>

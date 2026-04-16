@@ -113,6 +113,7 @@ export default function TimerPage() {
   const [tasksLoading, setTasksLoading] = useState(false)
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [selectedTask, setSelectedTask] = useState<string>('')
+  const [selectedTaskLabel, setSelectedTaskLabel] = useState<string>('')
   const [description, setDescription] = useState('')
   const [error, setError] = useState('')
   const [timeLogsRefreshKey, setTimeLogsRefreshKey] = useState(0)
@@ -146,6 +147,8 @@ export default function TimerPage() {
   const taskSearchTimerRef = useRef<NodeJS.Timeout | null>(null)
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)
   const isLoadingMoreRef = useRef(false)
+  const selectedTaskIdRef = useRef<string>('')
+  const selectedTaskObjectRef = useRef<Task | null>(null)
 
 
 
@@ -251,6 +254,7 @@ export default function TimerPage() {
   const resetTimerForm = useCallback(() => {
     setDescription('')
     setSelectedTask('')
+    setSelectedTaskLabel('')
     setSelectedProject('')
     setTasks([])
     setTaskSearch('')
@@ -262,7 +266,17 @@ export default function TimerPage() {
     setPendingActiveTask(null)
     setPendingActiveDescription('')
     setInitializedFromActive(true)
+    selectedTaskIdRef.current = ''
+    selectedTaskObjectRef.current = null
   }, [])
+
+  useEffect(() => {
+    selectedTaskIdRef.current = selectedTask
+    if (!selectedTask) {
+      setSelectedTaskLabel('')
+      selectedTaskObjectRef.current = null
+    }
+  }, [selectedTask])
 
 
   const fetchDailyHoursLogged = useCallback(async () => {
@@ -372,21 +386,28 @@ export default function TimerPage() {
     }
   }, [projects, searchParams, selectedProject, pendingActiveProject, pendingActiveDescription])
 
-  // Preselect task from query params when tasks are loaded
+  // Preselect task from active timer / query params.
+  // Active timer task might not be present in the currently loaded tasks page.
   useEffect(() => {
-    if (!tasks || tasks.length === 0) return
-    if (pendingActiveTask && tasks.some(t => t._id === pendingActiveTask)) {
-      handleTaskChange(pendingActiveTask)
+    if (selectedTask) return
+    if (!selectedProject) return
+
+    // Active timer preselect
+    if (pendingActiveTask) {
+      setSelectedTask(pendingActiveTask)
+
       if (pendingActiveDescription) {
         setDescription(pendingActiveDescription)
       }
+
       setPendingActiveTask(null)
       setPendingActiveDescription('')
       setInitializedFromActive(true)
       return
     }
-    if (selectedTask) return
-    if (!selectedProject) return
+
+    // Query-param preselect requires tasks to be loaded
+    if (!tasks || tasks.length === 0) return
 
     let tid = searchParams?.get('taskId') || ''
     const tnameRaw = searchParams?.get('taskName') || ''
@@ -402,7 +423,15 @@ export default function TimerPage() {
     if (taskIdToSelect && tasks.some(t => t._id === taskIdToSelect)) {
       handleTaskChange(taskIdToSelect)
     }
-  }, [tasks, searchParams, selectedTask, selectedProject, pendingActiveTask, pendingActiveDescription])
+  }, [
+    tasks,
+    searchParams,
+    selectedTask,
+    selectedProject,
+    pendingActiveTask,
+    pendingActiveDescription,
+    activeTimerSnapshot
+  ])
 
   useEffect(() => {
     if (!pendingActiveDescription) return
@@ -520,7 +549,7 @@ export default function TimerPage() {
 
       if (data.success && Array.isArray(data.data)) {
         console.log('DEBUG: fetched tasks for search', search, data.data);
-        const validTasks = data.data.filter((task: any) => {
+        let validTasks = data.data.filter((task: any) => {
           const projectMatch = task?.project === projectId ||
             task?.project?._id === projectId ||
             task?.project?.id === projectId
@@ -541,6 +570,28 @@ export default function TimerPage() {
 
           return userAssigned
         })
+
+        // If the user selected a task from a search result or a later page,
+        // clearing the search refetches page 1 and the selected task can drop
+        // out of the list, causing the Select trigger to render empty.
+        // Preserve the selected task as an option if we have it cached.
+        const selectedId = selectedTaskIdRef.current
+        const selectedObj = selectedTaskObjectRef.current
+        if (
+          page === 1 &&
+          selectedId &&
+          selectedObj &&
+          selectedObj._id === selectedId &&
+          !validTasks.some((t: any) => t?._id === selectedId)
+        ) {
+          const projectMatch =
+            (selectedObj as any)?.project === projectId ||
+            (selectedObj as any)?.project?._id === projectId ||
+            (selectedObj as any)?.project?.id === projectId
+          if (projectMatch) {
+            validTasks = [selectedObj, ...validTasks]
+          }
+        }
 
         const totalPages = data.pagination?.totalPages || 1
         setHasMoreTasks(page < totalPages)
@@ -632,9 +683,19 @@ export default function TimerPage() {
   }, [taskSearch, selectedProject, fetchTasks])
 
   const handleTaskChange = (taskId: string) => {
-    setSelectedTask(taskId === 'none' ? '' : taskId)
-    const task = tasks.find(t => t._id === taskId)
+    const nextTaskId = taskId === 'none' ? '' : taskId
+    setSelectedTask(nextTaskId)
+
+    if (!nextTaskId) {
+      setSelectedTaskLabel('')
+      selectedTaskObjectRef.current = null
+      return
+    }
+
+    const task = tasks.find(t => t._id === nextTaskId)
     if (task) {
+      setSelectedTaskLabel(task.title)
+      selectedTaskObjectRef.current = task
       setDescription(task.title)
 
       // Check if task is billable and allowBillableTime is false
@@ -648,6 +709,18 @@ export default function TimerPage() {
       }
     }
   }
+
+  // Keep label/cache in sync when tasks list changes (e.g. after refetch).
+  useEffect(() => {
+    if (!selectedTask) return
+    const found = Array.isArray(tasks) ? tasks.find(t => t._id === selectedTask) : undefined
+    if (found) {
+      if (found.title && found.title !== selectedTaskLabel) {
+        setSelectedTaskLabel(found.title)
+      }
+      selectedTaskObjectRef.current = found
+    }
+  }, [tasks, selectedTask, selectedTaskLabel])
 
   const handleSubmitManualLog = async () => {
     if (!selectedProject || !user) {
@@ -921,11 +994,14 @@ export default function TimerPage() {
   const handleProjectChange = useCallback((projectId: string) => {
     setSelectedProject(projectId)
     setSelectedTask('')
+    setSelectedTaskLabel('')
     setTasks([])
     setTaskSearch('')
     setTaskPage(1)
     setHasMoreTasks(false)
     setError('')
+    selectedTaskIdRef.current = ''
+    selectedTaskObjectRef.current = null
     if (projectId && user) {
       fetchTasks(projectId)
     }
@@ -1219,13 +1295,21 @@ export default function TimerPage() {
                       }
                     >
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder={
-                          showInitialTasksLoading
-                            ? 'Loading tasks...'
-                            : selectedProject
-                              ? (Array.isArray(tasks) && tasks.length > 0 ? 'Select a task' : 'No tasks available')
-                              : 'Select a project first'
-                        } />
+                        {liveActiveTimer?.task?.title ? (
+                          <span>{liveActiveTimer.task.title}</span>
+                        ) : selectedTask && selectedTaskLabel ? (
+                          <span>{selectedTaskLabel}</span>
+                        ) : (
+                          <SelectValue
+                            placeholder={
+                              showInitialTasksLoading
+                                ? 'Loading tasks...'
+                                : selectedProject
+                                  ? (Array.isArray(tasks) && tasks.length > 0 ? 'Select a task' : 'No tasks available')
+                                  : 'Select a project first'
+                            }
+                          />
+                        )}
                       </SelectTrigger>
                       {showInitialTasksLoading && (
                         <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
@@ -1486,13 +1570,19 @@ export default function TimerPage() {
                         disabled={!selectedProject || tasksLoading || (!tasksLoading && (!Array.isArray(tasks) || tasks.length === 0))}
                       >
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder={
-                            tasksLoading 
-                              ? 'Loading tasks...' 
-                              : selectedProject 
-                                ? (Array.isArray(tasks) && tasks.length > 0 ? 'Select a task' : 'No tasks available') 
-                                : 'Select a project first'
-                          } />
+                          {liveActiveTimer?.task?.title ? (
+                            <span>{liveActiveTimer.task.title}</span>
+                          ) : (
+                            <SelectValue
+                              placeholder={
+                                tasksLoading
+                                  ? 'Loading tasks...'
+                                  : selectedProject
+                                    ? (Array.isArray(tasks) && tasks.length > 0 ? 'Select a task' : 'No tasks available')
+                                    : 'Select a project first'
+                              }
+                            />
+                          )}
                         </SelectTrigger>
                         {tasksLoading && (
                           <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />

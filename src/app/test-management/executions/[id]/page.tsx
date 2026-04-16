@@ -7,18 +7,18 @@ import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { formatToTitleCase } from '@/lib/utils'
 import { Separator } from '@/components/ui/Separator'
 import { Play, ArrowLeft, CheckCircle, XCircle, AlertTriangle, Clock, Calendar, User, FileText, Edit, Trash2 } from 'lucide-react'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { TestExecutionForm } from '@/components/test-management/TestExecutionForm'
 import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmDialog'
+import { useNotify } from '@/lib/notify'
 
 interface Execution {
   _id: string
-  testCase?: { _id: string; title: string; priority?: string; category?: string }
-  testPlan?: { _id: string; name: string; version?: string }
-  project?: { _id: string; name: string }
+  testCase?: { _id: string; title: string; priority?: string; category?: string } | string
+  testPlan?: { _id: string; name: string; version?: string } | string
+  project?: { _id: string; name: string } | string
   executedBy?: { firstName?: string; lastName?: string; email?: string }
   status: 'passed' | 'failed' | 'blocked' | 'skipped'
   actualResult: string
@@ -34,6 +34,7 @@ export default function TestExecutionViewPage() {
   const router = useRouter()
   const params = useParams() as { id: string }
   const { setItems } = useBreadcrumb()
+  const { success: notifySuccess, error: notifyError } = useNotify()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [execution, setExecution] = useState<Execution | null>(null)
@@ -62,7 +63,7 @@ export default function TestExecutionViewPage() {
         } else {
           setError(data?.error || 'Failed to load execution')
         }
-      } catch (e: any) {
+      } catch {
         setError('Failed to load execution')
       } finally {
         setLoading(false)
@@ -73,17 +74,24 @@ export default function TestExecutionViewPage() {
 
   const mappedForForm = useMemo(() => {
     if (!execution) return undefined
+
+    const testCaseId =
+      typeof execution.testCase === 'string' ? execution.testCase : execution.testCase?._id ?? ''
+
+    const testPlanId =
+      typeof execution.testPlan === 'string' ? execution.testPlan : execution.testPlan?._id ?? undefined
+
     return {
       _id: execution._id,
-      testCase: (execution as any)?.testCase?._id || (execution as any)?.testCase,
-      testPlan: (execution as any)?.testPlan?._id || (execution as any)?.testPlan,
+      testCase: testCaseId,
+      testPlan: testPlanId,
       status: execution.status,
       actualResult: execution.actualResult,
       comments: execution.comments,
       executionTime: execution.executionTime,
       environment: execution.environment,
       version: execution.version,
-      attachments: (execution as any)?.attachments || []
+      attachments: execution.attachments || [],
     }
   }, [execution])
 
@@ -158,16 +166,16 @@ export default function TestExecutionViewPage() {
                     <div className="text-xs text-muted-foreground">Test Case</div>
                     <div className="text-sm font-medium flex items-center gap-2">
                       <FileText className="h-4 w-4" />
-                      {execution.testCase?.title ?? String(execution?.testCase ?? '—')}
+                      {typeof execution.testCase === 'string' ? execution.testCase : execution.testCase?.title ?? '—'}
                     </div>
                   </div>
                   <div className="space-y-1">
                     <div className="text-xs text-muted-foreground">Test Plan</div>
-                    <div className="text-sm">{execution.testPlan?.name || '—'}</div>
+                    <div className="text-sm">{typeof execution.testPlan === 'string' ? execution.testPlan : execution.testPlan?.name || '—'}</div>
                   </div>
                   <div className="space-y-1">
                     <div className="text-xs text-muted-foreground">Project</div>
-                    <div className="text-sm">{execution.project?.name || '—'}</div>
+                    <div className="text-sm">{typeof execution.project === 'string' ? execution.project : execution.project?.name || '—'}</div>
                   </div>
                   <div className="space-y-1">
                     <div className="text-xs text-muted-foreground">Tester</div>
@@ -237,8 +245,16 @@ export default function TestExecutionViewPage() {
         >
           <TestExecutionForm
             testExecution={mappedForForm}
-            projectId={String((execution as any)?.project?._id || '')}
-            onSave={async (formData: any) => {
+            projectId={typeof execution?.project === 'string' ? execution.project : execution?.project?._id ?? ''}
+            onSave={async (formData: {
+              status: Execution['status']
+              actualResult: string
+              comments: string
+              executionTime: number
+              environment: string
+              version: string
+              attachments?: string[]
+            }) => {
               if (!execution) return
               setSaving(true)
               try {
@@ -256,17 +272,23 @@ export default function TestExecutionViewPage() {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(payload)
                 })
-                const data = await res.json()
-                if (res.ok && data?.success) {
+                const data = await res.json().catch(() => ({}))
+                if (res.ok && (data as any)?.success) {
+                  notifySuccess({ title: 'Test execution updated.' })
                   setEditOpen(false)
                   // refetch execution
                   const refreshed = await fetch(`/api/test-executions/${execution._id}`)
-                  const refreshedData = await refreshed.json()
-                  if (refreshed.ok && refreshedData?.success) setExecution(refreshedData.data)
+                  const refreshedData = await refreshed.json().catch(() => ({}))
+                  if (refreshed.ok && (refreshedData as any)?.success) setExecution((refreshedData as any).data)
                 } else {
-                  console.error('Failed to update execution')
+                  notifyError({
+                    title: 'Failed to update test execution.',
+                    message: (data as any)?.error || 'Please try again.'
+                  })
+                  console.error('Failed to update execution', data)
                 }
-              } catch (e) {
+              } catch (e: unknown) {
+                notifyError({ title: 'Failed to update test execution.', message: 'Please try again.' })
                 console.error('Error updating execution:', e)
               } finally {
                 setSaving(false)
@@ -284,19 +306,26 @@ export default function TestExecutionViewPage() {
             if (!execution) return
             try {
               const res = await fetch(`/api/test-executions/${execution._id}`, { method: 'DELETE' })
-              if (res.ok) {
+              const data = await res.json().catch(() => ({}))
+              if (res.ok && (data as any)?.success !== false) {
+                notifySuccess({ title: 'Test execution deleted.' })
                 router.push('/test-management/executions')
               } else {
-                console.error('Failed to delete test execution')
+                notifyError({
+                  title: 'Failed to delete test execution.',
+                  message: (data as any)?.error || 'Please try again.'
+                })
+                console.error('Failed to delete test execution', data)
               }
-            } catch (e) {
+            } catch (e: unknown) {
+              notifyError({ title: 'Failed to delete test execution.', message: 'Please try again.' })
               console.error('Error deleting execution:', e)
             } finally {
               setDeleteOpen(false)
             }
           }}
           title="Delete Test Execution"
-          itemName={String(execution?.testCase && (execution as any)?.testCase?.title ? (execution as any).testCase.title : (execution as any)?.testCase || 'this execution')}
+          itemName={String(typeof execution?.testCase === 'string' ? execution.testCase : execution?.testCase?.title || 'this execution')}
           itemType="Test Execution"
         />
       </div>

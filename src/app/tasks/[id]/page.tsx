@@ -44,6 +44,7 @@ import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { extractUserId } from '@/lib/auth/user-utils'
 import TaskActivityLog from '@/components/tasks/TaskActivityLog'
+import { StartTimerModal } from '@/components/time-tracking/StartTimerModal'
 
 interface Task {
   _id: string
@@ -214,6 +215,8 @@ export default function TaskDetailPage() {
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
   const [suggestionComposer, setSuggestionComposer] = useState<ComposerType | null>(null)
   const [currentUserId, setCurrentUserId] = useState('')
+  const [currentOrganizationId, setCurrentOrganizationId] = useState('')
+  const [showStartTimerModal, setShowStartTimerModal] = useState(false)
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editingContent, setEditingContent] = useState<string>('')
@@ -268,6 +271,9 @@ export default function TaskDetailPage() {
         const me = await response.json().catch(() => null)
         const uid = extractUserId(me)
         if (uid) setCurrentUserId(uid)
+        const orgRaw = me?.organization
+        const orgId = (typeof orgRaw === 'string' ? orgRaw : (orgRaw?._id ?? orgRaw?.id))
+        if (orgId) setCurrentOrganizationId(orgId.toString())
         setAuthError('')
         await fetchTask()
       } else if (response.status === 401) {
@@ -279,6 +285,9 @@ export default function TaskDetailPage() {
           const me = await fetch('/api/auth/me').then(r => r.json()).catch(() => null)
           const uid = extractUserId(me)
           if (uid) setCurrentUserId(uid)
+          const orgRaw = me?.organization
+          const orgId = (typeof orgRaw === 'string' ? orgRaw : (orgRaw?._id ?? orgRaw?.id))
+          if (orgId) setCurrentOrganizationId(orgId.toString())
           setAuthError('')
           await fetchTask()
         } else {
@@ -1422,6 +1431,14 @@ export default function TaskDetailPage() {
                 </h1>
                 <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap ml-auto justify-end">
                   <Button
+                    onClick={() => setShowStartTimerModal(true)}
+                    disabled={!currentUserId || !currentOrganizationId || !task.project?._id || !task._id}
+                    className="min-h-[36px] w-full sm:w-auto"
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Start Timer
+                  </Button>
+                  <Button
                     variant="outline"
                     disabled={!editAllowed}
                     onClick={() => {
@@ -2039,6 +2056,15 @@ export default function TaskDetailPage() {
           </div>
         </div>
       </div>
+
+      <StartTimerModal
+        open={showStartTimerModal}
+        onOpenChange={setShowStartTimerModal}
+        userId={currentUserId}
+        organizationId={currentOrganizationId}
+        project={{ id: task.project._id, name: task.project.name }}
+        task={{ id: task._id, title: task.title }}
+      />
 
       {/* Delete Confirmation Modal */}
       <ConfirmationModal

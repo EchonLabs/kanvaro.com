@@ -38,14 +38,15 @@ export function TestSuiteForm({ testSuite, projectId, projectName, onSave, onCan
     name: '',
     description: '',
     parentSuite: '',
-    project: projectId,
+    project: testSuite?.project || projectId || '',
     ...testSuite
   })
   const [parentSuites, setParentSuites] = useState<TestSuite[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
+  // For editing: use testSuite.project. For creating: use projectId if provided, otherwise empty
+  const [currentProjectId, setCurrentProjectId] = useState<string>(testSuite?.project || projectId || '')
   const nameInputRef = useRef<HTMLInputElement | null>(null)
-  const [currentProjectId, setCurrentProjectId] = useState(testSuite?.project || projectId)
   const [selectedProjectName, setSelectedProjectName] = useState(projectName || '')
   const [projectQuery, setProjectQuery] = useState('')
   const [parentSuiteQuery, setParentSuiteQuery] = useState('')
@@ -70,13 +71,23 @@ export function TestSuiteForm({ testSuite, projectId, projectName, onSave, onCan
   }, [showProjectSelector, currentProjectId, projects.length])
 
   useEffect(() => {
-    setCurrentProjectId(testSuite?.project || projectId)
+    setCurrentProjectId(testSuite?.project || projectId || '')
     setSelectedProjectName(projectName || '')
-    setFormData(prev => ({
-      ...prev,
-      project: testSuite?.project || projectId,
-      ...testSuite
-    }))
+    // Reset form data when creating new suite to avoid stale values
+    if (!testSuite) {
+      setFormData({
+        name: '',
+        description: '',
+        parentSuite: '',
+        project: projectId || ''
+      })
+    } else {
+      // When editing, update with the suite data
+      setFormData(prev => ({
+        ...prev,
+        ...testSuite
+      }))
+    }
   }, [projectId, projectName, testSuite])
 
   useEffect(() => {
@@ -174,7 +185,8 @@ export function TestSuiteForm({ testSuite, projectId, projectName, onSave, onCan
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (validateForm()) {
-      onSave(formData)
+      // Ensure project value is included in formData
+      onSave({ ...formData, project: formData.project || currentProjectId })
     }
   }
 

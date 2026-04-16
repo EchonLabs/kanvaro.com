@@ -6,7 +6,6 @@ import { Header } from './Header'
 import { MobileMenu } from '@/components/ui/MobileMenu'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { BreadcrumbProvider } from '@/contexts/BreadcrumbContext'
-import { useTimeTrackingNotifications } from '@/hooks/useTimeTrackingNotifications'
 import { usePermissionContext } from '@/lib/permissions/permission-context'
 import { ContentLoader } from '@/components/ui/ContentLoader'
 import { DateTimeProvider } from '@/components/providers/DateTimeProvider'
@@ -21,9 +20,6 @@ export function MainLayout({ children, breadcrumbItems }: MainLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const { loading: permissionsLoading, error: permissionsError, permissions } = usePermissionContext()
-
-  // Listen for time tracking notifications and show toast popups
-  useTimeTrackingNotifications()
 
   // Load user preferences for sidebar collapsed state (non-blocking)
   useEffect(() => {

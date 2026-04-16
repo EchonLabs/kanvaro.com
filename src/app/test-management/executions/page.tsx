@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { formatToTitleCase } from '@/lib/utils'
+import { Input } from '@/components/ui/Input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/DropdownMenu'
 import { TestExecutionForm } from '@/components/test-management/TestExecutionForm'
@@ -17,6 +18,7 @@ import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Play, Calendar, User, Clock, CheckCircle, XCircle, AlertCircle, SkipForward, Edit, Eye, Trash2, MoreVertical } from 'lucide-react'
 import { Permission } from '@/lib/permissions'
 import { PermissionGate } from '@/lib/permissions/permission-components'
+import { useNotify } from '@/lib/notify'
 
 interface TestExecution {
   _id?: string
@@ -31,15 +33,51 @@ interface TestExecution {
   attachments?: string[]
 }
 
+interface Project {
+  _id: string
+  name: string
+  description?: string
+  status?: string
+}
+
+interface ExecutionRow {
+  _id: string
+  testCase?: { _id: string; title: string } | string
+  testPlan?: { _id: string; name: string; version?: string } | string
+  project?: { _id: string; name: string } | string
+  executedBy?: { firstName?: string; lastName?: string; email?: string }
+  status: TestExecution['status']
+  actualResult: string
+  comments: string
+  executionTime: number
+  environment: string
+  version: string
+  attachments?: string[]
+  executedAt?: string
+}
+
+type ApiResponse<T> = {
+  success?: boolean
+  data?: T
+  error?: string
+}
+
 export default function TestExecutionsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { setItems } = useBreadcrumb()
+  const { success: notifySuccess, error: notifyError } = useNotify()
+
+  const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('')
+  const [projectQuery, setProjectQuery] = useState('')
+  const [projectsLoading, setProjectsLoading] = useState(true)
+
   const [testExecutionDialogOpen, setTestExecutionDialogOpen] = useState(false)
   const [selectedTestExecution, setSelectedTestExecution] = useState<TestExecution | null>(null)
   const [saving, setSaving] = useState(false)
-  const [executions, setExecutions] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [executions, setExecutions] = useState<ExecutionRow[]>([])
+  const [loading, setLoading] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const { formatDate, formatTime } = useDateTime()
@@ -53,24 +91,63 @@ export default function TestExecutionsPage() {
   }, [setItems])
 
   useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        setProjectsLoading(true)
+        const res = await fetch('/api/projects')
+        const data = await res.json().catch(() => ({}))
+        if (res.ok && data?.success && Array.isArray(data.data)) {
+          setProjects(data.data)
+        } else {
+          setProjects([])
+        }
+      } catch {
+        setProjects([])
+      } finally {
+        setProjectsLoading(false)
+      }
+    }
+
+    fetchProjects()
+  }, [])
+
+  useEffect(() => {
+    if (projectsLoading) return
+    if (selectedProject) return
+
+    const fromQuery = searchParams.get('projectId')
+    if (!fromQuery) return
+    if (!projects.some((p) => p._id === fromQuery)) return
+
+    setSelectedProject(fromQuery)
+  }, [searchParams, projectsLoading, projects, selectedProject])
+
+  useEffect(() => {
     const fetchExecutions = async () => {
+      if (!selectedProject) {
+        setExecutions([])
+        setLoading(false)
+        return
+      }
+
       try {
         setLoading(true)
-        const res = await fetch('/api/test-executions')
-        const data = await res.json()
+        const res = await fetch(`/api/test-executions?projectId=${encodeURIComponent(selectedProject)}&page=1&limit=200`)
+        const data = (await res.json().catch(() => ({}))) as ApiResponse<ExecutionRow[]>
         if (res.ok && data?.success && Array.isArray(data.data)) {
-          setExecutions(data.data)
+          setExecutions(data.data as ExecutionRow[])
         } else {
           setExecutions([])
         }
-      } catch (e) {
+      } catch {
         setExecutions([])
       } finally {
         setLoading(false)
       }
     }
+
     fetchExecutions()
-  }, [])
+  }, [selectedProject])
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -104,12 +181,25 @@ export default function TestExecutionsPage() {
   }
 
   const handleExecuteTest = () => {
-    setSelectedTestExecution(null)
-    setTestExecutionDialogOpen(true)
+    if (!selectedProject) return
+    router.push(`/test-management/executions/new?projectId=${encodeURIComponent(selectedProject)}`)
   }
 
-  const handleEditTestExecution = (execution: TestExecution) => {
-    setSelectedTestExecution(execution)
+  const handleEditTestExecution = (execution: ExecutionRow) => {
+    const mapped: TestExecution = {
+      _id: execution._id,
+      testCase: typeof execution.testCase === 'string' ? execution.testCase : execution.testCase?._id ?? '',
+      testPlan: typeof execution.testPlan === 'string' ? execution.testPlan : execution.testPlan?._id,
+      status: execution.status,
+      actualResult: execution.actualResult,
+      comments: execution.comments,
+      executionTime: execution.executionTime,
+      environment: execution.environment,
+      version: execution.version,
+      attachments: execution.attachments || [],
+    }
+
+    setSelectedTestExecution(mapped)
     setTestExecutionDialogOpen(true)
   }
 
@@ -122,59 +212,57 @@ export default function TestExecutionsPage() {
     setDeleteDialogOpen(true)
   }
 
-  const handleSaveTestExecution = async (executionData: any) => {
+  const handleSaveTestExecution = async (executionData: TestExecution) => {
+    if (!selectedTestExecution?._id) return
+
     setSaving(true)
     try {
-      const url = selectedTestExecution?._id 
-        ? `/api/test-executions/${selectedTestExecution._id}`
-        : '/api/test-executions'
-      
-      const method = selectedTestExecution?._id ? 'PUT' : 'POST'
-      const payload = selectedTestExecution?._id
-        ? {
-            status: executionData.status,
-            actualResult: executionData.actualResult,
-            comments: executionData.comments,
-            executionTime: executionData.executionTime,
-            environment: executionData.environment,
-            version: executionData.version,
-            attachments: executionData.attachments || []
-          }
-        : {
-            testCaseId: executionData.testCase,
-            testPlanId: executionData.testPlan || undefined,
-            status: executionData.status,
-            actualResult: executionData.actualResult,
-            comments: executionData.comments,
-            executionTime: executionData.executionTime,
-            environment: executionData.environment,
-            version: executionData.version,
-            attachments: executionData.attachments || []
-          }
+      const url = `/api/test-executions/${selectedTestExecution._id}`
+      const payload = {
+        status: executionData.status,
+        actualResult: executionData.actualResult,
+        comments: executionData.comments,
+        executionTime: executionData.executionTime,
+        environment: executionData.environment,
+        version: executionData.version,
+        attachments: executionData.attachments || []
+      }
 
       const response = await fetch(url, {
-        method,
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
 
-      if (response.ok) {
+      const data = await response.json().catch(() => ({}))
+
+      if (response.ok && (data as any)?.success !== false) {
+        notifySuccess({ title: 'Test execution updated.' })
         setTestExecutionDialogOpen(false)
         setSelectedTestExecution(null)
-        const res = await fetch('/api/test-executions')
-        const data = await res.json().catch(() => ({}))
-        if (res.ok && (data as any)?.success && Array.isArray((data as any).data)) {
-          setExecutions((data as any).data)
+
+        // Refresh list
+        const res = await fetch(`/api/test-executions?projectId=${encodeURIComponent(selectedProject)}&page=1&limit=200`)
+        const refreshed = (await res.json().catch(() => ({}))) as ApiResponse<ExecutionRow[]>
+        if (res.ok && refreshed?.success && Array.isArray(refreshed.data)) {
+          setExecutions(refreshed.data as ExecutionRow[])
         }
       } else {
-        console.error('Failed to save test execution')
+        notifyError({
+          title: 'Failed to update test execution.',
+          message: (data as any)?.error || 'Please try again.'
+        })
+        console.error('Failed to update test execution', data)
       }
     } catch (error) {
+      notifyError({ title: 'Failed to update test execution.', message: 'Please try again.' })
       console.error('Error saving test execution:', error)
     } finally {
       setSaving(false)
     }
   }
+
+  const deleteExecution = deleteId ? executions.find((e) => e._id === deleteId) : undefined
 
   return (
     <MainLayout>
@@ -187,10 +275,63 @@ export default function TestExecutionsPage() {
                 Track and manage test execution results
               </p>
             </div>
-            <Button onClick={handleExecuteTest} className="w-full sm:w-auto">
+            <Button onClick={handleExecuteTest} className="w-full sm:w-auto" disabled={!selectedProject}>
               <Play className="mr-2 h-4 w-4" />
               Execute Test
             </Button>
+          </div>
+
+          {/* Project Selection */}
+          <div className="space-y-1">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <label htmlFor="project-select" className="text-sm font-medium">
+                Project:
+              </label>
+              <Select
+                value={selectedProject}
+                onValueChange={setSelectedProject}
+                onOpenChange={(open) => {
+                  if (open) setProjectQuery('')
+                }}
+                disabled={projectsLoading}
+              >
+                <SelectTrigger id="project-select" className="w-full sm:w-96">
+                  <SelectValue placeholder={projectsLoading ? 'Loading projects...' : 'Select a project'} />
+                </SelectTrigger>
+                <SelectContent className="p-0">
+                  <div className="p-2">
+                    <Input
+                      value={projectQuery}
+                      onChange={(e) => setProjectQuery(e.target.value)}
+                      placeholder="Search projects"
+                      className="mb-2"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <div className="max-h-56 overflow-y-auto">
+                      {(projects.filter(p => !projectQuery.trim() || (p.name || '').toLowerCase().includes(projectQuery.toLowerCase()))).length === 0 ? (
+                        <div className="px-2 py-2 text-sm text-muted-foreground">No matching projects</div>
+                      ) : (
+                        projects
+                          .filter(p => !projectQuery.trim() || (p.name || '').toLowerCase().includes(projectQuery.toLowerCase()))
+                          .map((p) => (
+                            <SelectItem key={p._id} value={p._id}>
+                              {p.name}
+                            </SelectItem>
+                          ))
+                      )}
+                    </div>
+                  </div>
+                </SelectContent>
+              </Select>
+            </div>
+            {!selectedProject && (
+              <div className="flex items-center gap-2 text-sm text-amber-600">
+                <AlertCircle className="h-4 w-4" />
+                <span>Please select a project to view and execute tests</span>
+              </div>
+            )}
           </div>
 
         <div className="grid gap-6">
@@ -198,7 +339,7 @@ export default function TestExecutionsPage() {
             <CardHeader>
               <CardTitle>Recent Test Executions</CardTitle>
               <CardDescription>
-                Latest test execution results across all projects
+                {selectedProject ? 'Latest test execution results for the selected project' : 'Select a project to see executions'}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -225,13 +366,17 @@ export default function TestExecutionsPage() {
                     <TableRow>
                       <TableCell colSpan={9}>No test executions found</TableCell>
                     </TableRow>
-                  ) : executions.map((execution: any) => (
+                  ) : executions.map((execution) => (
                     <TableRow key={execution._id}>
                       <TableCell className="font-medium">
-                        {execution?.testCase?.title || execution.testCase}
+                        {typeof execution.testCase === 'string' ? execution.testCase : execution.testCase?.title || '—'}
                       </TableCell>
-                      <TableCell>{execution?.testPlan?.name || 'N/A'}</TableCell>
-                      <TableCell>{execution?.project?.name || execution.project}</TableCell>
+                      <TableCell>
+                        {typeof execution.testPlan === 'string' ? execution.testPlan : execution.testPlan?.name || 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        {typeof execution.project === 'string' ? execution.project : execution.project?.name || '—'}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           {getStatusIcon(execution.status)}
@@ -291,7 +436,7 @@ export default function TestExecutionsPage() {
         <ResponsiveDialog
           open={testExecutionDialogOpen}
           onOpenChange={setTestExecutionDialogOpen}
-          title={selectedTestExecution ? 'Edit Test Execution' : 'Execute Test Case'}
+          title="Edit Test Execution"
           dismissible={false}
         >
           <TestExecutionForm
@@ -315,18 +460,26 @@ export default function TestExecutionsPage() {
             if (!deleteId) return
             try {
               const res = await fetch(`/api/test-executions/${deleteId}`, { method: 'DELETE' })
-              if (res.ok) {
-                const refreshed = await fetch('/api/test-executions')
-                const data = await refreshed.json().catch(() => ({}))
-                if (refreshed.ok && (data as any)?.success && Array.isArray((data as any).data)) {
-                  setExecutions((data as any).data)
+              const data = await res.json().catch(() => ({}))
+
+              if (res.ok && (data as any)?.success !== false) {
+                notifySuccess({ title: 'Test execution deleted.' })
+                const refreshed = await fetch(`/api/test-executions?projectId=${encodeURIComponent(selectedProject)}&page=1&limit=200`)
+                const refreshedData = (await refreshed.json().catch(() => ({}))) as ApiResponse<ExecutionRow[]>
+                if (refreshed.ok && refreshedData?.success && Array.isArray(refreshedData.data)) {
+                  setExecutions(refreshedData.data as ExecutionRow[])
                 } else {
-                  setExecutions(prev => prev.filter(e => e._id !== deleteId))
+                  setExecutions((prev) => prev.filter((e) => e._id !== deleteId))
                 }
               } else {
-                console.error('Failed to delete execution')
+                notifyError({
+                  title: 'Failed to delete test execution.',
+                  message: (data as any)?.error || 'Please try again.'
+                })
+                console.error('Failed to delete execution', data)
               }
             } catch (e) {
+              notifyError({ title: 'Failed to delete test execution.', message: 'Please try again.' })
               console.error('Error deleting execution:', e)
             } finally {
               setDeleteDialogOpen(false)
@@ -334,7 +487,11 @@ export default function TestExecutionsPage() {
             }
           }}
           title="Delete Test Execution"
-          itemName={String((executions.find(e => e._id === deleteId)?.testCase?.title) || (executions.find(e => e._id === deleteId)?.testCase) || 'this execution')}
+          itemName={String(
+            typeof deleteExecution?.testCase === 'string'
+              ? deleteExecution.testCase
+              : deleteExecution?.testCase?.title || 'this execution'
+          )}
           itemType="Test Execution"
         />
       </div>
