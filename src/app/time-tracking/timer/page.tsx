@@ -145,10 +145,32 @@ export default function TimerPage() {
   const [hasMoreTasks, setHasMoreTasks] = useState(false)
   const [loadingMoreTasks, setLoadingMoreTasks] = useState(false)
   const taskSearchTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const projectSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const taskSearchInputRef = useRef<HTMLInputElement | null>(null)
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)
   const isLoadingMoreRef = useRef(false)
   const selectedTaskIdRef = useRef<string>('')
   const selectedTaskObjectRef = useRef<Task | null>(null)
+
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+
+    const doFocus = () => {
+      el.focus({ preventScroll: true })
+      // Convenience: if user opens dropdown again, keep typing fluid
+      try {
+        el.select?.()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(doFocus)
+    } else {
+      setTimeout(doFocus, 0)
+    }
+  }
 
 
 
@@ -1239,13 +1261,18 @@ export default function TimerPage() {
                     <Select
                       value={selectedProject}
                       onValueChange={handleProjectChange}
+                      onOpenChange={(open) => {
+                        if (open) focusSearchInput(projectSearchInputRef.current)
+                      }}
                       disabled={!timeTrackingSettings?.allowTimeTracking || liveActiveTimer !== null}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a project" />
                       </SelectTrigger>
                       <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]">
-                        <div className="p-2 sticky top-0 bg-background z-10">                      <Input
+                        <div className="p-2 sticky top-0 bg-background z-10">
+                          <Input
+                          ref={projectSearchInputRef}
                           placeholder="Type project name..."
                           value={projectSearch}
                           onChange={(e) => {
@@ -1283,6 +1310,7 @@ export default function TimerPage() {
                       value={selectedTask}
                       onValueChange={handleTaskChange}
                       onOpenChange={(open) => {
+                        if (open) focusSearchInput(taskSearchInputRef.current)
                         if (!open) {
                           setTaskSearch('')
                         }
@@ -1318,6 +1346,7 @@ export default function TimerPage() {
                         {!showInitialTasksLoading && (
                           <div className="p-2 sticky top-0 bg-background z-10">
                             <Input
+                              ref={taskSearchInputRef}
                               placeholder="Search tasks..."
                               value={taskSearch}
                               onChange={(e) => {
@@ -1326,7 +1355,6 @@ export default function TimerPage() {
                               }}
                               onKeyDown={(e) => e.stopPropagation()}
                               onClick={(e) => e.stopPropagation()}
-                              autoFocus
                               className="h-8"
                             />
                           </div>)}
