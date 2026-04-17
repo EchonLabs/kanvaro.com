@@ -135,6 +135,32 @@ export function TimeLogs({
   const [modalProjectSearch, setModalProjectSearch] = useState('')
   const [modalTaskSearch, setModalTaskSearch] = useState('')
 
+  const projectFilterSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const taskFilterSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const employeeFilterSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const statusFilterSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const modalProjectSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const modalTaskSearchInputRef = useRef<HTMLInputElement | null>(null)
+
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+
+    const doFocus = () => {
+      el.focus({ preventScroll: true })
+      try {
+        el.select?.()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(doFocus)
+    } else {
+      setTimeout(doFocus, 0)
+    }
+  }
+
   // Filtered lists based on search queries
   const filteredProjects = useMemo(() => {
     if (!projectSearch.trim()) return filterProjects
@@ -2180,6 +2206,9 @@ export function TimeLogs({
                       handleFilterChange('taskId', '')
                     }
                   }}
+                  onOpenChange={(open) => {
+                    if (open) focusSearchInput(projectFilterSearchInputRef.current)
+                  }}
                 >
                   <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-project">
                     <SelectValue placeholder="All projects" />
@@ -2189,6 +2218,7 @@ export function TimeLogs({
                       <div className="relative">
                         <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
                         <Input
+                          ref={projectFilterSearchInputRef}
                           placeholder="Search projects..."
                           value={projectSearch}
                           onChange={(e) => setProjectSearch(e.target.value)}
@@ -2245,6 +2275,9 @@ export function TimeLogs({
                   value={filters.taskId || 'all'}
                   onValueChange={(value) => handleFilterChange('taskId', value === 'all' ? '' : value)}
                   disabled={filterTasksLoading}
+                  onOpenChange={(open) => {
+                    if (open) focusSearchInput(taskFilterSearchInputRef.current)
+                  }}
                 >
                   <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-task">
                     <SelectValue placeholder={
@@ -2258,6 +2291,7 @@ export function TimeLogs({
                       <div className="relative">
                         <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
                         <Input
+                          ref={taskFilterSearchInputRef}
                           placeholder="Search tasks..."
                           value={taskSearch}
                           onChange={(e) => setTaskSearch(e.target.value)}
@@ -2314,6 +2348,9 @@ export function TimeLogs({
                     value={filters.employeeId || 'all'}
                     onValueChange={(value) => handleFilterChange('employeeId', value === 'all' ? '' : value)}
                     disabled={filterEmployeesLoading}
+                    onOpenChange={(open) => {
+                      if (open) focusSearchInput(employeeFilterSearchInputRef.current)
+                    }}
                   >
                     <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm" id="filter-employee">
                       <SelectValue placeholder={
@@ -2325,6 +2362,7 @@ export function TimeLogs({
                         <div className="relative">
                           <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
                           <Input
+                            ref={employeeFilterSearchInputRef}
                             placeholder="Search employees..."
                             value={employeeSearch}
                             onChange={(e) => setEmployeeSearch(e.target.value)}
@@ -2398,7 +2436,13 @@ export function TimeLogs({
               </div>
               <div className="space-y-1.5 sm:space-y-2 min-w-0">
                 <Label htmlFor="status" className="text-xs sm:text-sm font-medium">Status</Label>
-                <Select value={filters.status || 'all'} onValueChange={handleStatusFilterChange}>
+                <Select
+                  value={filters.status || 'all'}
+                  onValueChange={handleStatusFilterChange}
+                  onOpenChange={(open) => {
+                    if (open) focusSearchInput(statusFilterSearchInputRef.current)
+                  }}
+                >
                   <SelectTrigger className="w-full h-9 sm:h-10 text-xs sm:text-sm">
                     <SelectValue placeholder="All statuses" />
                   </SelectTrigger>
@@ -2407,6 +2451,7 @@ export function TimeLogs({
                       <div className="relative">
                         <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
                         <Input
+                          ref={statusFilterSearchInputRef}
                           placeholder="Search status..."
                           value={statusSearch}
                           onChange={(e) => setStatusSearch(e.target.value)}
@@ -3047,6 +3092,9 @@ export function TimeLogs({
                     setSelectedTaskForLog('')
                     setTasks([])
                   }}
+                  onOpenChange={(open) => {
+                    if (open) focusSearchInput(modalProjectSearchInputRef.current)
+                  }}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select a project" />
@@ -3056,6 +3104,7 @@ export function TimeLogs({
                       <div className="relative">
                         <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
                         <Input
+                          ref={modalProjectSearchInputRef}
                           placeholder="Search projects..."
                           value={modalProjectSearch}
                           onChange={(e) => setModalProjectSearch(e.target.value)}
@@ -3104,6 +3153,9 @@ export function TimeLogs({
                   value={selectedTaskForLog}
                   onValueChange={setSelectedTaskForLog}
                   disabled={!selectedProjectForLog || tasks.length === 0}
+                  onOpenChange={(open) => {
+                    if (open) focusSearchInput(modalTaskSearchInputRef.current)
+                  }}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder={
@@ -3428,6 +3480,9 @@ export function TimeLogs({
                   value={selectedTaskForLog}
                   onValueChange={setSelectedTaskForLog}
                   disabled={!selectedProjectForLog || tasks.length === 0}
+                  onOpenChange={(open) => {
+                    if (open) focusSearchInput(modalTaskSearchInputRef.current)
+                  }}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder={
@@ -3446,6 +3501,7 @@ export function TimeLogs({
                       <div className="relative">
                         <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
                         <Input
+                          ref={modalTaskSearchInputRef}
                           placeholder="Search tasks..."
                           value={modalTaskSearch}
                           onChange={(e) => setModalTaskSearch(e.target.value)}

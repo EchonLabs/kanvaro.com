@@ -34,6 +34,7 @@ interface StartTimerModalProps {
   organizationId: string
   project: EntityRef
   task: TaskRef
+  onStarted?: (activeTimer: any) => void
 }
 
 export function StartTimerModal({
@@ -42,7 +43,8 @@ export function StartTimerModal({
   userId,
   organizationId,
   project,
-  task
+  task,
+  onStarted
 }: StartTimerModalProps) {
   const { success: notifySuccess, error: notifyError } = useNotify()
   const [memo, setMemo] = useState('')
@@ -88,6 +90,7 @@ export function StartTimerModal({
         return
       }
 
+      onStarted?.(data?.activeTimer)
       notifySuccess({ title: 'Timer started' })
       onOpenChange(false)
     } catch (e) {
