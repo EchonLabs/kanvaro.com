@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -12,8 +12,9 @@ interface ConfirmationModalProps {
   onClose: () => void
   onConfirm: () => void
   title: string
-  description: string
+  description: ReactNode
   confirmText?: string
+  confirmIcon?: ReactNode
   cancelText?: string
   variant?: 'default' | 'destructive'
   isLoading?: boolean
@@ -26,6 +27,7 @@ export function ConfirmationModal({
   title,
   description,
   confirmText = 'Confirm',
+  confirmIcon,
   cancelText = 'Cancel',
   variant = 'default',
   isLoading = false
@@ -83,7 +85,7 @@ export function ConfirmationModal({
         aria-describedby={descriptionId}
         className={cn(
           "w-full max-w-md flex flex-col max-h-[90vh] bg-card text-card-foreground shadow-2xl transition-all duration-200 ease-out pointer-events-auto",
-          isDestructive && 'border-destructive/60 bg-red-50 text-red-900 dark:bg-red-900 dark:text-red-100'
+          isDestructive && 'border-destructive/60'
         )}
         onClick={event => {
           event.stopPropagation()
@@ -97,7 +99,7 @@ export function ConfirmationModal({
               {isDestructive && (
                 <AlertTriangle className="h-5 w-5 text-destructive" aria-hidden="true" />
               )}
-              <CardTitle id={titleId} className={cn(isDestructive && 'text-destructive')}>
+              <CardTitle id={titleId}>
                 {title}
               </CardTitle>
             </div>
@@ -105,7 +107,7 @@ export function ConfirmationModal({
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <CardDescription id={descriptionId} className={cn(isDestructive && 'text-destructive/80 dark:text-red-200')}>
+          <CardDescription id={descriptionId}>
             {description}
           </CardDescription>
         </CardHeader>
@@ -134,7 +136,14 @@ export function ConfirmationModal({
               disabled={isLoading}
               className="pointer-events-auto"
             >
-              {isLoading ? 'Processing...' : confirmText}
+              {isLoading ? (
+                'Processing...'
+              ) : (
+                <span className="inline-flex items-center gap-2">
+                  {confirmIcon}
+                  {confirmText}
+                </span>
+              )}
             </Button>
           </div>
         </CardContent>

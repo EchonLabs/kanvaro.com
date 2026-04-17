@@ -294,6 +294,13 @@ async function handleCreate(
     projectIds.add(project.trim())
   }
 
+  // Debug: confirm parsed counts before saving (dev-only)
+  if (process.env.NODE_ENV !== 'production') {
+    const totalSubtasks = tasksToCreate.reduce((sum: number, t: any) => sum + (Array.isArray(t.subtasks) ? t.subtasks.length : 0), 0)
+    const totalComments = tasksToCreate.reduce((sum: number, t: any) => sum + (Array.isArray(t.comments) ? t.comments.length : 0), 0)
+    console.log(`[bulk-csv] Parsed ${tasksToCreate.length} tasks; subtasks=${totalSubtasks}; comments=${totalComments}`)
+  }
+
   // Validate projects exist & user has permission
   const projectIdsArray = Array.from(projectIds)
   const projects = await Project.find(
@@ -392,7 +399,7 @@ async function handleCreate(
         subtasks: taskData.subtasks
           .filter((s: any) => typeof s.title === 'string' && s.title.trim().length > 0)
           .map((s: any) => ({
-            title: s.title.trim().slice(0, 200),
+            title: s.title.trim(),
             status: 'backlog',
             isCompleted: false
           }))

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { useToast } from '@/components/ui/Toast'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 
 interface TimerProps {
@@ -57,6 +58,7 @@ export function Timer({
   onAutoStop
 }: TimerProps) {
   const { formatDuration, preferences } = useDateTime()
+  const { showToast } = useToast()
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -66,6 +68,10 @@ export function Timer({
   const baseMinutesRef = useRef<number>(0)
   const tickStartMsRef = useRef<number | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  // Guard to prevent multiple concurrent stop requests
+  const stoppingRef = useRef(false)
+  // If auto-stop triggers, the parent (via onAutoStop) should own the toast
+  const autoStopRequestedRef = useRef(false)
 
   // Track active timer state
   useEffect(() => {
@@ -127,7 +133,10 @@ export function Timer({
       // Auto-stop when reaching max session hours (when overtime is NOT allowed)
       if (!allowOvertime && activeTimer.maxSessionHours && runningMinutes >= activeTimer.maxSessionHours * 60) {
         console.log('Timer: Auto-stopping - reached max session hours')
+        // Clear interval immediately to prevent double-fire from daily limit check
+        if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
         const maxHours = activeTimer.maxSessionHours
+        autoStopRequestedRef.current = true
         onAutoStop?.(`Timer stopped automatically. Maximum session limit of ${maxHours} ${maxHours === 1 ? 'hour' : 'hours'} reached.`)
         handleStopTimer()
         return
@@ -136,6 +145,9 @@ export function Timer({
       // Auto-stop when reaching remaining daily hours limit
       if (!allowOvertime && activeTimer.remainingDailyMinutes != null && activeTimer.remainingDailyMinutes > 0 && runningMinutes >= activeTimer.remainingDailyMinutes) {
         console.log('Timer: Auto-stopping - reached daily hours limit')
+        // Clear interval immediately to prevent repeat fire
+        if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
+        autoStopRequestedRef.current = true
         onAutoStop?.(`Timer stopped automatically. Daily hours limit of ${maxDailyHours || 'N/A'} hours reached.`)
         handleStopTimer()
         return
@@ -270,6 +282,9 @@ export function Timer({
   }
 
   const handleStopTimer = async () => {
+    // Prevent multiple concurrent stop requests (from auto-stop + manual click)
+    if (stoppingRef.current) return
+    stoppingRef.current = true
     setIsLoading(true)
     setError('')
     setShowStopConfirmation(false)
@@ -285,8 +300,25 @@ export function Timer({
 
       if (response.ok) {
         const hasTimeLogged = data.hasTimeLogged && data.duration > 0
+        const shouldShowToast = !autoStopRequestedRef.current
+        autoStopRequestedRef.current = false
+
         setActiveTimer(null)
         setDisplayTime('00:00:00')
+
+        if (shouldShowToast) {
+          showToast({
+            type: hasTimeLogged ? 'success' : 'info',
+            title: 'Timer Stopped',
+            message:
+              data.message ||
+              (hasTimeLogged
+                ? 'Timer stopped successfully.'
+                : 'Timer stopped. No time was logged.'),
+            duration: 5000
+          })
+        }
+
         // Pass timeEntry info through callback so parent can decide whether to show notifications
         if (hasTimeLogged && data.timeEntry) {
           onTimerUpdate?.({ timeEntry: data.timeEntry, hasTimeLogged: true, duration: data.duration })
@@ -302,6 +334,7 @@ export function Timer({
       setError('Failed to stop timer')
     } finally {
       setIsLoading(false)
+      stoppingRef.current = false
     }
   }
 
@@ -397,18 +430,28 @@ export function Timer({
               <Square className="h-4 w-4 mr-2" />
               Stop
             </Button>
-            <ConfirmationModal
-              isOpen={showStopConfirmation}
-              onClose={() => setShowStopConfirmation(false)}
-              onConfirm={handleConfirmStop}
-              title="Stop Timer?"
-              description={`Are you sure you want to stop the timer? You have logged ${displayTime} so far.`}
-              confirmText="Stop"
-              cancelText="Cancel"
-              variant="destructive"
-              isLoading={isLoading}
-            />
           </div>
+
+          <ConfirmationModal
+            isOpen={showStopConfirmation}
+            onClose={() => setShowStopConfirmation(false)}
+            onConfirm={handleConfirmStop}
+            title="Stop Timer"
+            description={
+              <>
+                Are you sure you want to stop the active timer?
+                <span className="block mt-2 text-foreground font-medium">
+                  {activeTimer.project?.name || 'Unknown project'}
+                  {activeTimer.task && ` • ${activeTimer.task.title}`}
+                </span>
+              </>
+            }
+            confirmText="Stop Timer"
+            confirmIcon={<Square className="h-4 w-4" />}
+            cancelText="Cancel"
+            variant="destructive"
+            isLoading={isLoading}
+          />
         </CardContent>
       </Card>
     )

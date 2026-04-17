@@ -16,6 +16,9 @@ export async function GET(
   { params }: { params: { path: string[] } }
 ) {
   try {
+    const download = request.nextUrl.searchParams.get('download') === '1'
+    const requestedFilename = request.nextUrl.searchParams.get('filename')
+
     // Extract type and filename from path
     // path = ['logos', 'filename.png'] or ['avatars', 'filename.jpg']
     // or org-scoped: ['{orgId}', '{entityType}', '{entityId}', '{filename}']
@@ -84,10 +87,17 @@ export async function GET(
       'svg': 'image/svg+xml',
       'pdf': 'application/pdf',
       'txt': 'text/plain',
+      'csv': 'text/csv',
+      'md': 'text/markdown',
       'doc': 'application/msword',
       'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'xls': 'application/vnd.ms-excel',
       'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'ppt': 'application/vnd.ms-powerpoint',
+      'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'zip': 'application/zip',
+      'rar': 'application/x-rar-compressed',
+      '7z': 'application/x-7z-compressed'
     }
 
     const contentType = contentTypeMap[extension || ''] || 'application/octet-stream'
@@ -96,10 +106,22 @@ export async function GET(
     // This ensures the buffer is compatible with NextResponse's BodyInit type
     const uint8Array = new Uint8Array(fileBuffer)
 
+    // Best-effort filename for download prompt
+    const fallbackFilename = filePath.split(/[\\/]/).pop() || 'download'
+    const safeRequestedFilename = (requestedFilename || '')
+      .replace(/[\r\n"\\]/g, '')
+      .trim()
+      .slice(0, 180)
+    const safeFilename = safeRequestedFilename || fallbackFilename
+
+    const contentDisposition = `${download ? 'attachment' : 'inline'}; filename="${safeFilename}"`
+
     return new NextResponse(uint8Array, {
       headers: {
         'Content-Type': contentType,
+        'Content-Disposition': contentDisposition,
         'Cache-Control': 'public, max-age=31536000, immutable', // Cache for 1 year
+        'X-Content-Type-Options': 'nosniff'
       },
     })
   } catch (error) {

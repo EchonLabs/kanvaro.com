@@ -81,6 +81,7 @@ export async function PUT(
       startDate,
       endDate,
       isActive,
+      testCases,
       tags,
       customFields
     } = await req.json()
@@ -115,11 +116,17 @@ export async function PUT(
     testPlan.name = name || testPlan.name
     testPlan.description = description !== undefined ? description : testPlan.description
     testPlan.version = version !== undefined ? version : testPlan.version
-    testPlan.assignedTo = assignedTo !== undefined ? assignedTo : testPlan.assignedTo
+    if (assignedTo !== undefined) {
+      const assignedToId = typeof assignedTo === 'string' && assignedTo.trim().length > 0 ? assignedTo : undefined
+      testPlan.assignedTo = assignedToId
+    }
     testPlan.status = status || testPlan.status
     testPlan.startDate = startDate ? new Date(startDate) : testPlan.startDate
     testPlan.endDate = endDate ? new Date(endDate) : testPlan.endDate
     testPlan.isActive = isActive !== undefined ? isActive : testPlan.isActive
+    if (Array.isArray(testCases)) {
+      testPlan.testCases = testCases
+    }
     testPlan.tags = tags || testPlan.tags
     testPlan.customFields = customFields || testPlan.customFields
 

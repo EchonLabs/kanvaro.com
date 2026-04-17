@@ -35,7 +35,7 @@ interface TestSuiteCardsProps {
   highlightSuiteId?: string
 }
 
-const ITEMS_PER_PAGE = 6
+const ITEMS_PER_PAGE = 18
 
 export default function TestSuiteCards({
   projectId,
@@ -75,18 +75,28 @@ export default function TestSuiteCards({
   const isAdmin = userRole && ['admin', 'super_admin', 'superadmin'].includes(userRole.toLowerCase())
 
   const fetchTestSuites = async () => {
+    if (!projectId) {
+      setSuites([])
+      setCurrentPage(1)
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       setCurrentPage(1)
-      const response = await fetch(`/api/test-suites?projectId=${projectId}`)
+      const response = await fetch(`/api/test-suites?projectId=${encodeURIComponent(projectId)}`)
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
         // Flatten to show all suites, not hierarchical
         setSuites(data.data)
+      } else {
+        setSuites([])
       }
     } catch (error) {
       console.error('Error fetching test suites:', error)
+      setSuites([])
     } finally {
       setLoading(false)
     }

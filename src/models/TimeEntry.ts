@@ -133,4 +133,35 @@ TimeEntrySchema.pre('save', function(next) {
   next()
 })
 
+// Deduplication safety net: prevent creating duplicate entries from race conditions
+// (e.g., concurrent timer stop from client + cron + GET auto-stop)
+TimeEntrySchema.pre('save', async function(next) {
+  if (!this.isNew || this.status !== 'completed') return next()
+
+  try {
+    const startWindow = new Date(this.startTime.getTime() - 2000)
+    const endWindow = new Date(this.startTime.getTime() + 2000)
+    const existing = await mongoose.models.TimeEntry?.findOne({
+      user: this.user,
+      organization: this.organization,
+      project: this.project,
+      startTime: { $gte: startWindow, $lte: endWindow },
+      status: 'completed'
+    })
+    if (existing) {
+      console.warn(`Duplicate time entry prevented: user=${this.user}, project=${this.project}, startTime=${this.startTime}`)
+      const err = new Error('Duplicate time entry detected — this timer was already stopped by another process')
+      return next(err)
+    }
+  } catch (checkErr: any) {
+    // If the duplicate check itself fails, log but allow the save to proceed
+    // (better to risk a duplicate than to lose the entry entirely)
+    if (checkErr.message?.includes('Duplicate time entry detected')) {
+      return next(checkErr)
+    }
+    console.error('Deduplication check failed:', checkErr)
+  }
+  next()
+})
+
 export const TimeEntry = mongoose.models.TimeEntry || mongoose.model<ITimeEntry>('TimeEntry', TimeEntrySchema)

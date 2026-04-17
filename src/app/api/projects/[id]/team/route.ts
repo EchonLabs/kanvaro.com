@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { Project } from '@/models/Project'
 import { User } from '@/models/User'
+import '@/models/CustomRole'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -38,10 +39,18 @@ export async function GET(
       organization: organizationId,
       is_deleted: { $ne: true }
     })
-      .populate('teamMembers.memberId', 'firstName lastName email avatar role hourlyRate')
+      .populate({
+        path: 'teamMembers.memberId',
+        select: 'firstName lastName email avatar role hourlyRate customRole',
+        populate: { path: 'customRole', select: 'name' }
+      })
       .populate('createdBy', 'firstName lastName email avatar')
       .populate('client', 'firstName lastName email avatar')
-      .populate('projectRoles.user', 'firstName lastName email avatar')
+      .populate({
+        path: 'projectRoles.user',
+        select: 'firstName lastName email avatar role customRole',
+        populate: { path: 'customRole', select: 'name' }
+      })
 
     if (!project) {
       return NextResponse.json(
@@ -56,7 +65,8 @@ export async function GET(
       isActive: true,
       _id: { $nin: project.teamMembers }
     })
-      .select('firstName lastName email avatar role hourlyRate')
+      .select('firstName lastName email avatar role hourlyRate customRole')
+      .populate('customRole', 'name')
       .lean()
 
     // Normalize avatar URLs for all members

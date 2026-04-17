@@ -1,19 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import TestCaseList from '@/components/test-management/TestCaseList'
-import { TestCaseForm } from '@/components/test-management/TestCaseForm'
-import { TestExecutionForm } from '@/components/test-management/TestExecutionForm'
 import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmDialog'
-import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, AlertCircle } from 'lucide-react'
 import { Permission } from '@/lib/permissions'
 import { PermissionGate } from '@/lib/permissions/permission-components'
+import { useNotify } from '@/lib/notify'
 
 interface TestCase {
   _id: string
@@ -38,23 +37,6 @@ interface TestCase {
   updatedAt: string
 }
 
-interface FormTestCase {
-  _id?: string
-  title: string
-  description: string
-  preconditions: string
-  steps: Array<{ step: string; expectedResult: string }>
-  expectedResult: string
-  testData: string
-  priority: 'low' | 'medium' | 'high' | 'critical'
-  category: 'functional' | 'integration' | 'regression' | 'performance' | 'security' | 'usability' | 'compatibility'
-  automationStatus: 'not_automated' | 'automated' | 'semi_automated' | 'deprecated'
-  estimatedExecutionTime: number
-  testSuite: string
-  tags: string[]
-  requirements?: string
-}
-
 interface Project {
   _id: string
   name: string
@@ -63,18 +45,15 @@ interface Project {
 }
 
 export default function TestCasesPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { setItems } = useBreadcrumb()
+  const { success: notifySuccess, error: notifyError, warning: notifyWarning } = useNotify()
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [projectQuery, setProjectQuery] = useState('')
-  const [testCaseDialogOpen, setTestCaseDialogOpen] = useState(false)
-  const [testExecutionDialogOpen, setTestExecutionDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [selectedTestCase, setSelectedTestCase] = useState<FormTestCase | null>(null)
-  const [executionTestCase, setExecutionTestCase] = useState<any | null>(null)
   const [deleteItem, setDeleteItem] = useState<{ id: string; name: string } | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [executionSaving, setExecutionSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [refreshCounter, setRefreshCounter] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -90,6 +69,13 @@ export default function TestCasesPage() {
   useEffect(() => {
     fetchProjects()
   }, [])
+
+  useEffect(() => {
+    const projectIdFromQuery = searchParams.get('projectId')
+    if (projectIdFromQuery && projectIdFromQuery !== selectedProject) {
+      setSelectedProject(projectIdFromQuery)
+    }
+  }, [searchParams, selectedProject])
 
   const fetchProjects = async () => {
     try {
@@ -109,32 +95,16 @@ export default function TestCasesPage() {
 
   const handleCreateTestCase = () => {
     if (!selectedProject) {
-      alert('Please select a project first')
+      notifyWarning({ title: 'Select a project first.' })
       return
     }
-    setSelectedTestCase(null)
-    setTestCaseDialogOpen(true)
+    router.push(`/test-management/cases/new?projectId=${encodeURIComponent(selectedProject)}`)
   }
 
   const handleEditTestCase = (testCase: TestCase) => {
-    const formTestCase: FormTestCase = {
-      _id: testCase._id,
-      title: testCase.title,
-      description: (testCase as any)?.description || '',
-      preconditions: (testCase as any)?.preconditions || '',
-      steps: (testCase as any)?.steps || [{ step: '', expectedResult: '' }],
-      expectedResult: (testCase as any)?.expectedResult || '',
-      testData: (testCase as any)?.testData || '',
-      priority: testCase.priority,
-      category: testCase.category,
-      automationStatus: testCase.automationStatus,
-      estimatedExecutionTime: testCase.estimatedExecutionTime,
-      testSuite: testCase.testSuite._id,
-      tags: testCase.tags || [],
-      requirements: (testCase as any)?.requirements || ''
-    }
-    setSelectedTestCase(formTestCase)
-    setTestCaseDialogOpen(true)
+    router.push(
+      `/test-management/cases/${encodeURIComponent(testCase._id)}/edit?projectId=${encodeURIComponent(selectedProject)}`
+    )
   }
 
   const handleDeleteTestCase = (testCaseId: string, testCaseTitle?: string) => {
@@ -143,102 +113,41 @@ export default function TestCasesPage() {
   }
 
   const handleExecuteTestCase = (testCase: TestCase) => {
-    setExecutionTestCase({
-      _id: testCase._id,
-      title: testCase.title,
-      priority: testCase.priority,
-      category: testCase.category,
-      estimatedExecutionTime: testCase.estimatedExecutionTime
-    })
-    setTestExecutionDialogOpen(true)
-  }
-
-  const handleSaveTestExecution = async (executionData: any) => {
-    setExecutionSaving(true)
-    try {
-      const payload = {
-        testCaseId: executionData.testCase,
-        testPlanId: executionData.testPlan || undefined,
-        status: executionData.status,
-        actualResult: executionData.actualResult,
-        comments: executionData.comments,
-        executionTime: executionData.executionTime,
-        environment: executionData.environment,
-        version: executionData.version,
-        attachments: executionData.attachments || []
-      }
-
-      const response = await fetch('/api/test-executions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-
-      if (response.ok) {
-        setTestExecutionDialogOpen(false)
-        setExecutionTestCase(null)
-      } else {
-        const data = await response.json().catch(() => ({}))
-        console.error('Failed to create test execution', data)
-      }
-    } catch (error) {
-      console.error('Error creating test execution:', error)
-    } finally {
-      setExecutionSaving(false)
+    if (!selectedProject) {
+      notifyWarning({ title: 'Select a project first.' })
+      return
     }
-  }
 
-  const handleSaveTestCase = async (testCaseData: FormTestCase) => {
-    setSaving(true)
-    try {
-      const url = selectedTestCase?._id 
-        ? `/api/test-cases/${selectedTestCase._id}`
-        : '/api/test-cases'
-      
-      const method = selectedTestCase?._id ? 'PUT' : 'POST'
-      
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...testCaseData,
-          // API expects testSuiteId, include it always to be explicit
-          testSuiteId: testCaseData.testSuite,
-          projectId: selectedProject
-        })
-      })
-
-      if (response.ok) {
-        setTestCaseDialogOpen(false)
-        setSelectedTestCase(null)
-        setRefreshCounter(c => c + 1)
-      } else {
-        console.error('Failed to save test case')
-      }
-    } catch (error) {
-      console.error('Error saving test case:', error)
-    } finally {
-      setSaving(false)
-    }
+    router.push(
+      `/test-management/executions/new?projectId=${encodeURIComponent(selectedProject)}&testCaseId=${encodeURIComponent(testCase._id)}`
+    )
   }
 
   const handleConfirmDelete = async () => {
     if (!deleteItem) return
-    
+
     setDeleting(true)
     try {
       const response = await fetch(`/api/test-cases/${deleteItem.id}`, {
         method: 'DELETE'
       })
 
-      if (response.ok) {
+      const data = await response.json().catch(() => ({}))
+
+      if (response.ok && (data as any)?.success !== false) {
+        notifySuccess({ title: 'Test case deleted.' })
         setDeleteDialogOpen(false)
         setDeleteItem(null)
         setRefreshCounter(c => c + 1)
       } else {
-        console.error('Failed to delete test case')
+        notifyError({
+          title: 'Failed to delete test case.',
+          message: (data as any)?.error || 'Please try again.'
+        })
+        console.error('Failed to delete test case', data)
       }
     } catch (error) {
+      notifyError({ title: 'Failed to delete test case.', message: 'Please try again.' })
       console.error('Error deleting test case:', error)
     } finally {
       setDeleting(false)
@@ -327,43 +236,6 @@ export default function TestCasesPage() {
             onTestCaseExecute={handleExecuteTestCase}
           />
         </div>
-
-        {/* Dialogs */}
-        <ResponsiveDialog
-          open={testCaseDialogOpen}
-          onOpenChange={setTestCaseDialogOpen}
-          title={selectedTestCase ? 'Edit Test Case' : 'Create Test Case'}
-          dismissible={false}
-        >
-          <TestCaseForm
-            testCase={selectedTestCase || undefined}
-            projectId={selectedProject}
-            onSave={handleSaveTestCase}
-            onCancel={() => {
-              setTestCaseDialogOpen(false)
-              setSelectedTestCase(null)
-            }}
-            loading={saving}
-          />
-        </ResponsiveDialog>
-
-        <ResponsiveDialog
-          open={testExecutionDialogOpen}
-          onOpenChange={setTestExecutionDialogOpen}
-          title="Execute Test Case"
-          dismissible={false}
-        >
-          <TestExecutionForm
-            projectId={selectedProject}
-            testCase={executionTestCase || undefined}
-            onSave={handleSaveTestExecution}
-            onCancel={() => {
-              setTestExecutionDialogOpen(false)
-              setExecutionTestCase(null)
-            }}
-            loading={executionSaving}
-          />
-        </ResponsiveDialog>
 
         <DeleteConfirmDialog
           isOpen={deleteDialogOpen}

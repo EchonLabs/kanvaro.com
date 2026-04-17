@@ -86,6 +86,14 @@ export default function TestCaseList({
 }: TestCaseListProps) {
   const ITEMS_PER_PAGE = 20
 
+  const stripHtml = (html: string): string => {
+    return (html || '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
   const [testCases, setTestCases] = useState<TestCase[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -317,10 +325,10 @@ export default function TestCaseList({
 
             <Select value={categoryFilter || ALL_CATEGORIES} onValueChange={(v) => setCategoryFilter(v === ALL_CATEGORIES ? '' : v)}>
               <SelectTrigger className="w-full sm:w-36">
-                <SelectValue placeholder="Category" />
+                <SelectValue placeholder="Testing Types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL_CATEGORIES}>All Categories</SelectItem>
+                <SelectItem value={ALL_CATEGORIES}>All Testing Types</SelectItem>
                 <SelectItem value="functional">Functional</SelectItem>
                 <SelectItem value="integration">Integration</SelectItem>
                 <SelectItem value="regression">Regression</SelectItem>
@@ -333,10 +341,10 @@ export default function TestCaseList({
 
             <Select value={automationFilter || ALL_STATUS} onValueChange={(v) => setAutomationFilter(v === ALL_STATUS ? '' : v)}>
               <SelectTrigger className="w-full sm:w-40">
-                <SelectValue placeholder="Automation" />
+                <SelectValue placeholder="Testing Approaches" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL_STATUS}>All Status</SelectItem>
+                <SelectItem value={ALL_STATUS}>All Testing Approaches</SelectItem>
                 <SelectItem value="not_automated">Not Automated</SelectItem>
                 <SelectItem value="automated">Automated</SelectItem>
                 <SelectItem value="semi_automated">Semi Automated</SelectItem>
@@ -393,8 +401,8 @@ export default function TestCaseList({
                   <TableHead>Title</TableHead>
                   <TableHead>Suite</TableHead>
                   <TableHead>Priority</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Automation</TableHead>
+                  <TableHead>Testing Types</TableHead>
+                  <TableHead>Testing Approaches</TableHead>
                   <TableHead>Time</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
@@ -420,7 +428,7 @@ export default function TestCaseList({
                       <div>
                         <div className="font-medium">{testCase.title}</div>
                         <div className="text-sm text-muted-foreground truncate max-w-xs">
-                          {testCase.description}
+                          {stripHtml(testCase.description)}
                         </div>
                       </div>
                     </TableCell>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { BarChart3, PieChart, TrendingUp, Download, Calendar, Users, DollarSign, Clock, X, RotateCcw, FileText, Briefcase } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -136,6 +136,30 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
   const [assignedByFilterQuery, setAssignedByFilterQuery] = useState('')
   const [taskFilterQuery, setTaskFilterQuery] = useState('')
+
+  const projectFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const taskFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const assignedToFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const assignedByFilterInputRef = useRef<HTMLInputElement | null>(null)
+
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+
+    const doFocus = () => {
+      el.focus({ preventScroll: true })
+      try {
+        el.select?.()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(doFocus)
+    } else {
+      setTimeout(doFocus, 0)
+    }
+  }
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -747,13 +771,20 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
             </div>
             <div>
               <Label htmlFor="projectId">Project</Label>
-              <Select value={filters.projectId} onValueChange={(value) => { setFilters(prev => ({ ...prev, projectId: value })); setProjectFilterQuery(''); }}>
+              <Select
+                value={filters.projectId}
+                onValueChange={(value) => { setFilters(prev => ({ ...prev, projectId: value })); setProjectFilterQuery(''); }}
+                onOpenChange={(open) => {
+                  if (open) focusSearchInput(projectFilterInputRef.current)
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="All Projects" />
                 </SelectTrigger>
                 <SelectContent className="p-0">
                   <div className="p-2">
                     <Input
+                      ref={projectFilterInputRef}
                       value={projectFilterQuery}
                       onChange={(e) => setProjectFilterQuery(e.target.value)}
                       placeholder="Search projects"
@@ -779,13 +810,20 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
             </div>
             <div>
               <Label htmlFor="taskId">Task</Label>
-              <Select value={filters.taskId} onValueChange={(value) => { setFilters(prev => ({ ...prev, taskId: value })); setTaskFilterQuery(''); }}>
+              <Select
+                value={filters.taskId}
+                onValueChange={(value) => { setFilters(prev => ({ ...prev, taskId: value })); setTaskFilterQuery(''); }}
+                onOpenChange={(open) => {
+                  if (open) focusSearchInput(taskFilterInputRef.current)
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder={filters.projectId === 'all' ? 'All Tasks' : 'Select Task'} />
                 </SelectTrigger>
                 <SelectContent className="p-0">
                   <div className="p-2">
                     <Input
+                      ref={taskFilterInputRef}
                       value={taskFilterQuery}
                       onChange={(e) => setTaskFilterQuery(e.target.value)}
                       placeholder="Search tasks"
@@ -814,13 +852,20 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
             </div>
             <div>
               <Label htmlFor="assignedTo">Assigned To</Label>
-              <Select value={filters.assignedTo} onValueChange={(value) => { setFilters(prev => ({ ...prev, assignedTo: value })); setAssignedToFilterQuery(''); }}>
+              <Select
+                value={filters.assignedTo}
+                onValueChange={(value) => { setFilters(prev => ({ ...prev, assignedTo: value })); setAssignedToFilterQuery(''); }}
+                onOpenChange={(open) => {
+                  if (open) focusSearchInput(assignedToFilterInputRef.current)
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="All Users" />
                 </SelectTrigger>
                 <SelectContent className="p-0">
                   <div className="p-2">
                     <Input
+                      ref={assignedToFilterInputRef}
                       value={assignedToFilterQuery}
                       onChange={(e) => setAssignedToFilterQuery(e.target.value)}
                       placeholder="Search users"
@@ -846,13 +891,20 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
             </div>
             <div className='mb-4'>
               <Label htmlFor="approvedBy">Approved By</Label>
-              <Select value={filters.assignedBy} onValueChange={(value) => { setFilters(prev => ({ ...prev, assignedBy: value })); setAssignedByFilterQuery(''); }}>
+              <Select
+                value={filters.assignedBy}
+                onValueChange={(value) => { setFilters(prev => ({ ...prev, assignedBy: value })); setAssignedByFilterQuery(''); }}
+                onOpenChange={(open) => {
+                  if (open) focusSearchInput(assignedByFilterInputRef.current)
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="All Approvers" />
                 </SelectTrigger>
                 <SelectContent className="p-0">
                   <div className="p-2">
                     <Input
+                      ref={assignedByFilterInputRef}
                       value={assignedByFilterQuery}
                       onChange={(e) => setAssignedByFilterQuery(e.target.value)}
                       placeholder="Search approvers"

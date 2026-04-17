@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/Dialog'
+import { useToast } from '@/components/ui/Toast'
 import { Timer } from '@/components/time-tracking/Timer'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
@@ -51,6 +52,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
   const router = useRouter()
   const { organization } = useOrganization()
   const { formatDuration: formatDurationUtil } = useDateTime()
+  const { showToast } = useToast()
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null)
   const [timeStats, setTimeStats] = useState<TimeStats | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -241,6 +243,17 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
       }
       if (action === 'stop') {
         handleTimerUpdate(null)
+        const hasTimeLogged = data.hasTimeLogged && data.duration > 0
+        showToast({
+          type: hasTimeLogged ? 'success' : 'info',
+          title: 'Timer Stopped',
+          message:
+            data.message ||
+            (hasTimeLogged
+              ? 'Timer stopped successfully.'
+              : 'Timer stopped. No time was logged.'),
+          duration: 5000
+        })
       } else {
         setActiveTimer(data.activeTimer)
       }

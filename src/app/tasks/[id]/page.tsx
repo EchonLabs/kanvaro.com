@@ -44,6 +44,7 @@ import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { extractUserId } from '@/lib/auth/user-utils'
 import TaskActivityLog from '@/components/tasks/TaskActivityLog'
+import { StartTimerModal } from '@/components/time-tracking/StartTimerModal'
 
 interface Task {
   _id: string
@@ -198,7 +199,7 @@ export default function TaskDetailPage() {
   const params = useParams()
   const taskId = params.id as string
   const { setItems } = useBreadcrumb()
-  const { formatDate, formatDateTimeSafe } = useDateTime()
+  const { formatDate, formatDateTimeSafe, formatDuration } = useDateTime()
 
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
@@ -214,6 +215,14 @@ export default function TaskDetailPage() {
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
   const [suggestionComposer, setSuggestionComposer] = useState<ComposerType | null>(null)
   const [currentUserId, setCurrentUserId] = useState('')
+  const [currentOrganizationId, setCurrentOrganizationId] = useState('')
+  const [showStartTimerModal, setShowStartTimerModal] = useState(false)
+  const [activeTimer, setActiveTimer] = useState<any | null | undefined>(undefined)
+  const [activeTimerDisplay, setActiveTimerDisplay] = useState(() => formatDuration(0))
+  const activeTimerBaseMinutesRef = useRef<number>(0)
+  const activeTimerTickStartMsRef = useRef<number | null>(null)
+  const activeTimerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [stoppingTimer, setStoppingTimer] = useState(false)
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editingContent, setEditingContent] = useState<string>('')
@@ -268,6 +277,9 @@ export default function TaskDetailPage() {
         const me = await response.json().catch(() => null)
         const uid = extractUserId(me)
         if (uid) setCurrentUserId(uid)
+        const orgRaw = me?.organization
+        const orgId = (typeof orgRaw === 'string' ? orgRaw : (orgRaw?._id ?? orgRaw?.id))
+        if (orgId) setCurrentOrganizationId(orgId.toString())
         setAuthError('')
         await fetchTask()
       } else if (response.status === 401) {
@@ -279,6 +291,9 @@ export default function TaskDetailPage() {
           const me = await fetch('/api/auth/me').then(r => r.json()).catch(() => null)
           const uid = extractUserId(me)
           if (uid) setCurrentUserId(uid)
+          const orgRaw = me?.organization
+          const orgId = (typeof orgRaw === 'string' ? orgRaw : (orgRaw?._id ?? orgRaw?.id))
+          if (orgId) setCurrentOrganizationId(orgId.toString())
           setAuthError('')
           await fetchTask()
         } else {
@@ -310,6 +325,123 @@ export default function TaskDetailPage() {
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
+
+  const loadActiveTimer = useCallback(async () => {
+    if (!currentUserId || !currentOrganizationId) return
+
+    try {
+      const response = await fetch(
+        `/api/time-tracking/timer?userId=${encodeURIComponent(currentUserId)}&organizationId=${encodeURIComponent(currentOrganizationId)}`
+      )
+
+      if (!response.ok) {
+        setActiveTimer(null)
+        return
+      }
+
+      const data = await response.json().catch(() => null)
+      setActiveTimer(data?.activeTimer ?? null)
+    } catch (error) {
+      console.error('Failed to load active timer:', error)
+    }
+  }, [currentUserId, currentOrganizationId])
+
+  const handleStopTimer = useCallback(async () => {
+    if (!currentUserId || !currentOrganizationId || !activeTimer) return
+
+    setStoppingTimer(true)
+    try {
+      const response = await fetch('/api/time-tracking/timer', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUserId,
+          organizationId: currentOrganizationId,
+          action: 'stop',
+          description: (activeTimer as any)?.description ?? ''
+        })
+      })
+
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        notifyError({ title: data?.error || 'Failed to stop timer' })
+        return
+      }
+
+      notifySuccess({ title: data?.message || 'Timer stopped' })
+      setActiveTimer(null)
+      setActiveTimerDisplay(formatDuration(0))
+      loadActiveTimer()
+    } catch (error) {
+      console.error('Failed to stop timer:', error)
+      notifyError({ title: 'Failed to stop timer' })
+    } finally {
+      setStoppingTimer(false)
+    }
+  }, [activeTimer, currentOrganizationId, currentUserId, formatDuration, loadActiveTimer, notifyError, notifySuccess])
+
+  useEffect(() => {
+    if (!currentUserId || !currentOrganizationId) return
+
+    loadActiveTimer()
+    const interval = setInterval(loadActiveTimer, 30_000)
+    return () => clearInterval(interval)
+  }, [currentUserId, currentOrganizationId, loadActiveTimer])
+
+  useEffect(() => {
+    if (activeTimerIntervalRef.current) {
+      clearInterval(activeTimerIntervalRef.current)
+      activeTimerIntervalRef.current = null
+    }
+
+    const activeTimerTaskId = (() => {
+      const candidate = (activeTimer as any)?.task
+      if (!candidate) return null
+      if (typeof candidate === 'string') return candidate
+      if (typeof candidate === 'object') {
+        if ((candidate as any)._id) return (candidate as any)._id.toString()
+        if ((candidate as any).id) return (candidate as any).id.toString()
+      }
+      return candidate?.toString?.() ?? null
+    })()
+
+    const currentTaskId = task?._id?.toString?.() ?? null
+    const isRelevant = Boolean(activeTimer && currentTaskId && activeTimerTaskId && activeTimerTaskId === currentTaskId)
+
+    if (!activeTimer || !isRelevant) {
+      activeTimerBaseMinutesRef.current = 0
+      activeTimerTickStartMsRef.current = null
+      setActiveTimerDisplay(formatDuration(0))
+      return
+    }
+
+    const baseMinutes = Number(activeTimer?.currentDuration || 0)
+    activeTimerBaseMinutesRef.current = baseMinutes
+    setActiveTimerDisplay(formatDuration(baseMinutes))
+
+    const isPaused = Boolean(activeTimer?.isPaused || activeTimer?.pausedAt)
+    if (isPaused) {
+      activeTimerTickStartMsRef.current = null
+      return
+    }
+
+    activeTimerTickStartMsRef.current = Date.now()
+    activeTimerIntervalRef.current = setInterval(() => {
+      const tickStart = activeTimerTickStartMsRef.current
+      if (!tickStart) return
+      const elapsedMinutes = (Date.now() - tickStart) / 60_000
+      const runningMinutes = activeTimerBaseMinutesRef.current + elapsedMinutes
+      setActiveTimerDisplay(formatDuration(runningMinutes))
+    }, 1000)
+
+    return () => {
+      if (activeTimerIntervalRef.current) {
+        clearInterval(activeTimerIntervalRef.current)
+        activeTimerIntervalRef.current = null
+      }
+    }
+  }, [activeTimer, task?._id, formatDuration])
 
   // Load mentions and issues when component mounts
   useEffect(() => {
@@ -1395,6 +1527,25 @@ export default function TaskDetailPage() {
         : 'Unknown'
   }))
 
+  const isActiveTimerLoading = activeTimer === undefined
+  const hasActiveTimer = Boolean(activeTimer)
+  const activeTimerTaskId = (() => {
+    const candidate = (activeTimer as any)?.task
+    if (!candidate) return null
+    if (typeof candidate === 'string') return candidate
+    if (typeof candidate === 'object') {
+      if ((candidate as any)._id) return (candidate as any)._id.toString()
+      if ((candidate as any).id) return (candidate as any).id.toString()
+    }
+    return candidate?.toString?.() ?? null
+  })()
+  const isRelevantActiveTimer = Boolean(
+    hasActiveTimer &&
+      task?._id &&
+      activeTimerTaskId &&
+      activeTimerTaskId === task._id.toString()
+  )
+
   return (
     <MainLayout>
       <div className="space-y-8 sm:space-y-10 lg:space-y-12 overflow-x-hidden">
@@ -1421,6 +1572,38 @@ export default function TaskDetailPage() {
                   </span>
                 </h1>
                 <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap ml-auto justify-end">
+                  {isRelevantActiveTimer && (
+                    <Badge variant="outline" className="min-h-[36px] inline-flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      {activeTimerDisplay}
+                    </Badge>
+                  )}
+                  {isRelevantActiveTimer && (
+                    <Button
+                      variant="destructive"
+                      onClick={handleStopTimer}
+                      disabled={stoppingTimer}
+                      className="min-h-[36px] w-full sm:w-auto"
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Stop
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => setShowStartTimerModal(true)}
+                    disabled={
+                      isActiveTimerLoading ||
+                      hasActiveTimer ||
+                      !currentUserId ||
+                      !currentOrganizationId ||
+                      !task.project?._id ||
+                      !task._id
+                    }
+                    className="min-h-[36px] w-full sm:w-auto"
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Start Timer
+                  </Button>
                   <Button
                     variant="outline"
                     disabled={!editAllowed}
@@ -2039,6 +2222,19 @@ export default function TaskDetailPage() {
           </div>
         </div>
       </div>
+
+      <StartTimerModal
+        open={showStartTimerModal}
+        onOpenChange={setShowStartTimerModal}
+        userId={currentUserId}
+        organizationId={currentOrganizationId}
+        project={{ id: task.project._id, name: task.project.name }}
+        task={{ id: task._id, title: task.title }}
+        onStarted={(startedTimer) => {
+          if (startedTimer) setActiveTimer(startedTimer)
+          else loadActiveTimer()
+        }}
+      />
 
       {/* Delete Confirmation Modal */}
       <ConfirmationModal

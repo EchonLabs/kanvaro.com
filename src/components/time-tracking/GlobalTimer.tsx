@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { useToast } from '@/components/ui/Toast'
 import { 
   Play, 
   Pause, 
@@ -35,6 +36,7 @@ export function GlobalTimer({ className }: GlobalTimerProps) {
   const [elapsed, setElapsed] = useState(0)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const { showToast } = useToast()
 
   useEffect(() => {
     loadCurrentTimer()
@@ -140,6 +142,12 @@ export function GlobalTimer({ className }: GlobalTimerProps) {
       })
 
       if (response.ok) {
+        showToast({
+          type: 'success',
+          title: 'Timer Stopped',
+          message: 'Timer stopped successfully.',
+          duration: 5000
+        })
         setTimer(null)
         setElapsed(0)
       }

@@ -44,7 +44,8 @@ import {
   File,
   Image,
   Trash2,
-  ExternalLink
+  ExternalLink,
+  Download
 } from 'lucide-react'
 
 interface ProjectFormData {
@@ -717,6 +718,18 @@ const [overheadInput, setOverheadInput] = useState('')
       ...prev,
       teamMembers: [...prev.teamMembers, { memberId: memberIdString }]
     }))
+
+    // Prefill hourly rate from member's saved default hourly rate (set in Edit Team Member)
+    setMemberHourlyRates(prev => {
+      if (prev[memberIdString] !== undefined) return prev
+      const defaultRate = typeof member === 'object' ? member.hourlyRate : undefined
+      if (defaultRate === null || defaultRate === undefined || Number.isNaN(Number(defaultRate))) return prev
+      return {
+        ...prev,
+        [memberIdString]: String(defaultRate)
+      }
+    })
+
     setShowMemberSearch(false)
     setMemberSearchQuery('')
     notifySuccess({ title: '', message: 'Team member has been successfully added to the project team.' })
@@ -1480,21 +1493,21 @@ const [overheadInput, setOverheadInput] = useState('')
                                       ...prev,
                                       [member.memberId]: e.target.value
                                     }))}
-                                    placeholder={memberData.projectHourlyRate ? `${memberData.projectHourlyRate}` : 'Set rate'}
+                                    placeholder={memberData.hourlyRate !== undefined && memberData.hourlyRate !== null ? `${memberData.hourlyRate}` : 'Set rate'}
                                     className="w-24 h-8 text-xs"
                                   />
                                   <span className="text-xs text-muted-foreground">/hr</span>
-                                  {memberData.projectHourlyRate && (
+                                  {memberData.hourlyRate !== undefined && memberData.hourlyRate !== null && (
                                     <Button
                                       type="button"
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => setMemberHourlyRates(prev => ({
                                         ...prev,
-                                        [member.memberId]: memberData.projectHourlyRate.toString()
+                                        [member.memberId]: memberData.hourlyRate.toString()
                                       }))}
                                       className="text-xs h-6 px-2"
-                                      title="Use project default rate"
+                                      title="Use member default rate"
                                     >
                                       Use default
                                     </Button>
@@ -1532,17 +1545,42 @@ const [overheadInput, setOverheadInput] = useState('')
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              filteredMembers.forEach(member => {
-                                const memberId = member._id
-                                const memberIdString = typeof memberId === 'string' ? memberId : memberId.toString()
-                                const alreadyExists = formData.teamMembers.some((m: any) => m.memberId === memberIdString)
-                                if (!alreadyExists) {
-                                  setFormData(prev => ({
-                                    ...prev,
-                                    teamMembers: [...prev.teamMembers, { memberId: memberIdString }]
-                                  }))
+                              const newMemberIds: string[] = []
+
+                              setFormData(prev => {
+                                const existing = new Set(prev.teamMembers.map(m => m.memberId))
+                                const additions = filteredMembers
+                                  .map(member => {
+                                    const rawId = member._id
+                                    const id = typeof rawId === 'string' ? rawId : rawId.toString()
+                                    return { id, member }
+                                  })
+                                  .filter(({ id }) => !existing.has(id))
+
+                                additions.forEach(({ id }) => newMemberIds.push(id))
+
+                                if (additions.length === 0) return prev
+                                return {
+                                  ...prev,
+                                  teamMembers: [...prev.teamMembers, ...additions.map(({ id }) => ({ memberId: id }))]
                                 }
                               })
+
+                              if (newMemberIds.length > 0) {
+                                setMemberHourlyRates(prev => {
+                                  const next = { ...prev }
+                                  filteredMembers.forEach(member => {
+                                    const rawId = member._id
+                                    const id = typeof rawId === 'string' ? rawId : rawId.toString()
+                                    if (!newMemberIds.includes(id)) return
+                                    if (next[id] !== undefined) return
+                                    if (member.hourlyRate === null || member.hourlyRate === undefined) return
+                                    if (Number.isNaN(Number(member.hourlyRate))) return
+                                    next[id] = String(member.hourlyRate)
+                                  })
+                                  return next
+                                })
+                              }
                             }}
                             className="whitespace-nowrap"
                           >
@@ -1574,7 +1612,14 @@ const [overheadInput, setOverheadInput] = useState('')
                                     {formatToTitleCase(member.role?.replace(/_/g, ' '))}
                                   </Badge>
                                 </div>
-                                <Plus className="h-4 w-4 text-muted-foreground" />
+                                <div className="flex items-center gap-3">
+                                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                    {member.hourlyRate !== undefined && member.hourlyRate !== null
+                                      ? `${orgCurrency} ${member.hourlyRate}/hr`
+                                      : 'No default rate'}
+                                  </span>
+                                  <Plus className="h-4 w-4 text-muted-foreground" />
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -2000,6 +2045,7 @@ const [overheadInput, setOverheadInput] = useState('')
                           .slice((attachmentsPage - 1) * attachmentsPerPage, attachmentsPage * attachmentsPerPage)
                           .map((attachment, index) => {
                             const actualIndex = (attachmentsPage - 1) * attachmentsPerPage + index;
+                            const downloadUrl = `${attachment.url}${attachment.url.includes('?') ? '&' : '?'}download=1&filename=${encodeURIComponent(attachment.name)}`
                             return (
                               <div key={actualIndex} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
                                 <div className="flex items-center space-x-3 flex-1 min-w-0">
@@ -2019,18 +2065,48 @@ const [overheadInput, setOverheadInput] = useState('')
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <Button
+                                        asChild
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => window.open(attachment.url, '_blank')}
                                       >
-                                        <ExternalLink className="h-4 w-4" />
+                                        <a
+                                          href={attachment.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <ExternalLink className="h-4 w-4" />
+                                        </a>
                                       </Button>
                                     </TooltipTrigger>
                                     <TooltipContent>
                                       <p>Open file</p>
                                     </TooltipContent>
                                   </Tooltip>
+
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        asChild
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                      >
+                                        <a
+                                          href={downloadUrl}
+                                          download={attachment.name}
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <Download className="h-4 w-4" />
+                                        </a>
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Download file</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <Button
