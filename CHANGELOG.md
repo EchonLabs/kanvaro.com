@@ -1,3 +1,10 @@
+## [1.31.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.31.0...v1.31.1) (2026-04-17)
+
+
+### Bug Fixes
+
+* add active timer functionality and improve timer management in task and time tracking components ([1762e4f](https://github.com/EchonLabs/kanvaro.com/commit/1762e4f2f0678664e4ed922e89d2e540b1e14a9b))
+
 # [1.31.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.30.14...v1.31.0) (2026-04-16)
 
 
