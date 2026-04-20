@@ -1,3 +1,10 @@
+# [1.32.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.31.1...v1.32.0) (2026-04-20)
+
+
+### Features
+
+* enhance time tracking widget with word truncation and improved task description display ([9fddfcd](https://github.com/EchonLabs/kanvaro.com/commit/9fddfcd265e63e1e6a9ce0abb694a92bc53fbbc0))
+
 ## [1.31.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.31.0...v1.31.1) (2026-04-17)
 
 
