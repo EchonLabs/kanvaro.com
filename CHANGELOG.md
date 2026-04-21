@@ -1,3 +1,10 @@
+## [1.32.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.32.2...v1.32.3) (2026-04-21)
+
+
+### Bug Fixes
+
+* update local server URL to use HTTPS for development ([0ff3e46](https://github.com/EchonLabs/kanvaro.com/commit/0ff3e46c288426e8175daf4cf15579b5c3d5db73))
+
 ## [1.32.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.32.1...v1.32.2) (2026-04-21)
 
 
