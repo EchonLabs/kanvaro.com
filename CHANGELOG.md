@@ -1,3 +1,10 @@
+## [1.32.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.32.4...v1.32.5) (2026-04-21)
+
+
+### Bug Fixes
+
+* update Swagger UI endpoint and add new API route for OpenAPI specification ([7a2f0f4](https://github.com/EchonLabs/kanvaro.com/commit/7a2f0f4ae1aefe88840834b74070022e2f31c3d6))
+
 ## [1.32.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.32.3...v1.32.4) (2026-04-21)
 
 
