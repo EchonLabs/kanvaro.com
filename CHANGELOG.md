@@ -1,3 +1,31 @@
+## [1.32.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.32.4...v1.32.5) (2026-04-21)
+
+
+### Bug Fixes
+
+* update Swagger UI endpoint and add new API route for OpenAPI specification ([7a2f0f4](https://github.com/EchonLabs/kanvaro.com/commit/7a2f0f4ae1aefe88840834b74070022e2f31c3d6))
+
+## [1.32.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.32.3...v1.32.4) (2026-04-21)
+
+
+### Bug Fixes
+
+* add sanitize-html dependency for improved HTML sanitization ([351d015](https://github.com/EchonLabs/kanvaro.com/commit/351d01507a8ce0c96a087f06ca3ce552a69ceeb8))
+
+## [1.32.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.32.2...v1.32.3) (2026-04-21)
+
+
+### Bug Fixes
+
+* update local server URL to use HTTPS for development ([0ff3e46](https://github.com/EchonLabs/kanvaro.com/commit/0ff3e46c288426e8175daf4cf15579b5c3d5db73))
+
+## [1.32.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.32.1...v1.32.2) (2026-04-21)
+
+
+### Bug Fixes
+
+* sanitize task descriptions and improve HTML handling in task components ([845e8bc](https://github.com/EchonLabs/kanvaro.com/commit/845e8bc135ff3df9c1057e6e063c2551a76a029d))
+
 ## [1.32.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.32.0...v1.32.1) (2026-04-20)
 
 

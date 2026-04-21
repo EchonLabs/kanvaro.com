@@ -275,16 +275,46 @@ export default function ColumnSettingsModal({
 
   const checkTasksInColumn = async (columnKey: string): Promise<number> => {
     try {
-      const response = await fetch(`/api/tasks?project=${projectId}&status=${columnKey}`)
-      const data = await response.json()
-      
-      if (data.success && Array.isArray(data.data)) {
-        const ids = data.data.map((task: any) => task._id)
-        setTaskIdsInColumn(ids)
-        return ids.length
+      if (!projectId || projectId.trim() === '') {
+        setTaskIdsInColumn([])
+        return 0
       }
-      setTaskIdsInColumn([])
-      return 0
+
+      const ids: string[] = []
+      let page = 1
+      let total = 0
+      let totalPages = 1
+
+      // Fetch tasks in minimal mode to avoid heavy population.
+      // Page through results so we can migrate *all* tasks in the column.
+      do {
+        const response = await fetch(
+          `/api/tasks?project=${encodeURIComponent(projectId)}&status=${encodeURIComponent(columnKey)}&minimal=true&limit=1000&page=${page}`
+        )
+        const data = await response.json()
+
+        if (!data?.success || !Array.isArray(data.data)) {
+          setTaskIdsInColumn([])
+          return 0
+        }
+
+        ids.push(
+          ...data.data
+            .map((task: any) => task?._id)
+            .filter((id: any): id is string => typeof id === 'string' && id.length > 0)
+        )
+
+        total = typeof data?.pagination?.total === 'number' ? data.pagination.total : ids.length
+        totalPages = typeof data?.pagination?.totalPages === 'number' ? data.pagination.totalPages : page
+
+        page += 1
+
+        // Safety cap to prevent accidental endless loops.
+        if (page > 50) break
+      } while (page <= totalPages)
+
+      setTaskIdsInColumn(ids)
+      return total
     } catch (error) {
       console.error('Error checking tasks:', error)
       setTaskIdsInColumn([])

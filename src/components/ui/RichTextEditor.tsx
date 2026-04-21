@@ -30,6 +30,232 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu'
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function plainTextToHtml(text: string): string {
+  const normalized = text.replace(/\r\n?/g, '\n').replace(/\u00a0/g, ' ')
+  const paragraphs = normalized
+    .split(/\n{2,}/)
+    .map(p => p.trim())
+    .filter(Boolean)
+
+  if (paragraphs.length === 0) return ''
+
+  return paragraphs
+    .map(p => {
+      const lines = p.split(/\n/).map(line => escapeHtml(line))
+      return `<p>${lines.join('<br>')}</p>`
+    })
+    .join('')
+}
+
+function sanitizePastedHtml(html: string): string {
+  const container = document.createElement('div')
+  container.innerHTML = html
+
+  // Remove dangerous/non-content elements early
+  container.querySelectorAll('script,style,meta,link,iframe,object,embed').forEach(node => node.remove())
+
+  const allowedTags = new Set([
+    'P',
+    'BR',
+    'STRONG',
+    'B',
+    'EM',
+    'I',
+    'U',
+    'UL',
+    'OL',
+    'LI',
+    'A',
+    'IMG',
+    'H1',
+    'H2',
+    'H3',
+    'H4',
+    'H5',
+    'H6',
+    'DIV',
+    'SPAN',
+    'FONT'
+  ])
+
+  const elements = Array.from(container.querySelectorAll('*')).reverse()
+  for (const el of elements) {
+    const tag = el.tagName.toUpperCase()
+
+    // Strip attributes we don't want (styles/classes from external sources cause spacing issues)
+    for (const attr of Array.from(el.attributes)) {
+      const name = attr.name.toLowerCase()
+      if (name === 'href' && tag === 'A') continue
+      if (name === 'src' && tag === 'IMG') continue
+      if ((name === 'alt' || name === 'title' || name === 'width' || name === 'height') && tag === 'IMG') continue
+      if ((name === 'target' || name === 'rel') && tag === 'A') continue
+      el.removeAttribute(attr.name)
+    }
+
+    if (!allowedTags.has(tag)) {
+      // Unknown tag: unwrap it but keep its content
+      const parent = el.parentNode
+      if (!parent) continue
+      while (el.firstChild) parent.insertBefore(el.firstChild, el)
+      parent.removeChild(el)
+      continue
+    }
+
+    // Normalize common inline tags
+    if (tag === 'B') {
+      const strong = document.createElement('strong')
+      while (el.firstChild) strong.appendChild(el.firstChild)
+      el.replaceWith(strong)
+      continue
+    }
+    if (tag === 'I') {
+      const em = document.createElement('em')
+      while (el.firstChild) em.appendChild(el.firstChild)
+      el.replaceWith(em)
+      continue
+    }
+
+    // Convert div wrappers into paragraphs to preserve structure on render
+    if (tag === 'DIV') {
+      const p = document.createElement('p')
+      while (el.firstChild) p.appendChild(el.firstChild)
+      el.replaceWith(p)
+      continue
+    }
+
+    // Unwrap span/font (keep text but avoid inline style artifacts)
+    if (tag === 'SPAN' || tag === 'FONT') {
+      const parent = el.parentNode
+      if (!parent) continue
+      while (el.firstChild) parent.insertBefore(el.firstChild, el)
+      parent.removeChild(el)
+      continue
+    }
+
+    if (tag === 'A') {
+      const href = (el.getAttribute('href') || '').trim()
+      // Avoid javascript: and other odd protocols
+      if (href && /^(https?:|mailto:|tel:|\/)/i.test(href)) {
+        el.setAttribute('href', href)
+      } else {
+        el.removeAttribute('href')
+      }
+
+      if (el.getAttribute('target') === '_blank') {
+        el.setAttribute('rel', 'noopener noreferrer')
+      } else {
+        el.removeAttribute('target')
+        el.removeAttribute('rel')
+      }
+    }
+
+    if (tag === 'IMG') {
+      const src = (el.getAttribute('src') || '').trim()
+      // Only keep reasonably safe/expected image sources
+      if (!src || !/^(https?:|\/)/i.test(src)) {
+        el.remove()
+        continue
+      }
+      el.setAttribute('src', src)
+    }
+  }
+
+  // Normalize NBSP and excessive whitespace in text nodes
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+  const textNodes: Text[] = []
+  while (walker.nextNode()) textNodes.push(walker.currentNode as Text)
+  for (const node of textNodes) {
+    node.nodeValue = (node.nodeValue || '').replace(/\u00a0/g, ' ')
+  }
+
+  // Remove empty blocks like <p><br></p> and collapse excessive <br>
+  container.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li').forEach(block => {
+    const hasImage = !!block.querySelector('img')
+    const text = (block.textContent || '').replace(/\u00a0/g, ' ').trim()
+    const brOnly = block.querySelectorAll('*').length === 1 && block.querySelector('br')
+    if (!hasImage && (!text || brOnly) && block.querySelectorAll('br').length > 0) {
+      block.remove()
+    } else if (!hasImage && !text && block.querySelectorAll('br').length === 0) {
+      block.remove()
+    }
+  })
+
+  // Collapse 3+ consecutive <br> into 2
+  const brs = Array.from(container.querySelectorAll('br'))
+  for (const br of brs) {
+    let count = 1
+    let next = br.nextSibling
+    while (next && (next.nodeType === Node.TEXT_NODE ? !(next.textContent || '').trim() : next.nodeName === 'BR')) {
+      if (next.nodeName === 'BR') {
+        count++
+      }
+      const toCheck = next
+      next = next.nextSibling
+      if (toCheck.nodeName === 'BR' && count > 2) {
+        toCheck.parentNode?.removeChild(toCheck)
+      }
+    }
+  }
+
+  return container.innerHTML.trim()
+}
+
+async function uploadImageToAttachmentsApi(file: Blob, filename: string): Promise<{ url: string; name?: string } | null> {
+  // Validate file size (25MB max)
+  if (file.size > 25 * 1024 * 1024) return null
+
+  const formData = new FormData()
+  formData.append('attachment', file, filename)
+
+  const response = await fetch('/api/uploads/attachments', {
+    method: 'POST',
+    body: formData,
+  })
+
+  if (!response.ok) return null
+
+  const result = await response.json().catch(() => null)
+  if (!result?.success || !result?.data?.url) return null
+  return { url: result.data.url, name: result.data.name }
+}
+
+async function replaceDataUrlImagesWithUploads(html: string): Promise<string> {
+  const container = document.createElement('div')
+  container.innerHTML = html
+
+  const images = Array.from(container.querySelectorAll('img'))
+  for (const img of images) {
+    const src = (img.getAttribute('src') || '').trim()
+    if (!src.toLowerCase().startsWith('data:image/')) continue
+
+    try {
+      const blob = await fetch(src).then(r => r.blob())
+      const ext = blob.type?.split('/')?.[1] || 'png'
+      const uploaded = await uploadImageToAttachmentsApi(blob, `pasted-image.${ext}`)
+      if (uploaded?.url) {
+        img.setAttribute('src', uploaded.url)
+        if (uploaded.name && !img.getAttribute('alt')) img.setAttribute('alt', uploaded.name)
+      } else {
+        // If upload fails, remove the image to avoid inserting unusable data URLs
+        img.remove()
+      }
+    } catch {
+      img.remove()
+    }
+  }
+
+  return container.innerHTML
+}
+
 interface RichTextEditorProps {
   value: string
   onChange: (value: string) => void
@@ -532,61 +758,30 @@ export function RichTextEditor({
         setIsUploadingImage(false)
       }
     } else {
-      // Handle text paste - clean up color styles to ensure proper theme colors
+      // Handle text paste - sanitize HTML/plain text to prevent extra spacing and preserve structure
       e.preventDefault()
-      
-      // Get HTML and plain text from clipboard
+
       const html = clipboardData.getData('text/html')
       const plainText = clipboardData.getData('text/plain')
-      
-      let pasteContent = html || plainText
-      
-      if (html) {
-        // Parse and clean the HTML to remove color-related styles
-        const tempDiv = document.createElement('div')
-        tempDiv.innerHTML = html
-        
-        // Remove all color-related inline styles and attributes
-        const walk = (node: Node) => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            const el = node as HTMLElement
-            
-            // Remove color-related attributes
-            el.removeAttribute('color')
-            el.removeAttribute('bgcolor')
-            
-            // Clean style attribute - remove color, background-color, etc.
-            if (el.style.color) el.style.color = ''
-            if (el.style.backgroundColor) el.style.backgroundColor = ''
-            if (el.style.background) el.style.background = ''
-            
-            // Handle style attribute string manipulation for other color properties
-            let style = el.getAttribute('style') || ''
-            style = style
-              .replace(/color\s*:\s*[^;]*;?/gi, '')
-              .replace(/background-color\s*:\s*[^;]*;?/gi, '')
-              .replace(/background\s*:\s*[^;]*;?/gi, '')
-              .replace(/;\s*;/g, ';') // Clean up double semicolons
-              .trim()
-            
-            if (style) {
-              el.setAttribute('style', style)
-            } else {
-              el.removeAttribute('style')
-            }
-            
-            // Recursively clean child nodes
-            Array.from(el.childNodes).forEach(walk)
-          }
+
+      let pasteContent = ''
+      if (html && html.trim()) {
+        // Word/Office often embeds images as data URLs inside HTML; upload them first.
+        setIsUploadingImage(true)
+        try {
+          const htmlWithUploadedImages = await replaceDataUrlImagesWithUploads(html)
+          pasteContent = sanitizePastedHtml(htmlWithUploadedImages)
+        } finally {
+          setIsUploadingImage(false)
         }
-        
-        walk(tempDiv)
-        pasteContent = tempDiv.innerHTML
+      } else if (plainText && plainText.trim()) {
+        pasteContent = plainTextToHtml(plainText)
       }
-      
-      // Insert the cleaned content
-      document.execCommand('insertHTML', false, pasteContent)
-      handleInput()
+
+      if (pasteContent) {
+        document.execCommand('insertHTML', false, pasteContent)
+        handleInput()
+      }
     }
   }, [disabled, handleInput])
 

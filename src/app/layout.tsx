@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 // import { Inter } from 'next/font/google'
 import './globals.css'
+import 'swagger-ui-react/swagger-ui.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { PermissionProvider } from '@/lib/permissions/permission-context'
 import { ToastProviderWrapper } from '@/components/providers/ToastProviderWrapper'

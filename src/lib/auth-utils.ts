@@ -1,7 +1,7 @@
 import connectDB from '@/lib/db-config'
 import { User } from '@/models/User'
 import jwt from 'jsonwebtoken'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
@@ -31,20 +31,29 @@ export async function authenticateUser(): Promise<{ user: AuthUser } | { error: 
     await connectDB()
 
     const cookieStore = cookies()
+    const headerStore = headers()
+    const authorization = headerStore.get('authorization') || headerStore.get('Authorization')
+    const bearerToken = authorization?.startsWith('Bearer ')
+      ? authorization.slice('Bearer '.length).trim()
+      : undefined
+
     const accessToken = cookieStore.get('accessToken')?.value
     const refreshToken = cookieStore.get('refreshToken')?.value
 
+    // Prefer explicit Bearer token if provided (useful for Swagger UI / Postman)
+    const effectiveAccessToken = bearerToken || accessToken
+
     // If no tokens, return unauthorized
-    if (!accessToken && !refreshToken) {
+    if (!effectiveAccessToken && !refreshToken) {
       return { error: 'No authentication tokens', status: 401 }
     }
 
     let userData = null
 
     // Try to verify access token first
-    if (accessToken) {
+    if (effectiveAccessToken) {
       try {
-        const decoded = jwt.verify(accessToken, JWT_SECRET) as any
+        const decoded = jwt.verify(effectiveAccessToken, JWT_SECRET) as any
         const user = await User.findById(decoded.userId)
         if (user && user.isActive) {
           userData = {
@@ -69,12 +78,16 @@ export async function authenticateUser(): Promise<{ user: AuthUser } | { error: 
               )
 
               // Set new access token cookie
-              cookieStore.set('accessToken', newAccessToken, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
-                maxAge: 15 * 60 // 15 minutes
-              })
+              // Only set cookies when we are using cookie-based auth.
+              // If the client supplied a Bearer token, avoid mutating response cookies.
+              if (!bearerToken) {
+                cookieStore.set('accessToken', newAccessToken, {
+                  httpOnly: true,
+                  secure: process.env.NODE_ENV === 'production',
+                  sameSite: 'strict',
+                  maxAge: 15 * 60 // 15 minutes
+                })
+              }
 
               userData = {
                 id: user._id,

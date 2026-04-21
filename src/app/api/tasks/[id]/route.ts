@@ -13,6 +13,7 @@ import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { logTaskFieldChanges } from '@/lib/task-activity-logger'
 import { logActivity } from '@/lib/activity-logger'
+import { sanitizeTaskDescriptionHtml } from '@/lib/text/sanitize-task-description'
 
 const TASK_STATUS_SET = new Set<TaskStatus>(TASK_STATUS_VALUES)
 
@@ -312,6 +313,15 @@ export async function PUT(
       taskId,
       receivedKeys: Object.keys(updateData)
     })
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'description')) {
+      const rawDescription = updateData.description
+      if (rawDescription === null || typeof rawDescription === 'undefined' || rawDescription === '') {
+        updateData.description = ''
+      } else {
+        updateData.description = sanitizeTaskDescriptionHtml(rawDescription) || ''
+      }
+    }
 
     if (Object.prototype.hasOwnProperty.call(updateData, 'status')) {
       // Allow any string status to support custom kanban statuses per project

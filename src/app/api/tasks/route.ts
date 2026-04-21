@@ -15,6 +15,7 @@ import { Counter } from '@/models/Counter'
 import { logTaskActivity } from '@/lib/task-activity-logger'
 import { logActivity } from '@/lib/activity-logger'
 import { countWords, TASK_TITLE_MAX_WORDS } from '@/lib/text/word-limit'
+import { sanitizeTaskDescriptionHtml } from '@/lib/text/sanitize-task-description'
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -498,6 +499,8 @@ export async function POST(request: NextRequest) {
       isBillable
     } = payload
 
+    const sanitizedDescription = sanitizeTaskDescriptionHtml(description)
+
     const normalizedTitle = typeof title === 'string' ? title.trim() : ''
 
     // Validate required fields first (fail fast)
@@ -595,7 +598,7 @@ export async function POST(request: NextRequest) {
     try {
       task = new Task({
         title: normalizedTitle,
-        description,
+        description: sanitizedDescription,
         status: taskStatus,
         priority: priority || 'medium',
         type: type || 'task',
