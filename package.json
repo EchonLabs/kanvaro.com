@@ -79,6 +79,7 @@
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
+    "sanitize-html": "^2.17.3",
     "semantic-release": "^24.2.9",
     "sharp": "^0.32.6",
     "slugify": "^1.6.6",
