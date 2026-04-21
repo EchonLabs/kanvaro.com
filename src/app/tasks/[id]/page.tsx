@@ -1722,12 +1722,18 @@ export default function TaskDetailPage() {
                 <CardTitle>Description</CardTitle>
               </CardHeader>
               <CardContent>
-                {task.description ? (
-                  <div
-                    className="task-description max-w-none"
-                    dangerouslySetInnerHTML={{ __html: task.description }}
-                  />
-                ) : (
+                {task.description ? (() => {
+                  const isHtmlDescription = /<(p|br|div|ul|ol|li|strong|em|u|h[1-6]|img|a)(\s|>|\/)/i.test(task.description)
+
+                  return isHtmlDescription ? (
+                    <div
+                      className="task-description max-w-none"
+                      dangerouslySetInnerHTML={{ __html: task.description }}
+                    />
+                  ) : (
+                    <div className="task-description whitespace-pre-line">{task.description}</div>
+                  )
+                })() : (
                   <p className="text-muted-foreground">No description provided</p>
                 )}
               </CardContent>

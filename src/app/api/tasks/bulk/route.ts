@@ -7,6 +7,25 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 import { invalidateCache } from '@/lib/redis'
 import { CompletionService } from '@/lib/completion-service'
 
+function scheduleTaskCacheInvalidation(projectIds: string[], organizationId: string) {
+  // Best-effort cache invalidation: do not block the API response.
+  // In environments where the process is short-lived (serverless), this may not always complete,
+  // but cache entries will still expire naturally.
+  setImmediate(() => {
+    const invalidations: Promise<unknown>[] = []
+
+    for (const projectId of projectIds) {
+      if (projectId) {
+        invalidations.push(invalidateCache(`tasks:*project:${projectId}*`))
+      }
+    }
+
+    invalidations.push(invalidateCache(`tasks:*org:${organizationId}*`))
+
+    void Promise.allSettled(invalidations)
+  })
+}
+
 export async function POST(request: NextRequest) {
   try {
     await connectDB()
@@ -123,26 +142,16 @@ export async function POST(request: NextRequest) {
           })
         }
 
-        // Invalidate cache for affected projects
-        for (const projectId of projectIds) {
-          if (projectId) {
-            await invalidateCache(`tasks:*project:${projectId}*`)
-          }
-        }
-        await invalidateCache(`tasks:*org:${organizationId}*`)
+        // Invalidate cache for affected projects (best-effort; do not block response)
+        scheduleTaskCacheInvalidation(projectIds, organizationId)
 
         break
 
       case 'delete':
         result = await Task.deleteMany({ _id: { $in: validTaskIds }, organization: organizationId })
-        
-        // Invalidate cache for affected projects
-        for (const projectId of projectIds) {
-          if (projectId) {
-            await invalidateCache(`tasks:*project:${projectId}*`)
-          }
-        }
-        await invalidateCache(`tasks:*org:${organizationId}*`)
+
+        // Invalidate cache for affected projects (best-effort; do not block response)
+        scheduleTaskCacheInvalidation(projectIds, organizationId)
 
         break
 

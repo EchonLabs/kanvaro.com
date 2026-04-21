@@ -233,10 +233,18 @@ export default function ViewTaskModal({
             <div>
               <label className="text-sm font-medium text-muted-foreground">Description</label>
               <div className="mt-1 p-3 bg-muted rounded-lg">
-                <div
-                  className="task-description text-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: task.description }}
-                />
+                {(() => {
+                  const isHtmlDescription = /<(p|br|div|ul|ol|li|strong|em|u|h[1-6]|img|a)(\s|>|\/)/i.test(task.description)
+
+                  return isHtmlDescription ? (
+                    <div
+                      className="task-description text-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: task.description }}
+                    />
+                  ) : (
+                    <div className="task-description text-sm whitespace-pre-line">{task.description}</div>
+                  )
+                })()}
               </div>
             </div>
           )}
