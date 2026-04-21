@@ -17,7 +17,7 @@ export default function ApiDocsPage() {
       <div className="px-2 pb-8">
         <div className="max-w-6xl mx-auto">
           <SwaggerUI
-            url="/openapi.json"
+            url="/api/openapi"
             requestInterceptor={(req: any) => {
               // Kanvaro auth uses HttpOnly cookies; include them so Swagger UI can
               // call /api/auth/login and then test authenticated endpoints.
