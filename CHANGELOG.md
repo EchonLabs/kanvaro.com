@@ -1,3 +1,10 @@
+## [1.32.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.32.5...v1.32.6) (2026-04-22)
+
+
+### Bug Fixes
+
+* update task interface and improve timer controls for assignees ([2ea9d32](https://github.com/EchonLabs/kanvaro.com/commit/2ea9d323662372b8b1dac9ee25e3000bb017830c))
+
 ## [1.32.5](https://github.com/EchonLabs/kanvaro.com/compare/v1.32.4...v1.32.5) (2026-04-21)
 
 

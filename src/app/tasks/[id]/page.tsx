@@ -59,7 +59,7 @@ interface Task {
     _id: string
     name: string
   }
-  assignedTo?: [Array<{
+  assignedTo?: Array<{
     user?: {
       _id: string
       firstName: string
@@ -70,7 +70,7 @@ interface Task {
     lastName?: string
     email?: string
     hourlyRate?: number
-  }>]
+  }>
   createdBy: {
     firstName: string
     lastName: string
@@ -1578,11 +1578,13 @@ export default function TaskDetailPage() {
     }
     return candidate?.toString?.() ?? null
   })()
+  const isAssignee = task.assignedTo?.some(assignee => assignee.user?._id === currentUserId) || false
+
   const isRelevantActiveTimer = Boolean(
     hasActiveTimer &&
-      task?._id &&
-      activeTimerTaskId &&
-      activeTimerTaskId === task._id.toString()
+    task?._id &&
+    activeTimerTaskId &&
+    activeTimerTaskId === task._id.toString()
   )
 
   return (
@@ -1638,76 +1640,78 @@ export default function TaskDetailPage() {
                     </Button>
                   </div>
 
-                  <div className="flex flex-row items-stretch sm:items-center gap-2 flex-wrap justify-end">
-                    {isRelevantActiveTimer && (
-                      <Badge variant="outline" className="min-h-[36px] inline-flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        {activeTimerDisplay}
-                      </Badge>
-                    )}
-                    {isRelevantActiveTimer && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              onClick={handlePauseResumeTimer}
-                              disabled={stoppingTimer || !!timerActionLoading}
-                              size="icon"
-                              aria-label={
-                                Boolean((activeTimer as any)?.isPaused || (activeTimer as any)?.pausedAt)
-                                  ? 'Resume timer'
-                                  : 'Pause timer'
-                              }
-                            >
-                              {Boolean((activeTimer as any)?.isPaused || (activeTimer as any)?.pausedAt) ? (
-                                <Play className="h-4 w-4" />
-                              ) : (
-                                <Pause className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {Boolean((activeTimer as any)?.isPaused || (activeTimer as any)?.pausedAt)
-                              ? 'Resume'
-                              : 'Pause'}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                    {isRelevantActiveTimer && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="destructive"
-                              onClick={() => setShowStopTimerConfirmModal(true)}
-                              disabled={stoppingTimer || !!timerActionLoading}
-                              size="icon"
-                              aria-label="Stop timer"
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Stop</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                    <Button
-                      onClick={() => setShowStartTimerModal(true)}
-                      disabled={
-                        isActiveTimerLoading ||
-                        hasActiveTimer ||
-                        !currentUserId ||
-                        !currentOrganizationId ||
-                        !task.project?._id ||
-                        !task._id
-                      }
-                      className="min-h-[36px] w-full sm:w-auto"
-                    >
-                      <Play className="h-4 w-4 mr-2" />
-                      Start Timer
-                    </Button>
-                  </div>
+                  {isAssignee && (
+                    <div className="flex flex-row items-stretch sm:items-center gap-2 flex-wrap justify-end">
+                      {isRelevantActiveTimer && (
+                        <Badge variant="outline" className="min-h-[36px] inline-flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          {activeTimerDisplay}
+                        </Badge>
+                      )}
+                      {isRelevantActiveTimer && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                onClick={handlePauseResumeTimer}
+                                disabled={stoppingTimer || !!timerActionLoading}
+                                size="icon"
+                                aria-label={
+                                  Boolean((activeTimer as any)?.isPaused || (activeTimer as any)?.pausedAt)
+                                    ? 'Resume timer'
+                                    : 'Pause timer'
+                                }
+                              >
+                                {Boolean((activeTimer as any)?.isPaused || (activeTimer as any)?.pausedAt) ? (
+                                  <Play className="h-4 w-4" />
+                                ) : (
+                                  <Pause className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {Boolean((activeTimer as any)?.isPaused || (activeTimer as any)?.pausedAt)
+                                ? 'Resume'
+                                : 'Pause'}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                      {isRelevantActiveTimer && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="destructive"
+                                onClick={() => setShowStopTimerConfirmModal(true)}
+                                disabled={stoppingTimer || !!timerActionLoading}
+                                size="icon"
+                                aria-label="Stop timer"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Stop</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                      <Button
+                        onClick={() => setShowStartTimerModal(true)}
+                        disabled={
+                          isActiveTimerLoading ||
+                          hasActiveTimer ||
+                          !currentUserId ||
+                          !currentOrganizationId ||
+                          !task.project?._id ||
+                          !task._id
+                        }
+                        className="min-h-[36px] w-full sm:w-auto"
+                      >
+                        <Play className="h-4 w-4 mr-2" />
+                        Start Timer
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
