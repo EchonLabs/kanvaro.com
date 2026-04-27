@@ -174,6 +174,33 @@ export default function BacklogPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // Helper function to focus filter search inputs
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+
+    const doFocus = () => {
+      el.focus({ preventScroll: true })
+      try {
+        el.select?.()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(doFocus)
+    } else {
+      setTimeout(doFocus, 0)
+    }
+  }
+
+  // Filter search input refs
+  const projectFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const assignedToFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const assignedByFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const createdByFilterInputRef = useRef<HTMLInputElement | null>(null)
+
   const [typeFilter, setTypeFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -1547,13 +1574,16 @@ export default function BacklogPage() {
           </div>
           {/* Filter options - compact grid layout */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-            <Select value={projectFilterValue} onValueChange={setProjectFilterValue}>
+            <Select value={projectFilterValue} onValueChange={setProjectFilterValue} onOpenChange={(open) => {
+              if (open) focusSearchInput(projectFilterInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Project" />
               </SelectTrigger>
               <SelectContent className="z-[10050] p-0">
                 <div className="p-2">
                   <Input
+                    ref={projectFilterInputRef}
                     value={projectFilterQuery}
                     onChange={(e) => {
                       e.stopPropagation()
@@ -1614,13 +1644,16 @@ export default function BacklogPage() {
                 <SelectItem value="high">High</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={assignedToFilter} onValueChange={(value) => { setAssignedToFilter(value); setAssignedToFilterQuery(''); }}>
+            <Select value={assignedToFilter} onValueChange={(value) => { setAssignedToFilter(value); setAssignedToFilterQuery(''); }} onOpenChange={(open) => {
+              if (open) focusSearchInput(assignedToFilterInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Assignee" />
               </SelectTrigger>
               <SelectContent className="z-[10050] p-0">
                 <div className="p-2">
                   <Input
+                    ref={assignedToFilterInputRef}
                     value={assignedToFilterQuery}
                     onChange={(e) => {
                       e.stopPropagation()
@@ -1646,13 +1679,16 @@ export default function BacklogPage() {
                 </div>
               </SelectContent>
             </Select>
-            <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
+            <Select value={createdByFilter} onValueChange={setCreatedByFilter} onOpenChange={(open) => {
+              if (open) focusSearchInput(createdByFilterInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Creator" />
               </SelectTrigger>
               <SelectContent className="z-[10050] p-0">
                 <div className="p-2">
                   <Input
+                    ref={createdByFilterInputRef}
                     value={createdByFilterQuery}
                     onChange={(e) => {
                       e.stopPropagation()

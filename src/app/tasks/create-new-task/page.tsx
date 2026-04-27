@@ -21,6 +21,7 @@ import {
   Paperclip
 } from 'lucide-react'
 import { AttachmentList } from '@/components/ui/AttachmentList'
+import { countWords, TASK_TITLE_MAX_WORDS, truncateToMaxWords } from '@/lib/text/word-limit'
 
 interface Project {
   _id: string
@@ -157,6 +158,10 @@ export default function CreateTaskPage() {
   const [attachmentError, setAttachmentError] = useState('')
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
+
+  // Word limit validation state
+  const [titleWordLimitMessage, setTitleWordLimitMessage] = useState('')
+  const [titleWordLimitIsError, setTitleWordLimitIsError] = useState(false)
 
   const [formData, setFormData] = useState({
     title: '',
@@ -304,6 +309,13 @@ export default function CreateTaskPage() {
         return
       }
 
+      const titleTrimmed = formData.title.trim()
+      if (countWords(titleTrimmed) > TASK_TITLE_MAX_WORDS) {
+        notifyError({ title: 'Validation Error', message: `Task title must be ${TASK_TITLE_MAX_WORDS} words or fewer.` })
+        setLoading(false)
+        return
+      }
+
       if (missingSubtaskTitle) {
         notifyError({ title: 'Validation Error', message: 'Please fill in all required subtask titles' })
         setLoading(false)
@@ -385,6 +397,11 @@ export default function CreateTaskPage() {
   }
 
   const handleChange = useCallback((field: string, value: string) => {
+    if (field === 'title') {
+      handleTitleChange(value)
+      return
+    }
+
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -409,6 +426,24 @@ export default function CreateTaskPage() {
       }
     }
   }, [fetchStories, fetchEpics, fetchProjectMembers])
+
+  const handleTitleChange = useCallback((nextValue: string) => {
+    const attemptedWordCount = countWords(nextValue)
+    const truncated = truncateToMaxWords(nextValue, TASK_TITLE_MAX_WORDS)
+
+    if (attemptedWordCount > TASK_TITLE_MAX_WORDS) {
+      setTitleWordLimitMessage(`Maximum ${TASK_TITLE_MAX_WORDS} words. Extra words won't be added.`)
+      setTitleWordLimitIsError(true)
+    } else if (countWords(truncated) >= TASK_TITLE_MAX_WORDS) {
+      setTitleWordLimitMessage(`Word limit reached (${TASK_TITLE_MAX_WORDS} words).`)
+      setTitleWordLimitIsError(false)
+    } else {
+      setTitleWordLimitMessage('')
+      setTitleWordLimitIsError(false)
+    }
+
+    setFormData(prev => ({ ...prev, title: truncated }))
+  }, [])
 
   const addLabel = () => {
     if (newLabel.trim()) {
@@ -537,6 +572,9 @@ export default function CreateTaskPage() {
     )
   }, [projectMembers, assigneeQuery])
 
+  // Word count for title validation
+  const titleWordCount = useMemo(() => countWords(formData.title), [formData.title])
+
   // Required field validation (only fields marked with *)
   const isFormValid = useMemo(() => {
     return (
@@ -643,10 +681,18 @@ export default function CreateTaskPage() {
                     <label className="text-sm font-medium text-foreground">Title *</label>
                     <Input
                       value={formData.title}
-                      onChange={(e) => handleChange('title', e.target.value)}
+                      onChange={(e) => handleTitleChange(e.target.value)}
                       placeholder="Enter task title"
                       required
                     />
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <p className={`text-xs ${titleWordCount >= TASK_TITLE_MAX_WORDS ? 'text-red-600' : 'text-muted-foreground'}`}>
+                        {titleWordCount}/{TASK_TITLE_MAX_WORDS} words
+                      </p>
+                      {titleWordLimitMessage && (
+                        <p className={`text-xs ${titleWordLimitIsError ? 'text-red-600' : 'text-muted-foreground'}`}>{titleWordLimitMessage}</p>
+                      )}
+                    </div>
                   </div>
 
                   {/* <div>

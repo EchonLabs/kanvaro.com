@@ -109,6 +109,34 @@ export default function StoriesPage() {
   const [loading, setLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
   const isFirstFetch = useRef(true);
+
+  // Helper function to focus filter search inputs
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+
+    const doFocus = () => {
+      el.focus({ preventScroll: true })
+      try {
+        el.select?.()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(doFocus)
+    } else {
+      setTimeout(doFocus, 0)
+    }
+  }
+
+  // Filter search input refs
+  const statusSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const prioritySearchInputRef = useRef<HTMLInputElement | null>(null)
+  const projectSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const epicSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const sprintSearchInputRef = useRef<HTMLInputElement | null>(null)
+
   ;
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -625,12 +653,15 @@ export default function StoriesPage() {
           </div>
           {/* Filter options - responsive grid layout 3-4 filters per line */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={setStatusFilter} onOpenChange={(open) => {
+              if (open) focusSearchInput(statusSearchInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <Input
+                  ref={statusSearchInputRef}
                   placeholder="Search status..."
                   className="m-2"
                   value={statusSearch}
@@ -645,12 +676,15 @@ export default function StoriesPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+            <Select value={priorityFilter} onValueChange={setPriorityFilter} onOpenChange={(open) => {
+              if (open) focusSearchInput(prioritySearchInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
               <SelectContent>
                 <Input
+                  ref={prioritySearchInputRef}
                   placeholder="Search priority..."
                   className="m-2"
                   value={prioritySearch}
@@ -665,12 +699,15 @@ export default function StoriesPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={projectFilter} onValueChange={setProjectFilter}>
+            <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
+              if (open) focusSearchInput(projectSearchInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Project" />
               </SelectTrigger>
               <SelectContent>
                 <Input
+                  ref={projectSearchInputRef}
                   placeholder="Search project..."
                   className="m-2"
                   value={projectSearch}
@@ -686,12 +723,15 @@ export default function StoriesPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={epicFilter} onValueChange={setEpicFilter}>
+            <Select value={epicFilter} onValueChange={setEpicFilter} onOpenChange={(open) => {
+              if (open) focusSearchInput(epicSearchInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Epic" />
               </SelectTrigger>
               <SelectContent>
                 <Input
+                  ref={epicSearchInputRef}
                   placeholder="Search epic..."
                   className="m-2"
                   value={epicSearch}
@@ -707,12 +747,15 @@ export default function StoriesPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={sprintFilter} onValueChange={setSprintFilter}>
+            <Select value={sprintFilter} onValueChange={setSprintFilter} onOpenChange={(open) => {
+              if (open) focusSearchInput(sprintSearchInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Sprint" />
               </SelectTrigger>
               <SelectContent>
                 <Input
+                  ref={sprintSearchInputRef}
                   placeholder="Search sprint..."
                   className="m-2"
                   value={sprintSearch}

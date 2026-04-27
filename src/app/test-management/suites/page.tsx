@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import TestSuiteCards from '@/components/test-management/TestSuiteCards'
@@ -10,10 +10,18 @@ import { DeleteConfirmDialog } from '@/components/test-management/DeleteConfirmD
 import { TestSuiteDetailDialog } from '@/components/test-management/TestSuiteDetailDialog'
 import { ResponsiveDialog } from '@/components/ui/ResponsiveDialog'
 import { Button } from '@/components/ui/Button'
-import { Plus } from 'lucide-react'
+import { Input } from '@/components/ui/Input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Card, CardContent } from '@/components/ui/Card'
+import { AlertCircle, Plus } from 'lucide-react'
 import { Permission } from '@/lib/permissions'
 import { PermissionGate } from '@/lib/permissions/permission-components'
 import { useNotify } from '@/lib/notify'
+
+interface Project {
+  _id: string
+  name: string
+}
 
 interface TestSuite {
   _id?: string
@@ -24,10 +32,37 @@ interface TestSuite {
 }
 
 export default function TestSuitesPage() {
+  const router = useRouter()
   const { setItems } = useBreadcrumb()
   const searchParams = useSearchParams()
   const { success: notifySuccess } = useNotify()
+  const [projects, setProjects] = useState<Project[]>([])
+  const [projectsLoading, setProjectsLoading] = useState(false)
   const [selectedProject, setSelectedProject] = useState<string>('')
+  const [projectQuery, setProjectQuery] = useState('')
+
+  // Helper function to focus filter search inputs
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+
+    const doFocus = () => {
+      el.focus({ preventScroll: true })
+      try {
+        el.select?.()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(doFocus)
+    } else {
+      setTimeout(doFocus, 0)
+    }
+  }
+
+  const projectSearchInputRef = useRef<HTMLInputElement | null>(null)
+
   // Project selection inside the create/edit dialog.
   // This is intentionally NOT persisted as the default for the next create flow.
   const [suiteDialogProjectId, setSuiteDialogProjectId] = useState<string>('')
@@ -52,6 +87,31 @@ export default function TestSuitesPage() {
   }, [setItems])
 
   useEffect(() => {
+    const fetchProjects = async () => {
+      setProjectsLoading(true)
+      try {
+        const res = await fetch('/api/projects')
+        const data = await res.json().catch(() => ({}))
+        if ((data as any)?.success && Array.isArray((data as any)?.data)) {
+          const list = (data as any).data
+            .filter((p: any) => p?._id && p?.name)
+            .map((p: any) => ({ _id: String(p._id), name: String(p.name) }))
+          setProjects(list)
+        } else {
+          setProjects([])
+        }
+      } catch (e) {
+        console.error('Error fetching projects:', e)
+        setProjects([])
+      } finally {
+        setProjectsLoading(false)
+      }
+    }
+
+    fetchProjects()
+  }, [])
+
+  useEffect(() => {
     const suiteId = searchParams.get('suiteId')
     const projectId = searchParams.get('projectId')
 
@@ -63,9 +123,27 @@ export default function TestSuitesPage() {
     // Intentionally respond to URL changes (e.g., navigation from Project → Testing)
   }, [searchParams, selectedProject])
 
+  const filteredProjects = useMemo(() => {
+    const q = projectQuery.trim().toLowerCase()
+    if (!q) return projects
+    return projects.filter((p) => (p.name || '').toLowerCase().includes(q))
+  }, [projects, projectQuery])
+
+  const handleProjectChange = (projectId: string) => {
+    setSelectedProject(projectId)
+
+    const nextParams = new URLSearchParams(searchParams.toString())
+    if (projectId) nextParams.set('projectId', projectId)
+    else nextParams.delete('projectId')
+
+    const nextQuery = nextParams.toString()
+    router.replace(nextQuery ? `/test-management/suites?${nextQuery}` : '/test-management/suites')
+  }
+
   const handleCreateTestSuite = () => {
+    if (!selectedProject) return
     setSelectedTestSuite(null)
-    setSuiteDialogProjectId('')
+    setSuiteDialogProjectId(selectedProject)
     setTestSuiteDialogOpen(true)
   }
 
@@ -159,30 +237,95 @@ export default function TestSuitesPage() {
                 Organize your test cases into hierarchical test suites
               </p>
             </div>
-            <Button onClick={handleCreateTestSuite} className="w-full sm:w-auto">
+            <Button onClick={handleCreateTestSuite} className="w-full sm:w-auto" disabled={!selectedProject}>
               <Plus className="mr-2 h-4 w-4" />
               Create Test Suite
             </Button>
           </div>
 
-          <div className="rounded-lg border bg-card p-4 sm:p-6">
-            <TestSuiteCards
-              key={`suites-${selectedProject}-${refreshCounter}`}
-              projectId={selectedProject}
-              highlightSuiteId={highlightSuiteId || undefined}
-              onSuiteView={(suite) => {
-                setDetailSuiteId(suite._id)
-                setSuiteDetailDialogOpen(true)
-              }}
-              onSuiteEdit={handleEditTestSuite}
-              onSuiteDelete={handleDeleteTestSuite}
-              onSuiteCreate={() => {
-                setSelectedTestSuite(null)
-                setSuiteDialogProjectId('')
-                setTestSuiteDialogOpen(true)
-              }}
-            />
+          {/* Project Selection (required) */}
+          <div className="space-y-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+              <span className="text-sm font-medium">Project:</span>
+              <Select
+                value={selectedProject}
+                onValueChange={handleProjectChange}
+                onOpenChange={(open) => {
+                  if (open) {
+                    setProjectQuery('')
+                    focusSearchInput(projectSearchInputRef.current)
+                  }
+                }}
+                disabled={projectsLoading || projects.length === 0}
+              >
+                <SelectTrigger className="w-full sm:w-96">
+                  <SelectValue placeholder={projectsLoading ? 'Loading projects...' : 'Select a project'} />
+                </SelectTrigger>
+                <SelectContent className="p-0">
+                  <div className="p-2">
+                    <Input
+                      ref={projectSearchInputRef}
+                      value={projectQuery}
+                      onChange={(e) => setProjectQuery(e.target.value)}
+                      placeholder="Search projects"
+                      className="mb-2"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <div className="max-h-56 overflow-y-auto">
+                      {filteredProjects.length === 0 ? (
+                        <div className="px-2 py-2 text-sm text-muted-foreground">No matching projects</div>
+                      ) : (
+                        filteredProjects.map((project) => (
+                          <SelectItem key={project._id} value={project._id}>
+                            {project.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {!selectedProject && (
+              <div className="flex items-center gap-2 text-sm text-amber-600">
+                <AlertCircle className="h-4 w-4" />
+                <span>Select a project to view its test suites.</span>
+              </div>
+            )}
           </div>
+
+          {!selectedProject ? (
+            <Card>
+              <CardContent className="p-6 sm:p-8 text-center">
+                <h3 className="text-base sm:text-lg font-semibold mb-2">Select a Project</h3>
+                <p className="text-sm sm:text-base text-muted-foreground">
+                  Choose a project to view its test suites.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="rounded-lg border bg-card p-4 sm:p-6">
+              <TestSuiteCards
+                key={`suites-${selectedProject}-${refreshCounter}`}
+                projectId={selectedProject}
+                highlightSuiteId={highlightSuiteId || undefined}
+                onSuiteView={(suite) => {
+                  setDetailSuiteId(suite._id)
+                  setSuiteDetailDialogOpen(true)
+                }}
+                onSuiteEdit={handleEditTestSuite}
+                onSuiteDelete={handleDeleteTestSuite}
+                onSuiteCreate={() => {
+                  setSelectedTestSuite(null)
+                  setSuiteDialogProjectId(selectedProject)
+                  setTestSuiteDialogOpen(true)
+                }}
+              />
+            </div>
+          )}
 
           {/* Dialogs */}
           <ResponsiveDialog

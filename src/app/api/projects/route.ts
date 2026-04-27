@@ -72,11 +72,24 @@ export async function GET(request: NextRequest) {
     
     // If user can't view all projects, filter by access
     if (!canViewAllProjects) {
-      projectQuery.$or = [
+      const accessControlOr = [
         { createdBy: userId },
         { "teamMembers.memberId": userId }, // Check teamMembers array for memberId
         { client: userId }
       ]
+      
+      // If search filter exists, combine it with access control using $and
+      if (filters.$or) {
+        projectQuery.$and = [
+          { $or: filters.$or },  // Search condition: name OR description matches
+          { $or: accessControlOr }  // Access control: user is creator OR team member OR client
+        ]
+        delete projectQuery.$or  // Remove the old $or as it's now in $and
+      } else {
+        // If no search, just apply access control
+        projectQuery.$or = accessControlOr
+      }
+      
       console.log('Projects API - Restricted query for team member:', {
         userId,
         baseFilters: filters,

@@ -302,6 +302,26 @@ async function stopTimerAndBuildResponse(
   }
   await timeEntry.save()
 
+  // Log activity: time logged from timer stop (non-blocking)
+  const projectNameForLog = (activeTimer.project as any)?.name || 'Unknown Project'
+  const taskTitleForLog = (activeTimer.task as any)?.title || undefined
+  logActivity({
+    organizationId: String(organizationId),
+    userId: String(userId),
+    action: 'time_entry_saved',
+    entityType: 'timer',
+    entityId: String(activeTimer._id),
+    entityName: taskTitleForLog || projectNameForLog,
+    projectId: projectId || undefined,
+    projectName: projectNameForLog,
+    details: {
+      timeEntryId: String(timeEntry._id),
+      taskTitle: taskTitleForLog,
+      duration: finalDuration,
+      description: finalDescription
+    }
+  }).catch(err => console.error('Failed to log time entry saved activity from timer:', err))
+
   const notificationsSent = {
     timerStop: false,
     overtime: false,

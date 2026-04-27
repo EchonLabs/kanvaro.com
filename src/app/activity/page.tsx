@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -125,6 +125,29 @@ export default function ActivityPage() {
   const { formatDate } = useDateTime()
   const [dataError, setDataError] = useState('')
   const router = useRouter()
+
+  // Helper function to focus filter search inputs
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+
+    const doFocus = () => {
+      el.focus({ preventScroll: true })
+      try {
+        el.select?.()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(doFocus)
+    } else {
+      setTimeout(doFocus, 0)
+    }
+  }
+
+  // Filter search input ref
+  const projectSearchInputRef = useRef<HTMLInputElement | null>(null)
 
   const getActionConfig = (action: string) => {
     return ACTION_CONFIG[action] || { icon: Clock, label: action, color: 'text-muted-foreground' }
@@ -422,7 +445,9 @@ export default function ActivityPage() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Project</label>
-                  <Select value={filters.project} onValueChange={(value) => setFilters(prev => ({ ...prev, project: value }))}>
+                  <Select value={filters.project} onValueChange={(value) => setFilters(prev => ({ ...prev, project: value }))} onOpenChange={(open) => {
+                    if (open) focusSearchInput(projectSearchInputRef.current)
+                  }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -430,6 +455,7 @@ export default function ActivityPage() {
                       <div className="p-2">
                         <div className="relative mb-2">
                           <Input
+                            ref={projectSearchInputRef}
                             value={projectFilterQuery}
                             onChange={(e) => setProjectFilterQuery(e.target.value)}
                             placeholder="Search projects"

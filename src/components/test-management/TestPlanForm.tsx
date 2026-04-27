@@ -463,48 +463,13 @@ export function TestPlanForm({ testPlan, projectId, onSave, onCancel, loading = 
           {/* Test Cases Selection */}
           <div className="space-y-4">
             <Label>Test Cases</Label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="sm:col-span-2">
-                <Label className="text-xs text-muted-foreground">Search</Label>
-                <Input
-                  value={testCaseSearch}
-                  onChange={(e) => setTestCaseSearch(e.target.value)}
-                  placeholder="Search test cases"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Priority</Label>
-                <Select value={testCasePriority} onValueChange={setTestCasePriority}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="sm:col-span-3">
-                <Label className="text-xs text-muted-foreground">Category</Label>
-                <Select value={testCaseCategory} onValueChange={setTestCaseCategory}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="functional">Functional</SelectItem>
-                    <SelectItem value="regression">Regression</SelectItem>
-                    <SelectItem value="integration">Integration</SelectItem>
-                    <SelectItem value="performance">Performance</SelectItem>
-                    <SelectItem value="security">Security</SelectItem>
-                    <SelectItem value="usability">Usability</SelectItem>
-                    <SelectItem value="compatibility">Compatibility</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Search</Label>
+              <Input
+                value={testCaseSearch}
+                onChange={(e) => setTestCaseSearch(e.target.value)}
+                placeholder="Search test cases"
+              />
             </div>
 
             <div className="border rounded-lg p-4 max-h-[420px] overflow-y-auto space-y-3">
@@ -598,6 +563,42 @@ export function TestPlanForm({ testPlan, projectId, onSave, onCancel, loading = 
             <p className="text-xs text-muted-foreground">
               {formData.testCases.length} test case(s) selected
             </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Priority</Label>
+                <Select value={testCasePriority} onValueChange={setTestCasePriority}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Category</Label>
+                <Select value={testCaseCategory} onValueChange={setTestCaseCategory}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="functional">Functional</SelectItem>
+                    <SelectItem value="regression">Regression</SelectItem>
+                    <SelectItem value="integration">Integration</SelectItem>
+                    <SelectItem value="performance">Performance</SelectItem>
+                    <SelectItem value="security">Security</SelectItem>
+                    <SelectItem value="usability">Usability</SelectItem>
+                    <SelectItem value="compatibility">Compatibility</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
 
           {/* Tags */}

@@ -184,6 +184,29 @@ const [searchQuery, setSearchQuery] = useState('')
   const canStartSprint = hasPermission(Permission.SPRINT_START)
   const canCompleteSprint = hasPermission(Permission.SPRINT_COMPLETE)
 
+  // Helper function to focus filter search inputs
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+
+    const doFocus = () => {
+      el.focus({ preventScroll: true })
+      try {
+        el.select?.()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(doFocus)
+    } else {
+      setTimeout(doFocus, 0)
+    }
+  }
+
+  // Filter search input ref
+  const projectSearchInputRef = useRef<HTMLInputElement | null>(null)
+
   const showSuccess = useCallback((message: string) => {
     setSuccess(message)
     if (successTimeoutRef.current) {
@@ -844,7 +867,9 @@ const [searchQuery, setSearchQuery] = useState('')
                 <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={projectFilter} onValueChange={setProjectFilter}>
+            <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
+              if (open) focusSearchInput(projectSearchInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Project" />
               </SelectTrigger>
@@ -852,6 +877,7 @@ const [searchQuery, setSearchQuery] = useState('')
                 <div className="p-2">
                   <div className="relative mb-2">
                     <Input
+                      ref={projectSearchInputRef}
                       value={projectFilterQuery}
                       onChange={(e) => setProjectFilterQuery(e.target.value)}
                       placeholder="Search projects"

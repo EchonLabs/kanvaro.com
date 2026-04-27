@@ -165,7 +165,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     endDate: '',
     reportType: 'detailed', // Default to detailed entries view
     projectId: projectId || 'all',
-    assignedTo: userId || 'all',
+    assignedTo: 'all',
     assignedBy: 'all',
     taskId: 'all'
   })
@@ -211,10 +211,10 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     return filters.startDate !== '' ||
       filters.endDate !== '' ||
       filters.projectId !== (projectId || 'all') ||
-      filters.assignedTo !== (userId || 'all') ||
+      filters.assignedTo !== 'all' ||
       filters.assignedBy !== 'all' ||
       filters.taskId !== 'all'
-  }, [filters, projectId, userId])
+  }, [filters, projectId])
 
   // Reset all filters to default values
   const resetFilters = () => {
@@ -227,7 +227,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       endDate: newEndDate,
       reportType: 'detailed',
       projectId: projectId || 'all',
-      assignedTo: userId || 'all',
+      assignedTo: 'all',
       assignedBy: 'all',
       taskId: 'all'
     })

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { PageWrapper } from '@/components/layout/PageWrapper'
@@ -35,6 +35,31 @@ export default function GanttReportPage() {
   const [sprintSearchQuery, setSprintSearchQuery] = useState('')
   const [assigneeSearchQuery, setAssigneeSearchQuery] = useState('')
   const router = useRouter()
+
+  // Helper function to focus filter search inputs
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+
+    const doFocus = () => {
+      el.focus({ preventScroll: true })
+      try {
+        el.select?.()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(doFocus)
+    } else {
+      setTimeout(doFocus, 0)
+    }
+  }
+
+  // Filter search input refs
+  const projectSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const sprintSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const assigneeSearchInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     // Set breadcrumb
@@ -230,6 +255,9 @@ export default function GanttReportPage() {
                   <Select
                     value={filters.project || ALL_PROJECTS}
                     onValueChange={(value) => handleFilterChange('project', value === ALL_PROJECTS ? '' : value)}
+                    onOpenChange={(open) => {
+                      if (open) focusSearchInput(projectSearchInputRef.current)
+                    }}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="All projects" />
@@ -237,6 +265,7 @@ export default function GanttReportPage() {
                     <SelectContent className="p-0">
                       <div className="p-2">
                         <Input
+                          ref={projectSearchInputRef}
                           value={projectSearchQuery}
                           onChange={(e) => setProjectSearchQuery(e.target.value)}
                           placeholder="Search projects"
@@ -267,6 +296,9 @@ export default function GanttReportPage() {
                     value={filters.sprint || ALL_SPRINTS}
                     onValueChange={(value) => handleFilterChange('sprint', value === ALL_SPRINTS ? '' : value)}
                     disabled={!filters.project}
+                    onOpenChange={(open) => {
+                      if (open) focusSearchInput(sprintSearchInputRef.current)
+                    }}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="All sprints" />
@@ -274,6 +306,7 @@ export default function GanttReportPage() {
                     <SelectContent className="p-0">
                       <div className="p-2">
                         <Input
+                          ref={sprintSearchInputRef}
                           value={sprintSearchQuery}
                           onChange={(e) => setSprintSearchQuery(e.target.value)}
                           placeholder="Search sprints"
@@ -303,6 +336,9 @@ export default function GanttReportPage() {
                   <Select
                     value={filters.assignee || ALL_ASSIGNEES}
                     onValueChange={(value) => handleFilterChange('assignee', value === ALL_ASSIGNEES ? '' : value)}
+                    onOpenChange={(open) => {
+                      if (open) focusSearchInput(assigneeSearchInputRef.current)
+                    }}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="All assignees" />
@@ -310,6 +346,7 @@ export default function GanttReportPage() {
                     <SelectContent className="p-0">
                       <div className="p-2">
                         <Input
+                          ref={assigneeSearchInputRef}
                           value={assigneeSearchQuery}
                           onChange={(e) => setAssigneeSearchQuery(e.target.value)}
                           placeholder="Search assignees"

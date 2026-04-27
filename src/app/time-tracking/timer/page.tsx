@@ -921,7 +921,7 @@ export default function TimerPage() {
           setInitializedFromActive(true)
 
           // Show notification for auto-stop (only once per auto-stop event)
-          if (timeTrackingSettings?.notifications?.onTimerStop && data.autoStopped && !autoStopNotifiedRef.current) {
+          if (data.autoStopped && !autoStopNotifiedRef.current) {
             autoStopNotifiedRef.current = true
             showToast({
               type: 'warning',

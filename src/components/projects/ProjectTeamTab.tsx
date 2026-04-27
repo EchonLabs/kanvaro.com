@@ -88,6 +88,28 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
 
   const pageRef = useRef<HTMLDivElement | null>(null)
   const addMemberSectionRef = useRef<HTMLDivElement | null>(null)
+  const memberSearchInputRef = useRef<HTMLInputElement | null>(null)
+
+  // Helper function to focus filter search inputs
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+
+    const doFocus = () => {
+      el.focus({ preventScroll: true })
+      try {
+        el.select?.()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(doFocus)
+    } else {
+      setTimeout(doFocus, 0)
+    }
+  }
+
   const { hasPermission } = usePermissions()
   const canManageOrgRoles = hasPermission(Permission.USER_MANAGE_ROLES)
   const canManageBudget = hasPermission(Permission.BUDGET_HANDLING)
@@ -718,6 +740,9 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                 <Select
                   value={selectedMemberId || ''}
                   onValueChange={(value) => setSelectedMemberId(value)}
+                  onOpenChange={(open) => {
+                    if (open) focusSearchInput(memberSearchInputRef.current)
+                  }}
                 >
                   <SelectTrigger className="h-12">
                     <SelectValue placeholder="Choose a team member">
@@ -747,6 +772,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                   <SelectContent className="z-[10050] p-0">
                     <div className="p-2">
                       <Input
+                        ref={memberSearchInputRef}
                         value={memberSearchQuery}
                         onChange={(e) => setMemberSearchQuery(e.target.value)}
                         placeholder="Type to search team members"

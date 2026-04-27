@@ -79,32 +79,23 @@ function SignInForm() {
       const data = await response.json()
 
       if (response.ok && data.success) {
-        console.log('Login successful, loading permissions...')
-        // Login successful, now load permissions before redirecting
+        console.log('Login successful, preparing dashboard...')
         setIsLoading(false)
         setIsLoadingPermissions(true)
         
         try {
-          // Fetch permissions to ensure they're loaded before redirecting
-          const permissionsResponse = await fetch('/api/auth/permissions', {
-            method: 'GET',
-            credentials: 'include'
-          })
-          
-          if (permissionsResponse.ok) {
-            console.log('Permissions loaded successfully, redirecting to dashboard')
-            // Permissions loaded, now redirect to dashboard
-            router.push('/dashboard')
-          } else {
-            console.error('Failed to load permissions:', permissionsResponse.status)
-            // Even if permissions fail, redirect to dashboard (it will handle loading there)
-            router.push('/dashboard')
-          }
-        } catch (permError) {
-          console.error('Error loading permissions:', permError)
-          // Even if permissions fail, redirect to dashboard (it will handle loading there)
-          router.push('/dashboard')
-        } finally {
+          // IMPORTANT: Use window.location.href for hard navigation instead of router.push().
+          // This forces the browser to send a new HTTP request with the HTTP-only cookies
+          // that were just set by the login API. Client-side navigation doesn't trigger
+          // the browser to send cookies, causing the middleware to reject the request.
+          // The 100ms delay ensures cookies are fully processed before navigation.
+          console.log('Performing hard redirect to dashboard')
+          setTimeout(() => {
+            window.location.href = '/dashboard'
+          }, 100)
+        } catch (err) {
+          console.error('Error during redirect:', err)
+          setError('An error occurred during login. Please try again.')
           setIsLoadingPermissions(false)
         }
       } else {

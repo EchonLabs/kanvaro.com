@@ -28,7 +28,7 @@ const ACTIVITY_THROTTLE_MS = 30_000 // 30 seconds
 const COUNTDOWN_INTERVAL_MS = 1_000 // 1 second
 
 export function useSessionTimeout({
-  timeoutMs = 30 * 60 * 1000, // 30 minutes
+  timeoutMs = 4 * 60 * 60 * 1000, // 4 hours
   warningBeforeMs = 5 * 60 * 1000, // 5 minutes before
   enabled = true,
   onTimeout,

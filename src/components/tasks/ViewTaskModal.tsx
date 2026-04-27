@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { AttachmentList } from '@/components/ui/AttachmentList'
 import { formatToTitleCase } from '@/lib/utils'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { 
@@ -310,6 +311,26 @@ export default function ViewTaskModal({
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Attachments */}
+          {task.attachments && task.attachments.length > 0 && (
+            <div>
+              <label className="text-sm font-medium text-muted-foreground">Attachments</label>
+              <div className="mt-1">
+                <AttachmentList
+                  attachments={task.attachments.map((att: any) => ({
+                    name: att.name,
+                    url: att.url,
+                    size: att.size || 0,
+                    type: att.type || 'application/octet-stream',
+                    uploadedAt: att.uploadedAt || new Date().toISOString(),
+                    uploadedBy: att.uploadedBy || 'Unknown'
+                  }))}
+                  canDelete={false}
+                />
               </div>
             </div>
           )}

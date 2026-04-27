@@ -307,6 +307,35 @@ export default function KanbanPage() {
   const [taskNumberFilterQuery, setTaskNumberFilterQuery] = useState('')
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [pendingUpdates, setPendingUpdates] = useState<Set<string>>(new Set())
+
+  // Helper function to focus filter search inputs
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+
+    const doFocus = () => {
+      el.focus({ preventScroll: true })
+      try {
+        el.select?.()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(doFocus)
+    } else {
+      setTimeout(doFocus, 0)
+    }
+  }
+
+  // Filter search input refs
+  const projectFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const assignedToFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const assignedByFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const priorityFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const typeFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const taskNumberFilterInputRef = useRef<HTMLInputElement | null>(null)
+
   const hasFetchedProjects = useRef(false)
 
   const isAdmin = userRole === 'admin'
@@ -1052,7 +1081,9 @@ export default function KanbanPage() {
             </div>
             {/* Filter options - compact grid layout */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
-              <Select value={projectFilter} onValueChange={setProjectFilter}>
+              <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
+                if (open) focusSearchInput(projectFilterInputRef.current)
+              }}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Project" />
                 </SelectTrigger>
@@ -1060,6 +1091,7 @@ export default function KanbanPage() {
                   <div className="p-2">
                     <div className="relative mb-2">
                       <Input
+                        ref={projectFilterInputRef}
                         value={projectFilterQuery}
                         onChange={(e) => setProjectFilterQuery(e.target.value)}
                         placeholder="Search projects"
@@ -1098,7 +1130,9 @@ export default function KanbanPage() {
                   </div>
                 </SelectContent>
               </Select>
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <Select value={priorityFilter} onValueChange={setPriorityFilter} onOpenChange={(open) => {
+                if (open) focusSearchInput(priorityFilterInputRef.current)
+              }}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Priority" />
                 </SelectTrigger>
@@ -1106,6 +1140,7 @@ export default function KanbanPage() {
                   <div className="p-2">
                     <div className="relative mb-2">
                       <Input
+                        ref={priorityFilterInputRef}
                         value={priorityFilterQuery}
                         onChange={(e) => setPriorityFilterQuery(e.target.value)}
                         placeholder="Search priority"
@@ -1144,7 +1179,9 @@ export default function KanbanPage() {
                   </div>
                 </SelectContent>
               </Select>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <Select value={typeFilter} onValueChange={setTypeFilter} onOpenChange={(open) => {
+                if (open) focusSearchInput(typeFilterInputRef.current)
+              }}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Type" />
                 </SelectTrigger>
@@ -1152,6 +1189,7 @@ export default function KanbanPage() {
                   <div className="p-2">
                     <div className="relative mb-2">
                       <Input
+                        ref={typeFilterInputRef}
                         value={typeFilterQuery}
                         onChange={(e) => setTypeFilterQuery(e.target.value)}
                         placeholder="Search type"
@@ -1190,7 +1228,9 @@ export default function KanbanPage() {
                   </div>
                 </SelectContent>
               </Select>
-              <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
+              <Select value={assignedToFilter} onValueChange={setAssignedToFilter} onOpenChange={(open) => {
+                if (open) focusSearchInput(assignedToFilterInputRef.current)
+              }}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Assigned To" />
                 </SelectTrigger>
@@ -1198,6 +1238,7 @@ export default function KanbanPage() {
                   <div className="p-2">
                     <div className="relative mb-2">
                       <Input
+                        ref={assignedToFilterInputRef}
                         value={assignedToFilterQuery}
                         onChange={(e) => setAssignedToFilterQuery(e.target.value)}
                         placeholder="Search assignees"
@@ -1236,7 +1277,9 @@ export default function KanbanPage() {
                   </div>
                 </SelectContent>
               </Select>
-              <Select value={assignedByFilter} onValueChange={setAssignedByFilter}>
+              <Select value={assignedByFilter} onValueChange={setAssignedByFilter} onOpenChange={(open) => {
+                if (open) focusSearchInput(assignedByFilterInputRef.current)
+              }}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Assigned By" />
                 </SelectTrigger>
@@ -1244,6 +1287,7 @@ export default function KanbanPage() {
                   <div className="p-2">
                     <div className="relative mb-2">
                       <Input
+                        ref={assignedByFilterInputRef}
                         value={assignedByFilterQuery}
                         onChange={(e) => setAssignedByFilterQuery(e.target.value)}
                         placeholder="Search creators"
@@ -1282,7 +1326,9 @@ export default function KanbanPage() {
                   </div>
                 </SelectContent>
               </Select>
-              <Select value={taskNumberFilter} onValueChange={setTaskNumberFilter}>
+              <Select value={taskNumberFilter} onValueChange={setTaskNumberFilter} onOpenChange={(open) => {
+                if (open) focusSearchInput(taskNumberFilterInputRef.current)
+              }}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select Task Number" />
                 </SelectTrigger>
@@ -1290,6 +1336,7 @@ export default function KanbanPage() {
                   <div className="p-2">
                     <div className="relative mb-2">
                       <Input
+                        ref={taskNumberFilterInputRef}
                         value={taskNumberFilterQuery}
                         onChange={(e) => setTaskNumberFilterQuery(e.target.value)}
                         placeholder="Search tasks"

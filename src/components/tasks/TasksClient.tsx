@@ -227,7 +227,7 @@ export default function TasksClient({
       setAssignedToFilterQuery('')
       setCreatedByFilterQuery('')
       // Trigger a fresh fetch with reset filters
-      fetchTasks(true)
+      fetchTasks(true, '')
     }
 
     // Handle date range changes with validation and auto-correction
@@ -487,8 +487,31 @@ export default function TasksClient({
         }
     }, [availableStatusOptions, statusFilter])
 
+    // Helper function to focus filter search inputs
+    const focusSearchInput = (el: HTMLInputElement | null) => {
+        if (!el || el.disabled) return
+
+        const doFocus = () => {
+            el.focus({ preventScroll: true })
+            try {
+                el.select?.()
+            } catch {
+                // ignore
+            }
+        }
+
+        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+            window.requestAnimationFrame(doFocus)
+        } else {
+            setTimeout(doFocus, 0)
+        }
+    }
+
     // Virtualization refs
     const parentRef = useRef<HTMLDivElement>(null)
+    const projectFilterInputRef = useRef<HTMLInputElement | null>(null)
+    const assignedToFilterInputRef = useRef<HTMLInputElement | null>(null)
+    const createdByFilterInputRef = useRef<HTMLInputElement | null>(null)
     const rowVirtualizer = useVirtualizer({
         count: tasks.length,
         getScrollElement: () => parentRef.current,
@@ -536,13 +559,16 @@ export default function TasksClient({
     ])
 
     // Fetch tasks with current filters
-    const fetchTasks = useCallback(async (reset = false) => {
+    const fetchTasks = useCallback(async (reset = false, searchOverride?: string) => {
         try {
             setLoading(true)
             const params = new URLSearchParams()
 
-            // Use debounced search only (searchQuery is for input, debouncedSearch for API)
-            if (debouncedSearch) params.set('search', debouncedSearch)
+            const effectiveSearch = searchOverride !== undefined
+                ? searchOverride.trim()
+                : (debouncedSearch || searchQuery.trim())
+
+            if (effectiveSearch) params.set('search', effectiveSearch)
 
             if (statusFilter !== 'all') params.set('status', statusFilter)
             if (priorityFilter !== 'all') params.set('priority', priorityFilter)
@@ -936,7 +962,7 @@ export default function TasksClient({
                                         type="button"
                                         onClick={() => {
                                             setSearchQuery('')
-                                            fetchTasks(true)
+                                            fetchTasks(true, '')
                                         }}
                                         className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-foreground"
                                         aria-label="Clear search"
@@ -946,7 +972,9 @@ export default function TasksClient({
                                 )}
                             </div>
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
-                                <Select value={projectFilter} onValueChange={setProjectFilter}>
+                                <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
+                                    if (open) focusSearchInput(projectFilterInputRef.current)
+                                }}>
                                     <SelectTrigger className="w-full sm:w-40">
                                         <SelectValue placeholder="Project" />
                                     </SelectTrigger>
@@ -954,6 +982,7 @@ export default function TasksClient({
                                         <div className="p-2">
                                             <div className="relative mb-2">
                                                 <Input
+                                                    ref={projectFilterInputRef}
                                                     value={projectFilterQuery}
                                                     onChange={(e) => setProjectFilterQuery(e.target.value)}
                                                     placeholder="Search projects"
@@ -1033,7 +1062,9 @@ export default function TasksClient({
                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
                                 {canViewAllTasks && (
                                     <>
-                                        <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
+                                        <Select value={assignedToFilter} onValueChange={setAssignedToFilter} onOpenChange={(open) => {
+                                            if (open) focusSearchInput(assignedToFilterInputRef.current)
+                                        }}>
                                             <SelectTrigger className="w-full">
                                                 <SelectValue placeholder="Assigned To" />
                                             </SelectTrigger>
@@ -1041,6 +1072,7 @@ export default function TasksClient({
                                                 <div className="p-2">
                                                     <div className="relative mb-2">
                                                         <Input
+                                                            ref={assignedToFilterInputRef}
                                                             value={assignedToFilterQuery}
                                                             onChange={(e) => setAssignedToFilterQuery(e.target.value)}
                                                             placeholder="Search assignees"
@@ -1079,7 +1111,9 @@ export default function TasksClient({
                                                 </div>
                                             </SelectContent>
                                         </Select>
-                                        <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
+                                        <Select value={createdByFilter} onValueChange={setCreatedByFilter} onOpenChange={(open) => {
+                                            if (open) focusSearchInput(createdByFilterInputRef.current)
+                                        }}>
                                             <SelectTrigger className="w-full">
                                                 <SelectValue placeholder="Created By" />
                                             </SelectTrigger>
@@ -1087,6 +1121,7 @@ export default function TasksClient({
                                                 <div className="p-2">
                                                     <div className="relative mb-2">
                                                         <Input
+                                                            ref={createdByFilterInputRef}
                                                             value={createdByFilterQuery}
                                                             onChange={(e) => setCreatedByFilterQuery(e.target.value)}
                                                             placeholder="Search creators"
