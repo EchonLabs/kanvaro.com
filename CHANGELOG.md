@@ -1,3 +1,10 @@
+## [1.34.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.34.0...v1.34.1) (2026-04-27)
+
+
+### Bug Fixes
+
+* refactor invitation email generation to use a dedicated HTML template function ([5fac30b](https://github.com/EchonLabs/kanvaro.com/commit/5fac30b49bab03962d1a819f571467f75c92b872))
+
 # [1.34.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.33.0...v1.34.0) (2026-04-27)
 
 
