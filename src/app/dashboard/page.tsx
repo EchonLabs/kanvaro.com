@@ -19,6 +19,8 @@ import { PageContent } from '@/components/ui/PageContent'
 import { usePermissionContext } from '@/lib/permissions/permission-context'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 
 interface DashboardData {
   stats: {
@@ -59,6 +61,16 @@ export default function DashboardPage() {
   const [dashboardLoaded, setDashboardLoaded] = useState(false)
   const router = useRouter()
   const { loading: permissionsLoading, error: permissionsError, permissions, refreshPermissions } = usePermissionContext()
+
+  const lastLoginText = user?.lastLogin
+    ? new Date(user.lastLogin).toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : 'Not available'
 
   const loadDashboardData = useCallback(async (force = false) => {
     // Prevent multiple simultaneous dashboard loads
@@ -174,21 +186,11 @@ export default function DashboardPage() {
     <MainLayout>
       <PageContent>
         <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
-          {/* Welcome Section with Refresh Button */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
+          {/* Welcome Section */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 mb-1">
             <div className="flex-1 min-w-0 w-full sm:w-auto">
               <DashboardHeader user={user} />
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="w-full sm:w-auto flex-shrink-0 text-xs"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
           </div>
 
           {dataError && (
@@ -206,12 +208,35 @@ export default function DashboardPage() {
           )}
 
           {/* Quick Actions - Full Width at Top */}
-          <div className="w-full">
+          <div className="w-full mb-12">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
+              <h2 className="text-sm font-semibold text-foreground">Quick Actions</h2>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    Last login: {lastLoginText}
+                  </span>
+                  <Badge variant="secondary" className="text-[10px] h-4.5 px-1.5 py-0 hover:bg-secondary dark:hover:bg-secondary">
+                    {user?.customRole?.name || formatToTitleCase(user?.role) || 'Team Member'}
+                  </Badge>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="h-7 px-2 text-[10px]"
+                >
+                  <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
+            </div>
             <QuickActions />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mt-10">
-            <div className="lg:col-span-2 flex flex-col gap-4 sm:gap-6 mt-10">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+            <div className="lg:col-span-2 flex flex-col gap-4 sm:gap-6">
               <StatsCards
                 stats={dashboardData?.stats}
                 changes={dashboardData?.changes}
@@ -233,7 +258,7 @@ export default function DashboardPage() {
               />
             </div>
 
-            <div className="flex flex-col gap-3 sm:gap-4 mt-10">
+            <div className="flex flex-col gap-3 sm:gap-4">
               {user.id && user.organization  && (
                 <TimeTrackingWidget
                   userId={user.id}

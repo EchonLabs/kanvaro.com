@@ -9,396 +9,14 @@ import { Organization } from '@/models/Organization'
 import { applyRoundingRules } from '@/lib/utils'
 import { logActivity } from '@/lib/activity-logger'
 
-type EffectiveTimeTrackingSettings = {
-  maxSessionHours?: number
-  allowOvertime?: boolean
-  maxDailyHours?: number
-  maxWeeklyHours?: number
-  requireApproval?: boolean
-  requireDescription?: boolean
-  roundingRules?: {
-    enabled?: boolean
-    increment?: number
-    roundUp?: boolean
-  }
-  notifications?: {
-    onTimerStart?: boolean
-    onTimerStop?: boolean
-    onOvertime?: boolean
-    onApprovalNeeded?: boolean
-    onTimeSubmitted?: boolean
-  }
-}
-
-type StopTimerReason = 'manual' | 'auto_max_session' | 'auto_max_daily'
-
-const MINUTES_PER_HOUR = 60
-
-/**
- * Calculate total hours already logged today for a user (from completed TimeEntry records).
- * Does NOT include currently running timer duration.
- */
-async function getDailyHoursLogged(userId: string, organizationId: string): Promise<number> {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-
-  const result = await TimeEntry.aggregate([
-    {
-      $match: {
-        user: new (require('mongoose').Types.ObjectId)(userId),
-        organization: new (require('mongoose').Types.ObjectId)(organizationId),
-        startTime: { $gte: today, $lt: tomorrow }
-      }
-    },
-    {
-      $group: {
-        _id: null,
-        totalDuration: { $sum: '$duration' }
-      }
-    }
-  ])
-
-  const totalMinutes = result.length > 0 ? result[0].totalDuration : 0
-  return totalMinutes / MINUTES_PER_HOUR
-}
-
-const getIdString = (value: any): string | null => {
-  if (!value) return null
-  if (typeof value === 'string') return value
-  if (typeof value === 'object' && value !== null) {
-    if ('_id' in value && value._id) return value._id.toString()
-    if ('id' in value && value.id) return value.id.toString()
-  }
-  return value.toString?.() ?? null
-}
-
-const calculateCurrentDurationMinutes = (timer: IActiveTimer, referenceDate = new Date()) => {
-  // When paused, use pausedAt as the effective end so ongoing pause time is excluded
-  const effectiveEnd = timer.pausedAt ? timer.pausedAt : referenceDate
-  const baseDuration = (effectiveEnd.getTime() - timer.startTime.getTime()) / (1000 * 60)
-  return Math.max(0, baseDuration - (timer.totalPausedDuration || 0))
-}
-
-async function getEffectiveTimeTrackingSettings(
-  organizationId: string | null,
-  projectId?: string | null
-): Promise<EffectiveTimeTrackingSettings | null> {
-  if (!organizationId) return null
-
-  if (projectId) {
-    const projectSettings = await TimeTrackingSettings.findOne({
-      organization: organizationId,
-      project: projectId
-    })
-    if (projectSettings) {
-      const settings = projectSettings.toObject()
-      // Also check project.settings.requireApproval as fallback if not set in TimeTrackingSettings
-      if (settings.requireApproval === undefined || settings.requireApproval === null) {
-        const project = await Project.findById(projectId).select('settings.requireApproval')
-        if (project?.settings?.requireApproval !== undefined) {
-          settings.requireApproval = project.settings.requireApproval
-        }
-      }
-      return settings
-    }
-  }
-
-  const orgSettings = await TimeTrackingSettings.findOne({
-    organization: organizationId,
-    project: null
-  })
-  if (orgSettings) {
-    return orgSettings.toObject()
-  }
-
-  const organization = await Organization.findById(organizationId).select('settings.timeTracking')
-  return organization?.settings?.timeTracking ?? null
-}
-
-interface StopTimerOptions {
-  description?: string
-  category?: string
-  tags?: string[]
-  reason?: StopTimerReason
-  stopSettings?: EffectiveTimeTrackingSettings
-  now?: Date
-}
-
-async function stopTimerAndBuildResponse(
-  activeTimer: IActiveTimer,
-  options: StopTimerOptions = {}
-): Promise<{ status: number; body: any }> {
-  const organizationId = getIdString(activeTimer.organization)
-  const projectId = getIdString(activeTimer.project)
-
-  if (!organizationId) {
-    return { status: 400, body: { error: 'Invalid organization for timer' } }
-  }
-
-  const stopSettings =
-    options.stopSettings || (await getEffectiveTimeTrackingSettings(organizationId, projectId))
-
-  if (!stopSettings) {
-    return { status: 500, body: { error: 'Time tracking settings not found' } }
-  }
-
-  const userId = getIdString(activeTimer.user)
-  let endTime = options.now || new Date()
-
-  // Finalize current pause period before computing duration
-  if (activeTimer.pausedAt) {
-    const currentPauseMinutes = (endTime.getTime() - activeTimer.pausedAt.getTime()) / (1000 * 60)
-    activeTimer.totalPausedDuration = (activeTimer.totalPausedDuration || 0) + currentPauseMinutes
-    activeTimer.pausedAt = undefined
-  }
-  
-  const isAutoStop = options.reason === 'auto_max_session' || options.reason === 'auto_max_daily'
-  let effectiveLimitMinutes: number | null = null
-  
-  if (isAutoStop && stopSettings.allowOvertime === false) {
-    // Calculate session limit
-    const sessionLimitMinutes = stopSettings.maxSessionHours
-      ? stopSettings.maxSessionHours * MINUTES_PER_HOUR
-      : null
-
-    // Calculate daily remaining limit
-    let dailyRemainingMinutes: number | null = null
-    if (stopSettings.maxDailyHours) {
-      const userId = getIdString(activeTimer.user)
-      const orgId = getIdString(activeTimer.organization)
-      if (userId && orgId) {
-        const dailyHoursLogged = await getDailyHoursLogged(userId, orgId)
-        const remainingHours = Math.max(0, stopSettings.maxDailyHours - dailyHoursLogged)
-        dailyRemainingMinutes = remainingHours * MINUTES_PER_HOUR
-      }
-    }
-
-    // Use the stricter of the two limits
-    if (sessionLimitMinutes !== null && dailyRemainingMinutes !== null) {
-      effectiveLimitMinutes = Math.min(sessionLimitMinutes, dailyRemainingMinutes)
-    } else {
-      effectiveLimitMinutes = sessionLimitMinutes ?? dailyRemainingMinutes
-    }
-
-    if (effectiveLimitMinutes !== null) {
-      const maxDurationMs = effectiveLimitMinutes * 60 * 1000
-      const totalPausedMs = (activeTimer.totalPausedDuration || 0) * 60 * 1000
-      endTime = new Date(activeTimer.startTime.getTime() + maxDurationMs + totalPausedMs)
-    }
-  }
-
-  const descriptionSource = options.description ?? activeTimer.description ?? ''
-  const finalDescription =
-    typeof descriptionSource === 'string'
-      ? descriptionSource.trim()
-      : String(descriptionSource).trim()
-  const requireDescription = stopSettings.requireDescription ?? false
-
-  if (requireDescription && !finalDescription) {
-    return { status: 400, body: { error: 'Description is required for time entries' } }
-  }
-
-  let totalDuration = calculateCurrentDurationMinutes(activeTimer, endTime)
-  
-  if (isAutoStop && effectiveLimitMinutes !== null && totalDuration > effectiveLimitMinutes) {
-    totalDuration = effectiveLimitMinutes
-  }
-  
-  let finalDuration = totalDuration
-  if (stopSettings.roundingRules?.enabled) {
-    finalDuration = applyRoundingRules(totalDuration, {
-      enabled: stopSettings.roundingRules.enabled ?? false,
-      increment: stopSettings.roundingRules.increment ?? 15,
-      roundUp: stopSettings.roundingRules.roundUp ?? true
-    })
-  }
-  const hasTimeLogged = finalDuration > 0
-
-  if (!hasTimeLogged) {
-    // Atomically claim the timer — only the first caller succeeds
-    const deletedTimer = await ActiveTimer.findOneAndDelete({ _id: activeTimer._id })
-    if (!deletedTimer) {
-      // Another process already stopped this timer — bail out
-      return {
-        status: 200,
-        body: {
-          message: 'Timer already stopped by another process',
-          timeEntry: null,
-          hasTimeLogged: false,
-          duration: 0,
-          alreadyStopped: true
-        }
-      }
-    }
-    return {
-      status: 200,
-      body: {
-        message:
-          isAutoStop
-            ? (options.reason === 'auto_max_daily'
-              ? 'Timer automatically stopped after reaching the daily hours limit.'
-              : 'Timer automatically stopped after reaching max session hours.')
-            : 'Timer stopped. No time was logged (0 minutes).',
-        timeEntry: null,
-        hasTimeLogged: false,
-        duration: 0,
-        notificationsSent: {
-          timerStop: false,
-          overtime: false,
-          approvalNeeded: false,
-          timeSubmitted: false
-        },
-        autoStopped: isAutoStop,
-        reason: options.reason ?? 'manual'
-      }
-    }
-  }
-
-  const category = options.category ?? activeTimer.category
-  const tags = options.tags ?? activeTimer.tags
-  const projectValue = (activeTimer.project as any)?._id ?? activeTimer.project
-  const taskValue = (activeTimer.task as any)?._id ?? activeTimer.task
-
-  // Check project settings for approval requirement
-  let requiresProjectApproval = false
-  if (projectId) {
-    const project = await Project.findById(projectId).select('settings.requireApproval')
-    requiresProjectApproval = project?.settings?.requireApproval === true
-  }
-
-  const timeEntry = new TimeEntry({
-    user: activeTimer.user,
-    organization: activeTimer.organization,
-    project: projectValue,
-    task: taskValue,
-    description: finalDescription,
-    startTime: activeTimer.startTime,
-    endTime,
-    duration: finalDuration,
-    isBillable: activeTimer.isBillable,
-    hourlyRate: activeTimer.hourlyRate,
-    status: 'completed',
-    category,
-    tags,
-    isApproved: !requiresProjectApproval
-  })
-
-  // Atomically claim the timer — only the first caller succeeds
-  const deletedTimer = await ActiveTimer.findOneAndDelete({ _id: activeTimer._id })
-  if (!deletedTimer) {
-    // Another process already stopped this timer — bail out without creating duplicate
-    return {
-      status: 200,
-      body: {
-        message: 'Timer already stopped by another process',
-        timeEntry: null,
-        hasTimeLogged: false,
-        duration: 0,
-        alreadyStopped: true
-      }
-    }
-  }
-  await timeEntry.save()
-
-  // Log activity: time logged from timer stop (non-blocking)
-  const projectNameForLog = (activeTimer.project as any)?.name || 'Unknown Project'
-  const taskTitleForLog = (activeTimer.task as any)?.title || undefined
-  logActivity({
-    organizationId: String(organizationId),
-    userId: String(userId),
-    action: 'time_entry_saved',
-    entityType: 'timer',
-    entityId: String(activeTimer._id),
-    entityName: taskTitleForLog || projectNameForLog,
-    projectId: projectId || undefined,
-    projectName: projectNameForLog,
-    details: {
-      timeEntryId: String(timeEntry._id),
-      taskTitle: taskTitleForLog,
-      duration: finalDuration,
-      description: finalDescription
-    }
-  }).catch(err => console.error('Failed to log time entry saved activity from timer:', err))
-
-  const notificationsSent = {
-    timerStop: false,
-    overtime: false,
-    approvalNeeded: false,
-    timeSubmitted: false
-  }
-
-  return {
-    status: 200,
-    body: {
-      message:
-        isAutoStop
-          ? (options.reason === 'auto_max_daily'
-            ? 'Timer automatically stopped after reaching the daily hours limit.'
-            : 'Timer automatically stopped after reaching max session hours.')
-          : 'Timer stopped successfully',
-      timeEntry: timeEntry.toObject(),
-      hasTimeLogged: true,
-      duration: finalDuration,
-      notificationsSent,
-      autoStopped: isAutoStop,
-      reason: options.reason ?? 'manual'
-    }
-  }
-}
-
-/**
- * Enforce both max session hours and max daily hours limits.
- * Returns an auto-stop response if either limit is exceeded.
- */
-async function enforceTimerLimits(
-  activeTimer: IActiveTimer
-): Promise<{ status: number; body: any } | null> {
-  const organizationId = getIdString(activeTimer.organization)
-  if (!organizationId) return null
-
-  const projectId = getIdString(activeTimer.project)
-  const stopSettings = await getEffectiveTimeTrackingSettings(organizationId, projectId)
-  if (!stopSettings || stopSettings.allowOvertime !== false) {
-    return null
-  }
-
-  const now = new Date()
-  const currentDuration = calculateCurrentDurationMinutes(activeTimer, now)
-
-  // Check max session hours limit
-  if (stopSettings.maxSessionHours) {
-    const sessionLimitMinutes = stopSettings.maxSessionHours * MINUTES_PER_HOUR
-    if (currentDuration >= sessionLimitMinutes) {
-      return stopTimerAndBuildResponse(activeTimer, {
-        stopSettings,
-        now,
-        reason: 'auto_max_session'
-      })
-    }
-  }
-
-  // Check max daily hours limit
-  if (stopSettings.maxDailyHours) {
-    const userId = getIdString(activeTimer.user)
-    if (userId) {
-      const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
-      const currentSessionHours = currentDuration / MINUTES_PER_HOUR
-      const totalDailyHours = dailyHoursLogged + currentSessionHours
-
-      if (totalDailyHours >= stopSettings.maxDailyHours) {
-        return stopTimerAndBuildResponse(activeTimer, {
-          stopSettings,
-          now,
-          reason: 'auto_max_daily'
-        })
-      }
-    }
-  }
-
-  return null
-}
+import { 
+  getEffectiveTimeTrackingSettings, 
+  getDailyHoursLogged, 
+  calculateCurrentDurationMinutes, 
+  stopTimerInternal, 
+  enforceTimerLimitsInternal,
+  getIdString
+} from '@/lib/time-tracking-server'
 
 export async function GET(request: NextRequest) {
   try {
@@ -421,14 +39,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ activeTimer: null })
     }
 
-    const autoStopResult = await enforceTimerLimits(activeTimer)
-    if (autoStopResult) {
+    const autoStopResult = await enforceTimerLimitsInternal(activeTimer)
+    if (autoStopResult && autoStopResult.success) {
       return NextResponse.json(
         {
-          ...autoStopResult.body,
+          ...autoStopResult.result,
           activeTimer: null
         },
-        { status: autoStopResult.status }
+        { status: 200 }
       )
     }
 
@@ -437,6 +55,7 @@ export async function GET(request: NextRequest) {
     // Calculate remaining daily minutes for the client
     const effectiveSettings = await getEffectiveTimeTrackingSettings(organizationId, null)
     let remainingDailyMinutes: number | null = null
+    const MINUTES_PER_HOUR = 60
     if (effectiveSettings?.maxDailyHours && effectiveSettings.allowOvertime === false) {
       const dailyHoursLogged = await getDailyHoursLogged(userId, organizationId)
       const remainingHours = Math.max(0, effectiveSettings.maxDailyHours - dailyHoursLogged)
@@ -704,14 +323,14 @@ export async function PUT(request: NextRequest) {
         break
 
       case 'stop': {
-        const stopResult = await stopTimerAndBuildResponse(activeTimer, {
+        const stopResult = await stopTimerInternal(activeTimer, {
           description,
           category,
           tags,
           reason: 'manual'
         })
         // Log activity: timer stopped (non-blocking)
-        if (stopResult.status === 200 && !stopResult.body.alreadyStopped) {
+        if (stopResult.success && !stopResult.alreadyStopped) {
           logActivity({
             organizationId: timerOrgId,
             userId: String(userId),
@@ -723,12 +342,12 @@ export async function PUT(request: NextRequest) {
             projectName: timerProjectName,
             details: {
               taskTitle: timerTaskTitle,
-              duration: stopResult.body.duration,
-              hasTimeLogged: stopResult.body.hasTimeLogged
+              duration: stopResult.duration,
+              hasTimeLogged: !!stopResult.timeEntry
             }
           }).catch(err => console.error('Failed to log timer stop activity:', err))
         }
-        return NextResponse.json(stopResult.body, { status: stopResult.status })
+        return NextResponse.json(stopResult, { status: stopResult.success ? 200 : 400 })
       }
 
       case 'update':

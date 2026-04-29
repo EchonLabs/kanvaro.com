@@ -139,11 +139,57 @@ export default function ProfilePage() {
   // Auth initialization
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      setLoading(false)
+      // Data loading is handled by the fetchProfile useEffect
     } else if (!authLoading && !isAuthenticated) {
       router.push('/login')
     }
   }, [authLoading, isAuthenticated, router])
+
+  // Load profile data
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch('/api/settings/user')
+        const data = await response.json()
+        if (data.success && data.data) {
+          const profileData = data.data
+          setProfile(profileData)
+          setTwoFactorEnabled(!!profileData.twoFactorEnabled)
+          setTwoFactorInitial(!!profileData.twoFactorEnabled)
+          
+          const newFormData = {
+            firstName: profileData.firstName || '',
+            lastName: profileData.lastName || '',
+            language: profileData.language || 'en',
+            currency: profileData.currency || 'USD',
+            theme: profileData.preferences?.theme || 'system',
+            sidebarCollapsed: profileData.preferences?.sidebarCollapsed || false,
+            dateFormat: profileData.preferences?.dateFormat || 'MM/DD/YYYY',
+            timeFormat: profileData.preferences?.timeFormat || '12h',
+            notifications: {
+              email: profileData.preferences?.notifications?.email ?? true,
+              inApp: profileData.preferences?.notifications?.inApp ?? true,
+              push: profileData.preferences?.notifications?.push ?? false,
+              taskReminders: profileData.preferences?.notifications?.taskReminders ?? true,
+              projectUpdates: profileData.preferences?.notifications?.projectUpdates ?? true,
+              teamActivity: profileData.preferences?.notifications?.teamActivity ?? false,
+            }
+          }
+          setFormData(newFormData)
+          setOriginalFormData(newFormData)
+        }
+      } catch (err) {
+        console.error('Failed to fetch profile:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (isAuthenticated) {
+      fetchProfile()
+    }
+  }, [isAuthenticated])
 
   useEffect(() => {
     setBrowserTimezone(detectClientTimezone())

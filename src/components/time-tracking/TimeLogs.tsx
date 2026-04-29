@@ -139,7 +139,6 @@ export function TimeLogs({
     taskId: '',
     employeeId: ''
   })
-  const [currentUserRole, setCurrentUserRole] = useState<string>('')
   const [filterProjects, setFilterProjects] = useState<any[]>([])
   const [filterTasks, setFilterTasks] = useState<any[]>([])
   const [filterEmployees, setFilterEmployees] = useState<any[]>([])
@@ -264,6 +263,11 @@ export function TimeLogs({
       task.displayId?.toLowerCase().includes(searchLower)
     )
   }, [tasks, modalTaskSearch])
+
+  const selectedTaskForLogObject = useMemo(() =>
+    tasks.find(t => t._id === selectedTaskForLog),
+    [tasks, selectedTaskForLog]
+  )
   const [manualLogData, setManualLogData] = useState({
     startDate: '',
     startTime: '',
@@ -2056,7 +2060,7 @@ export function TimeLogs({
             Time Logs */}
             </CardTitle>
             {/* HR Manual Time Log Button - visible only to HR role and only in Timer tab */}
-            {currentUserRole === 'human_resource' && !showManualLogButtons && pathname === '/time-tracking/timer' && (
+            {['human_resource', 'admin', 'super_admin'].includes(user?.role || '') && !showManualLogButtons && (pathname === '/time-tracking/timer' || pathname === '/time-tracking/logs') && (
               <Button
                 onClick={() => setShowHRManualLogModal(true)}
                 size="sm"
@@ -3080,15 +3084,24 @@ export function TimeLogs({
                     if (open) focusSearchInput(modalTaskSearchInputRef.current)
                   }}
                 >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={
-                      tasksLoading
-                        ? 'Loading tasks...'
-                        : selectedProjectForLog
-                          ? (tasks.length > 0 ? 'Select a task' : 'No tasks available')
-                          : 'Select a project first'
-                    } />
-                  </SelectTrigger>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={
+                          tasksLoading
+                            ? 'Loading tasks...'
+                            : selectedProjectForLog
+                              ? (tasks.length > 0 ? 'Select a task' : 'No tasks available')
+                              : 'Select a project first'
+                        } />
+                      </SelectTrigger>
+                    </TooltipTrigger>
+                    {selectedTaskForLogObject && (
+                      <TooltipContent side="top" className="max-w-sm">
+                        <p className="font-medium">{selectedTaskForLogObject.title}</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
                   {tasksLoading && (
                     <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                   )}
@@ -3407,15 +3420,24 @@ export function TimeLogs({
                     if (open) focusSearchInput(modalTaskSearchInputRef.current)
                   }}
                 >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={
-                      tasksLoading
-                        ? 'Loading tasks...'
-                        : selectedProjectForLog
-                          ? (tasks.length > 0 ? 'Select a task' : 'No tasks available')
-                          : 'Select a project first'
-                    } />
-                  </SelectTrigger>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={
+                          tasksLoading
+                            ? 'Loading tasks...'
+                            : selectedProjectForLog
+                              ? (tasks.length > 0 ? 'Select a task' : 'No tasks available')
+                              : 'Select a project first'
+                        } />
+                      </SelectTrigger>
+                    </TooltipTrigger>
+                    {selectedTaskForLogObject && (
+                      <TooltipContent side="top" className="max-w-sm">
+                        <p className="font-medium">{selectedTaskForLogObject.title}</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
                   {tasksLoading && (
                     <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                   )}

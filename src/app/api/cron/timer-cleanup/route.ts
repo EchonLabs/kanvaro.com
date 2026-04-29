@@ -9,105 +9,15 @@ import { applyRoundingRules } from '@/lib/utils'
 
 import mongoose from 'mongoose'
 
+import { 
+  getEffectiveTimeTrackingSettings, 
+  getDailyHoursLogged, 
+  calculateCurrentDurationMinutes, 
+  stopTimerInternal, 
+  getIdString 
+} from '@/lib/time-tracking-server'
+
 const MINUTES_PER_HOUR = 60
-
-interface EffectiveTimeTrackingSettings {
-  maxSessionHours?: number
-  maxDailyHours?: number
-  allowOvertime?: boolean
-  requireApproval?: boolean
-  roundingRules?: {
-    enabled?: boolean
-    increment?: number
-    roundUp?: boolean
-  }
-  notifications?: {
-    onTimerStop?: boolean
-    onOvertime?: boolean
-    onApprovalNeeded?: boolean
-  }
-}
-
-const getIdString = (value: any): string | null => {
-  if (!value) return null
-  if (typeof value === 'string') return value
-  if (typeof value === 'object' && value !== null) {
-    if ('_id' in value && value._id) return value._id.toString()
-    if ('id' in value && value.id) return value.id.toString()
-  }
-  return value.toString?.() ?? null
-}
-
-const calculateCurrentDurationMinutes = (timer: IActiveTimer, referenceDate = new Date()) => {
-  // When paused, use pausedAt as the effective end so ongoing pause time is excluded
-  const effectiveEnd = timer.pausedAt ? timer.pausedAt : referenceDate
-  const baseDuration = (effectiveEnd.getTime() - timer.startTime.getTime()) / (1000 * 60)
-  return Math.max(0, baseDuration - (timer.totalPausedDuration || 0))
-}
-
-async function getEffectiveTimeTrackingSettings(
-  organizationId: string | null,
-  projectId?: string | null
-): Promise<EffectiveTimeTrackingSettings | null> {
-  if (!organizationId) return null
-
-  if (projectId) {
-    const projectSettings = await TimeTrackingSettings.findOne({
-      organization: organizationId,
-      project: projectId
-    })
-    if (projectSettings) {
-      const settings = projectSettings.toObject()
-      if (settings.requireApproval === undefined || settings.requireApproval === null) {
-        const project = await Project.findById(projectId).select('settings.requireApproval')
-        if (project?.settings?.requireApproval !== undefined) {
-          settings.requireApproval = project.settings.requireApproval
-        }
-      }
-      return settings
-    }
-  }
-
-  const orgSettings = await TimeTrackingSettings.findOne({
-    organization: organizationId,
-    project: null
-  })
-  if (orgSettings) {
-    return orgSettings.toObject()
-  }
-
-  const organization = await Organization.findById(organizationId).select('settings.timeTracking')
-  return organization?.settings?.timeTracking ?? null
-}
-
-/**
- * Calculate total hours already logged today for a user.
- */
-async function getDailyHoursLogged(userId: string, organizationId: string): Promise<number> {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-
-  const result = await TimeEntry.aggregate([
-    {
-      $match: {
-        user: new mongoose.Types.ObjectId(userId),
-        organization: new mongoose.Types.ObjectId(organizationId),
-        startTime: { $gte: today, $lt: tomorrow }
-      }
-    },
-    {
-      $group: {
-        _id: null,
-        totalDuration: { $sum: '$duration' }
-      }
-    }
-  ])
-
-  const totalMinutes = result.length > 0 ? result[0].totalDuration : 0
-  return totalMinutes / MINUTES_PER_HOUR
-}
 
 async function stopExpiredTimer(activeTimer: IActiveTimer): Promise<{
   success: boolean
@@ -128,8 +38,16 @@ async function stopExpiredTimer(activeTimer: IActiveTimer): Promise<{
 
     // Get effective settings
     const settings = await getEffectiveTimeTrackingSettings(organizationId, projectId)
-    if (!settings || settings.allowOvertime !== false) {
-      return { success: false, timerId, error: 'Timer does not require enforcement' }
+    if (!settings) {
+      return { success: false, timerId, error: 'Settings not found' }
+    }
+
+    // Determine if we should enforce limits
+    const hasSessionLimit = !!settings.maxSessionHours
+    const hasDailyLimit = !!settings.maxDailyHours && settings.allowOvertime === false
+
+    if (!hasSessionLimit && !hasDailyLimit) {
+      return { success: false, timerId, error: 'Timer does not require enforcement (no session limit and overtime allowed)' }
     }
 
     // Need at least one limit to enforce
@@ -336,14 +254,18 @@ export async function GET(request: NextRequest) {
         // Get settings to check if timer needs enforcement
         const settings = await getEffectiveTimeTrackingSettings(organizationId, projectId)
         
-        // Skip timers that don't need enforcement
-        if (!settings || settings.allowOvertime !== false) {
+        if (!settings) {
           skippedCount++
           continue
         }
 
-        // Need at least one limit to enforce
-        if (!settings.maxSessionHours && !settings.maxDailyHours) {
+        // Check if we have any limits to enforce
+        // maxSessionHours is always enforced if set
+        // maxDailyHours is only enforced if allowOvertime is false
+        const hasSessionLimit = !!settings.maxSessionHours
+        const hasDailyLimit = !!settings.maxDailyHours && settings.allowOvertime === false
+
+        if (!hasSessionLimit && !hasDailyLimit) {
           skippedCount++
           continue
         }

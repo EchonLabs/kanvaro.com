@@ -60,6 +60,16 @@ function sanitizePastedHtml(html: string): string {
   const container = document.createElement('div')
   container.innerHTML = html
 
+  // Remove comments to prevent fragment markers (like StartFragment/EndFragment) from entering the editor
+  const commentWalker = document.createTreeWalker(container, NodeFilter.SHOW_COMMENT)
+  const comments: Node[] = []
+  let currentCommentNode = commentWalker.nextNode()
+  while (currentCommentNode) {
+    comments.push(currentCommentNode)
+    currentCommentNode = commentWalker.nextNode()
+  }
+  comments.forEach(c => c.parentNode?.removeChild(c))
+
   // Remove dangerous/non-content elements early
   container.querySelectorAll('script,style,meta,link,iframe,object,embed').forEach(node => node.remove())
 
@@ -534,6 +544,7 @@ export function RichTextEditor({
     }
 
     const extractText = (node: Node) => {
+      if (node.nodeType === 8) return // Skip COMMENT_NODE (8)
       if (node.nodeName === 'LI') {
         flushLine()
         const text = (node as HTMLElement).innerHTML
@@ -660,6 +671,7 @@ export function RichTextEditor({
     }
 
     const extractText = (node: Node) => {
+      if (node.nodeType === 8) return // Skip COMMENT_NODE (8)
       if (node.nodeName === 'LI') {
         flushLine()
         const text = (node as HTMLElement).innerHTML

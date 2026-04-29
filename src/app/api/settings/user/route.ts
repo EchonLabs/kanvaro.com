@@ -3,6 +3,57 @@ import connectDB from '@/lib/db-config'
 import { User } from '@/models/User'
 import { authenticateUser } from '@/lib/auth-utils'
 
+export async function GET(request: NextRequest) {
+  try {
+    await connectDB()
+
+    const authResult = await authenticateUser()
+    if ('error' in authResult) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const userId = authResult.user.id
+    const organizationId = authResult.user.organization
+
+    const user = await User.findOne({
+      _id: userId,
+      organization: organizationId
+    }).select('-password')
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        timezone: user.timezone,
+        language: user.language,
+        currency: user.currency,
+        preferences: user.preferences
+      }
+    })
+
+  } catch (error) {
+    console.error('Get user settings error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function PUT(request: NextRequest) {
   try {
     await connectDB()

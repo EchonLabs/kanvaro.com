@@ -136,6 +136,11 @@ export function HRManualTimeLogModal({
     )
   }, [tasks, taskSearch])
 
+  const selectedTask = useMemo(() =>
+    tasks.find(t => t._id === selectedTaskId),
+    [tasks, selectedTaskId]
+  )
+
   // Reset form when modal opens
   useEffect(() => {
     if (open) {
@@ -619,17 +624,26 @@ export function HRManualTimeLogModal({
                 }}
                 disabled={!selectedProjectId}
               >
-                <SelectTrigger className="w-full" id="hr-task">
-                  <SelectValue placeholder={
-                    !selectedProjectId
-                      ? 'Select a project first'
-                      : tasksLoading
-                        ? 'Loading tasks...'
-                        : tasks.length > 0
-                          ? 'Select a task'
-                          : 'No tasks available'
-                  } />
-                </SelectTrigger>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <SelectTrigger className="w-full" id="hr-task">
+                      <SelectValue placeholder={
+                        !selectedProjectId
+                          ? 'Select a project first'
+                          : tasksLoading
+                            ? 'Loading tasks...'
+                            : tasks.length > 0
+                              ? 'Select a task'
+                              : 'No tasks available'
+                      } />
+                    </SelectTrigger>
+                  </TooltipTrigger>
+                  {selectedTask && (
+                    <TooltipContent side="top" className="max-w-sm">
+                      <p className="font-medium">{selectedTask.title}</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
                 <SelectContent className="max-h-[250px] w-[var(--radix-select-trigger-width)]">
                   <div className="sticky top-0 z-10 p-2 border-b bg-popover">
                     <div className="relative">

@@ -157,7 +157,7 @@ export default function StoriesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
-  const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [showFilters, setShowFilters] = useState(false)
   const [creatorDetailsMap, setCreatorDetailsMap] = useState<Record<string, UserSummary>>({});
 
   // Filter search states
@@ -299,9 +299,8 @@ export default function StoriesPage() {
   }, [])
 
   useEffect(() => {
-    if (!currentUserId) return
     fetchEpicOptions()
-  }, [currentUserId, fetchEpicOptions])
+  }, [fetchEpicOptions])
 
   useEffect(() => {
     if (!stories.length) {
@@ -548,17 +547,9 @@ export default function StoriesPage() {
   }
 
   const isCreator = (story: Story) => {
-    const creatorData = story.createdBy as any
-    const creatorId =
-      typeof creatorData === 'string'
-        ? creatorData
-        : creatorData?._id || creatorData?.id
-
-    return (
-      Boolean(creatorId) &&
-      Boolean(currentUserId) &&
-      creatorId.toString() === currentUserId.toString()
-    )
+    const creatorId = (story as any)?.createdBy?._id || (story as any)?.createdBy?.id
+    const currentUserId = user ? ((user as any)._id || (user as any).id) : null
+    return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
   }
 
   const canEditStory = (story: Story) =>
@@ -1007,8 +998,8 @@ export default function StoriesPage() {
                           </p>
                         ) : (
                           columnStories.map((story) => {
-                            const isCreator = story.createdBy?.toString() === currentUserId || story.createdBy === currentUserId
-                            const canDragStory = canManageAllStories || isCreator
+                            const isOwner = isCreator(story)
+                            const canDragStory = canManageAllStories || isOwner
                             const isDraggable = Boolean(story.sprint?._id) && canDragStory
                             const creatorDetails = resolveStoryCreator(story)
                             const creatorName = getUserDisplayName(creatorDetails)

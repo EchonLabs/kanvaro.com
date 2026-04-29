@@ -5,12 +5,10 @@ import { authenticateUser } from '@/lib/auth-utils'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { PermissionService } from '@/lib/permissions/permission-service'
 
-function calculateCurrentDurationMinutes(activeTimer: any): number {
-  // When paused, use pausedAt as the effective end so ongoing pause time is excluded
-  const effectiveEnd = activeTimer.pausedAt ? new Date(activeTimer.pausedAt) : new Date()
-  const baseDuration = (effectiveEnd.getTime() - activeTimer.startTime.getTime()) / (1000 * 60)
-  return Math.max(0, baseDuration - (activeTimer.totalPausedDuration || 0))
-}
+import { 
+  calculateCurrentDurationMinutes, 
+  enforceTimerLimitsInternal 
+} from '@/lib/time-tracking-server'
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,22 +57,30 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all active timers for the organization
+    // Don't use .lean() because we need to pass them to enforceTimerLimitsInternal
     const activeTimers = await ActiveTimer.find(query)
       .populate('user', 'firstName lastName email')
       .populate('project', 'name settings')
       .populate('task', 'title')
       .sort({ startTime: -1 })
-      .lean()
 
-    // Calculate current duration for each timer
-    const timersWithDuration = activeTimers.map((timer: any) => {
+    // Calculate current duration for each timer and perform real-time cleanup
+    const timersWithDuration = []
+    for (const timer of activeTimers) {
+      // Check if timer should be auto-stopped
+      const autoStopResult = await enforceTimerLimitsInternal(timer)
+      if (autoStopResult && autoStopResult.success) {
+        // Timer was auto-stopped, skip it for the active timers list
+        continue
+      }
+
       const currentDuration = calculateCurrentDurationMinutes(timer)
-      return {
-        ...timer,
+      timersWithDuration.push({
+        ...timer.toObject(),
         currentDuration,
         isPaused: !!timer.pausedAt
-      }
-    })
+      })
+    }
 
     return NextResponse.json({
       success: true,

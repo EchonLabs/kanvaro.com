@@ -162,6 +162,8 @@ export default function TasksClient({
     const isAdmin = typeof permissions?.userRole === 'string' && ['admin', 'super_admin', 'superadmin'].includes(permissions.userRole.toLowerCase())
     const { formatDate } = useDateTime()
     const canViewAllTasks = hasPermission(Permission.PROJECT_VIEW_ALL) || hasPermission(Permission.TASK_VIEW_ALL)
+    const canViewAssignedProjects = hasPermission(Permission.TASK_VIEW_ASSIGNED_PROJECTS)
+    const canFilterUsers = canViewAllTasks || canViewAssignedProjects
     const canCreateTask = hasPermission(Permission.TASK_CREATE)
 
     const [tasks, setTasks] = useState<Task[]>(initialTasks)
@@ -200,46 +202,45 @@ export default function TasksClient({
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
     const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
     const { statusMap: projectsWithStatuses } = useProjectKanbanStatuses()
-    const [currentUserId, setCurrentUserId] = useState<string>('')
     const { success: notifySuccess, error: notifyError } = useNotify()
 
     // Check if any filters are active
     const hasActiveFilters = searchQuery !== '' ||
-                            statusFilter !== 'all' ||
-                            priorityFilter !== 'all' ||
-                            typeFilter !== 'all' ||
-                            projectFilter !== 'all' ||
-                            assignedToFilter !== 'all' ||
-                            createdByFilter !== 'all' ||
-                            dateRangeFilter !== undefined
+        statusFilter !== 'all' ||
+        priorityFilter !== 'all' ||
+        typeFilter !== 'all' ||
+        projectFilter !== 'all' ||
+        assignedToFilter !== 'all' ||
+        createdByFilter !== 'all' ||
+        dateRangeFilter !== undefined
 
     // Reset all filters
     const resetFilters = () => {
-      setSearchQuery('')
-      setStatusFilter('all')
-      setPriorityFilter('all')
-      setTypeFilter('all')
-      setProjectFilter('all')
-      setAssignedToFilter('all')
-      setCreatedByFilter('all')
-      setDateRangeFilter(undefined)
-      setProjectFilterQuery('')
-      setAssignedToFilterQuery('')
-      setCreatedByFilterQuery('')
-      // Trigger a fresh fetch with reset filters
-      fetchTasks(true, '')
+        setSearchQuery('')
+        setStatusFilter('all')
+        setPriorityFilter('all')
+        setTypeFilter('all')
+        setProjectFilter('all')
+        setAssignedToFilter('all')
+        setCreatedByFilter('all')
+        setDateRangeFilter(undefined)
+        setProjectFilterQuery('')
+        setAssignedToFilterQuery('')
+        setCreatedByFilterQuery('')
+        // Trigger a fresh fetch with reset filters
+        fetchTasks(true, '')
     }
 
     // Handle date range changes with validation and auto-correction
     const handleDateRangeChange = useCallback((range: DateRange | undefined) => {
-      if (!range) {
-        setDateRangeFilter(undefined)
-        return
-      }
-      
-      // Validate and auto-correct the date range
-      const correctedRange = validateAndCorrectDateRange(range.from, range.to)
-      setDateRangeFilter(correctedRange as DateRange | undefined)
+        if (!range) {
+            setDateRangeFilter(undefined)
+            return
+        }
+
+        // Validate and auto-correct the date range
+        const correctedRange = validateAndCorrectDateRange(range.from, range.to)
+        setDateRangeFilter(correctedRange as DateRange | undefined)
     }, [])
 
     const startDateBoundary = useMemo(() => {
@@ -259,9 +260,10 @@ export default function TasksClient({
     const isCreator = useCallback(
         (task: Task) => {
             const creatorId = (task as any)?.createdBy?._id || (task as any)?.createdBy?.id
+            const currentUserId = user ? ((user as any)._id || (user as any).id) : null
             return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
         },
-        [currentUserId]
+        [user]
     )
 
     const canEditTask = useCallback(
@@ -331,8 +333,8 @@ export default function TasksClient({
             return Array.from(combined.values()).sort((a, b) => a.name.localeCompare(b.name))
         })
 
-        // Only show user filters if user can view all tasks
-        if (canViewAllTasks) {
+        // Only show user filters if user can filter users
+        if (canFilterUsers) {
             setAssignedToOptions((prev) => {
                 const combined = new Map<string, UserSummary>()
                 prev.forEach((user) => combined.set(user._id, user))
@@ -350,7 +352,7 @@ export default function TasksClient({
                 )
             })
         }
-    }, [tasks, canViewAllTasks])
+    }, [tasks, canFilterUsers])
 
     // Load projects from API for filter dropdown
     useEffect(() => {
@@ -376,9 +378,9 @@ export default function TasksClient({
         loadProjects()
     }, [])
 
-    // Load users for filter dropdown (only if user can view all tasks)
+    // Load users for filter dropdown (only if user can filter users)
     useEffect(() => {
-        if (!canViewAllTasks) return
+        if (!canFilterUsers) return
 
         const loadUsers = async () => {
             try {
@@ -415,7 +417,7 @@ export default function TasksClient({
             }
         }
         loadUsers()
-    }, [canViewAllTasks])
+    }, [canFilterUsers])
 
     // Debounce search query
     const debouncedSearch = useDebounce(searchQuery, 300)
@@ -427,22 +429,56 @@ export default function TasksClient({
     }, [projectOptions, projectFilterQuery])
 
     const filteredAssignedToOptions = useMemo(() => {
+        let options = assignedToOptions
+
+        // Filter by project members if a specific project is selected
+        if (selectedProjectDetails && selectedProjectDetails.teamMembers) {
+            const projectMemberIds = new Set<string>();
+            selectedProjectDetails.teamMembers.forEach((member: any) => {
+                const id = member.memberId || member.user?._id || member.user || member._id || member;
+                if (id) projectMemberIds.add(id.toString());
+            });
+            if (selectedProjectDetails.createdBy) {
+                const creatorId = selectedProjectDetails.createdBy._id || selectedProjectDetails.createdBy;
+                if (creatorId) projectMemberIds.add(creatorId.toString());
+            }
+
+            options = options.filter(opt => projectMemberIds.has(opt._id.toString()));
+        }
+
         const query = assignedToFilterQuery.trim().toLowerCase()
-        if (!query) return assignedToOptions
-        return assignedToOptions.filter((member) =>
+        if (!query) return options
+        return options.filter((member) =>
             `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
             member.email.toLowerCase().includes(query)
         )
-    }, [assignedToOptions, assignedToFilterQuery])
+    }, [assignedToOptions, assignedToFilterQuery, selectedProjectDetails])
 
     const filteredCreatedByOptions = useMemo(() => {
+        let options = createdByOptions
+
+        // Filter by project members if a specific project is selected
+        if (selectedProjectDetails && selectedProjectDetails.teamMembers) {
+            const projectMemberIds = new Set<string>();
+            selectedProjectDetails.teamMembers.forEach((member: any) => {
+                const id = member.memberId || member.user?._id || member.user || member._id || member;
+                if (id) projectMemberIds.add(id.toString());
+            });
+            if (selectedProjectDetails.createdBy) {
+                const creatorId = selectedProjectDetails.createdBy._id || selectedProjectDetails.createdBy;
+                if (creatorId) projectMemberIds.add(creatorId.toString());
+            }
+
+            options = options.filter(opt => projectMemberIds.has(opt._id.toString()));
+        }
+
         const query = createdByFilterQuery.trim().toLowerCase()
-        if (!query) return createdByOptions
-        return createdByOptions.filter((member) =>
+        if (!query) return options
+        return options.filter((member) =>
             `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
             member.email.toLowerCase().includes(query)
         )
-    }, [createdByOptions, createdByFilterQuery])
+    }, [createdByOptions, createdByFilterQuery, selectedProjectDetails])
 
     // Fetch project details when project filter changes
     useEffect(() => {
@@ -535,7 +571,7 @@ export default function TasksClient({
         if (statusFilter !== 'all') params.status = statusFilter
         if (priorityFilter !== 'all') params.priority = priorityFilter
         if (typeFilter !== 'all') params.type = typeFilter
-        if (canViewAllTasks) {
+        if (canFilterUsers) {
             if (assignedToFilter !== 'all') params.assignedTo = assignedToFilter
             if (createdByFilter !== 'all') params.createdBy = createdByFilter
         }
@@ -555,7 +591,7 @@ export default function TasksClient({
         assignedToFilter,
         createdByFilter,
         dateRangeFilter,
-        canViewAllTasks
+        canFilterUsers
     ])
 
     // Fetch tasks with current filters
@@ -575,8 +611,8 @@ export default function TasksClient({
             if (typeFilter !== 'all') params.set('type', typeFilter)
             if (projectFilter !== 'all') params.set('project', projectFilter)
 
-            // Only allow assignedTo and createdBy filters if user can view all tasks
-            if (canViewAllTasks) {
+            // Only allow assignedTo and createdBy filters if user can filter users
+            if (canFilterUsers) {
                 if (assignedToFilter !== 'all') params.set('assignedTo', assignedToFilter)
                 if (createdByFilter !== 'all') params.set('createdBy', createdByFilter)
             }
@@ -632,7 +668,7 @@ export default function TasksClient({
         dateRangeFilter,
         currentPage,
         pageSize,
-        canViewAllTasks,
+        canFilterUsers,
         router
     ])
 
@@ -1060,7 +1096,7 @@ export default function TasksClient({
                                 </Select>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-                                {canViewAllTasks && (
+                                {canFilterUsers && (
                                     <>
                                         <Select value={assignedToFilter} onValueChange={setAssignedToFilter} onOpenChange={(open) => {
                                             if (open) focusSearchInput(assignedToFilterInputRef.current)
@@ -1207,26 +1243,26 @@ export default function TasksClient({
                                         </Button>
                                     </div>
                                 </div>
-                                                            <div className="flex justify-end w-full md:col-span-2 xl:col-span-3">
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={resetFilters}
-                                        className="text-xs"
-                                        aria-label="Reset all filters"
-                                      >
-                                        <RotateCcw className="h-4 w-4 mr-1" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Reset filters</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
+                                <div className="flex justify-end w-full md:col-span-2 xl:col-span-3">
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={resetFilters}
+                                                    className="text-xs"
+                                                    aria-label="Reset all filters"
+                                                >
+                                                    <RotateCcw className="h-4 w-4 mr-1" />
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Reset filters</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1293,7 +1329,7 @@ export default function TasksClient({
                                                                 transform: `translateY(${virtualRow.start}px)`,
                                                             }}
                                                         >
-                                                            <Card 
+                                                            <Card
                                                                 className="hover:shadow-md transition-shadow m-2 cursor-pointer"
                                                                 onClick={(e) => {
                                                                     // Don't navigate if clicking on select, dropdown, or buttons
@@ -1340,7 +1376,7 @@ export default function TasksClient({
                                                                                             handleInlineStatusChange(task, value as Task['status'])
                                                                                         }
                                                                                         disabled={statusUpdatingId === task._id || !task.sprint}
-                                                                                        //onClick={(e) => e.stopPropagation()}
+                                                                                    //onClick={(e) => e.stopPropagation()}
                                                                                     >
                                                                                         <SelectTrigger className="h-7 w-full sm:w-[150px] text-xs">
                                                                                             <SelectValue placeholder="Status" />

@@ -102,7 +102,7 @@ const [localSearch, setLocalSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
-  const [currentUserId, setCurrentUserId] = useState<string>('')
+  const [showFilters, setShowFilters] = useState(false)
   const filtersInitializedRef = useRef(false)
 
   const { hasPermission } = usePermissions()
@@ -266,6 +266,7 @@ if (currentPage === 1) {
 
   const isCreator = (epic: Epic) => {
     const creatorId = (epic as any)?.createdBy?._id || (epic as any)?.createdBy?.id
+    const currentUserId = user ? ((user as any)._id || (user as any).id) : null
     return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
   }
 

@@ -1,3 +1,10 @@
+# [1.35.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.34.1...v1.35.0) (2026-04-28)
+
+
+### Features
+
+* enhance dashboard header and quick actions layout ([d0e1089](https://github.com/EchonLabs/kanvaro.com/commit/d0e1089e2f233fb15853719cae368a4c29f51284))
+
 ## [1.34.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.34.0...v1.34.1) (2026-04-27)
 
 
