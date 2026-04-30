@@ -21,10 +21,6 @@
     display: none;
   }
   
-  /* Remove margin-top from space-y-6 utility */
-  .space-y-6 > :not([hidden]) ~ :not([hidden]) {
-    margin-top: 0 !important;
-  }
 }
 
 @layer base {

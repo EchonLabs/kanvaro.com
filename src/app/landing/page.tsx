@@ -343,12 +343,14 @@ export default function LandingPage() {
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
               className="flex items-center gap-2 text-2xl font-bold cursor-pointer group"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#7bffde] to-[#7afdea] shadow-lg shadow-[#7bffde]/30 group-hover:shadow-[#7bffde]/50 transition-all duration-300 group-hover:scale-110">
-                <Zap className="h-5 w-5 text-slate-900" />
-              </div>
-              <span className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-[#7bffde] dark:to-white bg-clip-text text-transparent group-hover:from-[#0f766e] group-hover:via-[#14b8a6] group-hover:to-[#0f766e] dark:group-hover:from-[#7bffde] dark:group-hover:via-white dark:group-hover:to-[#7bffde] transition-all duration-300">
-            Kanvaro
-          </span>
+              <Image
+                src="/Kanvaro.svg"
+                alt="Kanvaro"
+                width={107}
+                height={32}
+                className="h-8 w-auto transition-transform duration-300 group-hover:scale-105"
+                priority
+              />
             </button>
             
             <nav className="hidden md:flex items-center gap-2 overflow-x-auto md:overflow-visible">
@@ -571,12 +573,13 @@ export default function LandingPage() {
                 {/* Mobile Menu Header */}
                 <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/10">
                   <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#7bffde] to-[#7afdea]">
-                      <Zap className="h-5 w-5 text-slate-900" />
-                    </div>
-                    <span className="text-lg font-bold bg-gradient-to-r from-slate-900 to-slate-800 dark:from-white dark:to-[#7bffde] bg-clip-text text-transparent">
-                      Kanvaro
-                    </span>
+                    <Image
+                      src="/Kanvaro.svg"
+                      alt="Kanvaro"
+                      width={107}
+                      height={32}
+                      className="h-8 w-auto"
+                    />
                   </div>
                   <button
                     onClick={() => setIsMobileMenuOpen(false)}
@@ -1465,10 +1468,13 @@ export default function LandingPage() {
             {/* Company Info */}
             <div className="sm:col-span-2 lg:col-span-2 lg:pl-4">
               <div className="flex items-center gap-2 mb-4">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#7bffde] to-[#7afdea] shadow-lg shadow-[#7bffde]/30">
-                  <Zap className="h-5 w-5 text-slate-900" />
-                </div>
-                <span className="text-xl font-bold text-white">Kanvaro</span>
+                <Image
+                  src="/Kanvaro.svg"
+                  alt="Kanvaro"
+                  width={107}
+                  height={32}
+                  className="h-8 w-auto"
+                />
               </div>
               <p className="text-sm text-white/70 leading-relaxed max-w-md">
                 The complete open-source project management platform for modern teams. Self-hosted, customizable, and built for agile workflows, time tracking, and financial management. Deploy on your infrastructure with full data control.
@@ -1657,12 +1663,13 @@ export default function LandingPage() {
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/10">
                 <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#7bffde] to-[#7afdea] shadow-lg">
-                    <Zap className="h-5 w-5 text-slate-900" />
-                  </div>
-                  <span className="text-lg font-bold bg-gradient-to-r from-slate-900 to-slate-800 dark:from-white dark:to-[#7bffde] bg-clip-text text-transparent">
-                    Kanvaro
-                  </span>
+                  <Image
+                    src="/Kanvaro.svg"
+                    alt="Kanvaro"
+                    width={107}
+                    height={32}
+                    className="h-8 w-auto"
+                  />
                 </div>
                 <button
                   onClick={() => setIsMobileMenuOpen(false)}

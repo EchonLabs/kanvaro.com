@@ -107,41 +107,6 @@ export function PermissionProvider({ children, initialPermissions }: PermissionP
       
       const response = await fetch('/api/auth/permissions');
       if (!response.ok) {
-        if (response.status === 401) {
-          // In dev/docker, auth cookies can be momentarily unavailable after navigation.
-          // Provide safe defaults to avoid blank UI while user session hydrates.
-          const defaultPermissions = {
-            globalPermissions: [
-              Permission.PROJECT_READ,
-              Permission.TASK_READ,
-              Permission.TEAM_READ,
-              Permission.TIME_TRACKING_READ,
-              Permission.FINANCIAL_READ,
-              Permission.REPORTING_VIEW,
-              Permission.SETTINGS_VIEW,
-              Permission.EPIC_READ,
-              Permission.SPRINT_READ,
-              Permission.SPRINT_VIEW,
-              Permission.STORY_READ,
-              Permission.CALENDAR_READ,
-              Permission.KANBAN_READ,
-              Permission.BACKLOG_READ,
-              Permission.TEST_SUITE_READ,
-              Permission.TEST_CASE_READ,
-              Permission.TEST_PLAN_READ,
-              Permission.TEST_EXECUTION_READ,
-              Permission.TEST_REPORT_VIEW
-            ],
-            projectPermissions: {},
-            projectRoles: {},
-            userRole: 'team_member',
-            accessibleProjects: []
-          };
-          setPermissions(defaultPermissions);
-          permissionsCache = defaultPermissions;
-          cacheTimestamp = Date.now();
-          return;
-        }
         throw new Error('Failed to fetch permissions');
       }
       
@@ -152,6 +117,12 @@ export function PermissionProvider({ children, initialPermissions }: PermissionP
       cacheTimestamp = Date.now();
       savePermissionsToStorage(data);
     } catch (err) {
+      // If we already have permissions (e.g. from cache or default), don't show error yet
+      if (permissions) {
+        console.warn('Error refreshing permissions, using current data:', err);
+        return;
+      }
+
       console.error('Error fetching permissions:', err);
       setError(err instanceof Error ? err.message : 'Unknown error');
       

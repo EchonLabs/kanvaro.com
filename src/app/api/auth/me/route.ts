@@ -97,7 +97,7 @@ export async function GET() {
               cookieStore.set('accessToken', newAccessToken, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
+                sameSite: 'lax',
                 maxAge: 15 * 60 // 15 minutes
               })
 
@@ -168,7 +168,7 @@ export async function GET() {
           cookieStore.set('accessToken', newAccessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: 'lax',
             maxAge: 15 * 60 // 15 minutes
           })
 

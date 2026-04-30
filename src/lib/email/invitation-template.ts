@@ -91,7 +91,7 @@ export function generateInvitationEmailHtml(params: {
                     </p>
                     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
                       <tr>
-                        <td style="background:linear-gradient(135deg,#f3f4f6 0%,#e5e7eb 100%);color:#374151;padding:8px 16px;border-radius:20px;font-size:14px;font-weight:600;border:1px solid #d1d5db;">${roleDisplayName}</td>
+                        <td style="background:linear-gradient(135deg,#f3f4f6 0%,#e5e7eb 100%);color:#374151;padding:8px 16px;border-radius:20px;font-size:14px;font-weight:600;">${roleDisplayName}</td>
                       </tr>
                     </table>
                   </td>

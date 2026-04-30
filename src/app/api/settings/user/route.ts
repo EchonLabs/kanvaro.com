@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/db-config'
 import { User } from '@/models/User'
 import { authenticateUser } from '@/lib/auth-utils'
+import { normalizeUploadUrl } from '@/lib/file-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,8 +37,10 @@ export async function GET(request: NextRequest) {
         id: user._id,
         firstName: user.firstName,
         lastName: user.lastName,
+        memberId: user.memberId,
         email: user.email,
         role: user.role,
+        avatar: normalizeUploadUrl(user.avatar || ''),
         timezone: user.timezone,
         language: user.language,
         currency: user.currency,
@@ -114,7 +117,9 @@ export async function PUT(request: NextRequest) {
         id: user._id,
         firstName: user.firstName,
         lastName: user.lastName,
+        memberId: user.memberId,
         email: user.email,
+        avatar: normalizeUploadUrl(user.avatar || ''),
         timezone: user.timezone,
         language: user.language,
         preferences: user.preferences

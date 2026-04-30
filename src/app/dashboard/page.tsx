@@ -56,8 +56,6 @@ export default function DashboardPage() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuthContext()
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [dataError, setDataError] = useState('')
-  const [permissionsRefreshed, setPermissionsRefreshed] = useState(false)
-  const [initialPermissionCheckDone, setInitialPermissionCheckDone] = useState(false)
   const [dashboardLoaded, setDashboardLoaded] = useState(false)
   const router = useRouter()
   const { loading: permissionsLoading, error: permissionsError, permissions, refreshPermissions } = usePermissionContext()
@@ -86,17 +84,8 @@ export default function DashboardPage() {
         setDashboardLoaded(true)
         setDataError('')
 
-        // Quick refresh of permissions after dashboard loads to ensure they're current
-        if (!permissionsRefreshed) {
-          setTimeout(async () => {
-            try {
-              await refreshPermissions()
-              setPermissionsRefreshed(true)
-            } catch (error) {
-              console.error('Dashboard: Failed to refresh permissions:', error)
-            }
-          }, 500) // Small delay to ensure dashboard is fully rendered
-        }
+        setDashboardLoaded(true)
+        setDataError('')
       } else {
         setDataError('Failed to load dashboard data')
       }
@@ -104,7 +93,7 @@ export default function DashboardPage() {
       console.error('Failed to load dashboard data:', error)
       setDataError('Failed to load dashboard data')
     }
-  }, [dashboardLoaded, isRefreshing, permissionsRefreshed, refreshPermissions])
+  }, [dashboardLoaded, isRefreshing])
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true)
@@ -125,29 +114,10 @@ export default function DashboardPage() {
     }
   }, [authLoading, isAuthenticated, dashboardLoaded, loadDashboardData, router])
 
-  // Ensure permissions are current when component mounts
-  useEffect(() => {
-    if (!permissionsLoading && permissions && !initialPermissionCheckDone) {
-      // Quick check to refresh permissions if needed
-      const timer = setTimeout(async () => {
-        try {
-          await refreshPermissions()
-          setPermissionsRefreshed(true)
-          setInitialPermissionCheckDone(true)
-        } catch (error) {
-          console.error('Dashboard: Failed initial permission refresh:', error)
-          setInitialPermissionCheckDone(true) // Prevent infinite retries
-        }
-      }, 100)
-
-      return () => clearTimeout(timer)
-    }
-  }, [permissionsLoading, permissions, initialPermissionCheckDone, refreshPermissions])
 
   // Handle loading states consistently to prevent hydration mismatch
-  // Show loading until permissions are loaded, auth check is complete, initial permission check done, organization data is loaded, and dashboard data is ready
-  // Ensure permissions are fully available and refreshed before showing dashboard
-  const isInitialLoading = permissionsLoading || isLoading || authLoading || !permissions || !initialPermissionCheckDone || (!permissionsRefreshed && dashboardData);
+  // Show loading until permissions are loaded, auth check is complete, and dashboard data is ready
+  const isInitialLoading = permissionsLoading || authLoading || (!permissions && !permissionsError) || (isLoading && !dashboardLoaded);
 
   if (isInitialLoading) {
     return (
@@ -208,7 +178,7 @@ export default function DashboardPage() {
           )}
 
           {/* Quick Actions - Full Width at Top */}
-          <div className="w-full mb-12">
+          <div className="w-full mb-2">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
               <h2 className="text-sm font-semibold text-foreground">Quick Actions</h2>
               <div className="flex flex-wrap items-center gap-2 sm:gap-4">
@@ -234,7 +204,7 @@ export default function DashboardPage() {
             </div>
             <QuickActions />
           </div>
-
+          
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
             <div className="lg:col-span-2 flex flex-col gap-4 sm:gap-6">
               <StatsCards
