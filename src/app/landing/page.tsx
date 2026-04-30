@@ -350,6 +350,7 @@ export default function LandingPage() {
                 height={32}
                 className="h-8 w-auto transition-transform duration-300 group-hover:scale-105"
                 priority
+                unoptimized
               />
             </button>
             
@@ -579,6 +580,7 @@ export default function LandingPage() {
                       width={107}
                       height={32}
                       className="h-8 w-auto"
+                      unoptimized
                     />
                   </div>
                   <button
@@ -1474,6 +1476,7 @@ export default function LandingPage() {
                   width={107}
                   height={32}
                   className="h-8 w-auto"
+                  unoptimized
                 />
               </div>
               <p className="text-sm text-white/70 leading-relaxed max-w-md">
@@ -1669,6 +1672,7 @@ export default function LandingPage() {
                     width={107}
                     height={32}
                     className="h-8 w-auto"
+                    unoptimized
                   />
                 </div>
                 <button
