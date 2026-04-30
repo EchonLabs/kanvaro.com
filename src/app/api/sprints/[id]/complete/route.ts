@@ -7,6 +7,7 @@ import { CompletionService } from '@/lib/completion-service'
 import { authenticateUser } from '@/lib/auth-utils'
 import { PermissionService } from '@/lib/permissions/permission-service'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { logActivity } from '@/lib/activity-logger'
 
 export async function POST(
   request: NextRequest,
@@ -42,6 +43,8 @@ export async function POST(
         { status: 404 }
       )
     }
+
+    const previousStatus = sprint.status
 
     if (!sprint.organization) {
       console.warn('[Sprint Complete] Sprint missing organization, assigning current org', { sprintId })
@@ -249,6 +252,26 @@ export async function POST(
       .populate('project', 'name')
       .populate('createdBy', 'firstName lastName email')
       .populate('teamMembers', 'firstName lastName email')
+
+    // Log activity: sprint completed (non-blocking)
+    const sprintProjectName = (updatedSprint?.project as any)?.name || (sprint.project as any)?.name || 'Unknown Project'
+    const sprintProjectIdForLog = (updatedSprint?.project as any)?._id?.toString?.() || sprint.project?.toString?.() || sprintProjectId
+    logActivity({
+      organizationId: String(organizationId),
+      userId: String(userId),
+      action: 'sprint_completed',
+      entityType: 'sprint',
+      entityId: String(sprintId),
+      entityName: updatedSprint?.name || sprint.name,
+      projectId: sprintProjectIdForLog,
+      projectName: sprintProjectName,
+      details: {
+        oldStatus: previousStatus,
+        newStatus: 'completed',
+        targetSprintId: targetSprintId ?? null,
+        selectedTaskCount: Array.isArray(selectedTaskIds) ? selectedTaskIds.length : 0,
+      }
+    }).catch(err => console.error('Failed to log sprint complete activity:', err))
 
     return NextResponse.json({
       success: true,

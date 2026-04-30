@@ -203,11 +203,12 @@ export async function GET(request: NextRequest) {
     const sort = { createdAt: -1 as const };
 
     console.log('[Tasks GET] Checking user permissions');
-    const [canViewAllTasks, hasTaskViewAll] = await Promise.all([
+    const [canViewAllTasks, hasTaskViewAll, canViewAssignedProjects] = await Promise.all([
       PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
-      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL)
+      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL),
+      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ASSIGNED_PROJECTS)
     ]);
-    console.log('[Tasks GET] User permissions - canViewAllTasks:', canViewAllTasks, 'hasTaskViewAll:', hasTaskViewAll);
+    console.log('[Tasks GET] User permissions - canViewAllTasks:', canViewAllTasks, 'hasTaskViewAll:', hasTaskViewAll, 'canViewAssignedProjects:', canViewAssignedProjects);
 
     const filters: any = {
       organization: organizationId,
@@ -220,12 +221,27 @@ export async function GET(request: NextRequest) {
     if (!canViewAllTasks && !hasTaskViewAll) {
       const userFilters: any[] = [{ 'assignedTo.user': { $in: [userId] } }, { createdBy: userId }];
 
+      if (canViewAssignedProjects) {
+        const accessibleProjects = await PermissionService.getAccessibleProjects(userId);
+        if (accessibleProjects && accessibleProjects.length > 0) {
+          userFilters.push({ project: { $in: accessibleProjects } });
+        }
+      }
+
       // If assignedTo filter is provided and it's the current user, use it
       // Otherwise, ignore the filter and use default user restriction
       if (assignedTo && assignedTo === userId) {
         filters['assignedTo.user'] = { $in: [userId] };
       } else if (createdBy && createdBy === userId) {
         filters.createdBy = userId;
+      } else if (canViewAssignedProjects && (assignedTo || createdBy)) {
+        // Allow using assignedTo/createdBy filters freely if they can view assigned projects
+        if (assignedTo) filters['assignedTo.user'] = { $in: [assignedTo] };
+        if (createdBy) filters.createdBy = createdBy;
+        
+        // Still restrict the overall query to their accessible projects or own tasks
+        filters.$and = filters.$and || [];
+        filters.$and.push({ $or: userFilters });
       } else {
         filters.$or = userFilters;
       }

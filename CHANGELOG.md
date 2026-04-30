@@ -1,3 +1,38 @@
+## [1.35.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.35.0...v1.35.1) (2026-04-30)
+
+
+### Bug Fixes
+
+* mark image components as unoptimized for performance improvements ([d149303](https://github.com/EchonLabs/kanvaro.com/commit/d149303c439387053426935d8758dd021873bed4))
+
+# [1.35.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.34.1...v1.35.0) (2026-04-28)
+
+
+### Features
+
+* enhance dashboard header and quick actions layout ([d0e1089](https://github.com/EchonLabs/kanvaro.com/commit/d0e1089e2f233fb15853719cae368a4c29f51284))
+
+## [1.34.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.34.0...v1.34.1) (2026-04-27)
+
+
+### Bug Fixes
+
+* refactor invitation email generation to use a dedicated HTML template function ([5fac30b](https://github.com/EchonLabs/kanvaro.com/commit/5fac30b49bab03962d1a819f571467f75c92b872))
+
+# [1.34.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.33.0...v1.34.0) (2026-04-27)
+
+
+### Features
+
+* enhance filter search inputs with focus functionality across various components ([9a401b2](https://github.com/EchonLabs/kanvaro.com/commit/9a401b283bbf1bbc059291e75f6579c8a73deecc))
+
+# [1.33.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.32.6...v1.33.0) (2026-04-23)
+
+
+### Features
+
+* Implement AuthContext for user authentication and session management ([59bd24c](https://github.com/EchonLabs/kanvaro.com/commit/59bd24c744a969a647021815260d8a36db1319e9))
+
 ## [1.32.6](https://github.com/EchonLabs/kanvaro.com/compare/v1.32.5...v1.32.6) (2026-04-22)
 
 

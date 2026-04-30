@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
-import { 
+import { useAuthContext } from '@/contexts/AuthContext'
+import {
   ArrowLeft,
   Calendar,
   Clock,
@@ -196,6 +197,8 @@ type CommentNode = {
 type ComposerType = 'comment' | 'reply'
 
 export default function TaskDetailPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
   const params = useParams()
   const taskId = params.id as string
@@ -205,7 +208,6 @@ export default function TaskDetailPage() {
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [authError, setAuthError] = useState('')
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [commentContent, setCommentContent] = useState('')
   const [commentSubmitting, setCommentSubmitting] = useState(false)
@@ -272,6 +274,18 @@ export default function TaskDetailPage() {
     (epicDetails && epicDetails._id)
   )
 
+
+  // Auth initialization - trigger data loading
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      setLoading(false)
+      fetchTask()
+      fetchOrganizationUsers()
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated])
   const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me')
@@ -283,7 +297,7 @@ export default function TaskDetailPage() {
         const orgRaw = me?.organization
         const orgId = (typeof orgRaw === 'string' ? orgRaw : (orgRaw?._id ?? orgRaw?.id))
         if (orgId) setCurrentOrganizationId(orgId.toString())
-        setAuthError('')
+        setError('')
         await fetchTask()
       } else if (response.status === 401) {
         const refreshResponse = await fetch('/api/auth/refresh', {
@@ -297,10 +311,10 @@ export default function TaskDetailPage() {
           const orgRaw = me?.organization
           const orgId = (typeof orgRaw === 'string' ? orgRaw : (orgRaw?._id ?? orgRaw?.id))
           if (orgId) setCurrentOrganizationId(orgId.toString())
-          setAuthError('')
+          setError('')
           await fetchTask()
         } else {
-          setAuthError('Session expired')
+          setError('Session expired')
           setTimeout(() => {
             router.push('/login')
           }, 2000)
@@ -310,7 +324,7 @@ export default function TaskDetailPage() {
       }
     } catch (error) {
       console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
+      setError('Authentication failed')
       setTimeout(() => {
         router.push('/login')
       }, 2000)
@@ -582,7 +596,7 @@ export default function TaskDetailPage() {
         method: 'DELETE'
       })
       const data = await response.json()
-      
+
       if (data.success) {
         setShowDeleteConfirmModal(false)
         router.push('/tasks')
@@ -892,9 +906,8 @@ export default function TaskDetailPage() {
               <button
                 key={s._id}
                 type="button"
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-muted focus:bg-muted focus:outline-none transition-colors ${
-                  index === selectedSuggestionIndex ? 'bg-muted' : ''
-                }`}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-muted focus:bg-muted focus:outline-none transition-colors ${index === selectedSuggestionIndex ? 'bg-muted' : ''
+                  }`}
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
@@ -1282,7 +1295,7 @@ export default function TaskDetailPage() {
                   variant="ghost"
                   size="sm"
                   className="h-7 px-2 text-destructive"
-                    onClick={() => setDeleteConfirmId(commentId)}
+                  onClick={() => setDeleteConfirmId(commentId)}
                 >
                   Delete
                 </Button>
@@ -1515,19 +1528,6 @@ export default function TaskDetailPage() {
     )
   }
 
-  if (authError) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{authError}</p>
-            <p className="text-muted-foreground">Redirecting to login...</p>
-          </div>
-        </div>
-      </MainLayout>
-    )
-  }
-
   if (error || !task) {
     return (
       <MainLayout>
@@ -1561,8 +1561,8 @@ export default function TaskDetailPage() {
     uploadedBy:
       attachment.uploadedBy
         ? `${attachment.uploadedBy.firstName || ''} ${attachment.uploadedBy.lastName || ''}`.trim() ||
-          attachment.uploadedBy.email ||
-          'Unknown'
+        attachment.uploadedBy.email ||
+        'Unknown'
         : 'Unknown'
   }))
 
@@ -1894,41 +1894,41 @@ export default function TaskDetailPage() {
                       )}
                     </div>
                   </div>
-              <div className="flex items-center gap-2 mt-2">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div
-                        role="button"
-                        aria-label="Attachments"
-                        className="h-9 w-9 inline-flex items-center justify-center rounded-md border hover:bg-muted cursor-pointer"
-                        onClick={() => commentFileInputRef.current?.click()}
-                      >
-                        <Paperclip className="h-4 w-4" />
+                  <div className="flex items-center gap-2 mt-2">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div
+                            role="button"
+                            aria-label="Attachments"
+                            className="h-9 w-9 inline-flex items-center justify-center rounded-md border hover:bg-muted cursor-pointer"
+                            onClick={() => commentFileInputRef.current?.click()}
+                          >
+                            <Paperclip className="h-4 w-4" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">Attachments</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <input
+                      ref={commentFileInputRef}
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => handleFileInputChange(e, false)}
+                    />
+                    {commentAttachments.length > 0 && (
+                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        {commentAttachments.map((att, idx) => (
+                          <span key={`${att.url}-${idx}`} className="inline-flex items-center gap-1 rounded border px-2 py-1">
+                            <a className="text-primary hover:underline" href={att.url} target="_blank" rel="noreferrer">
+                              {att.name}
+                            </a>
+                            {att.size ? <span>({(att.size / 1024).toFixed(1)} KB)</span> : null}
+                          </span>
+                        ))}
                       </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Attachments</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <input
-                  ref={commentFileInputRef}
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => handleFileInputChange(e, false)}
-                />
-                {commentAttachments.length > 0 && (
-                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                    {commentAttachments.map((att, idx) => (
-                      <span key={`${att.url}-${idx}`} className="inline-flex items-center gap-1 rounded border px-2 py-1">
-                        <a className="text-primary hover:underline" href={att.url} target="_blank" rel="noreferrer">
-                          {att.name}
-                        </a>
-                        {att.size ? <span>({(att.size / 1024).toFixed(1)} KB)</span> : null}
-                      </span>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
                   {renderSuggestionMenu('comment')}
                 </div>
 
@@ -2011,7 +2011,7 @@ export default function TaskDetailPage() {
                 </CardContent>
               </Card>
             )}
-{/* 
+            {/* 
             {task.story && (
               <Card>
                 <CardHeader>
@@ -2096,7 +2096,7 @@ export default function TaskDetailPage() {
                       // Open in new tab if it's a viewable file (PDF, images, etc.)
                       const viewableTypes = ['application/pdf', 'image/', 'text/'];
                       const isViewable = viewableTypes.some(type => attachment.type.startsWith(type));
-                      
+
                       if (isViewable) {
                         window.open(attachment.url, '_blank');
                       } else {
@@ -2129,14 +2129,14 @@ export default function TaskDetailPage() {
                     <span className="ml-1">{formatToTitleCase(task.status)}</span>
                   </Badge>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Priority</span>
                   <Badge className={getPriorityColor(task.priority)}>
                     {formatToTitleCase(task.priority)}
                   </Badge>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Type</span>
                   <Badge className={getTypeColor(task.type)}>
@@ -2144,7 +2144,7 @@ export default function TaskDetailPage() {
                     <span className="ml-1">{formatToTitleCase(task.type)}</span>
                   </Badge>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Project</span>
                   {task.project?.name ? (
@@ -2158,7 +2158,7 @@ export default function TaskDetailPage() {
                     <span className="font-medium">—</span>
                   )}
                 </div>
-{/*                 
+                {/*                 
                 {task.sprint?.name && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Sprint</span>
@@ -2170,7 +2170,7 @@ export default function TaskDetailPage() {
                     </span>
                   </div>
                 )} */}
-                
+
                 {/* {task.story?.title && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Story</span>
@@ -2194,7 +2194,7 @@ export default function TaskDetailPage() {
                     </span>
                   </div>
                 )} */}
-                
+
                 {task.assignedTo && task.assignedTo.length > 0 && (
                   <div className="flex flex-col gap-2">
                     <span className="text-muted-foreground">Assigned To</span>
@@ -2227,7 +2227,7 @@ export default function TaskDetailPage() {
                     </div>
                   </div>
                 )}
-                
+
                 {task.dueDate && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Due Date</span>
@@ -2236,21 +2236,21 @@ export default function TaskDetailPage() {
                     </span>
                   </div>
                 )}
-                
+
                 {task.storyPoints && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Story Points</span>
                     <span className="font-medium">{task.storyPoints}</span>
                   </div>
                 )}
-                
+
                 {task.estimatedHours && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Estimated Hours</span>
                     <span className="font-medium">{task.estimatedHours}h</span>
                   </div>
                 )}
-                
+
                 {task.actualHours != null && task.actualHours > 0 && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Actual Hours</span>

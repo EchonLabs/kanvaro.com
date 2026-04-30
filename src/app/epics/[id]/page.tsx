@@ -13,7 +13,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { useNotify } from '@/lib/notify'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
-import { 
+import { useAuthContext } from '@/contexts/AuthContext'
+import {
   ArrowLeft,
   Calendar,
   Clock,
@@ -73,18 +74,19 @@ interface Epic {
 }
 
 export default function EpicDetailPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
   const params = useParams()
   const epicId = params.id as string
   const { setItems } = useBreadcrumb()
   const { success: notifySuccess, error: notifyError } = useNotify()
   const { formatDate } = useDateTime()
-  
+
   const [epic, setEpic] = useState<Epic | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(false)
-  const [authError, setAuthError] = useState('')
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [stories, setStories] = useState<any[]>([])
   const [storiesLoading, setStoriesLoading] = useState(false)
@@ -103,57 +105,6 @@ export default function EpicDetailPage() {
 
   const { hasPermission } = usePermissions()
 
-  const fetchAndSetCurrentUser = useCallback(async () => {
-    const response = await fetch('/api/auth/me')
-    if (response.ok) {
-      const data = await response.json().catch(() => ({}))
-      const userId = extractUserId(data)
-      if (userId) setCurrentUserId(userId.toString())
-    }
-    return response
-  }, [])
-
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await fetchAndSetCurrentUser()
-      
-      if (response.ok) {
-        setAuthError('')
-        await fetchEpic()
-      } else if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-        
-        if (refreshResponse.ok) {
-          setAuthError('')
-          const meAfterRefresh = await fetchAndSetCurrentUser()
-          if (meAfterRefresh.ok) {
-            await fetchEpic()
-          } else {
-            setAuthError('Session expired')
-            setTimeout(() => {
-              router.push('/login')
-            }, 2000)
-          }
-        } else {
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    }
-  }, [router, epicId, fetchAndSetCurrentUser])
-
   useEffect(() => {
     // Set breadcrumb immediately on mount
     setItems([
@@ -162,9 +113,16 @@ export default function EpicDetailPage() {
     ])
   }, [setItems])
 
+  // Initialize: set user ID from context and fetch data
   useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
+    if (!authLoading && isAuthenticated && user) {
+      const userId = extractUserId(user)
+      if (userId) setCurrentUserId(userId.toString())
+      fetchEpic()
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+  }, [authLoading, isAuthenticated, user, epicId])
 
   const fetchEpic = async () => {
     try {
@@ -297,19 +255,6 @@ export default function EpicDetailPage() {
     )
   }
 
-  if (authError) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{authError}</p>
-            <p className="text-muted-foreground">Redirecting to login...</p>
-          </div>
-        </div>
-      </MainLayout>
-    )
-  }
-
   if (error || !epic) {
     return (
       <MainLayout>
@@ -337,17 +282,17 @@ export default function EpicDetailPage() {
                 onClick={() => router.back()}
                 className="self-start text-sm hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-3"
               >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
-              <h1
+                <h1
                   className="text-2xl font-semibold leading-snug text-foreground flex items-start gap-2 min-w-0 flex-wrap max-w-[70ch] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden break-words overflow-wrap-anywhere"
-                title={epic?.title}
-              >
-                <Layers className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-purple-600 flex-shrink-0" />
+                  title={epic?.title}
+                >
+                  <Layers className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-purple-600 flex-shrink-0" />
                   <span className="break-words overflow-wrap-anywhere">{epic?.title}</span>
-              </h1>
+                </h1>
                 <div className="flex flex-row items-stretch sm:items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap ml-auto">
                   {editAllowed && (
                     <Button
@@ -406,7 +351,7 @@ export default function EpicDetailPage() {
                   </div>
                   <Progress value={epic?.progress?.completionPercentage || 0} className="h-1.5 sm:h-2" />
                 </div>
-                
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs sm:text-sm">
@@ -416,16 +361,16 @@ export default function EpicDetailPage() {
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
-                      <div 
+                      <div
                         className="bg-blue-600 h-1.5 sm:h-2 rounded-full"
-                        style={{ 
-                          width: `${epic?.progress?.totalStories ? 
-                            ((epic?.progress?.storiesCompleted / epic?.progress?.totalStories) * 100) : 0}%` 
+                        style={{
+                          width: `${epic?.progress?.totalStories ?
+                            ((epic?.progress?.storiesCompleted / epic?.progress?.totalStories) * 100) : 0}%`
                         }}
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs sm:text-sm">
                       <span className="text-muted-foreground">Story Points</span>
@@ -434,11 +379,11 @@ export default function EpicDetailPage() {
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
-                      <div 
+                      <div
                         className="bg-green-600 h-1.5 sm:h-2 rounded-full"
-                        style={{ 
-                          width: `${epic?.progress?.totalStoryPoints ? 
-                            ((epic?.progress?.storyPointsCompleted / epic?.progress?.totalStoryPoints) * 100) : 0}%` 
+                        style={{
+                          width: `${epic?.progress?.totalStoryPoints ?
+                            ((epic?.progress?.storyPointsCompleted / epic?.progress?.totalStoryPoints) * 100) : 0}%`
                         }}
                       />
                     </div>
@@ -569,24 +514,24 @@ export default function EpicDetailPage() {
                     <span className="ml-1">{formatToTitleCase(epic?.status)}</span>
                   </Badge>
                 </div>
-                
+
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <span className="text-xs sm:text-sm text-muted-foreground">Priority</span>
                   <Badge className={`${getPriorityColor(epic?.priority)} text-xs`}>
                     {formatToTitleCase(epic?.priority)}
                   </Badge>
                 </div>
-                
+
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <span className="text-xs sm:text-sm text-muted-foreground">Project</span>
-                  <span 
+                  <span
                     className="text-xs sm:text-sm font-medium truncate max-w-[200px] sm:max-w-none text-right sm:text-left"
                     title={epic?.project?.name && epic?.project?.name.length > 10 ? epic?.project?.name : undefined}
                   >
                     {epic?.project?.name && epic?.project?.name.length > 10 ? `${epic?.project?.name.slice(0, 10)}…` : epic?.project?.name}
                   </span>
                 </div>
-                
+
                 {epic?.assignedTo && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                     <span className="text-xs sm:text-sm text-muted-foreground">Assigned To</span>
@@ -595,7 +540,7 @@ export default function EpicDetailPage() {
                     </span>
                   </div>
                 )}
-                
+
                 {epic?.dueDate && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                     <span className="text-xs sm:text-sm text-muted-foreground">Due Date</span>
@@ -604,14 +549,14 @@ export default function EpicDetailPage() {
                     </span>
                   </div>
                 )}
-                
+
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <span className="text-xs sm:text-sm text-muted-foreground">Story Points</span>
                   <span className="text-xs sm:text-sm font-medium">
                     {epic?.progress?.totalStoryPoints ?? 0}
                   </span>
                 </div>
-                
+
                 {epic?.estimatedHours && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                     <span className="text-xs sm:text-sm text-muted-foreground">Estimated Hours</span>

@@ -18,6 +18,9 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { PageContent } from '@/components/ui/PageContent'
 import { usePermissionContext } from '@/lib/permissions/permission-context'
 import { useOrganization } from '@/hooks/useOrganization'
+import { useAuthContext } from '@/contexts/AuthContext'
+import { Badge } from '@/components/ui/Badge'
+import { formatToTitleCase } from '@/lib/utils'
 
 interface DashboardData {
   stats: {
@@ -50,16 +53,22 @@ interface DashboardData {
 export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [user, setUser] = useState<any>(null)
+  const { user, isLoading: authLoading, isAuthenticated } = useAuthContext()
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
-  const [authError, setAuthError] = useState('')
   const [dataError, setDataError] = useState('')
-  const [permissionsRefreshed, setPermissionsRefreshed] = useState(false)
-  const [initialPermissionCheckDone, setInitialPermissionCheckDone] = useState(false)
   const [dashboardLoaded, setDashboardLoaded] = useState(false)
-  const [isAuthChecking, setIsAuthChecking] = useState(false)
   const router = useRouter()
   const { loading: permissionsLoading, error: permissionsError, permissions, refreshPermissions } = usePermissionContext()
+
+  const lastLoginText = user?.lastLogin
+    ? new Date(user.lastLogin).toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : 'Not available'
 
   const loadDashboardData = useCallback(async (force = false) => {
     // Prevent multiple simultaneous dashboard loads
@@ -75,17 +84,8 @@ export default function DashboardPage() {
         setDashboardLoaded(true)
         setDataError('')
 
-        // Quick refresh of permissions after dashboard loads to ensure they're current
-        if (!permissionsRefreshed) {
-          setTimeout(async () => {
-            try {
-              await refreshPermissions()
-              setPermissionsRefreshed(true)
-            } catch (error) {
-              console.error('Dashboard: Failed to refresh permissions:', error)
-            }
-          }, 500) // Small delay to ensure dashboard is fully rendered
-        }
+        setDashboardLoaded(true)
+        setDataError('')
       } else {
         setDataError('Failed to load dashboard data')
       }
@@ -93,113 +93,31 @@ export default function DashboardPage() {
       console.error('Failed to load dashboard data:', error)
       setDataError('Failed to load dashboard data')
     }
-  }, [dashboardLoaded, isRefreshing, permissionsRefreshed, refreshPermissions])
-
-  const checkAuth = useCallback(async (forceLoadDashboard = false) => {
-    // Prevent multiple simultaneous auth checks
-    if (isAuthChecking && !forceLoadDashboard) {
-      return
-    }
-
-    try {
-      setIsAuthChecking(true)
-      const response = await fetch('/api/auth/me')
-
-      if (response.ok) {
-        const userData = await response.json()
-        setUser(userData)
-        setAuthError('')
-
-        // Only load dashboard data if not already loaded or if forced
-        if (!dashboardLoaded || forceLoadDashboard) {
-          await loadDashboardData(forceLoadDashboard)
-        } 
-      } else if (response.status === 401) {
-        // Try to refresh token
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json()
-          setUser(refreshData.user)
-          setAuthError('')
-
-          // Only load dashboard data if not already loaded or if forced
-          if (!dashboardLoaded || forceLoadDashboard) {
-            await loadDashboardData(forceLoadDashboard)
-          } 
-        } else {
-          // Both access and refresh tokens are invalid
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        // Other error, redirect to login
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    } finally {
-      setIsLoading(false)
-      setIsAuthChecking(false)
-    }
-  }, [router, loadDashboardData, isAuthChecking, dashboardLoaded, permissionsLoading, permissions])
+  }, [dashboardLoaded, isRefreshing])
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true)
     try {
-      await loadDashboardData()
+      await loadDashboardData(true)
     } finally {
       setIsRefreshing(false)
     }
   }, [loadDashboardData])
 
-  // Initial auth check on mount
+  // Load dashboard data when authenticated
   useEffect(() => {
-    if (!dashboardLoaded) {
-    checkAuth()
+    if (!authLoading && isAuthenticated && !dashboardLoaded) {
+      loadDashboardData()
+      setIsLoading(false)
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
     }
-  }, []) // Empty dependency array to run only once on mount
+  }, [authLoading, isAuthenticated, dashboardLoaded, loadDashboardData, router])
 
-  // Ensure permissions are current when component mounts
-  useEffect(() => {
-    if (!permissionsLoading && permissions && !initialPermissionCheckDone) {
-      // Quick check to refresh permissions if needed
-      const timer = setTimeout(async () => {
-        try {
-          await refreshPermissions()
-          setPermissionsRefreshed(true)
-          setInitialPermissionCheckDone(true)
-        } catch (error) {
-          console.error('Dashboard: Failed initial permission refresh:', error)
-          setInitialPermissionCheckDone(true) // Prevent infinite retries
-        }
-      }, 100)
-
-      return () => clearTimeout(timer)
-    }
-  }, [permissionsLoading, permissions, initialPermissionCheckDone, refreshPermissions])
-
-  // Set up periodic auth check to handle token expiration (less frequent)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      checkAuth(true) // Force dashboard reload on periodic checks
-    }, 10 * 60 * 1000) // Check every 10 minutes instead of 5
-
-    return () => clearInterval(interval)
-  }, []) // Empty dependency array
 
   // Handle loading states consistently to prevent hydration mismatch
-  // Show loading until permissions are loaded, auth check is complete, initial permission check done, organization data is loaded, and dashboard data is ready
-  // Ensure permissions are fully available and refreshed before showing dashboard
-  const isInitialLoading = permissionsLoading || isLoading  || !permissions || !initialPermissionCheckDone  || (!permissionsRefreshed && dashboardData);
+  // Show loading until permissions are loaded, auth check is complete, and dashboard data is ready
+  const isInitialLoading = permissionsLoading || authLoading || (!permissions && !permissionsError) || (isLoading && !dashboardLoaded);
 
   if (isInitialLoading) {
     return (
@@ -223,16 +141,6 @@ export default function DashboardPage() {
     )
   }
 
-  if (authError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-destructive mb-4">{authError}</p>
-          <p className="text-muted-foreground">Redirecting to login...</p>
-        </div>
-      </div>
-    )
-  }
 
   if (!user) {
     return (
@@ -248,21 +156,11 @@ export default function DashboardPage() {
     <MainLayout>
       <PageContent>
         <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
-          {/* Welcome Section with Refresh Button */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
+          {/* Welcome Section */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 mb-1">
             <div className="flex-1 min-w-0 w-full sm:w-auto">
               <DashboardHeader user={user} />
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="w-full sm:w-auto flex-shrink-0 text-xs"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
           </div>
 
           {dataError && (
@@ -280,12 +178,35 @@ export default function DashboardPage() {
           )}
 
           {/* Quick Actions - Full Width at Top */}
-          <div className="w-full">
+          <div className="w-full mb-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
+              <h2 className="text-sm font-semibold text-foreground">Quick Actions</h2>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    Last login: {lastLoginText}
+                  </span>
+                  <Badge variant="secondary" className="text-[10px] h-4.5 px-1.5 py-0 hover:bg-secondary dark:hover:bg-secondary">
+                    {user?.customRole?.name || formatToTitleCase(user?.role) || 'Team Member'}
+                  </Badge>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="h-7 px-2 text-[10px]"
+                >
+                  <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
+            </div>
             <QuickActions />
           </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mt-10">
-            <div className="lg:col-span-2 flex flex-col gap-4 sm:gap-6 mt-10">
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+            <div className="lg:col-span-2 flex flex-col gap-4 sm:gap-6">
               <StatsCards
                 stats={dashboardData?.stats}
                 changes={dashboardData?.changes}
@@ -307,7 +228,7 @@ export default function DashboardPage() {
               />
             </div>
 
-            <div className="flex flex-col gap-3 sm:gap-4 mt-10">
+            <div className="flex flex-col gap-3 sm:gap-4">
               {user.id && user.organization  && (
                 <TimeTrackingWidget
                   userId={user.id}

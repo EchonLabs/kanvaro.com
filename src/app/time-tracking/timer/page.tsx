@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useAuthContext } from '@/contexts/AuthContext'
 import {
   ArrowLeft,
   Clock,
@@ -102,12 +103,12 @@ interface TimeTrackingSettings {
 }
 
 export default function TimerPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showToast } = useToast()
-  const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [authError, setAuthError] = useState('')
   const [projects, setProjects] = useState<Project[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [tasksLoading, setTasksLoading] = useState(false)
@@ -171,7 +172,6 @@ export default function TimerPage() {
       setTimeout(doFocus, 0)
     }
   }
-
 
 
   // Helper function to combine date and time into datetime-local format
@@ -268,6 +268,19 @@ export default function TimerPage() {
     dailyHoursLogged
   ])
 
+
+  // Auth initialization - trigger data loading
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      setIsLoading(false)
+      fetchProjects()
+      fetchActiveTimer()
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated])
+
   // Validate session hours when relevant fields change
   useEffect(() => {
     validateSessionHours()
@@ -329,56 +342,6 @@ export default function TimerPage() {
       console.error('Failed to fetch daily hours:', err)
     }
   }, [user?.id, user?.organization])
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await fetch('/api/auth/me')
-
-        if (response.ok) {
-          const userData = await response.json()
-
-
-          setUser(userData)
-          setAuthError('')
-          await fetchProjects(userData)
-          await fetchActiveTimer(userData)
-          await fetchDailyHoursLogged()
-        } else if (response.status === 401) {
-          const refreshResponse = await fetch('/api/auth/refresh', {
-            method: 'POST'
-          })
-
-          if (refreshResponse.ok) {
-            const refreshData = await refreshResponse.json()
-
-
-            setUser(refreshData.user)
-            setAuthError('')
-            await fetchProjects(refreshData.user)
-            await fetchActiveTimer(refreshData.user)
-            await fetchDailyHoursLogged()
-          } else {
-            setAuthError('Session expired')
-            setTimeout(() => {
-              router.push('/login')
-            }, 2000)
-          }
-        } else {
-          router.push('/login')
-        }
-      } catch (error) {
-        console.error('Auth check failed:', error)
-        setAuthError('Authentication failed')
-        setTimeout(() => {
-          router.push('/login')
-        }, 2000)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    checkAuth()
-  }, [router])
 
   // Preselect project from query params when projects are loaded
   useEffect(() => {
@@ -958,7 +921,7 @@ export default function TimerPage() {
           setInitializedFromActive(true)
 
           // Show notification for auto-stop (only once per auto-stop event)
-          if (timeTrackingSettings?.notifications?.onTimerStop && data.autoStopped && !autoStopNotifiedRef.current) {
+          if (data.autoStopped && !autoStopNotifiedRef.current) {
             autoStopNotifiedRef.current = true
             showToast({
               type: 'warning',
@@ -1129,17 +1092,6 @@ export default function TimerPage() {
     )
   }
 
-  if (authError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-destructive mb-4">{authError}</p>
-          <p className="text-muted-foreground">Redirecting to login...</p>
-        </div>
-      </div>
-    )
-  }
-
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -1191,13 +1143,13 @@ export default function TimerPage() {
         )}
 
         {/* Daily Hours Info */}
-        
+
         {/* {timeTrackingSettings && dailyHoursLogged > 0 && (
           <Alert variant={dailyHoursLogged >= timeTrackingSettings.maxDailyHours ? 'destructive' : 'default'}>
             <Info className="h-4 w-4" />
             <AlertDescription> */}
-              {/* You have logged <strong>{dailyHoursLogged.toFixed(1)} hours</strong> today. */}
-              {/* {dailyHoursLogged >= timeTrackingSettings.maxDailyHours && (
+        {/* You have logged <strong>{dailyHoursLogged.toFixed(1)} hours</strong> today. */}
+        {/* {dailyHoursLogged >= timeTrackingSettings.maxDailyHours && (
                 <span className="ml-2">
                   You have exceeded your daily limit of {timeTrackingSettings.maxDailyHours} hours.
                 </span>

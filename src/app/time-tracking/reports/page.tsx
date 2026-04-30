@@ -9,56 +9,24 @@ import { Button } from '@/components/ui/Button'
 import { BarChart3, Loader2, Shield } from 'lucide-react'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { useAuthContext } from '@/contexts/AuthContext'
 
 export default function TimeReportsPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [authError, setAuthError] = useState('')
   const { hasPermission } = usePermissions()
 
   const canAccessTimeReports = hasPermission(Permission.TIME_LOG_REPORT_ACCESS)
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await fetch('/api/auth/me')
-        
-        if (response.ok) {
-          const userData = await response.json()
-          setUser(userData)
-          setAuthError('')
-        } else if (response.status === 401) {
-          const refreshResponse = await fetch('/api/auth/refresh', {
-            method: 'POST'
-          })
-          
-          if (refreshResponse.ok) {
-            const refreshData = await refreshResponse.json()
-            setUser(refreshData.user)
-            setAuthError('')
-          } else {
-            setAuthError('Session expired')
-            setTimeout(() => {
-              router.push('/login')
-            }, 2000)
-          }
-        } else {
-          router.push('/login')
-        }
-      } catch (error) {
-        console.error('Auth check failed:', error)
-        setAuthError('Authentication failed')
-        setTimeout(() => {
-          router.push('/login')
-        }, 2000)
-      } finally {
-        setIsLoading(false)
-      }
+    if (!authLoading && isAuthenticated && user) {
+      setIsLoading(false)
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
     }
-
-    checkAuth()
-  }, [router])
+  }, [authLoading, isAuthenticated, user, router])
 
   if (isLoading) {
     return (
@@ -66,17 +34,6 @@ export default function TimeReportsPage() {
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
           <p className="text-muted-foreground">Loading reports...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (authError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-destructive mb-4">{authError}</p>
-          <p className="text-muted-foreground">Redirecting to login...</p>
         </div>
       </div>
     )
@@ -132,7 +89,7 @@ export default function TimeReportsPage() {
         </div>
 
         <TimeReports
-          userId={user._id}
+          userId={(user as any)._id || (user as any).id}
           organizationId={user.organization}
         />
       </div>

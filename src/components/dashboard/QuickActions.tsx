@@ -69,9 +69,8 @@ export function QuickActions() {
     : quickActions.filter(action => hasAnyPermission(action.permissions))
 
   return (
-    <div className="space-y-2">
-      <h2 className="text-sm font-semibold text-foreground">Quick Actions</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
+    <div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5">
         {loading && (
           <>
             {[0, 1, 2, 3, 4].map((i) => (

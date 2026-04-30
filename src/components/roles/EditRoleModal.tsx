@@ -80,7 +80,8 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
       { permission: Permission.TASK_MANAGE_ATTACHMENTS, label: 'Manage Attachments', description: 'Manage task attachments' },
       { permission: Permission.TASK_VIEW_ALL, label: 'View All Tasks', description: 'View all tasks created or assigned to anyone' },
       { permission: Permission.TASK_EDIT_ALL, label: 'Edit All Tasks', description: 'Edit all tasks created or assigned to anyone' },
-      { permission: Permission.TASK_DELETE_ALL, label: 'Delete All Tasks', description: 'Delete all tasks created or assigned to anyone' }
+      { permission: Permission.TASK_DELETE_ALL, label: 'Delete All Tasks', description: 'Delete all tasks created or assigned to anyone' },
+      { permission: Permission.TASK_VIEW_ASSIGNED_PROJECTS, label: 'View Assigned Projects Tasks', description: 'View tasks from all assigned projects' },
     ]
   },
   {
@@ -336,7 +337,7 @@ export function EditRoleModal({ isOpen, onClose, onRoleUpdated, role }: EditRole
     if (!group) return
 
     const allSelected = group.permissions.every(p => formData.permissions.includes(p.permission))
-    
+
     if (allSelected) {
       // Deselect all in this category
       setFormData(prev => ({
@@ -357,13 +358,13 @@ export function EditRoleModal({ isOpen, onClose, onRoleUpdated, role }: EditRole
   const hasChanges = () => {
     if (formData.name !== originalData.name) return true
     if (formData.description !== originalData.description) return true
-    
+
     // Check if permissions have changed
     if (formData.permissions.length !== originalData.permissions.length) return true
-    
+
     const sortedFormPerms = [...formData.permissions].sort()
     const sortedOriginalPerms = [...originalData.permissions].sort()
-    
+
     return !sortedFormPerms.every((perm, index) => perm === sortedOriginalPerms[index])
   }
 

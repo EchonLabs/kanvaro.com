@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef} from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -19,6 +19,7 @@ import { useOrganization } from '@/hooks/useOrganization'
 import { useNotify } from '@/lib/notify'
 import { formatToTitleCase } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useAuthContext } from '@/contexts/AuthContext'
 import {
   ArrowLeft,
   ArrowRight,
@@ -115,6 +116,8 @@ interface ProjectFormData {
 }
 
 export default function CreateProjectPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay, error: currenciesError } = useCurrencies(true)
   const { organization } = useOrganization()
@@ -128,7 +131,7 @@ export default function CreateProjectPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [materialsInput, setMaterialsInput] = useState('')
-const [overheadInput, setOverheadInput] = useState('')
+  const [overheadInput, setOverheadInput] = useState('')
 
   const [availableMembers, setAvailableMembers] = useState<any[]>([])
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
@@ -503,6 +506,14 @@ const [overheadInput, setOverheadInput] = useState('')
     setFormData(prev => ({ ...prev, [fieldName]: value }))
     validateField(fieldName, value)
   }
+   useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      fetchAvailableMembers()
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated])
 
   // Validate timeline dates whenever start or end date changes
   useEffect(() => {
@@ -554,56 +565,24 @@ const [overheadInput, setOverheadInput] = useState('')
     }
   }, [validationErrors, error])
 
-  // Fetch current user for attachment uploads
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const response = await fetch('/api/auth/me')
-        if (response.ok) {
-          const data = await response.json()
-          // API returns user data directly, not wrapped in { success: true, user: ... }
-          if (data && (data.id || data._id || data.email)) {
-            setCurrentUser({
-              firstName: data.firstName || '',
-              lastName: data.lastName || '',
-              email: data.email || '',
-              id: data.id || data._id || ''
-            })
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch current user:', error)
-      }
-    }
-    fetchCurrentUser()
-  }, [])
 
   // Helper function to get or fetch current user
   const getCurrentUser = async () => {
     if (currentUser) return currentUser
 
     try {
-      const response = await fetch('/api/auth/me')
-      if (!response.ok) {
-        console.error('Failed to fetch user, status:', response.status)
-        return null
-      }
-
-      const data = await response.json()
-
-      // API returns user data directly: { id, firstName, lastName, email, ... }
-      if (data && (data.id || data._id || data.email)) {
-        const user = {
-          firstName: data.firstName || '',
-          lastName: data.lastName || '',
-          email: data.email || '',
-          id: data.id || data._id || ''
+          // User available from useAuthContext (no fetch needed)
+      if (user) {
+        const userData = {
+          firstName: (user as any).firstName || '',
+          lastName: (user as any).lastName || '',
+          email: (user as any).email || '',
+          id: (user as any).id || (user as any)._id || ''
         }
-        setCurrentUser(user)
-        return user
+        setCurrentUser(userData)
+        return userData
       }
 
-      console.error('Invalid user data structure:', data)
       return null
     } catch (error) {
       console.error('Failed to fetch current user:', error)
@@ -999,22 +978,22 @@ const [overheadInput, setOverheadInput] = useState('')
         { label: isEditMode ? 'Edit Project' : 'Create Project' }
       ]}>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" onClick={() => router.back()}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">
-                {isEditMode ? 'Edit Project' : 'Create New Project'}
-              </h1>
-              <p className="text-muted-foreground">
-                {isEditMode ? 'Update project details and configuration' : 'Set up a new project with detailed configuration'}
-              </p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button variant="outline" size="sm" onClick={() => router.back()}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+              <div>
+                <h1 className="text-3xl font-bold text-foreground">
+                  {isEditMode ? 'Edit Project' : 'Create New Project'}
+                </h1>
+                <p className="text-muted-foreground">
+                  {isEditMode ? 'Update project details and configuration' : 'Set up a new project with detailed configuration'}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
         {/* Progress Bar */}
         <Card>

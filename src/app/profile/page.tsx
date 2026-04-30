@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -21,6 +21,7 @@ import { useCurrencies } from '@/hooks/useCurrencies'
 import { useProfile } from '@/hooks/useProfile'
 import { useToast } from '@/components/ui/Toast'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { useAuthContext } from '@/contexts/AuthContext'
 import {
   User,
   Settings,
@@ -82,6 +83,8 @@ interface SessionInsight {
 }
 
 export default function ProfilePage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
   const { organization, loading: orgLoading } = useOrganization()
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay } = useCurrencies(true)
@@ -92,7 +95,6 @@ export default function ProfilePage() {
   const canEditProfile = hasPermission(Permission.USER_UPDATE)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [authError, setAuthError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -134,150 +136,60 @@ export default function ProfilePage() {
   const [currentDeviceInfo, setCurrentDeviceInfo] = useState('Current device')
   const [sessionInsights, setSessionInsights] = useState<SessionInsight[]>([])
 
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-      
-      if (response.ok) {
-        const userData = await response.json()
-        setProfile(userData)
-        const twoFactorState = !!userData.twoFactorEnabled
-        setTwoFactorEnabled(twoFactorState)
-        setTwoFactorInitial(twoFactorState)
-        const loadedDateFormat = userData.preferences?.notifications?.dateFormat || userData.preferences?.dateFormat || 'MM/DD/YYYY'
-        const loadedTimeFormat = userData.preferences?.notifications?.timeFormat || userData.preferences?.timeFormat || '12h'
-
-        setFormData({
-          firstName: userData.firstName || '',
-          lastName: userData.lastName || '',
-          language: userData.language || 'en',
-          currency: userData.currency || 'USD',
-          theme: userData.preferences?.theme || 'system',
-          sidebarCollapsed: userData.preferences?.sidebarCollapsed || false,
-          dateFormat: loadedDateFormat,
-          timeFormat: loadedTimeFormat,
-          notifications: {
-            email: userData.preferences?.notifications?.email ?? true,
-            inApp: userData.preferences?.notifications?.inApp ?? true,
-            push: userData.preferences?.notifications?.push ?? false,
-            taskReminders: userData.preferences?.notifications?.taskReminders ?? true,
-            projectUpdates: userData.preferences?.notifications?.projectUpdates ?? true,
-            teamActivity: userData.preferences?.notifications?.teamActivity ?? false
-          }
-        })
-
-        // Update DateTimeProvider with loaded preferences
-        const timezonePreference = browserTimezone || 'UTC'
-        setPreferences({
-          dateFormat: loadedDateFormat as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD',
-          timeFormat: loadedTimeFormat as '12h' | '24h',
-          timezone: timezonePreference
-        })
-
-        setAuthError('')
-        // Store original form data for change detection
-        setOriginalFormData(JSON.parse(JSON.stringify({
-          firstName: userData.firstName || '',
-          lastName: userData.lastName || '',
-          language: userData.language || 'en',
-          currency: userData.currency || 'USD',
-          theme: userData.preferences?.theme || 'system',
-          sidebarCollapsed: userData.preferences?.sidebarCollapsed || false,
-          dateFormat: loadedDateFormat,
-          timeFormat: loadedTimeFormat,
-          notifications: {
-            email: userData.preferences?.notifications?.email ?? true,
-            inApp: userData.preferences?.notifications?.inApp ?? true,
-            push: userData.preferences?.notifications?.push ?? false,
-            taskReminders: userData.preferences?.notifications?.taskReminders ?? true,
-            projectUpdates: userData.preferences?.notifications?.projectUpdates ?? true,
-            teamActivity: userData.preferences?.notifications?.teamActivity ?? false
-          }
-        })))
-        } else if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-        
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json()
-          setProfile(refreshData)
-          const refreshTwoFactorState = !!refreshData.twoFactorEnabled
-          setTwoFactorEnabled(refreshTwoFactorState)
-          setTwoFactorInitial(refreshTwoFactorState)
-          const refreshDateFormat = refreshData.preferences?.notifications?.dateFormat || refreshData.preferences?.dateFormat || 'MM/DD/YYYY'
-          const refreshTimeFormat = refreshData.preferences?.notifications?.timeFormat || refreshData.preferences?.timeFormat || '12h'
-
-          setFormData({
-            firstName: refreshData.firstName || '',
-            lastName: refreshData.lastName || '',
-            language: refreshData.language || 'en',
-            currency: refreshData.currency || 'USD',
-            theme: refreshData.preferences?.theme || 'system',
-            sidebarCollapsed: refreshData.preferences?.sidebarCollapsed || false,
-            dateFormat: refreshDateFormat,
-            timeFormat: refreshTimeFormat,
-            notifications: {
-              email: refreshData.preferences?.notifications?.email ?? true,
-              inApp: refreshData.preferences?.notifications?.inApp ?? true,
-              push: refreshData.preferences?.notifications?.push ?? false,
-              taskReminders: refreshData.preferences?.notifications?.taskReminders ?? true,
-              projectUpdates: refreshData.preferences?.notifications?.projectUpdates ?? true,
-              teamActivity: refreshData.preferences?.notifications?.teamActivity ?? false
-            }
-          })
-
-          // Update DateTimeProvider with loaded preferences
-          const timezonePreference = browserTimezone || 'UTC'
-          setPreferences({
-            dateFormat: refreshDateFormat as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD',
-            timeFormat: refreshTimeFormat as '12h' | '24h',
-            timezone: timezonePreference
-          })
-
-          setAuthError('')
-          // Store original form data for change detection
-          setOriginalFormData(JSON.parse(JSON.stringify({
-            firstName: refreshData.firstName || '',
-            lastName: refreshData.lastName || '',
-            language: refreshData.language || 'en',
-            currency: refreshData.currency || 'USD',
-            theme: refreshData.preferences?.theme || 'system',
-            sidebarCollapsed: refreshData.preferences?.sidebarCollapsed || false,
-            dateFormat: refreshDateFormat,
-            timeFormat: refreshTimeFormat,
-            notifications: {
-              email: refreshData.preferences?.notifications?.email ?? true,
-              inApp: refreshData.preferences?.notifications?.inApp ?? true,
-              push: refreshData.preferences?.notifications?.push ?? false,
-              taskReminders: refreshData.preferences?.notifications?.taskReminders ?? true,
-              projectUpdates: refreshData.preferences?.notifications?.projectUpdates ?? true,
-              teamActivity: refreshData.preferences?.notifications?.teamActivity ?? false
-            }
-          })))
-        } else {
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    } finally {
-      setLoading(false)
-    }
-  }, [router, browserTimezone])
-
+  // Auth initialization
   useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
+    if (!authLoading && isAuthenticated) {
+      // Data loading is handled by the fetchProfile useEffect
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+  }, [authLoading, isAuthenticated, router])
+
+  // Load profile data
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch('/api/settings/user')
+        const data = await response.json()
+        if (data.success && data.data) {
+          const profileData = data.data
+          setProfile(profileData)
+          setTwoFactorEnabled(!!profileData.twoFactorEnabled)
+          setTwoFactorInitial(!!profileData.twoFactorEnabled)
+          
+          const newFormData = {
+            firstName: profileData.firstName || '',
+            lastName: profileData.lastName || '',
+            language: profileData.language || 'en',
+            currency: profileData.currency || 'USD',
+            theme: profileData.preferences?.theme || 'system',
+            sidebarCollapsed: profileData.preferences?.sidebarCollapsed || false,
+            dateFormat: profileData.preferences?.dateFormat || 'MM/DD/YYYY',
+            timeFormat: profileData.preferences?.timeFormat || '12h',
+            notifications: {
+              email: profileData.preferences?.notifications?.email ?? true,
+              inApp: profileData.preferences?.notifications?.inApp ?? true,
+              push: profileData.preferences?.notifications?.push ?? false,
+              taskReminders: profileData.preferences?.notifications?.taskReminders ?? true,
+              projectUpdates: profileData.preferences?.notifications?.projectUpdates ?? true,
+              teamActivity: profileData.preferences?.notifications?.teamActivity ?? false,
+            }
+          }
+          setFormData(newFormData)
+          setOriginalFormData(newFormData)
+        }
+      } catch (err) {
+        console.error('Failed to fetch profile:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (isAuthenticated) {
+      fetchProfile()
+    }
+  }, [isAuthenticated])
 
   useEffect(() => {
     setBrowserTimezone(detectClientTimezone())
@@ -345,7 +257,6 @@ export default function ProfilePage() {
         duration: 4000
       })
       // Clear any previous error
-      setAuthError('')
     }
   }
 
@@ -401,7 +312,6 @@ export default function ProfilePage() {
         message: 'Your password has been updated successfully. Please use your new password for future logins.',
         duration: 5000
       })
-      setAuthError('')
     }
   }
 
@@ -418,7 +328,6 @@ export default function ProfilePage() {
           message: 'Your profile picture has been updated successfully',
           duration: 4000
         })
-        setAuthError('')
       }
     }
   }
@@ -442,7 +351,6 @@ export default function ProfilePage() {
           message: 'Your avatar has been removed.',
           duration: 4000
         })
-        setAuthError('')
       } else {
         showToast({
           type: 'error',
@@ -471,19 +379,6 @@ export default function ProfilePage() {
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
             <p className="text-muted-foreground">Loading profile...</p>
-          </div>
-        </div>
-      </MainLayout>
-    )
-  }
-
-  if (authError) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{authError}</p>
-            <p className="text-muted-foreground">Redirecting to login...</p>
           </div>
         </div>
       </MainLayout>
@@ -565,9 +460,9 @@ export default function ProfilePage() {
 
         {/* Profile Content */}
         <div className="space-y-8">
-          {(profileError || authError) && (
+          {(profileError) && (
             <Alert variant="destructive">
-              <AlertDescription>{profileError || authError}</AlertDescription>
+              <AlertDescription>{profileError}</AlertDescription>
             </Alert>
           )}
 
@@ -607,7 +502,7 @@ export default function ProfilePage() {
                 <CardContent className="space-y-8">
                   {/* Avatar Section */}
                   <div className="flex flex-col md:flex-row items-center md:items-start gap-6 p-6 rounded-lg border bg-muted/30">
-                    <GravatarAvatar 
+                    <GravatarAvatar
                       user={{
                         avatar: profile?.avatar,
                         firstName: profile?.firstName,
@@ -868,8 +763,8 @@ export default function ProfilePage() {
                           </div>
                           <Switch
                             checked={formData.notifications.email}
-                            onCheckedChange={(checked) => setFormData(prev => ({ 
-                              ...prev, 
+                            onCheckedChange={(checked) => setFormData(prev => ({
+                              ...prev,
                               notifications: { ...prev.notifications, email: checked }
                             }))}
                           />
@@ -887,8 +782,8 @@ export default function ProfilePage() {
                           </div>
                           <Switch
                             checked={formData.notifications.inApp}
-                            onCheckedChange={(checked) => setFormData(prev => ({ 
-                              ...prev, 
+                            onCheckedChange={(checked) => setFormData(prev => ({
+                              ...prev,
                               notifications: { ...prev.notifications, inApp: checked }
                             }))}
                           />
@@ -906,8 +801,8 @@ export default function ProfilePage() {
                           </div>
                           <Switch
                             checked={formData.notifications.push}
-                            onCheckedChange={(checked) => setFormData(prev => ({ 
-                              ...prev, 
+                            onCheckedChange={(checked) => setFormData(prev => ({
+                              ...prev,
                               notifications: { ...prev.notifications, push: checked }
                             }))}
                           />
@@ -930,8 +825,8 @@ export default function ProfilePage() {
                           </div>
                           <Switch
                             checked={formData.notifications.taskReminders}
-                            onCheckedChange={(checked) => setFormData(prev => ({ 
-                              ...prev, 
+                            onCheckedChange={(checked) => setFormData(prev => ({
+                              ...prev,
                               notifications: { ...prev.notifications, taskReminders: checked }
                             }))}
                           />
@@ -949,8 +844,8 @@ export default function ProfilePage() {
                           </div>
                           <Switch
                             checked={formData.notifications.projectUpdates}
-                            onCheckedChange={(checked) => setFormData(prev => ({ 
-                              ...prev, 
+                            onCheckedChange={(checked) => setFormData(prev => ({
+                              ...prev,
                               notifications: { ...prev.notifications, projectUpdates: checked }
                             }))}
                           />
@@ -968,8 +863,8 @@ export default function ProfilePage() {
                           </div>
                           <Switch
                             checked={formData.notifications.teamActivity}
-                            onCheckedChange={(checked) => setFormData(prev => ({ 
-                              ...prev, 
+                            onCheckedChange={(checked) => setFormData(prev => ({
+                              ...prev,
                               notifications: { ...prev.notifications, teamActivity: checked }
                             }))}
                           />
@@ -1171,8 +1066,8 @@ export default function ProfilePage() {
           {/* Save Changes Button - Only show for non-security tabs */}
           {activeTab !== 'security' && (
             <div className="flex items-center justify-end p-4 border-t bg-background">
-              <Button 
-                onClick={handleSave} 
+              <Button
+                onClick={handleSave}
                 disabled={profileLoading || !hasChanges()}
                 size="lg"
               >

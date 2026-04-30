@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -9,6 +9,7 @@ import { OrganizationSettings } from '@/components/settings/OrganizationSettings
 import { EmailSettings } from '@/components/settings/EmailSettings'
 import { DatabaseSettings } from '@/components/settings/DatabaseSettings'
 import { DocumentationSettings } from '@/components/settings/DocumentationSettings'
+import { useAuthContext } from '@/contexts/AuthContext'
 import {
   Building2,
   Mail,
@@ -21,65 +22,21 @@ import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 
 export default function SettingsPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const [activeTab, setActiveTab] = useState('organization')
   const [isLoading, setIsLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
-  const [authError, setAuthError] = useState('')
   const router = useRouter()
   const { hasPermission, loading: permissionsLoading } = usePermissions()
 
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-      
-      if (response.ok) {
-        const userData = await response.json()
-        setUser(userData)
-        setAuthError('')
-      } else if (response.status === 401) {
-        // Try to refresh token
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-        
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json()
-          setUser(refreshData.user)
-          setAuthError('')
-        } else {
-          // Both access and refresh tokens are invalid
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        // Other error, redirect to login
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    } finally {
+  // Auth initialization
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
       setIsLoading(false)
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
     }
-  }, [router])
-
-  useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
-
-  // Set up periodic auth check to handle token expiration
-  useEffect(() => {
-    const interval = setInterval(() => {
-      checkAuth()
-    }, 5 * 60 * 1000) // Check every 5 minutes
-
-    return () => clearInterval(interval)
-  }, [checkAuth])
+  }, [authLoading, isAuthenticated, router])
 
   if (isLoading) {
     return (
@@ -87,17 +44,6 @@ export default function SettingsPage() {
         <div className="text-center">
           <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin mx-auto mb-3 sm:mb-4 text-primary" />
           <p className="text-xs sm:text-sm text-muted-foreground">Loading settings...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (authError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <div className="text-center">
-          <p className="text-xs sm:text-sm text-destructive mb-3 sm:mb-4 break-words">{authError}</p>
-          <p className="text-xs sm:text-sm text-muted-foreground">Redirecting to login...</p>
         </div>
       </div>
     )

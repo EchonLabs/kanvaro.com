@@ -6,6 +6,8 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { PermissionProvider } from '@/lib/permissions/permission-context'
 import { ToastProviderWrapper } from '@/components/providers/ToastProviderWrapper'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { AuthProvider } from '@/contexts/AuthContext'
+import { SessionTimeoutWrapper } from '@/components/auth/SessionTimeoutWrapper'
 
 // Use system fonts for better reliability
 const fontClass = "font-sans"
@@ -48,11 +50,15 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <TooltipProvider>
-            <PermissionProvider initialPermissions={initialPermissions}>
-              <ToastProviderWrapper>
-                {children}
-              </ToastProviderWrapper>
-            </PermissionProvider>
+            <AuthProvider>
+              <PermissionProvider initialPermissions={initialPermissions}>
+                <SessionTimeoutWrapper>
+                  <ToastProviderWrapper>
+                    {children}
+                  </ToastProviderWrapper>
+                </SessionTimeoutWrapper>
+              </PermissionProvider>
+            </AuthProvider>
           </TooltipProvider>
         </ThemeProvider>
       </body>

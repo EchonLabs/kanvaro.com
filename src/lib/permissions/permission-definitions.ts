@@ -84,6 +84,8 @@ export enum Permission {
   TASK_VIEW_ALL = 'task:view_all',
   TASK_EDIT_ALL = 'task:edit_all',
   TASK_DELETE_ALL = 'task:delete_all',
+  TASK_VIEW_ASSIGNED_PROJECTS = 'task:view_assigned_projects',
+  TASK_EDIT_ASSIGNED_PROJECTS = 'task:edit_assigned_projects',
 
   // Team permissions
   TEAM_READ = 'team:read',
@@ -925,8 +927,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.TASK_CHANGE_STATUS,
     Permission.TASK_MANAGE_COMMENTS,
     Permission.TASK_MANAGE_ATTACHMENTS,
-    Permission.TASK_VIEW_ALL,
-    Permission.TASK_EDIT_ALL,
+    Permission.TASK_VIEW_ASSIGNED_PROJECTS,
+    Permission.TASK_EDIT_ASSIGNED_PROJECTS,
     // Permission.TASK_DELETE_ALL,
 
     // Team (read only)
@@ -1252,6 +1254,8 @@ export function getPermissionScope(permission: Permission): PermissionScope {
     Permission.TASK_VIEW_ALL,
     Permission.TASK_EDIT_ALL,
     Permission.TASK_DELETE_ALL,
+    Permission.TASK_VIEW_ASSIGNED_PROJECTS,
+    Permission.TASK_EDIT_ASSIGNED_PROJECTS,
     Permission.EPIC_VIEW,
     Permission.EPIC_READ,
     Permission.STORY_VIEW_ALL,

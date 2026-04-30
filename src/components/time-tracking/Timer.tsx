@@ -72,6 +72,8 @@ export function Timer({
   const stoppingRef = useRef(false)
   // If auto-stop triggers, the parent (via onAutoStop) should own the toast
   const autoStopRequestedRef = useRef(false)
+  // Prevent repeating auto-stop snackbar if loadActiveTimer runs again
+  const autoStopNotifiedRef = useRef(false)
 
   // Track active timer state
   useEffect(() => {
@@ -172,6 +174,42 @@ export function Timer({
       const data = await response.json()
 
       if (response.ok) {
+        // If server enforced an auto-stop (e.g., max session/daily reached), show snackbar
+        if (data?.activeTimer === null && data?.autoStopped && !autoStopNotifiedRef.current) {
+          autoStopNotifiedRef.current = true
+
+          setActiveTimer(null)
+          setDisplayTime('00:00:00')
+
+          const message: string =
+            typeof data?.message === 'string' && data.message.trim()
+              ? data.message
+              : 'Timer automatically stopped. Maximum limit reached.'
+
+          if (onAutoStop) {
+            onAutoStop(message)
+          } else {
+            showToast({
+              type: 'warning',
+              title: 'Timer Auto-Stopped',
+              message,
+              duration: 8000
+            })
+          }
+
+          // Let parent refresh logs / UI similarly to a normal stop
+          const hasTimeLogged = !!data?.hasTimeLogged && (data?.duration ?? 0) > 0
+          if (hasTimeLogged && data?.timeEntry) {
+            onTimerUpdate?.({ timeEntry: data.timeEntry, hasTimeLogged: true, duration: data.duration })
+          } else {
+            onTimerUpdate?.(null)
+          }
+
+          return
+        }
+
+        // Normal active timer state
+        autoStopNotifiedRef.current = false
         setActiveTimer(data.activeTimer)
         // Log timezone info for debugging
         if (data.userTimezone) {

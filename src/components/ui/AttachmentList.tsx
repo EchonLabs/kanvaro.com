@@ -153,7 +153,7 @@ export function AttachmentList({
         </div>
       )}
 
-      {/* Non-image attachments - show as file list (name only) */}
+      {/* Non-image attachments - show as file list with download option */}
       {attachments.filter(a => !isImage(a.type)).map((attachment, idx) => {
         const originalIndex = attachments.indexOf(attachment)
         return (
@@ -189,6 +189,16 @@ export function AttachmentList({
                 </div>
                 
                 <div className="flex items-center space-x-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDownload(attachment)}
+                    className="h-8 w-8 p-0 text-blue-600 hover:text-blue-600 hover:bg-blue-50"
+                    title="Download attachment"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
                   {canDelete && onDelete && (
                     <Button
                       type="button"

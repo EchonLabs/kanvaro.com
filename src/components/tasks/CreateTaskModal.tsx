@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/Badge'
+import { useAuthContext } from '@/contexts/AuthContext'
 import {
   X,
   Plus,
@@ -135,6 +136,8 @@ export default function CreateTaskModal({
   availableStatuses: _availableStatuses,
   stayOnCurrentPage = false
 }: CreateTaskModalProps) {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
   const { success: notifySuccess, error: notifyError } = useNotify()
   const [loading, setLoading] = useState(false)
@@ -309,30 +312,17 @@ export default function CreateTaskModal({
 
   const fetchCurrentUser = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/me')
-      if (response.ok) {
-        const data = await response.json()
-        const normalized = mapUserResponse(data)
+      // User data available from AuthContext
+      if (user) {
+        const normalized = mapUserResponse(user)
         if (normalized) {
           setCurrentUser(normalized)
-        }
-        return
-      }
-
-      if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', { method: 'POST' })
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json().catch(() => ({}))
-          const normalized = mapUserResponse(refreshData?.user || refreshData)
-          if (normalized) {
-            setCurrentUser(normalized)
-          }
         }
       }
     } catch (error) {
       console.error('Failed to fetch current user:', error)
     }
-  }, [])
+  }, [user])
 
   // Fetch project members when modal opens or project selection changes
   useEffect(() => {

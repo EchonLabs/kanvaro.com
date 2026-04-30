@@ -1,17 +1,17 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { Bell, User, Sun, Moon, Monitor, LogOut, UserCircle, X, Check, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { Badge } from '@/components/ui/Badge'
-import { OrganizationLogo } from '@/components/ui/OrganizationLogo'
 import { GlobalSearch } from '@/components/search/GlobalSearch'
 import { useNotifications } from '@/hooks/useNotifications'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useAuthContext } from '@/contexts/AuthContext'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,11 +31,10 @@ interface HeaderProps {
 }
 
 export function Header({ onMobileMenuToggle }: HeaderProps) {
-  const [user, setUser] = useState<any>(null)
+  const { user, logout } = useAuthContext()
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
-  const pathname = usePathname()
   const { theme, setTheme } = useTheme()
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, loading } = useNotifications({
     limit: 10,
@@ -47,79 +46,8 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
     setMounted(true)
   }, [])
 
-  // Load user data and refresh when returning from profile page
-  const loadUser = useCallback(async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-      if (response.ok) {
-        const userData = await response.json()
-        setUser(userData)
-      }
-    } catch (error) {
-      console.error('Failed to load user data:', error)
-    }
-  }, [])
-
-  useEffect(() => {
-    loadUser()
-  }, [loadUser])
-
-  // Refresh user data when returning from profile page
-  useEffect(() => {
-    if (pathname && pathname !== '/profile') {
-      // Small delay to ensure profile update is saved
-      const timer = setTimeout(() => {
-        loadUser()
-      }, 500)
-      return () => clearTimeout(timer)
-    }
-  }, [pathname, loadUser])
-
-  // Refresh user data when page regains focus (e.g., after updating profile)
-  useEffect(() => {
-    const handleFocus = () => {
-      loadUser()
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        loadUser()
-      }
-    }
-
-    window.addEventListener('focus', handleFocus)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    return () => {
-      window.removeEventListener('focus', handleFocus)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [loadUser])
-
   const handleLogout = async () => {
-    try {
-      // Clear permission cache before logout
-      try {
-        sessionStorage.removeItem('kanvaro_permissions')
-        sessionStorage.removeItem('kanvaro_permissions_timestamp')
-      } catch (cacheError) {
-        console.error('Error clearing permission cache:', cacheError)
-      }
-
-      const response = await fetch('/api/auth/logout', { method: 'POST' })
-      if (response.ok) {
-        // Clear any client-side state if needed
-        router.push('/login')
-      } else {
-        console.error('Logout failed:', await response.text())
-        // Still redirect to login even if logout API fails
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Logout failed:', error)
-      // Still redirect to login even if logout API fails
-      router.push('/login')
-    }
+    await logout()
   }
 
   const getUserDisplayName = () => {

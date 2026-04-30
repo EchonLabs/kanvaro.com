@@ -10,12 +10,14 @@ import { Switch } from '@/components/ui/switch'
 import { User, Save, AlertCircle, CheckCircle } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useCurrencies } from '@/hooks/useCurrencies'
+import { useAuthContext } from '@/contexts/AuthContext'
 
 export function UserSettings() {
+  const { user } = useAuthContext()
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay } = useCurrencies(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  
+
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -36,9 +38,9 @@ export function UserSettings() {
     // Load user data from API
     const loadUserData = async () => {
       try {
-        const response = await fetch('/api/auth/me')
-        if (response.ok) {
-          const userData = await response.json()
+        // User data available from AuthContext
+        if (user) {
+          const userData = user
           setFormData({
             firstName: userData.firstName || '',
             lastName: userData.lastName || '',
@@ -46,7 +48,7 @@ export function UserSettings() {
             timezone: userData.timezone || 'UTC',
             language: userData.language || 'en',
             currency: userData.currency || 'USD',
-            theme: userData.preferences?.theme || 'system',
+            theme: (userData.preferences?.theme || 'system') as 'system' | 'light' | 'dark',
             sidebarCollapsed: userData.preferences?.sidebarCollapsed || false,
             notifications: {
               email: userData.preferences?.notifications?.email || true,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useAuthContext } from '@/contexts/AuthContext'
 import {
   ArrowLeft,
   Save,
@@ -26,10 +27,11 @@ interface Project {
 }
 
 export default function CreateEpicPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
   const { success: notifySuccess, error: notifyError } = useNotify()
   const [loading, setLoading] = useState(false)
-  const [authError, setAuthError] = useState('')
   const [projects, setProjects] = useState<Project[]>([])
   const [projectQuery, setProjectQuery] = useState("");
 
@@ -45,42 +47,16 @@ export default function CreateEpicPage() {
   })
   const [newLabel, setNewLabel] = useState('')
 
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-      
-      if (response.ok) {
-        setAuthError('')
-        await fetchProjects()
-      } else if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-        
-        if (refreshResponse.ok) {
-          setAuthError('')
-          await fetchProjects()
-        } else {
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    }
-  }, [router])
 
+  // Auth initialization - trigger data loading
   useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
+    if (!authLoading && isAuthenticated) {
+      fetchProjects()
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated])
 
   // Clear due date if it's outside the valid range when project changes
   useEffect(() => {
@@ -209,19 +185,6 @@ export default function CreateEpicPage() {
       return
     }
     router.push('/epics')
-  }
-
-  if (authError) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{authError}</p>
-            <p className="text-muted-foreground">Redirecting to login...</p>
-          </div>
-        </div>
-      </MainLayout>
-    )
   }
 
   return (

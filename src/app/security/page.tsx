@@ -12,6 +12,7 @@ import { Shield, Save, Loader2, Key, Smartphone, ShieldCheck, Eye, EyeOff } from
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PasswordStrength } from '@/components/ui/PasswordStrength'
 import { useToast } from '@/components/ui/Toast'
+import { useAuthContext } from '@/contexts/AuthContext'
 
 type SecuritySettingsState = {
   twoFactorEnabled: boolean
@@ -53,11 +54,11 @@ const normalizeSecurityPayload = (
 }
 
 export default function SecurityPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const [isLoading, setIsLoading] = useState(true)
   const [isSavingPassword, setIsSavingPassword] = useState(false)
   const [isSavingSecurity, setIsSavingSecurity] = useState(false)
-  const [user, setUser] = useState<any>(null)
-  const [authError, setAuthError] = useState('')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const router = useRouter()
   const { showToast } = useToast()
@@ -79,6 +80,17 @@ export default function SecurityPage() {
     ...DEFAULT_SECURITY_SETTINGS
   })
   const [isSavingTwoFactor, setIsSavingTwoFactor] = useState(false)
+
+  // Auth initialization
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      setIsLoading(false)
+      loadSecuritySettings()
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated])
 
   const loadSecuritySettings = useCallback(async () => {
     try {
@@ -111,53 +123,6 @@ export default function SecurityPage() {
       setInitialSecuritySettings({ ...DEFAULT_SECURITY_SETTINGS })
     }
   }, [showToast])
-
-  const checkAuth = useCallback(async () => {
-    try {
-      console.log('Security: Checking authentication...')
-      const response = await fetch('/api/auth/me')
-      console.log('Security: Auth response status:', response.status)
-      
-      if (response.ok) {
-        const userData = await response.json()
-        console.log('Security: User data received:', userData)
-        setUser(userData)
-        await loadSecuritySettings()
-        setAuthError('')
-      } else if (response.status === 401) {
-        console.log('Security: 401 response, trying refresh token')
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-        
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json()
-          setUser(refreshData.user)
-          await loadSecuritySettings()
-          setAuthError('')
-        } else {
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [loadSecuritySettings, router])
-
-  useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
 
   const passwordDirty =
     passwordForm.newPassword.trim() !== '' || passwordForm.confirmPassword.trim() !== ''
@@ -352,17 +317,6 @@ export default function SecurityPage() {
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
           <p className="text-muted-foreground">Loading security settings...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (authError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-destructive mb-4">{authError}</p>
-          <p className="text-muted-foreground">Redirecting to login...</p>
         </div>
       </div>
     )
@@ -636,7 +590,7 @@ export default function SecurityPage() {
             </CardContent>
           </Card>
 
-          
+
         </div>
       </div>
     </MainLayout>

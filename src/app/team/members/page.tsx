@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useAuthContext } from '@/contexts/AuthContext'
 import {
   Users,
   UserPlus,
@@ -65,7 +66,7 @@ interface Member {
     email: string
     role: string
   }
-    memberId?: string
+  memberId?: string
 
 }
 
@@ -87,6 +88,8 @@ interface PendingInvitation {
 }
 
 export default function MembersPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
   const { formatDate } = useDateTime()
   const [members, setMembers] = useState<Member[]>([])
@@ -94,7 +97,6 @@ export default function MembersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [localSearch, setLocalSearch] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -146,6 +148,18 @@ export default function MembersPage() {
   const [invitationToCancel, setInvitationToCancel] = useState<PendingInvitation | null>(null)
   const [cancelingInvitation, setCancelingInvitation] = useState(false)
 
+
+  // Auth initialization - trigger data loading
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      setLoading(false)
+      fetchMembers()
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated])
+
   // Load available organization roles (both system and custom) from the central roles API
   useEffect(() => {
     const loadRoles = async () => {
@@ -170,64 +184,27 @@ export default function MembersPage() {
     loadRoles()
   }, [])
 
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-      
-      if (response.ok) {
-        setAuthError('')
-        await fetchMembers()
-      } else if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-        
-        if (refreshResponse.ok) {
-          setAuthError('')
-          await fetchMembers()
-        } else {
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    }
-  }, [router])
-
-  useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
-
   const fetchMembers = async () => {
     try {
       setLoading(true)
-      
+
       // Build query parameters for server-side filtering
       const params = new URLSearchParams({
         page: membersPagination.page.toString(),
         limit: membersPagination.limit.toString(),
       })
-      
+
       if (searchQuery) params.append('search', searchQuery)
       if (roleFilter !== 'all') params.append('role', roleFilter)
       if (statusFilter !== 'all') params.append('status', statusFilter)
-      
+
       const response = await fetch(`/api/members?${params.toString()}`)
       const data = await response.json()
 
       if (data.success) {
         setMembers(data.data.members)
         setPendingInvitations(data.data.pendingInvitations)
-        
+
         // Update pagination with server response
         if (data.data.pagination) {
           setMembersPagination(prev => ({
@@ -270,7 +247,6 @@ export default function MembersPage() {
         // Switch to Pending Invitations tab
         setActiveTab('invitations')
         // Refresh authentication state and then fetch members
-        await checkAuth()
         await fetchMembers()
         // Return void on success
         return
@@ -408,7 +384,7 @@ export default function MembersPage() {
 
   // Fetch members whenever filters or pagination changes
   useEffect(() => {
-    if (!loading && !authError) {
+    if (!loading) {
       fetchMembers()
     }
   }, [searchQuery, roleFilter, statusFilter, membersPagination.page, membersPagination.limit])
@@ -446,7 +422,7 @@ export default function MembersPage() {
 
   // Fetch members when filters change
   useEffect(() => {
-    if (!loading && !authError) {
+    if (!loading) {
       fetchMembers()
     }
   }, [searchQuery, roleFilter, statusFilter, membersPagination.page, membersPagination.limit])
@@ -482,10 +458,10 @@ export default function MembersPage() {
       hash = customRoleId.charCodeAt(i) + ((hash << 5) - hash)
       hash = hash & hash // Convert to 32-bit integer
     }
-    
+
     // Use absolute value and modulo to get a consistent index
     const index = Math.abs(hash) % 12
-    
+
     // Palette of distinct colors (avoiding red which is for admin)
     const colorPalette = [
       'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-900',
@@ -501,7 +477,7 @@ export default function MembersPage() {
       'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900 dark:text-fuchsia-200 hover:bg-fuchsia-100 dark:hover:bg-fuchsia-900',
       'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 hover:bg-violet-100 dark:hover:bg-violet-900',
     ]
-    
+
     return colorPalette[index]
   }
 
@@ -510,7 +486,7 @@ export default function MembersPage() {
     if (customRoleId) {
       return getCustomRoleColor(customRoleId)
     }
-    
+
     // Otherwise, use predefined role colors
     switch (role) {
       case 'admin': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900'
@@ -534,19 +510,6 @@ export default function MembersPage() {
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
             <p className="text-muted-foreground">Loading members...</p>
-          </div>
-        </div>
-      </MainLayout>
-    )
-  }
-
-  if (authError) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{authError}</p>
-            <p className="text-muted-foreground">Redirecting to login...</p>
           </div>
         </div>
       </MainLayout>
@@ -590,8 +553,8 @@ export default function MembersPage() {
             <p className="text-sm sm:text-base text-muted-foreground mt-1 break-words">Manage your team members and invitations</p>
           </div>
           {canInviteMembers && (
-            <Button 
-              onClick={handleOpenInviteModal} 
+            <Button
+              onClick={handleOpenInviteModal}
               className="w-full sm:w-auto flex-shrink-0 text-sm sm:text-base min-h-[44px] touch-target whitespace-nowrap shadow-sm hover:shadow-md transition-shadow"
             >
               <UserPlus className="h-4 w-4 mr-2 flex-shrink-0" />
@@ -601,86 +564,86 @@ export default function MembersPage() {
           )}
         </div>
 
-      {success && (
-        <Alert variant="success" className="break-words border-green-500 bg-green-50 dark:bg-green-900">
-          <CheckCircle className="h-4 w-4 flex-shrink-0 text-green-600 dark:text-green-400" />
-          <AlertDescription className="break-words text-green-800 dark:text-green-200">{success}</AlertDescription>
-        </Alert>
-      )}
+        {success && (
+          <Alert variant="success" className="break-words border-green-500 bg-green-50 dark:bg-green-900">
+            <CheckCircle className="h-4 w-4 flex-shrink-0 text-green-600 dark:text-green-400" />
+            <AlertDescription className="break-words text-green-800 dark:text-green-200">{success}</AlertDescription>
+          </Alert>
+        )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 overflow-x-hidden">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="members" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            <span className="truncate">Members</span>
-            <span className="ml-1 flex-shrink-0">({membersPagination.total})</span>
-          </TabsTrigger>
-          <TabsTrigger value="invitations" className="flex items-center gap-2">
-            <Mail className="h-4 w-4" />
-            <span className="hidden sm:inline truncate">Pending Invitations</span>
-            <span className="sm:hidden truncate">Invitations</span>
-            <span className="ml-1 flex-shrink-0">({pendingInvitations.length})</span>
-          </TabsTrigger>
-        </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 overflow-x-hidden">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="members" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <span className="truncate">Members</span>
+              <span className="ml-1 flex-shrink-0">({membersPagination.total})</span>
+            </TabsTrigger>
+            <TabsTrigger value="invitations" className="flex items-center gap-2">
+              <Mail className="h-4 w-4" />
+              <span className="hidden sm:inline truncate">Pending Invitations</span>
+              <span className="sm:hidden truncate">Invitations</span>
+              <span className="ml-1 flex-shrink-0">({pendingInvitations.length})</span>
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="members" className="space-y-4 mt-4 overflow-x-hidden">
-          {/* View mode toggle */}
-          <div className="flex justify-end">
-            <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'grid' | 'list')}>
-              <TabsList className="grid w-full grid-cols-2 h-9 sm:h-10">
-                <TabsTrigger value="grid" className="text-xs sm:text-sm">
-                  <Grid3x3 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
-                  Grid
-                </TabsTrigger>
-                <TabsTrigger value="list" className="text-xs sm:text-sm">
-                  <List className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
-                  List
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-          
-          {/* Search and Filters */}
-          <div className="space-y-3">
-            {/* Search bar */}
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none flex-shrink-0" />
-              <Input
-                ref={searchInputRef}
-                placeholder="Search members..."
-                value={localSearch}
-                onChange={(e) => setLocalSearch(e.target.value)}
-                className="pl-10 w-full text-sm sm:text-base min-h-[44px] touch-target"
-              />
+          <TabsContent value="members" className="space-y-4 mt-4 overflow-x-hidden">
+            {/* View mode toggle */}
+            <div className="flex justify-end">
+              <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'grid' | 'list')}>
+                <TabsList className="grid w-full grid-cols-2 h-9 sm:h-10">
+                  <TabsTrigger value="grid" className="text-xs sm:text-sm">
+                    <Grid3x3 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
+                    Grid
+                  </TabsTrigger>
+                  <TabsTrigger value="list" className="text-xs sm:text-sm">
+                    <List className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
+                    List
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
-            {/* Filter options - compact grid layout */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <Select value={roleFilter} onValueChange={setRoleFilter}>
-                      <SelectTrigger className="w-full text-sm min-h-[44px] touch-target">
-                        <SelectValue placeholder="Role" />
-                      </SelectTrigger>
-                      <SelectContent className="z-[10050]">
-                        <SelectItem value="all">All Roles</SelectItem>
-                        {organizationRoles.map((role) => (
-                          <SelectItem key={role.id} value={role.key}>
-                            {formatToTitleCase(role.name)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-full text-sm min-h-[44px] touch-target">
-                        <SelectValue placeholder="Status" />
-                      </SelectTrigger>
-                      <SelectContent className="z-[10050]">
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
-                      </SelectContent>
-                    </Select>
-            </div>
-            {/* Member count */}
-            <div className="flex items-center justify-between">
+
+            {/* Search and Filters */}
+            <div className="space-y-3">
+              {/* Search bar */}
+              <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none flex-shrink-0" />
+                <Input
+                  ref={searchInputRef}
+                  placeholder="Search members..."
+                  value={localSearch}
+                  onChange={(e) => setLocalSearch(e.target.value)}
+                  className="pl-10 w-full text-sm sm:text-base min-h-[44px] touch-target"
+                />
+              </div>
+              {/* Filter options - compact grid layout */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger className="w-full text-sm min-h-[44px] touch-target">
+                    <SelectValue placeholder="Role" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[10050]">
+                    <SelectItem value="all">All Roles</SelectItem>
+                    {organizationRoles.map((role) => (
+                      <SelectItem key={role.id} value={role.key}>
+                        {formatToTitleCase(role.name)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full text-sm min-h-[44px] touch-target">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[10050]">
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Member count */}
+              <div className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">
                   {hasActiveFilters ? (
                     <span>
@@ -708,12 +671,12 @@ export default function MembersPage() {
                     Clear Filters
                   </Button>
                 )}
+              </div>
             </div>
-          </div>
-          
-          {/* Members View */}
-          <div>
-            {paginatedMembers.length === 0 ? (
+
+            {/* Members View */}
+            <div>
+              {paginatedMembers.length === 0 ? (
                 <div className="text-center py-8 sm:py-12 text-muted-foreground">
                   <Users className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50 flex-shrink-0" />
                   <p className="text-sm sm:text-base break-words">No members found</p>
@@ -797,7 +760,7 @@ export default function MembersPage() {
                   {paginatedMembers.map((member) => (
                     <div key={member._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 border border-muted rounded-lg gap-3 sm:gap-4 overflow-x-hidden hover:bg-muted/50 transition-colors">
                       <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 flex-1 min-w-0 w-full">
-                        <GravatarAvatar 
+                        <GravatarAvatar
                           user={{
                             firstName: member.firstName,
                             lastName: member.lastName,
@@ -817,7 +780,7 @@ export default function MembersPage() {
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground truncate mb-1">
-                            ID: {member?.memberId  ? member.memberId : '-'}
+                            ID: {member?.memberId ? member.memberId : '-'}
                           </p>
                           <p className="text-xs sm:text-sm text-muted-foreground truncate mb-2" title={member.email}>{member.email}</p>
                           <div className="flex flex-wrap items-center gap-2">
@@ -914,242 +877,242 @@ export default function MembersPage() {
                   </div>
                 </div>
               )}
-          </div>
-        </TabsContent>
+            </div>
+          </TabsContent>
 
-        <TabsContent value="invitations" className="space-y-4 mt-4 overflow-x-hidden">
-          <Card className="overflow-x-hidden">
-            <CardHeader className="p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <CardTitle className="text-lg sm:text-xl break-words">Pending Invitations</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm break-words">
-                    Invitations that are waiting to be accepted
-                  </CardDescription>
+          <TabsContent value="invitations" className="space-y-4 mt-4 overflow-x-hidden">
+            <Card className="overflow-x-hidden">
+              <CardHeader className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-lg sm:text-xl break-words">Pending Invitations</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm break-words">
+                      Invitations that are waiting to be accepted
+                    </CardDescription>
+                  </div>
+                  <Tabs value={invitationViewMode} onValueChange={(value) => setInvitationViewMode(value as 'grid' | 'list')}>
+                    <TabsList className="grid w-full grid-cols-2 h-9 sm:h-10">
+                      <TabsTrigger value="grid" className="text-xs sm:text-sm">
+                        <Grid3x3 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
+                        Grid
+                      </TabsTrigger>
+                      <TabsTrigger value="list" className="text-xs sm:text-sm">
+                        <List className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
+                        List
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                 </div>
-                <Tabs value={invitationViewMode} onValueChange={(value) => setInvitationViewMode(value as 'grid' | 'list')}>
-                  <TabsList className="grid w-full grid-cols-2 h-9 sm:h-10">
-                    <TabsTrigger value="grid" className="text-xs sm:text-sm">
-                      <Grid3x3 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
-                      Grid
-                    </TabsTrigger>
-                    <TabsTrigger value="list" className="text-xs sm:text-sm">
-                      <List className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
-                      List
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6 pt-0">
-              {paginatedInvitations.length === 0 ? (
-                <div className="text-center py-8 sm:py-12 text-muted-foreground">
-                  <Mail className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50 flex-shrink-0" />
-                  <p className="text-sm sm:text-base break-words">No pending invitations</p>
-                </div>
-              ) : invitationViewMode === 'grid' ? (
-                <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                  {paginatedInvitations.map((invitation) => (
-                    <Card key={invitation._id} className="overflow-hidden hover:shadow-md transition-shadow">
-                      <CardContent className="p-4 sm:p-5">
-                        <div className="flex flex-col items-center text-center space-y-3">
-                          <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                            <Mail className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="p-4 sm:p-6 pt-0">
+                {paginatedInvitations.length === 0 ? (
+                  <div className="text-center py-8 sm:py-12 text-muted-foreground">
+                    <Mail className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50 flex-shrink-0" />
+                    <p className="text-sm sm:text-base break-words">No pending invitations</p>
+                  </div>
+                ) : invitationViewMode === 'grid' ? (
+                  <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                    {paginatedInvitations.map((invitation) => (
+                      <Card key={invitation._id} className="overflow-hidden hover:shadow-md transition-shadow">
+                        <CardContent className="p-4 sm:p-5">
+                          <div className="flex flex-col items-center text-center space-y-3">
+                            <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                              <Mail className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
+                            </div>
+                            <div className="w-full space-y-1">
+                              <h3 className="font-semibold text-base sm:text-lg truncate" title={invitation.email}>
+                                {invitation.email}
+                              </h3>
+                              <p className="text-xs sm:text-sm text-muted-foreground truncate" title={`Invited by ${invitation.invitedBy.firstName} ${invitation.invitedBy.lastName}`}>
+                                Invited by {invitation.invitedBy.firstName} {invitation.invitedBy.lastName}
+                              </p>
+                            </div>
+                            <div className="w-full space-y-2">
+                              <Badge className={`${getRoleColor(invitation.role, invitation.customRole?._id)} text-xs sm:text-sm w-full justify-center py-1.5`}>
+                                {getInvitationRoleLabel(invitation)}
+                              </Badge>
+                              <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                                <Clock className="h-3.5 w-3.5 text-yellow-500" />
+                                <span>Expires {formatDate(invitation.expiresAt)}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 w-full pt-2 border-t">
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-1 justify-center">
+                                <Clock className="h-3.5 w-3.5 text-yellow-500" />
+                                <span>Pending</span>
+                              </div>
+                              {canInviteMembers && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleCancelInvitationClick(invitation)}
+                                  className="text-destructive hover:text-destructive flex-1 text-xs sm:text-sm min-h-[36px]"
+                                >
+                                  <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
+                                  Cancel
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                          <div className="w-full space-y-1">
-                            <h3 className="font-semibold text-base sm:text-lg truncate" title={invitation.email}>
-                              {invitation.email}
-                            </h3>
-                            <p className="text-xs sm:text-sm text-muted-foreground truncate" title={`Invited by ${invitation.invitedBy.firstName} ${invitation.invitedBy.lastName}`}>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3 sm:space-y-4">
+                    {paginatedInvitations.map((invitation) => (
+                      <div key={invitation._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 border border-muted rounded-lg gap-3 sm:gap-4 overflow-x-hidden hover:bg-muted/50 transition-colors">
+                        <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 flex-1 min-w-0 w-full">
+                          <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                            <Mail className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground flex-shrink-0" />
+                          </div>
+                          <div className="flex-1 min-w-0 overflow-hidden">
+                            <h3 className="font-medium text-sm sm:text-base truncate mb-1" title={invitation.email}>{invitation.email}</h3>
+                            <p className="text-xs sm:text-sm text-muted-foreground truncate mb-2" title={`Invited by ${invitation.invitedBy.firstName} ${invitation.invitedBy.lastName}`}>
                               Invited by {invitation.invitedBy.firstName} {invitation.invitedBy.lastName}
                             </p>
-                          </div>
-                          <div className="w-full space-y-2">
-                            <Badge className={`${getRoleColor(invitation.role, invitation.customRole?._id)} text-xs sm:text-sm w-full justify-center py-1.5`}>
-                              {getInvitationRoleLabel(invitation)}
-                            </Badge>
-                            <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-                              <Clock className="h-3.5 w-3.5 text-yellow-500" />
-                              <span>Expires {formatDate(invitation.expiresAt)}</span>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge className={`${getRoleColor(invitation.role, invitation.customRole?._id)} text-xs flex-shrink-0`}>
+                                {getInvitationRoleLabel(invitation)}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                Expires {formatDate(invitation.expiresAt)}
+                              </span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 w-full pt-2 border-t">
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-1 justify-center">
-                              <Clock className="h-3.5 w-3.5 text-yellow-500" />
-                              <span>Pending</span>
-                            </div>
-                            {canInviteMembers && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleCancelInvitationClick(invitation)}
-                                className="text-destructive hover:text-destructive flex-1 text-xs sm:text-sm min-h-[36px]"
-                              >
-                                <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
-                                Cancel
-                              </Button>
-                            )}
-                          </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3 sm:space-y-4">
-                  {paginatedInvitations.map((invitation) => (
-                    <div key={invitation._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 border border-muted rounded-lg gap-3 sm:gap-4 overflow-x-hidden hover:bg-muted/50 transition-colors">
-                      <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 flex-1 min-w-0 w-full">
-                        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                          <Mail className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground flex-shrink-0" />
-                        </div>
-                        <div className="flex-1 min-w-0 overflow-hidden">
-                          <h3 className="font-medium text-sm sm:text-base truncate mb-1" title={invitation.email}>{invitation.email}</h3>
-                          <p className="text-xs sm:text-sm text-muted-foreground truncate mb-2" title={`Invited by ${invitation.invitedBy.firstName} ${invitation.invitedBy.lastName}`}>
-                            Invited by {invitation.invitedBy.firstName} {invitation.invitedBy.lastName}
-                          </p>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge className={`${getRoleColor(invitation.role, invitation.customRole?._id)} text-xs flex-shrink-0`}>
-                              {getInvitationRoleLabel(invitation)}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">
-                              Expires {formatDate(invitation.expiresAt)}
-                            </span>
+                        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto flex-shrink-0 sm:ml-4">
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-yellow-500 flex-shrink-0" />
+                            <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">Pending</span>
                           </div>
+                          {canInviteMembers && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCancelInvitationClick(invitation)}
+                              className="text-destructive hover:text-destructive flex-1 sm:flex-initial text-xs sm:text-sm min-h-[44px] touch-target"
+                            >
+                              <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
+                              Cancel
+                            </Button>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto flex-shrink-0 sm:ml-4">
-                        <div className="flex items-center gap-1.5 sm:gap-2">
-                          <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-yellow-500 flex-shrink-0" />
-                          <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">Pending</span>
-                        </div>
-                        {canInviteMembers && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleCancelInvitationClick(invitation)}
-                            className="text-destructive hover:text-destructive flex-1 sm:flex-initial text-xs sm:text-sm min-h-[44px] touch-target"
-                          >
-                            <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
-                            Cancel
-                          </Button>
-                        )}
+                    ))}
+                  </div>
+                )}
+
+                {/* Invitations Pagination Controls */}
+                {invitationsPagination.total > 0 && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Items per page:</span>
+                        <Select
+                          value={invitationsPagination.limit.toString()}
+                          onValueChange={(value) => {
+                            const newLimit = parseInt(value)
+                            setInvitationsPagination(prev => ({
+                              ...prev,
+                              limit: newLimit,
+                              page: 1
+                            }))
+                          }}
+                        >
+                          <SelectTrigger className="w-16 h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="10">10</SelectItem>
+                            <SelectItem value="20">20</SelectItem>
+                            <SelectItem value="50">50</SelectItem>
+                            <SelectItem value="100">100</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Showing {((invitationsPagination.page - 1) * invitationsPagination.limit) + 1} to {Math.min(invitationsPagination.page * invitationsPagination.limit, invitationsPagination.total)} of {invitationsPagination.total}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Invitations Pagination Controls */}
-              {invitationsPagination.total > 0 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
-                  <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">Items per page:</span>
-                      <Select
-                        value={invitationsPagination.limit.toString()}
-                        onValueChange={(value) => {
-                          const newLimit = parseInt(value)
-                          setInvitationsPagination(prev => ({
-                            ...prev,
-                            limit: newLimit,
-                            page: 1
-                          }))
-                        }}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setInvitationsPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                        disabled={invitationsPagination.page === 1}
                       >
-                        <SelectTrigger className="w-16 h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="10">10</SelectItem>
-                          <SelectItem value="20">20</SelectItem>
-                          <SelectItem value="50">50</SelectItem>
-                          <SelectItem value="100">100</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Showing {((invitationsPagination.page - 1) * invitationsPagination.limit) + 1} to {Math.min(invitationsPagination.page * invitationsPagination.limit, invitationsPagination.total)} of {invitationsPagination.total}
+                        Previous
+                      </Button>
+                      <span className="text-sm text-muted-foreground">
+                        Page {invitationsPagination.page} of {invitationsPagination.totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setInvitationsPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                        disabled={invitationsPagination.page === invitationsPagination.totalPages}
+                      >
+                        Next
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setInvitationsPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                      disabled={invitationsPagination.page === 1}
-                    >
-                      Previous
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                      Page {invitationsPagination.page} of {invitationsPagination.totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setInvitationsPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                      disabled={invitationsPagination.page === invitationsPagination.totalPages}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
-      {showInviteModal && canInviteMembers && (
-        <InviteMemberModal
-          onClose={() => setShowInviteModal(false)}
-          onInvite={handleInviteMember}
+        {showInviteModal && canInviteMembers && (
+          <InviteMemberModal
+            onClose={() => setShowInviteModal(false)}
+            onInvite={handleInviteMember}
+          />
+        )}
+
+        {editingMember && canEditMemberRecord(editingMember) && (
+          <EditMemberModal
+            member={editingMember}
+            onClose={() => setEditingMember(null)}
+            onUpdate={handleUpdateMember}
+            canEditAdminUsers={canEditMembers}
+          />
+        )}
+        <ConfirmationModal
+          isOpen={showRemoveConfirm}
+          onClose={() => {
+            if (removingMember) return
+            setShowRemoveConfirm(false)
+            setMemberToRemove(null)
+          }}
+          onConfirm={confirmRemoveMember}
+          title="Remove member"
+          description={
+            memberToRemove
+              ? `Are you sure you want to remove ${memberToRemove.firstName} ${memberToRemove.lastName}? They will be deactivated and removed from the team.`
+              : 'Are you sure you want to remove this member?'
+          }
+          confirmText="Remove"
+          cancelText="Cancel"
+          variant="destructive"
+          isLoading={removingMember}
         />
-      )}
 
-      {editingMember && canEditMemberRecord(editingMember) && (
-        <EditMemberModal
-          member={editingMember}
-          onClose={() => setEditingMember(null)}
-          onUpdate={handleUpdateMember}
-          canEditAdminUsers={canEditMembers}
+        <ConfirmationModal
+          isOpen={showCancelInvitationConfirm}
+          onClose={handleCancelInvitationCancel}
+          onConfirm={handleCancelInvitationConfirm}
+          title="Cancel invitation"
+          description={
+            invitationToCancel
+              ? `Are you sure you want to cancel the invitation for ${invitationToCancel.email}? This action cannot be undone.`
+              : 'Are you sure you want to cancel this invitation?'
+          }
+          confirmText="Cancel Invitation"
+          cancelText="Keep Invitation"
+          variant="destructive"
+          isLoading={cancelingInvitation}
         />
-      )}
-      <ConfirmationModal
-        isOpen={showRemoveConfirm}
-        onClose={() => {
-          if (removingMember) return
-          setShowRemoveConfirm(false)
-          setMemberToRemove(null)
-        }}
-        onConfirm={confirmRemoveMember}
-        title="Remove member"
-        description={
-          memberToRemove
-            ? `Are you sure you want to remove ${memberToRemove.firstName} ${memberToRemove.lastName}? They will be deactivated and removed from the team.`
-            : 'Are you sure you want to remove this member?'
-        }
-        confirmText="Remove"
-        cancelText="Cancel"
-        variant="destructive"
-        isLoading={removingMember}
-      />
-
-      <ConfirmationModal
-        isOpen={showCancelInvitationConfirm}
-        onClose={handleCancelInvitationCancel}
-        onConfirm={handleCancelInvitationConfirm}
-        title="Cancel invitation"
-        description={
-          invitationToCancel
-            ? `Are you sure you want to cancel the invitation for ${invitationToCancel.email}? This action cannot be undone.`
-            : 'Are you sure you want to cancel this invitation?'
-        }
-        confirmText="Cancel Invitation"
-        cancelText="Keep Invitation"
-        variant="destructive"
-        isLoading={cancelingInvitation}
-      />
       </div>
     </MainLayout>
   )

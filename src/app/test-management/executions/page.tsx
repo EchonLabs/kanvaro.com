@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
@@ -72,6 +72,28 @@ export default function TestExecutionsPage() {
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [projectQuery, setProjectQuery] = useState('')
   const [projectsLoading, setProjectsLoading] = useState(true)
+
+  // Helper function to focus filter search inputs
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+
+    const doFocus = () => {
+      el.focus({ preventScroll: true })
+      try {
+        el.select?.()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(doFocus)
+    } else {
+      setTimeout(doFocus, 0)
+    }
+  }
+
+  const projectSearchInputRef = useRef<HTMLInputElement | null>(null)
 
   const [testExecutionDialogOpen, setTestExecutionDialogOpen] = useState(false)
   const [selectedTestExecution, setSelectedTestExecution] = useState<TestExecution | null>(null)
@@ -291,7 +313,10 @@ export default function TestExecutionsPage() {
                 value={selectedProject}
                 onValueChange={setSelectedProject}
                 onOpenChange={(open) => {
-                  if (open) setProjectQuery('')
+                  if (open) {
+                    setProjectQuery('')
+                    focusSearchInput(projectSearchInputRef.current)
+                  }
                 }}
                 disabled={projectsLoading}
               >
@@ -301,6 +326,7 @@ export default function TestExecutionsPage() {
                 <SelectContent className="p-0">
                   <div className="p-2">
                     <Input
+                      ref={projectSearchInputRef}
                       value={projectQuery}
                       onChange={(e) => setProjectQuery(e.target.value)}
                       placeholder="Search projects"

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useNotify } from '@/lib/notify'
 import { validateSprintDates } from '@/lib/sprintDateValidation'
 import { Badge } from '@/components/ui/Badge'
+import { useAuthContext } from '@/contexts/AuthContext'
 import {
   ArrowLeft,
   Save,
@@ -35,11 +36,12 @@ interface User {
 }
 
 export default function CreateSprintPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
   const { success: notifySuccess, error: notifyError } = useNotify()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [authError, setAuthError] = useState('')
   const [projects, setProjects] = useState<Project[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [teamMemberQuery, setTeamMemberQuery] = useState('')
@@ -59,43 +61,6 @@ export default function CreateSprintPage() {
     capacity: '',
     teamMembers: [] as string[]
   })
-
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-
-      if (response.ok) {
-        setAuthError('')
-        await Promise.all([fetchProjects(), fetchUsers()])
-      } else if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-
-        if (refreshResponse.ok) {
-          setAuthError('')
-          await Promise.all([fetchProjects(), fetchUsers()])
-        } else {
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    }
-  }, [router])
-
-  useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
 
   // Remove the old global sprint count logic
 
@@ -427,18 +392,15 @@ export default function CreateSprintPage() {
     }, {})
   }, [users])
 
-  if (authError) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{authError}</p>
-            <p className="text-muted-foreground">Redirecting to login...</p>
-          </div>
-        </div>
-      </MainLayout>
-    )
-  }
+  // Auth initialization - trigger data loading
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      fetchProjects()
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated])
 
   return (
     <MainLayout>
@@ -531,11 +493,11 @@ export default function CreateSprintPage() {
                       min={
                         selectedProject?.startDate
                           ? new Date(
-                              Math.max(
-                                new Date(selectedProject.startDate).getTime(),
-                                new Date().setHours(0, 0, 0, 0)
-                              )
+                            Math.max(
+                              new Date(selectedProject.startDate).getTime(),
+                              new Date().setHours(0, 0, 0, 0)
                             )
+                          )
                             .toISOString()
                             .split('T')[0]
                           : new Date().toISOString().split('T')[0]
@@ -572,14 +534,14 @@ export default function CreateSprintPage() {
                       min={
                         selectedProject?.startDate || formData.startDate
                           ? new Date(
-                              Math.max(
-                                selectedProject?.startDate
-                                  ? new Date(selectedProject.startDate).getTime()
-                                  : 0,
-                                formData.startDate ? new Date(formData.startDate).getTime() : 0,
-                                new Date().setHours(0, 0, 0, 0)
-                              )
+                            Math.max(
+                              selectedProject?.startDate
+                                ? new Date(selectedProject.startDate).getTime()
+                                : 0,
+                              formData.startDate ? new Date(formData.startDate).getTime() : 0,
+                              new Date().setHours(0, 0, 0, 0)
                             )
+                          )
                             .toISOString()
                             .split('T')[0]
                           : new Date().toISOString().split('T')[0]

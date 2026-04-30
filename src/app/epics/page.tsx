@@ -20,6 +20,7 @@ import { PermissionGate } from '@/lib/permissions/permission-components'
 import { useNotify } from '@/lib/notify'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { extractUserId } from '@/lib/auth/user-utils'
+import { useAuthContext } from '@/contexts/AuthContext'
 import { 
   Plus, 
   Search, 
@@ -85,12 +86,13 @@ interface Epic {
 }
 
 export default function EpicsPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
   const searchParams = useSearchParams()
   const [epics, setEpics] = useState<Epic[]>([])
   const [loading, setLoading] = useState(true)
-  const [authError, setAuthError] = useState('')
-  const [localSearch, setLocalSearch] = useState('')
+const [localSearch, setLocalSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -100,12 +102,24 @@ export default function EpicsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
-  const [currentUserId, setCurrentUserId] = useState<string>('')
+  const [showFilters, setShowFilters] = useState(false)
   const filtersInitializedRef = useRef(false)
 
   const { hasPermission } = usePermissions()
   const { success: notifySuccess, error: notifyError } = useNotify()
   const { formatDate } = useDateTime()
+
+
+  // Auth initialization - trigger data loading
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      setLoading(false)
+      fetchEpics()
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated])
 
   // Show success when redirected with ?updated=true
   useEffect(() => {
@@ -118,70 +132,10 @@ export default function EpicsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, router])
 
-  const fetchAndSetCurrentUser = useCallback(async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-      if (response.ok) {
-        const data = await response.json().catch(() => ({}))
-        const userId = extractUserId(data)
-        if (userId) setCurrentUserId(userId.toString())
-      }
-      return response
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      throw error
-    }
-  }, [])
-
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await fetchAndSetCurrentUser()
-
-      if (response.ok) {
-        setAuthError('')
-        await fetchEpics()
-      } else if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-        
-        if (refreshResponse.ok) {
-          const meResponse = await fetchAndSetCurrentUser()
-          if (meResponse.ok) {
-            setAuthError('')
-            await fetchEpics()
-          } else {
-            setAuthError('Session expired')
-            setTimeout(() => {
-              router.push('/login')
-            }, 2000)
-          }
-        } else {
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    }
-  }, [router, fetchAndSetCurrentUser])
-
-  useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
-
 
   // Fetch when pagination changes (after initial load)
   useEffect(() => {
-    if (!loading && !authError) {
+    if (!loading) {
       fetchEpics()
     }
   }, [currentPage, pageSize])
@@ -192,8 +146,7 @@ export default function EpicsPage() {
       filtersInitializedRef.current = true
       return
     }
-    if (authError) return
-    if (currentPage === 1) {
+if (currentPage === 1) {
       fetchEpics()
     } else {
       setCurrentPage(1)
@@ -313,6 +266,7 @@ export default function EpicsPage() {
 
   const isCreator = (epic: Epic) => {
     const creatorId = (epic as any)?.createdBy?._id || (epic as any)?.createdBy?.id
+    const currentUserId = user ? ((user as any)._id || (user as any).id) : null
     return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
   }
 
@@ -336,19 +290,6 @@ export default function EpicsPage() {
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
             <p className="text-muted-foreground">Loading epics...</p>
-          </div>
-        </div>
-      </MainLayout>
-    )
-  }
-
-  if (authError) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{authError}</p>
-            <p className="text-muted-foreground">Redirecting to login...</p>
           </div>
         </div>
       </MainLayout>

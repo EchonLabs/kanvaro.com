@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
+import { useAuthContext } from '@/contexts/AuthContext'
 import {
   DateTimePreferences,
   DEFAULT_DATE_TIME_PREFERENCES,
@@ -30,50 +31,45 @@ export function DateTimeProvider({ children }: { children: React.ReactNode }) {
   const [preferences, setPreferencesState] = useState<DateTimePreferences>(DEFAULT_DATE_TIME_PREFERENCES)
   const [isInitialized, setIsInitialized] = useState(false)
 
-  // Load user preferences on initialization
+  let authUser: any = null
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const ctx = useAuthContext()
+    authUser = ctx.user
+  } catch {
+    // AuthProvider may not be available yet
+  }
+
+  // Load user preferences from auth context
   useEffect(() => {
-    const loadUserPreferences = async () => {
-      try {
-        const response = await fetch('/api/auth/me')
-        if (response.ok) {
-          const userData = await response.json()
-          const detectedTimezone = detectClientTimezone()
-          const userPreferences = {
-            dateFormat: userData.preferences?.dateFormat || DEFAULT_DATE_TIME_PREFERENCES.dateFormat,
-            timeFormat: userData.preferences?.timeFormat || DEFAULT_DATE_TIME_PREFERENCES.timeFormat,
-            timezone: detectedTimezone
-          }
-          setPreferencesState(userPreferences)
-          if (typeof window !== 'undefined') {
-            sessionStorage.setItem('user_date_preferences', JSON.stringify(userPreferences))
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to load user date/time preferences:', error)
-        // Clear sessionStorage on API failure to avoid stale data
-        if (typeof window !== 'undefined') {
-          sessionStorage.removeItem('user_date_preferences')
-        }
-      } finally {
-        setIsInitialized(true)
+    if (authUser) {
+      const detectedTimezone = detectClientTimezone()
+      const userPreferences = {
+        dateFormat: authUser.preferences?.dateFormat || DEFAULT_DATE_TIME_PREFERENCES.dateFormat,
+        timeFormat: authUser.preferences?.timeFormat || DEFAULT_DATE_TIME_PREFERENCES.timeFormat,
+        timezone: detectedTimezone
       }
-    }
-
-    // Check sessionStorage first for immediate loading
-    if (typeof window !== 'undefined') {
-      const stored = sessionStorage.getItem('user_date_preferences')
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored)
-          setPreferencesState(parsed)
-        } catch (e) {
-          console.warn('Failed to parse stored preferences:', e)
+      setPreferencesState(userPreferences)
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('user_date_preferences', JSON.stringify(userPreferences))
+      }
+      setIsInitialized(true)
+    } else {
+      // Check sessionStorage for immediate loading
+      if (typeof window !== 'undefined') {
+        const stored = sessionStorage.getItem('user_date_preferences')
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored)
+            setPreferencesState(parsed)
+          } catch (e) {
+            console.warn('Failed to parse stored preferences:', e)
+          }
         }
       }
+      setIsInitialized(true)
     }
-
-    loadUserPreferences()
-  }, [])
+  }, [authUser])
 
   const setPreferences = (prefs: DateTimePreferences) => {
     setPreferencesState(prefs)

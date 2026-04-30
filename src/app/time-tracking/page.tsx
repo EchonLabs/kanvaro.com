@@ -6,11 +6,12 @@ import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { 
-  Clock, 
-  Play, 
-  FileText, 
-  BarChart3, 
+import { useAuthContext } from '@/contexts/AuthContext'
+import {
+  Clock,
+  Play,
+  FileText,
+  BarChart3,
   Target,
   Timer,
   Calendar,
@@ -37,9 +38,7 @@ interface ActiveTimer {
 }
 
 export default function TimeTrackingPage() {
-  const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [authError, setAuthError] = useState('')
   const [stats, setStats] = useState<any>(null)
   const [statsLoading, setStatsLoading] = useState(true)
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null)
@@ -48,6 +47,7 @@ export default function TimeTrackingPage() {
   const tickStartMsRef = useRef<number | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const router = useRouter()
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
 
   const loadActiveTimer = async (currentUser: any) => {
     if (!currentUser?.id || !currentUser?.organization) return
@@ -65,47 +65,13 @@ export default function TimeTrackingPage() {
   }
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await fetch('/api/auth/me')
-
-        if (response.ok) {
-          const userData = await response.json()
-          setUser(userData)
-          setAuthError('')
-          await loadActiveTimer(userData)
-        } else if (response.status === 401) {
-          const refreshResponse = await fetch('/api/auth/refresh', {
-            method: 'POST'
-          })
-
-          if (refreshResponse.ok) {
-            const refreshData = await refreshResponse.json()
-            setUser(refreshData.user)
-            setAuthError('')
-            await loadActiveTimer(refreshData.user)
-          } else {
-            setAuthError('Session expired')
-            setTimeout(() => {
-              router.push('/login')
-            }, 2000)
-          }
-        } else {
-          router.push('/login')
-        }
-      } catch (error) {
-        console.error('Auth check failed:', error)
-        setAuthError('Authentication failed')
-        setTimeout(() => {
-          router.push('/login')
-        }, 2000)
-      } finally {
-        setIsLoading(false)
-      }
+    if (!authLoading && isAuthenticated && user) {
+      setIsLoading(false)
+      loadActiveTimer(user)
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
     }
-
-    checkAuth()
-  }, [router])
+  }, [authLoading, isAuthenticated, user, router])
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -176,17 +142,6 @@ export default function TimeTrackingPage() {
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
           <p className="text-muted-foreground">Loading time tracking...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (authError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-destructive mb-4">{authError}</p>
-          <p className="text-muted-foreground">Redirecting to login...</p>
         </div>
       </div>
     )

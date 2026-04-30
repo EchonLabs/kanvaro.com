@@ -73,7 +73,8 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
       { permission: Permission.TASK_MANAGE_ATTACHMENTS, label: 'Manage Attachments', description: 'Manage task attachments' },
       { permission: Permission.TASK_VIEW_ALL, label: 'View All Tasks', description: 'View all tasks created or assigned to anyone' },
       { permission: Permission.TASK_EDIT_ALL, label: 'Edit All Tasks', description: 'Edit all tasks created or assigned to anyone' },
-      { permission: Permission.TASK_DELETE_ALL, label: 'Delete All Tasks', description: 'Delete all tasks created or assigned to anyone' }
+      { permission: Permission.TASK_DELETE_ALL, label: 'Delete All Tasks', description: 'Delete all tasks created or assigned to anyone' },
+      { permission: Permission.TASK_VIEW_ASSIGNED_PROJECTS, label: 'View Assigned Projects Tasks', description: 'View tasks from all assigned projects' },
     ]
   },
   {

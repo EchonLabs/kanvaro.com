@@ -25,6 +25,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { detectClientTimezone } from '@/lib/timezone'
 import { HRManualTimeLogModal } from '@/components/time-tracking/HRManualTimeLogModal'
 import { validateAndCorrectDateRangeStrings } from '@/lib/dateRangeValidation'
+import { useAuthContext } from '@/contexts/AuthContext'
 
 interface TimeLogsProps {
   userId: string
@@ -96,6 +97,23 @@ export function TimeLogs({
   const { formatDateTimeSafe, preferences } = useDateTime()
   const { showToast } = useToast()
   const pathname = usePathname()
+  const { user } = useAuthContext()
+  const { organization } = useOrganization()
+  const { hasPermission } = usePermissions()
+
+  // Permission flags used throughout the component
+  const canViewEmployeeFilter = hasPermission(Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ)
+  const canApproveTimeLogs = hasPermission(Permission.TIME_TRACKING_APPROVE)
+  const canApproveTime = hasPermission(Permission.TIME_TRACKING_APPROVE)
+  const canUpdateTime = hasPermission(Permission.TIME_TRACKING_UPDATE)
+  const canDeleteTime = hasPermission(Permission.TIME_TRACKING_DELETE)
+  const canEditTimeEntry = (entry: any) => {
+    if (hasPermission(Permission.TIME_TRACKING_VIEW_ALL)) return true
+    const userId = user ? ((user as any)._id || (user as any).id) : null
+    const entryUserId = entry?.user?._id || entry?.user?.id || entry?.userId
+    return userId && entryUserId && userId.toString() === entryUserId.toString()
+  }
+
 
   // Debug timezone and DateTimeProvider
   useEffect(() => {
@@ -121,7 +139,6 @@ export function TimeLogs({
     taskId: '',
     employeeId: ''
   })
-  const [currentUserRole, setCurrentUserRole] = useState<string>('')
   const [filterProjects, setFilterProjects] = useState<any[]>([])
   const [filterTasks, setFilterTasks] = useState<any[]>([])
   const [filterEmployees, setFilterEmployees] = useState<any[]>([])
@@ -246,6 +263,11 @@ export function TimeLogs({
       task.displayId?.toLowerCase().includes(searchLower)
     )
   }, [tasks, modalTaskSearch])
+
+  const selectedTaskForLogObject = useMemo(() =>
+    tasks.find(t => t._id === selectedTaskForLog),
+    [tasks, selectedTaskForLog]
+  )
   const [manualLogData, setManualLogData] = useState({
     startDate: '',
     startTime: '',
@@ -281,97 +303,6 @@ export function TimeLogs({
   } | null>(null)
 
   // Resolve auth if props are missing
-  useEffect(() => {
-    const resolveAuth = async () => {
-      if (resolvedUserId && resolvedOrgId) {
-        setAuthResolving(false)
-        return
-      }
-      try {
-        const res = await fetch('/api/auth/me')
-        if (res.ok) {
-          const me = await res.json()
-          setResolvedUserId(me.id)
-          setResolvedOrgId(me.organization)
-          setError('')
-        } else {
-          setError('Unable to resolve user. Please log in again.')
-        }
-      } catch (e) {
-        setError('Failed to resolve user information')
-      } finally {
-        setAuthResolving(false)
-      }
-    }
-    if (!resolvedUserId || !resolvedOrgId) {
-      resolveAuth()
-    }
-  }, [resolvedUserId, resolvedOrgId])
-
-  const { organization } = useOrganization()
-  const { canApproveTime } = useFeaturePermissions()
-  const { hasPermission } = usePermissions()
-
-  // Permission checks for time tracking operations
-  const canViewAllTime = hasPermission(Permission.TIME_TRACKING_VIEW_ALL)
-  const canUpdateTime = hasPermission(Permission.TIME_TRACKING_UPDATE)
-  const canDeleteTime = hasPermission(Permission.TIME_TRACKING_DELETE)
-  const canApproveTimeLogs = hasPermission(Permission.TIME_TRACKING_APPROVE) 
-
-  // Check if user can view employee filter using permission
-  const canViewEmployeeFilter = useMemo(() => {
-    return hasPermission(Permission.TIME_TRACKING_EMPLOYEE_FILTER_READ)
-  }, [hasPermission])
-
-  // Function to check if a time entry can be edited/deleted based on time tracking settings
-  const canEditTimeEntry = useCallback((entry: TimeEntry): boolean => {
-    if (!timeTrackingSettings?.disableTimeLogEditing) {
-      return true
-    }
-
-    const entryDate = new Date(entry.startTime)
-    const now = new Date()
-
-
-
-    if (timeTrackingSettings.timeLogEditMode === 'days') {
-      const diffTime = now.getTime() - entryDate.getTime()
-      const diffDays = diffTime / (1000 * 3600 * 24)
-      const canEdit = diffDays <= timeTrackingSettings.timeLogEditDays
-      console.log('Days mode check:', { diffDays, maxDays: timeTrackingSettings.timeLogEditDays, canEdit })
-      return canEdit
-    } else if (timeTrackingSettings.timeLogEditMode === 'dayOfMonth') {
-      // Allow editing if entry is from a previous month/year
-      if (entryDate.getFullYear() < now.getFullYear() ||
-        (entryDate.getFullYear() === now.getFullYear() && entryDate.getMonth() < now.getMonth())) {
-        console.log('Entry from previous month, allowing edit')
-        return true
-      }
-      // For current month, allow editing if entry day is on or after the threshold
-      const canEdit = entryDate.getDate() >= timeTrackingSettings.timeLogEditDayOfMonth
-      console.log('Day of month mode check:', { entryDay: entryDate.getDate(), threshold: timeTrackingSettings.timeLogEditDayOfMonth, canEdit })
-      return canEdit
-    }
-
-    console.log('Unknown mode or no restriction, allowing edit')
-    return true
-  }, [timeTrackingSettings])
-
-  // Fetch current user role
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      try {
-        const response = await fetch('/api/auth/me')
-        if (response.ok) {
-          const userData = await response.json()
-          setCurrentUserRole(userData.role || '')
-        }
-      } catch (error) {
-        console.error('Failed to fetch user role:', error)
-      }
-    }
-    fetchUserRole()
-  }, [])
 
   // Fetch projects for filter
   useEffect(() => {
@@ -512,11 +443,11 @@ export function TimeLogs({
           const data = await response.json()
           if (data.settings) {
             console.log('Fetched time tracking settings:', data.settings)
-            if(data.settings.disableTimeLogEditing) {
-              if(data.settings.timeLogEditMode === 'dayOfMonth') {
+            if (data.settings.disableTimeLogEditing) {
+              if (data.settings.timeLogEditMode === 'dayOfMonth') {
                 const disble_from_month = data.settings.timeLogEditDayOfMonth
                 const disable_from_created_date = null
-              }else{
+              } else {
                 const disable_from_created_date = data.settings.timeLogEditDays
                 const disble_from_month = null
               }
@@ -812,7 +743,7 @@ export function TimeLogs({
       return
     }
 
-    if ( !manualLogData.description.trim()) {
+    if (!manualLogData.description.trim()) {
       setError('Memo is required')
       return
     }
@@ -904,7 +835,7 @@ export function TimeLogs({
       return
     }
 
-    if ( !manualLogData.description.trim()) {
+    if (!manualLogData.description.trim()) {
       setError('Memo is required')
       return
     }
@@ -1181,7 +1112,6 @@ export function TimeLogs({
       loadActiveTimer()
     }
   }, [authResolving, loadTimeEntries, loadActiveTimer, refreshKey])
-
 
 
   const handleDeleteEntry = async (entryId: string) => {
@@ -1529,15 +1459,14 @@ export function TimeLogs({
       return value
     }
 
-    const headers = ['Task No', 'Start Date', 'Start Time', 'End Date', 'End Time','Memo']
+    const headers = ['Task No', 'Start Date', 'Start Time', 'End Date', 'End Time', 'Memo']
     const exampleRows = [
-      ['20.7', '2024-01-15', '09:00', '2024-01-15', '17:00','Worked on feature'], // ISO format
-      ['20.8', '01/15/2024', '9:00 AM', '01/15/2024', '5:00 PM','Worked on feature'], // US format with AM/PM
-      ['20.9', '15/01/2024', '14:00', '15/01/2024', '18:30','Worked on feature'], // European format 24h
-      ['20.10', '15-01-2024', '9 AM', '15-01-2024', '5 PM','Worked on feature'] // Dash format with AM/PM
+      ['20.7', '2024-01-15', '09:00', '2024-01-15', '17:00', 'Worked on feature'], // ISO format
+      ['20.8', '01/15/2024', '9:00 AM', '01/15/2024', '5:00 PM', 'Worked on feature'], // US format with AM/PM
+      ['20.9', '15/01/2024', '14:00', '15/01/2024', '18:30', 'Worked on feature'], // European format 24h
+      ['20.10', '15-01-2024', '9 AM', '15-01-2024', '5 PM', 'Worked on feature'] // Dash format with AM/PM
 
     ]
-
 
 
     const csvContent = [
@@ -1926,7 +1855,7 @@ export function TimeLogs({
       }
 
       // Check if description is required
-      if ( !description) {
+      if (!description) {
         errors.push('Memo is required')
       }
 
@@ -2131,7 +2060,7 @@ export function TimeLogs({
             Time Logs */}
             </CardTitle>
             {/* HR Manual Time Log Button - visible only to HR role and only in Timer tab */}
-            {currentUserRole === 'human_resource' && !showManualLogButtons && pathname === '/time-tracking/timer' && (
+            {['human_resource', 'admin', 'super_admin'].includes(user?.role || '') && !showManualLogButtons && (pathname === '/time-tracking/timer' || pathname === '/time-tracking/logs') && (
               <Button
                 onClick={() => setShowHRManualLogModal(true)}
                 size="sm"
@@ -2624,10 +2553,9 @@ export function TimeLogs({
                 </div>
 
                 {/* Table Header - Hidden on mobile */}
-                <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium overflow-x-auto ${
-                  showSelectionAndApproval && canApproveTimeLogs
-                    ? 'grid-cols-[40px_minmax(150px,1.5fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
-                    : 'grid-cols-[minmax(200px,2fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
+                <div className={`hidden md:grid gap-2 p-3 bg-muted rounded-lg text-xs sm:text-sm font-medium overflow-x-auto ${showSelectionAndApproval && canApproveTimeLogs
+                  ? 'grid-cols-[40px_minmax(150px,1.5fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
+                  : 'grid-cols-[minmax(200px,2fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
                   }`}>
                   {showSelectionAndApproval && canApproveTimeLogs && (
                     <div className="flex items-center justify-center">
@@ -2836,10 +2764,9 @@ export function TimeLogs({
                     </div>
 
                     {/* Desktop Table View */}
-                    <div className={`hidden md:grid gap-2 p-3 items-center overflow-x-auto ${
-                      showSelectionAndApproval && canApproveTimeLogs
-                        ? 'grid-cols-[40px_minmax(150px,1.5fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
-                        : 'grid-cols-[minmax(200px,2fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
+                    <div className={`hidden md:grid gap-2 p-3 items-center overflow-x-auto ${showSelectionAndApproval && canApproveTimeLogs
+                      ? 'grid-cols-[40px_minmax(150px,1.5fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
+                      : 'grid-cols-[minmax(200px,2fr)_minmax(120px,1fr)_minmax(100px,120px)_minmax(100px,120px)_minmax(100px,120px)_minmax(80px,100px)_minmax(80px,100px)_minmax(80px,100px)_minmax(90px,110px)_minmax(80px,100px)]'
                       }`}>
                       {showSelectionAndApproval && canApproveTimeLogs && (
                         <div className="flex items-center justify-center">
@@ -3157,15 +3084,24 @@ export function TimeLogs({
                     if (open) focusSearchInput(modalTaskSearchInputRef.current)
                   }}
                 >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={
-                      tasksLoading
-                        ? 'Loading tasks...'
-                        : selectedProjectForLog
-                          ? (tasks.length > 0 ? 'Select a task' : 'No tasks available')
-                          : 'Select a project first'
-                    } />
-                  </SelectTrigger>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={
+                          tasksLoading
+                            ? 'Loading tasks...'
+                            : selectedProjectForLog
+                              ? (tasks.length > 0 ? 'Select a task' : 'No tasks available')
+                              : 'Select a project first'
+                        } />
+                      </SelectTrigger>
+                    </TooltipTrigger>
+                    {selectedTaskForLogObject && (
+                      <TooltipContent side="top" className="max-w-sm">
+                        <p className="font-medium">{selectedTaskForLogObject.title}</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
                   {tasksLoading && (
                     <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                   )}
@@ -3484,15 +3420,24 @@ export function TimeLogs({
                     if (open) focusSearchInput(modalTaskSearchInputRef.current)
                   }}
                 >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={
-                      tasksLoading
-                        ? 'Loading tasks...'
-                        : selectedProjectForLog
-                          ? (tasks.length > 0 ? 'Select a task' : 'No tasks available')
-                          : 'Select a project first'
-                    } />
-                  </SelectTrigger>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={
+                          tasksLoading
+                            ? 'Loading tasks...'
+                            : selectedProjectForLog
+                              ? (tasks.length > 0 ? 'Select a task' : 'No tasks available')
+                              : 'Select a project first'
+                        } />
+                      </SelectTrigger>
+                    </TooltipTrigger>
+                    {selectedTaskForLogObject && (
+                      <TooltipContent side="top" className="max-w-sm">
+                        <p className="font-medium">{selectedTaskForLogObject.title}</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
                   {tasksLoading && (
                     <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                   )}
@@ -3553,9 +3498,10 @@ export function TimeLogs({
                                     <TooltipTrigger asChild>
                                       <span className="truncate block overflow-hidden">{task.title}</span>
                                     </TooltipTrigger>
-<TooltipContent 
-  side="bottom" 
-  className="max-w-sm whitespace-normal break-words">
+                                    <TooltipContent
+                                      side="bottom"
+                                      className="max-w-sm whitespace-normal break-words"
+                                    >
                                       <p className="font-medium whitespace-normal break-words">{task.title}</p>
                                     </TooltipContent>
                                   </Tooltip>
@@ -3681,7 +3627,7 @@ export function TimeLogs({
                 id="edit-description"
                 value={manualLogData.description}
                 onChange={(e) => setManualLogData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder={'What did you work on? (required)' }
+                placeholder={'What did you work on? (required)'}
                 rows={3}
                 required={true}
                 className="w-full"
@@ -3725,7 +3671,7 @@ export function TimeLogs({
                 !manualLogData.endTime ||
                 !!(startDateError || startTimeError || endDateError || endTimeError) ||
                 !hasEditChanges ||
-                ( !manualLogData.description.trim())
+                (!manualLogData.description.trim())
               }
             >
               {submittingManualLog ? (
@@ -3831,12 +3777,11 @@ export function TimeLogs({
                       .map(([rowNum, status]) => (
                         <div
                           key={rowNum}
-                          className={`flex items-center gap-2 p-2 rounded text-sm transition-all ${
-                            status.status === 'success'
-                              ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400'
-                              : status.status === 'error'
-                                ? 'bg-destructive/10 text-destructive'
-                                : 'bg-muted/50 text-muted-foreground'
+                          className={`flex items-center gap-2 p-2 rounded text-sm transition-all ${status.status === 'success'
+                            ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400'
+                            : status.status === 'error'
+                              ? 'bg-destructive/10 text-destructive'
+                              : 'bg-muted/50 text-muted-foreground'
                             }`}
                         >
                           {status.status === 'pending' && (

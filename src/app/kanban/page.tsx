@@ -37,12 +37,12 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreHorizontal, 
-  Calendar, 
+import {
+  Plus,
+  Search,
+  Filter,
+  MoreHorizontal,
+  Calendar,
   Clock,
   CheckCircle,
   Pause,
@@ -76,12 +76,13 @@ import { DateRange } from 'react-day-picker'
 import { format } from 'date-fns'
 import { useNotify } from '@/lib/notify'
 import { validateAndCorrectDateRange } from '@/lib/dateRangeValidation'
+import { useAuthContext } from '@/contexts/AuthContext'
 
 interface Task {
   _id: string
   title: string
   description: string
-  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled'|'backlog'
+  status: 'todo' | 'in_progress' | 'review' | 'testing' | 'done' | 'cancelled' | 'backlog'
   priority: 'low' | 'medium' | 'high' | 'critical'
   type: 'bug' | 'feature' | 'improvement' | 'task' | 'subtask'
   project: {
@@ -221,8 +222,8 @@ function ColumnDropZone({
             </span>
           </div>
           {canCreateTask && (
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="sm"
               onClick={() => onCreateTask?.(column.id)}
             >
@@ -230,41 +231,40 @@ function ColumnDropZone({
             </Button>
           )}
         </div>
-        
-        <SortableContext 
+
+        <SortableContext
           items={tasks.map(task => task._id)}
           strategy={verticalListSortingStrategy}
         >
-          <div 
+          <div
             ref={setNodeRef}
-            className={`space-y-3 min-h-[400px] max-h-[600px] overflow-y-auto overflow-x-hidden border-2 border-dashed rounded-lg transition-colors p-2 flex-1 ${
-              isOver 
-                ? 'border-primary bg-primary/5' 
+            className={`space-y-3 min-h-[400px] max-h-[600px] overflow-y-auto overflow-x-hidden border-2 border-dashed rounded-lg transition-colors p-2 flex-1 ${isOver
+                ? 'border-primary bg-primary/5'
                 : 'border-border/30 dark:border-border/50 hover:border-border/50 dark:hover:border-border/70'
-            }`}
+              }`}
           >
-          {tasks.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-muted-foreground">
-             <div className="text-center">
-                <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Drag tasks here to update status</p>
+            {tasks.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Drag tasks here to update status</p>
+                </div>
               </div>
-            </div>
-          ) : (
-            tasks.map((task) => (
-              <SortableTask
-                key={`${task._id}-${task.status}-${task.position}`}
-                task={task}
-                onClick={() => router.push(`/tasks/${task._id}`)}
-                getPriorityColor={getPriorityColor}
-                getTypeColor={getTypeColor}
-                onEdit={onEditTask}
-                onDelete={onDeleteTask}
-                isUpdating={pendingUpdates?.has(task._id)}
-                isDraggable={canDragTask ? canDragTask(task) : true}
-              />
-            ))
-          )}
+            ) : (
+              tasks.map((task) => (
+                <SortableTask
+                  key={`${task._id}-${task.status}-${task.position}`}
+                  task={task}
+                  onClick={() => router.push(`/tasks/${task._id}`)}
+                  getPriorityColor={getPriorityColor}
+                  getTypeColor={getTypeColor}
+                  onEdit={onEditTask}
+                  onDelete={onDeleteTask}
+                  isUpdating={pendingUpdates?.has(task._id)}
+                  isDraggable={canDragTask ? canDragTask(task) : true}
+                />
+              ))
+            )}
           </div>
         </SortableContext>
       </div>
@@ -307,18 +307,47 @@ export default function KanbanPage() {
   const [taskNumberFilterQuery, setTaskNumberFilterQuery] = useState('')
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [pendingUpdates, setPendingUpdates] = useState<Set<string>>(new Set())
+
+  // Helper function to focus filter search inputs
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+
+    const doFocus = () => {
+      el.focus({ preventScroll: true })
+      try {
+        el.select?.()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(doFocus)
+    } else {
+      setTimeout(doFocus, 0)
+    }
+  }
+
+  // Filter search input refs
+  const projectFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const assignedToFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const assignedByFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const priorityFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const typeFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const taskNumberFilterInputRef = useRef<HTMLInputElement | null>(null)
+
   const hasFetchedProjects = useRef(false)
 
   const isAdmin = userRole === 'admin'
 
   // Check if any filters are active
   const hasActiveFilters = projectFilter !== 'all' ||
-                          priorityFilter !== 'all' ||
-                          typeFilter !== 'all' ||
-                          assignedToFilter !== 'all' ||
-                          assignedByFilter !== 'all' ||
-                          taskNumberFilter !== 'all' ||
-                          dateRangeFilter !== undefined
+    priorityFilter !== 'all' ||
+    typeFilter !== 'all' ||
+    assignedToFilter !== 'all' ||
+    assignedByFilter !== 'all' ||
+    taskNumberFilter !== 'all' ||
+    dateRangeFilter !== undefined
 
   // Reset all filters
   const resetFilters = () => {
@@ -343,7 +372,7 @@ export default function KanbanPage() {
       setDateRangeFilter(undefined)
       return
     }
-    
+
     // Validate and auto-correct the date range
     const correctedRange = validateAndCorrectDateRange(range.from, range.to)
     setDateRangeFilter(correctedRange as DateRange | undefined)
@@ -461,12 +490,12 @@ export default function KanbanPage() {
           color: col.color || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
         }))
     }
-    
+
     // When "all" is selected or no custom columns, collect unique statuses from all projects
     if (projectFilter === 'all' && projects.length > 0) {
       const statusSet = new Set<string>()
       const statusMap = new Map<string, { title: string; color: string }>()
-      
+
       // Collect all unique statuses from all projects
       projects.forEach(project => {
         if (project.settings?.kanbanStatuses) {
@@ -481,7 +510,7 @@ export default function KanbanPage() {
           })
         }
       })
-      
+
       // If we found custom statuses, use them; otherwise use defaults
       if (statusMap.size > 0) {
         return Array.from(statusMap.entries()).map(([key, value]) => ({
@@ -491,7 +520,7 @@ export default function KanbanPage() {
         }))
       }
     }
-    
+
     // Fall back to default columns
     return defaultColumns
   }, [selectedProject, projectFilter, projects])
@@ -751,7 +780,7 @@ export default function KanbanPage() {
       (task.project?.name || '').toLowerCase().includes(normalizedSearchQuery) ||
       (task.displayId || '').toLowerCase().includes(normalizedSearchQuery) ||
       (task._id || '').toLowerCase().includes(normalizedSearchQuery)
-    
+
     const matchesProject = projectFilter === 'all' || (task.project?._id && task.project._id === projectFilter)
     const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
     const matchesType = typeFilter === 'all' || task.type === typeFilter
@@ -759,7 +788,7 @@ export default function KanbanPage() {
     // Check if the selected user is in the assignedTo array
     const matchesAssignedTo = assignedToFilter === 'all' ||
       (Array.isArray(task.assignedTo) &&
-       task.assignedTo.some((assignee: any) => assignee.user?._id === assignedToFilter))
+        task.assignedTo.some((assignee: any) => assignee.user?._id === assignedToFilter))
 
     const createdById = task.createdBy?._id || task.createdBy?.email || `${task.createdBy?.firstName ?? ''}-${task.createdBy?.lastName ?? ''}`
     const matchesAssignedBy = assignedByFilter === 'all' || (createdById && createdById === assignedByFilter)
@@ -1012,410 +1041,415 @@ export default function KanbanPage() {
     )
   }
 
-  if (authError) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{authError}</p>
-            <p className="text-muted-foreground">Redirecting to login...</p>
-          </div>
-        </div>
-      </MainLayout>
-    )
-  }
-
   return (
     <MainLayout>
       <TooltipProvider delayDuration={200}>
-      <div className="space-y-8 sm:space-y-10">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Kanban Board</h1>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{isConnected ? 'Real-time sync active' : 'Real-time sync inactive'}</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            <p className="text-sm sm:text-base text-muted-foreground">Streamline workflow with intuitive drag-and-drop task management</p>
-          </div>
-          {canCreateTask && (
-            <Button onClick={() => handleCreateTask()} className="w-full sm:w-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              New Task
-            </Button>
-          )}
-        </div>
-        {/* Search and Filters */}
-        <div className="space-y-3">
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder="Search tasks..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-full"
-            />
-          </div>
-          {/* Filter options - compact grid layout */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
-                <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Project" />
-                  </SelectTrigger>
-                  <SelectContent className="z-[10050] p-0">
-                    <div className="p-2">
-                      <div className="relative mb-2">
-                        <Input
-                          value={projectFilterQuery}
-                          onChange={(e) => setProjectFilterQuery(e.target.value)}
-                          placeholder="Search projects"
-                          className="pr-10"
-                          onKeyDown={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                        />
-                        {projectFilterQuery && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              setProjectFilterQuery('')
-                              setProjectFilter('all')
-                            }}
-                            className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                            aria-label="Clear project filter"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                      <div className="max-h-56 overflow-y-auto">
-                        <SelectItem value="all">All Projects</SelectItem>
-                        {filteredProjectOptions.length === 0 ? (
-                          <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
-                        ) : (
-                          filteredProjectOptions.map((project) => (
-                            <SelectItem key={project._id} value={project._id}>
-                              {project.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </SelectContent>
-                </Select>
-                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Priority" />
-                  </SelectTrigger>
-                  <SelectContent className="z-[10050] p-0">
-                    <div className="p-2">
-                      <div className="relative mb-2">
-                        <Input
-                          value={priorityFilterQuery}
-                          onChange={(e) => setPriorityFilterQuery(e.target.value)}
-                          placeholder="Search priority"
-                          className="pr-10"
-                          onKeyDown={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                        />
-                        {priorityFilterQuery && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              setPriorityFilterQuery('')
-                              setPriorityFilter('all')
-                            }}
-                            className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                            aria-label="Clear priority filter"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                      <div className="max-h-56 overflow-y-auto">
-                        <SelectItem value="all">All Priority</SelectItem>
-                        {filteredPriorityOptions.length === 0 ? (
-                          <div className="px-2 py-1 text-xs text-muted-foreground">No matching priorities</div>
-                        ) : (
-                          filteredPriorityOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </SelectContent>
-                </Select>
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent className="z-[10050] p-0">
-                    <div className="p-2">
-                      <div className="relative mb-2">
-                        <Input
-                          value={typeFilterQuery}
-                          onChange={(e) => setTypeFilterQuery(e.target.value)}
-                          placeholder="Search type"
-                          className="pr-10"
-                          onKeyDown={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                        />
-                        {typeFilterQuery && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              setTypeFilterQuery('')
-                              setTypeFilter('all')
-                            }}
-                            className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                            aria-label="Clear type filter"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                      <div className="max-h-56 overflow-y-auto">
-                        <SelectItem value="all">All Types</SelectItem>
-                        {filteredTypeOptions.length === 0 ? (
-                          <div className="px-2 py-1 text-xs text-muted-foreground">No matching types</div>
-                        ) : (
-                          filteredTypeOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </SelectContent>
-                </Select>
-                <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Assigned To" />
-                  </SelectTrigger>
-                  <SelectContent className="z-[10050] p-0">
-                    <div className="p-2">
-                      <div className="relative mb-2">
-                        <Input
-                          value={assignedToFilterQuery}
-                          onChange={(e) => setAssignedToFilterQuery(e.target.value)}
-                          placeholder="Search assignees"
-                          className="pr-10"
-                          onKeyDown={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                        />
-                        {assignedToFilterQuery && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              setAssignedToFilterQuery('')
-                              setAssignedToFilter('all')
-                            }}
-                            className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                            aria-label="Clear assignee filter"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                      <div className="max-h-56 overflow-y-auto">
-                        <SelectItem value="all">All Assignees</SelectItem>
-                        {filteredAssignedToOptions.length === 0 ? (
-                          <div className="px-2 py-1 text-xs text-muted-foreground">No matching assignees</div>
-                        ) : (
-                          filteredAssignedToOptions.map((option) => (
-                            <SelectItem key={option.id} value={option.id}>
-                              {option.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </SelectContent>
-                </Select>
-                <Select value={assignedByFilter} onValueChange={setAssignedByFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Assigned By" />
-                  </SelectTrigger>
-                  <SelectContent className="z-[10050] p-0">
-                    <div className="p-2">
-                      <div className="relative mb-2">
-                        <Input
-                          value={assignedByFilterQuery}
-                          onChange={(e) => setAssignedByFilterQuery(e.target.value)}
-                          placeholder="Search creators"
-                          className="pr-10"
-                          onKeyDown={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                        />
-                        {assignedByFilterQuery && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              setAssignedByFilterQuery('')
-                              setAssignedByFilter('all')
-                            }}
-                            className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                            aria-label="Clear creator filter"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                      <div className="max-h-56 overflow-y-auto">
-                        <SelectItem value="all">All Creators</SelectItem>
-                        {filteredAssignedByOptions.length === 0 ? (
-                          <div className="px-2 py-1 text-xs text-muted-foreground">No matching creators</div>
-                        ) : (
-                          filteredAssignedByOptions.map((option) => (
-                            <SelectItem key={option.id} value={option.id}>
-                              {option.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </SelectContent>
-                </Select>
-                <Select value={taskNumberFilter} onValueChange={setTaskNumberFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select Task Number" />
-                  </SelectTrigger>
-                  <SelectContent className="z-[10050] p-0">
-                    <div className="p-2">
-                      <div className="relative mb-2">
-                        <Input
-                          value={taskNumberFilterQuery}
-                          onChange={(e) => setTaskNumberFilterQuery(e.target.value)}
-                          placeholder="Search tasks"
-                          className="pr-10"
-                          onKeyDown={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                        />
-                        {taskNumberFilterQuery && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              setTaskNumberFilterQuery('')
-                              setTaskNumberFilter('all')
-                            }}
-                            className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
-                            aria-label="Clear task filter"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                      <div className="max-h-56 overflow-y-auto">
-                        <SelectItem value="all">All Tasks</SelectItem>
-                        {filteredTaskNumberOptions.length === 0 ? (
-                          <div className="px-2 py-1 text-xs text-muted-foreground">No matching tasks</div>
-                        ) : (
-                          filteredTaskNumberOptions.map((option) => (
-                            <SelectItem key={option.id} value={option.id}>
-                              {option.label}
-                            </SelectItem>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </SelectContent>
-                </Select>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        'w-full justify-start text-left font-normal',
-                        !dateRangeFilter?.from && !dateRangeFilter?.to && 'text-muted-foreground'
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateRangeFilter?.from ? (
-                        dateRangeFilter.to ? (
-                          `${format(dateRangeFilter.from, 'LLL dd, y')} - ${format(dateRangeFilter.to, 'LLL dd, y')}`
-                        ) : (
-                          `${format(dateRangeFilter.from, 'LLL dd, y')} - …`
-                        )
-                      ) : (
-                        'Date Range'
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <DateRangeCalendar
-                      initialFocus
-                      mode="range"
-                      defaultMonth={dateRangeFilter?.from}
-                      selected={dateRangeFilter}
-                      onSelect={handleDateRangeChange}
-                      numberOfMonths={2}
-                    />
-                    <div className="p-3 border-t">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={clearDateFilters}
-                        disabled={!dateRangeFilter?.from && !dateRangeFilter?.to}
-                        className="w-full"
-                      >
-                        Clear dates
-                      </Button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-          </div>
-          {/* Task count and reset filters */}
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} found
-            </p>
-            {hasActiveFilters && (
-              <TooltipProvider>
+        <div className="space-y-8 sm:space-y-10">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Kanban Board</h1>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={resetFilters}
-                      className="text-xs"
-                      aria-label="Reset all filters"
-                    >
-                      <RotateCcw className="h-4 w-4 mr-1" />
-                      Reset Filters
-                    </Button>
+                    <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Reset filters</p>
+                    <p>{isConnected ? 'Real-time sync active' : 'Real-time sync inactive'}</p>
                   </TooltipContent>
                 </Tooltip>
-              </TooltipProvider>
+              </div>
+              <p className="text-sm sm:text-base text-muted-foreground">Streamline workflow with intuitive drag-and-drop task management</p>
+            </div>
+            {canCreateTask && (
+              <Button onClick={() => handleCreateTask()} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                New Task
+              </Button>
             )}
           </div>
-        </div>
-        
-        {/* Kanban Board */}
-        <div>
+          {/* Search and Filters */}
+          <div className="space-y-3">
+            {/* Search bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                placeholder="Search tasks..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 w-full"
+              />
+            </div>
+            {/* Filter options - compact grid layout */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
+              <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
+                if (open) focusSearchInput(projectFilterInputRef.current)
+              }}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Project" />
+                </SelectTrigger>
+                <SelectContent className="z-[10050] p-0">
+                  <div className="p-2">
+                    <div className="relative mb-2">
+                      <Input
+                        ref={projectFilterInputRef}
+                        value={projectFilterQuery}
+                        onChange={(e) => setProjectFilterQuery(e.target.value)}
+                        placeholder="Search projects"
+                        className="pr-10"
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      />
+                      {projectFilterQuery && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setProjectFilterQuery('')
+                            setProjectFilter('all')
+                          }}
+                          className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                          aria-label="Clear project filter"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-56 overflow-y-auto">
+                      <SelectItem value="all">All Projects</SelectItem>
+                      {filteredProjectOptions.length === 0 ? (
+                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                      ) : (
+                        filteredProjectOptions.map((project) => (
+                          <SelectItem key={project._id} value={project._id}>
+                            {project.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </SelectContent>
+              </Select>
+              <Select value={priorityFilter} onValueChange={setPriorityFilter} onOpenChange={(open) => {
+                if (open) focusSearchInput(priorityFilterInputRef.current)
+              }}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent className="z-[10050] p-0">
+                  <div className="p-2">
+                    <div className="relative mb-2">
+                      <Input
+                        ref={priorityFilterInputRef}
+                        value={priorityFilterQuery}
+                        onChange={(e) => setPriorityFilterQuery(e.target.value)}
+                        placeholder="Search priority"
+                        className="pr-10"
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      />
+                      {priorityFilterQuery && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setPriorityFilterQuery('')
+                            setPriorityFilter('all')
+                          }}
+                          className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                          aria-label="Clear priority filter"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-56 overflow-y-auto">
+                      <SelectItem value="all">All Priority</SelectItem>
+                      {filteredPriorityOptions.length === 0 ? (
+                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching priorities</div>
+                      ) : (
+                        filteredPriorityOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </SelectContent>
+              </Select>
+              <Select value={typeFilter} onValueChange={setTypeFilter} onOpenChange={(open) => {
+                if (open) focusSearchInput(typeFilterInputRef.current)
+              }}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent className="z-[10050] p-0">
+                  <div className="p-2">
+                    <div className="relative mb-2">
+                      <Input
+                        ref={typeFilterInputRef}
+                        value={typeFilterQuery}
+                        onChange={(e) => setTypeFilterQuery(e.target.value)}
+                        placeholder="Search type"
+                        className="pr-10"
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      />
+                      {typeFilterQuery && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setTypeFilterQuery('')
+                            setTypeFilter('all')
+                          }}
+                          className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                          aria-label="Clear type filter"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-56 overflow-y-auto">
+                      <SelectItem value="all">All Types</SelectItem>
+                      {filteredTypeOptions.length === 0 ? (
+                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching types</div>
+                      ) : (
+                        filteredTypeOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </SelectContent>
+              </Select>
+              <Select value={assignedToFilter} onValueChange={setAssignedToFilter} onOpenChange={(open) => {
+                if (open) focusSearchInput(assignedToFilterInputRef.current)
+              }}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Assigned To" />
+                </SelectTrigger>
+                <SelectContent className="z-[10050] p-0">
+                  <div className="p-2">
+                    <div className="relative mb-2">
+                      <Input
+                        ref={assignedToFilterInputRef}
+                        value={assignedToFilterQuery}
+                        onChange={(e) => setAssignedToFilterQuery(e.target.value)}
+                        placeholder="Search assignees"
+                        className="pr-10"
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      />
+                      {assignedToFilterQuery && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setAssignedToFilterQuery('')
+                            setAssignedToFilter('all')
+                          }}
+                          className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                          aria-label="Clear assignee filter"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-56 overflow-y-auto">
+                      <SelectItem value="all">All Assignees</SelectItem>
+                      {filteredAssignedToOptions.length === 0 ? (
+                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching assignees</div>
+                      ) : (
+                        filteredAssignedToOptions.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </SelectContent>
+              </Select>
+              <Select value={assignedByFilter} onValueChange={setAssignedByFilter} onOpenChange={(open) => {
+                if (open) focusSearchInput(assignedByFilterInputRef.current)
+              }}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Assigned By" />
+                </SelectTrigger>
+                <SelectContent className="z-[10050] p-0">
+                  <div className="p-2">
+                    <div className="relative mb-2">
+                      <Input
+                        ref={assignedByFilterInputRef}
+                        value={assignedByFilterQuery}
+                        onChange={(e) => setAssignedByFilterQuery(e.target.value)}
+                        placeholder="Search creators"
+                        className="pr-10"
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      />
+                      {assignedByFilterQuery && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setAssignedByFilterQuery('')
+                            setAssignedByFilter('all')
+                          }}
+                          className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                          aria-label="Clear creator filter"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-56 overflow-y-auto">
+                      <SelectItem value="all">All Creators</SelectItem>
+                      {filteredAssignedByOptions.length === 0 ? (
+                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching creators</div>
+                      ) : (
+                        filteredAssignedByOptions.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </SelectContent>
+              </Select>
+              <Select value={taskNumberFilter} onValueChange={setTaskNumberFilter} onOpenChange={(open) => {
+                if (open) focusSearchInput(taskNumberFilterInputRef.current)
+              }}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Task Number" />
+                </SelectTrigger>
+                <SelectContent className="z-[10050] p-0">
+                  <div className="p-2">
+                    <div className="relative mb-2">
+                      <Input
+                        ref={taskNumberFilterInputRef}
+                        value={taskNumberFilterQuery}
+                        onChange={(e) => setTaskNumberFilterQuery(e.target.value)}
+                        placeholder="Search tasks"
+                        className="pr-10"
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      />
+                      {taskNumberFilterQuery && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setTaskNumberFilterQuery('')
+                            setTaskNumberFilter('all')
+                          }}
+                          className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+                          aria-label="Clear task filter"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-56 overflow-y-auto">
+                      <SelectItem value="all">All Tasks</SelectItem>
+                      {filteredTaskNumberOptions.length === 0 ? (
+                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching tasks</div>
+                      ) : (
+                        filteredTaskNumberOptions.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.label}
+                          </SelectItem>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </SelectContent>
+              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      'w-full justify-start text-left font-normal',
+                      !dateRangeFilter?.from && !dateRangeFilter?.to && 'text-muted-foreground'
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRangeFilter?.from ? (
+                      dateRangeFilter.to ? (
+                        `${format(dateRangeFilter.from, 'LLL dd, y')} - ${format(dateRangeFilter.to, 'LLL dd, y')}`
+                      ) : (
+                        `${format(dateRangeFilter.from, 'LLL dd, y')} - …`
+                      )
+                    ) : (
+                      'Date Range'
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <DateRangeCalendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={dateRangeFilter?.from}
+                    selected={dateRangeFilter}
+                    onSelect={handleDateRangeChange}
+                    numberOfMonths={2}
+                  />
+                  <div className="p-3 border-t">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearDateFilters}
+                      disabled={!dateRangeFilter?.from && !dateRangeFilter?.to}
+                      className="w-full"
+                    >
+                      Clear dates
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            {/* Task count and reset filters */}
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} found
+              </p>
+              {hasActiveFilters && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={resetFilters}
+                        className="text-xs"
+                        aria-label="Reset all filters"
+                      >
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        Reset Filters
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Reset filters</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+          </div>
+
+          {/* Kanban Board */}
+          <div>
             <DndContext
               sensors={sensors}
               collisionDetection={closestCorners}
@@ -1432,7 +1466,7 @@ export default function KanbanPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                 {getColumns().map((column) => {
                   const columnTasks = getTasksByStatus(column.id)
-                  
+
                   return (
                     <ColumnDropZone
                       key={column.id}
@@ -1451,12 +1485,12 @@ export default function KanbanPage() {
                   )
                 })}
               </div>
-              
+
               <DragOverlay>
                 {activeTask ? (
-                  <SortableTask 
+                  <SortableTask
                     task={activeTask}
-                    onClick={() => {}}
+                    onClick={() => { }}
                     isDragOverlay
                     getPriorityColor={getPriorityColor}
                     getTypeColor={getTypeColor}
@@ -1466,8 +1500,8 @@ export default function KanbanPage() {
                 ) : null}
               </DragOverlay>
             </DndContext>
+          </div>
         </div>
-      </div>
       </TooltipProvider>
       {/* Modals */}
       <CreateTaskModal
@@ -1578,13 +1612,10 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
     <Card
       ref={setNodeRef}
       style={style}
-      className={`hover:shadow-md transition-shadow relative ${
-        isDraggable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'
-      } ${
-        isDragging ? 'opacity-50' : ''
-      } ${isDragOverlay ? 'rotate-3 shadow-lg' : ''} ${
-        isUpdating ? 'ring-2 ring-blue-500/50 ring-offset-1' : ''
-      }`}
+      className={`hover:shadow-md transition-shadow relative ${isDraggable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'
+        } ${isDragging ? 'opacity-50' : ''
+        } ${isDragOverlay ? 'rotate-3 shadow-lg' : ''} ${isUpdating ? 'ring-2 ring-blue-500/50 ring-offset-1' : ''
+        }`}
       onClick={onClick}
     >
       <CardContent className="p-4">
@@ -1615,8 +1646,8 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
               )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="sm"
                     className="h-6 w-6 p-0"
                     onClick={(e) => e.stopPropagation()}
@@ -1642,7 +1673,7 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
                   {onDelete && (
                     <>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem 
+                      <DropdownMenuItem
                         onClick={(e) => {
                           e.stopPropagation()
                           onDelete(task._id)
@@ -1657,7 +1688,7 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
               </DropdownMenu>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <Badge className={getPriorityColor(task.priority)}>
               {formatToTitleCase(task?.priority)}
@@ -1671,7 +1702,7 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
               #{task.displayId}
             </p>
           )}
-          
+
           <div className="text-xs text-muted-foreground">
             <div className="flex items-center space-x-1 mb-1">
               <Target className="h-3 w-3" />
@@ -1698,7 +1729,7 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
               </div>
             )}
           </div>
-          
+
           <div className="text-xs text-muted-foreground">
             {task.assignedTo ? (
               <TruncateTooltip text={`${task?.assignedTo?.firstName} ${task?.assignedTo?.lastName}`}>
@@ -1708,7 +1739,7 @@ function SortableTask({ task, onClick, getPriorityColor, getTypeColor, isDragOve
               <span>Not assigned</span>
             )}
           </div>
-          
+
           {task?.labels?.length > 0 && (
             <div className="flex items-center gap-1 overflow-hidden flex-nowrap">
               {task.labels.slice(0, 2).map((label, index) => (

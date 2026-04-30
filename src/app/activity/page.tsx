@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
+import { useAuthContext } from '@/contexts/AuthContext'
 import {
   ArrowLeft,
   Search,
@@ -25,7 +26,6 @@ import {
   FolderPlus,
   FolderEdit,
   Zap,
-  Target,
   UserPlus,
   ArrowRightLeft,
   Save,
@@ -102,8 +102,10 @@ function formatDuration(minutes: number): string {
 }
 
 export default function ActivityPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const [activities, setActivities] = useState<ActivityItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [projects, setProjects] = useState<Array<{ _id: string; name: string }>>([])
@@ -121,10 +123,31 @@ export default function ActivityPage() {
   const [totalActivities, setTotalActivities] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const { formatDate } = useDateTime()
-  const [user, setUser] = useState<any>(null)
-  const [authError, setAuthError] = useState('')
   const [dataError, setDataError] = useState('')
   const router = useRouter()
+
+  // Helper function to focus filter search inputs
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+
+    const doFocus = () => {
+      el.focus({ preventScroll: true })
+      try {
+        el.select?.()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(doFocus)
+    } else {
+      setTimeout(doFocus, 0)
+    }
+  }
+
+  // Filter search input ref
+  const projectSearchInputRef = useRef<HTMLInputElement | null>(null)
 
   const getActionConfig = (action: string) => {
     return ACTION_CONFIG[action] || { icon: Clock, label: action, color: 'text-muted-foreground' }
@@ -135,14 +158,18 @@ export default function ActivityPage() {
     const activityTime = new Date(timestamp)
     const diffInMinutes = Math.floor((now.getTime() - activityTime.getTime()) / (1000 * 60))
 
+
     if (diffInMinutes < 1) return 'Just now'
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`
+
 
     const diffInHours = Math.floor(diffInMinutes / 60)
     if (diffInHours < 24) return `${diffInHours}h ago`
 
+
     const diffInDays = Math.floor(diffInHours / 24)
     if (diffInDays < 7) return `${diffInDays}d ago`
+
 
     return formatDate(activityTime)
   }
@@ -187,7 +214,9 @@ export default function ActivityPage() {
     }
   }
 
-  const loadActivities = useCallback(async () => {
+  const loadActivities = useCallback(async ({ silent }: { silent?: boolean } = {}) => {
+    const shouldShowLoader = !silent
+    if (shouldShowLoader) setIsLoading(true)
     try {
       const params = new URLSearchParams()
       params.set('page', String(currentPage))
@@ -213,65 +242,29 @@ export default function ActivityPage() {
     } catch (error) {
       console.error('Failed to load activity data:', error)
       setDataError('Failed to load activity data')
+    } finally {
+      if (shouldShowLoader) setIsLoading(false)
     }
   }, [currentPage, pageSize, filters, searchTerm])
 
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-
-      if (response.ok) {
-        const userData = await response.json()
-        setUser(userData)
-        setAuthError('')
-      } else if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json()
-          setUser(refreshData.user)
-          setAuthError('')
-        } else {
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    } finally {
-      setIsLoading(false)
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login')
     }
-  }, [router])
+  }, [authLoading, isAuthenticated, router])
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true)
-    try {
-      await loadActivities()
-    } finally {
-      setIsRefreshing(false)
-    }
+    await loadActivities({ silent: true })
+    setIsRefreshing(false)
   }, [loadActivities])
-
-  useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
 
   // Load activities when auth is ready or filters change
   useEffect(() => {
-    if (user) {
+    if (!authLoading && isAuthenticated && user) {
       loadActivities()
     }
-  }, [user, loadActivities])
+  }, [authLoading, isAuthenticated, user, loadActivities])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -311,26 +304,20 @@ export default function ActivityPage() {
     return projects.filter((project) => project.name.toLowerCase().includes(query))
   }, [projects, projectFilterQuery])
 
+  const hasActiveFilters = useMemo(() => {
+    if (searchTerm.trim()) return true
+    return Object.values(filters).some((f) => f !== 'all')
+  }, [searchTerm, filters])
+
   const pageStartIndex = totalActivities === 0 ? 0 : ((currentPage - 1) * pageSize) + 1
   const pageEndIndex = totalActivities === 0 ? 0 : Math.min(currentPage * pageSize, totalActivities)
 
-  if (isLoading) {
+  if (authLoading || (isLoading && activities.length === 0)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <Activity className="h-8 w-8 animate-pulse mx-auto mb-4 text-primary" />
           <p className="text-muted-foreground">Loading activity...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (authError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-destructive mb-4">{authError}</p>
-          <p className="text-muted-foreground">Redirecting to login...</p>
         </div>
       </div>
     )
@@ -458,7 +445,9 @@ export default function ActivityPage() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Project</label>
-                  <Select value={filters.project} onValueChange={(value) => setFilters(prev => ({ ...prev, project: value }))}>
+                  <Select value={filters.project} onValueChange={(value) => setFilters(prev => ({ ...prev, project: value }))} onOpenChange={(open) => {
+                    if (open) focusSearchInput(projectSearchInputRef.current)
+                  }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -466,6 +455,7 @@ export default function ActivityPage() {
                       <div className="p-2">
                         <div className="relative mb-2">
                           <Input
+                            ref={projectSearchInputRef}
                             value={projectFilterQuery}
                             onChange={(e) => setProjectFilterQuery(e.target.value)}
                             placeholder="Search projects"
@@ -546,12 +536,12 @@ export default function ActivityPage() {
                   </div>
                   <h3 className="text-lg font-semibold mb-2">No activities found</h3>
                   <p className="text-muted-foreground mb-6">
-                    {searchTerm || Object.values(filters).some(f => f !== 'all')
+                    {hasActiveFilters
                       ? 'Try adjusting your search or filters'
                       : 'Team activity will appear here as members work on projects and tasks.'
                     }
                   </p>
-                  {(searchTerm || Object.values(filters).some(f => f !== 'all')) && (
+                  {hasActiveFilters && (
                     <Button
                       variant="outline"
                       onClick={() => {
@@ -580,7 +570,7 @@ export default function ActivityPage() {
                       return (
                         <div
                           key={activity.id}
-                          className="flex items-start space-x-4 p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                          className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                         >
                           <div className="relative flex-shrink-0">
                             {activity.user ? (
@@ -635,13 +625,7 @@ export default function ActivityPage() {
                               )}
                               <span>•</span>
                               <span>{formatTimestamp(activity.timestamp)}</span>
-                              {activity.action === 'timer_stopped' && activity.details?.duration && (
-                                <>
-                                  <span>•</span>
-                                  <span className="font-medium">{formatDuration(activity.details.duration)}</span>
-                                </>
-                              )}
-                              {activity.action === 'time_entry_saved' && activity.details?.duration && (
+                              {activity.details?.duration && (activity.action === 'timer_stopped' || activity.action === 'time_entry_saved') && (
                                 <>
                                   <span>•</span>
                                   <span className="font-medium">{formatDuration(activity.details.duration)}</span>

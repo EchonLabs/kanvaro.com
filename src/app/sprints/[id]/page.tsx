@@ -18,6 +18,7 @@ import { DEFAULT_TASK_STATUS_OPTIONS, DEFAULT_TASK_STATUS_BADGE_MAP, type TaskSt
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { useNotify } from '@/lib/notify'
+import { useAuthContext } from '@/contexts/AuthContext'
 import {
   ArrowLeft,
   Calendar,
@@ -188,6 +189,8 @@ const buildProgressFromTasks = (tasks?: Sprint['tasks'], previous?: Sprint['prog
 const formatDateInputValue = (date: Date) => date.toISOString().split('T')[0]
 
 export default function SprintDetailPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
   const params = useParams()
   const sprintId = params.id as string
@@ -197,7 +200,6 @@ export default function SprintDetailPage() {
   const [sprint, setSprint] = useState<Sprint | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [authError, setAuthError] = useState('')
   const [actionError, setActionError] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -256,6 +258,18 @@ export default function SprintDetailPage() {
 
   const totalTasks = sprint?.progress?.totalTasks ?? sprintTasks.length
   const hasTasks = (totalTasks ?? 0) > 0
+
+
+  // Auth initialization - trigger data loading
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      setLoading(false)
+      fetchSprint()
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated])
 
   useEffect(() => {
     if (!successMessage) return
@@ -462,43 +476,6 @@ export default function SprintDetailPage() {
       }
     }
   }, [sprintId])
-
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-
-      if (response.ok) {
-        setAuthError('')
-        await fetchSprint()
-      } else if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-
-        if (refreshResponse.ok) {
-          setAuthError('')
-          await fetchSprint()
-        } else {
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    }
-  }, [router, fetchSprint])
-
-  useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
 
   const loadAvailableSprints = useCallback(async (excludeSprintId: string) => {
     try {
@@ -899,19 +876,6 @@ export default function SprintDetailPage() {
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
             <p className="text-muted-foreground">Loading sprint...</p>
-          </div>
-        </div>
-      </MainLayout>
-    )
-  }
-
-  if (authError) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{authError}</p>
-            <p className="text-muted-foreground">Redirecting to login...</p>
           </div>
         </div>
       </MainLayout>

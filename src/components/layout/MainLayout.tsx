@@ -9,6 +9,8 @@ import { BreadcrumbProvider } from '@/contexts/BreadcrumbContext'
 import { usePermissionContext } from '@/lib/permissions/permission-context'
 import { ContentLoader } from '@/components/ui/ContentLoader'
 import { DateTimeProvider } from '@/components/providers/DateTimeProvider'
+import { useAuthContext } from '@/contexts/AuthContext'
+import { useTimeTrackingNotifications } from '@/hooks/useTimeTrackingNotifications'
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -20,28 +22,18 @@ export function MainLayout({ children, breadcrumbItems }: MainLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const { loading: permissionsLoading, error: permissionsError, permissions } = usePermissionContext()
+  const { user } = useAuthContext()
 
-  // Load user preferences for sidebar collapsed state (non-blocking)
+  // Listen for time tracking notifications and show toast popups
+  useTimeTrackingNotifications()
+
+  // Load user preferences for sidebar collapsed state from auth context
   useEffect(() => {
-    const loadUserPreferences = async () => {
-      try {
-        const response = await fetch('/api/auth/me')
-        if (response.ok) {
-          const userData = await response.json()
-          const sidebarPreference = userData.preferences?.sidebarCollapsed || false
-          setSidebarCollapsed(sidebarPreference)
-        }
-      } catch (error) {
-        console.error('Failed to load user preferences:', error)
-        // Keep default state (false) on error
-      }
+    if (mounted && user) {
+      const sidebarPreference = user.preferences?.sidebarCollapsed || false
+      setSidebarCollapsed(sidebarPreference)
     }
-
-    if (mounted) {
-      // Load preferences asynchronously without blocking render
-      loadUserPreferences()
-    }
-  }, [mounted])
+  }, [mounted, user])
 
   useEffect(() => {
     setMounted(true)

@@ -1081,7 +1081,7 @@ export default function ProjectDetailPage() {
                               <p className="text-xs text-muted-foreground">{user?.email}</p>
                               {member.hourlyRate && (
                                 <p className="text-xs text-muted-foreground">
-                                  ${member.hourlyRate}/hr
+                                  {member.hourlyRate}/hr
                                 </p>
                               )}
                             </div>
@@ -2043,7 +2043,7 @@ export default function ProjectDetailPage() {
                     <CardContent>
                       <div className="text-2xl font-bold">{project?.stats?.budget?.utilizationRate || 0}%</div>
                       <p className="text-xs text-muted-foreground">
-                        ${project?.stats?.budget?.spent || 0} of ${project?.stats?.budget?.total || 0} spent
+                        {project?.stats?.budget?.spent || 0} of {project?.stats?.budget?.total || 0} spent
                       </p>
                     </CardContent>
                   </Card>
@@ -2111,7 +2111,7 @@ export default function ProjectDetailPage() {
                                 <p className="text-xs text-muted-foreground">{user?.role ? formatToTitleCase(user.role.replace(/_/g, ' ')) : ''}</p>
                                 {member.hourlyRate && (
                                   <p className="text-xs text-muted-foreground">
-                                    ${member.hourlyRate}/hr
+                                    {member.hourlyRate}/hr
                                   </p>
                                 )}
                               </div>

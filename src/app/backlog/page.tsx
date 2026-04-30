@@ -20,6 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Calendar as DateRangeCalendar } from '@/components/ui/calendar'
 import { cn } from '@/lib/utils'
+import { useAuthContext } from '@/contexts/AuthContext'
 import {
   Eye,
   Edit,
@@ -128,6 +129,8 @@ function truncateText(value: string, maxLength = 20): string {
 }
 
 export default function BacklogPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
   const searchParams = useSearchParams()
   const [backlogItems, setBacklogItems] = useState<BacklogItem[]>([])
@@ -139,8 +142,6 @@ export default function BacklogPage() {
   const { hasPermission } = usePermissions()
   const canManageSprints = hasPermission(Permission.SPRINT_MANAGE)
   const canCreateTask = hasPermission(Permission.TASK_CREATE)
-  const [user, setUser] = useState<any>(null)
-
   // Permission functions for backlog items
   const canEditTask = useCallback((task: BacklogItem) => {
     return hasPermission(Permission.TASK_EDIT_ALL) || task.createdBy._id === user?.id
@@ -170,10 +171,36 @@ export default function BacklogPage() {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [selectedForDelete, setSelectedForDelete] = useState<{ id: string; type: BacklogItem['type']; title: string } | null>(null)
-  const [authError, setAuthError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // Helper function to focus filter search inputs
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+
+    const doFocus = () => {
+      el.focus({ preventScroll: true })
+      try {
+        el.select?.()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(doFocus)
+    } else {
+      setTimeout(doFocus, 0)
+    }
+  }
+
+  // Filter search input refs
+  const projectFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const assignedToFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const assignedByFilterInputRef = useRef<HTMLInputElement | null>(null)
+  const createdByFilterInputRef = useRef<HTMLInputElement | null>(null)
+
   const [typeFilter, setTypeFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -273,6 +300,18 @@ export default function BacklogPage() {
     setCreatedByFilterQuery('')
   }
 
+
+  // Auth initialization - trigger data loading
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      setLoading(false)
+      fetchBacklogItems()
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated])
+
   // Reset status filter if current value is not valid for the new context
   useEffect(() => {
     if (statusFilter !== 'all' && !availableStatusOptions.includes(statusFilter as any)) {
@@ -305,49 +344,6 @@ export default function BacklogPage() {
     fetchProjectDetails()
   }, [projectFilterValue])
 
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-
-      if (response.ok) {
-        const data = await response.json()
-        const userId = extractUserId(data)
-        if (userId) setUser({ id: userId.toString() })
-        setAuthError('')
-        await fetchBacklogItems()
-      } else if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json()
-          const userId = extractUserId(refreshData)
-          if (userId) setUser({ id: userId.toString() })
-          setAuthError('')
-          await fetchBacklogItems()
-        } else {
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    }
-  }, [router])
-
-  useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
-
   // Debounce search query to avoid excessive API calls
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -359,7 +355,7 @@ export default function BacklogPage() {
 
   // Fetch when pagination or filters change (after initial load)
   useEffect(() => {
-    if (!loading && !authError) {
+    if (!loading) {
       if (currentPage === 1) {
         fetchBacklogItems()
       } else {
@@ -370,7 +366,7 @@ export default function BacklogPage() {
 
   // Fetch when pagination changes
   useEffect(() => {
-    if (!loading && !authError) {
+    if (!loading) {
       fetchBacklogItems()
     }
   }, [currentPage, pageSize])
@@ -1518,19 +1514,6 @@ export default function BacklogPage() {
     )
   }
 
-  if (authError) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{authError}</p>
-            <p className="text-muted-foreground">Redirecting to login...</p>
-          </div>
-        </div>
-      </MainLayout>
-    )
-  }
-
   return (
     <MainLayout>
       <div className="space-y-8 sm:space-y-10">
@@ -1591,13 +1574,16 @@ export default function BacklogPage() {
           </div>
           {/* Filter options - compact grid layout */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-            <Select value={projectFilterValue} onValueChange={setProjectFilterValue}>
+            <Select value={projectFilterValue} onValueChange={setProjectFilterValue} onOpenChange={(open) => {
+              if (open) focusSearchInput(projectFilterInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Project" />
               </SelectTrigger>
               <SelectContent className="z-[10050] p-0">
                 <div className="p-2">
                   <Input
+                    ref={projectFilterInputRef}
                     value={projectFilterQuery}
                     onChange={(e) => {
                       e.stopPropagation()
@@ -1658,13 +1644,16 @@ export default function BacklogPage() {
                 <SelectItem value="high">High</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={assignedToFilter} onValueChange={(value) => { setAssignedToFilter(value); setAssignedToFilterQuery(''); }}>
+            <Select value={assignedToFilter} onValueChange={(value) => { setAssignedToFilter(value); setAssignedToFilterQuery(''); }} onOpenChange={(open) => {
+              if (open) focusSearchInput(assignedToFilterInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Assignee" />
               </SelectTrigger>
               <SelectContent className="z-[10050] p-0">
                 <div className="p-2">
                   <Input
+                    ref={assignedToFilterInputRef}
                     value={assignedToFilterQuery}
                     onChange={(e) => {
                       e.stopPropagation()
@@ -1690,13 +1679,16 @@ export default function BacklogPage() {
                 </div>
               </SelectContent>
             </Select>
-            <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
+            <Select value={createdByFilter} onValueChange={setCreatedByFilter} onOpenChange={(open) => {
+              if (open) focusSearchInput(createdByFilterInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Creator" />
               </SelectTrigger>
               <SelectContent className="z-[10050] p-0">
                 <div className="p-2">
                   <Input
+                    ref={createdByFilterInputRef}
                     value={createdByFilterQuery}
                     onChange={(e) => {
                       e.stopPropagation()

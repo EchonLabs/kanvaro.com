@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/Dialog'
 import { useToast } from '@/components/ui/Toast'
 import { Timer } from '@/components/time-tracking/Timer'
@@ -63,6 +63,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
   const baseMinutesRef = useRef<number>(0)
   const tickStartMsRef = useRef<number | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const autoStopNotifiedRef = useRef(false)
 
   const truncateWords = (text: string, maxWords: number) => {
     const trimmed = (text || '').trim()
@@ -71,19 +72,6 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
     if (words.length <= maxWords) return trimmed
     return `${words.slice(0, maxWords).join(' ')}…`
   }
-
-  const loadActiveTimer = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/time-tracking/timer?userId=${userId}&organizationId=${organizationId}`)
-      const data = await response.json()
-
-      if (response.ok) {
-        setActiveTimer(data.activeTimer)
-      }
-    } catch (error) {
-      console.error('Error loading active timer:', error)
-    }
-  }, [userId, organizationId])
 
   const loadTimeStats = useCallback(async () => {
     try {
@@ -118,6 +106,40 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
       console.error('Error loading time stats:', error)
     }
   }, [userId, organizationId])
+
+  const loadActiveTimer = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/time-tracking/timer?userId=${userId}&organizationId=${organizationId}`)
+      const data = await response.json()
+
+      if (response.ok) {
+        // Server-enforced auto-stop response (max session/daily reached)
+        if (data?.activeTimer === null && data?.autoStopped && !autoStopNotifiedRef.current) {
+          autoStopNotifiedRef.current = true
+          setActiveTimer(null)
+          showToast({
+            type: 'warning',
+            title: 'Timer Auto-Stopped',
+            message: data.message || 'Timer automatically stopped. Maximum limit reached.',
+            duration: 8000
+          })
+          // Refresh stats shortly after to include the saved entry
+          setTimeout(() => {
+            loadTimeStats()
+          }, 500)
+          return
+        }
+
+        // Normal active timer
+        if (data?.activeTimer) {
+          autoStopNotifiedRef.current = false
+        }
+        setActiveTimer(data.activeTimer)
+      }
+    } catch (error) {
+      console.error('Error loading active timer:', error)
+    }
+  }, [userId, organizationId, showToast, loadTimeStats])
 
   useEffect(() => {
     loadActiveTimer()
@@ -317,18 +339,16 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
               {activeTimer.description && (
                 <div className="text-xs">
                   <span className="font-semibold text-foreground">Memo:</span>{' '}
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="break-words whitespace-normal" title={activeTimer.description}>
-                          {truncateWords(activeTimer.description, 5)}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="max-w-xs break-words">{activeTimer.description}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="break-words whitespace-normal">
+                        {truncateWords(activeTimer.description, 5)}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs break-words">{activeTimer.description}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               )}
               <div className="flex flex-wrap items-center gap-1 pt-1">

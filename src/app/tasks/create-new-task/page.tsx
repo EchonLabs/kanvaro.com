@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/Input'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useNotify } from '@/lib/notify'
-import { 
+import { useAuthContext } from '@/contexts/AuthContext'
+import {
   ArrowLeft,
   Save,
   Loader2,
@@ -20,6 +21,7 @@ import {
   Paperclip
 } from 'lucide-react'
 import { AttachmentList } from '@/components/ui/AttachmentList'
+import { countWords, TASK_TITLE_MAX_WORDS, truncateToMaxWords } from '@/lib/text/word-limit'
 
 interface Project {
   _id: string
@@ -130,10 +132,10 @@ const SUBTASK_STATUS_OPTIONS: Array<{ value: SubtaskStatus; label: string }> = [
 ]
 
 export default function CreateTaskPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [authError, setAuthError] = useState('')
-
   // Use the notification hook
   const { error: notifyError, success: notifySuccess } = useNotify()
 
@@ -156,6 +158,10 @@ export default function CreateTaskPage() {
   const [attachmentError, setAttachmentError] = useState('')
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
+
+  // Word limit validation state
+  const [titleWordLimitMessage, setTitleWordLimitMessage] = useState('')
+  const [titleWordLimitIsError, setTitleWordLimitIsError] = useState(false)
 
   const [formData, setFormData] = useState({
     title: '',
@@ -189,55 +195,6 @@ export default function CreateTaskPage() {
       setProjects([])
     }
   }, [])
-
-  const checkAuth = useCallback(async () => {
-    const handleAuthenticated = async (payload: any) => {
-      const normalizedUser = mapUserResponse(payload)
-      if (normalizedUser) {
-        setCurrentUser(normalizedUser)
-      }
-      setAuthError('')
-      await fetchProjects()
-    }
-
-    try {
-      const response = await fetch('/api/auth/me')
-
-      if (response.ok) {
-        const userPayload = await response.json()
-        await handleAuthenticated(userPayload)
-        return
-      }
-
-      if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json().catch(() => ({}))
-          await handleAuthenticated(refreshData?.user || refreshData)
-        } else {
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    }
-  }, [router, fetchProjects])
-
-  useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
 
   const fetchStories = useCallback(async (projectId: string) => {
     if (!projectId) {
@@ -352,6 +309,13 @@ export default function CreateTaskPage() {
         return
       }
 
+      const titleTrimmed = formData.title.trim()
+      if (countWords(titleTrimmed) > TASK_TITLE_MAX_WORDS) {
+        notifyError({ title: 'Validation Error', message: `Task title must be ${TASK_TITLE_MAX_WORDS} words or fewer.` })
+        setLoading(false)
+        return
+      }
+
       if (missingSubtaskTitle) {
         notifyError({ title: 'Validation Error', message: 'Please fill in all required subtask titles' })
         setLoading(false)
@@ -433,6 +397,11 @@ export default function CreateTaskPage() {
   }
 
   const handleChange = useCallback((field: string, value: string) => {
+    if (field === 'title') {
+      handleTitleChange(value)
+      return
+    }
+
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -457,6 +426,24 @@ export default function CreateTaskPage() {
       }
     }
   }, [fetchStories, fetchEpics, fetchProjectMembers])
+
+  const handleTitleChange = useCallback((nextValue: string) => {
+    const attemptedWordCount = countWords(nextValue)
+    const truncated = truncateToMaxWords(nextValue, TASK_TITLE_MAX_WORDS)
+
+    if (attemptedWordCount > TASK_TITLE_MAX_WORDS) {
+      setTitleWordLimitMessage(`Maximum ${TASK_TITLE_MAX_WORDS} words. Extra words won't be added.`)
+      setTitleWordLimitIsError(true)
+    } else if (countWords(truncated) >= TASK_TITLE_MAX_WORDS) {
+      setTitleWordLimitMessage(`Word limit reached (${TASK_TITLE_MAX_WORDS} words).`)
+      setTitleWordLimitIsError(false)
+    } else {
+      setTitleWordLimitMessage('')
+      setTitleWordLimitIsError(false)
+    }
+
+    setFormData(prev => ({ ...prev, title: truncated }))
+  }, [])
 
   const addLabel = () => {
     if (newLabel.trim()) {
@@ -585,6 +572,9 @@ export default function CreateTaskPage() {
     )
   }, [projectMembers, assigneeQuery])
 
+  // Word count for title validation
+  const titleWordCount = useMemo(() => countWords(formData.title), [formData.title])
+
   // Required field validation (only fields marked with *)
   const isFormValid = useMemo(() => {
     return (
@@ -609,18 +599,20 @@ export default function CreateTaskPage() {
     [attachments]
   )
 
-  if (authError) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{authError}</p>
-            <p className="text-muted-foreground">Redirecting to login...</p>
-          </div>
-        </div>
-      </MainLayout>
-    )
-  }
+  // Auth initialization - trigger data loading
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      fetchProjects()
+      // Set currentUser from AuthContext
+      if (user) {
+        const mapped = mapUserResponse(user)
+        if (mapped) setCurrentUser(mapped)
+      }
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated])
 
   return (
     <MainLayout>
@@ -654,7 +646,7 @@ export default function CreateTaskPage() {
                     <Select
                       value={formData.project}
                       onValueChange={(value) => handleChange('project', value)}
-                      onOpenChange={open => { if(open) setProjectQuery(""); }}
+                      onOpenChange={open => { if (open) setProjectQuery(""); }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select a project" />
@@ -689,10 +681,18 @@ export default function CreateTaskPage() {
                     <label className="text-sm font-medium text-foreground">Title *</label>
                     <Input
                       value={formData.title}
-                      onChange={(e) => handleChange('title', e.target.value)}
+                      onChange={(e) => handleTitleChange(e.target.value)}
                       placeholder="Enter task title"
                       required
                     />
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <p className={`text-xs ${titleWordCount >= TASK_TITLE_MAX_WORDS ? 'text-red-600' : 'text-muted-foreground'}`}>
+                        {titleWordCount}/{TASK_TITLE_MAX_WORDS} words
+                      </p>
+                      {titleWordLimitMessage && (
+                        <p className={`text-xs ${titleWordLimitIsError ? 'text-red-600' : 'text-muted-foreground'}`}>{titleWordLimitMessage}</p>
+                      )}
+                    </div>
                   </div>
 
                   {/* <div>
@@ -757,15 +757,15 @@ export default function CreateTaskPage() {
                                   </div>
                                 ) : projectMembers.length === 0 ? (
                                   <>
-                                   
+
                                     <div className="px-2 py-1 text-sm text-muted-foreground">No team members found for this project</div>
                                   </>
                                 ) : filteredProjectMembers.length > 0 ? (
                                   filteredProjectMembers.map(user => {
                                     const isSelected = assignedTo.includes(user._id);
                                     return (
-                                      <SelectItem 
-                                        key={user._id} 
+                                      <SelectItem
+                                        key={user._id}
                                         value={user._id}
                                         disabled={isSelected}
                                         className={isSelected ? 'opacity-50 cursor-not-allowed' : ''}
@@ -848,8 +848,8 @@ export default function CreateTaskPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium text-foreground">User Story</label>
-                    <Select 
-                      value={formData.story} 
+                    <Select
+                      value={formData.story}
                       onValueChange={(value) => {
                         const selectedStory = stories.find(s => s._id === value)
                         setFormData(prev => ({
@@ -875,16 +875,16 @@ export default function CreateTaskPage() {
                           <div className="max-h-56 overflow-y-auto">
                             {(() => {
                               const q = storyQuery.toLowerCase().trim()
-                              const filtered = stories.filter(s => 
+                              const filtered = stories.filter(s =>
                                 !q || s.title.toLowerCase().includes(q)
                               )
-                              
+
                               if (filtered.length === 0) {
                                 return (
                                   <div className="px-2 py-1 text-sm text-muted-foreground">No matching stories</div>
                                 )
                               }
-                              
+
                               return filtered.map((story) => (
                                 <SelectItem key={story._id} value={story._id} title={story.title}>
                                   <div className="truncate max-w-xs" title={story.title}>
@@ -901,8 +901,8 @@ export default function CreateTaskPage() {
 
                   <div>
                     <label className="text-sm font-medium text-foreground">Epic</label>
-                    <Select 
-                      value={formData.epic} 
+                    <Select
+                      value={formData.epic}
                       onValueChange={(value) => handleChange('epic', value)}
                       disabled={loadingEpics}
                       onOpenChange={(open) => { if (open) setEpicQuery('') }}
@@ -928,7 +928,7 @@ export default function CreateTaskPage() {
                             ) : (() => {
                               const q = epicQuery.toLowerCase().trim()
                               let availableEpics: Epic[] = []
-                              
+
                               if (!formData.story) {
                                 // No story selected, show all epics
                                 availableEpics = epics
@@ -946,17 +946,17 @@ export default function CreateTaskPage() {
                                   availableEpics = epics
                                 }
                               }
-                              
-                              const filtered = availableEpics.filter(e => 
+
+                              const filtered = availableEpics.filter(e =>
                                 !q || e.title.toLowerCase().includes(q)
                               )
-                              
+
                               if (filtered.length === 0) {
                                 return (
                                   <div className="px-2 py-1 text-sm text-muted-foreground">No matching epics</div>
                                 )
                               }
-                              
+
                               return filtered.map((epic) => (
                                 <SelectItem key={epic._id} value={epic._id} title={epic.title}>
                                   <div className="truncate max-w-xs" title={epic.title}>
@@ -976,7 +976,7 @@ export default function CreateTaskPage() {
                     <Input
                       type="date"
                       value={formData.dueDate}
-                  min={today}
+                      min={today}
                       onChange={(e) => handleChange('dueDate', e.target.value)}
                     />
                   </div>
@@ -1074,8 +1074,8 @@ export default function CreateTaskPage() {
                   {formData.labels.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {formData.labels.map((label, index) => (
-                        <div 
-                          key={index} 
+                        <div
+                          key={index}
                           className="inline-flex items-center gap-1.5 bg-muted px-3 py-1.5 rounded-md text-sm"
                         >
                           <span>{label}</span>
@@ -1094,42 +1094,42 @@ export default function CreateTaskPage() {
                 </div>
               </div>
 
-            {/* Subtasks Section */}
-            <div className="space-y-4 pt-6 mt-6 border-t border-muted">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium">Subtasks</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addSubtask}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Subtask
-                </Button>
-              </div>
+              {/* Subtasks Section */}
+              <div className="space-y-4 pt-6 mt-6 border-t border-muted">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium">Subtasks</h3>
+                  <Button type="button" variant="outline" size="sm" onClick={addSubtask}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Subtask
+                  </Button>
+                </div>
 
-              {subtasks.map((subtask, index) => (
-                <div key={index} className="p-4 border rounded-lg space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Subtask {index + 1}</h4>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeSubtask(index)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium text-foreground">Title *</label>
-                    <Input
-                      value={subtask.title}
-                      onChange={(e) => updateSubtask(index, 'title', e.target.value)}
-                      placeholder="Subtask title"
-                      required
-                    />
-                  </div>
+                {subtasks.map((subtask, index) => (
+                  <div key={index} className="p-4 border rounded-lg space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium">Subtask {index + 1}</h4>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeSubtask(index)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
 
-                  {/* <div>
+                    <div>
+                      <label className="text-sm font-medium text-foreground">Title *</label>
+                      <Input
+                        value={subtask.title}
+                        onChange={(e) => updateSubtask(index, 'title', e.target.value)}
+                        placeholder="Subtask title"
+                        required
+                      />
+                    </div>
+
+                    {/* <div>
                     <label className="text-sm font-medium text-foreground">Description</label>
                     <Textarea
                       value={subtask.description || ''}
@@ -1138,17 +1138,17 @@ export default function CreateTaskPage() {
                       rows={2}
                     />
                   </div> */}
-                </div>
-              ))}
+                  </div>
+                ))}
 
-              {subtasks.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Target className="h-12 w-12 mx-auto mb-4" />
-                  <p>No subtasks added yet</p>
-                  <p className="text-sm">Click "Add Subtask" to create subtasks for this task</p>
-                </div>
-              )}
-            </div>
+                {subtasks.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Target className="h-12 w-12 mx-auto mb-4" />
+                    <p>No subtasks added yet</p>
+                    <p className="text-sm">Click "Add Subtask" to create subtasks for this task</p>
+                  </div>
+                )}
+              </div>
 
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-end pt-6 mt-8 border-t border-muted">
                 <Button type="button" variant="outline" onClick={() => router.back()} className="w-full sm:w-auto">

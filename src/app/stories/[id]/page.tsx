@@ -11,7 +11,8 @@ import { formatToTitleCase } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
-import { 
+import { useAuthContext } from '@/contexts/AuthContext'
+import {
   ArrowLeft,
   Calendar,
   Clock,
@@ -99,6 +100,8 @@ interface Story {
 }
 
 export default function StoryDetailPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
   const params = useParams()
   const storyId = params.id as string
@@ -108,8 +111,7 @@ export default function StoryDetailPage() {
   const [story, setStory] = useState<Story | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [authError, setAuthError] = useState('')
-  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [tasks, setTasks] = useState<any[]>([])
@@ -130,62 +132,17 @@ export default function StoryDetailPage() {
   const { hasPermission } = usePermissions()
   const { success: notifySuccess, error: notifyError } = useNotify()
 
-  const fetchAndSetCurrentUser = useCallback(async () => {
-    const response = await fetch('/api/auth/me')
-    if (response.ok) {
-      const data = await response.json().catch(() => ({}))
-      const userId = extractUserId(data)
-      if (userId) setCurrentUserId(userId)
+  // Initialize: set currentUserId from context and fetch data
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && user) {
+      const userId = extractUserId(user)
+      if (userId) setCurrentUserId(userId.toString())
+      fetchStory()
+      fetchTasks()
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
     }
-    return response
-  }, [])
-
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await fetchAndSetCurrentUser()
-
-      if (response.ok) {
-        setAuthError('')
-        // Fetch story first, then fetch tasks
-        await fetchStory()
-        // Fetch tasks after story is loaded (non-blocking)
-        fetchTasks()
-      } else if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-
-        if (refreshResponse.ok) {
-          const meResponse = await fetchAndSetCurrentUser()
-          if (meResponse.ok) {
-            setAuthError('')
-            // Fetch story first, then fetch tasks
-            await fetchStory()
-            // Fetch tasks after story is loaded (non-blocking)
-            fetchTasks()
-          } else {
-            setAuthError('Session expired')
-            setTimeout(() => {
-              router.push('/login')
-            }, 2000)
-          }
-        } else {
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    }
-  }, [router, storyId, fetchAndSetCurrentUser])
+  }, [authLoading, isAuthenticated, user, router, storyId])
 
   useEffect(() => {
     // Set breadcrumb immediately on mount
@@ -194,10 +151,6 @@ export default function StoryDetailPage() {
       { label: 'View Story' }
     ])
   }, [setItems])
-
-  useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
 
   useEffect(() => {
     if (error) {
@@ -337,19 +290,6 @@ export default function StoryDetailPage() {
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
             <p className="text-muted-foreground">Loading story...</p>
-          </div>
-        </div>
-      </MainLayout>
-    )
-  }
-
-  if (authError) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{authError}</p>
-            <p className="text-muted-foreground">Redirecting to login...</p>
           </div>
         </div>
       </MainLayout>
@@ -789,21 +729,21 @@ export default function StoryDetailPage() {
                     <span className="ml-1 hidden sm:inline">{formatToTitleCase(story.status)}</span>
                   </Badge>
                 </div>
-                
+
                 <div className="flex items-center justify-between text-xs sm:text-sm">
                   <span className="text-muted-foreground">Priority</span>
                   <Badge className={`${getPriorityColor(story.priority)} text-xs`}>
                     {formatToTitleCase(story.priority)}
                   </Badge>
                 </div>
-                
+
                 <div className="flex items-center justify-between gap-2 text-xs sm:text-sm">
                   <span className="text-muted-foreground">Project</span>
                   <span className="font-medium truncate max-w-[200px] sm:max-w-none text-right sm:text-left" title={story.project?.name && story.project?.name.length > 10 ? story.project?.name : undefined}>
-                    {story.project?.name ? (story.project?.name.length > 10 ? `${story.project?.name.slice(0,10)}…` : story.project?.name) : <span className="italic text-muted-foreground">Project deleted or unavailable</span>}
+                    {story.project?.name ? (story.project?.name.length > 10 ? `${story.project?.name.slice(0, 10)}…` : story.project?.name) : <span className="italic text-muted-foreground">Project deleted or unavailable</span>}
                   </span>
                 </div>
-                
+
                 {story.assignedTo && (
                   <div className="flex items-center justify-between gap-2 text-xs sm:text-sm">
                     <span className="text-muted-foreground">Assigned To</span>
@@ -812,7 +752,7 @@ export default function StoryDetailPage() {
                     </span>
                   </div>
                 )}
-                
+
                 {story.dueDate && (
                   <div className="flex items-center justify-between text-xs sm:text-sm">
                     <span className="text-muted-foreground">Due Date</span>
@@ -821,14 +761,14 @@ export default function StoryDetailPage() {
                     </span>
                   </div>
                 )}
-                
+
                 {story.storyPoints && (
                   <div className="flex items-center justify-between text-xs sm:text-sm">
                     <span className="text-muted-foreground">Story Points</span>
                     <span className="font-medium whitespace-nowrap">{story.storyPoints}</span>
                   </div>
                 )}
-                
+
                 {story.estimatedHours && (
                   <div className="flex items-center justify-between text-xs sm:text-sm">
                     <span className="text-muted-foreground">Estimated Hours</span>

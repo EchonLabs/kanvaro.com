@@ -14,6 +14,7 @@ import { CreateRoleModal } from '@/components/roles/CreateRoleModal'
 import { EditRoleModal } from '@/components/roles/EditRoleModal'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { useNotify } from '@/lib/notify'
+import { useAuthContext } from '@/contexts/AuthContext'
 import {
   Shield,
   Plus,
@@ -34,13 +35,14 @@ interface Role {
 }
 
 export default function RolesPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
   const { success: notifySuccess, error: notifyError } = useNotify()
   const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [authError, setAuthError] = useState('')
-  const [showCreateModal, setShowCreateModal] = useState(false)
+const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedRole, setSelectedRole] = useState<Role | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -56,44 +58,16 @@ export default function RolesPage() {
     totalPages: 0
   })
 
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-      
-      if (response.ok) {
-        setAuthError('')
-        await fetchRoles()
-      } else if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-        
-        if (refreshResponse.ok) {
-          setAuthError('')
-          await fetchRoles()
-        } else {
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    }
-  }, [router])
-
   useEffect(() => {
     if (hasInitializedRef.current) return
-    hasInitializedRef.current = true
-    checkAuth()
-  }, [checkAuth])
+    if (!authLoading && isAuthenticated) {
+      setLoading(false)
+      hasInitializedRef.current = true
+      fetchRoles()
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+  }, [authLoading, isAuthenticated])
 
   const fetchRoles = async () => {
     try {
@@ -211,18 +185,7 @@ export default function RolesPage() {
     )
   }
 
-  if (authError) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{authError}</p>
-            <p className="text-muted-foreground">Redirecting to login...</p>
-          </div>
-        </div>
-      </MainLayout>
-    )
-  }
+
 
   return (
     <MainLayout>

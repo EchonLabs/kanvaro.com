@@ -14,6 +14,7 @@ import { useNotify } from '@/lib/notify'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { AttachmentList } from '@/components/ui/AttachmentList'
 import { Loader2, ArrowLeft, CheckCircle, Plus, Trash2, Target, User, Clock, Calendar, Paperclip, X } from 'lucide-react'
+import { useAuthContext } from '@/contexts/AuthContext'
 
 const STATUS_OPTIONS = [
   { value: 'backlog', label: 'Backlog' },
@@ -277,6 +278,8 @@ const extractAssigneeObjects = (data: any): Array<{
 }
 
 export default function EditTaskPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter()
   const params = useParams()
   const taskId = params.id as string
@@ -415,42 +418,31 @@ export default function EditTaskPage() {
     }
   }, [taskId, updateAssignees])
 
-  const fetchCurrentUser = useCallback(async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-      if (response.ok) {
-        const payload = await response.json().catch(() => ({}))
-        const userData = mapCurrentUser(payload?.user || payload)
-        if (userData) {
-          setCurrentUser(userData)
-        }
-        return
-      }
 
-      if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', { method: 'POST' })
-        if (refreshResponse.ok) {
-          const refreshPayload = await refreshResponse.json().catch(() => ({}))
-          const userData = mapCurrentUser(refreshPayload?.user || refreshPayload)
-          if (userData) {
-            setCurrentUser(userData)
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load current user', err)
+  // Auth initialization - trigger data loading
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      setLoading(false)
+      fetchTask()
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated])
+
+  // Set currentUser from auth context
+  useEffect(() => {
+    if (user) {
+      const mapped = mapCurrentUser(user)
+      if (mapped) setCurrentUser(mapped)
+    }
+  }, [user])
 
   useEffect(() => {
     if (taskId) {
       fetchTask()
     }
   }, [taskId, fetchTask])
-
-  useEffect(() => {
-    fetchCurrentUser()
-  }, [fetchCurrentUser])
 
   const fetchProjects = async () => {
     setLoadingProjects(true)

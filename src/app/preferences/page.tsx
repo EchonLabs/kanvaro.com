@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -16,17 +16,27 @@ import { usePushNotifications } from '@/hooks/usePushNotifications'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { DateTimePreferences } from '@/lib/dateTimeUtils'
 import { NotificationTest } from '@/components/notifications/NotificationTest'
+import { useAuthContext } from '@/contexts/AuthContext'
 
 export default function PreferencesPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const { currencies, loading: currenciesLoading, formatCurrencyDisplay } = useCurrencies(true)
   const { isSupported, isSubscribed, permission, isLoading: pushLoading, toggleSubscription, showTestNotification } = usePushNotifications()
   const { setPreferences: setDateTimePreferences } = useDateTime()
   const [isLoading, setIsLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [user, setUser] = useState<any>(null)
-  const [authError, setAuthError] = useState('')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const router = useRouter()
+
+  // Auth initialization
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      setIsLoading(false)
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+  }, [authLoading, isAuthenticated, router])
 
   const [formData, setFormData] = useState({
     theme: 'system',
@@ -43,109 +53,6 @@ export default function PreferencesPage() {
       teamActivity: false
     }
   })
-
-  const checkAuth = useCallback(async () => {
-    try {
-      console.log('Preferences: Checking authentication...')
-      const response = await fetch('/api/auth/me')
-      console.log('Preferences: Auth response status:', response.status)
-      
-      if (response.ok) {
-        const userData = await response.json()
-        console.log('Preferences: User data received:', userData)
-        setUser(userData)
-        setFormData({
-          theme: userData.preferences?.theme || 'system',
-          language: userData.language || 'en',
-          timezone: userData.timezone || 'UTC',
-          currency: userData.currency || 'USD',
-          dateFormat: userData.preferences?.dateFormat || 'MM/DD/YYYY',
-          timeFormat: userData.preferences?.timeFormat || '12h',
-          notifications: {
-            email: userData.preferences?.notifications?.email ?? true,
-            push: userData.preferences?.notifications?.push ?? true,
-            taskReminders: userData.preferences?.notifications?.taskReminders ?? true,
-            projectUpdates: userData.preferences?.notifications?.projectUpdates ?? true,
-            teamActivity: userData.preferences?.notifications?.teamActivity ?? false
-          }
-        })
-
-        // Sync DateTimeProvider with user preferences
-        const loadedPreferences = {
-          dateFormat: userData.preferences?.dateFormat || 'MM/DD/YYYY',
-          timeFormat: userData.preferences?.timeFormat || '12h',
-          timezone: userData.timezone || 'UTC'
-        }
-        setDateTimePreferences(loadedPreferences)
-
-        // Store in sessionStorage
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('user_date_preferences', JSON.stringify(loadedPreferences))
-        }
-
-        setAuthError('')
-      } else if (response.status === 401) {
-        console.log('Preferences: 401 response, trying refresh token')
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-        
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json()
-          setUser(refreshData.user)
-          setFormData({
-            theme: refreshData.user.preferences?.theme || 'system',
-            language: refreshData.user.language || 'en',
-            timezone: refreshData.user.timezone || 'UTC',
-            currency: refreshData.user.currency || 'USD',
-            dateFormat: refreshData.user.preferences?.dateFormat || 'MM/DD/YYYY',
-            timeFormat: refreshData.user.preferences?.timeFormat || '12h',
-            notifications: {
-              email: refreshData.user.preferences?.notifications?.email ?? true,
-              push: refreshData.user.preferences?.notifications?.push ?? true,
-              taskReminders: refreshData.user.preferences?.notifications?.taskReminders ?? true,
-              projectUpdates: refreshData.user.preferences?.notifications?.projectUpdates ?? true,
-              teamActivity: refreshData.user.preferences?.notifications?.teamActivity ?? false
-            }
-          })
-
-          // Sync DateTimeProvider with refreshed user preferences
-          const refreshedPreferences = {
-            dateFormat: refreshData.user.preferences?.dateFormat || 'MM/DD/YYYY',
-            timeFormat: refreshData.user.preferences?.timeFormat || '12h',
-            timezone: refreshData.user.timezone || 'UTC'
-          }
-          setDateTimePreferences(refreshedPreferences)
-
-          // Store in sessionStorage
-          if (typeof window !== 'undefined') {
-            sessionStorage.setItem('user_date_preferences', JSON.stringify(refreshedPreferences))
-          }
-
-          setAuthError('')
-        } else {
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [router])
-
-  useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
 
   const handleSave = async () => {
     setSaving(true)
@@ -196,17 +103,6 @@ export default function PreferencesPage() {
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
           <p className="text-muted-foreground">Loading preferences...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (authError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-destructive mb-4">{authError}</p>
-          <p className="text-muted-foreground">Redirecting to login...</p>
         </div>
       </div>
     )
@@ -334,7 +230,7 @@ export default function PreferencesPage() {
                       {currenciesLoading ? (
                         <SelectItem value="loading" disabled>Loading currencies...</SelectItem>
                       ) : (
-                          currencies.map((currency, index) => (
+                        currencies.map((currency, index) => (
                           <SelectItem key={`${currency.code}-${index}`} value={currency.code}>
                             {formatCurrencyDisplay(currency)}
                           </SelectItem>

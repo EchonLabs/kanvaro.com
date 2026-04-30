@@ -11,6 +11,7 @@ import { formatToTitleCase } from '@/lib/utils'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useAuthContext } from '@/contexts/AuthContext'
 import {
   Plus,
   Search,
@@ -100,6 +101,8 @@ interface SprintSummary {
 
 
 export default function StoriesPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const [stories, setStories] = useState<Story[]>([]);
@@ -107,7 +110,34 @@ export default function StoriesPage() {
   const [isFetching, setIsFetching] = useState(false);
   const isFirstFetch = useRef(true);
 
-  const [authError, setAuthError] = useState('');
+  // Helper function to focus filter search inputs
+  const focusSearchInput = (el: HTMLInputElement | null) => {
+    if (!el || el.disabled) return
+
+    const doFocus = () => {
+      el.focus({ preventScroll: true })
+      try {
+        el.select?.()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(doFocus)
+    } else {
+      setTimeout(doFocus, 0)
+    }
+  }
+
+  // Filter search input refs
+  const statusSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const prioritySearchInputRef = useRef<HTMLInputElement | null>(null)
+  const projectSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const epicSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const sprintSearchInputRef = useRef<HTMLInputElement | null>(null)
+
+  ;
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -127,7 +157,7 @@ export default function StoriesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
-  const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [showFilters, setShowFilters] = useState(false)
   const [creatorDetailsMap, setCreatorDetailsMap] = useState<Record<string, UserSummary>>({});
 
   // Filter search states
@@ -158,65 +188,18 @@ export default function StoriesPage() {
   const { success: notifySuccess, error: notifyError } = useNotify();
   const canManageAllStories = hasPermission(Permission.STORY_MANAGE_ALL);
 
-  const fetchAndSetCurrentUser = useCallback(async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-      if (response.ok) {
-        const data = await response.json().catch(() => ({}))
-        const userId = extractUserId(data)
-        if (userId) setCurrentUserId(userId)
-      }
-      return response
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      throw error
-    }
-  }, [])
 
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await fetchAndSetCurrentUser()
-
-      if (response.ok) {
-        setAuthError('')
-        await fetchStories()
-      } else if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST'
-        })
-
-        if (refreshResponse.ok) {
-          const meResponse = await fetchAndSetCurrentUser()
-          if (meResponse.ok) {
-            setAuthError('')
-            await fetchStories()
-          } else {
-            setAuthError('Session expired')
-            setTimeout(() => {
-              router.push('/login')
-            }, 2000)
-          }
-        } else {
-          setAuthError('Session expired')
-          setTimeout(() => {
-            router.push('/login')
-          }, 2000)
-        }
-      } else {
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      setAuthError('Authentication failed')
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
-    }
-  }, [router, fetchAndSetCurrentUser])
-
+  // Auth initialization - trigger data loading
   useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
+    if (!authLoading && isAuthenticated) {
+      setLoading(false)
+      fetchStories()
+      fetchEpicOptions()
+    } else if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated])
 
   useEffect(() => {
     const successParam = searchParams?.get('success')
@@ -229,14 +212,13 @@ export default function StoriesPage() {
 
   // Fetch when pagination changes (after initial load)
   useEffect(() => {
-    if (!loading && !authError) {
+    if (!loading) {
       fetchStories(currentPage)
     }
   }, [currentPage, pageSize]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Re-fetch from page 1 whenever filters/search change
   useEffect(() => {
-    if (authError) return
     setCurrentPage(1)
     fetchStories(1)
   }, [searchQuery, statusFilter, priorityFilter, projectFilter, epicFilter, sprintFilter]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -317,9 +299,8 @@ export default function StoriesPage() {
   }, [])
 
   useEffect(() => {
-    if (!currentUserId) return
     fetchEpicOptions()
-  }, [currentUserId, fetchEpicOptions])
+  }, [fetchEpicOptions])
 
   useEffect(() => {
     if (!stories.length) {
@@ -566,17 +547,9 @@ export default function StoriesPage() {
   }
 
   const isCreator = (story: Story) => {
-    const creatorData = story.createdBy as any
-    const creatorId =
-      typeof creatorData === 'string'
-        ? creatorData
-        : creatorData?._id || creatorData?.id
-
-    return (
-      Boolean(creatorId) &&
-      Boolean(currentUserId) &&
-      creatorId.toString() === currentUserId.toString()
-    )
+    const creatorId = (story as any)?.createdBy?._id || (story as any)?.createdBy?.id
+    const currentUserId = user ? ((user as any)._id || (user as any).id) : null
+    return creatorId && currentUserId && creatorId.toString() === currentUserId.toString()
   }
 
   const canEditStory = (story: Story) =>
@@ -640,19 +613,6 @@ export default function StoriesPage() {
     )
   }
 
-  if (authError) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{authError}</p>
-            <p className="text-muted-foreground">Redirecting to login...</p>
-          </div>
-        </div>
-      </MainLayout>
-    )
-  }
-
   return (
     <MainLayout>
       <div className="space-y-6 overflow-x-hidden ">
@@ -684,12 +644,15 @@ export default function StoriesPage() {
           </div>
           {/* Filter options - responsive grid layout 3-4 filters per line */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={setStatusFilter} onOpenChange={(open) => {
+              if (open) focusSearchInput(statusSearchInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <Input
+                  ref={statusSearchInputRef}
                   placeholder="Search status..."
                   className="m-2"
                   value={statusSearch}
@@ -704,12 +667,15 @@ export default function StoriesPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+            <Select value={priorityFilter} onValueChange={setPriorityFilter} onOpenChange={(open) => {
+              if (open) focusSearchInput(prioritySearchInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
               <SelectContent>
                 <Input
+                  ref={prioritySearchInputRef}
                   placeholder="Search priority..."
                   className="m-2"
                   value={prioritySearch}
@@ -724,12 +690,15 @@ export default function StoriesPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={projectFilter} onValueChange={setProjectFilter}>
+            <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
+              if (open) focusSearchInput(projectSearchInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Project" />
               </SelectTrigger>
               <SelectContent>
                 <Input
+                  ref={projectSearchInputRef}
                   placeholder="Search project..."
                   className="m-2"
                   value={projectSearch}
@@ -745,12 +714,15 @@ export default function StoriesPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={epicFilter} onValueChange={setEpicFilter}>
+            <Select value={epicFilter} onValueChange={setEpicFilter} onOpenChange={(open) => {
+              if (open) focusSearchInput(epicSearchInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Epic" />
               </SelectTrigger>
               <SelectContent>
                 <Input
+                  ref={epicSearchInputRef}
                   placeholder="Search epic..."
                   className="m-2"
                   value={epicSearch}
@@ -766,12 +738,15 @@ export default function StoriesPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={sprintFilter} onValueChange={setSprintFilter}>
+            <Select value={sprintFilter} onValueChange={setSprintFilter} onOpenChange={(open) => {
+              if (open) focusSearchInput(sprintSearchInputRef.current)
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Sprint" />
               </SelectTrigger>
               <SelectContent>
                 <Input
+                  ref={sprintSearchInputRef}
                   placeholder="Search sprint..."
                   className="m-2"
                   value={sprintSearch}
@@ -1023,8 +998,8 @@ export default function StoriesPage() {
                           </p>
                         ) : (
                           columnStories.map((story) => {
-                            const isCreator = story.createdBy?.toString() === currentUserId || story.createdBy === currentUserId
-                            const canDragStory = canManageAllStories || isCreator
+                            const isOwner = isCreator(story)
+                            const canDragStory = canManageAllStories || isOwner
                             const isDraggable = Boolean(story.sprint?._id) && canDragStory
                             const creatorDetails = resolveStoryCreator(story)
                             const creatorName = getUserDisplayName(creatorDetails)

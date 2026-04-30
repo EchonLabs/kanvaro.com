@@ -14,6 +14,7 @@ import { useOrganization } from '@/hooks/useOrganization'
 import { useToast } from '@/components/ui/Toast'
 import { useNotify } from '@/lib/notify'
 import { cn } from '@/lib/utils'
+import { useAuthContext } from '@/contexts/AuthContext'
 
 type ExpenseCategory = 'labor' | 'materials' | 'overhead' | 'external' | 'other'
 type PaidStatus = 'paid' | 'unpaid'
@@ -69,6 +70,7 @@ interface ExpenseFormData {
 }
 
 export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense }: AddExpenseDialogProps) {
+  const { user } = useAuthContext()
   const { organization } = useOrganization()
   const orgCurrency = organization?.currency || 'USD'
   const { showToast } = useToast()
@@ -202,9 +204,9 @@ export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense 
       // Fetch current user
       const fetchCurrentUser = async () => {
         try {
-          const response = await fetch('/api/auth/me')
-          if (response.ok) {
-            const data = await response.json()
+          // User data available from AuthContext
+          if (user) {
+            const data = user
             setCurrentUser({ id: data.id })
           }
         } catch (error) {
@@ -668,8 +670,8 @@ export function AddExpenseDialog({ open, onClose, projectId, onSuccess, expense 
                 uploading
                   ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20 cursor-not-allowed"
                   : isDragging
-                  ? "border-primary bg-primary/5 scale-[1.01] cursor-pointer"
-                  : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30 cursor-pointer"
+                    ? "border-primary bg-primary/5 scale-[1.01] cursor-pointer"
+                    : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30 cursor-pointer"
               )}
               onDragOver={(e) => {
                 if (!uploading) {

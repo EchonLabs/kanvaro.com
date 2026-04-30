@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { OrganizationLogo } from '@/components/ui/OrganizationLogo'
 import { useOrganization } from '@/hooks/useOrganization'
-import { usePermissionContext } from '@/lib/permissions/permission-context'
 import { Eye, EyeOff, Loader2, X } from 'lucide-react'
 import { getAppVersion } from '@/lib/version'
 
@@ -62,41 +61,30 @@ function LoginForm() {
       console.log('Login response data:', data)
 
       if (response.ok && data.success) {
-        console.log('Login successful, loading permissions...')
-        // Login successful, now load permissions before redirecting
+        console.log('Login successful, preparing dashboard...')
         setIsLoading(false)
         setIsLoadingPermissions(true)
 
-        // Respect returnTo param set by middleware when the user tried to access a protected route
-        const returnTo = searchParams.get('returnTo')
-        const redirectTarget =
-          returnTo && returnTo.startsWith('/') && !returnTo.startsWith('/login')
-            ? decodeURIComponent(returnTo)
-            : '/dashboard'
-        
         try {
+          // Respect returnTo param set by middleware when the user tried to access a protected route
+          const returnTo = searchParams.get('returnTo')
+          const redirectTarget =
+            returnTo && returnTo.startsWith('/') && !returnTo.startsWith('/login')
+              ? decodeURIComponent(returnTo)
+              : '/dashboard'
 
-          // Fetch permissions to ensure they're loaded before redirecting
-          const permissionsResponse = await fetch('/api/auth/permissions', {
-            method: 'GET',
-            credentials: 'include'
-          })
-          
-          if (permissionsResponse.ok) {
-            console.log('Permissions loaded successfully, redirecting to', redirectTarget)
-
-            // Permissions will be cached by the permission context, redirect to target
-            router.push(redirectTarget)
-          } else {
-            console.error('Failed to load permissions:', permissionsResponse.status)
-            // Even if permissions fail, redirect (it will handle loading there)
-            router.push(redirectTarget)
-          }
-        } catch (permError) {
-          console.error('Error loading permissions:', permError)
-          // Even if permissions fail, redirect (it will handle loading there)
-          router.push(redirectTarget)
-        } finally {
+          // IMPORTANT: Use window.location.href for hard navigation instead of router.push().
+          // This forces the browser to send a new HTTP request with the HTTP-only cookies
+          // that were just set by the login API. Client-side navigation doesn't trigger
+          // the browser to send cookies, causing the middleware to reject the request.
+          // The 100ms delay ensures cookies are fully processed before navigation.
+          console.log('Performing hard redirect to', redirectTarget)
+          setTimeout(() => {
+            window.location.href = redirectTarget
+          }, 100)
+        } catch (err) {
+          console.error('Error during redirect:', err)
+          setError('An error occurred during login. Please try again.')
           setIsLoadingPermissions(false)
         }
       } else {

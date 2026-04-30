@@ -226,9 +226,10 @@ export async function GET(
     const taskId = params.id
 
     // Check if user has permission to view all tasks
-    const [hasTaskViewAll, hasProjectViewAll] = await Promise.all([
+    const [hasTaskViewAll, hasProjectViewAll, canViewAssignedProjects] = await Promise.all([
       PermissionService.hasPermission(userId, Permission.TASK_VIEW_ALL),
-      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL)
+      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
+      PermissionService.hasPermission(userId, Permission.TASK_VIEW_ASSIGNED_PROJECTS)
     ]);
 
     // Build query - if user has TASK_VIEW_ALL or PROJECT_VIEW_ALL, they can view any task
@@ -238,10 +239,19 @@ export async function GET(
     };
 
     if (!hasTaskViewAll && !hasProjectViewAll) {
-      taskQuery.$or = [
+      const userFilters: any[] = [
         { 'assignedTo.user': userId },
         { createdBy: userId }
       ];
+
+      if (canViewAssignedProjects) {
+        const accessibleProjects = await PermissionService.getAccessibleProjects(userId);
+        if (accessibleProjects && accessibleProjects.length > 0) {
+          userFilters.push({ project: { $in: accessibleProjects } });
+        }
+      }
+
+      taskQuery.$or = userFilters;
     }
 
     const task = await Task.findOne(taskQuery)
@@ -446,9 +456,10 @@ export async function PUT(
     }
 
     // Check if user has permission to edit all tasks
-    const [hasTaskEditAll, hasProjectViewAll] = await Promise.all([
+    const [hasTaskEditAll, hasProjectViewAll, canEditAssignedProjects] = await Promise.all([
       PermissionService.hasPermission(userId, Permission.TASK_EDIT_ALL),
-      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL)
+      PermissionService.hasPermission(userId, Permission.PROJECT_VIEW_ALL),
+      PermissionService.hasPermission(userId, Permission.TASK_EDIT_ASSIGNED_PROJECTS)
     ]);
 
     // Build query - if user has TASK_EDIT_ALL or PROJECT_VIEW_ALL, they can edit any task
@@ -458,10 +469,19 @@ export async function PUT(
     };
 
     if (!hasTaskEditAll && !hasProjectViewAll) {
-      taskQuery.$or = [
+      const userFilters: any[] = [
         { 'assignedTo.user': userId },
         { createdBy: userId }
       ];
+
+      if (canEditAssignedProjects) {
+        const accessibleProjects = await PermissionService.getAccessibleProjects(userId);
+        if (accessibleProjects && accessibleProjects.length > 0) {
+          userFilters.push({ project: { $in: accessibleProjects } });
+        }
+      }
+
+      taskQuery.$or = userFilters;
     }
 
     const currentTask = await Task.findOne(taskQuery)
@@ -579,10 +599,19 @@ export async function PUT(
     };
 
     if (!hasTaskEditAll && !hasProjectViewAll) {
-      updateQuery.$or = [
+      const userFilters: any[] = [
         { 'assignedTo.user': userId },
         { createdBy: userId }
       ];
+
+      if (canEditAssignedProjects) {
+        const accessibleProjects = await PermissionService.getAccessibleProjects(userId);
+        if (accessibleProjects && accessibleProjects.length > 0) {
+          userFilters.push({ project: { $in: accessibleProjects } });
+        }
+      }
+
+      updateQuery.$or = userFilters;
     }
 
     // Extract and remove internal rollback tracking field before saving
