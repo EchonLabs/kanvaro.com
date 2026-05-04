@@ -1,3 +1,10 @@
+## [1.35.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.35.1...v1.35.2) (2026-05-04)
+
+
+### Bug Fixes
+
+* update timer status handling and improve timer update callback ([f0d89e9](https://github.com/EchonLabs/kanvaro.com/commit/f0d89e921b46a69e9de6f3b333e9f99665955bae))
+
 ## [1.35.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.35.0...v1.35.1) (2026-04-30)
 
 

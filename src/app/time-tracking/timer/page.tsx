@@ -1007,12 +1007,12 @@ export default function TimerPage() {
       return
     }
 
-    if (liveActiveTimer === null && hadActiveTimerRef.current) {
+    if (liveActiveTimer === null && (hadActiveTimerRef.current || initializedFromActive)) {
       resetTimerForm()
       hadActiveTimerRef.current = false
       fetchDailyHoursLogged()
     }
-  }, [liveActiveTimer, resetTimerForm, fetchDailyHoursLogged])
+  }, [liveActiveTimer, resetTimerForm, fetchDailyHoursLogged, initializedFromActive])
 
   // Fetch daily hours when settings change
   useEffect(() => {
@@ -1453,15 +1453,10 @@ export default function TimerPage() {
                           allowOvertime={timeTrackingSettings?.allowOvertime ?? false}
                           maxDailyHours={timeTrackingSettings?.maxDailyHours}
                           dailyHoursLogged={dailyHoursLogged}
-                          onTimerUpdate={(timer) => {
-                            if (!timer) {
-                              resetTimerForm()
-                              // Timer stopped - notifications will be shown by backend notification system only if time was logged
-                            } else if (timer.hasTimeLogged && timer.timeEntry) {
-                              // Timer stopped with time logged - reset form but don't show notification here
-                              // Backend notification system will show the appropriate notifications
-                              resetTimerForm()
+                           onTimerUpdate={(timer) => {
+                            if (!timer || (timer as any).status === 'stopped') {
                               setLiveActiveTimer(null)
+                              // Timer stopped - notifications will be shown by backend notification system only if time was logged
                             } else {
                               // Timer is active/running
                               setActiveTimerSnapshot(timer)
@@ -1554,7 +1549,8 @@ export default function TimerPage() {
                         <SelectTrigger className="w-full">
                           {liveActiveTimer?.task?.title ? (
                             <span>{liveActiveTimer.task.title}</span>
-                          ) : (
+                          ) : selectedTask && selectedTaskLabel ? (
+                            <span>{selectedTaskLabel}</span>
                             <SelectValue
                               placeholder={
                                 tasksLoading

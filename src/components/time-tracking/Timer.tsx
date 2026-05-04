@@ -359,9 +359,9 @@ export function Timer({
 
         // Pass timeEntry info through callback so parent can decide whether to show notifications
         if (hasTimeLogged && data.timeEntry) {
-          onTimerUpdate?.({ timeEntry: data.timeEntry, hasTimeLogged: true, duration: data.duration })
+          onTimerUpdate?.({ timeEntry: data.timeEntry, hasTimeLogged: true, duration: data.duration, status: 'stopped' })
         } else {
-          onTimerUpdate?.(null)
+          onTimerUpdate?.({ status: 'stopped' })
         }
       } else {
         console.error('Failed to stop timer:', data?.error)
