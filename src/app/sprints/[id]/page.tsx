@@ -477,10 +477,14 @@ export default function SprintDetailPage() {
     }
   }, [sprintId])
 
-  const loadAvailableSprints = useCallback(async (excludeSprintId: string) => {
+  const loadAvailableSprints = useCallback(async (excludeSprintId: string, projectId?: string) => {
     try {
       setAvailableSprintsLoading(true)
-      const response = await fetch('/api/sprints?limit=200')
+      const params = new URLSearchParams({ limit: '200' })
+      if (projectId) {
+        params.set('project', projectId)
+      }
+      const response = await fetch(`/api/sprints?${params.toString()}`)
       const data = await response.json()
 
       if (!response.ok || !data.success) {
@@ -494,10 +498,12 @@ export default function SprintDetailPage() {
       )
 
       setAvailableSprints(filtered)
+      return filtered
     } catch (err) {
       console.error('Failed to load sprints list:', err)
       setAvailableSprints([])
       notifyError({ title: 'Failed to Load Sprints', message: err instanceof Error ? err.message : 'Failed to load sprints' })
+      return []
     } finally {
       setAvailableSprintsLoading(false)
     }
@@ -619,7 +625,7 @@ export default function SprintDetailPage() {
       // Initialize all tasks as selected by default
       setSelectedTaskIds(new Set(incomplete.map(task => task._id)))
       setCompleteModalOpen(true)
-      await loadAvailableSprints(sprintId)
+      const available = await loadAvailableSprints(sprintId, sprint?.project?._id)
 
       const baseStart = sprint.endDate ? new Date(sprint.endDate) : new Date()
       const startDate = formatDateInputValue(baseStart)
@@ -665,6 +671,9 @@ export default function SprintDetailPage() {
           // Next sprint doesn't exist - pre-fill create form
           setCompletionMode('new')
         }
+      } else if (available.length === 0) {
+        // No other available sprints - default to creating a new one
+        setCompletionMode('new')
       }
 
       setNewSprintForm({
@@ -1640,6 +1649,7 @@ export default function SprintDetailPage() {
                           setCompletionMode('existing')
                           setSelectedTargetSprintId('')
                         }}
+                        disabled={availableSprintsLoading || availableSprints.length === 0}
                       >
                         Move to Next Sprint
                       </Button>

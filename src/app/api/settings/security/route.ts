@@ -5,7 +5,7 @@ import { User, IUser } from '@/models/User'
 
 const DEFAULT_SECURITY_SETTINGS = {
   loginAlerts: true,
-  sessionTimeout: 30,
+  sessionTimeout: 240,
   requirePasswordChange: false
 }
 

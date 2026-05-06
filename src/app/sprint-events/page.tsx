@@ -38,6 +38,7 @@ import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
+import { focusSearchInput } from '@/lib/utils'
 
 interface SprintEvent {
   _id: string
@@ -160,6 +161,7 @@ export default function SprintEventsPage() {
   const [isDeletingEvent, setIsDeletingEvent] = useState(false)
   const { success: notifySuccess, error: notifyError } = useNotify()
   const { hasPermission } = usePermissions()
+  const projectFilterSearchRef = useRef<HTMLInputElement>(null)
 
   // Define fetch functions BEFORE useEffect that uses them
   const fetchProjects = useCallback(async (signal?: AbortSignal) => {
@@ -505,6 +507,7 @@ export default function SprintEventsPage() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
+              autoFocus
             />
           </div>
           {/* Filter options - compact grid layout */}
@@ -513,7 +516,12 @@ export default function SprintEventsPage() {
                   <Select 
                     value={filterProject} 
                     onValueChange={setFilterProject}
-                    onOpenChange={(open) => { if (open) setProjectQuery('') }}
+                    onOpenChange={(open) => { 
+                      if (open) {
+                        setProjectQuery('') 
+                        focusSearchInput(projectFilterSearchRef.current)
+                      }
+                    }}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Project" />
@@ -521,11 +529,13 @@ export default function SprintEventsPage() {
                     <SelectContent className="z-[10050] p-0">
                       <div className="p-2">
                         <Input
+                          ref={projectFilterSearchRef}
                           value={projectQuery}
                           onChange={(e) => setProjectQuery(e.target.value)}
                           placeholder="Type to search projects"
                           className="mb-2"
                           onKeyDown={(e) => e.stopPropagation()}
+                          autoFocus
                         />
                         <div className="max-h-56 overflow-y-auto">
                           <SelectItem value="all">

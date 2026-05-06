@@ -1219,6 +1219,7 @@ export default function ProjectDetailPage() {
                             .slice((attachmentsPage - 1) * attachmentsPerPage, attachmentsPage * attachmentsPerPage)
                             .map((attachment, index) => {
                               const actualIndex = (attachmentsPage - 1) * attachmentsPerPage + index;
+                              const uploadedByName = resolveUploadedByName(attachment.uploadedBy);
                               return (
                                 <div key={actualIndex} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors">
                                   <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
@@ -1231,9 +1232,9 @@ export default function ProjectDetailPage() {
                                       <p className="font-medium text-xs sm:text-sm truncate">{attachment.name}</p>
                                       <p className="text-xs text-muted-foreground break-words sm:break-normal">
                                         <span className="whitespace-nowrap">{(attachment.size / 1024).toFixed(2)} KB</span>
-                                        {attachment.uploadedBy && (
+                                        {uploadedByName && (
                                           <span className="hidden sm:inline">
-                                            {` • ${attachment.uploadedBy.firstName} ${attachment.uploadedBy.lastName}`}
+                                            {` • ${uploadedByName}`}
                                           </span>
                                         )}
                                         {attachment.uploadedAt && (

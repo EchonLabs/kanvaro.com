@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
 import connectDB from '@/lib/db-config'
 import { TimeEntry } from '@/models/TimeEntry'
 import { TimeTrackingSettings } from '@/models/TimeTrackingSettings'
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest) {
               total: 0,
               totalPages: 0
             },
-            summary: {
+            totals: {
               totalDuration: 0,
               totalCost: 0
             }
@@ -237,40 +238,70 @@ export async function GET(request: NextRequest) {
 
     const total = await TimeEntry.countDocuments(query)
 
-    // Calculate totals (self-only)
-    // Requirement: even if the viewer can see other users' logs, the summary total should reflect ONLY the viewer's own logs.
-    // We still respect the same non-user filters (date/project/task/status/billable/approval) when calculating these totals.
-    const totalsQuery: any = {
-      ...query,
-      user: viewerId
+    // Calculate totals
+    const searchParamsObj = Object.fromEntries(searchParams.entries());
+    const isExplicitUserRequested = !!searchParamsObj.userId;
+    const isOtherFilterApplied = !!(
+      searchParamsObj.projectId || 
+      searchParamsObj.taskId || 
+      searchParamsObj.startDate || 
+      searchParamsObj.endDate || 
+      (searchParamsObj.status && searchParamsObj.status !== 'all') || 
+      (searchParamsObj.isBillable && searchParamsObj.isBillable !== 'all') || 
+      (searchParamsObj.isApproved && searchParamsObj.isApproved !== 'all')
+    );
+    
+    let totalsQuery: any = { ...query };
+    if ((hasViewAll || hasViewAssigned) && !isExplicitUserRequested && !isOtherFilterApplied) {
+      totalsQuery.user = viewerId;
     }
 
-    // Note: Mongoose .find() auto-casts string IDs to ObjectId, but .aggregate() does NOT.
-    // We must cast string IDs to ObjectId for the aggregate pipeline to match correctly.
-    const aggregateQuery: any = { ...totalsQuery }
-    if (typeof aggregateQuery.user === 'string') {
-      aggregateQuery.user = new mongoose.Types.ObjectId(aggregateQuery.user)
-    } else if (aggregateQuery.user?.$in) {
-      aggregateQuery.user = { $in: aggregateQuery.user.$in.map((id: string) => new mongoose.Types.ObjectId(id)) }
-    }
-    if (typeof aggregateQuery.organization === 'string') {
-      aggregateQuery.organization = new mongoose.Types.ObjectId(aggregateQuery.organization)
-    }
-    if (typeof aggregateQuery.project === 'string') {
-      aggregateQuery.project = new mongoose.Types.ObjectId(aggregateQuery.project)
-    }
-    if (typeof aggregateQuery.task === 'string') {
-      aggregateQuery.task = new mongoose.Types.ObjectId(aggregateQuery.task)
+    // Prepare aggregation match object explicitly to avoid any potential query pollution or type issues
+    const match: any = {
+      organization: new mongoose.Types.ObjectId(orgId)
+    };
+
+    if (totalsQuery.user) {
+      if (typeof totalsQuery.user === 'string') {
+        match.user = new mongoose.Types.ObjectId(totalsQuery.user);
+      } else if (totalsQuery.user.$in) {
+        match.user = { $in: totalsQuery.user.$in.map((id: any) => new mongoose.Types.ObjectId(id)) };
+      } else {
+        match.user = totalsQuery.user;
+      }
     }
 
-    const totalDuration = await TimeEntry.aggregate([
-      { $match: aggregateQuery },
-      { $group: { _id: null, total: { $sum: '$duration' } } }
-    ])
+    if (query.project) match.project = new mongoose.Types.ObjectId(query.project);
+    if (query.task) match.task = new mongoose.Types.ObjectId(query.task);
+    if (query.status) match.status = query.status;
+    if (query.isBillable !== undefined) match.isBillable = query.isBillable;
+    if (query.isApproved !== undefined) match.isApproved = query.isApproved;
+    if (query.isReject !== undefined) match.isReject = query.isReject;
+    if (query.startTime) match.startTime = query.startTime;
 
-    // Calculate total cost using a simpler approach (self-only)
-    const billableEntries = await TimeEntry.find({ ...totalsQuery, isBillable: true })
-    const totalCost = billableEntries.reduce((sum, entry) => sum + ((entry.duration || 0) * (entry.hourlyRate || 0) / 60), 0)
+    const totalsResult = await TimeEntry.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: null,
+          totalDuration: { $sum: '$duration' },
+          totalCost: {
+            $sum: {
+              $cond: [
+                { $eq: ['$isBillable', true] },
+                { $divide: [{ $multiply: ['$duration', { $ifNull: ['$hourlyRate', 0] }] }, 60] },
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]);
+
+    const totals = {
+      totalDuration: totalsResult[0]?.totalDuration || 0,
+      totalCost: totalsResult[0]?.totalCost || 0
+    };
 
     return NextResponse.json({
       timeEntries: normalizedEntries,
@@ -280,10 +311,7 @@ export async function GET(request: NextRequest) {
         total,
         pages: Math.ceil(total / limit)
       },
-      totals: {
-        totalDuration: totalDuration[0]?.total || 0,
-        totalCost: totalCost
-      }
+      totals
     })
   } catch (error) {
     console.error('Error fetching time entries:', error)
@@ -347,8 +375,8 @@ export async function POST(request: NextRequest) {
     // Verify the requester can create time entries for the specified user
     // Allow if: 1) Creating for themselves, OR 2) Has bulk_upload_all permission, OR 3) Is HR/admin role
     const isCreatingSelf = userId === requesterId
-    const isHROrAdmin = ['admin', 'human_resource'].includes(requester.role)
-    const hasBulkUploadAll = isHROrAdmin || await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_BULK_UPLOAD_ALL)
+    const isHR = requester.role === 'human_resource'
+    const hasBulkUploadAll = isHR || requester.role === 'admin' || await PermissionService.hasPermission(requesterId, Permission.TIME_TRACKING_BULK_UPLOAD_ALL)
 
     if (!isCreatingSelf && !hasBulkUploadAll) {
       return NextResponse.json({ error: 'You do not have permission to create time entries for other users' }, { status: 403 })
@@ -446,8 +474,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // HR and admin users can always add manual time logs, bypass the setting check
-    if (!settings.allowManualTimeSubmission && !isHROrAdmin) {
+    // HR users can always add manual time logs, bypass the setting check
+    if (!settings.allowManualTimeSubmission && !isHR) {
       return NextResponse.json({ error: 'Manual time submission not allowed' }, { status: 403 })
     }
 

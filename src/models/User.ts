@@ -111,7 +111,7 @@ const UserSchema = new Schema<IUser>({
   },
   security: {
     loginAlerts: { type: Boolean, default: true },
-    sessionTimeout: { type: Number, default: 30 },
+    sessionTimeout: { type: Number, default: 240 },
     requirePasswordChange: { type: Boolean, default: false }
   }
 }, {
