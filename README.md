@@ -1,7 +1,5 @@
 # Kanvaro - Project Management Solution
 
-# Change
-
 ## Overview
 
 Kanvaro is a comprehensive, open-source project management web application designed for SMEs, tech startups, freelancers, and modern teams. Built with cutting-edge technologies, Kanvaro provides a self-hosted solution that gives teams complete control over their project management data.
