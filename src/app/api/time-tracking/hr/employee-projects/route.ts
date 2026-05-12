@@ -46,9 +46,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Only HR and admin can access this endpoint
-    if (!['admin', 'human_resource'].includes(requester.role)) {
-      return NextResponse.json({ error: 'Forbidden: Only HR and Admin users can access this endpoint' }, { status: 403 })
+    // Only HR can access this endpoint
+    if (requester.role !== 'human_resource') {
+      return NextResponse.json({ error: 'Forbidden: Only HR users can access this endpoint' }, { status: 403 })
     }
 
     const orgId = requester.organization.toString()

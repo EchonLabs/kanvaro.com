@@ -397,10 +397,14 @@ const [searchQuery, setSearchQuery] = useState('')
     cancelled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
   }
 
-  const loadAvailableSprints = useCallback(async (excludeSprintId: string) => {
+  const loadAvailableSprints = useCallback(async (excludeSprintId: string, projectId?: string) => {
     try {
       setAvailableSprintsLoading(true)
-      const response = await fetch('/api/sprints?limit=200')
+      const params = new URLSearchParams({ limit: '200' })
+      if (projectId) {
+        params.set('project', projectId)
+      }
+      const response = await fetch(`/api/sprints?${params.toString()}`)
       const data = await response.json()
 
       if (!response.ok || !data.success) {
@@ -414,10 +418,12 @@ const [searchQuery, setSearchQuery] = useState('')
       )
 
       setAvailableSprints(filtered)
+      return filtered
     } catch (err) {
       console.error('Failed to load sprints list:', err)
       setAvailableSprints([])
       setCompleteError(err instanceof Error ? err.message : 'Failed to load sprints')
+      return []
     } finally {
       setAvailableSprintsLoading(false)
     }
@@ -480,9 +486,9 @@ const [searchQuery, setSearchQuery] = useState('')
         setSelectedTaskIds(new Set(incomplete.map(task => task._id)))
         setCompletingSprintId(sprintId)
         setCompleteModalOpen(true)
-        await loadAvailableSprints(sprintId)
-
         const sprint = sprints.find(s => s._id === sprintId)
+        const available = await loadAvailableSprints(sprintId, sprint?.project?._id)
+
         if (sprint) {
           const baseStart = sprint.endDate ? new Date(sprint.endDate) : new Date()
           const startDate = formatDateInputValue(baseStart)
@@ -528,6 +534,9 @@ const [searchQuery, setSearchQuery] = useState('')
               // Next sprint doesn't exist - pre-fill create form
               setCompletionMode('new')
             }
+          } else if (available.length === 0) {
+            // No other available sprints - default to creating a new one
+            setCompletionMode('new')
           }
 
           setNewSprintForm({
@@ -1687,6 +1696,7 @@ const [searchQuery, setSearchQuery] = useState('')
                               setSelectedTargetSprintId('')
                               setCompleteError('')
                             }}
+                            disabled={availableSprintsLoading || availableSprints.length === 0}
                           >
                             Move to Next Sprint
                           </Button>

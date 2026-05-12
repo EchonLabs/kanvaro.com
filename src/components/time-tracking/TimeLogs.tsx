@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/Checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '@/components/ui/Dialog'
 import { useOrganization } from '@/hooks/useOrganization'
-import { applyRoundingRules } from '@/lib/utils'
+import { applyRoundingRules, focusSearchInput } from '@/lib/utils'
 import { useFeaturePermissions, usePermissions } from '@/lib/permissions/permission-context'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -121,7 +121,7 @@ export function TimeLogs({
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const [selfTotals, setSelfTotals] = useState<{ totalDuration: number; totalCost: number }>({ totalDuration: 0, totalCost: 0 })
+  const [viewTotals, setViewTotals] = useState<{ totalDuration: number; totalCost: number }>({ totalDuration: 0, totalCost: 0 })
   const [resolvedUserId, setResolvedUserId] = useState<string>(userId || '')
   const [resolvedOrgId, setResolvedOrgId] = useState<string>(organizationId || '')
   const [authResolving, setAuthResolving] = useState<boolean>(!userId || !organizationId)
@@ -159,24 +159,6 @@ export function TimeLogs({
   const modalProjectSearchInputRef = useRef<HTMLInputElement | null>(null)
   const modalTaskSearchInputRef = useRef<HTMLInputElement | null>(null)
 
-  const focusSearchInput = (el: HTMLInputElement | null) => {
-    if (!el || el.disabled) return
-
-    const doFocus = () => {
-      el.focus({ preventScroll: true })
-      try {
-        el.select?.()
-      } catch {
-        // ignore
-      }
-    }
-
-    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-      window.requestAnimationFrame(doFocus)
-    } else {
-      setTimeout(doFocus, 0)
-    }
-  }
 
   // Filtered lists based on search queries
   const filteredProjects = useMemo(() => {
@@ -188,12 +170,9 @@ export function TimeLogs({
   }, [filterProjects, projectSearch])
 
   const filteredTasks = useMemo(() => {
-    if (!taskSearch.trim()) return filterTasks
-    const searchLower = taskSearch.toLowerCase()
-    return filterTasks.filter(task =>
-      task.title?.toLowerCase().includes(searchLower)
-    )
-  }, [filterTasks, taskSearch])
+    // We now fetch tasks from the server based on search, so we display the server results directly
+    return filterTasks
+  }, [filterTasks])
 
   const filteredEmployees = useMemo(() => {
     if (!employeeSearch.trim()) return filterEmployees
@@ -356,40 +335,57 @@ export function TimeLogs({
     fetchFilterProjects()
   }, [resolvedOrgId, resolvedUserId, canViewEmployeeFilter])
 
-  // Fetch tasks for filter when project is selected or for all projects
-  useEffect(() => {
-    const fetchFilterTasks = async () => {
-      if (!resolvedOrgId) {
-        setFilterTasks([])
-        return
-      }
-
-      // If no specific project is selected (All projects), we don't load tasks
-      // Users can still search manually or the task filter will show "All tasks"
-      if (!filters.projectId) {
-        setFilterTasks([])
-        setFilterTasksLoading(false)
-        return
-      }
-
-      setFilterTasksLoading(true)
-      try {
-        const response = await fetch(`/api/tasks?project=${filters.projectId}&all=true`)
-        const data = await response.json()
-        if (data.success && Array.isArray(data.data)) {
-          setFilterTasks(data.data)
-        } else {
-          setFilterTasks([])
-        }
-      } catch (error) {
-        console.error('Failed to fetch tasks for filter:', error)
-        setFilterTasks([])
-      } finally {
-        setFilterTasksLoading(false)
-      }
+  // Memoized fetch tasks for filter to support pagination and search
+  const fetchFilterTasks = useCallback(async (search: string = '') => {
+    if (!resolvedOrgId || !filters.projectId) {
+      setFilterTasks([])
+      setFilterTasksLoading(false)
+      return
     }
-    fetchFilterTasks()
-  }, [filters.projectId, resolvedOrgId])
+
+    setFilterTasksLoading(true)
+    try {
+      const params = new URLSearchParams({
+        project: filters.projectId,
+        limit: search ? '1000' : '10',
+        search: search
+      })
+      const response = await fetch(`/api/tasks?${params}`)
+      const data = await response.json()
+      if (data.success && Array.isArray(data.data)) {
+        setFilterTasks(data.data)
+      } else {
+        setFilterTasks([])
+      }
+    } catch (error) {
+      console.error('Failed to fetch tasks for filter:', error)
+      setFilterTasks([])
+    } finally {
+      setFilterTasksLoading(false)
+    }
+  }, [resolvedOrgId, filters.projectId])
+
+  // Fetch tasks for filter when project is selected
+  useEffect(() => {
+    if (filters.projectId) {
+      fetchFilterTasks('')
+    } else {
+      setFilterTasks([])
+    }
+  }, [filters.projectId, fetchFilterTasks])
+
+  // Debounced task search for filter
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (filters.projectId && taskSearch) {
+        fetchFilterTasks(taskSearch)
+      } else if (filters.projectId && !taskSearch) {
+        // If search is cleared, reload the top 10 tasks
+        fetchFilterTasks('')
+      }
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [taskSearch, filters.projectId, fetchFilterTasks])
 
   // Fetch employees for filter (only if user has permission)
   useEffect(() => {
@@ -1082,7 +1078,7 @@ export function TimeLogs({
         params.append('isApproved', filters.isApproved)
       }
 
-      const response = await fetch(`/api/time-tracking/entries?${params}`)
+      const response = await fetch(`/api/time-tracking/entries?${params}`, { cache: 'no-store' })
       const data = await response.json()
 
       if (response.ok) {
@@ -1092,7 +1088,7 @@ export function TimeLogs({
         setPagination(data.pagination)
 
         const totals = data.totals || {}
-        setSelfTotals({
+        setViewTotals({
           totalDuration: typeof totals.totalDuration === 'number' ? totals.totalDuration : 0,
           totalCost: typeof totals.totalCost === 'number' ? totals.totalCost : 0
         })
@@ -1170,6 +1166,7 @@ export function TimeLogs({
 
       // If project filter changes, clear task filter if task doesn't belong to new project
       if (key === 'projectId') {
+        setTaskSearch('') // Clear search query when project changes
         if (value && prev.taskId) {
           // Check if current task belongs to new project
           const taskBelongsToProject = filterTasks.some(t => t._id === prev.taskId && t.project === value)
@@ -1206,9 +1203,14 @@ export function TimeLogs({
 
     const matchesProject = !projectId || activeTimerEntry.project?._id === projectId
     const matchesTask = !taskId || activeTimerEntry.task?._id === taskId
+    const matchesEmployee = !filters.employeeId ||
+      activeTimerEntry.user?._id === filters.employeeId ||
+      (activeTimerEntry.user as any)?.id === filters.employeeId ||
+      (!activeTimerEntry.user && resolvedUserId === filters.employeeId);
+
     const status = activeTimerEntry.isPaused ? 'paused' : 'running'
 
-    if (!matchesProject || !matchesTask) return null
+    if (!matchesProject || !matchesTask || !matchesEmployee) return null
     if (!passesStatusFilter(status)) return null
     if (!passesDateFilters(activeTimerEntry.startTime)) return null
 
@@ -1234,7 +1236,7 @@ export function TimeLogs({
       task: activeTimerEntry.task ?? null,
       __isActive: true
     } as TimeEntry
-  }, [activeTimerEntry, activeTimerDisplayDuration, projectId, taskId, passesStatusFilter, passesDateFilters])
+  }, [activeTimerEntry, activeTimerDisplayDuration, projectId, taskId, filters.employeeId, resolvedUserId, passesStatusFilter, passesDateFilters])
 
   const displayedEntries = useMemo(() => {
     // Ensure timeEntries is always an array to prevent undefined errors
@@ -2060,7 +2062,7 @@ export function TimeLogs({
             Time Logs */}
             </CardTitle>
             {/* HR Manual Time Log Button - visible only to HR role and only in Timer tab */}
-            {['human_resource', 'admin', 'super_admin'].includes(user?.role || '') && !showManualLogButtons && (pathname === '/time-tracking/timer' || pathname === '/time-tracking/logs') && (
+            {user?.role === 'human_resource' && !showManualLogButtons && (pathname === '/time-tracking/timer' || pathname === '/time-tracking/logs') && (
               <Button
                 onClick={() => setShowHRManualLogModal(true)}
                 size="sm"
@@ -2260,6 +2262,11 @@ export function TimeLogs({
                       filteredTasks.map((task) => (
                         <SelectItem key={task._id} value={task._id} onMouseDown={(e) => e.preventDefault()}>
                           <div className="flex items-center gap-2">
+                            {task.displayId && (
+                              <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                                {task.displayId}
+                              </span>
+                            )}
                             <Target className="h-3 w-3" />
                             <span className="truncate">{task.title}</span>
                           </div>
@@ -2537,9 +2544,9 @@ export function TimeLogs({
                     <div className="text-right">
                       <div className="text-2xl font-bold text-primary">
                         {(() => {
-                          // Self-only totals (per requirement): even if the list shows other users, the summary should reflect the viewer's own time.
-                          // Include the active timer display duration (if present) so the widget stays consistent with the current session.
-                          const totalMinutes = (selfTotals.totalDuration || 0) + (activeTimerDisplay ? (activeTimerDisplay.duration || 0) : 0)
+                          // Total time for the current view (filtered or default)
+                          // activeTimerDisplay only exists if it matches the current project/task/employee filters
+                          const totalMinutes = (viewTotals.totalDuration || 0) + (activeTimerDisplay ? (activeTimerDisplay.duration || 0) : 0)
                           const hours = Math.floor(totalMinutes / 60)
                           const minutes = Math.floor(totalMinutes % 60)
                           return `${hours}h ${minutes}m`
@@ -3084,24 +3091,33 @@ export function TimeLogs({
                     if (open) focusSearchInput(modalTaskSearchInputRef.current)
                   }}
                 >
-                  <Tooltip delayDuration={200}>
-                    <TooltipTrigger asChild>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder={
-                          tasksLoading
-                            ? 'Loading tasks...'
-                            : selectedProjectForLog
-                              ? (tasks.length > 0 ? 'Select a task' : 'No tasks available')
-                              : 'Select a project first'
-                        } />
-                      </SelectTrigger>
-                    </TooltipTrigger>
-                    {selectedTaskForLogObject && (
-                      <TooltipContent side="top" className="max-w-sm">
-                        <p className="font-medium">{selectedTaskForLogObject.title}</p>
-                      </TooltipContent>
+                  <SelectTrigger className="w-full">
+                    {selectedTaskForLogObject ? (
+                      <div className="flex items-center gap-2 truncate">
+                        {selectedTaskForLogObject.displayId && (
+                          <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                            {selectedTaskForLogObject.displayId}
+                          </span>
+                        )}
+                        <Tooltip delayDuration={200}>
+                          <TooltipTrigger asChild>
+                            <span className="truncate">{selectedTaskForLogObject.title}</span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-sm">
+                            <p className="font-medium">{selectedTaskForLogObject.title}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    ) : (
+                      <SelectValue placeholder={
+                        tasksLoading
+                          ? 'Loading tasks...'
+                          : selectedProjectForLog
+                            ? (tasks.length > 0 ? 'Select a task' : 'No tasks available')
+                            : 'Select a project first'
+                      } />
                     )}
-                  </Tooltip>
+                  </SelectTrigger>
                   {tasksLoading && (
                     <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                   )}
@@ -3124,6 +3140,11 @@ export function TimeLogs({
                               <Target className="h-4 w-4 flex-shrink-0" />
                               <div className="flex-1 min-w-0 overflow-hidden">
                                 <div className="font-medium truncate flex items-center gap-2 min-w-0">
+                                  {task.displayId && (
+                                    <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                                      {task.displayId}
+                                    </span>
+                                  )}
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <span className="truncate">{task.title}</span>
@@ -3420,24 +3441,33 @@ export function TimeLogs({
                     if (open) focusSearchInput(modalTaskSearchInputRef.current)
                   }}
                 >
-                  <Tooltip delayDuration={200}>
-                    <TooltipTrigger asChild>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder={
-                          tasksLoading
-                            ? 'Loading tasks...'
-                            : selectedProjectForLog
-                              ? (tasks.length > 0 ? 'Select a task' : 'No tasks available')
-                              : 'Select a project first'
-                        } />
-                      </SelectTrigger>
-                    </TooltipTrigger>
-                    {selectedTaskForLogObject && (
-                      <TooltipContent side="top" className="max-w-sm">
-                        <p className="font-medium">{selectedTaskForLogObject.title}</p>
-                      </TooltipContent>
+                  <SelectTrigger className="w-full">
+                    {selectedTaskForLogObject ? (
+                      <div className="flex items-center gap-2 truncate">
+                        {selectedTaskForLogObject.displayId && (
+                          <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                            {selectedTaskForLogObject.displayId}
+                          </span>
+                        )}
+                        <Tooltip delayDuration={200}>
+                          <TooltipTrigger asChild>
+                            <span className="truncate">{selectedTaskForLogObject.title}</span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-sm">
+                            <p className="font-medium">{selectedTaskForLogObject.title}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    ) : (
+                      <SelectValue placeholder={
+                        tasksLoading
+                          ? 'Loading tasks...'
+                          : selectedProjectForLog
+                            ? (tasks.length > 0 ? 'Select a task' : 'No tasks available')
+                            : 'Select a project first'
+                      } />
                     )}
-                  </Tooltip>
+                  </SelectTrigger>
                   {tasksLoading && (
                     <Loader2 className="absolute right-8 top-1/2 h-4 w-4 animate-spin -translate-y-1/2" />
                   )}

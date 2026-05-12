@@ -1,3 +1,25 @@
+## [1.36.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.36.0...v1.36.1) (2026-05-12)
+
+
+### Bug Fixes
+
+* added allowedStyles for CSS validation and improved tag handling for enhanced HTML sanitization ([3db1a63](https://github.com/EchonLabs/kanvaro.com/commit/3db1a632d8fef97845671daec8e831b42afb3451))
+* added allowedStyles for CSS validation and improved tag handling for enhanced HTML sanitization ([fed8f06](https://github.com/EchonLabs/kanvaro.com/commit/fed8f06df08ead915a013db8b4b3239e2ac801ef))
+* Epics Sub Module | Add Project Filter for Better Filtering ([04dbd05](https://github.com/EchonLabs/kanvaro.com/commit/04dbd056aaf0c14ce9facf252aa7ae6ba2e5a631))
+* Epics Sub Module | Add Project Filter for Better Filtering ([a13046a](https://github.com/EchonLabs/kanvaro.com/commit/a13046acfd8addca2c0a4406c2f8fb57d7c2fe85))
+
+# [1.36.0](https://github.com/EchonLabs/kanvaro.com/compare/v1.35.2...v1.36.0) (2026-05-06)
+
+
+### Bug Fixes
+
+* add a header for change section in README ([68c436e](https://github.com/EchonLabs/kanvaro.com/commit/68c436e364969df07a806e7d689465102d49011e))
+
+
+### Features
+
+* **TimeLogs, TimeReports, Timer:** enhance task handling and improve UI interactions ([febe71c](https://github.com/EchonLabs/kanvaro.com/commit/febe71c6258a05aa1a909aac479704e31536b14d))
+
 ## [1.35.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.35.1...v1.35.2) (2026-05-04)
 
 

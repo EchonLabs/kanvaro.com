@@ -64,7 +64,7 @@ export async function GET() {
             twoFactorEnabled: user.twoFactorEnabled ?? false,
             security: {
               loginAlerts: user.security?.loginAlerts ?? true,
-              sessionTimeout: user.security?.sessionTimeout ?? 30,
+              sessionTimeout: user.security?.sessionTimeout ?? 240,
               requirePasswordChange: user.security?.requirePasswordChange ?? false
             },
             lastLogin: user.lastLogin
@@ -123,7 +123,7 @@ export async function GET() {
                 twoFactorEnabled: user.twoFactorEnabled ?? false,
                 security: {
                   loginAlerts: user.security?.loginAlerts ?? true,
-                  sessionTimeout: user.security?.sessionTimeout ?? 30,
+                  sessionTimeout: user.security?.sessionTimeout ?? 240,
                   requirePasswordChange: user.security?.requirePasswordChange ?? false
                 },
                 lastLogin: user.lastLogin
@@ -194,7 +194,7 @@ export async function GET() {
             twoFactorEnabled: user.twoFactorEnabled ?? false,
             security: {
               loginAlerts: user.security?.loginAlerts ?? true,
-              sessionTimeout: user.security?.sessionTimeout ?? 30,
+              sessionTimeout: user.security?.sessionTimeout ?? 240,
               requirePasswordChange: user.security?.requirePasswordChange ?? false
             },
             lastLogin: user.lastLogin

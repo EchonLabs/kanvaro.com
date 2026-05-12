@@ -1438,7 +1438,7 @@ export default function EditTaskPage() {
                     <span className="text-sm text-muted-foreground">Mark as completed</span>
                   </div>
 
-                  <div>
+                  {/* <div>
                     <label className="text-sm font-medium">Description</label>
                     <div className="mt-1">
                       <RichTextEditor
@@ -1452,7 +1452,7 @@ export default function EditTaskPage() {
                     <p className="text-xs text-muted-foreground mt-1">
                       Supports rich text formatting. Maximum 2,000 characters.
                     </p>
-                  </div>
+                  </div> */}
                 </div>
               ))}
             </div>

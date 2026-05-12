@@ -650,7 +650,7 @@ export function ProjectTeamTab({ projectId, project, onUpdate }: ProjectTeamTabP
                                       setTempRate(member.projectHourlyRate?.toString() ?? '')
                                     }}
                                   >
-                                    <DollarSign className="h-3.5 w-3.5 opacity-70" />
+                                    {/* <DollarSign className="h-3.5 w-3.5 opacity-70" /> */}
                                     <span className="text-sm">
                                       {hourlyRate ? formatCurrency(hourlyRate, projectCurrency) : (projectBudget?.defaultHourlyRate ? formatCurrency(projectBudget.defaultHourlyRate, projectCurrency) : 'Set rate')}
                                     </span>

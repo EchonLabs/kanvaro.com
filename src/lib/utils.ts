@@ -103,3 +103,26 @@ export function applyRoundingRules(
   // Convert back to total minutes
   return totalHours * 60 + roundedMinutes
 }
+
+/**
+ * Utility to focus and select text in a search input within a dropdown/select component.
+ * Uses requestAnimationFrame to ensure the focus happens after the dropdown is rendered.
+ */
+export const focusSearchInput = (el: HTMLInputElement | null) => {
+  if (!el || el.disabled) return
+
+  const doFocus = () => {
+    el.focus({ preventScroll: true })
+    try {
+      el.select?.()
+    } catch {
+      // ignore
+    }
+  }
+
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(doFocus)
+  } else {
+    setTimeout(doFocus, 0)
+  }
+}

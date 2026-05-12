@@ -239,8 +239,8 @@ function ColumnDropZone({
           <div
             ref={setNodeRef}
             className={`space-y-3 min-h-[400px] max-h-[600px] overflow-y-auto overflow-x-hidden border-2 border-dashed rounded-lg transition-colors p-2 flex-1 ${isOver
-                ? 'border-primary bg-primary/5'
-                : 'border-border/30 dark:border-border/50 hover:border-border/50 dark:hover:border-border/70'
+              ? 'border-primary bg-primary/5'
+              : 'border-border/30 dark:border-border/50 hover:border-border/50 dark:hover:border-border/70'
               }`}
           >
             {tasks.length === 0 ? (
@@ -587,7 +587,7 @@ export default function KanbanPage() {
   const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me')
-      
+
       if (response.ok) {
         try {
           const me = await response.json()
@@ -603,7 +603,7 @@ export default function KanbanPage() {
         const refreshResponse = await fetch('/api/auth/refresh', {
           method: 'POST'
         })
-        
+
         if (refreshResponse.ok) {
           try {
             const meResponse = await fetch('/api/auth/me')
@@ -1080,7 +1080,7 @@ export default function KanbanPage() {
               />
             </div>
             {/* Filter options - compact grid layout */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
               <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
                 if (open) focusSearchInput(projectFilterInputRef.current)
               }}>
@@ -1375,49 +1375,53 @@ export default function KanbanPage() {
                   </div>
                 </SelectContent>
               </Select>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      'w-full justify-start text-left font-normal',
-                      !dateRangeFilter?.from && !dateRangeFilter?.to && 'text-muted-foreground'
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRangeFilter?.from ? (
-                      dateRangeFilter.to ? (
-                        `${format(dateRangeFilter.from, 'LLL dd, y')} - ${format(dateRangeFilter.to, 'LLL dd, y')}`
-                      ) : (
-                        `${format(dateRangeFilter.from, 'LLL dd, y')} - …`
-                      )
-                    ) : (
-                      'Date Range'
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <DateRangeCalendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={dateRangeFilter?.from}
-                    selected={dateRangeFilter}
-                    onSelect={handleDateRangeChange}
-                    numberOfMonths={2}
-                  />
-                  <div className="p-3 border-t">
+            </div>
+            <div className="flex justify-end">
+              <div className="w-full sm:w-72">
+                <Popover>
+                  <PopoverTrigger asChild>
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearDateFilters}
-                      disabled={!dateRangeFilter?.from && !dateRangeFilter?.to}
-                      className="w-full"
+                      variant="outline"
+                      className={cn(
+                        'w-full justify-start text-left font-normal',
+                        !dateRangeFilter?.from && !dateRangeFilter?.to && 'text-muted-foreground'
+                      )}
                     >
-                      Clear dates
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRangeFilter?.from ? (
+                        dateRangeFilter.to ? (
+                          `${format(dateRangeFilter.from, 'LLL dd, y')} - ${format(dateRangeFilter.to, 'LLL dd, y')}`
+                        ) : (
+                          `${format(dateRangeFilter.from, 'LLL dd, y')} - …`
+                        )
+                      ) : (
+                        'Date Range'
+                      )}
                     </Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <DateRangeCalendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={dateRangeFilter?.from}
+                      selected={dateRangeFilter}
+                      onSelect={handleDateRangeChange}
+                      numberOfMonths={2}
+                    />
+                    <div className="p-3 border-t">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearDateFilters}
+                        disabled={!dateRangeFilter?.from && !dateRangeFilter?.to}
+                        className="w-full"
+                      >
+                        Clear dates
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
             {/* Task count and reset filters */}
             <div className="flex items-center justify-between">
@@ -1555,9 +1559,9 @@ export default function KanbanPage() {
           onDelete={
             isAdmin
               ? () => {
-                  setShowViewTaskModal(false)
-                  handleDeleteTask(selectedTask._id)
-                }
+                setShowViewTaskModal(false)
+                handleDeleteTask(selectedTask._id)
+              }
               : undefined
           }
         />

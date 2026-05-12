@@ -679,7 +679,7 @@ export default function TimerPage() {
 
     const task = tasks.find(t => t._id === nextTaskId)
     if (task) {
-      setSelectedTaskLabel(task.title)
+      setSelectedTaskLabel(task.displayId ? `${task.displayId} • ${task.title}` : task.title)
       selectedTaskObjectRef.current = task
       setDescription(task.title)
 
@@ -1276,7 +1276,14 @@ export default function TimerPage() {
                     >
                       <SelectTrigger className="w-full">
                         {liveActiveTimer?.task?.title ? (
-                          <span>{liveActiveTimer.task.title}</span>
+                          <div className="flex items-center gap-2 truncate">
+                            {liveActiveTimer.task.displayId && (
+                              <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                                {liveActiveTimer.task.displayId}
+                              </span>
+                            )}
+                            <span className="truncate">{liveActiveTimer.task.title}</span>
+                          </div>
                         ) : selectedTask && selectedTaskLabel ? (
                           <span>{selectedTaskLabel}</span>
                         ) : (
@@ -1456,6 +1463,7 @@ export default function TimerPage() {
                            onTimerUpdate={(timer) => {
                             if (!timer || (timer as any).status === 'stopped') {
                               setLiveActiveTimer(null)
+                              // Timer stopped - notifications will be shown by backend notification system only if time was logged
                               // Timer stopped - notifications will be shown by backend notification system only if time was logged
                             } else {
                               // Timer is active/running
