@@ -85,7 +85,18 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Avatar uploaded successfully',
       data: {
-        avatar: normalizeUploadUrl(avatarUrl)
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        memberId: user.memberId,
+        role: user.role,
+        avatar: normalizeUploadUrl(avatarUrl),
+        timezone: user.timezone,
+        language: user.language,
+        currency: user.currency,
+        preferences: user.preferences,
+        organization: user.organization
       }
     })
 
