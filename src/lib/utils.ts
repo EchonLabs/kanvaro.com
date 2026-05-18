@@ -125,4 +125,20 @@ export const focusSearchInput = (el: HTMLInputElement | null) => {
   } else {
     setTimeout(doFocus, 0)
   }
-}
+}
+
+/**
+ * Truncates a string to a maximum character length and appends "..." if truncated
+ * @param text - The text to truncate
+ * @param maxLength - Maximum length before truncation (default: 30)
+ * @returns Truncated text with "..." if it exceeds maxLength
+ */
+export function truncateText(text?: string, maxLength: number = 30): { truncated: string; isTruncated: boolean } {
+  if (!text) return { truncated: '', isTruncated: false }
+  
+  if (text.length <= maxLength) {
+    return { truncated: text, isTruncated: false }
+  }
+  
+  return { truncated: `${text.slice(0, maxLength)}...`, isTruncated: true }
+}

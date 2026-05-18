@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/Checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from '@/components/ui/Dialog'
 import { useOrganization } from '@/hooks/useOrganization'
-import { applyRoundingRules, focusSearchInput } from '@/lib/utils'
+import { applyRoundingRules, focusSearchInput, truncateText } from '@/lib/utils'
 import { useFeaturePermissions, usePermissions } from '@/lib/permissions/permission-context'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -26,6 +26,10 @@ import { detectClientTimezone } from '@/lib/timezone'
 import { HRManualTimeLogModal } from '@/components/time-tracking/HRManualTimeLogModal'
 import { validateAndCorrectDateRangeStrings } from '@/lib/dateRangeValidation'
 import { useAuthContext } from '@/contexts/AuthContext'
+
+// Task filter truncation and dropdown width constants
+const TRUNCATION_LENGTH = 26
+const TASK_FILTER_DROPDOWN_WIDTH = 'w-full'
 
 interface TimeLogsProps {
   userId: string
@@ -2126,7 +2130,7 @@ export function TimeLogs({
               <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <Label className="text-sm font-medium whitespace-nowrap">Filters</Label>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
               <div className="space-y-1.5 sm:space-y-2 min-w-0">
                 <Label htmlFor="filter-project" className="text-xs sm:text-sm font-medium">Project</Label>
                 <Select
@@ -2217,7 +2221,7 @@ export function TimeLogs({
                         : 'All tasks'
                     } />
                   </SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
+                  <SelectContent className={`max-h-[200px] w-full ${TASK_FILTER_DROPDOWN_WIDTH}`}>
                     <div className="p-2 border-b">
                       <div className="relative">
                         <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -2259,19 +2263,33 @@ export function TimeLogs({
                         {!filters.projectId ? 'Select a project first' : 'No tasks found'}
                       </div>
                     ) : (
-                      filteredTasks.map((task) => (
-                        <SelectItem key={task._id} value={task._id} onMouseDown={(e) => e.preventDefault()}>
-                          <div className="flex items-center gap-2">
-                            {task.displayId && (
-                              <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
-                                {task.displayId}
-                              </span>
-                            )}
-                            <Target className="h-3 w-3" />
-                            <span className="truncate">{task.title}</span>
-                          </div>
-                        </SelectItem>
-                      ))
+                      filteredTasks.map((task) => {
+                        const { truncated: truncatedTitle, isTruncated } = truncateText(task.title, TRUNCATION_LENGTH)
+                        return (
+                          <SelectItem key={task._id} value={task._id} onMouseDown={(e) => e.preventDefault()}>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {task.displayId && (
+                                      <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                                        {task.displayId}
+                                      </span>
+                                    )}
+                                    <Target className="h-3 w-3 flex-shrink-0" />
+                                    <span className="truncate">{truncatedTitle}</span>
+                                  </div>
+                                </TooltipTrigger>
+                                {isTruncated && (
+                                  <TooltipContent side="left" align="center" className="max-w-sm break-words">
+                                    <p className="whitespace-normal">{task.title}</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
+                          </SelectItem>
+                        )
+                      })
                     )}
                   </SelectContent>
                 </Select>
