@@ -174,8 +174,15 @@ export function TimeLogs({
   }, [filterProjects, projectSearch])
 
   const filteredTasks = useMemo(() => {
-    // We now fetch tasks from the server based on search, so we display the server results directly
-    return filterTasks
+    // Apply smart truncation with capital letter detection
+    return filterTasks.map(task => {
+      const { truncated, isTruncated } = truncateText(task.title, TRUNCATION_LENGTH)
+      return {
+        ...task,
+        truncated,
+        isTruncated
+      }
+    })
   }, [filterTasks])
 
   const filteredEmployees = useMemo(() => {
@@ -2221,8 +2228,8 @@ export function TimeLogs({
                         : 'All tasks'
                     } />
                   </SelectTrigger>
-                  <SelectContent className={`max-h-[200px] w-full ${TASK_FILTER_DROPDOWN_WIDTH}`}>
-                    <div className="p-2 border-b">
+                  <SelectContent className={`max-h-[200px] w-full overflow-hidden ${TASK_FILTER_DROPDOWN_WIDTH}`}>
+                    <div className="p-2 border-b overflow-y-auto max-h-[200px]">
                       <div className="relative">
                         <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
                         <Input

@@ -471,8 +471,15 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   }, [users, assignedByFilterQuery])
 
   const filteredTaskOptions = useMemo(() => {
-    // We now fetch tasks from the server based on search, so we display the server results directly
-    return tasks
+    // Apply smart truncation with capital letter detection
+    return tasks.map(task => {
+      const { truncated, isTruncated } = truncateText(task.title, TRUNCATION_LENGTH)
+      return {
+        ...task,
+        truncated,
+        isTruncated
+      }
+    })
   }, [tasks])
 
   const formatDuration = (minutes: number) => {
