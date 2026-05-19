@@ -506,645 +506,654 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       // Add the selected task to options if it's missing (e.g. not in current search results)
       options.push(selectedTaskDetails)
     }
-    return options
+
+    // Apply smart truncation with capital letter detection
+    return options.map(task => {
+      const { truncated, isTruncated } = truncateText(task.title, TRUNCATION_LENGTH)
+      return {
+        ...task,
+        truncated,
+        isTruncated
+      }
+    })
   }, [tasks, selectedTaskDetails])
 
-  const formatDuration = (minutes: number) => {
-    // Apply rounding rules if enabled
-    let displayMinutes = minutes
-    const roundingRules = (organization?.settings as any)?.roundingRules
-    if (roundingRules?.enabled) {
-      displayMinutes = applyRoundingRules(minutes, {
-        enabled: roundingRules.enabled,
-        increment: roundingRules.increment || 15,
-        roundUp: roundingRules.roundUp ?? true
-      })
-    }
-
-    const hours = Math.floor(displayMinutes / 60)
-    const mins = Math.floor(displayMinutes % 60)
-    return `${hours}h ${mins}m`
+const formatDuration = (minutes: number) => {
+  // Apply rounding rules if enabled
+  let displayMinutes = minutes
+  const roundingRules = (organization?.settings as any)?.roundingRules
+  if (roundingRules?.enabled) {
+    displayMinutes = applyRoundingRules(minutes, {
+      enabled: roundingRules.enabled,
+      increment: roundingRules.increment || 15,
+      roundUp: roundingRules.roundUp ?? true
+    })
   }
 
-  // Simple currency conversion rates (you can replace with real-time API later)
-  const getCurrencyConversionRate = (fromCurrency: string, toCurrency: string): number => {
-    if (fromCurrency === toCurrency) return 1
+  const hours = Math.floor(displayMinutes / 60)
+  const mins = Math.floor(displayMinutes % 60)
+  return `${hours}h ${mins}m`
+}
 
-    // Base rates to USD (approximate rates, should be fetched from API in production)
-    const ratesToUSD: Record<string, number> = {
-      'USD': 1,
-      'EUR': 1.09,
-      'GBP': 1.27,
-      'INR': 0.012,
-      'LKR': 0.0034,
-      'AUD': 0.66,
-      'CAD': 0.73,
-      'JPY': 0.0067,
-      'CNY': 0.14
-    }
+// Simple currency conversion rates (you can replace with real-time API later)
+const getCurrencyConversionRate = (fromCurrency: string, toCurrency: string): number => {
+  if (fromCurrency === toCurrency) return 1
 
-    const fromRate = ratesToUSD[fromCurrency] || 1
-    const toRate = ratesToUSD[toCurrency] || 1
-
-    // Convert from source currency to USD, then to target currency
-    return fromRate / toRate
+  // Base rates to USD (approximate rates, should be fetched from API in production)
+  const ratesToUSD: Record<string, number> = {
+    'USD': 1,
+    'EUR': 1.09,
+    'GBP': 1.27,
+    'INR': 0.012,
+    'LKR': 0.0034,
+    'AUD': 0.66,
+    'CAD': 0.73,
+    'JPY': 0.0067,
+    'CNY': 0.14
   }
 
-  // Calculate summary statistics from detailed entries - just sum costs without conversion
-  const summaryStats = useMemo(() => {
-    if (!reportData?.detailedEntries || reportData.detailedEntries.length === 0) {
-      return {
-        totalEntries: 0,
-        totalDuration: 0,
-        totalCost: 0,
-        billableDuration: 0
-      }
-    }
+  const fromRate = ratesToUSD[fromCurrency] || 1
+  const toRate = ratesToUSD[toCurrency] || 1
 
-    return reportData.detailedEntries.reduce((acc, entry) => {
-      acc.totalEntries += 1
-      acc.totalDuration += entry.duration
+  // Convert from source currency to USD, then to target currency
+  return fromRate / toRate
+}
 
-      // Just sum the costs - no currency conversion
-      acc.totalCost += entry.cost
-
-      if (entry.isBillable) {
-        acc.billableDuration += entry.duration
-      }
-      return acc
-    }, {
+// Calculate summary statistics from detailed entries - just sum costs without conversion
+const summaryStats = useMemo(() => {
+  if (!reportData?.detailedEntries || reportData.detailedEntries.length === 0) {
+    return {
       totalEntries: 0,
       totalDuration: 0,
       totalCost: 0,
       billableDuration: 0
-    })
-  }, [reportData?.detailedEntries])
-
-  // Aggregate entries by employee + project (across all months in the date range)
-  const monthlyReportData = useMemo(() => {
-    if (!reportData?.detailedEntries || reportData.detailedEntries.length === 0) return []
-    const entries = reportData.detailedEntries
-
-    // Group by composite key: `userId|projectId` to merge across all months
-    const grouped: Record<string, {
-      userName: string
-      userEmail: string
-      projectId: string
-      projectName: string
-      totalDuration: number
-      totalCost: number
-      entryCount: number
-    }> = {}
-
-    for (const entry of entries) {
-      const key = `${entry.userId}|${entry.projectId}`
-      if (!grouped[key]) {
-        grouped[key] = {
-          userName: entry.userName,
-          userEmail: entry.userEmail,
-          projectId: entry.projectId,
-          projectName: entry.projectName,
-          totalDuration: 0,
-          totalCost: 0,
-          entryCount: 0,
-        }
-      }
-      grouped[key].totalDuration += entry.duration
-      grouped[key].totalCost += entry.cost
-      grouped[key].entryCount += 1
     }
-
-    return Object.values(grouped).sort(
-      (a, b) => a.userName.localeCompare(b.userName) || a.projectName.localeCompare(b.projectName)
-    )
-  }, [reportData?.detailedEntries])
-
-  const handleMonthlyReportExport = () => {
-    if (monthlyReportData.length === 0) return
-    const headers = ['Row', 'Employee', 'Project', 'Total Hours (HH:MM)']
-
-    const csvRows = monthlyReportData.map((row, i) => {
-      const h = Math.floor(row.totalDuration / 60)
-      const m = Math.round(row.totalDuration % 60)
-      const hours = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-      return [String(i + 1), row.userName, row.projectName, hours]
-    })
-
-    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
-    const csv = [headers, ...csvRows].map(r => r.map(escape).join(',')).join('\r\n')
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    const dateRange = filters.startDate && filters.endDate ? `_${filters.startDate}_to_${filters.endDate}` : ''
-    a.download = `Monthly_Report${dateRange}.csv`
-    document.body.appendChild(a)
-    a.click()
-    window.URL.revokeObjectURL(url)
-    document.body.removeChild(a)
   }
 
-  const handleBudgetReportExport = async () => {
-    try {
-      const params = new URLSearchParams({ organizationId })
-      if (filters.startDate) params.append('startDate', filters.startDate)
-      if (filters.endDate) params.append('endDate', filters.endDate)
+  return reportData.detailedEntries.reduce((acc, entry) => {
+    acc.totalEntries += 1
+    acc.totalDuration += entry.duration
 
-      const response = await fetch(`/api/time-tracking/reports/budget?${params}`)
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        const dateRange = filters.startDate && filters.endDate ? `_${filters.startDate}_to_${filters.endDate}` : ''
-        a.download = `Budget_Report${dateRange}.csv`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-      } else {
-        setError('Failed to generate budget report')
+    // Just sum the costs - no currency conversion
+    acc.totalCost += entry.cost
+
+    if (entry.isBillable) {
+      acc.billableDuration += entry.duration
+    }
+    return acc
+  }, {
+    totalEntries: 0,
+    totalDuration: 0,
+    totalCost: 0,
+    billableDuration: 0
+  })
+}, [reportData?.detailedEntries])
+
+// Aggregate entries by employee + project (across all months in the date range)
+const monthlyReportData = useMemo(() => {
+  if (!reportData?.detailedEntries || reportData.detailedEntries.length === 0) return []
+  const entries = reportData.detailedEntries
+
+  // Group by composite key: `userId|projectId` to merge across all months
+  const grouped: Record<string, {
+    userName: string
+    userEmail: string
+    projectId: string
+    projectName: string
+    totalDuration: number
+    totalCost: number
+    entryCount: number
+  }> = {}
+
+  for (const entry of entries) {
+    const key = `${entry.userId}|${entry.projectId}`
+    if (!grouped[key]) {
+      grouped[key] = {
+        userName: entry.userName,
+        userEmail: entry.userEmail,
+        projectId: entry.projectId,
+        projectName: entry.projectName,
+        totalDuration: 0,
+        totalCost: 0,
+        entryCount: 0,
       }
-    } catch (err) {
+    }
+    grouped[key].totalDuration += entry.duration
+    grouped[key].totalCost += entry.cost
+    grouped[key].entryCount += 1
+  }
+
+  return Object.values(grouped).sort(
+    (a, b) => a.userName.localeCompare(b.userName) || a.projectName.localeCompare(b.projectName)
+  )
+}, [reportData?.detailedEntries])
+
+const handleMonthlyReportExport = () => {
+  if (monthlyReportData.length === 0) return
+  const headers = ['Row', 'Employee', 'Project', 'Total Hours (HH:MM)']
+
+  const csvRows = monthlyReportData.map((row, i) => {
+    const h = Math.floor(row.totalDuration / 60)
+    const m = Math.round(row.totalDuration % 60)
+    const hours = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+    return [String(i + 1), row.userName, row.projectName, hours]
+  })
+
+  const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
+  const csv = [headers, ...csvRows].map(r => r.map(escape).join(',')).join('\r\n')
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = window.URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  const dateRange = filters.startDate && filters.endDate ? `_${filters.startDate}_to_${filters.endDate}` : ''
+  a.download = `Monthly_Report${dateRange}.csv`
+  document.body.appendChild(a)
+  a.click()
+  window.URL.revokeObjectURL(url)
+  document.body.removeChild(a)
+}
+
+const handleBudgetReportExport = async () => {
+  try {
+    const params = new URLSearchParams({ organizationId })
+    if (filters.startDate) params.append('startDate', filters.startDate)
+    if (filters.endDate) params.append('endDate', filters.endDate)
+
+    const response = await fetch(`/api/time-tracking/reports/budget?${params}`)
+    if (response.ok) {
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const dateRange = filters.startDate && filters.endDate ? `_${filters.startDate}_to_${filters.endDate}` : ''
+      a.download = `Budget_Report${dateRange}.csv`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } else {
       setError('Failed to generate budget report')
     }
+  } catch (err) {
+    setError('Failed to generate budget report')
   }
+}
 
-  const handleExport = async () => {
-    try {
-      if (reportData?.detailedEntries && reportData.detailedEntries.length > 0) {
-        const headers = [
-          'Id',
-          'No.',
-          'Task',
-          'Employee',
-          'Start Time',
-          'End Time',
-          'Total Hours',
-          'Earnings',
-          'Status'
-        ]
+const handleExport = async () => {
+  try {
+    if (reportData?.detailedEntries && reportData.detailedEntries.length > 0) {
+      const headers = [
+        'Id',
+        'No.',
+        'Task',
+        'Employee',
+        'Start Time',
+        'End Time',
+        'Total Hours',
+        'Earnings',
+        'Status'
+      ]
 
-        const sanitize = (value: string | number | null | undefined) => {
-          if (value === null || value === undefined) return ''
-          return String(value).replace(/"/g, '""')
+      const sanitize = (value: string | number | null | undefined) => {
+        if (value === null || value === undefined) return ''
+        return String(value).replace(/"/g, '""')
+      }
+
+      const rows = reportData.detailedEntries.map((entry, index) => {
+        // Determine status based on isApproved and isReject fields
+        let status = 'Pending'
+        if ((entry as any).isReject) {
+          status = 'Rejected'
+        } else if ((entry as any).isApproved) {
+          status = 'Approved'
         }
 
-        const rows = reportData.detailedEntries.map((entry, index) => {
-          // Determine status based on isApproved and isReject fields
-          let status = 'Pending'
-          if ((entry as any).isReject) {
-            status = 'Rejected'
-          } else if ((entry as any).isApproved) {
-            status = 'Approved'
-          }
+        // Custom time formatter for date and time AM/PM format
+        const formatTimeAMPM = (timeString: string) => {
+          if (!timeString) return '-'
+          const date = new Date(timeString)
+          if (isNaN(date.getTime())) return '-'
 
-          // Custom time formatter for date and time AM/PM format
-          const formatTimeAMPM = (timeString: string) => {
-            if (!timeString) return '-'
-            const date = new Date(timeString)
-            if (isNaN(date.getTime())) return '-'
+          const month = String(date.getMonth() + 1).padStart(2, '0')
+          const day = String(date.getDate()).padStart(2, '0')
+          const year = date.getFullYear()
+          const hours = date.getHours()
+          const minutes = String(date.getMinutes()).padStart(2, '0')
+          const ampm = hours >= 12 ? 'PM' : 'AM'
+          const displayHours = hours % 12 || 12
+          return `${month}/${day}/${year} ${displayHours.toString().padStart(2, '0')}:${minutes} ${ampm}`
+        }
 
-            const month = String(date.getMonth() + 1).padStart(2, '0')
-            const day = String(date.getDate()).padStart(2, '0')
-            const year = date.getFullYear()
-            const hours = date.getHours()
-            const minutes = String(date.getMinutes()).padStart(2, '0')
-            const ampm = hours >= 12 ? 'PM' : 'AM'
-            const displayHours = hours % 12 || 12
-            return `${month}/${day}/${year} ${displayHours.toString().padStart(2, '0')}:${minutes} ${ampm}`
-          }
-
-          return [
-            sanitize(entry.displayId || entry.taskId || ''), // Task ID (use displayId if available, fallback to taskId)
-            sanitize(index + 1), // Numbering
-            sanitize(entry.taskTitle || '-'), // Task
-            sanitize(entry.userName), // Employee
-            sanitize(entry.startTime ? formatTimeAMPM(entry.startTime) : '-'), // Start Time (AM/PM format)
-            sanitize(entry.endTime ? formatTimeAMPM(entry.endTime) : '-'), // End Time (AM/PM format)
-            sanitize(formatDurationUtil(entry.duration)), // Total Hours
-            sanitize(formatCurrency(entry.cost, orgCurrency)), // Cost
-            sanitize(status) // Status based on isApproved and isReject
-          ]
-        })
-
-        const csvContent = [headers, ...rows]
-          .map(row => row.map(value => `"${value}"`).join(','))
-          .join('\r\n')
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
-        a.download = `All_time_log_${timestamp}.csv`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-        return
-      }
-
-      // Fallback to server export if no detailed entries are loaded yet
-      const params = new URLSearchParams({
-        organizationId,
-        reportType: 'detailed',
-        format: 'csv'
+        return [
+          sanitize(entry.displayId || entry.taskId || ''), // Task ID (use displayId if available, fallback to taskId)
+          sanitize(index + 1), // Numbering
+          sanitize(entry.taskTitle || '-'), // Task
+          sanitize(entry.userName), // Employee
+          sanitize(entry.startTime ? formatTimeAMPM(entry.startTime) : '-'), // Start Time (AM/PM format)
+          sanitize(entry.endTime ? formatTimeAMPM(entry.endTime) : '-'), // End Time (AM/PM format)
+          sanitize(formatDurationUtil(entry.duration)), // Total Hours
+          sanitize(formatCurrency(entry.cost, orgCurrency)), // Cost
+          sanitize(status) // Status based on isApproved and isReject
+        ]
       })
 
-      if (filters.projectId && filters.projectId !== 'all') params.append('projectId', filters.projectId);
-      if (filters.assignedTo && filters.assignedTo !== 'all') params.append('userId', filters.assignedTo);
-      // Use approvedBy for approver filter
-      if (filters.assignedBy && filters.assignedBy !== 'all') params.append('approvedBy', filters.assignedBy);
-      if (filters.taskId && filters.taskId !== 'all') params.append('taskId', filters.taskId);
-      if (filters.startDate) params.append('startDate', filters.startDate);
-      if (filters.endDate) params.append('endDate', filters.endDate);
+      const csvContent = [headers, ...rows]
+        .map(row => row.map(value => `"${value}"`).join(','))
+        .join('\r\n')
 
-      const response = await fetch(`/api/time-tracking/reports?${params}`)
-
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
-        a.download = `All_time_log_${timestamp}.csv`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-      }
-    } catch (error) {
-      setError('Failed to export report')
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+      a.download = `All_time_log_${timestamp}.csv`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      return
     }
+
+    // Fallback to server export if no detailed entries are loaded yet
+    const params = new URLSearchParams({
+      organizationId,
+      reportType: 'detailed',
+      format: 'csv'
+    })
+
+    if (filters.projectId && filters.projectId !== 'all') params.append('projectId', filters.projectId);
+    if (filters.assignedTo && filters.assignedTo !== 'all') params.append('userId', filters.assignedTo);
+    // Use approvedBy for approver filter
+    if (filters.assignedBy && filters.assignedBy !== 'all') params.append('approvedBy', filters.assignedBy);
+    if (filters.taskId && filters.taskId !== 'all') params.append('taskId', filters.taskId);
+    if (filters.startDate) params.append('startDate', filters.startDate);
+    if (filters.endDate) params.append('endDate', filters.endDate);
+
+    const response = await fetch(`/api/time-tracking/reports?${params}`)
+
+    if (response.ok) {
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+      a.download = `All_time_log_${timestamp}.csv`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    }
+  } catch (error) {
+    setError('Failed to export report')
   }
+}
 
 
-  return (
-    <div className="space-y-8">
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Time Tracking Reports
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+return (
+  <div className="space-y-8">
+    {/* Filters */}
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <BarChart3 className="h-5 w-5" />
+          Time Tracking Reports
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div>
-              <Label htmlFor="startDate">Start Date</Label>
-              <Input
-                id="startDate"
-                type="date"
-                value={tempStartDate}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setTempStartDate(val);
-                  // If it looks like a complete date (YYYY-MM-DD), apply it
-                  if (val.length === 10 || val === '') {
-                    const corrected = validateAndCorrectDateRangeStrings(val, filters.endDate);
-                    setFilters(prev => ({ ...prev, startDate: corrected.startDate, endDate: corrected.endDate }));
-                  }
-                }}
-                onBlur={() => handleDateBlur('start')}
-              />
-            </div>
-            <div>
-              <Label htmlFor="endDate">End Date</Label>
-              <Input
-                id="endDate"
-                type="date"
-                value={tempEndDate}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setTempEndDate(val);
-                  // If it looks like a complete date (YYYY-MM-DD), apply it
-                  if (val.length === 10 || val === '') {
-                    const corrected = validateAndCorrectDateRangeStrings(filters.startDate, val);
-                    setFilters(prev => ({ ...prev, startDate: corrected.startDate, endDate: corrected.endDate }));
-                  }
-                }}
-                onBlur={() => handleDateBlur('end')}
-              />
-            </div>
-            <div>
-              <Label htmlFor="projectId">Project</Label>
-              <Select
-                value={filters.projectId}
-                onValueChange={(value) => { setFilters(prev => ({ ...prev, projectId: value })); setProjectFilterQuery(''); }}
-                onOpenChange={(open) => {
-                  if (open) focusSearchInput(projectFilterInputRef.current)
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All Projects" />
-                </SelectTrigger>
-                <SelectContent className="p-0">
-                  <div className="p-2">
-                    <Input
-                      ref={projectFilterInputRef}
-                      value={projectFilterQuery}
-                      onChange={(e) => setProjectFilterQuery(e.target.value)}
-                      placeholder="Search projects"
-                      className="mb-2"
-                      onKeyDown={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                    />
-                    <div className="max-h-56 overflow-y-auto">
-                      <SelectItem value="all">All Projects</SelectItem>
-                      {filteredProjectOptions.length === 0 ? (
-                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
-                      ) : (
-                        filteredProjectOptions.map((project) => (
-                          <SelectItem key={project._id} value={project._id}>
-                            {project.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="taskId">Task</Label>
-              <Select
-                value={filters.taskId}
-                onValueChange={(value) => { 
-                  setFilters(prev => ({ ...prev, taskId: value })); 
-                  setTaskFilterQuery('');
-                  // Also capture the task details if it's in the current list
-                  const task = tasks.find(t => t._id === value);
-                  if (task) setSelectedTaskDetails(task);
-                }}
-                onOpenChange={(open) => {
-                  if (open) focusSearchInput(taskFilterInputRef.current)
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={filters.projectId === 'all' ? 'All Tasks' : 'Select Task'} />
-                </SelectTrigger>
-                <SelectContent className={`p-0 w-full ${TASK_FILTER_DROPDOWN_WIDTH}`}>
-                  <div className="p-2">
-                    <Input
-                      ref={taskFilterInputRef}
-                      value={taskFilterQuery}
-                      onChange={(e) => setTaskFilterQuery(e.target.value)}
-                      placeholder="Search tasks"
-                      className="mb-2"
-                      onKeyDown={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                    />
-                    <div className="max-h-56 overflow-y-auto">
-                      {/* Only show "All Tasks" option when no project is selected */}
-                      {filters.projectId === 'all' && <SelectItem value="all">All Tasks</SelectItem>}
-                      {filteredTaskOptions.length === 0 ? (
-                        <div className="px-2 py-1 text-xs text-muted-foreground">
-                          {filters.projectId === 'all' ? 'No tasks found' : 'No tasks in this project'}
-                        </div>
-                      ) : (
-                        filteredTaskOptions.map((task) => {
-                          const { truncated: truncatedTitle, isTruncated } = truncateText(task.title, TRUNCATION_LENGTH)
-                          return (
-                            <SelectItem key={task._id} value={task._id}>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      {task.displayId && (
-                                        <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
-                                          {task.displayId}
-                                        </span>
-                                      )}
-                                      <span className="truncate">{truncatedTitle}</span>
-                                    </div>
-                                  </TooltipTrigger>
-                                  {isTruncated && (
-                                    <TooltipContent side="left" align="center" className="max-w-sm break-words">
-                                      <p className="whitespace-normal">{task.title}</p>
-                                    </TooltipContent>
-                                  )}
-                                </Tooltip>
-                              </TooltipProvider>
-                            </SelectItem>
-                          )
-                        })
-                      )}
-                    </div>
-                  </div>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="assignedTo">Assigned To</Label>
-              <Select
-                value={filters.assignedTo}
-                onValueChange={(value) => { setFilters(prev => ({ ...prev, assignedTo: value })); setAssignedToFilterQuery(''); }}
-                onOpenChange={(open) => {
-                  if (open) focusSearchInput(assignedToFilterInputRef.current)
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All Users" />
-                </SelectTrigger>
-                <SelectContent className="p-0">
-                  <div className="p-2">
-                    <Input
-                      ref={assignedToFilterInputRef}
-                      value={assignedToFilterQuery}
-                      onChange={(e) => setAssignedToFilterQuery(e.target.value)}
-                      placeholder="Search users"
-                      className="mb-2"
-                      onKeyDown={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                    />
-                    <div className="max-h-56 overflow-y-auto">
-                      <SelectItem value="all">All Users</SelectItem>
-                      {filteredAssignedToOptions.length === 0 ? (
-                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching users</div>
-                      ) : (
-                        filteredAssignedToOptions.map((user) => (
-                          <SelectItem key={user._id} value={user._id}>
-                            {user.firstName} {user.lastName} ({user.email})
-                          </SelectItem>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className='mb-4'>
-              <Label htmlFor="approvedBy">Approved By</Label>
-              <Select
-                value={filters.assignedBy}
-                onValueChange={(value) => { setFilters(prev => ({ ...prev, assignedBy: value })); setAssignedByFilterQuery(''); }}
-                onOpenChange={(open) => {
-                  if (open) focusSearchInput(assignedByFilterInputRef.current)
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All Approvers" />
-                </SelectTrigger>
-                <SelectContent className="p-0">
-                  <div className="p-2">
-                    <Input
-                      ref={assignedByFilterInputRef}
-                      value={assignedByFilterQuery}
-                      onChange={(e) => setAssignedByFilterQuery(e.target.value)}
-                      placeholder="Search approvers"
-                      className="mb-2"
-                      onKeyDown={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                    />
-                    <div className="max-h-56 overflow-y-auto">
-                      <SelectItem value="all">All Approvers</SelectItem>
-                      {filteredAssignedByOptions.length === 0 ? (
-                        <div className="px-2 py-1 text-xs text-muted-foreground">No matching approvers</div>
-                      ) : (
-                        filteredAssignedByOptions.map((user) => (
-                          <SelectItem key={user._id} value={user._id}>
-                            {user.firstName} {user.lastName} ({user.email})
-                          </SelectItem>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div>
+            <Label htmlFor="startDate">Start Date</Label>
+            <Input
+              id="startDate"
+              type="date"
+              value={tempStartDate}
+              onChange={(e) => {
+                const val = e.target.value;
+                setTempStartDate(val);
+                // If it looks like a complete date (YYYY-MM-DD), apply it
+                if (val.length === 10 || val === '') {
+                  const corrected = validateAndCorrectDateRangeStrings(val, filters.endDate);
+                  setFilters(prev => ({ ...prev, startDate: corrected.startDate, endDate: corrected.endDate }));
+                }
+              }}
+              onBlur={() => handleDateBlur('start')}
+            />
           </div>
-          <div className="flex justify-end gap-2 pt-2 mb-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={resetFilters}
-              title="Clear all filters"
+          <div>
+            <Label htmlFor="endDate">End Date</Label>
+            <Input
+              id="endDate"
+              type="date"
+              value={tempEndDate}
+              onChange={(e) => {
+                const val = e.target.value;
+                setTempEndDate(val);
+                // If it looks like a complete date (YYYY-MM-DD), apply it
+                if (val.length === 10 || val === '') {
+                  const corrected = validateAndCorrectDateRangeStrings(filters.startDate, val);
+                  setFilters(prev => ({ ...prev, startDate: corrected.startDate, endDate: corrected.endDate }));
+                }
+              }}
+              onBlur={() => handleDateBlur('end')}
+            />
+          </div>
+          <div>
+            <Label htmlFor="projectId">Project</Label>
+            <Select
+              value={filters.projectId}
+              onValueChange={(value) => { setFilters(prev => ({ ...prev, projectId: value })); setProjectFilterQuery(''); }}
+              onOpenChange={(open) => {
+                if (open) focusSearchInput(projectFilterInputRef.current)
+              }}
             >
-              <RotateCcw className="h-4 w-4" />
+              <SelectTrigger>
+                <SelectValue placeholder="All Projects" />
+              </SelectTrigger>
+              <SelectContent className="p-0">
+                <div className="p-2">
+                  <Input
+                    ref={projectFilterInputRef}
+                    value={projectFilterQuery}
+                    onChange={(e) => setProjectFilterQuery(e.target.value)}
+                    placeholder="Search projects"
+                    className="mb-2"
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  />
+                  <div className="max-h-56 overflow-y-auto">
+                    <SelectItem value="all">All Projects</SelectItem>
+                    {filteredProjectOptions.length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-muted-foreground">No matching projects</div>
+                    ) : (
+                      filteredProjectOptions.map((project) => (
+                        <SelectItem key={project._id} value={project._id}>
+                          {project.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="taskId">Task</Label>
+            <Select
+              value={filters.taskId}
+              onValueChange={(value) => {
+                setFilters(prev => ({ ...prev, taskId: value }));
+                setTaskFilterQuery('');
+                // Also capture the task details if it's in the current list
+                const task = tasks.find(t => t._id === value);
+                if (task) setSelectedTaskDetails(task);
+              }}
+              onOpenChange={(open) => {
+                if (open) focusSearchInput(taskFilterInputRef.current)
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={filters.projectId === 'all' ? 'All Tasks' : 'Select Task'} />
+              </SelectTrigger>
+              <SelectContent className={`p-0 w-full ${TASK_FILTER_DROPDOWN_WIDTH}`}>
+                <div className="p-2">
+                  <Input
+                    ref={taskFilterInputRef}
+                    value={taskFilterQuery}
+                    onChange={(e) => setTaskFilterQuery(e.target.value)}
+                    placeholder="Search tasks"
+                    className="mb-2"
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  />
+                  <div className="max-h-56 overflow-y-auto">
+                    {/* Only show "All Tasks" option when no project is selected */}
+                    {filters.projectId === 'all' && <SelectItem value="all">All Tasks</SelectItem>}
+                    {filteredTaskOptions.length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-muted-foreground">
+                        {filters.projectId === 'all' ? 'No tasks found' : 'No tasks in this project'}
+                      </div>
+                    ) : (
+                      filteredTaskOptions.map((task) => {
+                        const { truncated: truncatedTitle, isTruncated } = truncateText(task.title, TRUNCATION_LENGTH)
+                        return (
+                          <SelectItem key={task._id} value={task._id}>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {task.displayId && (
+                                      <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                                        {task.displayId}
+                                      </span>
+                                    )}
+                                    <span className="truncate">{truncatedTitle}</span>
+                                  </div>
+                                </TooltipTrigger>
+                                {isTruncated && (
+                                  <TooltipContent side="left" align="center" className="max-w-sm break-words">
+                                    <p className="whitespace-normal">{task.title}</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
+                          </SelectItem>
+                        )
+                      })
+                    )}
+                  </div>
+                </div>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="assignedTo">Assigned To</Label>
+            <Select
+              value={filters.assignedTo}
+              onValueChange={(value) => { setFilters(prev => ({ ...prev, assignedTo: value })); setAssignedToFilterQuery(''); }}
+              onOpenChange={(open) => {
+                if (open) focusSearchInput(assignedToFilterInputRef.current)
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All Users" />
+              </SelectTrigger>
+              <SelectContent className="p-0">
+                <div className="p-2">
+                  <Input
+                    ref={assignedToFilterInputRef}
+                    value={assignedToFilterQuery}
+                    onChange={(e) => setAssignedToFilterQuery(e.target.value)}
+                    placeholder="Search users"
+                    className="mb-2"
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  />
+                  <div className="max-h-56 overflow-y-auto">
+                    <SelectItem value="all">All Users</SelectItem>
+                    {filteredAssignedToOptions.length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-muted-foreground">No matching users</div>
+                    ) : (
+                      filteredAssignedToOptions.map((user) => (
+                        <SelectItem key={user._id} value={user._id}>
+                          {user.firstName} {user.lastName} ({user.email})
+                        </SelectItem>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className='mb-4'>
+            <Label htmlFor="approvedBy">Approved By</Label>
+            <Select
+              value={filters.assignedBy}
+              onValueChange={(value) => { setFilters(prev => ({ ...prev, assignedBy: value })); setAssignedByFilterQuery(''); }}
+              onOpenChange={(open) => {
+                if (open) focusSearchInput(assignedByFilterInputRef.current)
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All Approvers" />
+              </SelectTrigger>
+              <SelectContent className="p-0">
+                <div className="p-2">
+                  <Input
+                    ref={assignedByFilterInputRef}
+                    value={assignedByFilterQuery}
+                    onChange={(e) => setAssignedByFilterQuery(e.target.value)}
+                    placeholder="Search approvers"
+                    className="mb-2"
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  />
+                  <div className="max-h-56 overflow-y-auto">
+                    <SelectItem value="all">All Approvers</SelectItem>
+                    {filteredAssignedByOptions.length === 0 ? (
+                      <div className="px-2 py-1 text-xs text-muted-foreground">No matching approvers</div>
+                    ) : (
+                      filteredAssignedByOptions.map((user) => (
+                        <SelectItem key={user._id} value={user._id}>
+                          {user.firstName} {user.lastName} ({user.email})
+                        </SelectItem>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2 mb-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={resetFilters}
+            title="Clear all filters"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" onClick={handleMonthlyReportExport}>
+            <FileText className="h-4 w-4 mr-2" />
+            Monthly Report
+          </Button>
+          {isAdmin && (
+            <Button variant="outline" onClick={handleBudgetReportExport}>
+              <Briefcase className="h-4 w-4 mr-2" />
+              Budget Report
             </Button>
-            <Button variant="outline" onClick={handleMonthlyReportExport}>
-              <FileText className="h-4 w-4 mr-2" />
-              Monthly Report
-            </Button>
-            {isAdmin && (
-              <Button variant="outline" onClick={handleBudgetReportExport}>
-                <Briefcase className="h-4 w-4 mr-2" />
-                Budget Report
-              </Button>
-            )}
-            <Button onClick={handleExport}>
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
+          )}
+          <Button onClick={handleExport}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+
+    {/* Loading State Overlay for Results */}
+    {isLoading && (
+      <Card className="animate-pulse">
+        <CardContent className="p-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Updating report results...</p>
           </div>
         </CardContent>
       </Card>
+    )}
 
-      {/* Loading State Overlay for Results */}
-      {isLoading && (
-        <Card className="animate-pulse">
-          <CardContent className="p-12">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Updating report results...</p>
+    {/* Summary Widgets */}
+    {!isLoading && reportData && filters.reportType === 'detailed' && reportData.detailedEntries && (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Clock className="h-8 w-8 text-primary" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Total Time</p>
+                <p className="text-2xl font-bold">{formatDuration(summaryStats.totalDuration)}</p>
+              </div>
             </div>
           </CardContent>
         </Card>
-      )}
 
-      {/* Summary Widgets */}
-      {!isLoading && reportData && filters.reportType === 'detailed' && reportData.detailedEntries && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Clock className="h-8 w-8 text-primary" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">Total Time</p>
-                  <p className="text-2xl font-bold">{formatDuration(summaryStats.totalDuration)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <DollarSign className="h-8 w-8 text-green-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">Total Cost</p>
-                  <p className="text-2xl font-bold">{(() => {
-                    // Use API summary total cost if available, otherwise fall back to calculated
-                    const totalCost = reportData.summary?.totalCost ?? summaryStats.totalCost;
-                    return formatCurrency(totalCost, orgCurrency);
-                  })()}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <TrendingUp className="h-8 w-8 text-blue-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">Billable Time</p>
-                  <p className="text-2xl font-bold">{formatDuration(summaryStats.billableDuration)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Users className="h-8 w-8 text-purple-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">Total Entries</p>
-                  <p className="text-2xl font-bold">{summaryStats.totalEntries}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Detailed Entries Report - Always shown */}
-      {!isLoading && reportData && filters.reportType === 'detailed' && reportData.detailedEntries && (
         <Card>
-          <CardHeader>
-            <CardTitle>Approved Time Entries</CardTitle>
-            <CardDescription>
-              Shows only approved time entries
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* Results Count */}
-            <div className="flex items-center justify-between mb-4 pb-3 border-b">
-              <div className="text-sm text-muted-foreground">
-                {reportData.detailedEntries && reportData.detailedEntries.length > 0 ? (
-                  <span>
-                    Showing <span className="font-medium text-foreground">{getPaginatedDetailedEntries.length}</span> of{' '}
-                    <span className="font-medium text-foreground">{reportData.summary?.totalEntries || reportData.detailedEntries.length}</span> time entries
-                    {detailedEntriesPagination.page > 1 && (
-                      <span className="ml-2 text-xs">
-                        (Page {detailedEntriesPagination.page} of {Math.ceil(reportData.detailedEntries.length / detailedEntriesPagination.limit)})
-                      </span>
-                    )}
-                  </span>
-                ) : (
-                  <span>No time entries found</span>
-                )}
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <DollarSign className="h-8 w-8 text-green-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Total Cost</p>
+                <p className="text-2xl font-bold">{(() => {
+                  // Use API summary total cost if available, otherwise fall back to calculated
+                  const totalCost = reportData.summary?.totalCost ?? summaryStats.totalCost;
+                  return formatCurrency(totalCost, orgCurrency);
+                })()}</p>
               </div>
-              {/* {hasActiveFilters && (
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <TrendingUp className="h-8 w-8 text-blue-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Billable Time</p>
+                <p className="text-2xl font-bold">{formatDuration(summaryStats.billableDuration)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Users className="h-8 w-8 text-purple-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Total Entries</p>
+                <p className="text-2xl font-bold">{summaryStats.totalEntries}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )}
+
+    {/* Detailed Entries Report - Always shown */}
+    {!isLoading && reportData && filters.reportType === 'detailed' && reportData.detailedEntries && (
+      <Card>
+        <CardHeader>
+          <CardTitle>Approved Time Entries</CardTitle>
+          <CardDescription>
+            Shows only approved time entries
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Results Count */}
+          <div className="flex items-center justify-between mb-4 pb-3 border-b">
+            <div className="text-sm text-muted-foreground">
+              {reportData.detailedEntries && reportData.detailedEntries.length > 0 ? (
+                <span>
+                  Showing <span className="font-medium text-foreground">{getPaginatedDetailedEntries.length}</span> of{' '}
+                  <span className="font-medium text-foreground">{reportData.summary?.totalEntries || reportData.detailedEntries.length}</span> time entries
+                  {detailedEntriesPagination.page > 1 && (
+                    <span className="ml-2 text-xs">
+                      (Page {detailedEntriesPagination.page} of {Math.ceil(reportData.detailedEntries.length / detailedEntriesPagination.limit)})
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <span>No time entries found</span>
+              )}
+            </div>
+            {/* {hasActiveFilters && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1155,244 +1164,244 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                   Clear Filters
                 </Button>
               )} */}
-            </div>
+          </div>
 
-            {reportData.detailedEntries.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No approved time entries found for the selected filters.
-                <div className="text-sm mt-2">
-                  Only entries that have been approved and not rejected are shown.
-                </div>
+          {reportData.detailedEntries.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No approved time entries found for the selected filters.
+              <div className="text-sm mt-2">
+                Only entries that have been approved and not rejected are shown.
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <div className="min-w-full">
-                  {/* Desktop Table View */}
-                  <div className="hidden md:block">
-                    <div className="grid grid-cols-12 gap-4 p-4 border-b font-semibold text-sm text-muted-foreground">
-                      <div className="col-span-2">Employee</div>
-                      <div className="col-span-2">Project (Task)</div>
-                      <div className="col-span-1">Date</div>
-                      <div className="col-span-1">Start</div>
-                      <div className="col-span-1">End</div>
-                      <div className="col-span-1">Duration</div>
-                      <div className="col-span-1">Rate</div>
-                      <div className="col-span-1">Cost</div>
-                      <div className="col-span-1">Billable</div>
-                      <div className="col-span-1">Approval Status</div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <div className="min-w-full">
+                {/* Desktop Table View */}
+                <div className="hidden md:block">
+                  <div className="grid grid-cols-12 gap-4 p-4 border-b font-semibold text-sm text-muted-foreground">
+                    <div className="col-span-2">Employee</div>
+                    <div className="col-span-2">Project (Task)</div>
+                    <div className="col-span-1">Date</div>
+                    <div className="col-span-1">Start</div>
+                    <div className="col-span-1">End</div>
+                    <div className="col-span-1">Duration</div>
+                    <div className="col-span-1">Rate</div>
+                    <div className="col-span-1">Cost</div>
+                    <div className="col-span-1">Billable</div>
+                    <div className="col-span-1">Approval Status</div>
+                  </div>
+                  {getPaginatedDetailedEntries.map((entry) => (
+                    <div key={entry._id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-muted/50">
+                      <div className="col-span-2">
+                        <div className="font-medium text-sm">{entry.userName}</div>
+                        <div className="text-xs text-muted-foreground">{entry.userEmail}</div>
+                      </div>
+                      <div className="col-span-2">
+                        <div className="font-medium text-sm">{entry.projectName}</div>
+                        {entry.taskTitle && (
+                          <div className="text-xs text-muted-foreground">{entry.taskTitle}</div>
+                        )}
+                      </div>
+                      <div className="col-span-1 text-sm">
+                        {formatDate(entry.date)}
+                      </div>
+                      <div className="col-span-1 text-sm">
+                        {entry.startTime ? formatTime(entry.startTime) : '-'}
+                      </div>
+                      <div className="col-span-1 text-sm">
+                        {entry.endTime ? formatTime(entry.endTime) : '-'}
+                      </div>
+                      <div className="col-span-1 text-sm font-medium">
+                        {formatDurationUtil(entry.duration)}
+                      </div>
+                      <div className="col-span-1 text-sm">
+                        <div className="flex flex-col">
+                          <span className="font-medium">{formatCurrency(entry.hourlyRate, orgCurrency)}/hr</span>
+                          <span className="text-xs text-muted-foreground">
+                            {getHourlyRateSource(entry)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="col-span-1 text-sm font-medium">
+                        {formatCurrency(entry.cost, orgCurrency)}
+                      </div>
+                      <div className="col-span-1">
+                        {entry.isBillable ? (
+                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-400">
+                            Yes
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">No</Badge>
+                        )}
+                      </div>
+                      <div className="col-span-1">
+                        {(() => {
+                          const isApproved = (entry as any).isApproved;
+                          const isRejected = (entry as any).isReject;
+
+                          if (isRejected) {
+                            return (
+                              <Badge variant="destructive" className="text-xs">
+                                Rejected
+                              </Badge>
+                            );
+                          } else if (isApproved) {
+                            return (
+                              <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-400">
+                                Approved
+                              </Badge>
+                            );
+                          } else {
+                            return (
+                              <Badge variant="secondary" className="text-xs">
+                                Pending
+                              </Badge>
+                            );
+                          }
+                        })()}
+                      </div>
                     </div>
-                    {getPaginatedDetailedEntries.map((entry) => (
-                      <div key={entry._id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-muted/50">
-                        <div className="col-span-2">
-                          <div className="font-medium text-sm">{entry.userName}</div>
+                  ))}
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-5">
+                  {getPaginatedDetailedEntries.map((entry) => (
+                    <div key={entry._id} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium">{entry.userName}</div>
                           <div className="text-xs text-muted-foreground">{entry.userEmail}</div>
                         </div>
+                        {entry.isBillable && (
+                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-400">
+                            Billable
+                          </Badge>
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-medium text-sm">{entry.projectName}</div>
+                        {entry.taskTitle && (
+                          <div className="text-xs text-muted-foreground">{entry.taskTitle}</div>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Date: </span>
+                          <span>{formatDate(entry.date)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Duration: </span>
+                          <span className="font-medium">{formatDurationUtil(entry.duration)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Rate: </span>
+                          <span className="font-medium">{formatCurrency(entry.hourlyRate, orgCurrency)}/hr</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Start: </span>
+                          <span>{entry.startTime ? formatTime(entry.startTime) : '-'}</span>
+                        </div>
                         <div className="col-span-2">
-                          <div className="font-medium text-sm">{entry.projectName}</div>
-                          {entry.taskTitle && (
-                            <div className="text-xs text-muted-foreground">{entry.taskTitle}</div>
-                          )}
-                        </div>
-                        <div className="col-span-1 text-sm">
-                          {formatDate(entry.date)}
-                        </div>
-                        <div className="col-span-1 text-sm">
-                          {entry.startTime ? formatTime(entry.startTime) : '-'}
-                        </div>
-                        <div className="col-span-1 text-sm">
-                          {entry.endTime ? formatTime(entry.endTime) : '-'}
-                        </div>
-                        <div className="col-span-1 text-sm font-medium">
-                          {formatDurationUtil(entry.duration)}
-                        </div>
-                        <div className="col-span-1 text-sm">
-                          <div className="flex flex-col">
-                            <span className="font-medium">{formatCurrency(entry.hourlyRate, orgCurrency)}/hr</span>
-                            <span className="text-xs text-muted-foreground">
-                              {getHourlyRateSource(entry)}
-                            </span>
+                          <span className="text-muted-foreground">Cost: </span>
+                          <span className="font-medium">{formatCurrency(entry.cost, orgCurrency)}</span>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Cost = {formatDurationUtil(entry.duration)} × {formatCurrency(entry.hourlyRate, orgCurrency)}/hr
                           </div>
-                        </div>
-                        <div className="col-span-1 text-sm font-medium">
-                          {formatCurrency(entry.cost, orgCurrency)}
-                        </div>
-                        <div className="col-span-1">
-                          {entry.isBillable ? (
-                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-400">
-                              Yes
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-xs">No</Badge>
-                          )}
-                        </div>
-                        <div className="col-span-1">
-                          {(() => {
-                            const isApproved = (entry as any).isApproved;
-                            const isRejected = (entry as any).isReject;
-
-                            if (isRejected) {
-                              return (
-                                <Badge variant="destructive" className="text-xs">
-                                  Rejected
-                                </Badge>
-                              );
-                            } else if (isApproved) {
-                              return (
-                                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-400">
-                                  Approved
-                                </Badge>
-                              );
-                            } else {
-                              return (
-                                <Badge variant="secondary" className="text-xs">
-                                  Pending
-                                </Badge>
-                              );
-                            }
-                          })()}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                      <div>
+                        <span className="text-muted-foreground">Approval Status: </span>
+                        {(() => {
+                          const isApproved = (entry as any).isApproved;
+                          const isRejected = (entry as any).isReject;
 
-                  {/* Mobile Card View */}
-                  <div className="md:hidden space-y-5">
-                    {getPaginatedDetailedEntries.map((entry) => (
-                      <div key={entry._id} className="border rounded-lg p-4 space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium">{entry.userName}</div>
-                            <div className="text-xs text-muted-foreground">{entry.userEmail}</div>
-                          </div>
-                          {entry.isBillable && (
-                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-400">
-                              Billable
-                            </Badge>
-                          )}
-                        </div>
-                        <div>
-                          <div className="font-medium text-sm">{entry.projectName}</div>
-                          {entry.taskTitle && (
-                            <div className="text-xs text-muted-foreground">{entry.taskTitle}</div>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">Date: </span>
-                            <span>{formatDate(entry.date)}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Duration: </span>
-                            <span className="font-medium">{formatDurationUtil(entry.duration)}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Rate: </span>
-                            <span className="font-medium">{formatCurrency(entry.hourlyRate, orgCurrency)}/hr</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Start: </span>
-                            <span>{entry.startTime ? formatTime(entry.startTime) : '-'}</span>
-                          </div>
-                          <div className="col-span-2">
-                            <span className="text-muted-foreground">Cost: </span>
-                            <span className="font-medium">{formatCurrency(entry.cost, orgCurrency)}</span>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Cost = {formatDurationUtil(entry.duration)} × {formatCurrency(entry.hourlyRate, orgCurrency)}/hr
-                            </div>
-                          </div>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Approval Status: </span>
-                          {(() => {
-                            const isApproved = (entry as any).isApproved;
-                            const isRejected = (entry as any).isReject;
-
-                            if (isRejected) {
-                              return (
-                                <Badge variant="destructive" className="text-xs">
-                                  Rejected
-                                </Badge>
-                              );
-                            } else if (isApproved) {
-                              return (
-                                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-400">
-                                  Approved
-                                </Badge>
-                              );
-                            } else {
-                              return (
-                                <Badge variant="secondary" className="text-xs">
-                                  Pending
-                                </Badge>
-                              );
-                            }
-                          })()}
-                        </div>
+                          if (isRejected) {
+                            return (
+                              <Badge variant="destructive" className="text-xs">
+                                Rejected
+                              </Badge>
+                            );
+                          } else if (isApproved) {
+                            return (
+                              <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-400">
+                                Approved
+                              </Badge>
+                            );
+                          } else {
+                            return (
+                              <Badge variant="secondary" className="text-xs">
+                                Pending
+                              </Badge>
+                            );
+                          }
+                        })()}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            )}
-          </CardContent>
-
-          {/* Pagination Controls */}
-          {detailedEntriesPagination.total > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 pb-6">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Items per page:</span>
-                  <Select
-                    value={detailedEntriesPagination.limit.toString()}
-                    onValueChange={(value) => {
-                      const newLimit = parseInt(value)
-                      setDetailedEntriesPagination(prev => ({
-                        ...prev,
-                        limit: newLimit,
-                        page: 1 // Reset to first page when changing limit
-                      }))
-                    }}
-                  >
-                    <SelectTrigger className="w-16 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                      <SelectItem value="100">100</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  Showing {((detailedEntriesPagination.page - 1) * detailedEntriesPagination.limit) + 1} to {Math.min(detailedEntriesPagination.page * detailedEntriesPagination.limit, detailedEntriesPagination.total)} of {detailedEntriesPagination.total}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setDetailedEntriesPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                  disabled={detailedEntriesPagination.page === 1}
-                >
-                  Previous
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {detailedEntriesPagination.page} of {detailedEntriesPagination.totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setDetailedEntriesPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                  disabled={detailedEntriesPagination.page === detailedEntriesPagination.totalPages}
-                >
-                  Next
-                </Button>
               </div>
             </div>
           )}
-        </Card>
-      )}
+        </CardContent>
 
-    </div>
-  )
+        {/* Pagination Controls */}
+        {detailedEntriesPagination.total > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 pb-6">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Items per page:</span>
+                <Select
+                  value={detailedEntriesPagination.limit.toString()}
+                  onValueChange={(value) => {
+                    const newLimit = parseInt(value)
+                    setDetailedEntriesPagination(prev => ({
+                      ...prev,
+                      limit: newLimit,
+                      page: 1 // Reset to first page when changing limit
+                    }))
+                  }}
+                >
+                  <SelectTrigger className="w-16 h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Showing {((detailedEntriesPagination.page - 1) * detailedEntriesPagination.limit) + 1} to {Math.min(detailedEntriesPagination.page * detailedEntriesPagination.limit, detailedEntriesPagination.total)} of {detailedEntriesPagination.total}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDetailedEntriesPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                disabled={detailedEntriesPagination.page === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {detailedEntriesPagination.page} of {detailedEntriesPagination.totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDetailedEntriesPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                disabled={detailedEntriesPagination.page === detailedEntriesPagination.totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
+    )}
+
+  </div>
+)
 }
