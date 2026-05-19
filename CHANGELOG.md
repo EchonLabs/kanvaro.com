@@ -1,3 +1,10 @@
+## [1.36.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.36.2...v1.36.3) (2026-05-19)
+
+
+### Bug Fixes
+
+* reports - The selected task is missing after selection. Although the results are displayed, the selected task is not shown in the task dropdown. ([0875282](https://github.com/EchonLabs/kanvaro.com/commit/087528299148a3a132915432998c2833a97e77f6))
+
 ## [1.36.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.36.1...v1.36.2) (2026-05-19)
 
 
