@@ -36,20 +36,20 @@ export async function GET(request: NextRequest) {
         const decoded: any = jwt.verify(accessToken, JWT_SECRET)
         requester = await User.findById(decoded.userId)
       }
-    } catch {}
+    } catch { }
     if (!requester && refreshToken) {
       try {
         const decoded: any = jwt.verify(refreshToken, JWT_REFRESH_SECRET)
         requester = await User.findById(decoded.userId)
-      } catch {}
+      } catch { }
     }
     if (!requester || !requester.isActive) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Only HR and admin can access this endpoint
-    if (!['admin', 'human_resource'].includes(requester.role)) {
-      return NextResponse.json({ error: 'Forbidden: Only HR and Admin users can access this endpoint' }, { status: 403 })
+    // Only HR can access this endpoint
+    if (requester.role !== 'human_resource') {
+      return NextResponse.json({ error: 'Forbidden: Only HR users can access this endpoint' }, { status: 403 })
     }
 
     const orgId = requester.organization.toString()
@@ -60,6 +60,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Employee not found or not in your organization' }, { status: 404 })
     }
 
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
+
     // Find tasks in this project assigned to the employee
     // Tasks use assignedTo array with objects containing { user: ObjectId }
     const query: any = {
@@ -69,24 +72,29 @@ export async function GET(request: NextRequest) {
       'assignedTo.user': employeeId
     }
 
+    if (search.trim()) {
+      const searchLower = search.trim().toLowerCase()
+      const searchRegex = new RegExp(searchLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+      query.$or = [
+        { title: searchRegex },
+        { displayId: searchRegex }
+      ]
+    }
+
     const tasks = await Task.find(query)
       .select('_id title status priority isBillable displayId')
       .sort({ title: 1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
       .lean()
-
-    // Apply search filter on results if provided
-    let filteredTasks = tasks
-    if (search.trim()) {
-      const searchLower = search.trim().toLowerCase()
-      filteredTasks = tasks.filter((t: any) =>
-        t.title?.toLowerCase().includes(searchLower) ||
-        t.displayId?.toLowerCase().includes(searchLower)
-      )
-    }
 
     return NextResponse.json({
       success: true,
-      tasks: filteredTasks
+      tasks,
+      pagination: {
+        page,
+        limit
+      }
     })
   } catch (error) {
     console.error('Error fetching employee tasks for HR:', error)

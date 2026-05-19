@@ -128,74 +128,14 @@ export function HRManualTimeLogModal({
   }, [projects, projectSearch])
 
   const filteredTasks = useMemo(() => {
-    if (!taskSearch.trim()) return tasks
-    const searchLower = taskSearch.toLowerCase()
-    return tasks.filter(t =>
-      t.title?.toLowerCase().includes(searchLower) ||
-      t.displayId?.toLowerCase().includes(searchLower)
-    )
-  }, [tasks, taskSearch])
+    // We now fetch tasks from the server based on search, so we display the server results directly
+    return tasks
+  }, [tasks])
 
   const selectedTask = useMemo(() =>
     tasks.find(t => t._id === selectedTaskId),
     [tasks, selectedTaskId]
   )
-
-  // Reset form when modal opens
-  useEffect(() => {
-    if (open) {
-      resetForm()
-      loadEmployees()
-      loadTimeTrackingSettings()
-    }
-  }, [open])
-
-  // Load projects when employee changes
-  useEffect(() => {
-    if (selectedEmployeeId) {
-      loadProjects(selectedEmployeeId)
-    } else {
-      setProjects([])
-      setSelectedProjectId('')
-      setTasks([])
-      setSelectedTaskId('')
-    }
-  }, [selectedEmployeeId])
-
-  // Load tasks when project changes
-  useEffect(() => {
-    if (selectedEmployeeId && selectedProjectId) {
-      loadTasks(selectedEmployeeId, selectedProjectId)
-    } else {
-      setTasks([])
-      setSelectedTaskId('')
-    }
-  }, [selectedEmployeeId, selectedProjectId])
-
-
-  const resetForm = () => {
-    setSelectedEmployeeId('')
-    setSelectedProjectId('')
-    setSelectedTaskId('')
-    setEmployees([])
-    setProjects([])
-    setTasks([])
-    setEmployeeSearch('')
-    setProjectSearch('')
-    setTaskSearch('')
-    setFormData({
-      startDate: '',
-      startTime: '',
-      endDate: '',
-      endTime: '',
-      memo: ''
-    })
-    setError('')
-    setStartDateError('')
-    setStartTimeError('')
-    setEndDateError('')
-    setEndTimeError('')
-  }
 
   const loadEmployees = async () => {
     setEmployeesLoading(true)
@@ -253,13 +193,11 @@ export function HRManualTimeLogModal({
     }
   }
 
-  const loadTasks = async (employeeId: string, projectId: string) => {
+  const loadTasks = useCallback(async (employeeId: string, projectId: string, search: string = '') => {
     setTasksLoading(true)
-    setTasks([])
-    setSelectedTaskId('')
-    setTaskSearch('')
     try {
-      const res = await fetch(`/api/time-tracking/hr/employee-tasks?employeeId=${employeeId}&projectId=${projectId}`)
+      const limit = search ? 1000 : 10
+      const res = await fetch(`/api/time-tracking/hr/employee-tasks?employeeId=${employeeId}&projectId=${projectId}&search=${encodeURIComponent(search)}&limit=${limit}`)
       const data = await res.json()
       if (data.success && Array.isArray(data.tasks)) {
         setTasks(data.tasks)
@@ -272,7 +210,77 @@ export function HRManualTimeLogModal({
     } finally {
       setTasksLoading(false)
     }
+  }, [])
+
+  // Reset form when modal opens
+  useEffect(() => {
+    if (open) {
+      resetForm()
+      loadEmployees()
+      loadTimeTrackingSettings()
+    }
+  }, [open])
+
+  // Load projects when employee changes
+  useEffect(() => {
+    if (selectedEmployeeId) {
+      loadProjects(selectedEmployeeId)
+    } else {
+      setProjects([])
+      setSelectedProjectId('')
+      setTasks([])
+      setSelectedTaskId('')
+    }
+  }, [selectedEmployeeId])
+
+  // Load tasks when project changes
+  useEffect(() => {
+    if (selectedEmployeeId && selectedProjectId) {
+      loadTasks(selectedEmployeeId, selectedProjectId, '')
+    } else {
+      setTasks([])
+      setSelectedTaskId('')
+    }
+  }, [selectedEmployeeId, selectedProjectId, loadTasks])
+
+  // Debounced task search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (selectedEmployeeId && selectedProjectId && taskSearch) {
+        loadTasks(selectedEmployeeId, selectedProjectId, taskSearch)
+      } else if (selectedEmployeeId && selectedProjectId && !taskSearch) {
+        loadTasks(selectedEmployeeId, selectedProjectId, '')
+      }
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [taskSearch, selectedEmployeeId, selectedProjectId, loadTasks])
+
+
+  const resetForm = () => {
+    setSelectedEmployeeId('')
+    setSelectedProjectId('')
+    setSelectedTaskId('')
+    setEmployees([])
+    setProjects([])
+    setTasks([])
+    setEmployeeSearch('')
+    setProjectSearch('')
+    setTaskSearch('')
+    setFormData({
+      startDate: '',
+      startTime: '',
+      endDate: '',
+      endTime: '',
+      memo: ''
+    })
+    setError('')
+    setStartDateError('')
+    setStartTimeError('')
+    setEndDateError('')
+    setEndTimeError('')
   }
+
+
 
   const combineDateTime = (date: string, time: string): string => {
     if (!date || !time) return ''
@@ -624,26 +632,35 @@ export function HRManualTimeLogModal({
                 }}
                 disabled={!selectedProjectId}
               >
-                <Tooltip delayDuration={200}>
-                  <TooltipTrigger asChild>
-                    <SelectTrigger className="w-full" id="hr-task">
-                      <SelectValue placeholder={
-                        !selectedProjectId
-                          ? 'Select a project first'
-                          : tasksLoading
-                            ? 'Loading tasks...'
-                            : tasks.length > 0
-                              ? 'Select a task'
-                              : 'No tasks available'
-                      } />
-                    </SelectTrigger>
-                  </TooltipTrigger>
-                  {selectedTask && (
-                    <TooltipContent side="top" className="max-w-sm">
-                      <p className="font-medium">{selectedTask.title}</p>
-                    </TooltipContent>
+                <SelectTrigger className="w-full" id="hr-task">
+                  {selectedTask ? (
+                    <div className="flex items-center gap-2 truncate">
+                      {selectedTask.displayId && (
+                        <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                          {selectedTask.displayId}
+                        </span>
+                      )}
+                      <Tooltip delayDuration={200}>
+                        <TooltipTrigger asChild>
+                          <span className="truncate">{selectedTask.title}</span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-sm">
+                          <p className="font-medium">{selectedTask.title}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  ) : (
+                    <SelectValue placeholder={
+                      !selectedProjectId
+                        ? 'Select a project first'
+                        : tasksLoading
+                          ? 'Loading tasks...'
+                          : tasks.length > 0
+                            ? 'Select a task'
+                            : 'No tasks available'
+                    } />
                   )}
-                </Tooltip>
+                </SelectTrigger>
                 <SelectContent className="max-h-[250px] w-[var(--radix-select-trigger-width)]">
                   <div className="sticky top-0 z-10 p-2 border-b bg-popover">
                     <div className="relative">
@@ -684,21 +701,28 @@ export function HRManualTimeLogModal({
                     ) : (
                       filteredTasks.map((task) => (
                         <SelectItem key={task._id} value={task._id} onMouseDown={(e) => e.preventDefault()}>
-                          <div className="flex items-center space-x-2 min-w-0" style={{ maxWidth: '400px'}}>
+                          <div className="flex items-center space-x-2 min-w-0" style={{ maxWidth: '400px' }}>
                             <Target className="h-4 w-4 flex-shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <div className="text-xs text-muted-foreground truncate">
-                                {task.displayId && `${task.displayId} • `}{task.status} • {task.priority}
+                              <div className="flex items-center gap-2 min-w-0">
+                                {task.displayId && (
+                                  <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                                    {task.displayId}
+                                  </span>
+                                )}
+                                <div className="font-medium truncate">
+                                  <Tooltip delayDuration={200}>
+                                    <TooltipTrigger asChild>
+                                      <span className="truncate block overflow-hidden">{task.title}</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="max-w-sm">
+                                      <p className="font-medium">{task.title}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
                               </div>
-                              <div className="font-medium min-w-0">
-                                <Tooltip delayDuration={200}>
-                                  <TooltipTrigger asChild>
-                                    <span className="truncate block overflow-hidden">{task.title}</span>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" className="max-w-sm">
-                                    <p className="font-medium">{task.title}</p>
-                                  </TooltipContent>
-                                </Tooltip>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {task.status} • {task.priority}
                               </div>
                             </div>
                           </div>

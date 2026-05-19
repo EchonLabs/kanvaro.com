@@ -49,17 +49,17 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <TooltipProvider>
-            <AuthProvider>
-              <PermissionProvider initialPermissions={initialPermissions}>
-                <SessionTimeoutWrapper>
-                  <ToastProviderWrapper>
+          <ToastProviderWrapper>
+            <TooltipProvider>
+              <AuthProvider>
+                <PermissionProvider initialPermissions={initialPermissions}>
+                  <SessionTimeoutWrapper>
                     {children}
-                  </ToastProviderWrapper>
-                </SessionTimeoutWrapper>
-              </PermissionProvider>
-            </AuthProvider>
-          </TooltipProvider>
+                  </SessionTimeoutWrapper>
+                </PermissionProvider>
+              </AuthProvider>
+            </TooltipProvider>
+          </ToastProviderWrapper>
         </ThemeProvider>
       </body>
     </html>

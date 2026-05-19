@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useOrganization } from '@/hooks/useOrganization'
 import { usePermissions } from '@/lib/permissions/permission-context'
-import { applyRoundingRules } from '@/lib/utils'
+import { applyRoundingRules, focusSearchInput } from '@/lib/utils'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Permission, Role, ROLE_PERMISSIONS } from '@/lib/permissions/permission-definitions'
@@ -103,6 +103,15 @@ interface ReportData {
   }>
 }
 
+interface Task {
+  _id: string
+  title: string
+  status: string
+  priority: string
+  isBillable?: boolean
+  displayId?: string
+}
+
 export function TimeReports({ userId, organizationId, projectId }: TimeReportsProps) {
   const { organization } = useOrganization()
   const { formatCurrency } = useOrgCurrency()
@@ -131,7 +140,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   const [orgCurrency, setOrgCurrency] = useState<string>('USD')
   const [projects, setProjects] = useState<Array<{ _id: string; name: string }>>([])
   const [users, setUsers] = useState<Array<{ _id: string; firstName: string; lastName: string; email: string; role: string }>>([])
-  const [tasks, setTasks] = useState<Array<{ _id: string; title: string }>>([])
+  const [tasks, setTasks] = useState<Task[]>([])
   const [projectFilterQuery, setProjectFilterQuery] = useState('')
   const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
   const [assignedByFilterQuery, setAssignedByFilterQuery] = useState('')
@@ -142,24 +151,6 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   const assignedToFilterInputRef = useRef<HTMLInputElement | null>(null)
   const assignedByFilterInputRef = useRef<HTMLInputElement | null>(null)
 
-  const focusSearchInput = (el: HTMLInputElement | null) => {
-    if (!el || el.disabled) return
-
-    const doFocus = () => {
-      el.focus({ preventScroll: true })
-      try {
-        el.select?.()
-      } catch {
-        // ignore
-      }
-    }
-
-    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-      window.requestAnimationFrame(doFocus)
-    } else {
-      setTimeout(doFocus, 0)
-    }
-  }
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -237,61 +228,71 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     setTaskFilterQuery('')
   }
 
-  const loadReport = useCallback(async () => {
-    setIsLoading(true)
-    setError('')
-
-    try {
-      const params = new URLSearchParams({
-        organizationId,
-        reportType: filters.reportType,
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString()
-      })
-
-      if (filters.projectId && filters.projectId !== 'all') params.append('projectId', filters.projectId);
-      if (filters.assignedTo && filters.assignedTo !== 'all') params.append('userId', filters.assignedTo);
-      // Use approvedBy for approver filter
-      if (filters.assignedBy && filters.assignedBy !== 'all') params.append('approvedBy', filters.assignedBy);
-      if (filters.taskId && filters.taskId !== 'all') params.append('taskId', filters.taskId);
-      if (filters.startDate) params.append('startDate', filters.startDate);
-      if (filters.endDate) params.append('endDate', filters.endDate);
-
-      const response = await fetch(`/api/time-tracking/reports?${params}`)
-      const data = await response.json()
-
-      if (response.ok && data) {
-        // Handle different response structures
-        if (data.summary || data.userReport || data.projectReport || data.taskReport || data.billableReport) {
-          setReportData(data)
-        } else if (data.data) {
-          setReportData(data.data)
-        } else {
-          setReportData(data)
-        }
-
-        // Set organization currency from API response
-        if (data.organizationCurrency) {
-          setOrgCurrency(data.organizationCurrency)
-        }
-
-        // Set pagination from API response
-        if (data.pagination) {
-          setPagination(data.pagination)
-        }
-      } else {
-        setError(data?.error || 'Failed to load report')
-      }
-    } catch (error) {
-      setError('Failed to load report')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [organizationId, filters])
-
   useEffect(() => {
-    loadReport()
-  }, [loadReport])
+    let isCancelled = false;
+
+    const fetchReport = async () => {
+      setIsLoading(true)
+      setError('')
+
+      try {
+        const params = new URLSearchParams({
+          organizationId,
+          reportType: filters.reportType,
+          page: pagination.page.toString(),
+          limit: pagination.limit.toString()
+        })
+
+        if (filters.projectId && filters.projectId !== 'all') params.append('projectId', filters.projectId);
+        if (filters.assignedTo && filters.assignedTo !== 'all') params.append('userId', filters.assignedTo);
+        if (filters.assignedBy && filters.assignedBy !== 'all') params.append('approvedBy', filters.assignedBy);
+        if (filters.taskId && filters.taskId !== 'all') params.append('taskId', filters.taskId);
+        if (filters.startDate) params.append('startDate', filters.startDate);
+        if (filters.endDate) params.append('endDate', filters.endDate);
+
+        const response = await fetch(`/api/time-tracking/reports?${params}`)
+        const data = await response.json()
+
+        if (!isCancelled) {
+          if (response.ok && data) {
+            // Handle different response structures
+            const reportContent = data.data || data;
+            setReportData(reportContent);
+
+            // Set organization currency
+            if (data.organizationCurrency) {
+              setOrgCurrency(data.organizationCurrency)
+            }
+
+            // Set pagination only if it actually changed to avoid unnecessary renders
+            if (data.pagination) {
+              setPagination(prev => {
+                if (prev.page === data.pagination.page &&
+                  prev.total === data.pagination.total &&
+                  prev.totalPages === data.pagination.totalPages &&
+                  prev.limit === data.pagination.limit) {
+                  return prev;
+                }
+                return { ...prev, ...data.pagination };
+              });
+            }
+          } else {
+            setError(data?.error || 'Failed to load report')
+          }
+        }
+      } catch (error) {
+        if (!isCancelled) setError('Failed to load report')
+      } finally {
+        if (!isCancelled) setIsLoading(false)
+      }
+    }
+
+    fetchReport()
+
+    return () => {
+      isCancelled = true;
+    }
+  }, [organizationId, filters, pagination.page, pagination.limit])
 
   // Sync temporary dates when filters change from external sources (e.g., reset button)
   useEffect(() => {
@@ -376,31 +377,53 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     loadFilterData()
   }, [organizationId])
 
-  // Load tasks based on selected project
-  useEffect(() => {
-    const loadTasks = async () => {
-      try {
-        let tasksUrl = `/api/tasks?limit=1000&page=1`
+  // Memoized load tasks based on selected project to support pagination and search
+  const loadTasks = useCallback(async (search: string = '') => {
+    try {
+      let tasksUrl = `/api/tasks?limit=${search ? '1000' : '10'}&page=1`
 
-        // If a specific project is selected, filter tasks by that project
-        if (filters.projectId && filters.projectId !== 'all') {
-          tasksUrl += `&project=${filters.projectId}`
-        }
-
-        const tasksRes = await fetch(tasksUrl)
-        if (tasksRes.ok) {
-          const tasksData = await tasksRes.json()
-          if (tasksData.success && Array.isArray(tasksData.data)) {
-            setTasks(tasksData.data.map((t: any) => ({ _id: t._id, title: t.title })))
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load tasks:', error)
+      // If a specific project is selected, filter tasks by that project
+      if (filters.projectId && filters.projectId !== 'all') {
+        tasksUrl += `&project=${filters.projectId}`
       }
-    }
 
-    loadTasks()
+      if (search) {
+        tasksUrl += `&search=${encodeURIComponent(search)}`
+      }
+
+      const tasksRes = await fetch(tasksUrl)
+      if (tasksRes.ok) {
+        const tasksData = await tasksRes.json()
+        if (tasksData.success && Array.isArray(tasksData.data)) {
+          setTasks(tasksData.data.map((t: any) => ({
+            _id: t._id,
+            title: t.title,
+            displayId: t.displayId || t.taskNumber
+          })))
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load tasks:', error)
+    }
   }, [filters.projectId])
+
+  // Load initial tasks when project changes
+  useEffect(() => {
+    loadTasks('')
+  }, [loadTasks])
+
+  // Debounced task search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (taskFilterQuery) {
+        loadTasks(taskFilterQuery)
+      } else {
+        // If search is cleared, reload the top 10 tasks
+        loadTasks('')
+      }
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [taskFilterQuery, loadTasks])
 
   // Reset task filter when project changes
   useEffect(() => {
@@ -443,10 +466,9 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   }, [users, assignedByFilterQuery])
 
   const filteredTaskOptions = useMemo(() => {
-    const query = taskFilterQuery.trim().toLowerCase()
-    if (!query) return tasks
-    return tasks.filter((task) => task.title.toLowerCase().includes(query))
-  }, [tasks, taskFilterQuery])
+    // We now fetch tasks from the server based on search, so we display the server results directly
+    return tasks
+  }, [tasks])
 
   const formatDuration = (minutes: number) => {
     // Apply rounding rules if enabled
@@ -718,18 +740,6 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     }
   }
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="text-muted-foreground mt-2">Loading report...</p>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
 
   return (
     <div className="space-y-8">
@@ -755,7 +765,15 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 id="startDate"
                 type="date"
                 value={tempStartDate}
-                onChange={(e) => setTempStartDate(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setTempStartDate(val);
+                  // If it looks like a complete date (YYYY-MM-DD), apply it
+                  if (val.length === 10 || val === '') {
+                    const corrected = validateAndCorrectDateRangeStrings(val, filters.endDate);
+                    setFilters(prev => ({ ...prev, startDate: corrected.startDate, endDate: corrected.endDate }));
+                  }
+                }}
                 onBlur={() => handleDateBlur('start')}
               />
             </div>
@@ -765,7 +783,15 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 id="endDate"
                 type="date"
                 value={tempEndDate}
-                onChange={(e) => setTempEndDate(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setTempEndDate(val);
+                  // If it looks like a complete date (YYYY-MM-DD), apply it
+                  if (val.length === 10 || val === '') {
+                    const corrected = validateAndCorrectDateRangeStrings(filters.startDate, val);
+                    setFilters(prev => ({ ...prev, startDate: corrected.startDate, endDate: corrected.endDate }));
+                  }
+                }}
                 onBlur={() => handleDateBlur('end')}
               />
             </div>
@@ -841,7 +867,14 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                       ) : (
                         filteredTaskOptions.map((task) => (
                           <SelectItem key={task._id} value={task._id}>
-                            {task.title}
+                            <div className="flex items-center gap-2">
+                              {task.displayId && (
+                                <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                                  {task.displayId}
+                                </span>
+                              )}
+                              <span className="truncate">{task.title}</span>
+                            </div>
                           </SelectItem>
                         ))
                       )}
@@ -956,8 +989,20 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
         </CardContent>
       </Card>
 
+      {/* Loading State Overlay for Results */}
+      {isLoading && (
+        <Card className="animate-pulse">
+          <CardContent className="p-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Updating report results...</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Summary Widgets */}
-      {reportData && filters.reportType === 'detailed' && reportData.detailedEntries && (
+      {!isLoading && reportData && filters.reportType === 'detailed' && reportData.detailedEntries && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card>
             <CardContent className="p-6">
@@ -1014,7 +1059,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
       )}
 
       {/* Detailed Entries Report - Always shown */}
-      {reportData && filters.reportType === 'detailed' && reportData.detailedEntries && (
+      {!isLoading && reportData && filters.reportType === 'detailed' && reportData.detailedEntries && (
         <Card>
           <CardHeader>
             <CardTitle>Approved Time Entries</CardTitle>

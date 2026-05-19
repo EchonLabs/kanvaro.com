@@ -19,7 +19,7 @@ interface TimerProps {
   taskId?: string
   description?: string
   isBillable?: boolean
- // requireDescription?: boolean
+  // requireDescription?: boolean
   allowOvertime?: boolean
   maxDailyHours?: number
   dailyHoursLogged?: number
@@ -30,7 +30,7 @@ interface TimerProps {
 interface ActiveTimer {
   _id: string
   project: { _id: string; name: string }
-  task?: { _id: string; title: string }
+  task?: { _id: string; title: string; displayId?: string }
   description: string
   startTime: string
   currentDuration: number
@@ -50,7 +50,7 @@ export function Timer({
   taskId,
   description = '',
   isBillable,
- // requireDescription = true,
+  // requireDescription = true,
   allowOvertime = true,
   maxDailyHours,
   dailyHoursLogged = 0,
@@ -351,8 +351,8 @@ export function Timer({
             message:
               data.message ||
               (hasTimeLogged
-                ? 'Timer stopped successfully.'
-                : 'Timer stopped. No time was logged.'),
+                ? `Timer stopped. ${formatTime(data.duration)} logged.`
+                : `Timer stopped. ${formatTime(data.duration || 0)}`),
             duration: 5000
           })
         }
@@ -445,9 +445,16 @@ export function Timer({
             {activeTimer.task && (
               <div className="min-w-0">
                 <Label className="text-sm font-medium">Task</Label>
-                <p className="text-sm text-muted-foreground break-words whitespace-normal" title={activeTimer.task.title}>
-                  {activeTimer.task.title}
-                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  {activeTimer.task.displayId && (
+                    <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                      {activeTimer.task.displayId}
+                    </span>
+                  )}
+                  <p className="text-sm text-muted-foreground truncate" title={activeTimer.task.title}>
+                    {activeTimer.task.title}
+                  </p>
+                </div>
               </div>
             )}
             <div className="min-w-0">
@@ -486,7 +493,7 @@ export function Timer({
                 Are you sure you want to stop the active timer?
                 <span className="block mt-2 text-foreground font-medium">
                   {activeTimer.project?.name || 'Unknown project'}
-                  {activeTimer.task && ` • ${activeTimer.task.title}`}
+                  {activeTimer.task && ` • ${activeTimer.task.displayId ? `${activeTimer.task.displayId} - ` : ''}${activeTimer.task.title}`}
                 </span>
               </>
             }
@@ -521,9 +528,9 @@ export function Timer({
       <Button
         onClick={handleStartTimer}
         disabled={
-          isLoading || 
-          !projectId || 
-          !taskId || 
+          isLoading ||
+          !projectId ||
+          !taskId ||
           (!description.trim()) ||
           (!allowOvertime && !!maxDailyHours && dailyHoursLogged >= maxDailyHours)
         }

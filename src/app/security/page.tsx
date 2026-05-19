@@ -24,7 +24,7 @@ type SecuritySettingsState = {
 const DEFAULT_SECURITY_SETTINGS: SecuritySettingsState = {
   twoFactorEnabled: false,
   loginAlerts: true,
-  sessionTimeout: 30,
+  sessionTimeout: 240,
   requirePasswordChange: false
 }
 
@@ -561,9 +561,9 @@ export default function SecurityPage() {
                     value={securitySettings.sessionTimeout}
                     onChange={(e) => setSecuritySettings({
                       ...securitySettings,
-                      sessionTimeout: parseInt(e.target.value) || 30
+                      sessionTimeout: parseInt(e.target.value) || 240
                     })}
-                    placeholder="30"
+                    placeholder="240"
                     min="5"
                     max="1440"
                   />

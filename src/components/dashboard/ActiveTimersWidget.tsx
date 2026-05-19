@@ -87,6 +87,11 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
   }, [])
 
   const deriveTimerMinutes = useCallback((timer: ActiveTimer): number => {
+    // If paused, use the currentDuration provided by the server which is already correct for the paused state
+    if (timer.isPaused) {
+      return Math.max(0, timer.currentDuration || 0)
+    }
+
     const baselineIso = timer.createdAt || timer.startTime
     const baselineMs = baselineIso ? new Date(baselineIso).getTime() : NaN
     if (Number.isNaN(baselineMs)) {
@@ -324,7 +329,7 @@ export function ActiveTimersWidget({ organizationId }: ActiveTimersWidgetProps) 
     return project.name.toLowerCase().includes(searchLower)
   })
 
-  const filteredTimers = timers
+  const filteredTimers = timers.filter(timer => !timer.isPaused)
 
   return (
     <Card className="overflow-x-hidden">
