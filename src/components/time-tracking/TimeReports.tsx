@@ -150,6 +150,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   const [assignedToFilterQuery, setAssignedToFilterQuery] = useState('')
   const [assignedByFilterQuery, setAssignedByFilterQuery] = useState('')
   const [taskFilterQuery, setTaskFilterQuery] = useState('')
+  const [selectedTaskDetails, setSelectedTaskDetails] = useState<Task | null>(null)
 
   const projectFilterInputRef = useRef<HTMLInputElement | null>(null)
   const taskFilterInputRef = useRef<HTMLInputElement | null>(null)
@@ -231,6 +232,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
     setAssignedToFilterQuery('')
     setAssignedByFilterQuery('')
     setTaskFilterQuery('')
+    setSelectedTaskDetails(null)
   }
 
   useEffect(() => {
@@ -434,7 +436,33 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   useEffect(() => {
     setFilters(prev => ({ ...prev, taskId: 'all' }))
     setTaskFilterQuery('')
+    setSelectedTaskDetails(null)
   }, [filters.projectId])
+
+  // Effect to sync selectedTaskDetails with current filters.taskId using report data
+  useEffect(() => {
+    if (filters.taskId && filters.taskId !== 'all' && (!selectedTaskDetails || selectedTaskDetails._id !== filters.taskId)) {
+      // Try to find the task in current task list first
+      const taskInList = tasks.find(t => t._id === filters.taskId);
+      if (taskInList) {
+        setSelectedTaskDetails(taskInList);
+      } else if (reportData?.detailedEntries) {
+        // Fallback: try to find it in the report data
+        const entry = reportData.detailedEntries.find(e => e.taskId === filters.taskId);
+        if (entry) {
+          setSelectedTaskDetails({
+            _id: entry.taskId,
+            title: entry.taskTitle,
+            displayId: entry.displayId,
+            status: '',
+            priority: ''
+          });
+        }
+      }
+    } else if (filters.taskId === 'all' && selectedTaskDetails) {
+      setSelectedTaskDetails(null);
+    }
+  }, [filters.taskId, tasks, reportData, selectedTaskDetails]);
 
   const filteredProjectOptions = useMemo(() => {
     const query = projectFilterQuery.trim().toLowerCase()
@@ -472,8 +500,14 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
 
   const filteredTaskOptions = useMemo(() => {
     // We now fetch tasks from the server based on search, so we display the server results directly
-    return tasks
-  }, [tasks])
+    // but ensure the selected task is always included so it can be displayed correctly
+    const options = [...tasks]
+    if (selectedTaskDetails && !options.find(t => t._id === selectedTaskDetails._id)) {
+      // Add the selected task to options if it's missing (e.g. not in current search results)
+      options.push(selectedTaskDetails)
+    }
+    return options
+  }, [tasks, selectedTaskDetails])
 
   const formatDuration = (minutes: number) => {
     // Apply rounding rules if enabled
@@ -843,7 +877,13 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
               <Label htmlFor="taskId">Task</Label>
               <Select
                 value={filters.taskId}
-                onValueChange={(value) => { setFilters(prev => ({ ...prev, taskId: value })); setTaskFilterQuery(''); }}
+                onValueChange={(value) => { 
+                  setFilters(prev => ({ ...prev, taskId: value })); 
+                  setTaskFilterQuery('');
+                  // Also capture the task details if it's in the current list
+                  const task = tasks.find(t => t._id === value);
+                  if (task) setSelectedTaskDetails(task);
+                }}
                 onOpenChange={(open) => {
                   if (open) focusSearchInput(taskFilterInputRef.current)
                 }}
