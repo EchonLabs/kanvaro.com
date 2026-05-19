@@ -223,6 +223,7 @@ export default function BacklogPage() {
   const [removingSprint, setRemovingSprint] = useState(false)
   const [sprintModalMode, setSprintModalMode] = useState<'assign' | 'manage'>('assign')
   const [currentSprintInfo, setCurrentSprintInfo] = useState<{ _id: string; name: string } | null>(null)
+  const [sprintModalProjectId, setSprintModalProjectId] = useState<string | null>(null)
   const [statusChangeModalOpen, setStatusChangeModalOpen] = useState(false)
   const [statusChangeTaskId, setStatusChangeTaskId] = useState<string | null>(null)
   const [statusChangeValue, setStatusChangeValue] = useState<BacklogItem['status']>('backlog')
@@ -655,6 +656,7 @@ export default function BacklogPage() {
     setTasksFromStories([])
     setSprintModalMode('assign')
     setCurrentSprintInfo(null)
+    setSprintModalProjectId(null) // To ensure project context is reset when modal is closed
   }
 
   const handleCloseSprintModal = () => {
@@ -800,8 +802,19 @@ export default function BacklogPage() {
       return
     }
 
+    // Extract project ID from the selected items
+    let projectId: string | null = null
+    if (uniqueTaskIds.length > 0) {
+      const task = backlogItems.find((item) => item.type === 'task' && item._id === uniqueTaskIds[0])
+      projectId = task?.project?._id ?? null
+    } else if (uniqueStoryIds.length > 0) {
+      const story = backlogItems.find((item) => item.type === 'story' && item._id === uniqueStoryIds[0])
+      projectId = story?.project?._id ?? null
+    }
+
     setTaskIdsForSprint(uniqueTaskIds)
     setStoryIdsForSprint(uniqueStoryIds)
+    setSprintModalProjectId(projectId)  // Store the project ID
     clearSprintSelection()
     setSprintModalMode(mode)
     setCurrentSprintInfo(options?.existingSprint ?? null)
@@ -819,11 +832,18 @@ export default function BacklogPage() {
     setShowSprintModal(true)
   }
 
-  const fetchAvailableSprints = useCallback(async () => {
+  const fetchAvailableSprints = useCallback(async (projectId?: string | null) => {
     setSprintsLoading(true)
     setSprintsError('')
     try {
-      const response = await fetch('/api/sprints?limit=200')
+      // If we have a project ID from the selected items, 
+      // fetch sprints for that project to narrow down options. 
+      // Otherwise, fetch all sprints.
+      const url = projectId
+        ? `/api/sprints?limit=200&projectId=${projectId}`
+        : '/api/sprints?limit=200'
+
+      const response = await fetch(url)
       const data = await response.json()
 
       if (!response.ok || !data.success) {
@@ -852,9 +872,9 @@ export default function BacklogPage() {
 
   useEffect(() => {
     if (showSprintModal) {
-      fetchAvailableSprints()
+      fetchAvailableSprints(sprintModalProjectId)
     }
-  }, [showSprintModal, fetchAvailableSprints])
+  }, [showSprintModal, sprintModalProjectId, fetchAvailableSprints])
 
   useEffect(() => {
     // Remove tasks and stories that are already in a sprint from selection
@@ -941,19 +961,27 @@ export default function BacklogPage() {
 
   const filteredSprints = useMemo(() => {
     const query = sprintQuery.trim().toLowerCase()
-
-    // Get projects from selected tasks and stories
-    const selectedItems = backlogItems.filter(item =>
-      (item.type === 'task' && selectedTaskIds.includes(item._id)) ||
-      (item.type === 'story' && selectedStoryIds.includes(item._id))
-    )
-    const selectedProjectIds = selectedItems.map(item => item.project?._id).filter(Boolean)
-
+  
+    // Determine which projects to filter by
+    let projectIdsToFilter: string[] = []
+    
+    // Priority 1: Use the stored project from sprint modal context (for "More Actions" selections)
+    if (sprintModalProjectId) {
+      projectIdsToFilter = [sprintModalProjectId]
+    } else {
+      // Priority 2: Get projects from multi-select mode selections
+      const selectedItems = backlogItems.filter(item =>
+        (item.type === 'task' && selectedTaskIds.includes(item._id)) ||
+        (item.type === 'story' && selectedStoryIds.includes(item._id))
+      )
+      projectIdsToFilter = selectedItems.map(item => item.project?._id).filter((id): id is string => Boolean(id))
+    }
+  
     // Filter sprints by selected items' projects
-    let filtered = selectedProjectIds.length > 0
-      ? sprints.filter(sprint => selectedProjectIds.includes(sprint.project?._id ?? ''))
+    let filtered = projectIdsToFilter.length > 0
+      ? sprints.filter(sprint => projectIdsToFilter.includes(sprint.project?._id ?? ''))
       : sprints
-
+  
     // Apply search filter
     if (query) {
       filtered = filtered.filter((sprint) => {
@@ -962,9 +990,9 @@ export default function BacklogPage() {
         return nameMatch || projectMatch
       })
     }
-
+  
     return filtered
-  }, [sprints, sprintQuery, selectedTaskIds, selectedStoryIds, backlogItems])
+  }, [sprints, sprintQuery, selectedTaskIds, selectedStoryIds, sprintModalProjectId, backlogItems])
 
   const filteredProjectOptions = useMemo(() => {
     const query = projectFilterQuery.trim().toLowerCase()

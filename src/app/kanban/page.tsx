@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, type ReactElement } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/MainLayout'
-import { formatToTitleCase, cn } from '@/lib/utils'
+import { formatToTitleCase, cn, truncateText } from '@/lib/utils'
 import { useTaskSync, useTaskState } from '@/hooks/useTaskSync'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { usePermissions } from '@/lib/permissions/permission-context'
@@ -78,6 +78,10 @@ import { useNotify } from '@/lib/notify'
 import { validateAndCorrectDateRange } from '@/lib/dateRangeValidation'
 import { useAuthContext } from '@/contexts/AuthContext'
 
+// Task filter truncation and dropdown width constants
+const TRUNCATION_LENGTH = 40
+const TASK_FILTER_DROPDOWN_WIDTH = 'w-full'
+
 interface Task {
   _id: string
   title: string
@@ -144,6 +148,7 @@ interface PersonOption {
 interface TaskOption {
   id: string
   label: string
+  fullLabel: string
 }
 
 const defaultColumns = [
@@ -714,19 +719,23 @@ export default function KanbanPage() {
       const id = task._id
       // Use displayId if available, otherwise fall back to taskNumber, otherwise just title
       const identifier = task.displayId || (task.taskNumber ? String(task.taskNumber) : null)
-      const label = identifier
+      const fullLabel = identifier
         ? `#${identifier} - ${task.title}`
         : task.title
-      map.set(id, { id, label })
+      
+      // Truncate label to 45 characters with "..." if needed
+      const { truncated } = truncateText(fullLabel, TRUNCATION_LENGTH)
+      
+      map.set(id, { id, label: truncated, fullLabel })
     })
-    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label))
+    return Array.from(map.values()).sort((a, b) => a.fullLabel.localeCompare(b.fullLabel))
   }, [tasks])
 
   const filteredTaskNumberOptions = useMemo(() => {
     if (!taskNumberFilterQuery.trim()) return taskNumberOptions
     const query = taskNumberFilterQuery.toLowerCase()
     return taskNumberOptions.filter(option =>
-      option.label.toLowerCase().includes(query) ||
+      option.fullLabel.toLowerCase().includes(query) ||
       option.id.toLowerCase().includes(query)
     )
   }, [taskNumberOptions, taskNumberFilterQuery])
@@ -1079,8 +1088,8 @@ export default function KanbanPage() {
                 className="pl-10 w-full"
               />
             </div>
-            {/* Filter options - compact grid layout */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+            {/* Filter options - 3-3 grid layout (3 filters per row, 2 rows) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <Select value={projectFilter} onValueChange={setProjectFilter} onOpenChange={(open) => {
                 if (open) focusSearchInput(projectFilterInputRef.current)
               }}>
@@ -1332,8 +1341,8 @@ export default function KanbanPage() {
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select Task Number" />
                 </SelectTrigger>
-                <SelectContent className="z-[10050] p-0">
-                  <div className="p-2">
+                <SelectContent className={`z-[10050] p-0 w-full ${TASK_FILTER_DROPDOWN_WIDTH}`} align="end">
+                  <div className="p-2 w-full overflow-x-hidden">
                     <div className="relative mb-2">
                       <Input
                         ref={taskNumberFilterInputRef}
@@ -1360,17 +1369,44 @@ export default function KanbanPage() {
                         </button>
                       )}
                     </div>
-                    <div className="max-h-56 overflow-y-auto">
+                    <div className="max-h-40 overflow-y-auto [&::-webkit-scrollbar]:hidden">
                       <SelectItem value="all">All Tasks</SelectItem>
                       {filteredTaskNumberOptions.length === 0 ? (
                         <div className="px-2 py-1 text-xs text-muted-foreground">No matching tasks</div>
                       ) : (
-                        filteredTaskNumberOptions.map((option) => (
+                        filteredTaskNumberOptions.map((option) => {
+                        // Extract displayId and title from fullLabel
+                        const displayIdMatch = option.fullLabel.match(/^#(.+?)\s-\s(.+)$/)
+                        const displayId = displayIdMatch ? displayIdMatch[1] : null
+                        const title = displayIdMatch ? displayIdMatch[2] : option.fullLabel
+                        
+                        const { truncated: truncatedTitle, isTruncated } = truncateText(title, TRUNCATION_LENGTH)
+                         
+                        return (
                           <SelectItem key={option.id} value={option.id}>
-                            {option.label}
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {displayId && (
+                                      <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                                        #{displayId}
+                                      </span>
+                                    )}
+                                    <span className="truncate">{truncatedTitle}</span>
+                                  </div>
+                                </TooltipTrigger>
+                                {isTruncated && (
+                                  <TooltipContent side="left" align="center" className="max-w-sm break-words">
+                                    <p className="whitespace-normal">{title}</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
                           </SelectItem>
-                        ))
-                      )}
+                        )
+                      })
+                    )}
                     </div>
                   </div>
                 </SelectContent>

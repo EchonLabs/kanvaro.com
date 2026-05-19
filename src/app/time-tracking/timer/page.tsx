@@ -1463,6 +1463,7 @@ export default function TimerPage() {
                            onTimerUpdate={(timer) => {
                             if (!timer || (timer as any).status === 'stopped') {
                               setLiveActiveTimer(null)
+                              resetTimerForm()  // clears form when timer stops
                               // Timer stopped - notifications will be shown by backend notification system only if time was logged
                               // Timer stopped - notifications will be shown by backend notification system only if time was logged
                             } else {

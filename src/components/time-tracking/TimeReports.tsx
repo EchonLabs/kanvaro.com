@@ -10,13 +10,18 @@ import { Badge } from '@/components/ui/Badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useOrganization } from '@/hooks/useOrganization'
 import { usePermissions } from '@/lib/permissions/permission-context'
-import { applyRoundingRules, focusSearchInput } from '@/lib/utils'
+import { applyRoundingRules, focusSearchInput, truncateText } from '@/lib/utils'
 import { useOrgCurrency } from '@/hooks/useOrgCurrency'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { Permission, Role, ROLE_PERMISSIONS } from '@/lib/permissions/permission-definitions'
 import { validateAndCorrectDateRangeStrings } from '@/lib/dateRangeValidation'
+
+// Task filter truncation and dropdown width constants
+const TRUNCATION_LENGTH = 35
+const TASK_FILTER_DROPDOWN_WIDTH = 'w-full'
 
 interface TimeReportsProps {
   userId?: string
@@ -466,8 +471,15 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
   }, [users, assignedByFilterQuery])
 
   const filteredTaskOptions = useMemo(() => {
-    // We now fetch tasks from the server based on search, so we display the server results directly
-    return tasks
+    // Apply smart truncation with capital letter detection
+    return tasks.map(task => {
+      const { truncated, isTruncated } = truncateText(task.title, TRUNCATION_LENGTH)
+      return {
+        ...task,
+        truncated,
+        isTruncated
+      }
+    })
   }, [tasks])
 
   const formatDuration = (minutes: number) => {
@@ -846,7 +858,7 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                 <SelectTrigger>
                   <SelectValue placeholder={filters.projectId === 'all' ? 'All Tasks' : 'Select Task'} />
                 </SelectTrigger>
-                <SelectContent className="p-0">
+                <SelectContent className={`p-0 w-full ${TASK_FILTER_DROPDOWN_WIDTH}`}>
                   <div className="p-2">
                     <Input
                       ref={taskFilterInputRef}
@@ -865,18 +877,32 @@ export function TimeReports({ userId, organizationId, projectId }: TimeReportsPr
                           {filters.projectId === 'all' ? 'No tasks found' : 'No tasks in this project'}
                         </div>
                       ) : (
-                        filteredTaskOptions.map((task) => (
-                          <SelectItem key={task._id} value={task._id}>
-                            <div className="flex items-center gap-2">
-                              {task.displayId && (
-                                <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
-                                  {task.displayId}
-                                </span>
-                              )}
-                              <span className="truncate">{task.title}</span>
-                            </div>
-                          </SelectItem>
-                        ))
+                        filteredTaskOptions.map((task) => {
+                          const { truncated: truncatedTitle, isTruncated } = truncateText(task.title, TRUNCATION_LENGTH)
+                          return (
+                            <SelectItem key={task._id} value={task._id}>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      {task.displayId && (
+                                        <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                                          {task.displayId}
+                                        </span>
+                                      )}
+                                      <span className="truncate">{truncatedTitle}</span>
+                                    </div>
+                                  </TooltipTrigger>
+                                  {isTruncated && (
+                                    <TooltipContent side="left" align="center" className="max-w-sm break-words">
+                                      <p className="whitespace-normal">{task.title}</p>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              </TooltipProvider>
+                            </SelectItem>
+                          )
+                        })
                       )}
                     </div>
                   </div>

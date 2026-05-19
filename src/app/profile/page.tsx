@@ -83,7 +83,7 @@ interface SessionInsight {
 }
 
 export default function ProfilePage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+  const { user, isAuthenticated, isLoading: authLoading, setUser } = useAuthContext()
 
   const router = useRouter()
   const { organization, loading: orgLoading } = useOrganization()
@@ -322,6 +322,15 @@ export default function ProfilePage() {
       if (result.success) {
         // Update local profile state
         setProfile(prev => prev ? { ...prev, avatar: result.data?.avatar } : null)
+
+        // Update AuthContext user so top-right header updates immediately
+        if (result.data && user) {
+          setUser({
+            ...user,
+            avatar: result.data.avatar
+          })
+        }
+
         showToast({
           type: 'success',
           title: 'Avatar Updated',
@@ -345,6 +354,15 @@ export default function ProfilePage() {
 
       if (result.success) {
         setProfile(prev => prev ? { ...prev, avatar: result.data?.avatar } : null)
+
+        // Update AuthContext user so top-right header updates immediately
+        if (result.data && user) {
+          setUser({
+            ...user,
+            avatar: result.data.avatar
+          })
+        }
+
         showToast({
           type: 'success',
           title: 'Avatar Removed',
