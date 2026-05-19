@@ -1,3 +1,16 @@
+## [1.36.2](https://github.com/EchonLabs/kanvaro.com/compare/v1.36.1...v1.36.2) (2026-05-19)
+
+
+### Bug Fixes
+
+* add edit member details permission for HR role ([a6e276c](https://github.com/EchonLabs/kanvaro.com/commit/a6e276c05c8d1fe6da916f8a864ec5709f3c0780))
+* clear timer form when timer stops to refresh the timer form fields ([073a0c4](https://github.com/EchonLabs/kanvaro.com/commit/073a0c48927799ae8845a45841b349f09b55f974))
+* enhance sprint modal functionality to include project context and filtering ([abf463f](https://github.com/EchonLabs/kanvaro.com/commit/abf463f774e9f1ebda30577aea37ec2fd60eca8d))
+* implement text truncation for task titles in dropdowns and improve layout consistency ([4c43d21](https://github.com/EchonLabs/kanvaro.com/commit/4c43d2120c234fd016f63c54a9bfae5b6e6d3a60))
+* improved smart truncation for task titles based on capital letter detection ([b7dd50e](https://github.com/EchonLabs/kanvaro.com/commit/b7dd50e407867129580f69e5b89907ebd6f436b2))
+* update permissions to allow HR role to cancel invitations and restricted PM role to remove members ([c0d32d6](https://github.com/EchonLabs/kanvaro.com/commit/c0d32d642d75b96470a29b9da72bc127230d50aa))
+* update user profile picture to show changes immediately when updated or removed ([1a3acb7](https://github.com/EchonLabs/kanvaro.com/commit/1a3acb79adb0b7ae41d4e15fff74d81e739020e7))
+
 ## [1.36.1](https://github.com/EchonLabs/kanvaro.com/compare/v1.36.0...v1.36.1) (2026-05-12)
 
 
