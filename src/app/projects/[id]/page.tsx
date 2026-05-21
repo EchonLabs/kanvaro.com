@@ -1126,15 +1126,20 @@ export default function ProjectDetailPage() {
                           Manage Team
                         </Button>
                       </PermissionGate>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-start"
-                        onClick={() => router.push(`/projects/${projectId}?tab=reports`)}
+                      <PermissionGate
+                        permission={Permission.TIME_LOG_REPORT_ACCESS}
+                        projectId={projectId}
                       >
-                        <BarChart3 className="mr-2 h-4 w-4" />
-                        View Reports
-                      </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-start"
+                          onClick={() => router.push(`/projects/${projectId}?tab=reports`)}
+                        >
+                          <BarChart3 className="mr-2 h-4 w-4" />
+                          View Reports
+                        </Button>
+                      </PermissionGate>
                     </CardContent>
                   </Card>
                 </div>
