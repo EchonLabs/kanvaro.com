@@ -1604,7 +1604,7 @@ export default function TaskDetailPage() {
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
                 <h1
                   className="text-2xl font-semibold leading-snug text-foreground flex items-center gap-3 min-w-0 flex-wrap"
-                  title={`${task.title} ${task.displayId}`}
+                  title={task.title}
                 >
                   <span className="flex-shrink-0">{getTypeIcon(task.type)}</span>
                   <span className="break-words overflow-wrap-anywhere">{task.title}</span>
