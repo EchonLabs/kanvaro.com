@@ -830,7 +830,7 @@ export class EmailService {
         </div>
 
         <div class="cta-section">
-            <a href="${loginLink}" class="cta-button">Sign In to Your Account →</a>
+            <a href="${loginLink}" class="cta-button" style="color: #ffffff;">Sign In to Your Account →</a>
         </div>
 
         <div class="help-section">
@@ -1081,7 +1081,7 @@ export class EmailService {
             </div>
 
             <div class="cta-section">
-                <a href="${verificationUrl}" class="cta-button">Verify Your Email →</a>
+                <a href="${verificationUrl}" class="cta-button" style="color: #ffffff;">Verify Your Email →</a>
             </div>
 
             <div class="help-section">
