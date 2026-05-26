@@ -6,7 +6,8 @@ import { MainLayout } from '@/components/layout/MainLayout'
 import { StandupProjectCard } from '@/components/standup/StandupProjectCard'
 import { useNotify } from '@/lib/notify'
 import { useAuthContext } from '@/contexts/AuthContext'
-import { Loader2, Activity } from 'lucide-react'
+import { Input } from '@/components/ui/Input'
+import { Loader2, Activity, Search } from 'lucide-react'
 
 interface ProjectWithSession {
   project: {
@@ -29,7 +30,7 @@ export default function StandupDashboardPage() {
 
   const [projectSessions, setProjectSessions] = useState<ProjectWithSession[]>([])
   const [loading, setLoading] = useState(true)
-  const [startingProjectId, setStartingProjectId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   const todayStr = new Date().toISOString().split('T')[0]
 
@@ -93,22 +94,8 @@ export default function StandupDashboardPage() {
     fetchProjectSessions()
   }, [fetchProjectSessions])
 
-  const handleStartStandup = async (projectId: string) => {
-    setStartingProjectId(projectId)
-    try {
-      const res = await fetch('/api/standup/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Failed to start standup')
-      router.push(`/standup-dashboard/${data.session._id}`)
-    } catch (err: any) {
-      notify.error({ title: err.message })
-    } finally {
-      setStartingProjectId(null)
-    }
+  const handleOpenProject = (projectId: string) => {
+    router.push(`/standup-dashboard/${projectId}`)
   }
 
   return (
@@ -129,6 +116,19 @@ export default function StandupDashboardPage() {
           </div>
         </div>
 
+        {/* Search filter */}
+        {!loading && projectSessions.length > 0 && (
+          <div className="relative max-w-sm">
+            <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-8 h-8 text-sm"
+              placeholder="Search projects…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -139,17 +139,29 @@ export default function StandupDashboardPage() {
             <p className="text-sm">No projects found. You need to be a member of at least one project.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {projectSessions.map(({ project, todaySession }) => (
-              <StandupProjectCard
-                key={project._id}
-                project={project}
-                todaySession={todaySession}
-                onStartStandup={handleStartStandup}
-                isStarting={startingProjectId === project._id}
-              />
-            ))}
-          </div>
+          (() => {
+            const filtered = search.trim()
+              ? projectSessions.filter(({ project }) =>
+                  project.name.toLowerCase().includes(search.toLowerCase())
+                )
+              : projectSessions
+            return filtered.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                <p className="text-sm">No projects match &ldquo;{search}&rdquo;</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filtered.map(({ project, todaySession }) => (
+                  <StandupProjectCard
+                    key={project._id}
+                    project={project}
+                    todaySession={todaySession}
+                    onOpenProject={handleOpenProject}
+                  />
+                ))}
+              </div>
+            )
+          })()
         )}
       </div>
     </MainLayout>

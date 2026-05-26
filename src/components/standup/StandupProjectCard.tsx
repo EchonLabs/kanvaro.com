@@ -21,8 +21,7 @@ interface StandupProjectCardProps {
     } | null
     completedAt?: string | null
   } | null
-  onStartStandup: (projectId: string) => void
-  isStarting: boolean
+  onOpenProject: (projectId: string) => void
 }
 
 const riskColors: Record<string, string> = {
@@ -35,11 +34,8 @@ const riskColors: Record<string, string> = {
 export function StandupProjectCard({
   project,
   todaySession,
-  onStartStandup,
-  isStarting,
+  onOpenProject,
 }: StandupProjectCardProps) {
-  const router = useRouter()
-
   const statusIcon = !todaySession ? (
     <Clock className="h-4 w-4 text-muted-foreground" />
   ) : todaySession.status === 'completed' ? (
@@ -58,15 +54,23 @@ export function StandupProjectCard({
     ? 'In Progress'
     : 'Pending'
 
+  const buttonLabel = !todaySession
+    ? 'Start Standup'
+    : todaySession.status === 'completed'
+    ? 'View Report'
+    : 'Continue Standup'
+
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onOpenProject(project._id)}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-base truncate">{project.name}</h3>
             <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
               <Users className="h-3.5 w-3.5" />
-              <span>{project.memberCount} member{project.memberCount !== 1 ? 's' : ''}</span>
+              <span>
+                {project.memberCount} member{project.memberCount !== 1 ? 's' : ''}
+              </span>
             </div>
           </div>
 
@@ -89,27 +93,19 @@ export function StandupProjectCard({
           </div>
         )}
 
-        <div className="mt-4 flex gap-2">
-          {!todaySession || todaySession.status === 'pending' ? (
-            <Button
-              size="sm"
-              className="flex-1"
-              onClick={() => onStartStandup(project._id)}
-              disabled={isStarting}
-            >
-              <Play className="h-3.5 w-3.5 mr-1.5" />
-              {isStarting ? 'Starting…' : 'Start Standup'}
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex-1"
-              onClick={() => router.push(`/standup-dashboard/${todaySession._id}`)}
-            >
-              {todaySession.status === 'completed' ? 'View Report' : 'Continue Standup'}
-            </Button>
-          )}
+        <div className="mt-4">
+          <Button
+            size="sm"
+            variant={todaySession?.status === 'completed' ? 'outline' : 'default'}
+            className="w-full"
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenProject(project._id)
+            }}
+          >
+            {!todaySession && <Play className="h-3.5 w-3.5 mr-1.5" />}
+            {buttonLabel}
+          </Button>
         </div>
       </CardContent>
     </Card>
