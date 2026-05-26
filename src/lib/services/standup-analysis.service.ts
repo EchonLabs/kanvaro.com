@@ -266,11 +266,22 @@ async function callGroq(payload: GroqPayload): Promise<IStandupAnalysis> {
     riskLevel,
     summary: String(parsed.summary ?? ''),
     nudges: Array.isArray(parsed.nudges)
-      ? parsed.nudges.slice(0, 3).map((n: any) => ({
-          userId: new mongoose.Types.ObjectId(n.userId),
-          taskId: new mongoose.Types.ObjectId(n.taskId),
-          message: String(n.message ?? ''),
-        }))
+      ? parsed.nudges.slice(0, 3).flatMap((n: any) => {
+          try {
+            return [{
+              userId: new mongoose.Types.ObjectId(n.userId),
+              taskId: new mongoose.Types.ObjectId(n.taskId),
+              message: String(n.message ?? ''),
+            }]
+          } catch {
+            // Groq returned a non-ObjectId string — store nudge as message-only with zero IDs
+            return [{
+              userId: new mongoose.Types.ObjectId('000000000000000000000000'),
+              taskId: new mongoose.Types.ObjectId('000000000000000000000000'),
+              message: String(n.message ?? ''),
+            }]
+          }
+        })
       : [],
     trends: Array.isArray(parsed.trends) ? parsed.trends.slice(0, 3).map(String) : [],
     prioritySuggestions: Array.isArray(parsed.prioritySuggestions)

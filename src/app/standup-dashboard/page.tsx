@@ -36,19 +36,22 @@ export default function StandupDashboardPage() {
   const fetchProjectSessions = useCallback(async () => {
     try {
       setLoading(true)
-      // Fetch all projects the user has access to
       const projectsRes = await fetch('/api/projects')
       if (!projectsRes.ok) throw new Error('Failed to fetch projects')
-      const { projects } = await projectsRes.json()
+      const body = await projectsRes.json()
+      const projects: any[] = body.projects ?? body.data ?? []
+      console.log('[standup] projects fetched:', projects.length, projects.map((p: any) => p.name))
 
-      // For each project, check today's standup session
       const withSessions = await Promise.all(
-        (projects ?? []).map(async (project: any) => {
+        projects.map(async (project: any) => {
           try {
             const sessRes = await fetch(
               `/api/standup/sessions?projectId=${project._id}&date=${todayStr}`
             )
-            if (!sessRes.ok) return { project: { _id: project._id, name: project.name, memberCount: project.teamMembers?.length ?? 0 }, todaySession: null }
+            if (!sessRes.ok) {
+              console.log(`[standup] sessions 403/error for ${project.name} (${project._id})`)
+              return { project: { _id: project._id, name: project.name, memberCount: project.teamMembers?.length ?? 0 }, todaySession: null }
+            }
             const { sessions } = await sessRes.json()
             return {
               project: {
@@ -58,7 +61,8 @@ export default function StandupDashboardPage() {
               },
               todaySession: sessions?.[0] ?? null,
             }
-          } catch {
+          } catch (e) {
+            console.error(`[standup] error fetching session for ${project.name}:`, e)
             return {
               project: { _id: project._id, name: project.name, memberCount: 0 },
               todaySession: null,
@@ -67,7 +71,8 @@ export default function StandupDashboardPage() {
         })
       )
 
-      // Sort: active first, then pending, then completed
+      console.log('[standup] withSessions count:', withSessions.length)
+
       const order: Record<string, number> = { active: 0, pending: 1, completed: 2 }
       withSessions.sort((a, b) => {
         const aOrder = a.todaySession ? (order[a.todaySession.status] ?? 1) : 1
@@ -77,6 +82,7 @@ export default function StandupDashboardPage() {
 
       setProjectSessions(withSessions)
     } catch (err: any) {
+      console.error('[standup] fetchProjectSessions error:', err)
       notify.error({ title: err.message ?? 'Failed to load standup dashboard' })
     } finally {
       setLoading(false)
