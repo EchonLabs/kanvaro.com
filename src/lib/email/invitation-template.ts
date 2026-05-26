@@ -1,3 +1,5 @@
+import { EMAIL_LOGO_URL, escapeHtml, formatDisplayName, resolveEmailLogoUrl } from './email-branding'
+
 /**
  * Generates the invitation email HTML using table-based layout
  * for maximum email client compatibility (no flex/grid).
@@ -8,6 +10,7 @@ export function generateInvitationEmailHtml(params: {
   roleDisplayName: string
   inviterFirstName: string
   inviterLastName: string
+  inviterEmail?: string
   invitationLink: string
 }): string {
   const {
@@ -16,12 +19,22 @@ export function generateInvitationEmailHtml(params: {
     roleDisplayName,
     inviterFirstName,
     inviterLastName,
+    inviterEmail,
     invitationLink,
   } = params
 
-  const logoHtml = organizationLogo
-    ? `<img src="${organizationLogo}" alt="${organizationName} Logo" style="width:72px;height:72px;border-radius:12px;display:block;" />`
-    : `<div style="width:72px;height:72px;background:#ffffff;color:#667eea;font-size:32px;font-weight:700;line-height:72px;text-align:center;border-radius:14px;display:block;margin:0 auto;">${organizationName.charAt(0).toUpperCase()}</div>`
+  const inviterDisplayName = formatDisplayName({
+    firstName: inviterFirstName,
+    lastName: inviterLastName,
+    email: inviterEmail,
+  })
+  const organizationalLogo = resolveEmailLogoUrl(organizationLogo ?? EMAIL_LOGO_URL)
+  const organizationLabel = escapeHtml('EchonLabs')
+  const roleLabel = escapeHtml(roleDisplayName)
+  const inviterLabel = escapeHtml(inviterDisplayName)
+  const invitationUrl = escapeHtml(invitationLink)
+
+  const logoHtml = `<img src="${organizationalLogo}" alt="${organizationLabel} logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;margin:0 auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;" />`
 
   return `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
@@ -59,16 +72,8 @@ export function generateInvitationEmailHtml(params: {
           <!-- ===== HEADER ===== -->
           <tr>
             <td align="center" class="header-pad" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:48px 40px 32px;text-align:center;">
-              <!-- Logo -->
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 24px;">
-                <tr>
-                  <td align="center" style="width:80px;height:80px;text-align:center;vertical-align:middle;">
-                    ${logoHtml}
-                  </td>
-                </tr>
-              </table>
               <h1 style="color:#ffffff;font-size:28px;font-weight:700;margin:0 0 8px;letter-spacing:-0.5px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">You're Invited! &#127881;</h1>
-              <p style="color:rgba(255,255,255,0.9);font-size:16px;font-weight:400;margin:0;">Join ${organizationName} and start collaborating</p>
+              <p style="color:rgba(255,255,255,0.9);font-size:16px;font-weight:400;margin:0;">Join Kanvaro and start collaborating</p>
             </td>
           </tr>
 
@@ -80,18 +85,17 @@ export function generateInvitationEmailHtml(params: {
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:32px;">
                 <tr>
                   <td align="center">
-                    <!-- Wave icon -->
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 16px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 12px;">
                       <tr>
-                        <td align="center" style="width:64px;height:64px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:16px;text-align:center;vertical-align:middle;font-size:32px;">&#128075;</td>
+                        <td style="font-size:18px;color:#374151;line-height:1.6;vertical-align:middle;padding:0 8px 0 0;white-space:nowrap;">You've been invited to join </td>
+                        <td style="vertical-align:middle;white-space:nowrap;">
+                          <img src="https://kanvaro.com/Kanvaro.svg" alt="Kanvaro logo" width="128" style="display:block;width:128px;max-width:128px;height:auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;" />
+                        </td>
                       </tr>
                     </table>
-                    <p style="font-size:18px;color:#374151;margin:0 0 12px;line-height:1.6;">
-                      You've been invited to join <span style="color:#667eea;font-weight:700;font-size:20px;">${organizationName}</span>
-                    </p>
                     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
                       <tr>
-                        <td style="background:linear-gradient(135deg,#f3f4f6 0%,#e5e7eb 100%);color:#374151;padding:8px 16px;border-radius:20px;font-size:14px;font-weight:600;">${roleDisplayName}</td>
+                        <td style="background:linear-gradient(135deg,#f3f4f6 0%,#e5e7eb 100%);color:#374151;padding:8px 16px;border-radius:20px;font-size:14px;font-weight:600;">${roleLabel}</td>
                       </tr>
                     </table>
                   </td>
@@ -114,7 +118,7 @@ export function generateInvitationEmailHtml(params: {
                         </td>
                         <td style="padding:16px 16px 16px 12px;vertical-align:middle;">
                           <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:2px;">ORGANIZATION</div>
-                          <div style="font-size:15px;color:#1f2937;font-weight:600;">${organizationName}</div>
+                          <div style="font-size:15px;color:#1f2937;font-weight:600;">${organizationLabel}</div>
                         </td>
                       </tr>
                     </table>
@@ -128,13 +132,13 @@ export function generateInvitationEmailHtml(params: {
                         <td width="56" style="padding:16px 0 16px 16px;vertical-align:middle;">
                           <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                             <tr>
-                              <td align="center" style="width:40px;height:40px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:10px;text-align:center;vertical-align:middle;font-size:18px;color:#ffffff;">&#128100;</td>
+                              <td align="center" style="width:40px;height:40px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:10px;text-align:center;vertical-align:middle;font-size:18px;line-height:40px;color:#ffffff;font-family:'Segoe UI Symbol','Apple Color Emoji','Noto Color Emoji',Arial,sans-serif;-webkit-text-fill-color:#ffffff;mso-color-alt:#ffffff;">&#128100;</td>
                             </tr>
                           </table>
                         </td>
                         <td style="padding:16px 16px 16px 12px;vertical-align:middle;">
                           <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:2px;">YOUR ROLE</div>
-                          <div style="font-size:15px;color:#1f2937;font-weight:600;">${roleDisplayName}</div>
+                          <div style="font-size:15px;color:#1f2937;font-weight:600;">${roleLabel}</div>
                         </td>
                       </tr>
                     </table>
@@ -154,7 +158,7 @@ export function generateInvitationEmailHtml(params: {
                         </td>
                         <td style="padding:16px 16px 16px 12px;vertical-align:middle;">
                           <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:2px;">INVITED BY</div>
-                          <div style="font-size:15px;color:#1f2937;font-weight:600;">${inviterFirstName} ${inviterLastName}</div>
+                          <div style="font-size:15px;color:#1f2937;font-weight:600;">${inviterLabel}</div>
                         </td>
                       </tr>
                     </table>
@@ -172,7 +176,7 @@ export function generateInvitationEmailHtml(params: {
                     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
                       <tr>
                         <td align="center" style="border-radius:12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);">
-                          <a href="${invitationLink}" class="cta-btn" target="_blank" style="display:inline-block;color:#ffffff;padding:16px 40px;text-decoration:none;border-radius:12px;font-weight:600;font-size:16px;letter-spacing:0.5px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">Accept Invitation &rarr;</a>
+                          <a href="${invitationUrl}" class="cta-btn" target="_blank" style="display:inline-block;color:#ffffff;padding:16px 40px;text-decoration:none;border-radius:12px;font-weight:600;font-size:16px;letter-spacing:0.5px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">Accept Invitation &rarr;</a>
                         </td>
                       </tr>
                     </table>
@@ -202,7 +206,7 @@ export function generateInvitationEmailHtml(params: {
                   <td style="padding:20px;background:#f9fafb;border-radius:8px;border:1px dashed #d1d5db;">
                     <div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:8px;">Having trouble with the button?</div>
                     <div style="margin-top:8px;">
-                      <a href="${invitationLink}" style="word-break:break-all;color:#667eea;font-size:13px;font-family:'Courier New',monospace;line-height:1.6;text-decoration:none;">${invitationLink}</a>
+                      <a href="${invitationUrl}" style="word-break:break-all;color:#667eea;font-size:13px;font-family:'Courier New',monospace;line-height:1.6;text-decoration:none;">${invitationUrl}</a>
                     </div>
                     <p style="margin-top:12px;font-size:12px;color:#6b7280;">
                       Copy and paste this link into your browser if the button above doesn't work.
@@ -218,7 +222,7 @@ export function generateInvitationEmailHtml(params: {
           <tr>
             <td align="center" class="footer-pad" style="background:#f9fafb;padding:32px 40px;border-top:1px solid #e5e7eb;">
               <p style="color:#6b7280;font-size:14px;line-height:1.6;margin:0 0 8px;">
-                This invitation was sent by <span style="color:#374151;font-weight:600;">${inviterFirstName} ${inviterLastName}</span>
+                This invitation was sent by <span style="color:#374151;font-weight:600;">${inviterLabel}</span>
               </p>
               <div style="height:1px;background:#e5e7eb;margin:24px 0;"></div>
               <p style="color:#6b7280;font-size:14px;line-height:1.6;margin:0 0 8px;">
@@ -227,6 +231,13 @@ export function generateInvitationEmailHtml(params: {
               <p style="color:#9ca3af;font-size:12px;line-height:1.6;margin:16px 0 0;">
                 This is an automated message. Please do not reply to this email.
               </p>
+            </td>
+          </tr>
+
+          <!-- LOGO AFTER FOOTER -->
+          <tr>
+            <td align="center" style="padding:20px 40px 40px;background:#ffffff;">
+              <img src="${organizationalLogo}" alt="${organizationLabel} logo" width="100" style="display:block;width:100px;max-width:100px;height:auto;margin:0 auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;" />
             </td>
           </tr>
 
