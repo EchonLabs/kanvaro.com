@@ -144,6 +144,13 @@ const navigationItems = [
         path: '/sprint-events',
         permission: Permission.SPRINT_EVENT_VIEW
       },
+      {
+        id: 'tasks-standup-dashboard',
+        label: 'Standup Dashboard',
+        icon: Activity,
+        path: '/standup-dashboard',
+        permission: Permission.SPRINT_VIEW
+      },
     ]
   },
   {
