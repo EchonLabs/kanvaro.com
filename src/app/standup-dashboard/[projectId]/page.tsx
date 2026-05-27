@@ -36,6 +36,9 @@ export default function ProjectStandupPage() {
   const projectId = params.projectId as string
 
   const todayStr = new Date().toISOString().split('T')[0]
+  const maxDateStr = (() => {
+    const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().split('T')[0]
+  })()
 
   const [project, setProject] = useState<any>(null)
   const [session, setSession] = useState<any>(null)
@@ -55,6 +58,8 @@ export default function ProjectStandupPage() {
   }>({ open: false, commitmentId: null, existingNote: null, memberName: '', sessionId: null })
 
   const isToday = selectedDate === todayStr
+  const isFuture = selectedDate > todayStr
+  const isPast = selectedDate < todayStr
 
   const fetchSession = useCallback(
     async (date: string) => {
@@ -268,19 +273,19 @@ export default function ProjectStandupPage() {
             <input
               type="date"
               value={selectedDate}
-              max={todayStr}
+              max={maxDateStr}
               onChange={(e) => handleDateChange(e.target.value)}
               className="h-8 px-2 text-sm border border-border rounded-md bg-background text-foreground"
             />
 
-            {isToday && !session && (
+            {!isPast && !session && (
               <Button size="sm" onClick={handleStartStandup} disabled={starting}>
                 {starting ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
                 ) : (
                   <Play className="h-3.5 w-3.5 mr-1.5" />
                 )}
-                Start Standup
+                {isFuture ? 'Schedule Standup' : 'Start Standup'}
               </Button>
             )}
 
@@ -313,7 +318,17 @@ export default function ProjectStandupPage() {
           </div>
         )}
 
-        {!isToday && !session && (
+        {isFuture && !session && (
+          <div className="text-center py-16 border border-dashed rounded-lg">
+            <CalendarDays className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-30" />
+            <p className="text-sm font-medium">No standup scheduled for this date</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Click &ldquo;Schedule Standup&rdquo; to plan commitments in advance
+            </p>
+          </div>
+        )}
+
+        {isPast && !session && (
           <div className="text-center py-16 border border-dashed rounded-lg">
             <CalendarDays className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-30" />
             <p className="text-sm text-muted-foreground">
