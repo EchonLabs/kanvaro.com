@@ -59,6 +59,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
   const [error, setError] = useState('')
   const [displayTime, setDisplayTime] = useState('00:00:00')
   const [showStopConfirm, setShowStopConfirm] = useState(false)
+  const [runningTimerMinutes, setRunningTimerMinutes] = useState<number>(0)
   // Local ticking baseline when running
   const baseMinutesRef = useRef<number>(0)
   const tickStartMsRef = useRef<number | null>(null)
@@ -182,6 +183,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
 
     if (!activeTimer) {
       setDisplayTime('00:00:00')
+      setRunningTimerMinutes(0)
       baseMinutesRef.current = 0
       tickStartMsRef.current = null
       return
@@ -190,6 +192,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
     // Initialize baseline from server
     baseMinutesRef.current = activeTimer.currentDuration || 0
     setDisplayTime(formatActiveTimerDuration(baseMinutesRef.current))
+    setRunningTimerMinutes(baseMinutesRef.current)
 
     if (activeTimer.isPaused) {
       // Do not tick while paused
@@ -203,6 +206,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
       const elapsed = (Date.now() - (tickStartMsRef.current as number)) / 60000
       const runningMinutes = Math.max(0, baseMinutesRef.current + elapsed)
       setDisplayTime(formatActiveTimerDuration(runningMinutes))
+      setRunningTimerMinutes(runningMinutes)
     }, 1000)
 
     return () => {
@@ -470,7 +474,7 @@ export function TimeTrackingWidget({ userId, organizationId, timeStats: propTime
             <div className="grid grid-cols-3 gap-2 text-center">
               <div>
                 <div className="text-base sm:text-lg font-bold text-primary break-words">
-                  {formatDuration(timeStats.todayDuration)}
+                  {formatDuration(timeStats.todayDuration + (activeTimer ? runningTimerMinutes : 0))}
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">Today</div>
               </div>

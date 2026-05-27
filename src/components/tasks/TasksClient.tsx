@@ -165,6 +165,10 @@ export default function TasksClient({
     const canViewAssignedProjects = hasPermission(Permission.TASK_VIEW_ASSIGNED_PROJECTS)
     const canFilterUsers = canViewAllTasks || canViewAssignedProjects
     const canCreateTask = hasPermission(Permission.TASK_CREATE)
+    
+    // Detect if user has QA Engineer custom role
+    const isQAEngineer = user?.customRole?.name === 'QA Engineer' || 
+                         permissions?.customRole?.name === 'QA Engineer'
 
     const [tasks, setTasks] = useState<Task[]>(initialTasks)
     const [pagination, setPagination] = useState(initialPagination)
@@ -295,36 +299,49 @@ export default function TasksClient({
         const assignedToMap = new Map<string, UserSummary>()
         const createdByMap = new Map<string, UserSummary>()
 
-        tasks.forEach((task) => {
-            if (task.project?._id) {
-                projectMap.set(task.project._id, {
-                    _id: task.project._id,
-                    name: task.project.name,
-                })
+        // For QA users, only include current user in the options
+        if (isQAEngineer && user) {
+            const currentUserSummary: UserSummary = {
+                _id: user.id || '',
+                firstName: user.firstName || '',
+                lastName: user.lastName || '',
+                email: user.email || ''
             }
-            if (task.assignedTo && Array.isArray(task.assignedTo)) {
-                task.assignedTo.forEach((assignee) => {
-                    const userId = assignee.user?._id || assignee.user || assignee._id || assignee;
-                    const userData = assignee.user || assignee;
-                    if (userId && userData) {
-                        assignedToMap.set(userId.toString(), {
-                            _id: userId.toString(),
-                            firstName: userData.firstName || '',
-                            lastName: userData.lastName || '',
-                            email: userData.email || '',
-                        })
-                    }
-                })
-            }
-            if (task.createdBy?._id) {
-                createdByMap.set(task.createdBy._id, {
-                    _id: task.createdBy._id,
-                    firstName: task.createdBy.firstName,
-                    lastName: task.createdBy.lastName,
-                    email: task.createdBy.email,
-                })
-            }
-        })
+            assignedToMap.set(currentUserSummary._id, currentUserSummary)
+            createdByMap.set(currentUserSummary._id, currentUserSummary)
+        } else {
+            // For non-QA users, extract from tasks as normal
+            tasks.forEach((task) => {
+                if (task.project?._id) {
+                    projectMap.set(task.project._id, {
+                        _id: task.project._id,
+                        name: task.project.name,
+                    })
+                }
+                if (task.assignedTo && Array.isArray(task.assignedTo)) {
+                    task.assignedTo.forEach((assignee) => {
+                        const userId = assignee.user?._id || assignee.user || assignee._id || assignee;
+                        const userData = assignee.user || assignee;
+                        if (userId && userData) {
+                            assignedToMap.set(userId.toString(), {
+                                _id: userId.toString(),
+                                firstName: userData.firstName || '',
+                                lastName: userData.lastName || '',
+                                email: userData.email || '',
+                            })
+                        }
+                    })
+                }
+                if (task.createdBy?._id) {
+                    createdByMap.set(task.createdBy._id, {
+                        _id: task.createdBy._id,
+                        firstName: task.createdBy.firstName,
+                        lastName: task.createdBy.lastName,
+                        email: task.createdBy.email,
+                    })
+                }
+            })
+        }
 
         setProjectOptions((prev) => {
             const combined = new Map<string, ProjectSummary>()
@@ -352,7 +369,7 @@ export default function TasksClient({
                 )
             })
         }
-    }, [tasks, canFilterUsers])
+    }, [tasks, canFilterUsers, isQAEngineer, user])
 
     // Load projects from API for filter dropdown
     useEffect(() => {
@@ -429,6 +446,19 @@ export default function TasksClient({
     }, [projectOptions, projectFilterQuery])
 
     const filteredAssignedToOptions = useMemo(() => {
+        // For QA users, only show current user
+        if (isQAEngineer && user) {
+            let options = assignedToOptions.filter(opt => opt._id === user.id)
+            
+            const query = assignedToFilterQuery.trim().toLowerCase()
+            if (!query) return options
+            return options.filter((member) =>
+                `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
+                member.email.toLowerCase().includes(query)
+            )
+        }
+
+        // For non-QA users, apply normal filtering including project members
         let options = assignedToOptions
 
         // Filter by project members if a specific project is selected
@@ -452,9 +482,22 @@ export default function TasksClient({
             `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
             member.email.toLowerCase().includes(query)
         )
-    }, [assignedToOptions, assignedToFilterQuery, selectedProjectDetails])
+    }, [assignedToOptions, assignedToFilterQuery, selectedProjectDetails, isQAEngineer, user])
 
     const filteredCreatedByOptions = useMemo(() => {
+        // For QA users, only show current user
+        if (isQAEngineer && user) {
+            let options = createdByOptions.filter(opt => opt._id === user.id)
+            
+            const query = createdByFilterQuery.trim().toLowerCase()
+            if (!query) return options
+            return options.filter((member) =>
+                `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
+                member.email.toLowerCase().includes(query)
+            )
+        }
+
+        // For non-QA users, apply normal filtering including project members
         let options = createdByOptions
 
         // Filter by project members if a specific project is selected
@@ -478,7 +521,7 @@ export default function TasksClient({
             `${member.firstName} ${member.lastName}`.toLowerCase().includes(query) ||
             member.email.toLowerCase().includes(query)
         )
-    }, [createdByOptions, createdByFilterQuery, selectedProjectDetails])
+    }, [createdByOptions, createdByFilterQuery, selectedProjectDetails, isQAEngineer, user])
 
     // Fetch project details when project filter changes
     useEffect(() => {

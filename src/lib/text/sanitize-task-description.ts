@@ -15,7 +15,15 @@ function normalizeSanitizedHtml(html: string): string {
   // Collapse whitespace between block tags a bit (keeps intentional single newlines irrelevant in HTML)
   normalized = normalized.replace(/>\s+</g, "><");
 
-  return normalized.trim();
+  normalized = normalized.trim();
+
+  // Wrap orphaned inline elements in a <p> tag to ensure at least one block element
+  // This allows multiple formatting styles (font, span, etc.) on the same line
+  if (normalized && !/^<(p|h[1-6]|ul|ol|div|blockquote)/i.test(normalized)) {
+    normalized = `<p>${normalized}</p>`;
+  }
+
+  return normalized;
 }
 
 export function sanitizeTaskDescriptionHtml(

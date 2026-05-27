@@ -55,7 +55,7 @@ const quickActions: QuickAction[] = [
     icon: BarChart3,
     color: 'bg-indigo-500 hover:bg-indigo-600',
     href: '/time-tracking/reports',
-    permissions: [Permission.TIME_TRACKING_READ]
+    permissions: [Permission.TIME_LOG_REPORT_ACCESS]
   }
 ]
 
