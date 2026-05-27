@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -13,6 +13,9 @@ import {
   UserCheck,
   ClipboardList,
   CheckCircle2,
+  ChevronDown,
+  X,
+  Users,
 } from 'lucide-react'
 import { useNotify } from '@/lib/notify'
 import { PreStandupPanel } from './PreStandupPanel'
@@ -34,6 +37,14 @@ interface SprintTask {
   estimatedHours?: number
 }
 
+interface MemberState {
+  tasks: SprintTask[]
+  loading: boolean
+  selectedTaskIds: Set<string>
+  saving: boolean
+  search: string
+}
+
 interface StandupCaptureTabProps {
   session: any
   members: Member[]
@@ -51,6 +62,138 @@ const priorityColors: Record<string, string> = {
   critical: 'bg-red-100 text-red-600',
 }
 
+function MemberMultiSelect({
+  members,
+  selectedIds,
+  committedIds,
+  onChange,
+}: {
+  members: Member[]
+  selectedIds: Set<string>
+  committedIds: Set<string>
+  onChange: (ids: Set<string>) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const toggle = (id: string) => {
+    const next = new Set(selectedIds)
+    next.has(id) ? next.delete(id) : next.add(id)
+    onChange(next)
+  }
+
+  const label =
+    selectedIds.size === 0
+      ? 'Select team members…'
+      : selectedIds.size === members.length
+      ? 'All members'
+      : `${selectedIds.size} member${selectedIds.size > 1 ? 's' : ''} selected`
+
+  return (
+    <div ref={ref} className="relative w-full max-w-md">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-2 h-9 px-3 text-sm border border-border rounded-md bg-background hover:border-primary/50 transition-colors"
+      >
+        <span className="flex items-center gap-2 truncate">
+          <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className={selectedIds.size === 0 ? 'text-muted-foreground' : ''}>{label}</span>
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute top-full mt-1 left-0 z-50 w-full min-w-[220px] rounded-md border border-border bg-popover shadow-md">
+          {/* Select all / clear */}
+          <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+            <button
+              type="button"
+              className="text-xs text-primary hover:underline"
+              onClick={() => onChange(new Set(members.map((m) => m._id)))}
+            >
+              Select all
+            </button>
+            <button
+              type="button"
+              className="text-xs text-muted-foreground hover:underline"
+              onClick={() => onChange(new Set())}
+            >
+              Clear
+            </button>
+          </div>
+
+          <div className="max-h-52 overflow-y-auto py-1">
+            {members.map((m) => {
+              const checked = selectedIds.has(m._id)
+              const committed = committedIds.has(m._id)
+              return (
+                <button
+                  key={m._id}
+                  type="button"
+                  onClick={() => toggle(m._id)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-accent transition-colors text-left"
+                >
+                  <div
+                    className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
+                      checked
+                        ? 'bg-primary border-primary'
+                        : 'border-border'
+                    }`}
+                  >
+                    {checked && (
+                      <svg className="h-2.5 w-2.5 text-primary-foreground" viewBox="0 0 10 8" fill="none">
+                        <path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="flex-1 text-sm">{m.firstName} {m.lastName}</span>
+                  {committed && (
+                    <UserCheck className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Selected chips */}
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {members
+            .filter((m) => selectedIds.has(m._id))
+            .map((m) => (
+              <span
+                key={m._id}
+                className="flex items-center gap-1 bg-primary/10 text-primary text-xs rounded-full px-2.5 py-0.5"
+              >
+                {m.firstName} {m.lastName}
+                <button
+                  type="button"
+                  onClick={() => toggle(m._id)}
+                  className="hover:text-primary/70"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function StandupCaptureTab({
   session,
   members,
@@ -61,88 +204,129 @@ export function StandupCaptureTab({
   readOnly,
 }: StandupCaptureTabProps) {
   const notify = useNotify()
-  const [selectedMember, setSelectedMember] = useState<Member | null>(null)
-  const [tasks, setTasks] = useState<SprintTask[]>([])
-  const [loadingTasks, setLoadingTasks] = useState(false)
-  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
-  const [saving, setSaving] = useState(false)
-  const [search, setSearch] = useState('')
 
   const projectId = session.project?._id ?? session.project
   const sprintId = session.sprint
 
+  // Selected member IDs from dropdown
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set())
+  // Per-member state: tasks, loading, selection, saving, search
+  const [memberStates, setMemberStates] = useState<Map<string, MemberState>>(new Map())
+
+  const committedMemberIds = new Set(commitments.map((c) => c.user?._id ?? c.user))
+
   const getCommittedTaskIds = (userId: string): Set<string> => {
-    const commitment = commitments.find(
-      (c) => (c.user?._id ?? c.user) === userId
-    )
+    const commitment = commitments.find((c) => (c.user?._id ?? c.user) === userId)
     if (!commitment) return new Set()
     return new Set(commitment.tasks?.map((t: any) => t.task?._id ?? t.task) ?? [])
   }
 
-  const handleMemberSelect = async (member: Member) => {
-    if (selectedMember?._id === member._id) {
-      setSelectedMember(null)
-      setTasks([])
-      setSelectedTaskIds(new Set())
-      return
-    }
-    setSelectedMember(member)
-    setSelectedTaskIds(new Set())
-    setSearch('')
-    setLoadingTasks(true)
+  // Fetch tasks for a member if not already loaded
+  const ensureMemberTasks = async (memberId: string) => {
+    const existing = memberStates.get(memberId)
+    if (existing && (existing.tasks.length > 0 || existing.loading)) return
+
+    setMemberStates((prev) => {
+      const next = new Map(prev)
+      next.set(memberId, { tasks: [], loading: true, selectedTaskIds: new Set(), saving: false, search: '' })
+      return next
+    })
+
     try {
       const sprintPart = sprintId ? `&sprint=${sprintId}` : ''
-      const url = `/api/tasks?project=${projectId}&assignedTo=${member._id}${sprintPart}&status=todo,in_progress,review,testing`
+      const url = `/api/tasks?project=${projectId}&assignedTo=${memberId}${sprintPart}&status=todo,in_progress,review,testing&limit=100`
       const res = await fetch(url)
       const data = await res.json()
-      setTasks(data.tasks ?? [])
+      setMemberStates((prev) => {
+        const next = new Map(prev)
+        const cur = next.get(memberId) ?? { tasks: [], loading: false, selectedTaskIds: new Set(), saving: false, search: '' }
+        next.set(memberId, { ...cur, tasks: data.data ?? data.tasks ?? [], loading: false })
+        return next
+      })
     } catch {
       notify.error({ title: 'Failed to load tasks' })
-    } finally {
-      setLoadingTasks(false)
+      setMemberStates((prev) => {
+        const next = new Map(prev)
+        const cur = next.get(memberId) ?? { tasks: [], loading: false, selectedTaskIds: new Set(), saving: false, search: '' }
+        next.set(memberId, { ...cur, loading: false })
+        return next
+      })
     }
   }
 
-  const toggleTask = (taskId: string) => {
-    setSelectedTaskIds((prev) => {
-      const next = new Set(prev)
-      next.has(taskId) ? next.delete(taskId) : next.add(taskId)
+  // When selected members change, fetch their tasks
+  const handleMemberSelectionChange = (ids: Set<string>) => {
+    setSelectedMemberIds(ids)
+    ids.forEach((id) => ensureMemberTasks(id))
+  }
+
+  const toggleTask = (memberId: string, taskId: string) => {
+    setMemberStates((prev) => {
+      const next = new Map(prev)
+      const cur = next.get(memberId)
+      if (!cur) return prev
+      const sel = new Set(cur.selectedTaskIds)
+      sel.has(taskId) ? sel.delete(taskId) : sel.add(taskId)
+      next.set(memberId, { ...cur, selectedTaskIds: sel })
       return next
     })
   }
 
-  const handleSaveCommitment = async () => {
-    if (!selectedMember) return
-    setSaving(true)
+  const setSearch = (memberId: string, value: string) => {
+    setMemberStates((prev) => {
+      const next = new Map(prev)
+      const cur = next.get(memberId)
+      if (!cur) return prev
+      next.set(memberId, { ...cur, search: value })
+      return next
+    })
+  }
+
+  const handleSaveCommitment = async (memberId: string) => {
+    const state = memberStates.get(memberId)
+    if (!state || state.selectedTaskIds.size === 0) return
+
+    setMemberStates((prev) => {
+      const next = new Map(prev)
+      const cur = next.get(memberId)!
+      next.set(memberId, { ...cur, saving: true })
+      return next
+    })
+
     try {
-      const existingIds = getCommittedTaskIds(selectedMember._id)
-      const merged = new Set(Array.from(existingIds).concat(Array.from(selectedTaskIds)))
+      const existingIds = getCommittedTaskIds(memberId)
+      const merged = new Set(Array.from(existingIds).concat(Array.from(state.selectedTaskIds)))
       const allTaskIds = Array.from(merged)
 
       const res = await fetch(`/api/standup/sessions/${session._id}/commitments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: selectedMember._id, taskIds: allTaskIds }),
+        body: JSON.stringify({ userId: memberId, taskIds: allTaskIds }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Failed to save')
-      notify.success({ title: `Commitment saved for ${selectedMember.firstName}` })
-      setSelectedMember(null)
-      setTasks([])
-      setSelectedTaskIds(new Set())
+
+      const member = members.find((m) => m._id === memberId)
+      notify.success({ title: `Commitment saved for ${member?.firstName}` })
+
+      // Clear selection for this member
+      setMemberStates((prev) => {
+        const next = new Map(prev)
+        const cur = next.get(memberId)!
+        next.set(memberId, { ...cur, saving: false, selectedTaskIds: new Set() })
+        return next
+      })
       onCommitmentSaved()
     } catch (err: any) {
       notify.error({ title: err.message })
-    } finally {
-      setSaving(false)
+      setMemberStates((prev) => {
+        const next = new Map(prev)
+        const cur = next.get(memberId)!
+        next.set(memberId, { ...cur, saving: false })
+        return next
+      })
     }
   }
-
-  const filteredTasks = tasks.filter((t) =>
-    t.title.toLowerCase().includes(search.toLowerCase())
-  )
-
-  const committedMemberIds = new Set(commitments.map((c) => c.user?._id ?? c.user))
 
   return (
     <div className="space-y-5">
@@ -158,7 +342,7 @@ export function StandupCaptureTab({
 
       {/* Commitment capture — only for active sessions */}
       {!readOnly && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Today&apos;s Commitments
           </p>
@@ -167,133 +351,129 @@ export function StandupCaptureTab({
             <p className="text-sm text-muted-foreground">No team members found for this project.</p>
           ) : (
             <>
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">
-                  Select a team member to assign their tasks
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {members.map((m) => (
-                    <button
-                      key={m._id}
-                      onClick={() => handleMemberSelect(m)}
-                      className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm border transition-all ${
-                        selectedMember?._id === m._id
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : committedMemberIds.has(m._id)
-                          ? 'bg-green-50 border-green-300 text-green-700 dark:bg-green-900/20 dark:border-green-700 dark:text-green-400'
-                          : 'bg-card border-border hover:border-primary/50'
-                      }`}
-                    >
-                      {committedMemberIds.has(m._id) && (
-                        <UserCheck className="h-3.5 w-3.5" />
-                      )}
-                      {m.firstName} {m.lastName}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <MemberMultiSelect
+                members={members}
+                selectedIds={selectedMemberIds}
+                committedIds={committedMemberIds}
+                onChange={handleMemberSelectionChange}
+              />
 
-              {/* Task panel */}
-              {selectedMember && (
-                <Card>
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium">
-                        {selectedMember.firstName}&apos;s sprint tasks
-                      </p>
-                      <span className="text-xs text-muted-foreground">
-                        {selectedTaskIds.size} selected
-                      </span>
-                    </div>
+              {/* Per-member task cards */}
+              {selectedMemberIds.size > 0 && (
+                <div className="space-y-3">
+                  {members
+                    .filter((m) => selectedMemberIds.has(m._id))
+                    .map((member) => {
+                      const state = memberStates.get(member._id)
+                      const committedIds = getCommittedTaskIds(member._id)
+                      const filteredTasks = (state?.tasks ?? []).filter((t) =>
+                        t.title.toLowerCase().includes((state?.search ?? '').toLowerCase())
+                      )
 
-                    <div className="relative">
-                      <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        className="pl-8 h-8 text-sm"
-                        placeholder="Search tasks…"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                      />
-                    </div>
+                      return (
+                        <Card key={member._id}>
+                          <CardContent className="p-4 space-y-3">
+                            {/* Card header */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium">
+                                  {member.firstName} {member.lastName}
+                                </p>
+                                {committedMemberIds.has(member._id) && (
+                                  <Badge variant="outline" className="text-xs border-green-300 text-green-700 py-0">
+                                    <UserCheck className="h-3 w-3 mr-1" />
+                                    In standup
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {(state?.selectedTaskIds.size ?? 0)} selected
+                              </span>
+                            </div>
 
-                    {loadingTasks ? (
-                      <div className="flex justify-center py-6">
-                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : filteredTasks.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        No unfinished sprint tasks assigned to this member
-                      </p>
-                    ) : (
-                      <div className="space-y-1.5 max-h-72 overflow-y-auto">
-                        {filteredTasks.map((task) => {
-                          const alreadyCommitted = getCommittedTaskIds(selectedMember._id).has(
-                            task._id
-                          )
-                          const selected = selectedTaskIds.has(task._id)
-                          return (
-                            <button
-                              key={task._id}
-                              onClick={() => !alreadyCommitted && toggleTask(task._id)}
-                              disabled={alreadyCommitted}
-                              className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors ${
-                                alreadyCommitted
-                                  ? 'bg-green-50 border border-green-200 cursor-default dark:bg-green-900/20 dark:border-green-800'
-                                  : selected
-                                  ? 'bg-primary/10 border border-primary/30'
-                                  : 'bg-muted/40 border border-transparent hover:bg-muted/70'
-                              }`}
-                            >
-                              {alreadyCommitted ? (
-                                <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                              ) : selected ? (
-                                <CheckSquare className="h-4 w-4 text-primary shrink-0" />
-                              ) : (
-                                <Square className="h-4 w-4 text-muted-foreground shrink-0" />
-                              )}
-                              <span className="flex-1 text-sm truncate">{task.title}</span>
-                              {alreadyCommitted && (
-                                <span className="text-xs text-green-600 dark:text-green-400 shrink-0">
-                                  In standup
-                                </span>
-                              )}
-                              <Badge
-                                variant="outline"
-                                className={`text-xs px-1.5 py-0 shrink-0 ${priorityColors[task.priority] ?? ''}`}
+                            {/* Search */}
+                            <div className="relative">
+                              <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                              <Input
+                                className="pl-8 h-8 text-sm"
+                                placeholder="Filter tasks…"
+                                value={state?.search ?? ''}
+                                onChange={(e) => setSearch(member._id, e.target.value)}
+                              />
+                            </div>
+
+                            {/* Task list */}
+                            {state?.loading ? (
+                              <div className="flex justify-center py-6">
+                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                              </div>
+                            ) : filteredTasks.length === 0 ? (
+                              <p className="text-sm text-muted-foreground text-center py-4">
+                                {(state?.tasks.length ?? 0) === 0
+                                  ? 'No unfinished sprint tasks assigned to this member'
+                                  : 'No tasks match the filter'}
+                              </p>
+                            ) : (
+                              <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                                {filteredTasks.map((task) => {
+                                  const alreadyCommitted = committedIds.has(task._id)
+                                  const selected = state?.selectedTaskIds.has(task._id)
+                                  return (
+                                    <button
+                                      key={task._id}
+                                      onClick={() => !alreadyCommitted && toggleTask(member._id, task._id)}
+                                      disabled={alreadyCommitted}
+                                      className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors ${
+                                        alreadyCommitted
+                                          ? 'bg-green-50 border border-green-200 cursor-default dark:bg-green-900/20 dark:border-green-800'
+                                          : selected
+                                          ? 'bg-primary/10 border border-primary/30'
+                                          : 'bg-muted/40 border border-transparent hover:bg-muted/70'
+                                      }`}
+                                    >
+                                      {alreadyCommitted ? (
+                                        <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                                      ) : selected ? (
+                                        <CheckSquare className="h-4 w-4 text-primary shrink-0" />
+                                      ) : (
+                                        <Square className="h-4 w-4 text-muted-foreground shrink-0" />
+                                      )}
+                                      <span className="flex-1 text-sm truncate">{task.title}</span>
+                                      {alreadyCommitted && (
+                                        <span className="text-xs text-green-600 dark:text-green-400 shrink-0">
+                                          Saved
+                                        </span>
+                                      )}
+                                      <Badge
+                                        variant="outline"
+                                        className={`text-xs px-1.5 py-0 shrink-0 ${priorityColors[task.priority] ?? ''}`}
+                                      >
+                                        {task.priority}
+                                      </Badge>
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            )}
+
+                            {/* Save button */}
+                            <div className="flex justify-end pt-1">
+                              <Button
+                                size="sm"
+                                onClick={() => handleSaveCommitment(member._id)}
+                                disabled={state?.saving || (state?.selectedTaskIds.size ?? 0) === 0}
                               >
-                                {task.priority}
-                              </Badge>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
-
-                    <div className="flex justify-end gap-2 pt-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedMember(null)
-                          setTasks([])
-                          setSelectedTaskIds(new Set())
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleSaveCommitment}
-                        disabled={saving || selectedTaskIds.size === 0}
-                      >
-                        {saving && (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                        )}
-                        Add to Standup
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                                {state?.saving && (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                                )}
+                                Add to Standup
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                </div>
               )}
             </>
           )}
@@ -308,8 +488,7 @@ export function StandupCaptureTab({
           </p>
           {commitments.map((commitment) => {
             const member = commitment.user
-            const memberName =
-              `${member?.firstName ?? ''} ${member?.lastName ?? ''}`.trim()
+            const memberName = `${member?.firstName ?? ''} ${member?.lastName ?? ''}`.trim()
             return (
               <MemberCommitmentRow
                 key={commitment._id}

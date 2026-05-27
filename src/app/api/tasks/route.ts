@@ -185,6 +185,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') || '';
     const project = searchParams.get('project') || '';
     const story = searchParams.get('story') || '';
+    const sprint = searchParams.get('sprint') || '';
     const assignedTo = searchParams.get('assignedTo') || '';
     const createdBy = searchParams.get('createdBy') || '';
     const dueDateFrom = searchParams.get('dueDateFrom') || '';
@@ -295,11 +296,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Apply simple filters
-    if (status) filters.status = status;
+    if (status) {
+      const statusValues = status.split(',').map((s: string) => s.trim()).filter(Boolean)
+      filters.status = statusValues.length === 1 ? statusValues[0] : { $in: statusValues }
+    }
     if (priority) filters.priority = priority;
     if (type) filters.type = type;
     if (project) filters.project = project;
     if (story) filters.story = story;
+    if (sprint) filters.sprint = sprint;
 
     console.log('[Tasks GET] Building date filters');
     // Date range filters
