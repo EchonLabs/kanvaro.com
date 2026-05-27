@@ -1,3 +1,16 @@
+## [1.36.4](https://github.com/EchonLabs/kanvaro.com/compare/v1.36.3...v1.36.4) (2026-05-27)
+
+
+### Bug Fixes
+
+* dashboard showing incorrect logged hours until page is refreshed. ([e0298ac](https://github.com/EchonLabs/kanvaro.com/commit/e0298acefcd42301777889167e046dbf4b27369c))
+* ensure orphaned inline elements are wrapped in <p> tags for proper formatting ([f1e67af](https://github.com/EchonLabs/kanvaro.com/commit/f1e67af27c50803835bdf179177387a80146befc))
+* removed access for Team Members and QA's to view reports ([d6f9b2f](https://github.com/EchonLabs/kanvaro.com/commit/d6f9b2fd4f79c264a6bf2824c43a3c4fc12a4f08))
+* resolve missing organization logo and incorrect inviter/footer details; revamp welcome email design ([156090e](https://github.com/EchonLabs/kanvaro.com/commit/156090e53e385860cc43595bdd2ae1a5e6826e07))
+* restrict Assignee and Creator Filters for QA Engineer Role ([7ba0e9a](https://github.com/EchonLabs/kanvaro.com/commit/7ba0e9a148bfa940c311e33972ae360a31ef080c))
+* update email CTA button color for better visibility ([7c19481](https://github.com/EchonLabs/kanvaro.com/commit/7c19481a365d73be6dc0be67c600718712fe8393))
+* update task title tooltip to display only the title ([368b059](https://github.com/EchonLabs/kanvaro.com/commit/368b05904d01d0837a36fa4e1c21305d4603691f))
+
 ## [1.36.3](https://github.com/EchonLabs/kanvaro.com/compare/v1.36.2...v1.36.3) (2026-05-19)
 
 
