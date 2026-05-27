@@ -267,6 +267,10 @@ export async function GET(req: NextRequest) {
 
     if (eventType) {
       query.eventType = eventType
+    } else {
+      // Never surface daily_standup events in the listing —
+      // standups are managed via the AI Standup Dashboard
+      query.eventType = { $ne: 'daily_standup' }
     }
 
     if (status) {
@@ -620,6 +624,41 @@ export async function POST(req: NextRequest) {
     }, { status: 201 })
   } catch (error) {
     console.error('Error creating sprint event:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// Bulk delete sprint events by eventType (admin/PM only)
+export async function DELETE(req: NextRequest) {
+  try {
+    await connectDB()
+    const authResult = await authenticateUser()
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+    }
+
+    const { user } = authResult
+    const canDelete =
+      (await hasPermission(user.id, Permission.SPRINT_DELETE)) ||
+      (await hasPermission(user.id, Permission.SPRINT_MANAGE)) ||
+      user.role === 'admin'
+    if (!canDelete) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    }
+
+    const { searchParams } = new URL(req.url)
+    const eventType = searchParams.get('eventType')
+    const projectId = searchParams.get('projectId')
+
+    const filter: Record<string, any> = { organization: user.organization }
+    if (eventType) filter.eventType = eventType
+    if (projectId) filter.project = projectId
+
+    const result = await SprintEvent.deleteMany(filter)
+
+    return NextResponse.json({ deleted: result.deletedCount })
+  } catch (error) {
+    console.error('Error bulk deleting sprint events:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
