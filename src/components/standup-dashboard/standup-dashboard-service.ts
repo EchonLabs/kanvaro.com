@@ -13,19 +13,20 @@ import {
   StandupProjectStatus,
   StandupTimelineItem
 } from './standup-dashboard-types'
-import { getStandupProjectById, getStandupProjects } from './standup-dashboard-data'
-import { loadStoredStandupSchedules } from './standup-schedule-storage'
+import {
+  fetchStandupProjectSchedules,
+  fetchStandupSchedule,
+  type StandupScheduleApiItem
+} from './standup-schedule-storage'
 
 type ProjectApiItem = {
   _id: string
   name?: string
   description?: string
   status?: string
-  startDate?: string
-  endDate?: string
-  createdBy?: { _id?: string; firstName?: string; lastName?: string; email?: string }
-  client?: { _id?: string; firstName?: string; lastName?: string; email?: string }
-  teamMembers?: Array<{ memberId?: any }>
+  createdBy?: { _id?: string; firstName?: string; lastName?: string; email?: string; avatar?: string; role?: string; customRole?: { name?: string } }
+  client?: { _id?: string; firstName?: string; lastName?: string; email?: string; avatar?: string; role?: string; customRole?: { name?: string } }
+  teamMembers?: Array<{ memberId?: any; hourlyRate?: number }>
   progress?: { completionPercentage?: number; tasksCompleted?: number; totalTasks?: number }
   settings?: Record<string, any>
   updatedAt?: string
@@ -61,11 +62,15 @@ type TaskApiItem = {
   displayId?: string
   taskNumber?: number
   assignedTo?: Array<{
-    user?: { _id?: string; firstName?: string; lastName?: string; email?: string; avatar?: string }
+    user?: { _id?: string; firstName?: string; lastName?: string; email?: string; avatar?: string; role?: string; customRole?: { name?: string } }
     firstName?: string
     lastName?: string
     email?: string
+    avatar?: string
+    role?: string
+    customRole?: { name?: string }
     hourlyRate?: number
+    _id?: string
   }>
 }
 
@@ -88,6 +93,7 @@ type StandupLiveProjectDetail = {
   sprint?: SprintApiItem
   projectRecord?: ProjectApiItem
   teamResponse?: TeamApiResponse
+  schedules: StandupMeeting[]
 }
 
 const normalizeStatus = (status?: string): StandupProjectStatus => {
@@ -96,6 +102,8 @@ const normalizeStatus = (status?: string): StandupProjectStatus => {
   }
   return 'active'
 }
+
+const isObjectLike = (value: unknown): value is Record<string, any> => typeof value === 'object' && value !== null
 
 const normalizeMember = (member: any): StandupMember | null => {
   const source = member?.memberId || member?.user || member
@@ -116,60 +124,16 @@ const normalizeMember = (member: any): StandupMember | null => {
 
 const sanitizeString = (value?: string, fallback = '') => (typeof value === 'string' && value.trim() ? value : fallback)
 
-const buildMockFallbackSummary = (projectId: string) => {
-  const mock = getStandupProjectById(projectId) || getStandupProjects()[0]
-  return mock
-}
-
-const fetchJson = async <T,>(url: string, signal?: AbortSignal): Promise<T | null> => {
-  try {
-    const response = await fetch(url, { signal, cache: 'no-store' })
-    if (!response.ok) return null
-    return await response.json() as T
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw error
-    }
-    return null
+const fetchJson = async <T,>(url: string, signal?: AbortSignal, init?: RequestInit): Promise<T> => {
+  const response = await fetch(url, { signal, cache: 'no-store', ...init })
+  if (!response.ok) {
+    const message = await response.text().catch(() => '')
+    throw new Error(message || `Request failed with status ${response.status}`)
   }
+  return await response.json() as T
 }
 
-const mapProjectSummary = (project: ProjectApiItem): StandupProjectSummary => {
-  const teamMembers = Array.isArray(project.teamMembers)
-    ? project.teamMembers.map(normalizeMember).filter(Boolean) as StandupMember[]
-    : []
-
-  const progressPercent = project.progress?.completionPercentage ?? 0
-  const totalTasks = project.progress?.totalTasks ?? 0
-  const tasksCompleted = project.progress?.tasksCompleted ?? 0
-
-  return {
-    _id: project._id,
-    name: sanitizeString(project.name, 'Untitled Project'),
-    status: normalizeStatus(project.status),
-    sprintName: project.settings?.currentSprintName || project.settings?.sprintName,
-    teamMembers,
-    progressPercent,
-    lastStandupAt: project.updatedAt || new Date().toISOString(),
-    summary: sanitizeString(project.description, `${totalTasks} tasks tracked, ${tasksCompleted} completed.`),
-    meetings: [],
-    memberProgress: [],
-    timeline: []
-  }
-}
-
-const mapSprint = (sprint: SprintApiItem): StandupMeeting => ({
-  _id: sprint._id,
-  title: sprint.name || 'Sprint',
-  date: sprint.startDate || new Date().toISOString(),
-  time: '09:00 AM',
-  durationMinutes: 15,
-  participants: [],
-  status: (sprint.status === 'in_progress' ? 'in_progress' : sprint.status === 'completed' ? 'completed' : 'scheduled') as StandupMeetingStatus,
-  notes: sprint.goal || sprint.description
-})
-
-const mapTask = (task: TaskApiItem) => ({
+const normalizeTask = (task: TaskApiItem) => ({
   _id: task._id,
   title: task.title || 'Untitled task',
   status: task.status || 'todo',
@@ -179,6 +143,221 @@ const mapTask = (task: TaskApiItem) => ({
     ? task.assignedTo.map((entry) => normalizeMember(entry)).filter(Boolean) as StandupMember[]
     : []
 })
+
+const normalizeMeeting = (schedule: StandupScheduleApiItem): StandupMeeting => ({
+  _id: schedule._id,
+  title: schedule.title || 'Daily Standup',
+  date: schedule.actualDate || schedule.scheduledDate || new Date().toISOString(),
+  actualDate: schedule.actualDate,
+  time: schedule.time || '09:00',
+  durationMinutes: typeof schedule.durationMinutes === 'number' ? schedule.durationMinutes : 15,
+  participants: Array.isArray(schedule.participants)
+    ? schedule.participants.map(normalizeMember).filter(Boolean) as StandupMember[]
+    : [],
+  status: (schedule.status === 'in_progress'
+    ? 'in_progress'
+    : schedule.status === 'completed'
+      ? 'completed'
+      : schedule.status === 'missed'
+        ? 'missed'
+        : 'scheduled') as StandupMeetingStatus,
+  notes: schedule.notes,
+  facilitator: normalizeMember(schedule.facilitator) || undefined,
+  createdBy: normalizeMember(schedule.createdBy) || undefined,
+  location: schedule.location,
+  meetingLink: schedule.meetingLink,
+  assignments: Array.isArray(schedule.assignments)
+    ? schedule.assignments.map((assignment) => {
+      const member = normalizeMember(assignment.member)
+      if (!member) return null
+      const task = isObjectLike(assignment.task) ? assignment.task : undefined
+      const taskId = task?._id || (typeof assignment.task === 'string' ? assignment.task : '')
+      if (!taskId) return null
+
+      return {
+        memberId: member._id,
+        memberName: `${member.firstName} ${member.lastName}`.trim(),
+        taskId,
+        taskTitle: assignment.taskTitle || task?.title || 'Untitled task',
+        status: assignment.taskStatus || task?.status,
+        durationMinutes: assignment.durationMinutes
+      }
+    }).filter(Boolean) as StandupTaskAssignment[]
+    : [],
+  comments: Array.isArray(schedule.comments)
+    ? schedule.comments.map((comment) => {
+      const author = normalizeMember(comment.author || comment.member) || {
+        _id: 'unknown',
+        firstName: 'Unknown',
+        lastName: 'Member',
+        email: '',
+        role: 'Team Member'
+      }
+
+      return {
+        _id: comment._id || `comment-${Date.now()}`,
+        authorName: comment.authorName || `${author.firstName} ${author.lastName}`.trim(),
+        memberId: normalizeMember(comment.member)?._id,
+        reason: comment.reason || '',
+        createdAt: comment.createdAt || new Date().toISOString()
+      }
+    }).filter((comment): comment is NonNullable<typeof comment> => Boolean(comment.reason))
+    : [],
+  summary: schedule.summary
+})
+
+const buildMemberProgress = (members: StandupMember[], taskCards: ReturnType<typeof normalizeTask>[], overallProgress: number): StandupMemberProgress[] => {
+  return members.map((member, index) => {
+    const memberTasks = taskCards.filter((task) => task.assignedTo.some((assignedMember) => assignedMember._id === member._id))
+    const assignedTasks = memberTasks.length
+    const completedTasks = memberTasks.filter((task) => task.status === 'done' || task.status === 'completed').length
+    const blockedTasks = memberTasks.filter((task) => ['blocked', 'in_progress', 'on_hold'].includes(task.status)).length
+    const progressPercent = assignedTasks > 0
+      ? Math.max(0, Math.min(100, Math.round((completedTasks / assignedTasks) * 100)))
+      : Math.max(0, Math.min(100, overallProgress - index * 5))
+
+    return {
+      ...member,
+      assignedTasks,
+      completedTasks,
+      blockedTasks,
+      currentTask: memberTasks[0]?.title || 'Review standup updates',
+      progressPercent,
+      status: blockedTasks > 0 ? 'blocked' : completedTasks < assignedTasks ? 'needs_attention' : 'on_track'
+    }
+  })
+}
+
+const buildTimeline = (schedules: StandupMeeting[], members: StandupMember[]): StandupTimelineItem[] => {
+  const fallbackAuthor = members[0] || { _id: 'standup-system', firstName: 'Standup', lastName: 'System', email: '', role: 'System' }
+
+  return schedules
+    .slice()
+    .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
+    .slice(0, 8)
+    .flatMap((meeting, index) => {
+      const author = meeting.facilitator || meeting.createdBy || fallbackAuthor
+      const baseType: StandupTimelineItem['type'] = meeting.status === 'completed'
+        ? 'update'
+        : meeting.status === 'in_progress'
+          ? 'progress'
+          : meeting.status === 'missed'
+            ? 'blocker'
+            : 'note'
+
+      const items: StandupTimelineItem[] = [
+        {
+          _id: `${meeting._id}-summary`,
+          type: baseType,
+          title: meeting.title,
+          description: meeting.summary || meeting.notes || `${meeting.participants.length} participants scheduled`,
+          createdAt: meeting.actualDate || meeting.date,
+          author,
+          projectTask: meeting.assignments?.[0]?.taskTitle
+        }
+      ]
+
+      const firstComment = meeting.comments?.[0]
+      if (firstComment) {
+        items.push({
+          _id: `${meeting._id}-comment-${index}`,
+          type: 'note',
+          title: 'Follow-up comment',
+          description: firstComment.reason,
+          createdAt: firstComment.createdAt,
+          author,
+          projectTask: meeting.assignments?.[0]?.taskTitle
+        })
+      }
+
+      return items
+    })
+}
+
+const mapProjectSummary = async (project: ProjectApiItem, signal?: AbortSignal): Promise<StandupProjectSummary> => {
+  const schedules = await fetchStandupProjectSchedules(project._id, signal)
+  const teamMembers = Array.isArray(project.teamMembers)
+    ? project.teamMembers.map(normalizeMember).filter(Boolean) as StandupMember[]
+    : []
+  const progressPercent = project.progress?.completionPercentage ?? 0
+  const latestSchedule = schedules[0]
+
+  return {
+    _id: project._id,
+    name: sanitizeString(project.name, 'Untitled Project'),
+    status: normalizeStatus(project.status),
+    sprintName: project.settings?.currentSprintName || project.settings?.sprintName,
+    teamMembers,
+    progressPercent,
+    lastStandupAt: latestSchedule?.date || project.updatedAt || new Date().toISOString(),
+    summary: sanitizeString(project.description, schedules.length > 0 ? `${schedules.length} standup schedules recorded.` : 'No standup schedules recorded yet.'),
+    meetings: schedules,
+    memberProgress: buildMemberProgress(teamMembers, [], progressPercent),
+    timeline: buildTimeline(schedules, teamMembers)
+  }
+}
+
+export async function fetchStandupProjectSummaries(signal?: AbortSignal): Promise<StandupProjectSummary[]> {
+  const live = await fetchJson<{ success?: boolean; data?: ProjectApiItem[]; projects?: ProjectApiItem[] }>('/api/projects?limit=1000&page=1', signal)
+  const liveProjects = Array.isArray(live?.data) ? live.data : Array.isArray(live?.projects) ? live.projects : []
+
+  const summaries = await Promise.all(liveProjects.map((project) => mapProjectSummary(project, signal)))
+  return summaries.sort((left, right) => new Date(right.lastStandupAt).getTime() - new Date(left.lastStandupAt).getTime())
+}
+
+export async function fetchStandupProjectDetail(projectId: string, signal?: AbortSignal): Promise<StandupLiveProjectDetail> {
+  const [projectResponse, teamResponse, tasksResponse, sprintsResponse, schedules] = await Promise.all([
+    fetchJson<{ success?: boolean; data?: ProjectApiItem }>(`/api/projects/${projectId}`, signal),
+    fetchJson<{ success?: boolean; data?: TeamApiResponse }>(`/api/projects/${projectId}/team`, signal),
+    fetchJson<{ success?: boolean; data?: TaskApiItem[] }>(`/api/projects/${projectId}/tasks`, signal),
+    fetchJson<{ success?: boolean; data?: SprintApiItem[] | SprintApiItem }>(`/api/sprints?project=${projectId}&limit=20`, signal),
+    fetchStandupProjectSchedules(projectId, signal)
+  ])
+
+  const projectRecord = projectResponse.data
+  if (!projectRecord) {
+    throw new Error('Project not found')
+  }
+
+  const teamData = teamResponse.data
+  const tasksData = Array.isArray(tasksResponse.data) ? tasksResponse.data : []
+  const sprintData = Array.isArray(sprintsResponse.data)
+    ? sprintsResponse.data[0]
+    : sprintsResponse.data ?? undefined
+
+  const teamMembers = Array.isArray(teamData?.teamMembers)
+    ? teamData.teamMembers.map(normalizeMember).filter(Boolean) as StandupMember[]
+    : Array.isArray(projectRecord.teamMembers)
+      ? projectRecord.teamMembers.map(normalizeMember).filter(Boolean) as StandupMember[]
+      : []
+
+  const projectTasks = tasksData.map(normalizeTask)
+  const completionPercent = projectRecord.progress?.completionPercentage ?? 0
+  const memberProgress = buildMemberProgress(teamMembers, projectTasks, completionPercent)
+  const timeline = buildTimeline(schedules, teamMembers)
+  const meetings = schedules.length > 0 ? schedules : []
+
+  return {
+    summary: {
+      _id: projectRecord._id,
+      name: sanitizeString(projectRecord.name, 'Untitled Project'),
+      status: normalizeStatus(projectRecord.status),
+      sprintName: sprintData?.name || projectRecord.settings?.currentSprintName || projectRecord.settings?.sprintName,
+      teamMembers,
+      progressPercent: completionPercent,
+      lastStandupAt: meetings[0]?.date || projectRecord.updatedAt || new Date().toISOString(),
+      summary: sanitizeString(projectRecord.description, meetings.length > 0 ? `${meetings.length} standup schedules recorded.` : 'No standup schedules recorded yet.'),
+      meetings,
+      memberProgress,
+      timeline
+    },
+    projectTasks,
+    sprint: sprintData,
+    projectRecord,
+    teamResponse: teamData,
+    schedules: meetings
+  }
+}
 
 const mapTimeLog = (entry: TimeEntryApiItem): StandupTimelogItem => {
   const userId = typeof entry.user === 'string'
@@ -203,134 +382,26 @@ const mapTimeLog = (entry: TimeEntryApiItem): StandupTimelogItem => {
   }
 }
 
-export async function fetchStandupProjectSummaries(signal?: AbortSignal): Promise<StandupProjectSummary[]> {
-  const live = await fetchJson<{ success?: boolean; data?: ProjectApiItem[]; projects?: ProjectApiItem[] }>('/api/projects?limit=1000&page=1', signal)
-  const liveProjects = Array.isArray(live?.data) ? live!.data : Array.isArray(live?.projects) ? live!.projects : []
-
-  const liveSummaries = liveProjects.map(mapProjectSummary)
-  const mockProjects = getStandupProjects()
-  const mockExtras = mockProjects.filter((mockProject) => !liveSummaries.some((liveProject) => liveProject._id === mockProject._id || liveProject.name === mockProject.name))
-
-  if (liveSummaries.length === 0) {
-    return mockProjects
-  }
-
-  return [...liveSummaries, ...mockExtras]
-}
-
-export async function fetchStandupProjectDetail(projectId: string, signal?: AbortSignal): Promise<StandupLiveProjectDetail> {
-  const [projectResponse, teamResponse, tasksResponse, sprintsResponse] = await Promise.all([
-    fetchJson<{ success?: boolean; data?: ProjectApiItem }>(`/api/projects/${projectId}`, signal),
-    fetchJson<{ success?: boolean; data?: TeamApiResponse }>(`/api/projects/${projectId}/team`, signal),
-    fetchJson<{ success?: boolean; data?: TaskApiItem[] }>(`/api/projects/${projectId}/tasks`, signal),
-    fetchJson<{ success?: boolean; data?: SprintApiItem[] | SprintApiItem }>(`/api/sprints?project=${projectId}&limit=20`, signal)
-  ])
-
-  const projectRecord = projectResponse?.data
-  const teamData = teamResponse?.data
-  const tasksData = Array.isArray(tasksResponse?.data) ? tasksResponse!.data : []
-  const sprintData = Array.isArray(sprintsResponse?.data)
-    ? sprintsResponse!.data[0]
-    : sprintsResponse?.data ?? undefined
-
-  const mockFallback = buildMockFallbackSummary(projectId)
-  const liveProject = projectRecord ? mapProjectSummary(projectRecord) : mockFallback
-  const liveTeamMembers = Array.isArray(teamData?.teamMembers)
-    ? teamData!.teamMembers.map(normalizeMember).filter(Boolean) as StandupMember[]
-    : liveProject.teamMembers
-
-    const taskCards = Array.isArray(tasksData) ? tasksData.map(mapTask) : []
-    const normalizedTaskCards = taskCards.map((task) => ({
-      _id: task._id,
-      title: task.title || 'Untitled task',
-      status: task.status,
-      priority: task.priority,
-      displayId: task.displayId,
-      assignedTo: Array.isArray(task.assignedTo) ? task.assignedTo : []
-    }))
-  const totalTasks = taskCards.length
-  const completedTasks = taskCards.filter((task) => task.status === 'done' || task.status === 'completed').length
-  const completionPercent = projectRecord?.progress?.completionPercentage ?? liveProject.progressPercent
-
-  const membersForProgress = liveTeamMembers.length > 0 ? liveTeamMembers : liveProject.teamMembers
-  const fallbackProgress = mockFallback.memberProgress
-
-  const memberProgress: StandupMemberProgress[] = membersForProgress.map((member, index) => {
-    const fallback = fallbackProgress[index % Math.max(fallbackProgress.length, 1)]
-    const assignedTasks = totalTasks > 0 ? Math.max(1, Math.round(totalTasks / Math.max(membersForProgress.length, 1))) : (fallback?.assignedTasks || 0)
-    const completedEstimate = totalTasks > 0 ? Math.min(assignedTasks, Math.round(completedTasks / Math.max(membersForProgress.length, 1))) : (fallback?.completedTasks || 0)
-    const blockedTasks = totalTasks > 0 && index === 0 && completedTasks < totalTasks ? 1 : (fallback?.blockedTasks || 0)
-
-    return {
-      ...member,
-      assignedTasks,
-      completedTasks: completedEstimate,
-      blockedTasks,
-      currentTask: taskCards[index % Math.max(taskCards.length, 1)]?.title || fallback?.currentTask || 'Review standup updates',
-      progressPercent: Math.max(0, Math.min(100, completionPercent - index * 4)),
-      status: blockedTasks > 0 ? 'blocked' : completionPercent < 50 && index === 0 ? 'needs_attention' : 'on_track'
-    }
-  })
-
-  const liveSprint = sprintData ? mapSprint(sprintData) : mockFallback.meetings[0]
-  const meetings: StandupMeeting[] = sprintData
-    ? [
-        {
-          ...liveSprint,
-          participants: membersForProgress.slice(0, Math.min(membersForProgress.length, 4))
-        },
-        ...mockFallback.meetings.slice(0, 2)
-      ]
-    : mockFallback.meetings
-
-  const timeline: StandupTimelineItem[] = [
-    ...mockFallback.timeline.slice(0, 2),
-    ...(taskCards.slice(0, 3).map((task, index) => ({
-      _id: `${projectId}-task-${index}`,
-      type: index === 0 ? 'assignment' : 'progress',
-      title: task.title,
-      description: `${task.displayId || 'Task'} is ${task.status}`,
-      createdAt: new Date(Date.now() - index * 1000 * 60 * 18).toISOString(),
-      author: membersForProgress[index % Math.max(membersForProgress.length, 1)] || membersForProgress[0]
-    })) as StandupTimelineItem[])
-  ]
-
-  return {
-    summary: {
-      ...liveProject,
-      sprintName: liveProject.sprintName || sprintData?.name || mockFallback.sprintName,
-      lastStandupAt: liveProject.lastStandupAt || mockFallback.lastStandupAt,
-      summary: liveProject.summary || mockFallback.summary,
-      meetings,
-      memberProgress,
-      timeline
-    },
-      projectTasks: normalizedTaskCards,
-    sprint: sprintData,
-    projectRecord,
-    teamResponse: teamData
-  }
-}
-
 export async function fetchStandupScheduleDetail(projectId: string, meetingId: string, organizationId: string, signal?: AbortSignal): Promise<StandupScheduleDetail> {
   const projectDetail = await fetchStandupProjectDetail(projectId, signal)
-  const localSchedule = typeof window !== 'undefined'
-    ? loadStoredStandupSchedules(projectId).find((item) => item._id === meetingId)
-    : null
-  const meeting = localSchedule || projectDetail.summary.meetings.find((item) => item._id === meetingId) || projectDetail.summary.meetings[0]
+  const meeting = await fetchStandupSchedule(projectId, meetingId, signal)
+
+  if (!meeting) {
+    throw new Error('Standup schedule not found')
+  }
 
   const [logResponse, taskResponse] = await Promise.all([
     fetchJson<{ success?: boolean; timeEntries?: TimeEntryApiItem[]; data?: TimeEntryApiItem[] }>(`/api/time-tracking/entries?organizationId=${encodeURIComponent(organizationId)}&projectId=${encodeURIComponent(projectId)}&startDate=${encodeURIComponent(meeting.date.slice(0, 10))}&endDate=${encodeURIComponent(meeting.date.slice(0, 10))}&limit=200`, signal),
     fetchJson<{ success?: boolean; data?: TaskApiItem[] }>(`/api/projects/${projectId}/tasks`, signal)
   ])
 
-  const timelogs = Array.isArray(logResponse?.timeEntries)
-    ? logResponse!.timeEntries.map(mapTimeLog)
-    : Array.isArray(logResponse?.data)
-      ? logResponse!.data.map(mapTimeLog)
+  const timelogs = Array.isArray(logResponse.timeEntries)
+    ? logResponse.timeEntries.map(mapTimeLog)
+    : Array.isArray(logResponse.data)
+      ? logResponse.data.map(mapTimeLog)
       : []
 
-  const taskCards = Array.isArray(taskResponse?.data) ? taskResponse!.data.map(mapTask) : projectDetail.projectTasks
+  const taskCards = Array.isArray(taskResponse.data) ? taskResponse.data.map(normalizeTask) : projectDetail.projectTasks.map(normalizeTask)
   const normalizedTaskCards = taskCards.map((task) => ({
     _id: task._id,
     title: task.title || 'Untitled task',
@@ -342,22 +413,30 @@ export async function fetchStandupScheduleDetail(projectId: string, meetingId: s
 
   const memberSummaries: StandupScheduleMemberSummary[] = projectDetail.summary.teamMembers.map((member, index) => {
     const memberTimelogs = timelogs.filter((log) => log.userId === member._id)
+    const memberAssignments = meeting.assignments?.filter((assignment) => assignment.memberId === member._id) || []
     const memberTasks = normalizedTaskCards.filter((task) => task.assignedTo?.some((assignedMember) => {
-      const rawAssigned = assignedMember as { _id?: string; user?: { _id?: string } }
-      const assignedId = rawAssigned._id || rawAssigned.user?._id
+      const assignedId = assignedMember._id
       return assignedId === member._id
     }))
-    const assignedTasks: StandupTaskAssignment[] = memberTasks.map((task) => ({
-      memberId: member._id,
-      memberName: `${member.firstName} ${member.lastName}`.trim(),
-      taskId: task._id,
+
+    const assignedTasks: StandupTaskAssignment[] = memberAssignments.length > 0
+      ? memberAssignments
+      : memberTasks.map((task) => ({
+        memberId: member._id,
+        memberName: `${member.firstName} ${member.lastName}`.trim(),
+        taskId: task._id,
         taskTitle: task.title || 'Untitled task',
-      status: task.status,
-      durationMinutes: memberTimelogs.reduce((sum, log) => sum + log.duration, 0)
-    }))
+        status: task.status,
+        durationMinutes: memberTimelogs.reduce((sum, log) => sum + log.duration, 0)
+      }))
+
     const completedTasks = memberTasks.filter((task) => task.status === 'done' || task.status === 'completed').length
-    const blockedTasks = memberTasks.filter((task) => task.status === 'blocked' || task.status === 'in_progress').length
+    const blockedTasks = memberTasks.filter((task) => ['blocked', 'in_progress', 'on_hold'].includes(task.status)).length
     const timeLoggedMinutes = memberTimelogs.reduce((sum, log) => sum + log.duration, 0)
+    const commentNotes = meeting.comments
+      ?.filter((comment) => comment.memberId === member._id)
+      .map((comment) => comment.reason)
+      .filter(Boolean) || []
 
     return {
       ...member,
@@ -365,14 +444,14 @@ export async function fetchStandupScheduleDetail(projectId: string, meetingId: s
       completedTasks,
       blockedTasks,
       timeLoggedMinutes,
-      notes: memberTimelogs.map((log) => log.description).filter(Boolean),
+      notes: [...commentNotes, ...memberTimelogs.map((log) => log.description).filter(Boolean)],
       currentTask: assignedTasks[0]?.taskTitle || projectDetail.summary.memberProgress[index % Math.max(projectDetail.summary.memberProgress.length, 1)]?.currentTask || 'Review standup updates',
       progressPercent: Math.max(0, Math.min(100, projectDetail.summary.progressPercent - index * 5)),
       status: blockedTasks > 0 ? 'blocked' : timeLoggedMinutes > 0 ? 'on_track' : 'needs_attention'
     }
   })
 
-  const pastMeetings = projectDetail.summary.meetings.filter((item) => item.status === 'completed' || item.date < meeting.date)
+  const pastMeetings = projectDetail.schedules.filter((item) => item._id !== meeting._id && (item.status === 'completed' || item.status === 'missed' || new Date(item.date).getTime() < new Date(meeting.date).getTime()))
 
   return {
     project: projectDetail.summary,

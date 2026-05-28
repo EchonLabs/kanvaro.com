@@ -19,9 +19,17 @@ interface StandupScheduleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   members: StandupMember[]
+  onSubmit?: (payload: {
+    title: string
+    scheduledDate: string
+    time: string
+    durationMinutes: number
+    notes: string
+    participants: string[]
+  }) => Promise<void> | void
 }
 
-export function StandupScheduleDialog({ open, onOpenChange, members }: StandupScheduleDialogProps) {
+export function StandupScheduleDialog({ open, onOpenChange, members, onSubmit }: StandupScheduleDialogProps) {
   const [submitting, setSubmitting] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
   const [formState, setFormState] = useState({
@@ -52,7 +60,19 @@ export function StandupScheduleDialog({ open, onOpenChange, members }: StandupSc
 
     setSubmitting(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 600))
+      const payload = {
+        title: formState.title,
+        scheduledDate: selectedDate.toISOString(),
+        time: formState.time,
+        durationMinutes: Number(formState.durationMinutes),
+        notes: formState.notes,
+        participants: formState.attendeeIds
+      }
+
+      if (onSubmit) {
+        await onSubmit(payload)
+      }
+
       notifySuccess({ title: 'Standup schedule created', message: `${formState.title} scheduled for ${format(selectedDate, 'PPP')}` })
       onOpenChange(false)
     } catch (error) {

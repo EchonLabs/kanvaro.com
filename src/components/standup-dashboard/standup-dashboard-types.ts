@@ -21,6 +21,11 @@ export interface StandupMeeting {
   participants: StandupMember[]
   status: StandupMeetingStatus
   notes?: string
+  facilitator?: StandupMember
+  createdBy?: StandupMember
+  actualDate?: string
+  location?: string
+  meetingLink?: string
   assignments?: StandupTaskAssignment[]
   comments?: StandupScheduleComment[]
   summary?: string

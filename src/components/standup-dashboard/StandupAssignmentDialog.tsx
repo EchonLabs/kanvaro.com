@@ -46,8 +46,6 @@ export function StandupAssignmentDialog({ open, onOpenChange, members, onSubmit 
     try {
       if (onSubmit) {
         await onSubmit(payload)
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, 600))
       }
       notifySuccess({ title: 'Task assigned', message: 'Standup assignment saved successfully.' })
       onOpenChange(false)
