@@ -34,6 +34,44 @@ const isValidObjectIdString = (value: unknown): value is string => {
   return typeof value === 'string' && value.trim().length > 0 && mongoose.Types.ObjectId.isValid(value.trim())
 }
 
+const autoCompleteOverdueSchedule = async (scheduleId: string, projectId: string, organizationId: string) => {
+  const now = new Date()
+
+  const sched = await StandupSchedule.findOne({
+    _id: scheduleId,
+    project: projectId,
+    organization: organizationId,
+    archived: false,
+    status: { $in: ['scheduled', 'in_progress'] }
+  })
+
+  if (!sched) return null
+
+  const buildScheduledDateTime = (scheduledDate?: Date | string, time?: string) => {
+    if (!scheduledDate) return null
+    const base = new Date(scheduledDate)
+    if (Number.isNaN(base.getTime())) return null
+
+    if (typeof time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+      const [hours, minutes] = time.split(':').map((v) => Number(v))
+      base.setHours(hours, minutes, 0, 0)
+    } else {
+      base.setHours(0, 0, 0, 0)
+    }
+
+    return base
+  }
+
+  const scheduledDateTime = buildScheduledDateTime(sched.scheduledDate, sched.time)
+  if (scheduledDateTime && scheduledDateTime < now) {
+    sched.status = 'completed'
+    await sched.save()
+    return sched
+  }
+
+  return null
+}
+
 const normalizeObjectIdList = (input: unknown): string[] => {
   if (!Array.isArray(input)) {
     return []
@@ -214,6 +252,8 @@ export async function GET(
       return NextResponse.json({ error: projectContext.error }, { status: projectContext.status })
     }
 
+    await autoCompleteOverdueSchedule(params.scheduleId, params.id, user.organization)
+
     const standupSchedule = await StandupSchedule.findOne({
       _id: params.scheduleId,
       project: params.id,
@@ -265,6 +305,22 @@ export async function PUT(
 
     if (!standupSchedule) {
       return NextResponse.json({ error: 'Standup schedule not found' }, { status: 404 })
+    }
+
+    const scheduledDateTime = (() => {
+      const base = new Date(standupSchedule.scheduledDate)
+      if (Number.isNaN(base.getTime())) return null
+      if (typeof standupSchedule.time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(standupSchedule.time)) {
+        const [hours, minutes] = standupSchedule.time.split(':').map((value: string) => Number(value))
+        base.setHours(hours, minutes, 0, 0)
+      } else {
+        base.setHours(0, 0, 0, 0)
+      }
+      return base
+    })()
+
+    if (standupSchedule.status !== 'completed' && standupSchedule.status !== 'missed' && scheduledDateTime && scheduledDateTime < new Date()) {
+      standupSchedule.status = 'completed'
     }
 
     const body = await request.json().catch(() => null)

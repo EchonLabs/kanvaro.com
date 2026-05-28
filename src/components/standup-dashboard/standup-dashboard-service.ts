@@ -105,6 +105,21 @@ const normalizeStatus = (status?: string): StandupProjectStatus => {
 
 const isObjectLike = (value: unknown): value is Record<string, any> => typeof value === 'object' && value !== null
 
+const buildScheduledDateTime = (scheduledDate?: string, time?: string) => {
+  if (!scheduledDate) return null
+  const base = new Date(scheduledDate)
+  if (Number.isNaN(base.getTime())) return null
+
+  if (typeof time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+    const [hours, minutes] = time.split(':').map((value) => Number(value))
+    base.setHours(hours, minutes, 0, 0)
+  } else {
+    base.setHours(0, 0, 0, 0)
+  }
+
+  return base
+}
+
 const normalizeMember = (member: any): StandupMember | null => {
   const source = member?.memberId || member?.user || member
   if (!source) return null
@@ -144,67 +159,74 @@ const normalizeTask = (task: TaskApiItem) => ({
     : []
 })
 
-const normalizeMeeting = (schedule: StandupScheduleApiItem): StandupMeeting => ({
-  _id: schedule._id,
-  title: schedule.title || 'Daily Standup',
-  date: schedule.actualDate || schedule.scheduledDate || new Date().toISOString(),
-  actualDate: schedule.actualDate,
-  time: schedule.time || '09:00',
-  durationMinutes: typeof schedule.durationMinutes === 'number' ? schedule.durationMinutes : 15,
-  participants: Array.isArray(schedule.participants)
-    ? schedule.participants.map(normalizeMember).filter(Boolean) as StandupMember[]
-    : [],
-  status: (schedule.status === 'in_progress'
+const normalizeMeeting = (schedule: StandupScheduleApiItem): StandupMeeting => {
+  const scheduledDateTime = buildScheduledDateTime(schedule.actualDate || schedule.scheduledDate, schedule.time)
+  const resolvedStatus = schedule.status === 'in_progress'
     ? 'in_progress'
     : schedule.status === 'completed'
       ? 'completed'
       : schedule.status === 'missed'
         ? 'missed'
-        : 'scheduled') as StandupMeetingStatus,
-  notes: schedule.notes,
-  facilitator: normalizeMember(schedule.facilitator) || undefined,
-  createdBy: normalizeMember(schedule.createdBy) || undefined,
-  location: schedule.location,
-  meetingLink: schedule.meetingLink,
-  assignments: Array.isArray(schedule.assignments)
-    ? schedule.assignments.map((assignment) => {
-      const member = normalizeMember(assignment.member)
-      if (!member) return null
-      const task = isObjectLike(assignment.task) ? assignment.task : undefined
-      const taskId = task?._id || (typeof assignment.task === 'string' ? assignment.task : '')
-      if (!taskId) return null
+        : scheduledDateTime && scheduledDateTime < new Date()
+          ? 'completed'
+          : 'scheduled'
 
-      return {
-        memberId: member._id,
-        memberName: `${member.firstName} ${member.lastName}`.trim(),
-        taskId,
-        taskTitle: assignment.taskTitle || task?.title || 'Untitled task',
-        status: assignment.taskStatus || task?.status,
-        durationMinutes: assignment.durationMinutes
-      }
-    }).filter(Boolean) as StandupTaskAssignment[]
-    : [],
-  comments: Array.isArray(schedule.comments)
-    ? schedule.comments.map((comment) => {
-      const author = normalizeMember(comment.author || comment.member) || {
-        _id: 'unknown',
-        firstName: 'Unknown',
-        lastName: 'Member',
-        email: '',
-        role: 'Team Member'
-      }
+  return {
+    _id: schedule._id,
+    title: schedule.title || 'Daily Standup',
+    date: schedule.actualDate || schedule.scheduledDate || new Date().toISOString(),
+    actualDate: schedule.actualDate,
+    time: schedule.time || '09:00',
+    durationMinutes: typeof schedule.durationMinutes === 'number' ? schedule.durationMinutes : 15,
+    participants: Array.isArray(schedule.participants)
+      ? schedule.participants.map(normalizeMember).filter(Boolean) as StandupMember[]
+      : [],
+    status: resolvedStatus as StandupMeetingStatus,
+    notes: schedule.notes,
+    facilitator: normalizeMember(schedule.facilitator) || undefined,
+    createdBy: normalizeMember(schedule.createdBy) || undefined,
+    location: schedule.location,
+    meetingLink: schedule.meetingLink,
+    assignments: Array.isArray(schedule.assignments)
+      ? schedule.assignments.map((assignment) => {
+        const member = normalizeMember(assignment.member)
+        if (!member) return null
+        const task = isObjectLike(assignment.task) ? assignment.task : undefined
+        const taskId = task?._id || (typeof assignment.task === 'string' ? assignment.task : '')
+        if (!taskId) return null
 
-      return {
-        _id: comment._id || `comment-${Date.now()}`,
-        authorName: comment.authorName || `${author.firstName} ${author.lastName}`.trim(),
-        memberId: normalizeMember(comment.member)?._id,
-        reason: comment.reason || '',
-        createdAt: comment.createdAt || new Date().toISOString()
-      }
-    }).filter((comment): comment is NonNullable<typeof comment> => Boolean(comment.reason))
-    : [],
-  summary: schedule.summary
-})
+        return {
+          memberId: member._id,
+          memberName: `${member.firstName} ${member.lastName}`.trim(),
+          taskId,
+          taskTitle: assignment.taskTitle || task?.title || 'Untitled task',
+          status: assignment.taskStatus || task?.status,
+          durationMinutes: assignment.durationMinutes
+        }
+      }).filter(Boolean) as StandupTaskAssignment[]
+      : [],
+    comments: Array.isArray(schedule.comments)
+      ? schedule.comments.map((comment) => {
+        const author = normalizeMember(comment.author || comment.member) || {
+          _id: 'unknown',
+          firstName: 'Unknown',
+          lastName: 'Member',
+          email: '',
+          role: 'Team Member'
+        }
+
+        return {
+          _id: comment._id || `comment-${Date.now()}`,
+          authorName: comment.authorName || `${author.firstName} ${author.lastName}`.trim(),
+          memberId: normalizeMember(comment.member)?._id,
+          reason: comment.reason || '',
+          createdAt: comment.createdAt || new Date().toISOString()
+        }
+      }).filter((comment): comment is NonNullable<typeof comment> => Boolean(comment.reason))
+      : [],
+    summary: schedule.summary
+  }
+}
 
 const buildMemberProgress = (members: StandupMember[], taskCards: ReturnType<typeof normalizeTask>[], overallProgress: number): StandupMemberProgress[] => {
   return members.map((member, index) => {

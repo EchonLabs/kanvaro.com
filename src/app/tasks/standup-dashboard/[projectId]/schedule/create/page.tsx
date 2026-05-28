@@ -22,9 +22,22 @@ import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { fetchStandupProjectDetail } from '@/components/standup-dashboard/standup-dashboard-service'
 import type { StandupMember, StandupProjectSummary } from '@/components/standup-dashboard/standup-dashboard-types'
-import { ArrowLeft, CalendarIcon, Loader2 } from 'lucide-react'
+import { ArrowLeft, CalendarIcon, Loader2, Plus, Trash2 } from 'lucide-react'
 import { useNotify } from '@/lib/notify'
 import { createStandupParticipantList, createStandupSchedule } from '@/components/standup-dashboard/standup-schedule-storage'
+import { formatToTitleCase } from '@/lib/utils'
+
+type MemberTaskRow = {
+  id: string
+  taskId: string
+  notes: string
+}
+
+const createTaskRow = (): MemberTaskRow => ({
+  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  taskId: '',
+  notes: ''
+})
 
 export default function CreateStandupSchedulePage() {
   const params = useParams()
@@ -48,7 +61,7 @@ export default function CreateStandupSchedulePage() {
     notes: '',
     attendeeIds: [] as string[]
   })
-  const [taskAssignments, setTaskAssignments] = useState<Record<string, string>>({})
+  const [taskAssignments, setTaskAssignments] = useState<Record<string, MemberTaskRow[]>>({})
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -106,6 +119,26 @@ export default function CreateStandupSchedulePage() {
     return createStandupParticipantList(project.teamMembers, formState.attendeeIds)
   }, [formState.attendeeIds, project])
 
+  useEffect(() => {
+    setTaskAssignments((current) => {
+      const selectedIds = new Set(selectedMembers.map((member) => member._id))
+      const next: Record<string, MemberTaskRow[]> = {}
+
+      selectedMembers.forEach((member) => {
+        const existingRows = current[member._id]
+        next[member._id] = existingRows && existingRows.length > 0 ? existingRows : [createTaskRow()]
+      })
+
+      Object.entries(current).forEach(([memberId, rows]) => {
+        if (selectedIds.has(memberId) && rows.length > 0) {
+          next[memberId] = rows
+        }
+      })
+
+      return next
+    })
+  }, [selectedMembers])
+
   const handleToggleAttendee = (memberId: string) => {
     setFormState((current) => ({
       ...current,
@@ -113,13 +146,44 @@ export default function CreateStandupSchedulePage() {
         ? current.attendeeIds.filter((id) => id !== memberId)
         : [...current.attendeeIds, memberId]
     }))
+
+    setTaskAssignments((current) => {
+      if (current[memberId]) {
+        const next = { ...current }
+        delete next[memberId]
+        return next
+      }
+
+      return {
+        ...current,
+        [memberId]: [createTaskRow()]
+      }
+    })
   }
 
-  const handleSaveTaskAssignment = (memberId: string, taskId: string) => {
+  const handleSaveTaskAssignment = (memberId: string, rowId: string, patch: Partial<MemberTaskRow>) => {
     setTaskAssignments((current) => ({
       ...current,
-      [memberId]: taskId
+      [memberId]: (current[memberId] || [createTaskRow()]).map((row) => (row.id === rowId ? { ...row, ...patch } : row))
     }))
+  }
+
+  const handleAddTaskRow = (memberId: string) => {
+    setTaskAssignments((current) => ({
+      ...current,
+      [memberId]: [...(current[memberId] || [createTaskRow()]), createTaskRow()]
+    }))
+  }
+
+  const handleRemoveTaskRow = (memberId: string, rowId: string) => {
+    setTaskAssignments((current) => {
+      const rows = current[memberId] || []
+      const nextRows = rows.filter((row) => row.id !== rowId)
+      return {
+        ...current,
+        [memberId]: nextRows.length > 0 ? nextRows : [createTaskRow()]
+      }
+    })
   }
 
   const handleSubmit = async () => {
@@ -136,21 +200,24 @@ export default function CreateStandupSchedulePage() {
     setSubmitting(true)
     try {
       const selectedParticipants = project.teamMembers.filter((member) => formState.attendeeIds.includes(member._id))
-      const assignments = selectedParticipants
-        .map((member) => {
-          const taskId = taskAssignments[member._id]
-          const task = projectTasks.find((item) => item._id === taskId)
-          if (!task) return null
-          return {
-            memberId: member._id,
-            memberName: `${member.firstName} ${member.lastName}`.trim(),
-            taskId: task._id,
-            taskTitle: task.title,
-            status: task.status,
-            durationMinutes: Number(formState.durationMinutes)
-          }
-        })
-        .filter(Boolean)
+      const assignments = selectedParticipants.flatMap((member) => {
+        const rows = taskAssignments[member._id] || []
+        return rows
+          .map((row) => {
+            const task = projectTasks.find((item) => item._id === row.taskId)
+            if (!task) return null
+            return {
+              memberId: member._id,
+              memberName: `${member.firstName} ${member.lastName}`.trim(),
+              taskId: task._id,
+              taskTitle: task.title,
+              status: task.status,
+              durationMinutes: Number(formState.durationMinutes),
+              notes: row.notes.trim() || undefined
+            }
+          })
+          .filter(Boolean)
+      }).filter(Boolean)
 
       const createdSchedule = await createStandupSchedule(projectId, {
         title: formState.title,
@@ -166,7 +233,8 @@ export default function CreateStandupSchedulePage() {
           taskId: assignment?.taskId,
           taskTitle: assignment?.taskTitle,
           taskStatus: assignment?.status,
-          durationMinutes: assignment?.durationMinutes
+          durationMinutes: assignment?.durationMinutes,
+          notes: assignment?.notes
         })),
         comments: []
       })
@@ -304,26 +372,74 @@ export default function CreateStandupSchedulePage() {
                 </div>
 
                 <div className="grid gap-3">
-                  {selectedMembers.length > 0 ? selectedMembers.map((member) => (
-                    <div key={member._id} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] sm:items-center">
-                      <div>
-                        <p className="font-medium">{member.firstName} {member.lastName}</p>
-                        <p className="text-xs text-muted-foreground">{member.role}</p>
+                  {selectedMembers.length > 0 ? selectedMembers.map((member) => {
+                    const rows = taskAssignments[member._id] || [createTaskRow()]
+
+                    return (
+                      <div key={member._id} className="space-y-3 rounded-lg border p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{member.firstName} {member.lastName}</p>
+                            <p className="text-xs text-muted-foreground">{member.role}</p>
+                          </div>
+                          <Badge variant="outline" className="shrink-0">{rows.length} task{rows.length === 1 ? '' : 's'}</Badge>
+                        </div>
+
+                        <div className="space-y-3">
+                          {rows.map((row, index) => {
+                            const selectedTask = projectTasks.find((task) => task._id === row.taskId)
+
+                            return (
+                              <div key={row.id} className="space-y-3 rounded-md bg-muted/30 p-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="secondary">Task {index + 1}</Badge>
+                                    {selectedTask?.status ? (
+                                      <Badge variant="outline">{formatToTitleCase(selectedTask.status)}</Badge>
+                                    ) : null}
+                                  </div>
+                                  <Button variant="ghost" size="sm" onClick={() => handleRemoveTaskRow(member._id, row.id)} className="h-8 px-2 text-muted-foreground">
+                                    <Trash2 className="mr-2 h-3.5 w-3.5" />
+                                    Remove
+                                  </Button>
+                                </div>
+
+                                <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+                                  <Select value={row.taskId} onValueChange={(value) => handleSaveTaskAssignment(member._id, row.id, { taskId: value })}>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Choose a project task" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {projectTasks.map((task) => (
+                                        <SelectItem key={task._id} value={task._id}>
+                                          <span className="flex items-center gap-2">
+                                            <span>{task.displayId ? `${task.displayId} · ` : ''}{task.title}</span>
+                                            {task.status ? <span className="text-xs text-muted-foreground">{formatToTitleCase(task.status)}</span> : null}
+                                          </span>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+
+                                  <Textarea
+                                    rows={3}
+                                    value={row.notes}
+                                    onChange={(event) => handleSaveTaskAssignment(member._id, row.id, { notes: event.target.value })}
+                                    placeholder="Task notes, blockers, or handoff details"
+                                  />
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        <Button variant="outline" size="sm" onClick={() => handleAddTaskRow(member._id)} className="w-fit">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add task
+                        </Button>
                       </div>
-                      <Select value={taskAssignments[member._id] || ''} onValueChange={(value) => handleSaveTaskAssignment(member._id, value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose a project task" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {projectTasks.map((task) => (
-                            <SelectItem key={task._id} value={task._id}>
-                              {task.displayId ? `${task.displayId} · ` : ''}{task.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )) : (
+                    )
+                  }) : (
                     <Card>
                       <CardContent className="py-6 text-center text-sm text-muted-foreground">
                         Select at least one attendee to assign project tasks.

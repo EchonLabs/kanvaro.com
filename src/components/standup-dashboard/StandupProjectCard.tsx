@@ -3,7 +3,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
 import { Progress } from '@/components/ui/Progress'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { formatToTitleCase } from '@/lib/utils'
@@ -60,23 +59,15 @@ export function StandupProjectCard({ project, onOpen }: StandupProjectCardProps)
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex -space-x-2 overflow-hidden">
-            {project.teamMembers.slice(0, 4).map((member) => (
-              <GravatarAvatar key={member._id} user={member} size={28} className="h-7 w-7 border-2 border-background" />
-            ))}
-            {project.teamMembers.length > 4 && (
-              <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-semibold text-muted-foreground">
-                +{project.teamMembers.length - 4}
-              </div>
-            )}
+        <div className="space-y-3">
+          <div className="text-xs text-muted-foreground">
+            {project.teamMembers.length} people on the standup roster
           </div>
-
           <Button
             variant="default"
             size="sm"
             onClick={() => onOpen(project._id)}
-            className="shrink-0 bg-foreground text-background hover:bg-foreground/90"
+            className="w-full bg-foreground text-background hover:bg-foreground/90"
           >
             Open Dashboard
             <ArrowRight className="ml-1 h-4 w-4" />

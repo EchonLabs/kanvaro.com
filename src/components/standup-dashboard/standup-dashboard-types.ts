@@ -38,6 +38,7 @@ export interface StandupTaskAssignment {
   taskTitle: string
   status?: string
   durationMinutes?: number
+  notes?: string
 }
 
 export interface StandupScheduleComment {

@@ -14,8 +14,9 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { formatToTitleCase } from '@/lib/utils'
-import { Activity, ArrowLeft, CalendarDays, Clock3, Loader2, RefreshCw, Users, Eye } from 'lucide-react'
+import { Activity, ArrowLeft, CalendarDays, Clock3, Loader2, RefreshCw, Users, Eye, Trash2 } from 'lucide-react'
 import { fetchStandupProjectDetail } from '@/components/standup-dashboard/standup-dashboard-service'
+import { deleteStandupSchedule } from '@/components/standup-dashboard/standup-schedule-storage'
 import { StandupTimeline } from '@/components/standup-dashboard/StandupTimeline'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
  
@@ -80,6 +81,25 @@ export default function StandupProjectPage() {
   }, [project, setItems])
 
   const canManageStandup = hasPermission(Permission.PROJECT_MANAGE_TEAM) && canManageProject(projectId)
+  const handleDeleteMeeting = async (meetingId: string) => {
+    if (!project) return
+    if (!window.confirm('Delete this standup schedule? It will be archived from both upcoming and past views.')) return
+
+    try {
+      await deleteStandupSchedule(projectId, meetingId)
+      setProject((current) => {
+        if (!current) return current
+        return {
+          ...current,
+          meetings: current.meetings.filter((meeting) => meeting._id !== meetingId),
+          timeline: current.timeline.filter((item) => !item._id.startsWith(`${meetingId}-`))
+        }
+      })
+    } catch {
+      setError('Unable to delete standup schedule')
+    }
+  }
+
   const mergedMeetings = [...(project?.meetings || [])]
     .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
   const upcomingMeetings = mergedMeetings
@@ -223,10 +243,18 @@ export default function StandupProjectPage() {
                       </div>
                     </div>
                     <div className="flex items-center justify-end pt-2">
-                      <Button variant="outline" size="sm" onClick={() => router.push(`/tasks/standup-dashboard/${projectId}/schedule/${meeting._id}`)}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        View Details
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => router.push(`/tasks/standup-dashboard/${projectId}/schedule/${meeting._id}`)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Details
+                        </Button>
+                        {canManageStandup ? (
+                          <Button variant="destructive" size="sm" onClick={() => handleDeleteMeeting(meeting._id)}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -265,10 +293,18 @@ export default function StandupProjectPage() {
                       </div>
                     </div>
                     <div className="flex items-center justify-end pt-2">
-                      <Button variant="outline" size="sm" onClick={() => router.push(`/tasks/standup-dashboard/${projectId}/schedule/${meeting._id}`)}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        View Details
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => router.push(`/tasks/standup-dashboard/${projectId}/schedule/${meeting._id}`)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Details
+                        </Button>
+                        {canManageStandup ? (
+                          <Button variant="destructive" size="sm" onClick={() => handleDeleteMeeting(meeting._id)}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

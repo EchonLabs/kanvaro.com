@@ -52,6 +52,21 @@ export type StandupScheduleApiItem = {
 
 const isObjectLike = (value: unknown): value is Record<string, any> => typeof value === 'object' && value !== null
 
+const buildScheduledDateTime = (scheduledDate?: string, time?: string) => {
+  if (!scheduledDate) return null
+  const base = new Date(scheduledDate)
+  if (Number.isNaN(base.getTime())) return null
+
+  if (typeof time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+    const [hours, minutes] = time.split(':').map((value) => Number(value))
+    base.setHours(hours, minutes, 0, 0)
+  } else {
+    base.setHours(0, 0, 0, 0)
+  }
+
+  return base
+}
+
 const normalizeMember = (member: StandupMemberRef): StandupMember | null => {
   if (!member) return null
 
@@ -116,6 +131,18 @@ const normalizeAssignment = (assignment: NonNullable<StandupScheduleApiItem['ass
 }
 
 const normalizeMeeting = (schedule: StandupScheduleApiItem): StandupMeeting => {
+  const scheduledDateTime = buildScheduledDateTime(schedule.actualDate || schedule.scheduledDate, schedule.time)
+  const now = new Date()
+  const resolvedStatus = schedule.status === 'in_progress'
+    ? 'in_progress'
+    : schedule.status === 'completed'
+      ? 'completed'
+      : schedule.status === 'missed'
+        ? 'missed'
+        : scheduledDateTime && scheduledDateTime < now
+          ? 'completed'
+          : 'scheduled'
+
   const participants = Array.isArray(schedule.participants)
     ? schedule.participants.map(normalizeMember).filter(Boolean) as StandupMember[]
     : []
@@ -128,13 +155,7 @@ const normalizeMeeting = (schedule: StandupScheduleApiItem): StandupMeeting => {
     time: schedule.time || '09:00',
     durationMinutes: typeof schedule.durationMinutes === 'number' ? schedule.durationMinutes : 15,
     participants,
-    status: (schedule.status === 'in_progress'
-      ? 'in_progress'
-      : schedule.status === 'completed'
-        ? 'completed'
-        : schedule.status === 'missed'
-          ? 'missed'
-          : 'scheduled'),
+    status: resolvedStatus,
     notes: schedule.notes,
     facilitator: normalizeMember(schedule.facilitator) || undefined,
     createdBy: normalizeMember(schedule.createdBy) || undefined,
@@ -190,18 +211,32 @@ export async function createStandupSchedule(projectId: string, payload: Record<s
   return response.data
 }
 
-export async function updateStandupScheduleComments(projectId: string, scheduleId: string, comments: StandupScheduleComment[], signal?: AbortSignal): Promise<StandupMeeting> {
+export async function updateStandupSchedule(projectId: string, scheduleId: string, payload: Record<string, unknown>, signal?: AbortSignal): Promise<StandupMeeting> {
   const response = await fetchJson<{ success?: boolean; data?: StandupScheduleApiItem }>(`/api/projects/${projectId}/standup-schedules/${scheduleId}`, signal, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ comments })
+    body: JSON.stringify(payload)
   })
 
   if (!response?.data) {
-    throw new Error('Unable to update standup schedule comments')
+    throw new Error('Unable to update standup schedule')
   }
 
   return normalizeMeeting(response.data)
+}
+
+export async function updateStandupScheduleComments(projectId: string, scheduleId: string, comments: StandupScheduleComment[], signal?: AbortSignal): Promise<StandupMeeting> {
+  return updateStandupSchedule(projectId, scheduleId, { comments }, signal)
+}
+
+export async function deleteStandupSchedule(projectId: string, scheduleId: string, signal?: AbortSignal): Promise<void> {
+  const response = await fetchJson<{ success?: boolean }>(`/api/projects/${projectId}/standup-schedules/${scheduleId}`, signal, {
+    method: 'DELETE'
+  })
+
+  if (!response) {
+    throw new Error('Unable to delete standup schedule')
+  }
 }
 
 export function createStandupParticipantList(members: StandupMember[], memberIds: string[]) {

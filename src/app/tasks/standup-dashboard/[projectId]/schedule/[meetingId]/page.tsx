@@ -8,18 +8,19 @@ import { PageContent } from '@/components/ui/PageContent'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { fetchStandupScheduleDetail } from '@/components/standup-dashboard/standup-dashboard-service'
-import { updateStandupScheduleComments } from '@/components/standup-dashboard/standup-schedule-storage'
-import type { StandupScheduleDetail, StandupMeetingStatus, StandupScheduleComment } from '@/components/standup-dashboard/standup-dashboard-types'
-import { ArrowLeft, CalendarDays, CheckCircle2, Clock3, Loader2, MessageSquare, Users } from 'lucide-react'
+import type { StandupScheduleDetail, StandupMeetingStatus } from '@/components/standup-dashboard/standup-dashboard-types'
+import { StandupSummaryDialog } from '@/components/standup-dashboard/StandupSummaryDialog'
+import { deleteStandupSchedule, updateStandupSchedule } from '@/components/standup-dashboard/standup-schedule-storage'
 import { useNotify } from '@/lib/notify'
+import { StandupTaskNotesList } from '@/components/standup-dashboard/StandupTaskNotesList'
+import { StandupTimelogList } from '@/components/standup-dashboard/StandupTimelogList'
+import { ArrowLeft, CalendarDays, Clock3, Loader2, Trash2, Users } from 'lucide-react'
 
 const statusLabels: Record<StandupMeetingStatus, string> = {
   scheduled: 'Scheduled',
@@ -34,16 +35,13 @@ export default function StandupScheduleDetailPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
   const { hasPermission, canManageProject } = usePermissions()
   const { setItems } = useBreadcrumb()
-  const { formatDateTimeSafe, formatDate } = useDateTime()
+  const { formatDate } = useDateTime()
   const { success: notifySuccess, error: notifyError } = useNotify()
   const projectId = params.projectId as string
   const meetingId = params.meetingId as string
 
   const [detail, setDetail] = useState<StandupScheduleDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  const [comments, setComments] = useState<StandupScheduleComment[]>([])
-  const [selectedMemberId, setSelectedMemberId] = useState('')
-  const [commentText, setCommentText] = useState('')
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -65,8 +63,6 @@ export default function StandupScheduleDetailPage() {
         const data = await fetchStandupScheduleDetail(projectId, meetingId, user.organization, abortController.signal)
         if (!abortController.signal.aborted) {
           setDetail(data)
-          setSelectedMemberId(data.memberSummaries[0]?._id || '')
-          setComments(data.meeting.comments || [])
         }
       } finally {
         if (!abortController.signal.aborted) {
@@ -92,6 +88,25 @@ export default function StandupScheduleDetailPage() {
 
   const canManageStandup = hasPermission(Permission.PROJECT_MANAGE_TEAM) && canManageProject(projectId)
 
+  const handleDeleteSchedule = async () => {
+    if (!user?.organization) {
+      notifyError({ title: 'Unable to delete standup' })
+      return
+    }
+
+    if (!window.confirm('Delete this standup schedule? It will be archived from the dashboard.')) {
+      return
+    }
+
+    try {
+      await deleteStandupSchedule(projectId, meetingId)
+      notifySuccess({ title: 'Standup deleted', message: 'The standup schedule was archived.' })
+      router.push(`/tasks/standup-dashboard/${projectId}`)
+    } catch {
+      notifyError({ title: 'Unable to delete standup' })
+    }
+  }
+
   const overallSummary = useMemo(() => {
     if (!detail) return ''
     const completedTasks = detail.timelogs.filter((log) => log.status === 'completed').length
@@ -101,32 +116,6 @@ export default function StandupScheduleDetailPage() {
     }
     return `${completedTasks} logged tasks were completed on the meeting date.`
   }, [detail])
-
-  const selectedMember = detail?.memberSummaries.find((member) => member._id === selectedMemberId)
-
-  const handleAddComment = async () => {
-    if (!detail || !commentText.trim()) {
-      notifyError({ title: 'Add a comment before saving.' })
-      return
-    }
-
-    const nextComment = {
-      _id: `comment-${Date.now()}`,
-      authorName: `${user?.firstName || 'Team'} ${user?.lastName || 'Member'}`.trim(),
-      memberId: selectedMemberId || undefined,
-      reason: commentText.trim(),
-      createdAt: new Date().toISOString()
-    }
-
-    try {
-      const updatedMeeting = await updateStandupScheduleComments(projectId, meetingId, [nextComment, ...(comments || [])])
-      setComments(updatedMeeting.comments || [])
-      setCommentText('')
-      notifySuccess({ title: 'Comment saved', message: 'The note was added to this standup schedule.' })
-    } catch {
-      notifyError({ title: 'Unable to save comment' })
-    }
-  }
 
   if (loading || !detail) {
     return (
@@ -167,6 +156,30 @@ export default function StandupScheduleDetailPage() {
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className="h-fit">{detail.timelogs.length} timelogs</Badge>
               {canManageStandup ? <Badge variant="outline" className="h-fit">PM view</Badge> : null}
+              {detail.meeting.status !== 'completed' && canManageStandup ? (
+                <Button variant="outline" onClick={async () => {
+                  if (!user?.organization) {
+                    notifyError({ title: 'Unable to complete standup' })
+                    return
+                  }
+
+                  try {
+                    await updateStandupSchedule(projectId, meetingId, { status: 'completed', actualDate: new Date().toISOString() })
+                    const data = await fetchStandupScheduleDetail(projectId, meetingId, user.organization)
+                    setDetail(data)
+                    notifySuccess({ title: 'Standup completed', message: 'Standup marked as completed.' })
+                  } catch {
+                    notifyError({ title: 'Unable to complete standup' })
+                  }
+                }}>Mark Complete</Button>
+              ) : null}
+              {canManageStandup ? (
+                <Button variant="destructive" onClick={handleDeleteSchedule}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+              ) : null}
+              {detail.meeting.status === 'completed' ? <StandupSummaryDialog projectId={projectId} meetingId={meetingId} detail={detail} onGenerated={(summary) => setDetail((current) => current ? { ...current, meeting: { ...current.meeting, summary } } : current)} /> : null}
             </div>
           </div>
 
@@ -178,6 +191,7 @@ export default function StandupScheduleDetailPage() {
             <CardContent className="space-y-2 text-sm">
               <p>{overallSummary}</p>
               <p className="text-muted-foreground">{detail.meeting.notes || 'No standup notes were recorded.'}</p>
+              {detail.meeting.summary ? <p className="rounded-lg border border-dashed border-border/60 bg-muted/30 p-3 text-muted-foreground">{detail.meeting.summary}</p> : null}
             </CardContent>
           </Card>
 
@@ -237,110 +251,18 @@ export default function StandupScheduleDetailPage() {
             </div>
           </section>
 
-          <section className="space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold">Task Timelogs</h2>
-              <p className="text-sm text-muted-foreground">Time entries recorded for the meeting date.</p>
-            </div>
+          <StandupTimelogList timelogs={detail.timelogs} members={detail.project.teamMembers} />
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {detail.timelogs.length > 0 ? detail.timelogs.map((log) => (
-                <Card key={log._id}>
-                  <CardContent className="space-y-3 p-4 sm:p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium">{log.userName}</p>
-                        <p className="text-xs text-muted-foreground">{log.taskTitle || 'Task log'}</p>
-                      </div>
-                      <Badge variant="outline" className="capitalize">{log.status}</Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>Duration</span>
-                      <span>{log.duration} mins</span>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      <p>{log.description || 'No description provided.'}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )) : (
-                <Card>
-                  <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                    No timelogs were found for this schedule date.
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </section>
+          <StandupTaskNotesList memberSummaries={detail.memberSummaries} />
 
-          <section className="space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold">Comments & Follow-Up</h2>
-              <p className="text-sm text-muted-foreground">Leave a note when a member could not finish work or needs help.</p>
-            </div>
-
-            <Card>
-              <CardContent className="space-y-4 p-4 sm:p-5">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Member</label>
-                    <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a team member" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {detail.memberSummaries.map((member) => (
-                          <SelectItem key={member._id} value={member._id}>
-                            {member.firstName} {member.lastName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Comment</label>
-                    <Textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} rows={4} placeholder="Explain what blocked the member or why tasks were incomplete." />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end">
-                  <Button onClick={handleAddComment}>
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    Add Comment
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="space-y-3">
-              {comments.length > 0 ? comments.map((comment) => (
-                <Card key={comment._id}>
-                  <CardContent className="space-y-2 p-4 sm:p-5 text-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="font-medium">{comment.authorName}</p>
-                      <span className="text-xs text-muted-foreground">{formatDateTimeSafe(comment.createdAt)}</span>
-                    </div>
-                    <p className="text-muted-foreground">{comment.reason}</p>
-                  </CardContent>
-                </Card>
-              )) : (
-                <Card>
-                  <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                    No comments have been added yet.
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </section>
-
-          {selectedMember && (
+          {detail.memberSummaries[0] && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base sm:text-lg">Member Snapshot</CardTitle>
-                <CardDescription>{selectedMember.firstName} {selectedMember.lastName}</CardDescription>
+                <CardDescription>{detail.memberSummaries[0].firstName} {detail.memberSummaries[0].lastName}</CardDescription>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground">
-                <p>{selectedMember.completedTasks > 0 ? 'This member completed work during the standup window.' : 'This member still needs follow-up on the selected day.'}</p>
+                <p>{detail.memberSummaries[0].completedTasks > 0 ? 'This member completed work during the standup window.' : 'This member still needs follow-up on the selected day.'}</p>
               </CardContent>
             </Card>
           )}

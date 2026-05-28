@@ -34,6 +34,41 @@ const isValidObjectIdString = (value: unknown): value is string => {
   return typeof value === 'string' && value.trim().length > 0 && mongoose.Types.ObjectId.isValid(value.trim())
 }
 
+const buildScheduledDateTime = (scheduledDate?: Date | string, time?: string) => {
+  if (!scheduledDate) return null
+  const base = new Date(scheduledDate)
+  if (Number.isNaN(base.getTime())) return null
+
+  if (typeof time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+    const [hours, minutes] = time.split(':').map((v) => Number(v))
+    base.setHours(hours, minutes, 0, 0)
+  } else {
+    // default to start of day
+    base.setHours(0, 0, 0, 0)
+  }
+
+  return base
+}
+
+const markOverdueSchedulesCompleted = async (projectId: string, organizationId: string) => {
+  const now = new Date()
+
+  const candidates = await StandupSchedule.find({
+    project: projectId,
+    organization: organizationId,
+    archived: false,
+    status: { $in: ['scheduled', 'in_progress'] }
+  })
+
+  for (const sched of candidates) {
+    const scheduledDateTime = buildScheduledDateTime(sched.scheduledDate, sched.time)
+    if (scheduledDateTime && scheduledDateTime < now) {
+      sched.status = 'completed'
+      await sched.save()
+    }
+  }
+}
+
 const normalizeObjectIdList = (input: unknown): string[] => {
   if (!Array.isArray(input)) {
     return []
@@ -215,6 +250,8 @@ export async function GET(
     if ('error' in projectContext) {
       return NextResponse.json({ error: projectContext.error }, { status: projectContext.status })
     }
+
+    await markOverdueSchedulesCompleted(projectId, user.organization)
 
     const { searchParams } = new URL(request.url)
     const page = Math.max(parseInt(searchParams.get('page') || '1', 10), 1)
