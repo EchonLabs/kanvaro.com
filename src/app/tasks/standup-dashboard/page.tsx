@@ -161,7 +161,7 @@ export default function StandupDashboardPage() {
           {!loading && error && (
             <Card>
               <CardContent className="py-6 text-center text-sm text-muted-foreground">
-                {error}. Showing fallback project data instead.
+                {error}.
               </CardContent>
             </Card>
           )}

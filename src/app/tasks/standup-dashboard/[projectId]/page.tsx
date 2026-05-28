@@ -18,7 +18,6 @@ import { Activity, ArrowLeft, CalendarDays, Clock3, Loader2, RefreshCw, Users, E
 import { fetchStandupProjectDetail } from '@/components/standup-dashboard/standup-dashboard-service'
 import { StandupTimeline } from '@/components/standup-dashboard/StandupTimeline'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
-import { loadStoredStandupSchedules, type StoredStandupSchedule } from '@/components/standup-dashboard/standup-schedule-storage'
  
 import type { StandupProjectSummary } from '@/components/standup-dashboard/standup-dashboard-types'
 
@@ -35,7 +34,6 @@ export default function StandupProjectPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [standupDateFilter, setStandupDateFilter] = useState('')
-  const [localSchedules, setLocalSchedules] = useState<StoredStandupSchedule[]>([])
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -81,14 +79,8 @@ export default function StandupProjectPage() {
     }
   }, [project, setItems])
 
-  useEffect(() => {
-    if (project) {
-      setLocalSchedules(loadStoredStandupSchedules(projectId))
-    }
-  }, [project, projectId])
-
   const canManageStandup = hasPermission(Permission.PROJECT_MANAGE_TEAM) && canManageProject(projectId)
-  const mergedMeetings = [...(project?.meetings || []), ...localSchedules]
+  const mergedMeetings = [...(project?.meetings || [])]
     .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
   const upcomingMeetings = mergedMeetings
     .filter((meeting) => meeting.status !== 'completed' && meeting.status !== 'missed')
@@ -177,7 +169,7 @@ export default function StandupProjectPage() {
           {error && (
             <Card>
               <CardContent className="py-4 text-center text-sm text-muted-foreground">
-                {error}. Showing the available fallback standup data.
+                {error}.
               </CardContent>
             </Card>
           )}

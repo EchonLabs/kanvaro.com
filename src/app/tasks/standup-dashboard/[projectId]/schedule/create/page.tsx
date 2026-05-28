@@ -24,7 +24,7 @@ import { fetchStandupProjectDetail } from '@/components/standup-dashboard/standu
 import type { StandupMember, StandupProjectSummary } from '@/components/standup-dashboard/standup-dashboard-types'
 import { ArrowLeft, CalendarIcon, Loader2 } from 'lucide-react'
 import { useNotify } from '@/lib/notify'
-import { createStandupParticipantList, saveStoredStandupSchedule } from '@/components/standup-dashboard/standup-schedule-storage'
+import { createStandupParticipantList, createStandupSchedule } from '@/components/standup-dashboard/standup-schedule-storage'
 
 export default function CreateStandupSchedulePage() {
   const params = useParams()
@@ -135,7 +135,6 @@ export default function CreateStandupSchedulePage() {
 
     setSubmitting(true)
     try {
-      const scheduleId = `standup-${Date.now()}`
       const selectedParticipants = project.teamMembers.filter((member) => formState.attendeeIds.includes(member._id))
       const assignments = selectedParticipants
         .map((member) => {
@@ -153,22 +152,27 @@ export default function CreateStandupSchedulePage() {
         })
         .filter(Boolean)
 
-      saveStoredStandupSchedule(projectId, {
-        _id: scheduleId,
+      const createdSchedule = await createStandupSchedule(projectId, {
         title: formState.title,
-        date: selectedDate.toISOString(),
+        scheduledDate: selectedDate.toISOString(),
         time: formState.time,
         durationMinutes: Number(formState.durationMinutes),
         status: 'scheduled',
-        participants: selectedParticipants,
+        participants: selectedParticipants.map((member) => member._id),
+        facilitator: selectedParticipants[0]?._id || project.teamMembers[0]?._id,
         notes: formState.notes,
-        assignments: assignments as any,
+        assignments: assignments.map((assignment) => ({
+          memberId: assignment?.memberId,
+          taskId: assignment?.taskId,
+          taskTitle: assignment?.taskTitle,
+          taskStatus: assignment?.status,
+          durationMinutes: assignment?.durationMinutes
+        })),
         comments: []
       })
 
-      await new Promise((resolve) => setTimeout(resolve, 600))
       notifySuccess({ title: 'Standup schedule created', message: `${formState.title} scheduled for ${format(selectedDate, 'PPP')}` })
-      router.push(`/tasks/standup-dashboard/${projectId}/schedule/${scheduleId}`)
+      router.push(`/tasks/standup-dashboard/${projectId}/schedule/${createdSchedule._id}`)
     } catch {
       notifyError({ title: 'Unable to create schedule' })
     } finally {

@@ -16,8 +16,8 @@ import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
 import { fetchStandupScheduleDetail } from '@/components/standup-dashboard/standup-dashboard-service'
-import { loadStoredStandupComments, saveStoredStandupComment } from '@/components/standup-dashboard/standup-schedule-storage'
-import type { StandupScheduleDetail, StandupMeetingStatus } from '@/components/standup-dashboard/standup-dashboard-types'
+import { updateStandupScheduleComments } from '@/components/standup-dashboard/standup-schedule-storage'
+import type { StandupScheduleDetail, StandupMeetingStatus, StandupScheduleComment } from '@/components/standup-dashboard/standup-dashboard-types'
 import { ArrowLeft, CalendarDays, CheckCircle2, Clock3, Loader2, MessageSquare, Users } from 'lucide-react'
 import { useNotify } from '@/lib/notify'
 
@@ -41,7 +41,7 @@ export default function StandupScheduleDetailPage() {
 
   const [detail, setDetail] = useState<StandupScheduleDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  const [comments, setComments] = useState(loadStoredStandupComments(projectId, meetingId))
+  const [comments, setComments] = useState<StandupScheduleComment[]>([])
   const [selectedMemberId, setSelectedMemberId] = useState('')
   const [commentText, setCommentText] = useState('')
 
@@ -66,7 +66,7 @@ export default function StandupScheduleDetailPage() {
         if (!abortController.signal.aborted) {
           setDetail(data)
           setSelectedMemberId(data.memberSummaries[0]?._id || '')
-          setComments(loadStoredStandupComments(projectId, meetingId))
+          setComments(data.meeting.comments || [])
         }
       } finally {
         if (!abortController.signal.aborted) {
@@ -104,7 +104,7 @@ export default function StandupScheduleDetailPage() {
 
   const selectedMember = detail?.memberSummaries.find((member) => member._id === selectedMemberId)
 
-  const handleAddComment = () => {
+  const handleAddComment = async () => {
     if (!detail || !commentText.trim()) {
       notifyError({ title: 'Add a comment before saving.' })
       return
@@ -118,10 +118,14 @@ export default function StandupScheduleDetailPage() {
       createdAt: new Date().toISOString()
     }
 
-    saveStoredStandupComment(projectId, meetingId, nextComment)
-    setComments((current) => [nextComment, ...current])
-    setCommentText('')
-    notifySuccess({ title: 'Comment saved', message: 'The note was added to this standup schedule.' })
+    try {
+      const updatedMeeting = await updateStandupScheduleComments(projectId, meetingId, [nextComment, ...(comments || [])])
+      setComments(updatedMeeting.comments || [])
+      setCommentText('')
+      notifySuccess({ title: 'Comment saved', message: 'The note was added to this standup schedule.' })
+    } catch {
+      notifyError({ title: 'Unable to save comment' })
+    }
   }
 
   if (loading || !detail) {
