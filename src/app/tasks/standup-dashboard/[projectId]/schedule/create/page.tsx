@@ -14,6 +14,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Badge } from '@/components/ui/Badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { usePermissions } from '@/lib/permissions/permission-context'
 import { Permission } from '@/lib/permissions/permission-definitions'
@@ -23,6 +24,7 @@ import { fetchStandupProjectDetail } from '@/components/standup-dashboard/standu
 import type { StandupMember, StandupProjectSummary } from '@/components/standup-dashboard/standup-dashboard-types'
 import { ArrowLeft, CalendarIcon, Loader2 } from 'lucide-react'
 import { useNotify } from '@/lib/notify'
+import { createStandupParticipantList, saveStoredStandupSchedule } from '@/components/standup-dashboard/standup-schedule-storage'
 
 export default function CreateStandupSchedulePage() {
   const params = useParams()
@@ -35,6 +37,7 @@ export default function CreateStandupSchedulePage() {
   const projectId = params.projectId as string
 
   const [project, setProject] = useState<StandupProjectSummary | null>(null)
+  const [projectTasks, setProjectTasks] = useState<Array<{ _id: string; title: string; status?: string; priority?: string; displayId?: string }>>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
@@ -45,6 +48,7 @@ export default function CreateStandupSchedulePage() {
     notes: '',
     attendeeIds: [] as string[]
   })
+  const [taskAssignments, setTaskAssignments] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -61,6 +65,13 @@ export default function CreateStandupSchedulePage() {
         const data = await fetchStandupProjectDetail(projectId, abortController.signal)
         if (!abortController.signal.aborted) {
           setProject(data.summary)
+          setProjectTasks((data.projectTasks || []).map((task) => ({
+            _id: task._id,
+            title: task.title || 'Untitled task',
+            status: task.status,
+            priority: task.priority,
+            displayId: task.displayId
+          })))
           setFormState((current) => ({
             ...current,
             attendeeIds: data.summary.teamMembers.slice(0, 4).map((member) => member._id)
@@ -90,6 +101,10 @@ export default function CreateStandupSchedulePage() {
 
   const selectedCount = useMemo(() => formState.attendeeIds.length, [formState.attendeeIds])
   const canManageStandup = hasPermission(Permission.PROJECT_MANAGE_TEAM) && canManageProject(projectId)
+  const selectedMembers = useMemo(() => {
+    if (!project) return [] as StandupMember[]
+    return createStandupParticipantList(project.teamMembers, formState.attendeeIds)
+  }, [formState.attendeeIds, project])
 
   const handleToggleAttendee = (memberId: string) => {
     setFormState((current) => ({
@@ -100,17 +115,60 @@ export default function CreateStandupSchedulePage() {
     }))
   }
 
+  const handleSaveTaskAssignment = (memberId: string, taskId: string) => {
+    setTaskAssignments((current) => ({
+      ...current,
+      [memberId]: taskId
+    }))
+  }
+
   const handleSubmit = async () => {
     if (!selectedDate) {
       notifyError({ title: 'Choose a standup date before saving.' })
       return
     }
 
+    if (!project) {
+      notifyError({ title: 'Project data is not available yet.' })
+      return
+    }
+
     setSubmitting(true)
     try {
+      const scheduleId = `standup-${Date.now()}`
+      const selectedParticipants = project.teamMembers.filter((member) => formState.attendeeIds.includes(member._id))
+      const assignments = selectedParticipants
+        .map((member) => {
+          const taskId = taskAssignments[member._id]
+          const task = projectTasks.find((item) => item._id === taskId)
+          if (!task) return null
+          return {
+            memberId: member._id,
+            memberName: `${member.firstName} ${member.lastName}`.trim(),
+            taskId: task._id,
+            taskTitle: task.title,
+            status: task.status,
+            durationMinutes: Number(formState.durationMinutes)
+          }
+        })
+        .filter(Boolean)
+
+      saveStoredStandupSchedule(projectId, {
+        _id: scheduleId,
+        title: formState.title,
+        date: selectedDate.toISOString(),
+        time: formState.time,
+        durationMinutes: Number(formState.durationMinutes),
+        status: 'scheduled',
+        participants: selectedParticipants,
+        notes: formState.notes,
+        assignments: assignments as any,
+        comments: []
+      })
+
       await new Promise((resolve) => setTimeout(resolve, 600))
       notifySuccess({ title: 'Standup schedule created', message: `${formState.title} scheduled for ${format(selectedDate, 'PPP')}` })
-      router.push(`/tasks/standup-dashboard/${projectId}`)
+      router.push(`/tasks/standup-dashboard/${projectId}/schedule/${scheduleId}`)
     } catch {
       notifyError({ title: 'Unable to create schedule' })
     } finally {
@@ -164,7 +222,7 @@ export default function CreateStandupSchedulePage() {
               </Button>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Create Standup Schedule</h1>
-                <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
+                <p className="max-w-3xl text-sm text-muted-foreground sm:text-base mt-2">
                   Set up a standup session for {project.name} and pick the attendees, date, and notes.
                 </p>
               </div>
@@ -172,16 +230,6 @@ export default function CreateStandupSchedulePage() {
             <Badge variant="outline" className="h-fit hidden sm:inline-flex">{project.teamMembers.length} members</Badge>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base sm:text-lg">Project</CardTitle>
-              <CardDescription>{project.summary}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-              <span>{project.teamMembers.length} team members</span>
-              <span>Last standup {formatDate(project.lastStandupAt)}</span>
-            </CardContent>
-          </Card>
 
           <Card>
             <CardHeader>
@@ -242,6 +290,42 @@ export default function CreateStandupSchedulePage() {
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Badge variant="outline">{selectedCount} selected</Badge>
                   <span>Choose who should receive the schedule notification.</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <Label>Task assignments</Label>
+                  <p className="text-xs text-muted-foreground">Assign one of the project tasks to each selected member.</p>
+                </div>
+
+                <div className="grid gap-3">
+                  {selectedMembers.length > 0 ? selectedMembers.map((member) => (
+                    <div key={member._id} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] sm:items-center">
+                      <div>
+                        <p className="font-medium">{member.firstName} {member.lastName}</p>
+                        <p className="text-xs text-muted-foreground">{member.role}</p>
+                      </div>
+                      <Select value={taskAssignments[member._id] || ''} onValueChange={(value) => handleSaveTaskAssignment(member._id, value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose a project task" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {projectTasks.map((task) => (
+                            <SelectItem key={task._id} value={task._id}>
+                              {task.displayId ? `${task.displayId} · ` : ''}{task.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )) : (
+                    <Card>
+                      <CardContent className="py-6 text-center text-sm text-muted-foreground">
+                        Select at least one attendee to assign project tasks.
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               </div>
 

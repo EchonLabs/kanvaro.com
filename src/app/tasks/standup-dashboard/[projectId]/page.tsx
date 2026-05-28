@@ -14,11 +14,11 @@ import { Permission } from '@/lib/permissions/permission-definitions'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 import { useDateTime } from '@/components/providers/DateTimeProvider'
 import { formatToTitleCase } from '@/lib/utils'
-import { Activity, ArrowLeft, CalendarDays, Clock3, Loader2, RefreshCw, Users } from 'lucide-react'
+import { Activity, ArrowLeft, CalendarDays, Clock3, Loader2, RefreshCw, Users, Eye } from 'lucide-react'
 import { fetchStandupProjectDetail } from '@/components/standup-dashboard/standup-dashboard-service'
 import { StandupTimeline } from '@/components/standup-dashboard/StandupTimeline'
 import { GravatarAvatar } from '@/components/ui/GravatarAvatar'
-import { useNotify } from '@/lib/notify'
+import { loadStoredStandupSchedules, type StoredStandupSchedule } from '@/components/standup-dashboard/standup-schedule-storage'
  
 import type { StandupProjectSummary } from '@/components/standup-dashboard/standup-dashboard-types'
 
@@ -35,6 +35,7 @@ export default function StandupProjectPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [standupDateFilter, setStandupDateFilter] = useState('')
+  const [localSchedules, setLocalSchedules] = useState<StoredStandupSchedule[]>([])
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -80,11 +81,22 @@ export default function StandupProjectPage() {
     }
   }, [project, setItems])
 
+  useEffect(() => {
+    if (project) {
+      setLocalSchedules(loadStoredStandupSchedules(projectId))
+    }
+  }, [project, projectId])
+
   const canManageStandup = hasPermission(Permission.PROJECT_MANAGE_TEAM) && canManageProject(projectId)
-  const filteredMeetings = project?.meetings.filter((meeting) => {
-    if (!standupDateFilter) return true
-    return meeting.date.slice(0, 10) === standupDateFilter
-  }) ?? []
+  const mergedMeetings = [...(project?.meetings || []), ...localSchedules]
+    .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
+  const upcomingMeetings = mergedMeetings
+    .filter((meeting) => meeting.status !== 'completed' && meeting.status !== 'missed')
+    .filter((meeting) => (standupDateFilter ? meeting.date.slice(0, 10) === standupDateFilter : true))
+    .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime())
+  const pastMeetings = mergedMeetings
+    .filter((meeting) => meeting.status === 'completed' || meeting.status === 'missed')
+    .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
 
   if (loading) {
     return (
@@ -173,8 +185,8 @@ export default function StandupProjectPage() {
           <section className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-              <h2 className="text-lg font-semibold">Upcoming Standup Meetings</h2>
-              <p className="text-sm text-muted-foreground">Scheduled meetings.</p>
+                <h2 className="text-lg font-semibold">Upcoming Standup Meetings</h2>
+                <p className="text-sm text-muted-foreground">Scheduled meetings.</p>
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -196,7 +208,7 @@ export default function StandupProjectPage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {filteredMeetings.map((meeting) => (
+              {upcomingMeetings.map((meeting) => (
                 <Card key={meeting._id}>
                   <CardHeader className="space-y-3">
                     <div className="flex items-start justify-between gap-3">
@@ -218,9 +230,63 @@ export default function StandupProjectPage() {
                         ))}
                       </div>
                     </div>
+                    <div className="flex items-center justify-end pt-2">
+                      <Button variant="outline" size="sm" onClick={() => router.push(`/tasks/standup-dashboard/${projectId}/schedule/${meeting._id}`)}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        View Details
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold">Past Standup Meetings</h2>
+              <p className="text-sm text-muted-foreground">Completed or missed meetings from this project.</p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {pastMeetings.length > 0 ? pastMeetings.map((meeting) => (
+                <Card key={meeting._id}>
+                  <CardHeader className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <CardTitle className="text-base">{meeting.title}</CardTitle>
+                        <CardDescription>{meeting.notes}</CardDescription>
+                      </div>
+                      <Badge variant="outline" className="capitalize">{formatToTitleCase(meeting.status)}</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">Date</span><span>{formatDate(meeting.date)}</span></div>
+                    <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">Time</span><span>{meeting.time}</span></div>
+                    <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">Duration</span><span>{meeting.durationMinutes} mins</span></div>
+                    <div>
+                      <div className="mb-2 text-muted-foreground">Participants</div>
+                      <div className="flex -space-x-2 overflow-hidden">
+                        {meeting.participants.map((participant) => (
+                          <GravatarAvatar key={participant._id} user={participant} size={28} className="h-7 w-7 border-2 border-background" />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end pt-2">
+                      <Button variant="outline" size="sm" onClick={() => router.push(`/tasks/standup-dashboard/${projectId}/schedule/${meeting._id}`)}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        View Details
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )) : (
+                <Card>
+                  <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                    No past standup meetings yet.
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </section>
 
